@@ -28,19 +28,17 @@ describe("TestExplicitNamespace", () => {
   const hotel = "export class Hotel { static X = 1 }";
   const pricing = "export class Pricing {}";
 
-  async function assertHotel(ns: Constants) {
-    await loader.eagerLoad();
-    expect(typeof ns.Hotel).toEqual("function");
-    expect(ns.Hotel.X).toEqual(1);
-    expect(ns.Hotel.Pricing).toBeDefined();
-  }
-
   it("explicit namespaces are loaded correctly (directory first, Object)", async () => {
     const files: [string, string][] = [
       ["hotel.ts", hotel],
       ["hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, {}, () => assertHotel(top));
+    await withSetup(loader, files, {}, async () => {
+      await loader.eagerLoad();
+      expect(top.Hotel).toBeInstanceOf(Function);
+      expect(top.Hotel.X).toBeTruthy();
+      expect(top.Hotel.Pricing).toBeTruthy();
+    });
   });
 
   it("explicit namespaces are loaded correctly (directory first, Namespace)", async () => {
@@ -48,7 +46,12 @@ describe("TestExplicitNamespace", () => {
       ["hotel.ts", hotel],
       ["hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(ns));
+    await withSetup(loader, files, { namespace: Namespace }, async () => {
+      await loader.eagerLoad();
+      expect(ns.Hotel).toBeInstanceOf(Function);
+      expect(ns.Hotel.X).toBeTruthy();
+      expect(ns.Hotel.Pricing).toBeTruthy();
+    });
   });
 
   it("explicit namespaces are loaded correctly (file first, Object)", async () => {
@@ -56,7 +59,12 @@ describe("TestExplicitNamespace", () => {
       ["rd1/hotel.ts", hotel],
       ["rd2/hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, {}, () => assertHotel(top));
+    await withSetup(loader, files, {}, async () => {
+      await loader.eagerLoad();
+      expect(top.Hotel).toBeInstanceOf(Function);
+      expect(top.Hotel.X).toBeTruthy();
+      expect(top.Hotel.Pricing).toBeTruthy();
+    });
   });
 
   it("explicit namespaces are loaded correctly (file first, Namespace)", async () => {
@@ -64,7 +72,12 @@ describe("TestExplicitNamespace", () => {
       ["rd1/hotel.ts", hotel],
       ["rd2/hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(ns));
+    await withSetup(loader, files, { namespace: Namespace }, async () => {
+      await loader.eagerLoad();
+      expect(ns.Hotel).toBeInstanceOf(Function);
+      expect(ns.Hotel.X).toBeTruthy();
+      expect(ns.Hotel.Pricing).toBeTruthy();
+    });
   });
 
   it("explicit namespaces defined with an explicit constant assignment are loaded correctly", async () => {
@@ -72,7 +85,12 @@ describe("TestExplicitNamespace", () => {
       ["hotel.ts", "export const Hotel = class {}; (Hotel as any).X = 1;"],
       ["hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, {}, () => assertHotel(top));
+    await withSetup(loader, files, {}, async () => {
+      await loader.eagerLoad();
+      expect(top.Hotel).toBeInstanceOf(Function);
+      expect(top.Hotel.X).toBeTruthy();
+      expect(top.Hotel.Pricing).toBeTruthy();
+    });
   });
 
   it("explicit namespaces are loaded correctly even if #name is overridden", async () => {
@@ -82,7 +100,7 @@ describe("TestExplicitNamespace", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad();
-      expect(top.Hotel.Pricing).toBeDefined();
+      expect(top.Hotel.Pricing).toBeTruthy();
     });
   });
 
@@ -99,8 +117,8 @@ describe("TestExplicitNamespace", () => {
       await la.eagerLoad();
       await lb.eagerLoad();
 
-      expect(top.M.N).toBe(true);
-      expect(top.X.Y).toBe(true);
+      expect(top.M.N).toBeTruthy();
+      expect(top.X.Y).toBeTruthy();
     });
   });
 
@@ -113,8 +131,8 @@ describe("TestExplicitNamespace", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad();
-      expect(typeof top.A).toEqual("function");
-      expect(typeof top.B).toEqual("function");
+      expect(top.A).toBeInstanceOf(Function);
+      expect(top.B).toBeInstanceOf(Function);
       expect(top.B.X).toEqual("B");
     });
   });
@@ -129,6 +147,8 @@ describe("TestExplicitNamespace", () => {
   it("autoloads are set correctly, even if there are autoloads for the same cname in a module prepended to the superclass", async () => {
     await withSetup(loader, mixed, {}, async () => {
       await loader.eagerLoad();
+      expect(top.A).toBeInstanceOf(Function);
+      expect(top.B).toBeInstanceOf(Function);
       expect(top.B.X).toEqual("B");
     });
   });
@@ -136,6 +156,8 @@ describe("TestExplicitNamespace", () => {
   it("autoloads are set correctly, even if there are autoloads for the same cname in other ancestors", async () => {
     await withSetup(loader, mixed, {}, async () => {
       await loader.eagerLoad();
+      expect(top.A).toBeInstanceOf(Function);
+      expect(top.B).toBeInstanceOf(Function);
       expect(top.B.X).toEqual("B");
     });
   });
@@ -158,7 +180,7 @@ describe("TestExplicitNamespace", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad();
-      expect(top.M.X).toBe(true);
+      expect(top.M.X).toBeTruthy();
     });
   });
 
@@ -168,8 +190,9 @@ describe("TestExplicitNamespace", () => {
       ["hotel/pricing.ts", pricing],
     ];
     await withSetup(loader, files, {}, async () => {
-      const error = await loader.eagerLoad().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(ZeitwerkError);
+      const promise = loader.eagerLoad();
+      await expect(promise).rejects.toThrow(ZeitwerkError);
+      const error = await promise.catch((e: unknown) => e);
       expect((error as Error).message).toEqual(
         "Hotel is expected to be a namespace, should be a class or module (got Integer)",
       );

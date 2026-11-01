@@ -1,3 +1,4 @@
+import { expect } from "vitest";
 import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
 import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
@@ -22,6 +23,10 @@ export async function setupLoader(
   for (const dir of [dirs].flat()) await loader.pushDir(dir);
   await loader.setup();
   return loader;
+}
+
+export function assertAbspath(expected: string, actual: unknown): void {
+  expect(actual).toEqual(File.expandPath(expected));
 }
 
 export function isRequired(...files: [string, string?][]): boolean {

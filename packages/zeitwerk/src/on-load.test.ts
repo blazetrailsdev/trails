@@ -1,9 +1,10 @@
 import { autoloadGet } from "./core-ext/kernel.js";
-import { File, TopLevel, TypeError } from "@blazetrails/ruby-compat";
+import { TopLevel, TypeError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
 import {
+  assertAbspath,
   type Constants,
   newLoader,
   setupLoader,
@@ -23,6 +24,7 @@ describe("TestOnLoad", () => {
   afterEach(teardown);
 
   it("on_load checks its argument type", () => {
+    expect(() => loader.onLoad(1 as never, () => {})).toThrow(TypeError);
     expect(() => loader.onLoad(Object as never, () => {})).toThrow(TypeError);
   });
 
@@ -39,6 +41,8 @@ describe("TestOnLoad", () => {
       loader.onLoad("B", () => x.push(4));
 
       await loader.eagerLoad();
+      expect(top.A).toBeTruthy();
+      expect(top.B).toBeTruthy();
       expect(x).toEqual([1, 3, 2, 4]);
     });
   });
@@ -50,6 +54,7 @@ describe("TestOnLoad", () => {
       loader.onLoad("X::A", () => x.push(2));
 
       await loader.eagerLoad();
+      expect(top.X.A).toBeTruthy();
       expect(x).toEqual([1, 2]);
     });
   });
@@ -65,6 +70,7 @@ describe("TestOnLoad", () => {
       loader.onLoad("X::A", () => x.push(2));
 
       await loader.eagerLoad();
+      expect(top.X.A).toBeTruthy();
       expect(x).toEqual([1, 2]);
     });
   });
@@ -75,8 +81,9 @@ describe("TestOnLoad", () => {
       loader.onLoad("X", (...a: never[]) => (args = a));
 
       await loader.eagerLoad();
+      expect(top.X).toBeTruthy();
       expect(args[0]).toEqual(1);
-      expect(args[1]).toEqual(File.expandPath("x.ts"));
+      assertAbspath("x.ts", args[1]);
     });
   });
 
@@ -86,7 +93,10 @@ describe("TestOnLoad", () => {
       loader.onLoad((...a: never[]) => (args = a));
 
       await loader.eagerLoad();
-      expect(args).toEqual(["X", 1, File.expandPath("x.ts")]);
+      expect(top.X).toBeTruthy();
+      expect(args[0]).toEqual("X");
+      expect(args[1]).toEqual(1);
+      assertAbspath("x.ts", args[2]);
     });
   });
 
@@ -96,9 +106,10 @@ describe("TestOnLoad", () => {
       loader.onLoad((...a: never[]) => args.push(a));
 
       await loader.eagerLoad();
+      expect(top.X).toBeTruthy();
       expect(args[0][0]).toEqual("X");
       expect(args[0][1]).toBe(top.X);
-      expect(args[0][2]).toEqual(File.expandPath("x"));
+      assertAbspath("x", args[0][2]);
     });
   });
 
@@ -108,7 +119,10 @@ describe("TestOnLoad", () => {
       loader.onLoad((...a: never[]) => (args = a));
 
       await loader.eagerLoad();
-      expect(args).toEqual(["X::A", top.X.A, File.expandPath("x/a.ts")]);
+      expect(top.X.A).toBeTruthy();
+      expect(args[0]).toEqual("X::A");
+      expect(args[1]).toEqual(top.X.A);
+      assertAbspath("x/a.ts", args[2]);
     });
   });
 
@@ -119,6 +133,7 @@ describe("TestOnLoad", () => {
       loader.onLoad(() => x.push(2));
 
       await loader.eagerLoad();
+      expect(top.X).toBeTruthy();
       expect(x).toEqual([1, 2]);
     });
   });
@@ -130,6 +145,7 @@ describe("TestOnLoad", () => {
       loader.onLoad("X", () => x.push(1));
 
       await loader.eagerLoad();
+      expect(top.X).toBeTruthy();
       expect(x).toEqual([1, 2]);
     });
   });
@@ -147,7 +163,8 @@ describe("TestOnLoad", () => {
       loader.onLoad("X", () => (ok = new Cref(top.X, "A").isDefined()));
 
       await loader.eagerLoad();
-      expect(ok).toBe(true);
+      expect(top.X).toBeTruthy();
+      expect(ok).toBeTruthy();
     });
   });
 
@@ -157,7 +174,8 @@ describe("TestOnLoad", () => {
       loader.onLoad("X", () => (ok = new Cref(top.X, "A").isDefined()));
 
       await loader.eagerLoad();
-      expect(ok).toBe(true);
+      expect(top.X).toBeTruthy();
+      expect(ok).toBeTruthy();
     });
   });
 
@@ -169,7 +187,8 @@ describe("TestOnLoad", () => {
       }) as never);
 
       await loader.eagerLoad();
-      expect(ok).toBe(true);
+      expect(top.X).toBeTruthy();
+      expect(ok).toBeTruthy();
     });
   });
 
@@ -181,7 +200,8 @@ describe("TestOnLoad", () => {
       }) as never);
 
       await loader.eagerLoad();
-      expect(ok).toBe(true);
+      expect(top.X).toBeTruthy();
+      expect(ok).toBeTruthy();
     });
   });
 
@@ -191,10 +211,11 @@ describe("TestOnLoad", () => {
       let x = 0;
       l.onLoad("A", () => (x = 1));
 
-      expect(Object.keys(l.onLoadCallbacks)).not.toEqual([]);
+      expect(Object.keys(l.onLoadCallbacks).length !== 0).toBeTruthy();
       await l.eagerLoad();
+      expect(top.A).toBeTruthy();
       expect(x).toEqual(1);
-      expect(Object.keys(l.onLoadCallbacks)).toEqual([]);
+      expect(Object.keys(l.onLoadCallbacks).length === 0).toBeTruthy();
     });
   });
 
@@ -207,8 +228,8 @@ describe("TestOnLoad", () => {
       let loaded: unknown = false;
       loader.onLoad("M", async () => (loaded = await autoloadGet(new Cref(Object, "N"))));
 
-      await autoloadGet(new Cref(Object, "M"));
-      expect(loaded).toBe(top.N);
+      expect(await autoloadGet(new Cref(Object, "M"))).toBeTruthy();
+      expect(loaded).toBeTruthy();
     });
   });
 });

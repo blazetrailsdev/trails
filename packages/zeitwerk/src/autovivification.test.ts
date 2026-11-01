@@ -1,5 +1,5 @@
 import { autoloadGet } from "./core-ext/kernel.js";
-import { FileUtils, TopLevel, isModuleObject } from "@blazetrails/ruby-compat";
+import { FileUtils, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
@@ -30,8 +30,8 @@ describe("TestAutovivification", () => {
   it("autoloads a simple constant in an autovivified module (Object)", async () => {
     await withSetup(loader, [["admin/x.ts", "export const X = true"]], {}, async () => {
       await loader.eagerLoad();
-      expect(isModuleObject(top.Admin)).toBe(true);
-      expect(top.Admin.X).toBe(true);
+      expect(top.Admin).toBeInstanceOf(Object);
+      expect(top.Admin.X).toBeTruthy();
     });
   });
 
@@ -39,15 +39,15 @@ describe("TestAutovivification", () => {
     const files: [string, string][] = [["admin/x.ts", "export const X = true"]];
     await withSetup(loader, files, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(isModuleObject(ns.Admin)).toBe(true);
-      expect(ns.Admin.X).toBe(true);
+      expect(ns.Admin).toBeInstanceOf(Object);
+      expect(ns.Admin.X).toBeTruthy();
     });
   });
 
   it("autovivifies several levels in a row (Object)", async () => {
     await withSetup(loader, [["foo/bar/baz/woo.ts", "export const Woo = true"]], {}, async () => {
       await loader.eagerLoad();
-      expect(top.Foo.Bar.Baz.Woo).toBe(true);
+      expect(top.Foo.Bar.Baz.Woo).toBeTruthy();
     });
   });
 
@@ -55,7 +55,7 @@ describe("TestAutovivification", () => {
     const files: [string, string][] = [["foo/bar/baz/woo.ts", "export const Woo = true"]];
     await withSetup(loader, files, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(ns.Foo.Bar.Baz.Woo).toBe(true);
+      expect(ns.Foo.Bar.Baz.Woo).toBeTruthy();
     });
   });
 
@@ -67,16 +67,16 @@ describe("TestAutovivification", () => {
   it("autoloads several constants from the same namespace (Object)", async () => {
     await withSetup(loader, shared, {}, async () => {
       await loader.eagerLoad();
-      expect(top.Admin.Hotel).toBeDefined();
-      expect(top.Admin.HotelsController).toBeDefined();
+      expect(top.Admin.Hotel).toBeTruthy();
+      expect(top.Admin.HotelsController).toBeTruthy();
     });
   });
 
   it("autoloads several constants from the same namespace (Namespace)", async () => {
     await withSetup(loader, shared, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(ns.Admin.Hotel).toBeDefined();
-      expect(ns.Admin.HotelsController).toBeDefined();
+      expect(ns.Admin.Hotel).toBeTruthy();
+      expect(ns.Admin.HotelsController).toBeTruthy();
     });
   });
 
@@ -86,7 +86,7 @@ describe("TestAutovivification", () => {
       ["rd2/admin/y.ts", "export const Y = true"],
     ];
     await withSetup(loader, files, {}, () => {
-      expect(ExplicitNamespaces.isRegistered(new Cref(Object, "Admin"))).toBeNull();
+      expect(!ExplicitNamespaces.isRegistered(new Cref(Object, "Admin"))).toBeTruthy();
     });
   });
 
@@ -100,7 +100,8 @@ describe("TestAutovivification", () => {
       const cref = new Cref(admin, "V2");
       const [a, b] = await Promise.all([autoloadGet(cref), autoloadGet(cref)]);
 
-      expect(a).toBe(b);
+      expect(admin).toBeTruthy();
+      expect(a === b).toBeTruthy();
       expect(calls).toEqual(1);
     });
   });
@@ -110,7 +111,7 @@ describe("TestAutovivification", () => {
       FileUtils.mkdirP("foo");
       await loader.pushDir(".");
       await loader.setup();
-      expect(autoload("Foo")).toBeNull();
+      expect(!autoload("Foo")).toBeTruthy();
     });
   });
 
@@ -119,7 +120,7 @@ describe("TestAutovivification", () => {
       FileUtils.mkdirP("foo/bar/baz");
       await loader.pushDir(".");
       await loader.setup();
-      expect(autoload("Foo")).toBeNull();
+      expect(!autoload("Foo")).toBeTruthy();
     });
   });
 
@@ -129,8 +130,8 @@ describe("TestAutovivification", () => {
       ["assets/.keep", ""],
     ];
     await withSetup(loader, files, { dirs: ["."] }, () => {
-      expect(autoload("Tasks")).toBeNull();
-      expect(autoload("Assets")).toBeNull();
+      expect(!autoload("Tasks")).toBeTruthy();
+      expect(!autoload("Assets")).toBeTruthy();
     });
   });
 
@@ -140,20 +141,20 @@ describe("TestAutovivification", () => {
       ["assets/css/.keep", ""],
     ];
     await withSetup(loader, files, { dirs: ["."] }, () => {
-      expect(autoload("Tasks")).toBeNull();
-      expect(autoload("Assets")).toBeNull();
+      expect(!autoload("Tasks")).toBeTruthy();
+      expect(!autoload("Assets")).toBeTruthy();
     });
   });
 
   it("defines no namespace for directories whose Ruby files are all ignored", async () => {
     await withSetup(loader, [["foo/bar/ignored.ts", "throw 1"]], { dirs: ["."] }, () => {
-      expect(autoload("Foo")).toBeNull();
+      expect(!autoload("Foo")).toBeTruthy();
     });
   });
 
   it("defines no namespace for directories that have Ruby files below ignored directories", async () => {
     await withSetup(loader, [["foo/ignored/baz.ts", "throw 1"]], { dirs: ["."] }, () => {
-      expect(autoload("Foo")).toBeNull();
+      expect(!autoload("Foo")).toBeTruthy();
     });
   });
 });

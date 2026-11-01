@@ -41,7 +41,7 @@ describe("TestEagerLoad", () => {
 
       await Loader.eagerLoadAll();
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -61,7 +61,7 @@ describe("TestEagerLoad", () => {
 
       await Loader.eagerLoadAll();
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -81,7 +81,7 @@ describe("TestEagerLoad", () => {
 
       await Loader.eagerLoadAll();
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -90,7 +90,7 @@ describe("TestEagerLoad", () => {
     await withSetup(loader, files, {}, async () => {
       newLoader();
       await Loader.eagerLoadAll();
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
   it.skip("eager loads gems", () => {});
@@ -103,8 +103,8 @@ describe("TestEagerLoad", () => {
         l.doNotEagerLoad(".");
         await l.eagerLoad();
 
-        expect(isRequired(files[0])).toBe(false);
-        expect(await l.loadFile("foo.ts")).toBe(true);
+        expect(!isRequired(files[0])).toBeTruthy();
+        expect(await l.loadFile("foo.ts")).toBeTruthy();
       });
     });
 
@@ -118,9 +118,9 @@ describe("TestEagerLoad", () => {
         l.doNotEagerLoad("db_adapters");
         await l.eagerLoad();
 
-        expect(isRequired(files[0])).toBe(false);
-        expect(isRequired(files[1])).toBe(true);
-        expect(await l.loadFile("db_adapters/mysql_adapter.ts")).toBeDefined();
+        expect(!isRequired(files[0])).toBeTruthy();
+        expect(isRequired(files[1])).toBeTruthy();
+        expect(await l.loadFile("db_adapters/mysql_adapter.ts")).toBeTruthy();
       });
     });
 
@@ -134,9 +134,9 @@ describe("TestEagerLoad", () => {
         l.doNotEagerLoad("bar.ts");
         await l.eagerLoad();
 
-        expect(isRequired(files[0])).toBe(true);
-        expect(isRequired(files[1])).toBe(false);
-        expect(await l.loadFile("bar.ts")).toBe(true);
+        expect(isRequired(files[0])).toBeTruthy();
+        expect(!isRequired(files[1])).toBeTruthy();
+        expect(await l.loadFile("bar.ts")).toBeTruthy();
       });
     });
 
@@ -150,9 +150,9 @@ describe("TestEagerLoad", () => {
         l.doNotEagerLoad("lazylib");
         await l.eagerLoad();
 
-        expect(isRequired(files[0])).toBe(false);
-        expect(isRequired(files[1])).toBe(true);
-        expect(await l.loadFile("lazylib/ns/foo.ts")).toBeDefined();
+        expect(!isRequired(files[0])).toBeTruthy();
+        expect(isRequired(files[1])).toBeTruthy();
+        expect(await l.loadFile("lazylib/ns/foo.ts")).toBeTruthy();
       });
     });
 
@@ -166,9 +166,9 @@ describe("TestEagerLoad", () => {
         l.doNotEagerLoad("lazylib/ns");
         await l.eagerLoad();
 
-        expect(isRequired(files[0])).toBe(false);
-        expect(isRequired(files[1])).toBe(true);
-        expect(await l.loadFile("lazylib/ns/foo.ts")).toBeDefined();
+        expect(!isRequired(files[0])).toBeTruthy();
+        expect(isRequired(files[1])).toBeTruthy();
+        expect(await l.loadFile("lazylib/ns/foo.ts")).toBeTruthy();
       });
     });
   }
@@ -185,8 +185,8 @@ describe("TestEagerLoad", () => {
       await la.eagerLoad();
       await lb.eagerLoad();
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -195,7 +195,7 @@ describe("TestEagerLoad", () => {
     (TopLevel as Record<string, unknown>).X = 1;
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad();
-      expect(isRequired(files[0])).toBe(false);
+      expect(!isRequired(files[0])).toBeTruthy();
     });
   });
 
@@ -216,7 +216,7 @@ describe("TestEagerLoad", () => {
       loader.doNotEagerLoad(".");
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -226,8 +226,8 @@ describe("TestEagerLoad", () => {
       loader.doNotEagerLoad("db_adapters");
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(true);
-      expect(top.DbAdapters.MysqlAdapter).toBeDefined();
+      expect(isRequired(...files)).toBeTruthy();
+      expect(top.DbAdapters.MysqlAdapter).toBeTruthy();
     });
   });
 
@@ -237,7 +237,7 @@ describe("TestEagerLoad", () => {
       loader.doNotEagerLoad("foo.ts");
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -247,7 +247,7 @@ describe("TestEagerLoad", () => {
       loader.doNotEagerLoad("m/foo.ts");
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -256,7 +256,7 @@ describe("TestEagerLoad", () => {
     await withSetup(loader, files, { dirs: ["ignored"] }, async () => {
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(false);
+      expect(!isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -265,7 +265,7 @@ describe("TestEagerLoad", () => {
     await withSetup(loader, files, { dirs: ["."] }, async () => {
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(false);
+      expect(!isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -274,7 +274,7 @@ describe("TestEagerLoad", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(false);
+      expect(!isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -283,7 +283,7 @@ describe("TestEagerLoad", () => {
     await withSetup(loader, files, { dirs: ["."] }, async () => {
       await loader.eagerLoad({ force: true });
 
-      expect(isRequired(...files)).toBe(false);
+      expect(!isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -305,6 +305,6 @@ describe("TestEagerLoad", () => {
   });
 
   it("raises if called before setup", async () => {
-    await expect(loader.eagerLoad()).rejects.toBeInstanceOf(SetupRequired);
+    await expect(loader.eagerLoad()).rejects.toThrow(SetupRequired);
   });
 });
