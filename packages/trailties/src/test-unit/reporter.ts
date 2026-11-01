@@ -1,5 +1,11 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { Interrupt, rbObjMethod, rbObjRespondTo, type StringIO } from "@blazetrails/ruby-compat";
+import {
+  Interrupt,
+  STDOUT,
+  rbObjMethod,
+  rbObjRespondTo,
+  type StringIO,
+} from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../rails.js";
 
@@ -36,7 +42,7 @@ export class TestUnitReporter {
   /** @internal */
   private _appRoot?: string | null;
 
-  constructor(io: Io, options: Options = {}) {
+  constructor(io: Io = STDOUT, options: Options = {}) {
     this.io = io;
     this.options = options;
   }
