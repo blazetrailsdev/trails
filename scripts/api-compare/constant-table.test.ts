@@ -36,6 +36,30 @@ describe("derivedConstantPath", () => {
     );
   });
 
+  it("leaves a folded file's own cname and takes a renamed file's", async () => {
+    expect(await derivedConstantPath("activesupport", "inflector.ts", "Inflector")).toBe(
+      "ActiveSupport::Inflector",
+    );
+    expect(
+      await derivedConstantPath("actionview", "dependency-tracker/tse-tracker.ts", "RubyTracker"),
+    ).toBe("ActionView::DependencyTracker::RubyTracker");
+  });
+
+  it("reaches GemInflector's version arm", async () => {
+    expect(await derivedConstantPath("activejob", "gem-version.ts", "VERSION")).toBe(
+      "ActiveJob::VERSION",
+    );
+    expect(await derivedConstantPath("actionpack", "action-pack/gem-version.ts", "VERSION")).toBe(
+      "ActionPack::VERSION",
+    );
+  });
+
+  it("keeps a dotted name's owner", async () => {
+    expect(await derivedConstantPath("rack-session", "cookie.ts", "Cookie.SessionId")).toBe(
+      "Rack::Session::Cookie::SessionId",
+    );
+  });
+
   it("answers null for a segment cname_for refuses", async () => {
     expect(await derivedConstantPath("mail", "encodings/7bit.ts", "SevenBit")).toBeNull();
   });

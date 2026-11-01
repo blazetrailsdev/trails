@@ -452,7 +452,10 @@ export async function constantResidue(
   entries: readonly ClassPathEntry[],
 ): Promise<ConstantResidue> {
   const residue: Record<string, string> = {};
-  for (const { file, tsName, fqn } of entries) {
+  const sorted = [...entries].sort((a, b) =>
+    `${a.file}::${a.tsName}`.localeCompare(`${b.file}::${b.tsName}`),
+  );
+  for (const { file, tsName, fqn } of sorted) {
     if ((await derivedConstantPath(dir, file, tsName)) !== fqn) residue[`${file}::${tsName}`] = fqn;
   }
   return { rows: entries.length, residue };
@@ -467,12 +470,17 @@ async function syncConstantResidue(
   tables: Map<string, ClassPathEntry[]>,
   check: boolean,
   stale: string[],
+  only?: string,
 ): Promise<void> {
   const target = path.join(ROOT_DIR, "scripts/api-compare/constant-residue.json");
   const current = await fs.readFile(target, "utf8").catch(() => "{}");
   const record = JSON.parse(current) as Record<string, ConstantResidue>;
   for (const [dir, entries] of tables) {
     if (entries.length > 0) record[dir] = await constantResidue(dir, entries);
+    else delete record[dir];
+  }
+  if (only === undefined) {
+    for (const dir of Object.keys(record)) if (!tables.has(dir)) delete record[dir];
   }
   const sorted = Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   const next = await prettier.format(JSON.stringify(sorted), {
@@ -548,7 +556,7 @@ async function main(): Promise<void> {
     if (check) stale.push(path.relative(ROOT_DIR, target));
     else await fs.writeFile(target, next);
   }
-  await syncConstantResidue(tables, check, stale);
+  await syncConstantResidue(tables, check, stale, only);
   if (check && unexportedModules.length > 0) {
     console.warn(
       `Modules paired with a Ruby module but with no exported binding (not gated):\n  ${unexportedModules.join("\n  ")}`,
