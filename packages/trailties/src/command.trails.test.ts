@@ -3,7 +3,6 @@ import { setAppPath, setEngineRoot } from "./app-path.js";
 import { root } from "./command.js";
 import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
-import type { Base } from "./command/base.js";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
 import { findByNamespace, hiddenCommands, invoke } from "./command.js";

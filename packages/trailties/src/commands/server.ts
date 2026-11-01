@@ -438,11 +438,6 @@ Run \`${this.executable()} --help\` for more options.
 => Run \`${this.executable()} --help\` for more startup options
 `);
   }
-
-  /** @internal */
-  private executable(): string {
-    return (this.constructor as typeof Base).executable();
-  }
 }
 
 interface ServerCommandOptions extends Record<string, unknown> {
