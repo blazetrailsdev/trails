@@ -192,9 +192,19 @@ export class AppGenerator extends AppBase {
     });
     this.classOption("skipBundle", {
       type: "boolean",
-      aliases: "-B",
+      aliases: ["-B", "--skip-install"],
       default: null,
       desc: "Don't run bundle install",
+    });
+    this.classOption("packageManager", {
+      type: "string",
+      enum: [...VALID_PACKAGE_MANAGERS],
+      desc: "Package manager to use",
+    });
+    this.classOption("sqliteDriver", {
+      type: "string",
+      enum: [...VALID_SQLITE_DRIVERS],
+      desc: "SQLite driver",
     });
     this.classOption("skipDecryptedDiffs", {
       type: "boolean",
