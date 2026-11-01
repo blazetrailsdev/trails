@@ -216,6 +216,7 @@ export default { development: env("development"), test: env("test"), production:
     );
   }
 
+  /** @missingRailsCall unshift — PERMANENT */
   async engine(name: string, block?: (bukkit: Bukkit) => unknown): Promise<Bukkit> {
     const fs = getFs();
     const appPath = await this.appPath();
@@ -347,12 +348,13 @@ export default {
 
   async useMysql2({ multiDb = false }: { multiDb?: boolean } = {}): Promise<string> {
     const databaseName = `railties_${Process.pid}`;
-    const defaults = `const defaults = {
+    const defaults = `import { env } from "@blazetrails/ruby-compat";
+const defaults = {
   adapter: "mysql2",
   pool: 5,
   username: "root",
-  ...(process.env.MYSQL_HOST ? { host: process.env.MYSQL_HOST } : {}),
-  ...(process.env.MYSQL_SOCK ? { socket: process.env.MYSQL_SOCK } : {}),
+  ...(env.MYSQL_HOST ? { host: env.MYSQL_HOST } : {}),
+  ...(env.MYSQL_SOCK ? { socket: env.MYSQL_SOCK } : {}),
 };`;
     await puts(
       `${await this.appPath()}/config/database.ts`,
