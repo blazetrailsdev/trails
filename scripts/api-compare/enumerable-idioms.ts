@@ -1,5 +1,8 @@
 import { rubyCompatAliases } from "../parity/ruby-compat.js";
 
+/** `File.open`'s async port: ruby-compat's `File.openAsync`. No other `openAsync` exists. */
+const ASYNC_FILE_OPEN: [string, string[]] = ["open", ["openAsync"]];
+
 /**
  * Single source of truth for Ruby Enumerable/Comparable idioms whose faithful
  * port is a native JS method spelled DIFFERENTLY. Two api-compare tools consume
@@ -39,6 +42,7 @@ import { rubyCompatAliases } from "../parity/ruby-compat.js";
  * See the full finding at `NO_JS_CALL_FORM`'s comment in compare.ts.
  */
 export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
+  ASYNC_FILE_OPEN,
   ["any?", ["some"]],
   ["all?", ["every"]],
   // `none?` is `!any?`: the `some` analogue must be NEGATED, and so must the

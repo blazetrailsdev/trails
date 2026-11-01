@@ -1,0 +1,10 @@
+<% if (this.isMountable()) { -%>
+import { <%= this.camelizedModules().split("::")[0] %> } from "../lib/<%= this.namespacedName() %>/engine.js";
+
+<%= this.camelizedModules().replaceAll("::", ".") %>.Engine.instance().routes().draw(function () {
+<% } else { -%>
+import { Trails } from "@blazetrails/trailties";
+
+Trails.application.routes().draw(function () {
+<% } -%>
+});

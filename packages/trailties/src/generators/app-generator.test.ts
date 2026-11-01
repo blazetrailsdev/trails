@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import { execFile } from "node:child_process";
-import { AppGenerator, type AppDatabase } from "./app-generator.js";
+import { AppGenerator, type AppDatabase } from "./rails/app/app-generator.js";
 import * as Assertions from "./testing/assertions.js";
 
 let tmpDir: string;
@@ -463,6 +463,14 @@ describe("AppGenerator", () => {
 
     const layout = fs.readFileSync(appPath("app/views/layouts/application.html.tse"), "utf-8");
     expect(layout).toContain(`contentFor("title") ?? "My App"`);
+  });
+
+  it("rejects a name whose constant is already in use", async () => {
+    await expect(
+      new AppGenerator(["string"], {}, { destinationRoot: "/tmp/string" }).createRoot(),
+    ).rejects.toThrow(
+      "Invalid application name string, constant String is already in use. Please choose another application name.",
+    );
   });
 
   it("generates an application class that subclasses Application", async () => {

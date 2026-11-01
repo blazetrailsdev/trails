@@ -5,7 +5,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 import { run } from "@blazetrails/activerecord-cli";
-import { AppGenerator } from "../../app-generator.js";
+import { AppGenerator } from "../app/app-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
 import { Application } from "../../../application.js";
 import "../../../trailties/active-record.js";

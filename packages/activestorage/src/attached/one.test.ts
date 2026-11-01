@@ -709,7 +709,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
 
     const duped = await user.dup().avatar.attachment;
-    expect(duped === (await user.avatar.attachment)).toBe(false);
+    expect(duped).not.toBe(await user.avatar.attachment);
   });
 
   it("duped record does not share attachment changes", async () => {

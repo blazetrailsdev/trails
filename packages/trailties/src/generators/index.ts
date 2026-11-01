@@ -1,5 +1,5 @@
-export { AppGenerator } from "./app-generator.js";
-export type { AppGeneratorOptions, AppDatabase } from "./app-generator.js";
+export { AppGenerator } from "./rails/app/app-generator.js";
+export type { AppGeneratorOptions, AppDatabase } from "./rails/app/app-generator.js";
 export { ModelGenerator } from "./active-record/model/model-generator.js";
 export type { ModelGeneratorOptions } from "./active-record/model/model-generator.js";
 export { MigrationGenerator } from "./active-record/migration/migration-generator.js";

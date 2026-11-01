@@ -1,3 +1,4 @@
+import "../class-paths.stats.generated.js";
 import { Dir, File, stdout } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { CodeStatistics, type DirectoryPair } from "../code-statistics.js";

@@ -1,3 +1,4 @@
+import "../class-paths.dev.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { DevCaching } from "../dev-caching.js";

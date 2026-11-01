@@ -1,0 +1,8 @@
+<% if (this.isEngine() && !this.options.skipActiveRecord && this.isWithDummyApp()) { -%>
+const { File } = await import("@blazetrails/ruby-compat");
+export const APP_RAKEFILE = File.expandPath("<%= this.dummyPath() %>/Rakefile.ts", import.meta.dirname);
+await import("@blazetrails/trailties/tasks/engine");
+<% } -%>
+<% if (this.isEngine()) { -%>
+await import("@blazetrails/trailties/tasks/statistics");
+<% } -%>

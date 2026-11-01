@@ -13,7 +13,7 @@ import { Trailtie } from "./trailtie.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
-import type { ActionMethods } from "./generators/app-generator.js";
+import type { ActionMethods } from "./generators/rails/app/app-generator.js";
 import { VERSION, gemVersion } from "./gem-version.js";
 import { version } from "./version.js";
 import "./info-controller.js";

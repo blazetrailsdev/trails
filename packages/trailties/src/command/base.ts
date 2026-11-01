@@ -1,6 +1,17 @@
-import { classAttribute } from "@blazetrails/activesupport";
-import { kebabCase, include, rbObjMethod, type Included } from "@blazetrails/ruby-compat";
+import { classAttribute, underscore } from "@blazetrails/activesupport";
+import {
+  File,
+  kebabCase,
+  include,
+  rbFBinding,
+  rbModName,
+  rbObjAsString as toS,
+  rbObjMethod,
+  TSE,
+  type Included,
+} from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
+import type { Basic } from "@blazetrails/thor/shell/basic";
 import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
 import { Error as ThorError } from "@blazetrails/thor/error";
@@ -16,6 +27,8 @@ declare module "@blazetrails/thor" {
   }
 }
 
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Base extends Included<typeof Actions>, ThorBase, Shell {}
 
@@ -23,6 +36,10 @@ export interface Base extends Included<typeof Actions>, ThorBase, Shell {}
 export class Base extends Thor {
   declare static _namespace: string | undefined;
   declare private static _commandName: string | undefined;
+  declare private static _baseName: string | null | undefined;
+  declare private static _classUsage: string | undefined;
+  declare private static _usagePath: string | null;
+  declare private static _defaultCommandRoot: string | null;
 
   declare static bin: string;
 
@@ -44,6 +61,23 @@ export class Base extends Thor {
 
   static isEngine(): boolean {
     return ENGINE_ROOT != null;
+  }
+
+  static desc(
+    usage: string | string[] | null = null,
+    description: string | null = null,
+    options: Record<string, unknown> = {},
+  ): void | Promise<string | null> {
+    if (usage != null) {
+      return (Thor as unknown as ThorClass).desc.call(
+        this as unknown as ThorClass,
+        usage,
+        description,
+        options,
+      );
+    } else {
+      return this.classUsage();
+    }
   }
 
   /** @inventedArm replaceAll — PERMANENT */
@@ -83,6 +117,12 @@ export class Base extends Thor {
     await (this as unknown as ThorClass).dispatch(command, [...args], null, config);
   }
 
+  static printingCommands(): [string, string | null][] {
+    return Object.entries((this as unknown as ThorClass).commands())
+      .filter(([, command]) => !command.isHidden())
+      .map(([name, command]) => [this.namespacedName(name), command.description]);
+  }
+
   static executable(commandName: string = this.commandName()): string {
     return `${this.bin} ${this.namespacedName(commandName)}`;
   }
@@ -99,6 +139,19 @@ export class Base extends Thor {
     }
   }
 
+  static async help(shell: Basic, ...rest: unknown[]): Promise<void> {
+    await (Thor as unknown as ThorClass).help.call(this as unknown as ThorClass, shell, ...rest);
+    if ((await this.classUsage()) != null) shell.say(await this.classUsage());
+  }
+
+  static baseName(): string | null {
+    if (!Object.hasOwn(this, "_baseName") || this._baseName == null) {
+      const base = toS(rbModName(this)).split("::")[0];
+      this._baseName = base === "" ? null : underscore(base);
+    }
+    return this._baseName;
+  }
+
   /** @inventedArm kebabCase — PERMANENT */
   static commandName(): string {
     if (!Object.hasOwn(this, "_commandName")) {
@@ -106,6 +159,31 @@ export class Base extends Thor {
       this._commandName = kebabCase(command.replace(/Command$/, ""));
     }
     return this._commandName!;
+  }
+
+  static async classUsage(): Promise<string | null> {
+    const usagePath = await this.usagePath();
+    if (usagePath != null) {
+      if (!Object.hasOwn(this, "_classUsage") || this._classUsage == null) {
+        const erb = new TSE(await File.readAsync(usagePath), { trimMode: "-" });
+        erb.filename = usagePath;
+        this._classUsage = await erb.result(rbFBinding(this));
+      }
+      return this._classUsage;
+    }
+    return null;
+  }
+
+  static async usagePath(): Promise<string | null> {
+    if (!Object.hasOwn(this, "_usagePath")) this._usagePath = await this.resolvePath("USAGE");
+    return this._usagePath;
+  }
+
+  static async defaultCommandRoot(): Promise<string | null> {
+    if (!Object.hasOwn(this, "_defaultCommandRoot")) {
+      this._defaultCommandRoot = await this.resolvePath(".");
+    }
+    return this._defaultCommandRoot;
   }
 
   /** @internal */
@@ -153,6 +231,19 @@ export class Base extends Thor {
       .split(":");
     const basename = prefix.pop()!;
     return [...prefix, ...new Set([basename, String(name)])].join(":");
+  }
+
+  /** @internal */
+  private static async resolvePath(path: string): Promise<string | null> {
+    path = File.join(
+      "../commands",
+      ...this.namespace()
+        .replace(/^rails:/, "")
+        .split(":"),
+      path,
+    );
+    path = File.expandPath(path, __dir__);
+    return (await File.isExistAsync(path)) ? path : null;
   }
 }
 

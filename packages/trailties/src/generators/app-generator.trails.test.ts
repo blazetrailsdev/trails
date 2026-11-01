@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Dir, File, FileUtils, SecureRandom, getProcessAdapter } from "@blazetrails/ruby-compat";
-import { AppBuilder, AppGenerator } from "./app-generator.js";
+import { AppBuilder, AppGenerator } from "./rails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
 
@@ -18,6 +18,12 @@ describe("AppGenerator (trails-only)", () => {
 
   afterEach(() => {
     FileUtils.rmRf(tmpDir);
+  });
+
+  it("sourceRoot names the existing templates directory", async () => {
+    const root = (await AppGenerator.sourceRoot()) as string;
+    expect(root.endsWith("/generators/rails/app/templates")).toBe(true);
+    expect(await File.isDirectory(root)).toBe(true);
   });
 
   it("generates action cable files by default", async () => {

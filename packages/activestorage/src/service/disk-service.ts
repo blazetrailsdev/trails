@@ -66,15 +66,13 @@ export class DiskService extends Service {
     }
   }
 
-  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async downloadChunk(key: string, range: Range<number>): Promise<Uint8Array> {
     return await this.instrument("download_chunk", { key: key, range: range }, async () => {
       try {
-        return (await IO.binreadAsync(
-          this.pathFor(key),
-          Number(range.size()),
-          range.begin,
-        )) as Uint8Array;
+        return await File.openAsync(this.pathFor(key), "rb", async (file) => {
+          file.seek(range.begin!);
+          return (await file.readAsync(Number(range.size())))!;
+        });
       } catch (error) {
         if (error instanceof Errno.ENOENT) throw new FileNotFoundError();
         throw error;
@@ -156,18 +154,18 @@ export class DiskService extends Service {
     return File.join(this.root, this.folderFor(key), key);
   }
 
-  /** @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open */
   override async compose(
     sourceKeys: string[],
     destinationKey: string,
     _options: Record<string, unknown> = {},
   ): Promise<void> {
-    const destinationFile = await this.makePathFor(destinationKey);
-    await File.writeAsync(destinationFile, "");
-    for (const sourceKey of sourceKeys) {
-      const sourceFile = (await IO.binreadAsync(this.pathFor(sourceKey)))!;
-      await File.writeAsync(destinationFile, sourceFile, { mode: "a" });
-    }
+    await File.openAsync(await this.makePathFor(destinationKey), "w", async (destinationFile) => {
+      for (const sourceKey of sourceKeys) {
+        await File.openAsync(this.pathFor(sourceKey), "rb", async (sourceFile) => {
+          await IO.copyStreamAsync(sourceFile, destinationFile);
+        });
+      }
+    });
   }
 
   /** @internal */
@@ -257,19 +255,15 @@ export class DiskService extends Service {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall open — CONVERGEABLE disk-service-reads-through-file-open
-   */
+  /** @internal */
   private async stream(key: string, block: (chunk: Uint8Array) => unknown): Promise<void> {
     try {
-      const path = this.pathFor(key);
-      let offset = 0;
-      let data: Uint8Array | null;
-      while ((data = await IO.binreadAsync(path, Numeric.megabytes(5), offset)) != null) {
-        offset += data.length;
-        await block(data);
-      }
+      await File.openAsync(this.pathFor(key), "rb", async (file) => {
+        let data: Uint8Array | null;
+        while ((data = await file.readAsync(Numeric.megabytes(5))) != null) {
+          await block(data);
+        }
+      });
     } catch (error) {
       if (error instanceof Errno.ENOENT) throw new FileNotFoundError();
       throw error;

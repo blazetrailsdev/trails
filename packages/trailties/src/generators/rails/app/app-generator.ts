@@ -1,13 +1,13 @@
 import { File } from "@blazetrails/ruby-compat";
-import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
-import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
-import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "./app-base.js";
-import type { GeneratorConfig } from "./base.js";
-import { Trails } from "../rails.js";
-import { GeneratorError } from "./generated-attribute.js";
-import { type DatabaseName } from "./database.js";
-import { TEMPLATES } from "./rails/app/templates/index.js";
-import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
+import { TopLevel, titleize } from "@blazetrails/activesupport";
+import { ref, tsClass, tsField, tsModule, tsRaw } from "../../../template-builder/index.js";
+import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
+import type { GeneratorConfig } from "../../base.js";
+import { Trails } from "../../../rails.js";
+import { GeneratorError } from "../../generated-attribute.js";
+import { type DatabaseName } from "../../database.js";
+import { TEMPLATES } from "./templates/index.js";
+import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -17,8 +17,6 @@ const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
 };
 
 const META_OPTIONS = ["minimal"];
-
-const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
 const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
@@ -60,8 +58,8 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected async template(source: string, destination: string): Promise<void> {
-    await this.generator["template"](source, destination);
+  protected async template(source: string, ...args: unknown[]): Promise<void> {
+    await this.generator.template(source, ...args);
   }
 
   /** @internal */
@@ -99,8 +97,8 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected createFile(relativePath: string, content: string): unknown {
-    return this.generator["createFile"](relativePath, content);
+  protected createFile(...args: Parameters<AppGenerator["createFile"]>): unknown {
+    return this.generator.createFile(...args);
   }
 
   /** @internal */
@@ -167,7 +165,7 @@ export class AppGenerator extends AppBase {
   };
 
   static {
-    void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.addSharedOptionsFor("application");
     this.classOption("version", {
       type: "boolean",
@@ -231,10 +229,6 @@ export class AppGenerator extends AppBase {
 
   declare options: AppGeneratorOptions & AppBaseOptions;
 
-  /**
-   * @missingRailsCall run_bundle — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
-   * @missingRailsCall run_after_bundle_callbacks — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
-   */
   static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
     const generator = new this(
       [destination],
@@ -268,36 +262,6 @@ export class AppGenerator extends AppBase {
     if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
       throw new GeneratorError(
         `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
-      );
-    }
-  }
-
-  private originalAppName(): string {
-    return this.options.name ?? File.basename(this.destinationRoot);
-  }
-
-  private appName(): string {
-    return underscore(parameterize(this.originalAppName(), { preserveCase: true }));
-  }
-
-  private appConstBase(): string {
-    return camelize(this.appName().replace(/\W/g, "_").replace(/_+/g, "_"));
-  }
-
-  private appConst(): string {
-    return this.appConstBase();
-  }
-
-  private isValidConst(): void {
-    if (/^\d/.test(this.appConst())) {
-      throw new GeneratorError(
-        `Invalid application name ${this.originalAppName()}. Please give a name which does not start with numbers.`,
-      );
-    } else if (RESERVED_NAMES.includes(this.originalAppName())) {
-      throw new GeneratorError(
-        `Invalid application name ${this.originalAppName()}. Please give a ` +
-          `name which does not match one of the reserved trails ` +
-          `words: ${RESERVED_NAMES.join(", ")}`,
       );
     }
   }
@@ -1604,9 +1568,9 @@ export default defineConfig([
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
-  override async template(source: string, destination: string): Promise<void> {
+  override async template(source: string, ...args: unknown[]): Promise<void> {
     await this.createFile(
-      destination,
+      args[0] as string,
       TEMPLATES[source]({
         appName: this.appName(),
         database: this.database,

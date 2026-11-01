@@ -924,20 +924,24 @@ function hasNativeFormAnalogue(
   if (credited !== undefined && !kinds.every((k) => credited.has(k))) return false;
   const names = receiverNames?.[value] ?? [];
   if (analogue.named === true && names.length === 0) return false;
-  return names.every((name) =>
-    name.split("|").some((operand) => {
-      const bare = operand.replace(/^@+/, "");
-      return (
-        tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
-        (bare !== operand && tsNativeForms.has(`${analogue.form}:_${snakeToCamel(bare)}`)) ||
-        (analogue.key === true &&
-          /^[A-Z][A-Z0-9_]*$/.test(bare) &&
-          tsNativeForms.has(`${analogue.form}:${bare}`)) ||
-        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`)) ||
-        (bare === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except))
-      );
-    }),
-  );
+  return names.every((name) => {
+    if (name.startsWith("tail:") && !tsNativeForms.has(`${analogue.form}:void`)) return false;
+    return name
+      .replace(/^tail:/, "")
+      .split("|")
+      .some((operand) => {
+        const bare = operand.replace(/^@+/, "");
+        return (
+          tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
+          (bare !== operand && tsNativeForms.has(`${analogue.form}:_${snakeToCamel(bare)}`)) ||
+          (analogue.key === true &&
+            /^[A-Z][A-Z0-9_]*$/.test(bare) &&
+            tsNativeForms.has(`${analogue.form}:${bare}`)) ||
+          (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`)) ||
+          (bare === "except" && tsNativeForms.has(TYPED_NATIVE_FORM.except))
+        );
+      });
+  });
 }
 
 /**

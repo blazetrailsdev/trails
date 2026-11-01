@@ -1,0 +1,3 @@
+import { ActiveJob } from "@blazetrails/activejob";
+
+<%= this.wrapInModules(`export class ApplicationJob extends ActiveJob.Base {}`) %>

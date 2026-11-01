@@ -99,6 +99,7 @@
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
@@ -110,6 +111,7 @@
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {

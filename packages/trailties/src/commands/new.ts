@@ -7,7 +7,7 @@ import {
   VALID_SQLITE_DRIVERS,
   type PackageManager,
   type SqliteDriver,
-} from "../generators/app-generator.js";
+} from "../generators/rails/app/app-generator.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
 export function newCommand(): Command {
