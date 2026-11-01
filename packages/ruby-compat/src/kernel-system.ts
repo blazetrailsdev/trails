@@ -71,8 +71,13 @@ export async function rbFSystem(
   }
 }
 
-/** @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code */
-function rbSyserrFailStr(error: Error | undefined, mesg: string): never {
+/**
+ * `rb_syserr_fail_str` (`vendor/ruby/v3.3.11/error.c:3573`).
+ *
+ * @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSyserrFailStr(error: Error | undefined, mesg: string): never {
   const code = (error as { code?: string } | undefined)?.code;
   const klass = Errno[code as keyof typeof Errno];
   if (klass !== undefined) throw new klass(mesg);
