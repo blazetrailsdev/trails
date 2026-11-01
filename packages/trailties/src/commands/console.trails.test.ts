@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { capture, isPlainObject } from "@blazetrails/activesupport";
-import { Dir, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
+import { Dir, rbArgv, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
 import { invoke } from "../command.js";
 import { Trails } from "../rails.js";
 import { Console, ConsoleCommand } from "./console.js";
@@ -52,6 +52,11 @@ describe("ConsoleCommand (trails)", () => {
     } finally {
       Trails.application = null;
     }
+  });
+
+  it("leaves only options after -- in ARGV", () => {
+    expect(new ConsoleCommand([], ["-s", "--", "x"]).options.sandbox).toBe(true);
+    expect(rbArgv()).toEqual(["x"]);
   });
 
   it("--help reaches Thor's help through Rails::Command.invoke", async () => {

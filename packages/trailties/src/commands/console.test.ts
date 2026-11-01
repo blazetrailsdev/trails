@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { env, rbArgv, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 import { Console, ConsoleCommand } from "./console.js";
 import { IRBConsole } from "./console/irb-console.js";
@@ -63,11 +63,6 @@ describe("Rails::ConsoleTest", () => {
     if (value !== undefined) setEnv(name, value);
     await block();
   }
-
-  it("leaves only options after -- in ARGV", () => {
-    expect(parseArguments(["-s", "--", "x"]).sandbox).toBe(true);
-    expect(rbArgv()).toEqual(["x"]);
-  });
 
   it("sandbox option", () => {
     expect(new Console(app, parseArguments(["--sandbox"])).isSandbox()).toBeTruthy();

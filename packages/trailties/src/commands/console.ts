@@ -149,7 +149,11 @@ export class ConsoleCommand extends Base {
     }
   }
 
-  /** @missingRailsArgs start — CONVERGEABLE console-sandbox-rollback-and-irb-helpers */
+  /**
+   * @missingRailsArgs start — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm if — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm throw — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
     const railsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
