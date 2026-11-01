@@ -13,6 +13,7 @@ let lines: string[];
 const destination = { destinationRoot: "" };
 const assertFile = Assertions.assertFile.bind(destination);
 const assertNoFile = Assertions.assertNoFile.bind(destination);
+const assertNoDirectory = Assertions.assertNoDirectory.bind(destination);
 
 function assertGem(name: string): Promise<void> {
   return assertFile("my-app/package.json", new RegExp(`"${name}": `));
@@ -232,7 +233,7 @@ describe("AppGenerator", () => {
     await makeGen("sqlite", { skipGit: true }).invokeAll();
     await assertNoFile("my-app/.gitignore");
     await assertNoFile("my-app/.gitattributes");
-    await assertNoFile("my-app/.git");
+    await assertNoDirectory("my-app/.git");
   });
 
   it("generates valid package.json", async () => {
