@@ -76,8 +76,28 @@ describe("Ripper", () => {
       "a += 1\na /2\n# a\n",
       "a, b = 1, 2\na /2\n# a\n",
       "foo { _1 /2 }\n# a\n",
+      "def f(a = (1), b)\n b /2\nend\n# a\n",
+      "def f(a: (1), b: 2)\n b /2\nend\n# a\n",
+      "def f(a = [1], b = g(2), c)\n c /2\nend\n# a\n",
+      "-> (a,\n b) { b /2 }\n# a\n",
       "case b\nin {a:} then a /2\nend\n# a\n",
       "/(?<y>a)/ =~ b\ny /2\n# a\n",
+    ]) {
+      const ripper = lex(source);
+      expect(ripper.isError()).toBe(false);
+      expect(ripper.comments.map(([, value]) => value)).toEqual(["# a"]);
+    }
+  });
+
+  it("learns only binder names, so a regexp after a method name stays a regexp", () => {
+    for (const source of [
+      "def a; puts /'/; end\n# a\n",
+      "def a = puts /'/\n# a\n",
+      "case x\nin String then puts /'/\nend\n# a\n",
+      "for a in b do puts /'/ end\n# a\n",
+      "def f(a = foo)\n foo /'/\nend\n# a\n",
+      "foo { |a = bar| bar /'/ }\n# a\n",
+      "-> (a = puts) { puts /'/ }\n# a\n",
     ]) {
       const ripper = lex(source);
       expect(ripper.isError()).toBe(false);

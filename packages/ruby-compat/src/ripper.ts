@@ -23,9 +23,13 @@ const HEREDOC = new RegExp(
   `<<([~-]?)(?:"([^"\\n]+)"|'([^'\\n]+)'|\`([^\`\\n]+)\`|(${IDENT}))`,
   "y",
 );
-const BLOCK_PARAMS = /\s*\|([^|]*)\|/y;
-const LAMBDA_PARAMS = /->\s*\(?([^){\n]*)/y;
-const DEF_PARAMS = /[^(\n]*\(([^)]*)\)|[^\n]*/y;
+const BLOCK_OPEN = /\s*\|/y;
+const LAMBDA_OPEN = /->\s*(\(?)/y;
+const DEF_HEAD = new RegExp(
+  `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})(\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
+  "y",
+);
+const IN_PATTERN = /[^\n]*?(?=\bthen\b|\bif\b|\bunless\b|;|$)/my;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
 const RESCUE_VAR = new RegExp(`[^\\n]*?=>\\s*(${IDENT})`, "y");
 const ASSIGNMENT = new RegExp(
@@ -57,6 +61,7 @@ export class Ripper {
   private _counted = 0;
   private _error = false;
   private _state = EXPR_BEG;
+  private _forIn = false;
   private _pending: Array<{ id: string; indent: boolean; raw: boolean }> = [];
   /** @noRailsEquivalent CONVERGEABLE ripper-reports-syntax-errors-beyond-unterminated-literals */
   private _locals = new Set<string>();
@@ -115,12 +120,44 @@ export class Ripper {
   }
 
   private _localVars(text: string): void {
-    for (const [name] of text.matchAll(new RegExp(IDENT, "g"))) this._locals.add(name);
+    for (const [name] of text.matchAll(new RegExp(IDENT, "g"))) {
+      if (!/^[A-Z]/.test(name)) this._locals.add(name);
+    }
+  }
+
+  private _paramList(start: number, close: string): void {
+    const src = this._src;
+    let depth = 0;
+    let destructuring = 0;
+    let expected = true;
+    for (let i = start; i < src.length; i++) {
+      const c = src[i];
+      if (depth === 0 && destructuring === 0 && c === close) return;
+      if (depth === 0 && close === "\n" && c === ";") return;
+      WORD.lastIndex = i;
+      const word = expected && depth === 0 ? WORD.exec(src) : null;
+      if (word) {
+        this._locals.add(word[0]);
+        i += word[0].length - 1;
+        expected = false;
+      } else if (c === "(" && expected && depth === 0) {
+        destructuring += 1;
+      } else if (c === ")" && depth === 0 && destructuring > 0) {
+        destructuring -= 1;
+      } else if ("([{".includes(c)) {
+        depth += 1;
+      } else if (")]}".includes(c)) {
+        depth -= 1;
+        if (depth < 0) return;
+      } else if (depth === 0 && (c === "," || c === ";")) {
+        expected = true;
+      }
+    }
   }
 
   private _blockParams(): void {
-    const m = this._match(BLOCK_PARAMS);
-    if (m) this._localVars(m[1]);
+    const m = this._match(BLOCK_OPEN);
+    if (m) this._paramList(this._pos + m[0].length, "|");
   }
 
   private _code(interpolated: boolean): void {
@@ -219,8 +256,8 @@ export class Ripper {
       } else {
         if (c === "{") depth += 1;
         if (c === "-") {
-          const lambda = this._match(LAMBDA_PARAMS);
-          if (lambda) this._localVars(lambda[1]);
+          const lambda = this._match(LAMBDA_OPEN);
+          if (lambda) this._paramList(pos + lambda[0].length, lambda[1] ? ")" : "{");
         }
         this._pos += 1;
         this._state = EXPR_BEG;
@@ -286,8 +323,8 @@ export class Ripper {
     } else if (name === "def") {
       this._state = EXPR_FNAME;
       this._locals = new Set();
-      const params = this._match(DEF_PARAMS);
-      if (params) this._localVars(params[1] ?? params[0]);
+      const head = this._match(DEF_HEAD);
+      if (head?.[1]) this._paramList(this._pos + head[0].length, head[1] === "(" ? ")" : "\n");
     } else if (name === "class") {
       this._state = EXPR_CLASS;
     } else if (VALUE_KEYWORDS.has(name)) {
@@ -296,9 +333,15 @@ export class Ripper {
       this._state = EXPR_BEG;
       if (name === "do") this._blockParams();
       const vars = name === "for" ? this._match(FOR_VARS) : null;
-      if (vars) this._localVars(vars[1]);
-      const eol = src.indexOf("\n", this._pos);
-      if (name === "in") this._localVars(src.slice(this._pos, eol === -1 ? src.length : eol));
+      if (vars) {
+        this._localVars(vars[1]);
+        this._pos += vars[1].length;
+        this._forIn = true;
+      } else if (name === "in" && this._forIn) {
+        this._forIn = false;
+      } else if (name === "in") {
+        this._localVars(this._match(IN_PATTERN)![0]);
+      }
       const rescued = name === "rescue" ? this._match(RESCUE_VAR) : null;
       if (rescued) this._localVars(rescued[1]);
     } else {
