@@ -1832,7 +1832,10 @@ export class Migrator {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE Rails seats the pool on Base via migration_connection; trails pools migrate without one.
+   */
   seatedOn(pool?: ConnectionPool): this {
     this._pool = pool;
     return this;
