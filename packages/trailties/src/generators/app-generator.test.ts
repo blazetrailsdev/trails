@@ -197,7 +197,7 @@ describe("AppGenerator", () => {
   });
 
   it("skip active job option", async () => {
-    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).invokeAll();
+    await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
 
     for (const env of ["production", "development", "test"]) {
       await assertFile(`my-app/config/environments/${env}.ts`, (content) => {
