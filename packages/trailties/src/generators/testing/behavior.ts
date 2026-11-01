@@ -99,15 +99,17 @@ export function prepareDestination(this: BehaviorHost): void {
 }
 
 /** @internal */
-export function migrationFileName(this: BehaviorHost, relative: string): string | undefined {
+export function migrationFileName(this: BehaviorHost, relative: string): string | null {
   const absolute = File.expandPath(relative, this.destinationRoot);
   const [dirname, fileName] = [
     File.dirname(absolute),
     File.basename(absolute).replace(/\.ts$/, ""),
   ];
-  return Dir.glob(`${dirname}/[0-9]*_*.ts`).filter((f) =>
-    new RegExp(`\\d+_${fileName}.ts$`).test(f),
-  )[0];
+  return (
+    Dir.glob(`${dirname}/[0-9]*_*.ts`).filter((f) =>
+      new RegExp(`\\d+_${fileName}.ts$`).test(f),
+    )[0] ?? null
+  );
 }
 
 export const Behavior = {

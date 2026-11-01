@@ -119,11 +119,6 @@ beforeEach(async (context: TestContext) => {
     const isolated = async (): Promise<void> => {
       try {
         await body();
-      } catch (e) {
-        if ((e as { code?: unknown } | null)?.code === "VITEST_PENDING") {
-          throw new Skip((e as Error).message);
-        }
-        throw e;
       } finally {
         testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
       }
