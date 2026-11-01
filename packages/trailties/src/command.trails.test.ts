@@ -22,7 +22,8 @@ describe("Rails::Command.find_by_namespace", () => {
   }, 30_000);
 
   it("resolves the namespace of a namespace:command spelling", async () => {
-    expect(programName(await findByNamespace("dev", "cache"))).toBe("dev");
+    const { DevCommand } = await import("./commands/dev.js");
+    expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
     expect(programName(await findByNamespace("credentials", "edit"))).toBe("credentials");
   }, 30_000);

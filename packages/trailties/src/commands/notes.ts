@@ -1,25 +1,44 @@
-import { Command } from "commander";
 import { stdout } from "@blazetrails/ruby-compat";
-import { SourceAnnotationExtractor } from "../source-annotation-extractor.js";
+import type { ThorClass } from "@blazetrails/thor";
+import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
+import { Base } from "../command/base.js";
+import { Annotation, SourceAnnotationExtractor } from "../source-annotation-extractor.js";
 
-export function notesCommand(): Command {
-  const cmd = new Command("notes");
-  cmd
-    .description("Enumerate annotations (FIXME, TODO, OPTIMIZE) in your source")
-    .option(
-      "-a, --annotations <tags...>",
-      "Filter notes by custom annotations (e.g. FIXME RELEASE)",
-    )
-    .action(async (opts: { annotations?: string[] }) => {
-      const annotations = opts.annotations;
-      let tag: string | null = null;
-      let showTag = true;
-      if (annotations && annotations.length > 0) {
-        tag = annotations.join("|");
-        showTag = annotations.length > 1;
-      }
-      const output = await SourceAnnotationExtractor.enumerate(tag, { tag: showTag });
-      stdout.write(output);
+export class NotesCommand extends Base {
+  declare options: ThorOptions<Record<string, unknown> & { annotations?: string[] }>;
+
+  static {
+    const klass = this as unknown as ThorClass;
+    klass.classOption("annotations", {
+      aliases: "-a",
+      desc: "Filter by specific annotations, e.g. Foobar TODO",
+      type: "array",
     });
-  return cmd;
+    klass.desc("notes", "Show comments in your code annotated with FIXME, OPTIMIZE, and TODO");
+    klass.methodAdded("perform");
+  }
+
+  async perform(..._args: string[]): Promise<void> {
+    await this.bootApplicationBang();
+
+    this.displayAnnotations();
+  }
+
+  /**
+   * @internal
+   * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
+   */
+  private displayAnnotations(): void {
+    const annotations = this.options.annotations ?? Annotation.tags;
+    const tag = annotations.length > 1;
+
+    stdout.write(
+      SourceAnnotationExtractor.enumerate(annotations.join("|"), { tag, dirs: this.directories() }),
+    );
+  }
+
+  /** @internal */
+  private directories(): string[] {
+    return Annotation.directories;
+  }
 }
