@@ -4,8 +4,6 @@ import { Error as ZeitwerkError, NameError } from "./error.js";
 import type { Loader } from "./loader.js";
 import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
 
-const wrongName = ["wrong constant name", "Foo.bar"].join(" ");
-
 function hooks() {
   const state = { loader: null as unknown as Loader };
   beforeEach(() => {
@@ -32,11 +30,12 @@ describe("TestCpathExpectedAtErrors", () => {
     const files: [string, string?][] = [["foo.bar.ts"], ["1.ts"]];
     await withFiles(files, async () => {
       await s.loader.pushDir(".");
+      s.loader.inflector.inflect({ "foo.bar": "Foo-bar" });
 
       let at = s.loader.cpathExpectedAt(files[0][0]);
       await expect(at).rejects.toThrow(NameError);
       let error: unknown = await at.catch((e: Error) => e);
-      expect((error as Error).message).toContain(wrongName);
+      expect((error as Error).message).toContain("wrong constant name Foo-bar");
 
       at = s.loader.cpathExpectedAt(files[1][0]);
       await expect(at).rejects.toThrow(NameError);
@@ -48,10 +47,11 @@ describe("TestCpathExpectedAtErrors", () => {
   it("raises Zeitwerk::NameError if some intermediate segment does not yield a constant name", async () => {
     await withFiles([["x/foo.bar/y/z.ts"]], async () => {
       await s.loader.pushDir(".");
+      s.loader.inflector.inflect({ "foo.bar": "Foo-bar" });
       const at = s.loader.cpathExpectedAt("x/foo.bar/y/z.ts");
       await expect(at).rejects.toThrow(NameError);
       const error = await at.catch((e: Error) => e);
-      expect((error as Error).message).toContain(wrongName);
+      expect((error as Error).message).toContain("wrong constant name Foo-bar");
     });
   });
 });
