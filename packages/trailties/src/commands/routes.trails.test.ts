@@ -50,5 +50,14 @@ describe("RoutesCommand", () => {
     expect(output).not.toContain("You don't have any routes defined!");
     expect(output).toMatch(/posts GET\s+\/posts\(\.:format\)\s+posts#index/);
     expect(output).toMatch(/rails_health_check GET\s+\/up\(\.:format\)\s+rails\/health#show/);
+
+    const controller = await capture(":stdout", () => invoke("routes", ["-c", "admin/users"]));
+    expect(controller).toContain("admin/users#index");
+    expect(controller).not.toContain("posts#index");
+    const grep = await capture(":stdout", () => invoke("routes", ["-g", "legacy"]));
+    expect(grep).toContain("legacy#index");
+    expect(grep).not.toContain("posts#index");
+    const expanded = await capture(":stdout", () => invoke("routes", ["-E"]));
+    expect(expanded).toMatch(/--\[ Route 1 \]-/);
   }, 15_000);
 });

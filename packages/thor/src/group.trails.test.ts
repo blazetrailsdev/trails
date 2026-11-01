@@ -255,7 +255,7 @@ describe("Thor::Group", () => {
     expect(shell.out.some((line) => line.includes("--loud"))).toBe(true);
     expect(shell.out.filter((line) => line.includes("--orm")).length).toBe(1);
     expect(shell.out.at(-1)).toBe("counts\n  things");
-    expect(counter.printableCommands()[0][1]).toBe("# counts things");
+    expect((await counter.printableCommands())[0][1]).toBe("# counts things");
   });
 
   it("handle_argument_error re-raises the same error class with the arity message", () => {

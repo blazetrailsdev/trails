@@ -3,6 +3,7 @@ import { kebabCase, include, rbObjMethod, type Included } from "@blazetrails/rub
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
+import type { Invocation } from "@blazetrails/thor/invocation";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import type { Shell } from "@blazetrails/thor/shell";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
@@ -14,6 +15,8 @@ export interface Base extends Included<typeof Actions>, ThorBase, Shell {}
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export class Base extends Thor {
+  currentSubcommand: string | null = null;
+
   declare static _namespace: string | undefined;
   declare private static _commandName: string | undefined;
 
@@ -21,6 +24,9 @@ export class Base extends Thor {
 
   static {
     classAttribute.call(this, "bin", { instanceAccessor: false, default: "bin/rails" });
+    const klass = this as unknown as ThorClass;
+    klass.noCommands(() => klass.methodAdded("invokeCommand"));
+    this.methodAdded("invokeCommand");
   }
 
   static isExitOnFailure(): boolean {
@@ -77,6 +83,20 @@ export class Base extends Thor {
         );
     } else {
       return this.executable();
+    }
+  }
+
+  async invokeCommand(command: ThorCommand, ...args: unknown[]): Promise<unknown> {
+    const originalSubcommand = this.currentSubcommand;
+    this.currentSubcommand = command.name;
+    try {
+      return await (Thor.prototype as unknown as Invocation).invokeCommand.call(
+        this,
+        command,
+        ...args,
+      );
+    } finally {
+      this.currentSubcommand = originalSubcommand;
     }
   }
 

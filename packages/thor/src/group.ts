@@ -227,10 +227,11 @@ export class Group {
     });
   }
 
-  static printableCommands(this: GroupClass, ..._: unknown[]): string[][] {
+  static async printableCommands(this: GroupClass, ..._: unknown[]): Promise<string[][]> {
     const item: string[] = [];
     item.push(this.banner());
-    item.push(rtest(this.desc()) ? `# ${this.desc()!.replace(/\s+/g, " ")}` : "");
+    const desc = await this.desc();
+    item.push(rtest(desc) ? `# ${desc.replace(/\s+/g, " ")}` : "");
     return [item];
   }
   declare static printableTasks: typeof Group.printableCommands;

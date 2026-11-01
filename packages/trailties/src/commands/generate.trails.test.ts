@@ -1,3 +1,4 @@
+import { capture } from "@blazetrails/activesupport";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { invoke as commandInvoke } from "../command.js";
 import { Application } from "../application.js";
@@ -53,5 +54,11 @@ describe("GenerateCommand", () => {
     const help = vi.spyOn(Generators, "help").mockResolvedValue();
     await commandInvoke("generate", ["--help"]);
     expect(help).toHaveBeenCalledWith("generate");
+  });
+
+  it("lists generator names in kebab-case", async () => {
+    const help = await capture(":stdout", () => commandInvoke("generate", ["--help"]));
+    expect(help).toMatch(/^\s+scaffold-controller$/m);
+    expect(help).not.toContain("scaffold_controller");
   });
 });

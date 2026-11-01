@@ -137,8 +137,8 @@ export class UnusedRoutesCommand extends Base {
   private routesFilter(): RoutesFilter {
     const options = this.options as unknown as UnusedRoutesOptions;
     const filter: RoutesFilter = {};
-    if (options.controller !== undefined) filter.controller = options.controller;
-    if (options.grep !== undefined) filter.grep = options.grep;
+    if (this.options.hasKey("controller")) filter.controller = options.controller;
+    if (this.options.hasKey("grep")) filter.grep = options.grep;
     return filter;
   }
 }

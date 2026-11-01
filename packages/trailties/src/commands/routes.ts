@@ -4,10 +4,10 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { Thor, type ThorClass } from "@blazetrails/thor";
+import { rbArgv } from "@blazetrails/ruby-compat";
+import type { ThorClass } from "@blazetrails/thor";
 import type { Command } from "@blazetrails/thor/command";
-import type { Invocation } from "@blazetrails/thor/invocation";
-import { ARGV, invoke } from "../command.js";
+import { invoke } from "../command.js";
 import { Base } from "../command/base.js";
 import { Trails } from "../rails.js";
 
@@ -39,11 +39,12 @@ export class RoutesCommand extends Base {
     klass.methodAdded("perform");
   }
 
+  /** @missingRailsArgs invoke — PERMANENT */
   async invokeCommand(command: Command, ...args: unknown[]): Promise<unknown> {
     if (this.options.hasKey("unused")) {
-      return invoke("unused_routes", ARGV);
+      return invoke("unused_routes", rbArgv());
     } else {
-      return (Thor.prototype as unknown as Invocation).invokeCommand.call(this, command, ...args);
+      return super.invokeCommand(command, ...args);
     }
   }
 
@@ -72,8 +73,8 @@ export class RoutesCommand extends Base {
   private routesFilter(): RoutesFilter {
     const options = this.options as unknown as RoutesOptions;
     const filter: RoutesFilter = {};
-    if (options.controller !== undefined) filter.controller = options.controller;
-    if (options.grep !== undefined) filter.grep = options.grep;
+    if (this.options.hasKey("controller")) filter.controller = options.controller;
+    if (this.options.hasKey("grep")) filter.grep = options.grep;
     return filter;
   }
 }

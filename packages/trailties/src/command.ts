@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { env, rbArgv } from "@blazetrails/ruby-compat";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -8,9 +8,6 @@ import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
-
-/** @noRailsEquivalent PERMANENT */
-export const ARGV: string[] = [];
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 
@@ -31,19 +28,21 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
-  if (command && "perform" in command) {
-    if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-      await withArgv(args, () => command.perform(name, args, {}));
+  await withArgv(args, async () => {
+    if (command && "perform" in command) {
+      if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+        await command.perform(name, args, {});
+      } else {
+        await invokeRake(fullNamespace, args);
+      }
+    } else if (command && command.name() === name) {
+      await command.parent!.parseAsync([name, ...args], { from: "user" });
+    } else if (command && command.commands.some((c) => c.name() === name)) {
+      await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
     } else {
       await invokeRake(fullNamespace, args);
     }
-  } else if (command && command.name() === name) {
-    await command.parent!.parseAsync([name, ...args], { from: "user" });
-  } else if (command && command.commands.some((c) => c.name() === name)) {
-    await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
-  } else {
-    await invokeRake(fullNamespace, args);
-  }
+  });
 }
 
 /** @inventedArm replaceAll — PERMANENT */
@@ -79,12 +78,12 @@ function splitNamespace(namespace: string): [string, string] {
 
 /** @internal */
 async function withArgv(argv: string[], block: () => Promise<void>): Promise<void> {
-  const originalArgv = [...ARGV];
-  ARGV.splice(0, ARGV.length, ...argv);
+  const originalArgv = [...rbArgv()];
+  rbArgv().splice(0, rbArgv().length, ...argv);
   try {
     await block();
   } finally {
-    ARGV.splice(0, ARGV.length, ...originalArgv);
+    rbArgv().splice(0, rbArgv().length, ...originalArgv);
   }
 }
 
