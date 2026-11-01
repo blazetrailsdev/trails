@@ -50,5 +50,13 @@ the mean of three runs. CPU µs/req is 1,000,000 / req/s, since the pinned core 
 | Rails 8.1.4, Ruby 4.0.5 + YJIT, Puma 8.0.2 (3 threads) | 1,180 req/s, ~850 µs/req | 946 req/s, ~1,060 µs/req |
 | trails, Node.js 24.21.0                                | 527 req/s, ~1,900 µs/req | 406 req/s, ~2,460 µs/req |
 
-These figures predate the framework performance work merged since (#9427, #9428, #9430, #9437, #9446,
-#9482). They have not been re-measured under the same conditions, so treat them as a floor for trails.
+A later run on 2026-11-01 used the same pinning and `ab` settings, including the framework performance
+work merged since (#9427, #9428, #9430, #9437, #9446, #9482). The machine was busy (load 10-24) and
+`test/test.sh` was not re-run first, so treat the trails figures as good to about ±10%.
+
+|                                                        | `GET /posts/250000`      | `GET /feed`              |
+| ------------------------------------------------------ | ------------------------ | ------------------------ |
+| Rails 8.1.4, Ruby 4.0.5 + YJIT, Puma 8.0.2 (3 threads) | 1,204 req/s, ~830 µs/req | 953 req/s, ~1,050 µs/req |
+| trails, Node.js 24.21.0                                | 715 req/s, ~1,400 µs/req | 565 req/s, ~1,770 µs/req |
+
+That puts trails at about 0.59× Rails on both paths, up from about 0.44×.
