@@ -1,22 +1,29 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../test-unit/trailtie.js";
+import { TestCase } from "./test-case.js";
 
 class ChannelGeneratorApp extends Application {}
 let ChannelGenerator: typeof import("./rails/channel/channel-generator.js").ChannelGenerator;
-let destinationRoot: string;
+class ChannelGeneratorTest extends TestCase {}
+ChannelGeneratorTest.destination(Dir.mktmpdir());
+registerSpecType(/^ChannelGeneratorTest$/, ChannelGeneratorTest);
+let testCase: TestCase;
 
 beforeAll(async () => {
   await ChannelGeneratorApp.instance().loadGenerators();
   ({ ChannelGenerator } = await import("./rails/channel/channel-generator.js"));
+  ChannelGeneratorTest.tests(ChannelGenerator);
 });
 
-beforeEach(() => {
+beforeEach(async (context) => {
+  testCase = context.testCase as TestCase;
+  await testCase.prepareDestination();
   Trails.application = ChannelGeneratorApp.instance();
-  destinationRoot = Dir.mktmpdir();
-  File.write(File.join(destinationRoot, "tsconfig.json"), "{}");
+  File.write(path("tsconfig.json"), "{}");
   useWithJavascript();
   useUnderImportmap();
 });
@@ -30,7 +37,7 @@ async function runGenerator(
   args: string[],
   config: { behavior?: "invoke" | "revoke" } = {},
 ): Promise<void> {
-  await ChannelGenerator.start(args, { destinationRoot, ...config });
+  await testCase.runGenerator(args, config);
 }
 
 function stubInstallJavascriptDependencies(): void {
@@ -41,7 +48,7 @@ function stubInstallJavascriptDependencies(): void {
 }
 
 function path(relative: string): string {
-  return File.join(destinationRoot, relative);
+  return File.join(testCase.destinationRoot, relative);
 }
 
 function assertFile(relative: string): string {
@@ -50,7 +57,7 @@ function assertFile(relative: string): string {
 }
 
 function assertNoFile(relative: string): void {
-  expect(File.isExist(path(relative))).toBe(false);
+  testCase.assertNoFile(relative);
 }
 
 function useWithJavascript(): void {

@@ -1,5 +1,14 @@
-import { Dir, File, env } from "@blazetrails/ruby-compat";
-import { capture } from "@blazetrails/activesupport";
+import {
+  Dir,
+  File,
+  FileUtils,
+  RuntimeError,
+  env,
+  extend,
+  include,
+  included,
+} from "@blazetrails/ruby-compat";
+import { Stream, capture, classAttribute } from "@blazetrails/activesupport";
 import type { GeneratorBase, GeneratorConfig } from "../base.js";
 import { GeneratedAttribute } from "../generated-attribute.js";
 
@@ -10,6 +19,7 @@ type GeneratorClassHost = {
 
 export interface BehaviorHost {
   destinationRoot: string;
+  currentPath?: string;
   defaultArguments?: string[];
   generatorClass?: GeneratorClassHost;
   /** @internal */
@@ -56,6 +66,25 @@ export function createGeneratedAttribute(
 }
 
 /** @internal */
+export function isDestinationRootIsSet(this: BehaviorHost): void {
+  if (!this.destinationRoot) {
+    throw new RuntimeError(
+      "You need to configure your Rails::Generators::TestCase destination root.",
+    );
+  }
+}
+
+/** @internal */
+export function ensureCurrentPath(this: BehaviorHost): void {
+  FileUtils.cd(this.currentPath!);
+}
+
+export async function prepareDestination(this: BehaviorHost): Promise<void> {
+  await FileUtils.rmRfAsync(this.destinationRoot);
+  await FileUtils.mkdirPAsync(this.destinationRoot);
+}
+
+/** @internal */
 export function migrationFileName(this: BehaviorHost, relative: string): string | undefined {
   const absolute = File.expandPath(relative, this.destinationRoot);
   const [dirname, fileName] = [
@@ -66,3 +95,36 @@ export function migrationFileName(this: BehaviorHost, relative: string): string 
     new RegExp(`\\d+_${fileName}.ts$`).test(f),
   )[0];
 }
+
+export const ClassMethods = {
+  tests(this: { generatorClass?: unknown }, klass: unknown): void {
+    this.generatorClass = klass;
+  },
+
+  arguments(this: { defaultArguments?: string[] }, array: string[]): void {
+    this.defaultArguments = array;
+  },
+
+  destination(this: { destinationRoot?: string }, path: string): void {
+    this.destinationRoot = path;
+  },
+};
+
+export const Behavior = {
+  [included](klass: object): void {
+    classAttribute.call(klass, "currentPath", { default: File.expandPath(Dir.pwd()) });
+    classAttribute.call(klass, "defaultArguments", { default: [] });
+    classAttribute.call(klass, "destinationRoot");
+    classAttribute.call(klass, "generatorClass");
+    extend(klass as never, ClassMethods);
+  },
+  runGenerator,
+  generator,
+  createGeneratedAttribute,
+  isDestinationRootIsSet,
+  ensureCurrentPath,
+  prepareDestination,
+  migrationFileName,
+};
+
+include(Behavior, Stream);

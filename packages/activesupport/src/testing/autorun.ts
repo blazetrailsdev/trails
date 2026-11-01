@@ -8,9 +8,12 @@ import {
   iseqLocationSetup,
   rbModMethodDefined,
   rbModToS,
+  env,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
+import { Isolation } from "./isolation.js";
 import { Assertion, Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
@@ -110,6 +113,18 @@ beforeEach(async (context: TestContext) => {
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
   const testCase = (context.testCase = new klass(testName));
+  if (isModuleIncluded(klass, Isolation)) {
+    const body = getFn(context.task);
+    iseqLocationSetup(body, context.task.file.filepath, context.task.location?.line ?? 0);
+    Object.defineProperty(testCase, testName, { value: body, configurable: true });
+    setFn(context.task, async () => {
+      const result = await testCase.run();
+      if (env["ISOLATION_TEST"] == null && result.failure) {
+        throw result.failure instanceof UnexpectedError ? result.failure.error : result.failure;
+      }
+    });
+    return;
+  }
   captured.set(testCase, { from: context.task.result?.errors?.length ?? 0, at: -1, count: 0 });
   const run = getFn(context.task);
   if (!capturing.has(run)) {
@@ -135,11 +150,12 @@ beforeEach(async (context: TestContext) => {
   iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
   Object.defineProperty(testCase, testName, { value: test, configurable: true });
   await testCase.beforeSetup();
+  await testCase.setup();
 });
 
 afterEach(async (context: TestContext) => {
   const testCase = context.testCase;
-  if (testCase === undefined) return;
+  if (testCase === undefined || isModuleIncluded(testCase.constructor, Isolation)) return;
   const task = context.task as {
     mode?: string;
     result?: { state?: string; errors?: unknown[] };
@@ -154,6 +170,7 @@ afterEach(async (context: TestContext) => {
     testCase.failures.push(new Skip());
   }
   const failures = testCase.failures.length;
+  await testCase.teardown();
   await testCase.afterTeardown();
   if (testCase.failures.length > failures) throw testCase.failures[failures];
 });
