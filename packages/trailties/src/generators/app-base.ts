@@ -571,7 +571,10 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   protected dockerfileBinfileFixups(): string[] {
     const shebangs = Dir.glob("bin/*")
       .map((file) => File.read(file).split(/(?<=\n)/)[0] ?? "")
