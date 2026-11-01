@@ -63,6 +63,17 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(rake).not.toHaveBeenCalled();
   }, 30_000);
 
+  it("looks a task up without its bracketed arguments", async () => {
+    const rake = vi.spyOn(Program.prototype, "parseAsync").mockResolvedValue(createProgram());
+    onTestFinished(() => rake.mockRestore());
+
+    await invoke("db:migrate[1]");
+    expect(rake).toHaveBeenLastCalledWith(["db", "migrate"], { from: "user" });
+
+    await invoke("db[1]");
+    expect(rake).toHaveBeenLastCalledWith(["db"], { from: "user" });
+  }, 30_000);
+
   it("finds nothing for an unknown namespace", async () => {
     expect(await findByNamespace("nope", "cache")).toBeUndefined();
   });

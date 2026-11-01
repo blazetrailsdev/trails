@@ -191,13 +191,13 @@ async function invokeRake(
       return;
     }
   }
-  if (task !== "" && !program.commands.some((c) => c.name() === taskName)) {
+  if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
     throw new UnrecognizedCommandError(
       task,
       (await printingCommands()).map(([name]) => name),
     );
   }
-  await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
+  await program.parseAsync(taskName === "" ? args : [taskName, ...args], { from: "user" });
 }
 
 Trails.Command = { invoke };
