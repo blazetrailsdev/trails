@@ -23,6 +23,7 @@ import { RuntimeError } from "./runtime-error.js";
  * A host whose process adapter has no `signo` spawns no child, so it never
  * reaches the signal arm.
  *
+ * @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#system`
  * (`vendor/ruby/v3.3.11/process.c:4841`).
  */
@@ -41,6 +42,11 @@ export async function rbFSystem(
 
   const data = await adapter.system(prog, env, args, opthash);
   rbLastStatusSet(new Process.Status(data));
+  const klass = Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
+  const syserr =
+    klass !== undefined
+      ? new klass(prog)
+      : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
 
   if (data.pid != null && data.pid > 0) {
     if (data.status === 0) {
@@ -49,7 +55,7 @@ export async function rbFSystem(
 
     if (data.error !== undefined) {
       if (opthash.exception) {
-        rbSyserrFailStr(data.error, prog);
+        throw syserr;
       } else {
         return null;
       }
@@ -65,21 +71,8 @@ export async function rbFSystem(
   }
 
   if (opthash.exception) {
-    rbSyserrFailStr(data.error, prog);
+    throw syserr;
   } else {
     return null;
   }
-}
-
-/**
- * `rb_syserr_fail_str` (`vendor/ruby/v3.3.11/error.c:3573`).
- *
- * @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code
- * @noRailsEquivalent PERMANENT
- */
-export function rbSyserrFailStr(error: Error | undefined, mesg: string): never {
-  const code = (error as { code?: string } | undefined)?.code;
-  const klass = Errno[code as keyof typeof Errno];
-  if (klass !== undefined) throw new klass(mesg);
-  throw error ?? new SystemCallError(`unknown error - ${mesg}`);
 }
