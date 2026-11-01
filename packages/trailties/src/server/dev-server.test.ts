@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { RackApp } from "@blazetrails/actionpack";
 import type { TCPSocket } from "@blazetrails/ruby-compat";
 import { build } from "vite";
-import { AppGenerator } from "../generators/app-generator.js";
+import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import { DevServer } from "./dev-server.js";
 
 const rackApp: RackApp = async (env) => {

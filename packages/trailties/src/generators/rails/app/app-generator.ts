@@ -1,13 +1,13 @@
 import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, titleize } from "@blazetrails/activesupport";
-import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
-import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "./app-base.js";
-import type { GeneratorConfig } from "./base.js";
-import { Trails } from "../rails.js";
-import { GeneratorError } from "./generated-attribute.js";
-import { type DatabaseName } from "./database.js";
-import { TEMPLATES } from "./rails/app/templates/index.js";
-import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
+import { ref, tsClass, tsField, tsModule, tsRaw } from "../../../template-builder/index.js";
+import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
+import type { GeneratorConfig } from "../../base.js";
+import { Trails } from "../../../rails.js";
+import { GeneratorError } from "../../generated-attribute.js";
+import { type DatabaseName } from "../../database.js";
+import { TEMPLATES } from "./templates/index.js";
+import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -165,7 +165,7 @@ export class AppGenerator extends AppBase {
   };
 
   static {
-    void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.addSharedOptionsFor("application");
     this.classOption("version", {
       type: "boolean",
@@ -229,10 +229,6 @@ export class AppGenerator extends AppBase {
 
   declare options: AppGeneratorOptions & AppBaseOptions;
 
-  /**
-   * @missingRailsCall run_bundle — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
-   * @missingRailsCall run_after_bundle_callbacks — CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks
-   */
   static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
     const generator = new this(
       [destination],

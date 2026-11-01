@@ -1,6 +1,6 @@
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { AppGenerator } from "../generators/app-generator.js";
+import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import { GenerateCommand } from "./generate.js";
 
 export function appTemplateCommand(): Command {

@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { AppGenerator } from "../generators/app-generator.js";
+import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import {
   ViteManifest,
   loadViteManifest,
