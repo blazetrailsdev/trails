@@ -48,6 +48,7 @@ export class Cref {
     return true;
   }
 
+  /** @inventedArm if — PERMANENT */
   isDefined(): boolean {
     if (this.isAutoload() != null) return true;
     return constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false);
@@ -62,6 +63,7 @@ export class Cref {
     return rbConstGet(_seat(this.mod), this.cname, true, false);
   }
 
+  /** @inventedArm if — PERMANENT */
   remove(): unknown {
     if (_autoloads.get(this.mod)?.delete(this.cname)) return null;
     return rbModRemoveConst(this.mod, this.cname);

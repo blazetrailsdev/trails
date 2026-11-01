@@ -134,7 +134,10 @@ export class Loader {
     return result;
   }
 
-  /** @missingRailsArgs basename — PERMANENT */
+  /**
+   * @missingRailsArgs basename — PERMANENT
+   * @inventedArm replaceAll — PERMANENT
+   */
   async cpathExpectedAt(path: string | Pathname): Promise<string | null> {
     path = path.toString();
     const abspath = File.expandPath(path);
