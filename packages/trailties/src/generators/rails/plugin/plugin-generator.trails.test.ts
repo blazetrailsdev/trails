@@ -173,15 +173,24 @@ describe("PluginBuilder", () => {
     expect(await File.readAsync(`${root}/test/dummy/config/boot.ts`)).toContain(
       '"../../../lib/blog/admin.js"',
     );
-    expect(await File.readAsync(`${root}/test/dummy/config/application.ts`)).toMatch(
-      /^import ".\/boot.js";\n/,
-    );
     expect(await File.readAsync(`${root}/test/dummy/config/routes.ts`)).toContain(
       "this.mount(Blog.Admin.Engine,",
     );
     expect(
       await File.isExistAsync(`${root}/test/dummy/app/assets/stylesheets/application.css`),
     ).toBe(true);
+  });
+
+  it("loads the plugin's boot file from the dummy application", async () => {
+    const g = generator("mountable");
+    await g["build"]("generateTestDummy");
+    await g["build"]("testDummyConfig");
+    expect(await File.readAsync(`${root}/test/dummy/config/application.ts`)).toMatch(
+      /^import "\.\/boot\.ts";\n/,
+    );
+    expect(await File.readAsync(`${root}/test/dummy/config/boot.ts`)).toContain(
+      '"../../../lib/blog/admin.js"',
+    );
   });
 
   it("adds the plugin to an application's dependencies with none declared", async () => {

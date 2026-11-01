@@ -61,7 +61,9 @@ await Trails.application.loadServer();
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
-"import { Application } from "@blazetrails/trailties";
+"import "./boot.ts";
+
+import { Application } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
 

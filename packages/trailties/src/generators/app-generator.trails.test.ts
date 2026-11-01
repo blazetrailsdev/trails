@@ -37,6 +37,18 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
   });
 
+  it("writes config/boot.ts and imports it first from config/application.ts", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(fs.existsSync(path.join(tmpDir, "my-app/config/boot.ts"))).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, "my-app/config/application.ts"), "utf8")).toMatch(
+      /^import "\.\/boot\.ts";\n/,
+    );
+  });
+
   it("boots and builds its views under plain node, with no loader", async () => {
     const packageDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
     const root = fs.mkdtempSync(path.join(packageDir, "tmp-plain-node-"));

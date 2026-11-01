@@ -44,6 +44,7 @@ const ciSetup = (packageManager: string | undefined): string => `      - name: C
 `;
 
 export const TEMPLATES: Record<string, (locals: DatabaseTemplateLocals) => string> = {
+  "config/boot.ts": () => "// Set up anything that must run before trails loads.\n",
   "github/ci.yml": ({ database, packageManager, skipEslint, skipTest }) => `name: CI
 
 on:
