@@ -771,6 +771,16 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:3279` `rb_file_s_umask`, reading only. A backend
+   * with no permission bits answers 0, as `chmod` below is a no-op there.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static umask(): number {
+    return getProcessAdapter().umask?.() ?? 0;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2575` `rb_file_s_chmod`, which answers the number of
    * files whose mode was set. A backend with no permission bits has no
    * `chmodSync`, and there the call is a no-op.
@@ -778,10 +788,6 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
    * (`vendor/ruby/v3.3.11/file.c:2575`).
    */
-  static umask(): number {
-    return getProcessAdapter().umask!();
-  }
-
   static chmod(mode: number, ...files: string[]): number {
     for (const file of files) getFs().chmodSync?.(file, mode);
     return files.length;

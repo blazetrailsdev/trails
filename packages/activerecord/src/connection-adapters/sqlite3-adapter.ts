@@ -1051,6 +1051,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * @internal
    * @missingRailsCall busy_handler — PERMANENT
    * @inventedArm setBusyTimeout — PERMANENT
+   * @inventedArm retryBusy — PERMANENT
    */
   override async configureConnection(): Promise<void> {
     if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {

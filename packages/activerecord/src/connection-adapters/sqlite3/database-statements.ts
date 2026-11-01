@@ -194,11 +194,11 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  const retry = <T>(step: () => T | Promise<T>) =>
-    retryBusy(rawConnection, step, this._sharedLockHeld && this.isWriteQuery(sql));
+  const sharedLockHeld = this._sharedLockHeld && this.isTransactionOpen() && this.isWriteQuery(sql);
+  const retry = <T>(step: () => T | Promise<T>) => retryBusy(rawConnection, step, sharedLockHeld);
   let result: Result;
   if (batch) {
-    await execBatch(rawConnection, sql, this._sharedLockHeld && this.isWriteQuery(sql));
+    await execBatch(rawConnection, sql, sharedLockHeld);
     result = Result.empty();
   } else if (prepare) {
     const stmt = await retry(() => this._cachedStatement(rawConnection, sql));
@@ -233,7 +233,9 @@ export async function performQuery(
     }
   }
   this._sharedLockHeld =
-    /^\s*(?:SELECT|WITH)\b/i.test(sql) && !this.isWriteQuery(sql) && this.isTransactionOpen();
+    /^(?:\s|\/\*[\s\S]*?\*\/)*(?:SELECT|WITH)\b/i.test(sql) &&
+    !this.isWriteQuery(sql) &&
+    this.isTransactionOpen();
   this._lastAffectedRows = await rawConnection.changes();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;

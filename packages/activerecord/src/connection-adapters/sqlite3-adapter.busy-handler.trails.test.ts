@@ -144,6 +144,27 @@ describe("SQLite3Adapter busy handler", () => {
     }
   });
 
+  it("reads a commented SELECT in a transaction as a held lock", async () => {
+    await waiter.execute("BEGIN DEFERRED");
+    vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
+    await waiter.execute("/* tag */ SELECT * FROM t");
+
+    expect(waiter._sharedLockHeld).toBe(true);
+    await waiter.execute("ROLLBACK");
+  });
+
+  it("waits when a stale held-lock flag outlives its transaction", async () => {
+    await waiter.execute("SELECT 1");
+    waiter._sharedLockHeld = true;
+    await writer.execute("BEGIN IMMEDIATE");
+    setTimeout(() => void writer.execute("COMMIT"), 20);
+
+    await waiter.execute("INSERT INTO t VALUES (2)");
+
+    const rows = (await waiter.execute("SELECT COUNT(*) AS n FROM t"))!;
+    expect(Number(rows[0].n)).toBe(1);
+  });
+
   it("does not read a PRAGMA in a transaction as a held lock", async () => {
     await waiter.execute("BEGIN DEFERRED");
     vi.spyOn(waiter, "isTransactionOpen").mockReturnValue(true);
