@@ -9,8 +9,14 @@ import {
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
-import { FileUpdateChecker, onLoad, Reloader, resetLoadHooks } from "@blazetrails/activesupport";
-import { Dir, FileUtils, Monitor } from "@blazetrails/ruby-compat";
+import {
+  Executor,
+  FileUpdateChecker,
+  onLoad,
+  Reloader,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
+import { Dir, FileUtils, Monitor, Thread } from "@blazetrails/ruby-compat";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -435,6 +441,32 @@ describe("configure_executor_for_concurrency", () => {
 });
 
 describe("MonitorHook", () => {
+  it("excludes a second thread's executor until the first completes", async () => {
+    const executor = class extends Executor {};
+    executor.registerHook(new MonitorHook(), { outer: true });
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const first = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("first");
+        await gate;
+        order.push("first done");
+      }),
+    );
+    await Thread.pass();
+    const second = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("second");
+      }),
+    );
+    await Thread.pass();
+    release();
+    await first.join();
+    await second.join();
+    expect(order).toEqual(["first", "first done", "second"]);
+  });
+
   it("holds its monitor from run to complete", () => {
     const monitor = new Monitor();
     const hook = new MonitorHook(monitor);

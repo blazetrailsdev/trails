@@ -17,7 +17,7 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 
 export interface ExecutionHook {
   run(): unknown;
-  complete(state: unknown): void;
+  complete(state: unknown): unknown;
 }
 
 export interface CompletableExecution {
@@ -237,9 +237,16 @@ export class RunHook {
 
   constructor(readonly hook: ExecutionHook) {}
 
-  before(target: ExecutionWrapper): void {
+  before(target: ExecutionWrapper): unknown {
     const hookState = target.hookState();
-    hookState.set(this.hook, this.hook.run());
+    const state = this.hook.run();
+    if (isThenable(state)) {
+      return Promise.resolve(state).then((resolved) => {
+        hookState.set(this.hook, resolved);
+      });
+    }
+    hookState.set(this.hook, state);
+    return undefined;
   }
 }
 
@@ -252,15 +259,16 @@ export class CompleteHook {
 
   constructor(readonly hook: ExecutionHook) {}
 
-  before(target: ExecutionWrapper): void {
+  before(target: ExecutionWrapper): unknown {
     const hookState = target.hookState();
     if (hookState.has(this.hook)) {
-      this.hook.complete(hookState.get(this.hook));
+      return this.hook.complete(hookState.get(this.hook));
     }
+    return undefined;
   }
 
-  after(target: ExecutionWrapper): void {
-    this.before(target);
+  after(target: ExecutionWrapper): unknown {
+    return this.before(target);
   }
 }
 
