@@ -191,7 +191,6 @@ export class Session {
     this.env(name, value);
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   env(name: string, value: unknown): void {
     if (value == null) {
       delete this._env[name];

@@ -465,6 +465,14 @@ describe("AppGenerator", () => {
     expect(layout).toContain(`contentFor("title") ?? "My App"`);
   });
 
+  it("rejects a name whose constant is already in use", async () => {
+    await expect(
+      new AppGenerator(["string"], {}, { destinationRoot: "/tmp/string" }).createRoot(),
+    ).rejects.toThrow(
+      "Invalid application name string, constant String is already in use. Please choose another application name.",
+    );
+  });
+
   it("generates an application class that subclasses Application", async () => {
     await makeGen().invokeAll();
 

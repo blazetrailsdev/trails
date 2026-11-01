@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
+import { TopLevel, titleize } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../../../template-builder/index.js";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
@@ -17,8 +17,6 @@ const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
 };
 
 const META_OPTIONS = ["minimal"];
-
-const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
 const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
@@ -264,36 +262,6 @@ export class AppGenerator extends AppBase {
     if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
       throw new GeneratorError(
         `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
-      );
-    }
-  }
-
-  private originalAppName(): string {
-    return this.options.name ?? File.basename(this.destinationRoot);
-  }
-
-  private appName(): string {
-    return underscore(parameterize(this.originalAppName(), { preserveCase: true }));
-  }
-
-  private appConstBase(): string {
-    return camelize(this.appName().replace(/\W/g, "_").replace(/_+/g, "_"));
-  }
-
-  private appConst(): string {
-    return this.appConstBase();
-  }
-
-  private isValidConst(): void {
-    if (/^\d/.test(this.appConst())) {
-      throw new GeneratorError(
-        `Invalid application name ${this.originalAppName()}. Please give a name which does not start with numbers.`,
-      );
-    } else if (RESERVED_NAMES.includes(this.originalAppName())) {
-      throw new GeneratorError(
-        `Invalid application name ${this.originalAppName()}. Please give a ` +
-          `name which does not match one of the reserved trails ` +
-          `words: ${RESERVED_NAMES.join(", ")}`,
       );
     }
   }

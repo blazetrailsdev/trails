@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
 import {
   Dir,
   Errno,
@@ -6,6 +7,7 @@ import {
   RuntimeError,
   env,
   include,
+  type Included,
   rbFSend,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -16,6 +18,7 @@ import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
 import { GeneratorError } from "./generated-attribute.js";
+import { AppName } from "./app-name.js";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
@@ -38,6 +41,10 @@ export const BUN_VERSION = "1.0.1";
 export const JAVASCRIPT_OPTIONS = ["importmap", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
+export interface AppBase extends Included<typeof AppName> {
+  shebang(): string;
+}
+
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
@@ -49,8 +56,14 @@ export abstract class AppBase extends GeneratorBase {
   private _impliedOptionsConflicts: string[] = [];
   /** @internal */
   private _builder?: object;
+  /** @internal */
+  protected _argv: unknown[];
+  /** @internal */
+  protected _gemFilter: (gem: unknown) => boolean;
 
   static {
+    include(this as unknown as new (...args: unknown[]) => unknown, AppName);
+    this.addShebangOptionBang();
     this.argument("appPath", { type: "string" });
     this.noCommands(() => this.methodAdded("requiredRailties"));
     this.noCommands(() => this.methodAdded("includeAllRailties"));
@@ -235,6 +248,8 @@ export abstract class AppBase extends GeneratorBase {
     config: GeneratorConfig = {},
   ) {
     super(positionalArgv, optionArgv, config);
+    this._argv = [...positionalArgv, ...(Array.isArray(optionArgv) ? optionArgv : [])];
+    this._gemFilter = (_gem) => true;
     this.options = Object.fromEntries(
       this.options as unknown as Iterable<[string, unknown]>,
     ) as unknown as AppBaseOptions;

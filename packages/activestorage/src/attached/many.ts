@@ -76,6 +76,7 @@ Object.setPrototypeOf(
   delegateMissingTo.call(
     Object.create(Object.getPrototypeOf(Many.prototype) as object),
     "attachments",
+    { prototypeLayer: true },
   ),
 );
 

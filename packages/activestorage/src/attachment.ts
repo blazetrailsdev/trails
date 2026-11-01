@@ -172,6 +172,7 @@ Object.setPrototypeOf(
   delegateMissingTo.call(
     Object.create(Object.getPrototypeOf(Attachment.prototype) as object),
     "blob",
+    { prototypeLayer: true },
   ),
 );
 

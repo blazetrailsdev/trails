@@ -97,6 +97,13 @@ export interface FsAdapter {
     length: number,
     position: number | null,
   ): number;
+  writeAsync(
+    fd: number,
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): Promise<number>;
   closeSync(fd: number): void;
   copyFileSync(src: string, dest: string): void;
   cwd(): string;
@@ -347,6 +354,14 @@ function tryAutoRegisterNode(): boolean {
         position: number | null,
         cb: (error: Error | null, bytesRead: number) => void,
       ): void;
+      write(
+        fd: number,
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null,
+        cb: (error: Error | null, written: number) => void,
+      ): void;
     };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
       Object.assign(stat, {
@@ -364,6 +379,19 @@ function tryAutoRegisterNode(): boolean {
             if (error) return reject(error);
             flockPaths.set(fd, p);
             resolve(fd);
+          });
+        }),
+      writeAsync: (
+        fd: number,
+        buffer: Uint8Array,
+        offset: number,
+        length: number,
+        position: number | null,
+      ) =>
+        new Promise<number>((resolve, reject) => {
+          nodeCallbackFs.write(fd, buffer, offset, length, position, (error, written) => {
+            if (error) reject(error);
+            else resolve(written);
           });
         }),
       readAsync: (

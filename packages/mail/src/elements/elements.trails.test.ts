@@ -25,6 +25,10 @@ describe("elements with no spec of their own", () => {
     expect(new ContentDispositionElement("attachment;").dispositionType).toEqual("attachment");
   });
 
+  it("inspects an address with its class, id and string form", () => {
+    expect(new Address("a@b.c").inspect()).toMatch(/^#<Mail::Address:\d+ Address: \|a@b\.c\| >$/);
+  });
+
   it("reads the remaining single-parser elements", () => {
     expect(new ContentLocationElement("foo.html").toString()).toEqual("foo.html");
     expect(new ContentTransferEncodingElement("base64").encoding).toEqual("base64");
