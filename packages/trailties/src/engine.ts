@@ -230,7 +230,7 @@ export class Engine extends Trailtie {
   async helpers(): Promise<object> {
     if (this._helpers) return this._helpers;
     const helpers = {};
-    for (const mod of AbstractController.Helpers.helperModulesFromPaths(
+    for (const mod of AbstractController.Resolution.helperModulesFromPaths(
       await this.helpersPaths(),
     )) {
       include(helpers, mod);
@@ -331,7 +331,7 @@ export class Engine extends Trailtie {
 
   /** @internal */
   protected async isHasMigrations(): Promise<boolean> {
-    return ((await this.paths().get("db/migrate")?.existent()) ?? []).length > 0;
+    return (await this.paths().get("db/migrate")!.existent()).length > 0;
   }
 
   /** @internal */

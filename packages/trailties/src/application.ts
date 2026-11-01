@@ -23,7 +23,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { MessageVerifiers } from "@blazetrails/activesupport";
 import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
@@ -173,8 +173,13 @@ export class Application extends Engine {
 
   messageVerifiers(): MessageVerifiers {
     return (this._messageVerifiers ??= new MessageVerifiers(
-      (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
-        this.keyGenerator(secretKeyBase).generateKey(salt),
+      Object.assign(
+        (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
+          this.keyGenerator(secretKeyBase).generateKey(salt),
+        {
+          parameters: ["secretKeyBase"],
+        },
+      ),
     ).rotateDefaults());
   }
 
@@ -311,6 +316,34 @@ export class Application extends Engine {
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
 
+  override async helpersPaths(): Promise<string[]> {
+    return this.config.helpersPaths;
+  }
+
+  rakeTasks(block: TrailtieBlock): void {
+    (this.constructor as typeof Application).rakeTasks(block);
+  }
+
+  initializer(...args: Parameters<typeof Application.initializer>): void {
+    (this.constructor as typeof Application).initializer(...args);
+  }
+
+  runner(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).runner(blk);
+  }
+
+  console(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).console(blk);
+  }
+
+  generators(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).generators(blk);
+  }
+
+  isolateNamespace(mod: Parameters<typeof Application.isolateNamespace>[0]): void {
+    (this.constructor as typeof Application).isolateNamespace(mod);
+  }
+
   server(blk: TrailtieBlock): void {
     (this.constructor as typeof Application).server(blk);
   }
@@ -352,7 +385,7 @@ export class Application extends Engine {
   }
 
   messageVerifier(verifierName: string): MessageVerifier {
-    return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
+    return this.messageVerifiers().get(verifierName);
   }
 
   override envConfig(): Record<string, unknown> {

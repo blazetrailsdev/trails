@@ -7,7 +7,7 @@ await buildViews({ cwd: root });
 class SourceMapsApp extends Application {}
 const app = Trails.application ?? new SourceMapsApp();
 app.config.setRoot(root);
-await app.initialize();
+await app.initializeBang();
 const template = new LookupContext([`${root}/app/views`]).findTemplate(
   "show",
   ["broken"],

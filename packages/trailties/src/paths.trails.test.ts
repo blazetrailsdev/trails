@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
+import { Application } from "./application.js";
+import { Engine } from "./engine.js";
 import { Root } from "./paths.js";
 import { Annotation, Parser } from "./source-annotation-extractor.js";
 
@@ -33,11 +35,32 @@ describe("BacktraceCleaner", () => {
 });
 
 describe("Parser", () => {
+  it("skips a # in a multi-line string and stops at __END__", () => {
+    const parser = new Parser('x = "a\n# TODO: no"\n__END__\n# TODO: data\n', {
+      pattern: /#\s*(TODO):?\s*(.*)$/,
+    });
+    parser.parse();
+    expect(parser.comments).toEqual([]);
+    expect(parser.isError()).toBe(false);
+  });
+
   it("reads comments and skips a # inside a string", () => {
     const parser = new Parser('x = "# TODO: no"\ny # TODO: yes\n', {
       pattern: /#\s*(TODO):?\s*(.*)$/,
     });
     parser.parse();
     expect(parser.comments).toEqual([new Annotation(2, "TODO", "yes")]);
+  });
+});
+
+describe("Engine#helpers", () => {
+  it("answers a memoized module, read from config.helpersPaths on an Application", async () => {
+    class HelpersApp extends Application {}
+    const app = new HelpersApp();
+    const paths = await app.helpersPaths();
+    expect(paths).toBe(app.config.helpersPaths);
+    const helpers = await app.helpers();
+    expect(await app.helpers()).toBe(helpers);
+    expect(app).toBeInstanceOf(Engine);
   });
 });

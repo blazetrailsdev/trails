@@ -17,6 +17,7 @@ export class Parser {
   pattern: RegExp;
   private source: string;
   private lineno = 0;
+  private _quote: string | null = null;
 
   constructor(source: string, { pattern }: { pattern: RegExp }) {
     this.source = source;
@@ -28,18 +29,23 @@ export class Parser {
     if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
+  isError(): boolean {
+    return this._quote !== null;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
   parse(): void {
     for (const line of this.source.split("\n")) {
       this.lineno += 1;
-      let quote: string | null = null;
+      if (this._quote === null && line === "__END__") break;
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        if (quote !== null) {
+        if (this._quote !== null) {
           if (char === "\\") i += 1;
-          else if (char === quote) quote = null;
+          else if (char === this._quote) this._quote = null;
         } else if (char === '"' || char === "'") {
-          quote = char;
+          this._quote = char;
         } else if (char === "#") {
           this.onComment(line.slice(i));
           break;
@@ -56,7 +62,7 @@ export class ParserExtractor {
     const contents = File.read(file);
     const parser = new Parser(contents, { pattern: this.pattern });
     parser.parse();
-    return parser.comments;
+    return parser.isError() ? [] : parser.comments;
   }
 }
 

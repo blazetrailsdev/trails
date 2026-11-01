@@ -1,5 +1,5 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { File, getFs } from "@blazetrails/ruby-compat";
+import { File, getFs, sprintf } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];
@@ -192,6 +192,6 @@ export class CodeStatistics {
     const code = this.calculateCode();
     const tests = this.calculateTests();
 
-    return `  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${(tests / code).toFixed(1)}`;
+    return `  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${sprintf("%.1f", tests / code)}`;
   }
 }
