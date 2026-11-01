@@ -65,12 +65,6 @@ export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
 type Host = Base & Invocation & Shell & ActionsHost;
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Thor {
-  invokeCommand(command: Command, ...args: unknown[]): Promise<unknown>;
-}
-
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export class Thor {
   static {
     if (!rtest(rbGvGet("$thor_runner"))) rbGvSet("$thor_runner", false);

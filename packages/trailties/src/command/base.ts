@@ -9,6 +9,12 @@ import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";
 
+declare module "@blazetrails/thor" {
+  interface Thor {
+    invokeCommand(command: ThorCommand, ...args: unknown[]): Promise<unknown>;
+  }
+}
+
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Base extends Included<typeof Actions>, ThorBase, Shell {}
 
