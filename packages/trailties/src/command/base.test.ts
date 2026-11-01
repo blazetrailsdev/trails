@@ -42,20 +42,20 @@ describe("Rails::Command::BaseTest", () => {
     }
 
     const overview = await capture(":stdout", () => HelpfulCommand.perform("help", [], {}));
-    expect(overview).toContain("bin/rails helpful:foo PATH");
-    expect(overview).toContain("description of foo");
-    expect(overview).toContain("bin/rails helpful:bar [paths...]");
-    expect(overview).toContain("description of bar");
+    expect(overview).toMatch("bin/rails helpful:foo PATH");
+    expect(overview).toMatch("description of foo");
+    expect(overview).toMatch("bin/rails helpful:bar [paths...]");
+    expect(overview).toMatch("description of bar");
 
     const fooHelp = await capture(":stdout", () => HelpfulCommand.perform("foo", ["--help"], {}));
-    expect(fooHelp).toContain("bin/rails helpful:foo PATH");
-    expect(fooHelp).toContain("description of foo");
-    expect(fooHelp).not.toContain("helpful:bar");
+    expect(fooHelp).toMatch("bin/rails helpful:foo PATH");
+    expect(fooHelp).toMatch("description of foo");
+    expect(fooHelp).not.toMatch("helpful:bar");
 
     const barHelp = await capture(":stdout", () => HelpfulCommand.perform("bar", ["--help"], {}));
-    expect(barHelp).toContain("bin/rails helpful:bar [paths...]");
-    expect(barHelp).toContain("description of bar");
-    expect(barHelp).not.toContain("helpful:foo");
+    expect(barHelp).toMatch("bin/rails helpful:bar [paths...]");
+    expect(barHelp).toMatch("description of bar");
+    expect(barHelp).not.toMatch("helpful:foo");
   });
 
   it("::executable integrates ::bin", () => {

@@ -162,7 +162,6 @@ export class Base extends Thor {
     return this._commandName!;
   }
 
-  /** @internal */
   static async classUsage(): Promise<string | null> {
     const usagePath = await this.usagePath();
     if (usagePath != null) {

@@ -389,9 +389,7 @@ describe("Thor::Shell::Basic", () => {
           "Creates a back-up of the given folder by compressing it in a .tar.gz file and\n" +
           "then uploading it to the configured Amazon S3 Bucket.\n\n" +
           "It does not verify the integrity of the generated back-up.\n";
-        expect(await capture("stdout", () => new Basic().printWrapped(message))).toEqual(
-          expectedOutput,
-        );
+        await expect(() => new Basic().printWrapped(message)).toOutput(expectedOutput, "stdout");
       });
     });
 
@@ -401,9 +399,10 @@ describe("Thor::Shell::Basic", () => {
           "    Creates a back-up of the given folder by compressing it in a .tar.gz file\n" +
           "    and then uploading it to the configured Amazon S3 Bucket.\n\n" +
           "    It does not verify the integrity of the generated back-up.\n";
-        expect(
-          await capture("stdout", () => new Basic().printWrapped(message, { indent: 4 })),
-        ).toEqual(expectedOutput);
+        await expect(() => new Basic().printWrapped(message, { indent: 4 })).toOutput(
+          expectedOutput,
+          "stdout",
+        );
       });
     });
   });
@@ -532,7 +531,7 @@ describe("Thor::Shell::Basic", () => {
     it("prints tables with implicit columns", async () => {
       for (let i = 0; i < 2; i++) (table[0] as unknown[]).pop();
       const content = await capture("stdout", () => shell().printTable(table));
-      expect(content).toEqual("abc  \n     #0    empty\nxyz  #786  last three\n");
+      expect(content).toEqual(`abc${"  "}\n     #0    empty\nxyz  #786  last three\n`);
     });
 
     it("prints a table with small numbers and right-aligns them", async () => {
@@ -631,27 +630,32 @@ describe("Thor::Shell::Basic", () => {
       readline.mockResolvedValueOnce(null);
       expect(await shell().fileCollision("foo")).toBe(true);
       expect(print).toHaveBeenCalledWith("\n");
+      expect(readline).toHaveBeenCalled();
     });
 
     it("returns true if the user chooses default option", async () => {
       readline.mockResolvedValueOnce("");
       expect(await shell().fileCollision("foo")).toBe(true);
+      expect(readline).toHaveBeenCalled();
     });
 
     it("returns false if the user chooses no", async () => {
       readline.mockResolvedValueOnce("n");
       expect(await shell().fileCollision("foo")).toBe(false);
+      expect(readline).toHaveBeenCalled();
     });
 
     it("returns true if the user chooses yes", async () => {
       readline.mockResolvedValueOnce("y");
       expect(await shell().fileCollision("foo")).toBe(true);
+      expect(readline).toHaveBeenCalled();
     });
 
     it("shows help usage if the user chooses help", async () => {
       readline.mockResolvedValueOnce("h").mockResolvedValueOnce("n");
       const help = await capture("stdout", () => shell().fileCollision("foo"));
       expect(help).toMatch(/h - help, show this help/);
+      expect(readline).toHaveBeenCalled();
     });
 
     it("quits if the user chooses quit", async () => {
@@ -660,6 +664,7 @@ describe("Thor::Shell::Basic", () => {
 
       await expect(shell().fileCollision("foo")).rejects.toThrow(SystemExit);
       expect(print).toHaveBeenCalledWith("Aborting...\n");
+      expect(readline).toHaveBeenCalled();
     });
 
     it("always returns true if the user chooses always", async () => {
@@ -700,6 +705,8 @@ describe("Thor::Shell::Basic", () => {
         readline.mockResolvedValueOnce("d").mockResolvedValueOnce("n");
         await capture("stdout", () => shell().fileCollision("foo", block));
         expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/diff -u/));
+        expect(readline).toHaveBeenNthCalledWith(1, expect.anything(), expect.anything());
+        expect(readline).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything());
       });
 
       it("invokes the merge tool", async () => {
@@ -707,6 +714,7 @@ describe("Thor::Shell::Basic", () => {
         readline.mockResolvedValueOnce("m");
         await capture("stdout", () => shell().fileCollision("foo", block));
         expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/meld/));
+        expect(readline).toHaveBeenCalled();
       });
 
       it("invokes the merge tool that specified at ENV['THOR_MERGE']", async () => {
@@ -716,6 +724,7 @@ describe("Thor::Shell::Basic", () => {
           readline.mockResolvedValueOnce("m");
           await capture("stdout", () => shell().fileCollision("foo", block));
           expect(rbFSystem).toHaveBeenCalledWith(expect.stringMatching(/meld/));
+          expect(readline).toHaveBeenCalled();
         } finally {
           setEnv("THOR_MERGE", thorMerge);
         }
@@ -726,6 +735,8 @@ describe("Thor::Shell::Basic", () => {
         readline.mockResolvedValueOnce("m").mockResolvedValueOnce("n");
         const help = await capture("stdout", () => shell().fileCollision("foo", block));
         expect(help).toMatch(/Please specify merge tool to `THOR_MERGE` env/);
+        expect(readline).toHaveBeenNthCalledWith(1, expect.anything(), expect.anything());
+        expect(readline).toHaveBeenNthCalledWith(2, expect.anything(), expect.anything());
       });
     });
   });
