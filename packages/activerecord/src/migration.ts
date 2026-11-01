@@ -1421,7 +1421,8 @@ export class MigrationProxy {
   }
 
   async migrate(direction: "up" | "down", pool?: ConnectionPool): Promise<void> {
-    return (await this.migration()).migrate(direction, pool);
+    const migration = await this.migration();
+    return pool ? migration.migrate(direction, pool) : migration.migrate(direction);
   }
 
   async announce(message: string): Promise<void> {
