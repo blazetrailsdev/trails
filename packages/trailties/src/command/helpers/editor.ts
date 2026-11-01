@@ -36,6 +36,10 @@ export const Editor = defineModule(
       }
     },
 
+    /**
+     * @inventedArm if — PERMANENT
+     * @inventedArm onSignal — PERMANENT
+     */
     async systemEditor(this: EditorHost, filePath: string): Promise<boolean | null> {
       let interrupted = false;
       const untrap = onSignal("SIGINT", () => {

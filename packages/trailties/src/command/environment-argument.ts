@@ -5,7 +5,7 @@ import type { Base } from "./base.js";
 
 interface EnvironmentArgumentHost {
   options: { environment?: string };
-  _environment?: string;
+  _environment?: string | null;
   _environmentSpecified?: boolean;
   _availableEnvironments?: string[];
   environment(): string;
@@ -32,7 +32,7 @@ export const EnvironmentArgument = defineModule(
       return (this._environment ||= this.options.environment!);
     },
 
-    setEnvironment(this: EnvironmentArgumentHost, environment: string): void {
+    setEnvironment(this: EnvironmentArgumentHost, environment: string | null | undefined): void {
       this._environment = environment;
     },
 

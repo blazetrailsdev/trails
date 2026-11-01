@@ -114,7 +114,7 @@ export class CredentialsCommand extends Base {
     try {
       this._contentPath = contentPath;
       if (contentPath != null) {
-        this.setEnvironment(this.extractEnvironmentFromPath(contentPath)!);
+        this.setEnvironment(this.extractEnvironmentFromPath(contentPath));
         await this.loadEnvironmentConfigBang();
 
         const credentials = await this.credentials();

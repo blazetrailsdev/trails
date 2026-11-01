@@ -1,6 +1,6 @@
 import { presence } from "@blazetrails/activesupport";
 import { File, Pathname, env } from "@blazetrails/ruby-compat";
-import { APP_PATH } from "./app-path.js";
+import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -21,13 +21,24 @@ export function environment(): string {
 }
 
 export function root(): Pathname | undefined {
-  return applicationRoot();
+  if (ENGINE_ROOT != null) {
+    return new Pathname(ENGINE_ROOT);
+  } else {
+    return applicationRoot();
+  }
 }
 
-/** @inventedArm replace — PERMANENT */
+/**
+ * @inventedArm endsWith — CONVERGEABLE app-path-expands-to-the-application-root
+ * @inventedArm dirname — CONVERGEABLE app-path-expands-to-the-application-root
+ */
 export function applicationRoot(): Pathname | undefined {
-  if (APP_PATH != null)
-    return new Pathname(File.expandPath("../..", APP_PATH).replace(/\/dist$/, ""));
+  if (APP_PATH != null) {
+    const path = File.expandPath("../..", APP_PATH);
+    return new Pathname(
+      APP_PATH.endsWith("/dist/config/application.js") ? File.dirname(path) : path,
+    );
+  }
   return undefined;
 }
 

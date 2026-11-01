@@ -5,6 +5,7 @@ import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import type { Shell } from "@blazetrails/thor/shell";
+import { ENGINE_ROOT } from "../app-path.js";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";
@@ -35,6 +36,10 @@ export class Base extends Thor {
       this.methodAdded("executable");
       this.methodAdded("invokeCommand");
     });
+  }
+
+  static isEngine(): boolean {
+    return ENGINE_ROOT != null;
   }
 
   static isExitOnFailure(): boolean {
