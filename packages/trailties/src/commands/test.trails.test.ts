@@ -5,7 +5,7 @@ import { TestCommand } from "./test.js";
 
 describe("TestCommand", () => {
   it("is found under the test namespace with the reporter's executable", () => {
-    expect(TestCommand.namespace()).toBe("test");
+    expect(TestCommand.namespace()).toBe("rails:test");
     expect(TestCommand.executable()).toBe(TestUnitReporter.executable);
     expect(TestCommand.executable("models")).toBe("bin/rails test:models");
   });
