@@ -13,6 +13,7 @@ interface PluginBuilderHost {
   removeDir(path: string): Promise<unknown>;
   removeFile(path: string): Promise<unknown>;
   createFile(path: string, content: string, config: object): Promise<unknown>;
+  prependToFile(path: string, content: string): Promise<unknown>;
   insertIntoFile(path: string, content: string, config: object): Promise<unknown>;
   chmod(path: string, mode: number, config: object): Promise<unknown>;
   run(command: string, config: object): Promise<unknown>;
@@ -174,19 +175,16 @@ export class PluginBuilder {
 
   /**
    * @missingRailsArgs indent — PERMANENT
-   * @inventedArm insertIntoFile — CONVERGEABLE app-generator-writes-config-boot
+   * @inventedArm prependToFile — CONVERGEABLE app-generator-writes-config-boot
    */
   async testDummyConfig(this: PluginBuilderHost): Promise<void> {
     await this.template("rails/boot.ts", File.join(this.dummyPath(), "config/boot.ts"), {
       force: true,
     });
 
-    await this.insertIntoFile(
+    await this.prependToFile(
       File.join(this.dummyPath(), "config/application.ts"),
       'import "./boot.js";\n',
-      {
-        before: /^/,
-      },
     );
 
     if (this.isMountable()) {
