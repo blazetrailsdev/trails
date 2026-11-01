@@ -212,6 +212,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createEslintFile");
     this.methodAdded("createCifiles");
     this.methodAdded("createConfigFiles");
+    this.methodAdded("createBootFile");
     this.methodAdded("createDbFiles");
     this.methodAdded("createLibFiles");
     this.methodAdded("createLogFiles");
@@ -664,11 +665,18 @@ process.exit(status ?? 1);
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
+  /** @missingRailsArgs template — PERMANENT */
+  async createBootFile(): Promise<void> {
+    await this.template("config/boot.ts");
+  }
+
   async createConfigFiles(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
       "config/application.ts",
-      `import { Application } from "@blazetrails/trailties";
+      `import "./boot.ts";
+
+import { Application } from "@blazetrails/trailties";
 
 ${this.railsRequireStatement()}
 
@@ -1570,7 +1578,7 @@ export default defineConfig([
 
   override async template(source: string, ...args: unknown[]): Promise<void> {
     await this.createFile(
-      args[0] as string,
+      (args[0] as string | undefined) ?? source,
       TEMPLATES[source]({
         appName: this.appName(),
         database: this.database,

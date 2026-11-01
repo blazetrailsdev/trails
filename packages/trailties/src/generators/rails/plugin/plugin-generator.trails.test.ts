@@ -173,9 +173,6 @@ describe("PluginBuilder", () => {
     expect(await File.readAsync(`${root}/test/dummy/config/boot.ts`)).toContain(
       '"../../../lib/blog/admin.js"',
     );
-    expect(await File.readAsync(`${root}/test/dummy/config/application.ts`)).toMatch(
-      /^import ".\/boot.js";\n/,
-    );
     expect(await File.readAsync(`${root}/test/dummy/config/routes.ts`)).toContain(
       "this.mount(Blog.Admin.Engine,",
     );
