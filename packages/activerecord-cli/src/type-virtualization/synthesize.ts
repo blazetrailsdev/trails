@@ -241,7 +241,6 @@ function renderSchemaColumnDeclares(
     if (col === "id") continue;
     if (composedCols?.has(col)) continue;
     if (info.skipSchemaColumns.has(col)) continue;
-    // `changes`: the column reads through readAttribute; a declare would be TS2415.
     if (col in Base.prototype) continue;
     const railsType = typeof value === "string" ? value : value.type;
     const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);

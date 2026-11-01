@@ -2151,9 +2151,6 @@ extend(Base, {
 });
 extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
 extend(Base, {
-  // Rails raises from define_attribute_methods; trails' accessors are defined
-  // lazily, so a shadowing name would otherwise pass silently. A schema column
-  // never comes through here, so `changes` stays a legal column name.
   attribute(this: typeof Base, name: string, ...rest: unknown[]): void {
     const shadowsBase = name !== "id" && name in Base.prototype;
     if (shadowsBase || this.isDangerousAttributeMethod(name)) {
