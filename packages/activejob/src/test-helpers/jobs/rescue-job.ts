@@ -2,7 +2,7 @@ import {
   ArgumentError,
   block,
   NotImplementedError,
-  rbModConstSet,
+  constSet,
   rbModName,
   rbObjClass,
   registerConstant,
@@ -35,7 +35,7 @@ export class RescueJob extends Base {
   }
 }
 registerConstant("RescueJob", RescueJob);
-rbModConstSet(RescueJob, "OtherError", OtherError);
+constSet(RescueJob, "OtherError", OtherError);
 
 RescueJob.rescueFrom(
   ArgumentError,

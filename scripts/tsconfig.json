@@ -71,6 +71,9 @@
     },
     {
       "path": "../packages/raabro"
+    },
+    {
+      "path": "../packages/zeitwerk"
     }
   ]
 }

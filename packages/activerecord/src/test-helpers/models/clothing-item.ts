@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
 import { registerModel } from "../../associations.js";
@@ -19,13 +19,13 @@ registerModel(ClothingItem);
 
 export class ClothingItemUsed extends ClothingItem {
   static {
-    registerModel(rbModConstSet(ClothingItem, "Used", this));
+    registerModel(constSet(ClothingItem, "Used", this));
   }
 }
 
 export class ClothingItemSized extends ClothingItem {
   static {
-    registerModel(rbModConstSet(ClothingItem, "Sized", this));
+    registerModel(constSet(ClothingItem, "Sized", this));
   }
 
   static {

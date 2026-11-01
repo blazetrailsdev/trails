@@ -19,7 +19,7 @@ import {
   RuntimeError,
   StandardError,
   Zlib,
-  rbModConstSet,
+  constSet,
   rbObjRespondTo,
   slice,
   isModuleIncluded,
@@ -446,9 +446,9 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
-rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
-rbModConstSet(FixtureSet, "File", File);
+constSet(ActiveRecord, "FixtureSet", FixtureSet);
+constSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
 
-rbModConstSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);
+constSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);

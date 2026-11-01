@@ -737,7 +737,7 @@ describe("Thor", () => {
 
     describe("when the user enters an ambiguous substring of a command", () => {
       it("raises an exception and displays a message that explains the ambiguity", async () => {
-        const shell = new Base.shell!();
+        const shell = new Base.shell();
         const error = vi.spyOn(shell, "error").mockImplementation(() => {});
         await myScript.start(["call"], { shell: shell });
         expect(error).toHaveBeenCalledWith(
@@ -746,7 +746,7 @@ describe("Thor", () => {
       });
 
       it("raises an exception when there is an alias", async () => {
-        const shell = new Base.shell!();
+        const shell = new Base.shell();
         const error = vi.spyOn(shell, "error").mockImplementation(() => {});
         await myScript.start(["f"], { shell: shell });
         expect(error).toHaveBeenCalledWith("Ambiguous command f matches [foo, fu]");
@@ -760,7 +760,7 @@ describe("Thor", () => {
       memo = undefined;
     });
     function shell(): Basic {
-      return (memo ??= new Base.shell!());
+      return (memo ??= new Base.shell());
     }
 
     describe("on general", () => {

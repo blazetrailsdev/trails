@@ -1,5 +1,5 @@
 import { Admin } from "../admin.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 import { registerModel } from "../../../associations.js";
 
@@ -21,8 +21,8 @@ class Coder {
 
 export class AdminUserJson extends Base {
   static {
-    registerModel(rbModConstSet(Admin, "UserJSON", this));
-    rbModConstSet(this, "Coder", Coder);
+    registerModel(constSet(Admin, "UserJSON", this));
+    constSet(this, "Coder", Coder);
   }
 
   static {

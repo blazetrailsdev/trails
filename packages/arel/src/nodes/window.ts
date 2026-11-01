@@ -1,4 +1,4 @@
-import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -124,10 +124,10 @@ export class Following extends Unary {
   }
 }
 
-rbModConstSet(Nodes, "Window", Window);
-rbModConstSet(Nodes, "NamedWindow", NamedWindow);
-rbModConstSet(Nodes, "Preceding", Preceding);
-rbModConstSet(Nodes, "Following", Following);
-rbModConstSet(Nodes, "CurrentRow", CurrentRow);
-rbModConstSet(Nodes, "Rows", Rows);
-rbModConstSet(Nodes, "Range", Range);
+constSet(Nodes, "Window", Window);
+constSet(Nodes, "NamedWindow", NamedWindow);
+constSet(Nodes, "Preceding", Preceding);
+constSet(Nodes, "Following", Following);
+constSet(Nodes, "CurrentRow", CurrentRow);
+constSet(Nodes, "Rows", Rows);
+constSet(Nodes, "Range", Range);

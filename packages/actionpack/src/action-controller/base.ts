@@ -15,7 +15,7 @@ import {
   ArgumentError,
   isModuleIncluded,
   rbClassInheritedP,
-  rbModConstGet,
+  constGet,
   rbModName,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -461,9 +461,7 @@ export class Base extends Metal {
   static withoutModules(
     ...modules: Array<string | Parameters<typeof include>[1]>
   ): Array<Parameters<typeof include>[1]> {
-    const mods = modules.map((m) =>
-      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
-    );
+    const mods = modules.map((m) => (typeof m === "string" ? constGet(ActionController, m) : m));
     return Base.MODULES.filter((m) => !mods.includes(m));
   }
 

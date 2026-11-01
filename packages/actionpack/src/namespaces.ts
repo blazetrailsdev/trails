@@ -11,7 +11,7 @@ import {
   NameError,
   RuntimeError,
   rbInspect,
-  rbModConstGet,
+  constGet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
@@ -181,7 +181,7 @@ Session.resolveStore = function (sessionStore: string): unknown {
   const camelized = camelize(isSymbol ? sessionStore.slice(1) : sessionStore);
   const inspected = isSymbol ? sessionStore : rbInspect(sessionStore);
   try {
-    return rbModConstGet(this, camelized);
+    return constGet(this, camelized);
   } catch (e) {
     if (!(e instanceof NameError)) throw e;
     throw new RuntimeError(

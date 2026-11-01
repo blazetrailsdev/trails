@@ -1,5 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
 import "../nodes/index.js";
@@ -151,4 +151,4 @@ export class MySQL extends ToSql {
   }
 }
 
-rbModConstSet(Visitors, "MySQL", MySQL);
+constSet(Visitors, "MySQL", MySQL);

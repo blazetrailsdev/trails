@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Unary } from "./unary.js";
 import type { ArelNode } from "../arel.js";
 
@@ -18,5 +18,5 @@ export class BitwiseNot extends UnaryOperation {
   }
 }
 
-rbModConstSet(Nodes, "UnaryOperation", UnaryOperation);
-rbModConstSet(Nodes, "BitwiseNot", BitwiseNot);
+constSet(Nodes, "UnaryOperation", UnaryOperation);
+constSet(Nodes, "BitwiseNot", BitwiseNot);

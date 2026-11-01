@@ -122,6 +122,7 @@ export {
   TopLevel,
   type ConstantTable,
   type TopLevelConstants,
+  rbModUndefMethod,
 } from "./object.js";
 export {
   Hash,
@@ -253,8 +254,8 @@ export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs
 export {
   Module,
   rbCModule,
-  rbModConstDefined,
-  rbModConstSet,
+  constDefined,
+  constSet,
   defineModule,
   Kernel,
   type KernelModule,
@@ -393,7 +394,7 @@ export {
   rbConstGet,
   rbGvGet,
   rbGvSet,
-  rbModConstGet,
+  constGet,
   rbModConstants,
   rbModDeprecateConstant,
   rbConstWarnIfDeprecated,

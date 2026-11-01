@@ -62,7 +62,7 @@ import {
   Range as ArRange,
   RuntimeError,
   sort,
-  rbModConstSet,
+  constSet,
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
@@ -106,22 +106,22 @@ class CreditCard extends Base {}
 registerModel(CreditCard);
 class PinNumber extends Base {
   static {
-    rbModConstSet(CreditCard, "PinNumber", this);
+    constSet(CreditCard, "PinNumber", this);
   }
 }
 class CvvCode extends Base {
   static {
-    rbModConstSet(PinNumber, "CvvCode", this);
+    constSet(PinNumber, "CvvCode", this);
   }
 }
 class SubPinNumber extends PinNumber {
   static {
-    rbModConstSet(CreditCard, "SubPinNumber", this);
+    constSet(CreditCard, "SubPinNumber", this);
   }
 }
 class Brand extends Category {
   static {
-    rbModConstSet(CreditCard, "Brand", this);
+    constSet(CreditCard, "Brand", this);
   }
 }
 class MasterCreditCard extends Base {}

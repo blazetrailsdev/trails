@@ -386,6 +386,7 @@ const alias = {
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
+  "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/src/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
@@ -648,6 +649,7 @@ export default defineConfig({
             "packages/thor/**",
             "packages/et-orbi/**",
             "packages/raabro/**",
+            "packages/zeitwerk/**",
             "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
@@ -701,7 +703,7 @@ export default defineConfig({
           globals: true,
           include: ["packages/thor/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          globalSetup: ["./packages/thor/src/test-helpers/build-templates.ts"],
+          globalSetup: ["./scripts/thor-build-templates.ts"],
           setupFiles: [...otherSetupFiles, "./packages/thor/src/test-helpers/setup.ts"],
         },
       },
@@ -716,6 +718,16 @@ export default defineConfig({
             "./packages/vitest-matchers/src/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
           ],
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "zeitwerk",
+          globals: true,
+          include: ["packages/zeitwerk/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
       },
       {

@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import type { Attribute } from "../attributes/attribute.js";
 import { Unary } from "./unary.js";
 
@@ -11,4 +11,4 @@ export class Grouping extends Unary {
   }
 }
 
-rbModConstSet(Nodes, "Grouping", Grouping);
+constSet(Nodes, "Grouping", Grouping);

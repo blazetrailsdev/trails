@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  include,
-  rbModConstSet,
-  registerConstant,
-  unregisterConstant,
-} from "@blazetrails/ruby-compat";
+import { include, constSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Broadcasting } from "./broadcasting.js";
 import { Naming } from "./naming.js";
@@ -27,7 +22,7 @@ describe("ActionCable::Channel::Broadcasting", () => {
 
   it("serializes a namespaced class's channel name with the model", () => {
     registerConstant("Chat", Chat);
-    rbModConstSet(Chat, "RoomsChannel", RoomsChannel);
+    constSet(Chat, "RoomsChannel", RoomsChannel);
     expect(klass.broadcastingFor("lobby")).toBe("chat:rooms:lobby");
   });
 

@@ -1,11 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import {
-  type ConstantTable,
-  regexpEscape,
-  rbModConstGet,
-  rbModConstSet,
-} from "@blazetrails/ruby-compat";
+import { type ConstantTable, regexpEscape, constGet, constSet } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";
@@ -188,7 +183,7 @@ export function deconstantize(path: string): string {
 export function constantize<K extends keyof ConstantTable>(camelCasedWord: K): ConstantTable[K];
 export function constantize(camelCasedWord: string): unknown;
 export function constantize(camelCasedWord: string): unknown {
-  return rbModConstGet(Object, camelCasedWord);
+  return constGet(Object, camelCasedWord);
 }
 
 export function safeConstantize<K extends keyof ConstantTable>(
@@ -236,4 +231,4 @@ export function ordinalize(number: number): string {
 
 export { parameterize } from "./transliterate.js";
 
-rbModConstSet(ActiveSupport, "Inflector", Inflector);
+constSet(ActiveSupport, "Inflector", Inflector);

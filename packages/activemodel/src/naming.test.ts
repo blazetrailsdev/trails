@@ -2,17 +2,17 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { assert, assertNot, inflections } from "@blazetrails/activesupport";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant } from "@blazetrails/ruby-compat";
 
 class Post {
   static TrackBack = class TrackBack {};
 }
 registerConstant("Post", Post);
-rbModConstSet(Post, "TrackBack", Post.TrackBack);
+constSet(Post, "TrackBack", Post.TrackBack);
 
 const Blog = {} as { Post: { name: string } };
 registerConstant("Blog", Blog);
-rbModConstSet(Blog, "Post", class Post {});
+constSet(Blog, "Post", class Post {});
 
 describe("NamingTest", () => {
   const modelName = new ModelName(Post.TrackBack);
@@ -60,7 +60,7 @@ describe("NamingHelpersTest", () => {
 
   class NamedTrackBack extends Model {
     static {
-      rbModConstSet(Post, "NamedTrackBack", this);
+      constSet(Post, "NamedTrackBack", this);
     }
     static override get modelName(): ModelName {
       return new ModelName(this);

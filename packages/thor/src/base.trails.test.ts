@@ -248,13 +248,13 @@ describe("Thor::Base", () => {
       expect(klass.arguments()).toEqual([]);
       const proto = klass.prototype as Record<string, unknown>;
       expect(Object.getOwnPropertyDescriptor(proto, "name")?.get).toBeTypeOf("function");
-      expect(Object.getOwnPropertyDescriptor(proto, "other")).toMatchObject({ value: undefined });
       const instance = new klass([]);
       expect(rbObjRespondTo(instance, "name")).toBe(true);
       expect(rbObjRespondTo(instance, "name=")).toBe(true);
       expect(rbObjRespondTo(instance, "other")).toBe(false);
       expect(rbObjRespondTo(instance, "other=")).toBe(false);
       expect(() => rbFSend(instance, "other=", 1)).toThrow(NoMethodError);
+      expect(() => rbFSend(instance, "other")).toThrow(NoMethodError);
     });
   });
 

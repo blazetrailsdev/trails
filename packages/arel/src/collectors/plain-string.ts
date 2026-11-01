@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 export class PlainString {
@@ -18,4 +18,4 @@ export class PlainString {
   }
 }
 
-rbModConstSet(Collectors, "PlainString", PlainString);
+constSet(Collectors, "PlainString", PlainString);

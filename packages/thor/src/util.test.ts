@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assertEmpty } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { assertEmpty } from "./test-helpers/assertions.js";
+import { constSet } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import { Thor, type ThorClass } from "./thor.js";
 import { AnotherScript, Apple, MyScript, Pear, Scripts } from "./test-helpers/fixtures/script.js";
@@ -50,7 +50,7 @@ describe("Thor::Util", () => {
       expect(Util.namespaceFromThorClass(HashWithIndifferentAccess)).toEqual(
         "thor:core_ext:hash_with_indifferent_access",
       );
-      expect(Util.namespaceFromThorClass(rbModConstSet({ name: "Thor" }, "Util", {}))).toEqual(
+      expect(Util.namespaceFromThorClass(constSet({ name: "Thor" }, "Util", {}))).toEqual(
         "thor:util",
       );
     });
@@ -105,7 +105,7 @@ describe("Thor::Util", () => {
     });
 
     it("falls back in the namespace:command look up even if a full namespace does not match", () => {
-      rbModConstSet(Thor, "Help", {});
+      constSet(Thor, "Help", {});
       expect(Util.findClassAndCommandByNamespace("thor:help")).toEqual([Thor, "help"]);
       delete (Thor as { Help?: unknown }).Help;
     });

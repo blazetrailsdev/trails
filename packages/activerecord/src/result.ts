@@ -9,7 +9,7 @@ import {
   last,
   rbEqual,
   rbInspect,
-  rbModConstSet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -292,5 +292,5 @@ export function columnType(
   );
 }
 
-rbModConstSet(ActiveRecord, "Result", Result);
-rbModConstSet(Result, "IndexedRow", IndexedRow);
+constSet(ActiveRecord, "Result", Result);
+constSet(Result, "IndexedRow", IndexedRow);

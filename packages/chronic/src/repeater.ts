@@ -1,4 +1,4 @@
-import { capitalize, cmp, Hash, rbModConstGet, RuntimeError } from "@blazetrails/ruby-compat";
+import { capitalize, cmp, Hash, constGet, RuntimeError } from "@blazetrails/ruby-compat";
 import { Chronic } from "./namespaces.js";
 import type { Span } from "./span.js";
 import { Tag } from "./tag.js";
@@ -128,7 +128,7 @@ export class Repeater<T = unknown> extends Tag<T> {
       .set(/^seconds?$/m, "second")) {
       if (item.test(token.word)) {
         const klassName = "Repeater" + capitalize(symbol, []);
-        const klass = rbModConstGet(Chronic, klassName) as typeof Repeater;
+        const klass = constGet(Chronic, klassName) as typeof Repeater;
         return new klass(symbol, options);
       }
     }

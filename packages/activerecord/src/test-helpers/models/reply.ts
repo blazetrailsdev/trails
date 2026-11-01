@@ -1,7 +1,7 @@
 import type { Base } from "../../base.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { Account } from "./account.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
 import { registerModel } from "../../associations.js";
 
@@ -126,7 +126,7 @@ registerModel(WrongReply);
 
 export class WebReply extends WebTopic {
   static {
-    registerModel(rbModConstSet(Web, "Reply", this));
+    registerModel(constSet(Web, "Reply", this));
   }
   static {
     this.belongsTo("topic", {

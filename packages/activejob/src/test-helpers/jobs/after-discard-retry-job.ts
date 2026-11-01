@@ -1,5 +1,5 @@
 import { constantize, ordinalize } from "@blazetrails/activesupport";
-import { block, rbModConstSet, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import { block, constSet, registerConstant, StandardError } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
@@ -36,7 +36,7 @@ for (const [name, klass] of Object.entries({
   AfterDiscardError,
   ChildAfterDiscardError,
 })) {
-  rbModConstSet(AfterDiscardRetryJob, name, klass);
+  constSet(AfterDiscardRetryJob, name, klass);
 }
 
 AfterDiscardRetryJob.retryOn(DefaultsError);

@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Ordering } from "./ordering.js";
 
 export class Descending extends Ordering {
@@ -22,4 +22,4 @@ export class Descending extends Ordering {
 
 import { Ascending } from "./ascending.js";
 
-rbModConstSet(Nodes, "Descending", Descending);
+constSet(Nodes, "Descending", Descending);

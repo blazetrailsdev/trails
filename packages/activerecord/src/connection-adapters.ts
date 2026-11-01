@@ -1,5 +1,5 @@
 import { underscore } from "@blazetrails/activesupport";
-import { LoadError, NameError, rbModConstDefined, rbModConstGet } from "@blazetrails/ruby-compat";
+import { LoadError, NameError, constDefined, constGet } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -22,7 +22,7 @@ export async function load(adapterName: string | undefined): Promise<void> {
   if (!className) return;
 
   loadErrors.delete(adapterName ?? "");
-  if (!rbModConstDefined(Object, className)) {
+  if (!constDefined(Object, className)) {
     try {
       await (ConnectionAdapters.loadPath[pathToAdapter!] ?? (() => import(pathToAdapter!)))();
     } catch (error) {
@@ -43,7 +43,7 @@ export function resolve(adapterName: string | undefined): AdapterClass {
     );
   }
 
-  if (!rbModConstDefined(Object, className)) {
+  if (!constDefined(Object, className)) {
     const error = loadErrors.get(adapterName ?? "");
     if (error !== undefined) {
       const message = error instanceof Error ? error.message : String(error);
@@ -73,7 +73,7 @@ export function resolve(adapterName: string | undefined): AdapterClass {
   }
 
   try {
-    return rbModConstGet(Object, className) as AdapterClass;
+    return constGet(Object, className) as AdapterClass;
   } catch (error) {
     if (!(error instanceof NameError)) throw error;
     throw new AdapterNotFound(

@@ -5,7 +5,7 @@ import {
   Hash,
   isPlainHash,
   LoadError,
-  rbModConstGet,
+  constGet,
   StandardError,
   type Tempfile,
 } from "@blazetrails/ruby-compat";
@@ -49,7 +49,7 @@ export class ImageProcessingTransformer extends Transformer {
 
   /** @internal */
   private processor(): ChainableHost {
-    return rbModConstGet(
+    return constGet(
       ImageProcessing,
       camelize(String(ActiveStorage.variantProcessor)),
     ) as ChainableHost;

@@ -3,7 +3,7 @@ import {
   NoMethodError,
   puts,
   rbCheckArity,
-  rbModConstSet,
+  constSet,
   rbObjClassname,
   RuntimeError,
   stdout as $stdout,
@@ -186,7 +186,7 @@ export class AnotherScript extends Thor {
 
   baz() {}
 }
-rbModConstSet(MyScript, "AnotherScript", AnotherScript);
+constSet(MyScript, "AnotherScript", AnotherScript);
 
 export class MyChildScript extends MyScript {
   static {
@@ -280,7 +280,7 @@ class ScriptsMyScript extends MyChildScript {
     return this.accessor;
   }
 }
-rbModConstSet(scripts, "MyScript", ScriptsMyScript);
+constSet(scripts, "MyScript", ScriptsMyScript);
 
 class MyDefaults extends Thor {
   static {
@@ -310,14 +310,14 @@ class MyDefaults extends Thor {
     puts.call($stdout, "command");
   }
 }
-rbModConstSet(scripts, "MyDefaults", MyDefaults);
+constSet(scripts, "MyDefaults", MyDefaults);
 
 class ChildDefault extends Thor {
   static {
     (this as unknown as ThorClass).namespace("default:child");
   }
 }
-rbModConstSet(scripts, "ChildDefault", ChildDefault);
+constSet(scripts, "ChildDefault", ChildDefault);
 
 class Arities extends Thor {
   static isExitOnFailure(): boolean {
@@ -351,7 +351,7 @@ class Arities extends Thor {
   optional_arg(_arg: unknown = "default") {}
   multiple_usages(_arg: unknown) {}
 }
-rbModConstSet(scripts, "Arities", Arities);
+constSet(scripts, "Arities", Arities);
 
 export const Scripts = scripts as typeof scripts & {
   MyScript: typeof ScriptsMyScript;

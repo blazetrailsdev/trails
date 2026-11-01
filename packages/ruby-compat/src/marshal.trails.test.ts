@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
-import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
+import { Module, extend, rbDefineAllocFunc, constSet } from "./include.js";
 import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
 import {
   rbCBasicObject,
@@ -39,16 +39,16 @@ class Shape {
 }
 const Geo = { name: "Geo", Shape } as { name: string; Shape: typeof Shape; Mark?: object };
 rbSetClassPathString(Shape, Geo, "Shape");
-const Kind = rbModConstSet(Geo, "Kind", {});
-rbModConstSet(Geo, "Mark", {});
+const Kind = constSet(Geo, "Kind", {});
+constSet(Geo, "Mark", {});
 class Pair extends Struct.new("a", "b") {}
-rbModConstSet(Geo, "Pair", Pair);
+constSet(Geo, "Pair", Pair);
 class Shadow extends Struct.new("a") {
   override get a(): unknown {
     return 99;
   }
 }
-rbModConstSet(Geo, "Shadow", Shadow);
+constSet(Geo, "Shadow", Shadow);
 const STRUCT = "0408533a0e47656f3a3a50616972073a066169063a06625b063a0678";
 const EXTENDED =
   "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65";

@@ -7,7 +7,7 @@ import {
   stderr,
   registerConstant,
 } from "@blazetrails/ruby-compat";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -89,7 +89,7 @@ expect.addEqualityTesters([
 ]);
 
 class Undeprecated {}
-const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", {}), {
+const UndeprecatedFoo = Object.assign(constSet(Undeprecated, "Foo", {}), {
   BAR: "foo bar",
 });
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);

@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  rbModConstSet,
+  constSet,
   rbObjSingletonClass,
   registerConstant,
   RuntimeError,
@@ -720,7 +720,7 @@ describe("RedirectTest", () => {
 
 const ModuleTest = {} as { ModuleRedirectController: typeof RedirectController };
 registerConstant("ModuleTest", ModuleTest);
-rbModConstSet(
+constSet(
   ModuleTest,
   "ModuleRedirectController",
   class ModuleRedirectController extends RedirectController {

@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
-import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
+import { constGet, registerConstant, unregisterConstant } from "./variable.js";
 import { Hash } from "./hash.js";
 import {
   rbInspect,
@@ -21,8 +21,8 @@ import {
   include,
   rbCallSuper,
   rbObjIsKindOf,
-  rbModConstDefined,
-  rbModConstSet,
+  constDefined,
+  constSet,
   prepend,
   extend,
   included,
@@ -1823,25 +1823,25 @@ describe("Module#const_defined?", () => {
     class Topic {}
     class Reply extends Topic {}
     const mod = new Module();
-    expect(rbModConstDefined(Topic, "Generated")).toBe(false);
-    rbModConstSet(Topic, "Generated", 1);
-    rbModConstSet(mod, "ATTR_d697", "my");
-    expect(rbModConstDefined(Topic, "Generated")).toBe(true);
-    expect(rbModConstDefined(Reply, "Generated")).toBe(true);
-    expect(rbModConstDefined(mod, "ATTR_d697")).toBe(true);
-    expect(rbModConstDefined(mod, "Generated")).toBe(false);
+    expect(constDefined(Topic, "Generated")).toBe(false);
+    constSet(Topic, "Generated", 1);
+    constSet(mod, "ATTR_d697", "my");
+    expect(constDefined(Topic, "Generated")).toBe(true);
+    expect(constDefined(Reply, "Generated")).toBe(true);
+    expect(constDefined(mod, "ATTR_d697")).toBe(true);
+    expect(constDefined(mod, "Generated")).toBe(false);
   });
 
   it("rbModConstDefined walks a :: path from the top-level table", () => {
     const db = { Adapters: { Mega: class {} } };
     registerConstant("ConstDefinedTrailsDb", db);
     try {
-      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb")).toBe(true);
-      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Mega")).toBe(true);
-      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Nope")).toBe(false);
-      expect(rbModConstDefined(Object, "ConstDefinedTrailsNope::Adapters")).toBe(false);
-      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb", false)).toBe(false);
-      expect(() => rbModConstGet(Object, "ConstDefinedTrailsNope")).toThrow(
+      expect(constDefined(Object, "ConstDefinedTrailsDb")).toBe(true);
+      expect(constDefined(Object, "ConstDefinedTrailsDb::Adapters::Mega")).toBe(true);
+      expect(constDefined(Object, "ConstDefinedTrailsDb::Adapters::Nope")).toBe(false);
+      expect(constDefined(Object, "ConstDefinedTrailsNope::Adapters")).toBe(false);
+      expect(constDefined(Object, "ConstDefinedTrailsDb", false)).toBe(false);
+      expect(() => constGet(Object, "ConstDefinedTrailsNope")).toThrow(
         "uninitialized constant ConstDefinedTrailsNope",
       );
     } finally {
@@ -1852,15 +1852,15 @@ describe("Module#const_defined?", () => {
   it("looks at the module alone when recur is false", () => {
     class Topic {}
     class Reply extends Topic {}
-    rbModConstSet(Topic, "Generated", 1);
-    expect(rbModConstDefined(Topic, "Generated", false)).toBe(true);
-    expect(rbModConstDefined(Reply, "Generated", false)).toBe(false);
+    constSet(Topic, "Generated", 1);
+    expect(constDefined(Topic, "Generated", false)).toBe(true);
+    expect(constDefined(Reply, "Generated", false)).toBe(false);
   });
 
   it("raises NameError for a name that is not a constant name", () => {
     class Topic {}
-    expect(() => rbModConstDefined(Topic, "name")).toThrow(NameError);
-    expect(() => rbModConstDefined(Topic, "name")).toThrow("wrong constant name name");
+    expect(() => constDefined(Topic, "name")).toThrow(NameError);
+    expect(() => constDefined(Topic, "name")).toThrow("wrong constant name name");
   });
 });
 
@@ -1869,7 +1869,7 @@ describe("Module#const_set", () => {
     class Topic {}
     const mod = new Module();
     expect(mod.name).toBeNull();
-    expect(rbModConstSet(Topic, "Generated", mod)).toBe(mod);
+    expect(constSet(Topic, "Generated", mod)).toBe(mod);
     expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
     expect(mod.name).toBe("Topic::Generated");
     expect(mod.inspect()).toBe("Topic::Generated");
@@ -1880,7 +1880,7 @@ describe("Module#const_set", () => {
     const mod = {};
     expect(rbModName(mod)).toBeNull();
     expect(rbModToS(mod as never)).toMatch(/^#<Module:0x/);
-    rbModConstSet(Topic, "Generated", mod);
+    constSet(Topic, "Generated", mod);
     expect(rbModName(mod)).toBe("Topic::Generated");
     expect(rbModToS(mod as never)).toBe("Topic::Generated");
     expect(rbInspect(mod)).toBe("Topic::Generated");
@@ -1893,7 +1893,7 @@ describe("Module#const_set", () => {
     const W = { w: () => "w" };
     include(W, Y);
     include(W, Z);
-    rbModConstSet(W, "Inner", {});
+    constSet(W, "Inner", {});
     expect(rbModAncestors(W)).toEqual([W, Z, Y]);
     expect(isModuleIncluded(W, Y)).toBe(true);
     expect(isModuleIncluded(W, W)).toBe(false);
@@ -1905,11 +1905,11 @@ describe("Module#const_set", () => {
     const Namespace = { name: "Namespace" };
     class Topic {}
     expect(rbModName(Topic)).toBe("Topic");
-    expect(rbModConstSet(Namespace, "Topic", Topic)).toBe(Topic);
+    expect(constSet(Namespace, "Topic", Topic)).toBe(Topic);
     expect(rbModName(Topic)).toBe("Namespace::Topic");
     expect(rbModToS(Topic)).toBe("Namespace::Topic");
     class Reply {}
-    rbModConstSet(Topic, "Reply", Reply);
+    constSet(Topic, "Reply", Reply);
     expect(rbModName(Reply)).toBe("Namespace::Topic::Reply");
     expect(rbModName((() => class {})())).toBeNull();
   });
@@ -1917,24 +1917,24 @@ describe("Module#const_set", () => {
   it("gives a module bound under an anonymous owner a temporary path until a named owner binds it", () => {
     const owner = new Module();
     const mod = new Module();
-    rbModConstSet(owner, "X", mod);
+    constSet(owner, "X", mod);
     expect(mod.name).toBe(`${owner.inspect()}::X`);
     class N {}
-    rbModConstSet(N, "Z", mod);
+    constSet(N, "Z", mod);
     expect(mod.name).toBe("N::Z");
   });
 
   it("paths a module under an anonymous class by the class's temporary path", () => {
     const owner = (() => class {})();
     const mod = new Module();
-    rbModConstSet(owner, "X", mod);
+    constSet(owner, "X", mod);
     expect(owner.name).toBe("");
     expect(mod.name).toMatch(/^#<Class:0x[0-9a-f]{16}>::X$/);
     expect(mod.name).toBe(`${rbModToS(owner)}::X`);
   });
 
   it("raises NameError for a name that is not a constant name", () => {
-    expect(() => rbModConstSet(class N {}, "foo", 1)).toThrow(
+    expect(() => constSet(class N {}, "foo", 1)).toThrow(
       new NameError("wrong constant name foo", "foo"),
     );
   });

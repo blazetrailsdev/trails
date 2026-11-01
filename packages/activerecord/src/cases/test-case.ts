@@ -25,7 +25,7 @@ import {
   rbEqq,
   rbEqual,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbObjRespondTo,
   setEnv,
   stderr,
@@ -440,4 +440,4 @@ export interface TestCase extends Omit<TestFixtures, "beforeSetup" | "afterTeard
   loadSchema: typeof LoadSchemaHelper.loadSchema;
 }
 
-rbModConstSet(ActiveRecord, "TestCase", TestCase);
+constSet(ActiveRecord, "TestCase", TestCase);

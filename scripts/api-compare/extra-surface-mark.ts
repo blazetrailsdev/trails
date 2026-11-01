@@ -147,7 +147,6 @@ export const TAGGED_ONLY_PACKAGES = [
   "actionview",
   "i18n",
   "ruby-compat",
-  "thor",
 ] as const;
 
 /**
@@ -168,6 +167,7 @@ export const ROWLESS_PACKAGES = [
   "did-you-mean",
   "et-orbi",
   "raabro",
+  "zeitwerk",
   "fugit",
   "globalid",
   "marcel",
@@ -176,6 +176,7 @@ export const ROWLESS_PACKAGES = [
   "rack-session",
   "rack-test",
   "rails-dom-testing",
+  "thor",
 ] as const;
 
 /**

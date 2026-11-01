@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "../test-helpers/assertions.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Argument, type ArgumentOptions } from "./argument.js";
 

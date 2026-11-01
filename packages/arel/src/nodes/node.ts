@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 import { FactoryMethods, type FactoryMethodsModule } from "../factory-methods.js";
 import type { And } from "./nary.js";
@@ -55,4 +55,4 @@ export interface Node extends FactoryMethodsModule {}
 
 include(Node, FactoryMethods);
 
-rbModConstSet(Nodes, "Node", Node);
+constSet(Nodes, "Node", Node);

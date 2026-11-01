@@ -1,5 +1,5 @@
 import { PlainString } from "./plain-string.js";
-import { Range, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Range, constSet } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 export class SQLString extends PlainString {
@@ -29,4 +29,4 @@ export class SQLString extends PlainString {
   }
 }
 
-rbModConstSet(Collectors, "SQLString", SQLString);
+constSet(Collectors, "SQLString", SQLString);

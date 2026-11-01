@@ -123,6 +123,11 @@ const KERNEL_CALLEES = new Map([
   ["rbFLoad", "load"],
   ["rbProcCall", "call"],
 ]);
+/**
+ * ruby-compat's `Module#const_get` family. The module is Ruby's receiver, so it
+ * is not an argument: `constGet(Object, name)` pairs with `Object.const_get(name)`.
+ */
+const CONST_FAMILY_CALLEES = new Set(["constGet", "constSet", "constDefined"]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
 const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
@@ -7106,7 +7111,12 @@ function recordCallSite(
   const name = callSiteName(call);
   if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
-    const args = describeArgs(call.arguments, flags);
+    const args = describeArgs(
+      ts.isIdentifier(callee) && CONST_FAMILY_CALLEES.has(callee.text)
+        ? ts.factory.createNodeArray(call.arguments?.slice(1))
+        : call.arguments,
+      flags,
+    );
     const recv =
       wrapped !== undefined
         ? describeArg(wrapped, [])

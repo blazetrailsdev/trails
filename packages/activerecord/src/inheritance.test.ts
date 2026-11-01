@@ -9,7 +9,7 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { include, rbModConstSet, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
+import { include, constSet, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -598,7 +598,7 @@ describe("InheritanceAttributeTest", () => {
 
   class AttrTestCompany extends Base {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Company", this);
+      constSet(InheritanceAttributeTest, "Company", this);
     }
     static {
       this.tableName = "companies";
@@ -607,12 +607,12 @@ describe("InheritanceAttributeTest", () => {
   }
   class AttrTestStartup extends AttrTestCompany {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Startup", this);
+      constSet(InheritanceAttributeTest, "Startup", this);
     }
   }
   class AttrTestEmpire extends AttrTestCompany {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Empire", this);
+      constSet(InheritanceAttributeTest, "Empire", this);
     }
   }
 
@@ -656,7 +656,7 @@ describe("InheritanceAttributeMappingTest", () => {
 
   class IamtCompany extends Base {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Company", this);
+      constSet(InheritanceAttributeMappingTest, "Company", this);
     }
     static {
       this.tableName = "companies";
@@ -665,12 +665,12 @@ describe("InheritanceAttributeMappingTest", () => {
   }
   class IamtStartup extends IamtCompany {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Startup", this);
+      constSet(InheritanceAttributeMappingTest, "Startup", this);
     }
   }
   class IamtEmpire extends IamtCompany {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Empire", this);
+      constSet(InheritanceAttributeMappingTest, "Empire", this);
     }
   }
 

@@ -16,7 +16,7 @@ import {
   getPath,
   LOAD_PATH,
   Pathname,
-  rbConstGet,
+  constGet,
   RuntimeError,
   setSourceMapsSupport,
   symbolToS,
@@ -396,7 +396,7 @@ export class Application extends Engine {
       "action_dispatch.show_exceptions": this.config.actionDispatch.showExceptions,
       "action_dispatch.show_detailed_exceptions": this.config.considerAllRequestsLocal,
       "action_dispatch.log_rescued_responses": this.config.actionDispatch.logRescuedResponses,
-      "action_dispatch.debug_exception_log_level": rbConstGet(
+      "action_dispatch.debug_exception_log_level": constGet(
         Logger,
         symbolToS(this.config.actionDispatch.debugExceptionLogLevel).toUpperCase(),
       ),

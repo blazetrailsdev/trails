@@ -1,0 +1,33 @@
+{
+  "name": "@blazetrails/zeitwerk",
+  "version": "0.1.0",
+  "description": "Build-time autoloader for Trails, mirroring the zeitwerk gem",
+  "type": "module",
+  "main": "dist/zeitwerk.js",
+  "types": "dist/zeitwerk.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/zeitwerk.d.ts",
+      "default": "./dist/zeitwerk.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  }
+}

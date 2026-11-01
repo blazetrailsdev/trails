@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotImplementedError, rbModConstSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { NotImplementedError, constSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { Callbacks } from "./callbacks.js";
 import { ActiveJob } from "./namespaces.js";
@@ -65,7 +65,7 @@ describe("ActiveJob::Execution", () => {
         return value;
       }
     }
-    rbModConstSet(ActiveJob, "ExecutedJob", ExecutedJob);
+    constSet(ActiveJob, "ExecutedJob", ExecutedJob);
     try {
       const jobData = new ExecutedJob(1).serialize();
       expect(await Base.execute(jobData)).toBe(1);

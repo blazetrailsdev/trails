@@ -1,4 +1,4 @@
-import { Module, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Module, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { assigningSynchronously } from "@blazetrails/activemodel";
 import { camelize, classAttribute, kernelArray, singularize } from "@blazetrails/activesupport";
 import {
@@ -52,7 +52,7 @@ export class CollectionAssociation extends Association {
       const extensionModuleName = `${camelize(name)}AssociationExtension`;
       const extension: Record<string, unknown> = {};
       block(extension);
-      rbModConstSet(model, extensionModuleName, extension);
+      constSet(model, extensionModuleName, extension);
       return extension;
     }
     return undefined;

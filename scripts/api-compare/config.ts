@@ -213,6 +213,7 @@ export const MANIFEST_PACKAGES = [
   "mini-mime",
   "net-smtp",
   "rake",
+  "zeitwerk",
 ] as const;
 
 /**
