@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { rbArgv, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbArgv, rbEqual, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "./base.js";
 import { invoke } from "../command.js";
@@ -153,7 +153,7 @@ describe("Rails::Command::BaseTest", () => {
     class ArgvCommand extends Base {
       checkPopulated(...args: string[]): void {
         const argv = rbArgv();
-        if (argv.length === 0 || argv.join() !== args.join()) throw new Error("not populated");
+        if (argv.length === 0 || !rbEqual(argv, args)) throw new Error("not populated");
       }
 
       static {

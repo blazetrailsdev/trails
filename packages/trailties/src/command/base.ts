@@ -161,14 +161,12 @@ export class Base extends Thor {
     return this._commandName!;
   }
 
-  /** @inventedArm assign — PERMANENT */
   static async classUsage(): Promise<string | null> {
     const usagePath = await this.usagePath();
     if (usagePath != null) {
       if (!Object.hasOwn(this, "_classUsage") || this._classUsage == null) {
-        const erb = Object.assign(new TSE(await File.readAsync(usagePath), { trimMode: "-" }), {
-          filename: usagePath,
-        });
+        const erb = new TSE(await File.readAsync(usagePath), { trimMode: "-" });
+        erb.filename = usagePath;
         this._classUsage = await erb.result(rbFBinding(this));
       }
       return this._classUsage;

@@ -425,22 +425,53 @@ export function renderCoreClassPaths(): string {
   ].join("\n");
 }
 
+/** The per-file tables on disk, so one left with no paired classes is still visited. */
+async function lazyTablesOnDisk(dir: string): Promise<string[]> {
+  const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, "src"));
+  return files.filter(
+    (file) =>
+      /^class-paths\..+\.generated\.ts$/.test(file) &&
+      file !== EXCLUDED_GENERATED &&
+      file !== separateTable(SEPARATE_SUBPATH_ENTRIES[dir] ?? ""),
+  );
+}
+
+/** A lazy file is outside the entry graph, so only its own import loads its table. */
+async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Promise<string[]> {
+  const prefix = LAZY_DIRS[dir];
+  if (prefix === undefined) return [];
+  const missing = new Set<string>();
+  for (const { file, table } of entries) {
+    if (!table || !file.startsWith(prefix)) continue;
+    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    if (!source.includes(`/${table.replace(/\.ts$/, ".js")}"`)) missing.add(file);
+  }
+  return [...missing];
+}
+
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const at = process.argv.indexOf("--package");
   const only = at === -1 ? undefined : process.argv[at + 1];
   const stale: string[] = [];
   const tables = await collectClassPaths(only);
-  const targets = [...tables].flatMap(([dir, entries]) => [
-    [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
-    [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
-    ...[
-      ...new Set([
-        ...(SEPARATE_SUBPATH_ENTRIES[dir] ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])] : []),
-        ...entries.flatMap((e) => (e.table ? [e.table] : [])),
+  const targets = (
+    await Promise.all(
+      [...tables].map(async ([dir, entries]) => [
+        [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
+        [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
+        ...[
+          ...new Set([
+            ...(SEPARATE_SUBPATH_ENTRIES[dir]
+              ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])]
+              : []),
+            ...entries.flatMap((e) => (e.table ? [e.table] : [])),
+            ...(LAZY_DIRS[dir] ? await lazyTablesOnDisk(dir) : []),
+          ]),
+        ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
       ]),
-    ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
-  ]);
+    )
+  ).flat();
   if (only === undefined || only === "ruby-compat") {
     const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);
     const next = await prettier.format(renderCoreClassPaths(), {
@@ -495,6 +526,10 @@ async function main(): Promise<void> {
   }
   if (check) {
     for (const [dir, entries] of tables) {
+      for (const file of await lazyFilesMissingTable(dir, entries)) {
+        console.error(`${dir}/src/${file} does not import its class-path table`);
+        process.exitCode = 1;
+      }
       if (entries.length > 0) await checkSeatedPaths(dir);
     }
   }
