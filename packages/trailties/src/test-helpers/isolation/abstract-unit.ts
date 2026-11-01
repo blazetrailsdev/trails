@@ -120,7 +120,7 @@ export class Generation {
         `${appPath}/config/routes.ts`,
         `import { ActionDispatch } from "@blazetrails/actionpack";\n` +
           routes.slice(0, match.index) +
-          `\nActionDispatch.deprecator.silence(() => this.match(":controller(/:action(/:id))(.:format)", { via: "all" }));\n` +
+          `\nActionDispatch.deprecator().silence(() => this.match(":controller(/:action(/:id))(.:format)", { via: "all" }));\n` +
           match[1],
       );
     }

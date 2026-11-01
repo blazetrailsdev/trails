@@ -27,7 +27,7 @@ describe("TestHelpers::Generation#build_app", () => {
     expect(development).not.toContain("applyEslintAutocorrectAfterGenerateBang");
     expect(development).toContain("annotateRenderedViewWithFilenames = false;");
     expect(await getFs().readFile(`${appPath}/config/routes.ts`, "utf-8")).toContain(
-      ":controller(/:action(/:id))(.:format)",
+      "ActionDispatch.deprecator().silence(",
     );
     expect(await getFs().readdir!(`${appPath}/config/initializers`)).toEqual([]);
   });
