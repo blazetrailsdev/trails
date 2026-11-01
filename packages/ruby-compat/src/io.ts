@@ -887,12 +887,15 @@ export class IO {
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
   static async copyStreamAsync(
-    src: { read(length?: number): string | Uint8Array | null },
-    dst: string,
+    src: { read(length?: number): string | Uint8Array | null } | IO,
+    dst: string | IO,
   ): Promise<number> {
     const chunks: Uint8Array[] = [];
     let data: string | Uint8Array | null;
-    while ((data = src.read(16384)) != null && data.length > 0) {
+    while (
+      (data = await (src instanceof IO ? src.readAsync(16384) : src.read(16384))) != null &&
+      data.length > 0
+    ) {
       chunks.push(typeof data === "string" ? new TextEncoder().encode(data) : data);
     }
     const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
@@ -900,6 +903,12 @@ export class IO {
     for (const chunk of chunks) {
       bytes.set(chunk, offset);
       offset += chunk.length;
+    }
+    if (dst instanceof IO) {
+      const fs = getFs();
+      if (fs.writeFile) await fs.writeFile(dst.pathv!, bytes, { flag: "a" });
+      else dst.write(bytes);
+      return bytes.length;
     }
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(dst, bytes);
@@ -1190,6 +1199,25 @@ export class IO {
     }
     this._pos += n;
     if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
+    return buffer.slice(0, n);
+  }
+
+  /**
+   * {@link read}'s length form over the backend's async read.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
+   * (`vendor/ruby/v3.3.11/io.c:3711`).
+   */
+  async readAsync(length: number): Promise<Uint8Array | null> {
+    const buffer = new Uint8Array(length);
+    let n = 0;
+    while (n < length) {
+      const read = await getFs().readAsync(this.fd, buffer, n, length - n, this._pos + n);
+      if (read === 0) break;
+      n += read;
+    }
+    if (n === 0) return length === 0 ? new Uint8Array(0) : null;
+    this._pos += n;
     return buffer.slice(0, n);
   }
 

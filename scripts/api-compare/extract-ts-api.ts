@@ -7459,6 +7459,14 @@ function isSuspensionTimer(
   );
 }
 
+/** Whether the function around `n` declares `void` or `Promise<void>`: nothing reads its answer. */
+function answersVoid(n: ts.Node): boolean {
+  let fn: ts.Node | undefined = n;
+  while (fn !== undefined && !ts.isFunctionLike(fn)) fn = fn.parent;
+  const type = fn === undefined ? undefined : fn.type?.getText();
+  return type === "void" || type === "Promise<void>";
+}
+
 function collectCalls(
   node: ts.Node | undefined,
   skipHoistedClosures = false,
@@ -7507,6 +7515,9 @@ function collectCalls(
     const tails = form === "spread" ? spreadReceiverNames(receiver) : [receiverTailName(receiver)];
     for (const tail of tails) {
       if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    }
+    if (form === "delete" && answersVoid(receiver)) {
+      hashForms.add(`${NATIVE_FORM_PREFIX}delete:void`);
     }
     if (checkerProvenKind(receiver) === "object") {
       if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);

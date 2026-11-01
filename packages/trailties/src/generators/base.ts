@@ -16,6 +16,7 @@ import {
   hashDelete,
   isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
+import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
 import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
@@ -122,6 +123,33 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
     this.addRuntimeOptionsBang();
     this.strictArgsPositionBang();
+  }
+
+  static addShebangOptionBang(): void {
+    this.classOption("ruby", {
+      type: "string",
+      aliases: "-r",
+      default: rubyCommand(),
+      desc: "Path to the Ruby binary of your choice",
+      banner: "PATH",
+    });
+
+    this.noCommands(() => {
+      Object.defineProperty(this.prototype, "shebang", {
+        configurable: true,
+        writable: true,
+        value(this: { _shebang?: string; options: { ruby?: string } }): string {
+          if (this._shebang === undefined) {
+            const command =
+              this.options.ruby === rubyCommand()
+                ? `/usr/bin/env ${File.basename(rubyCommand())}`
+                : this.options.ruby;
+            this._shebang = `#!${command}`;
+          }
+          return this._shebang;
+        },
+      });
+    });
   }
 
   static isExitOnFailure(): boolean {

@@ -265,6 +265,7 @@ export namespace Delegation {
       has(obj, prop) {
         if (prop === "marshal_dump" || prop === "_dump") return false;
         if (Reflect.has(obj, prop)) return true;
+        if (Reflect.ownKeys(obj).length === 0) return false;
         const __target = (obj as Record<string, unknown>)[targetName];
         return __target != null && prop in Object(__target);
       },

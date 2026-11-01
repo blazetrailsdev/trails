@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Address } from "./address.js";
 import { ContentDispositionElement } from "./content-disposition-element.js";
 import { ContentLocationElement } from "./content-location-element.js";
 import { ContentTransferEncodingElement } from "./content-transfer-encoding-element.js";
@@ -14,6 +15,10 @@ describe("elements with no spec of their own", () => {
     const type = new ContentTypeElement("text/plain; charset=utf-8;  ");
     expect([type.mainType, type.subType]).toEqual(["text", "plain"]);
     expect(new ContentDispositionElement("attachment;").dispositionType).toEqual("attachment");
+  });
+
+  it("inspects an address with its class, id and string form", () => {
+    expect(new Address("a@b.c").inspect()).toMatch(/^#<Mail::Address:\d+ Address: \|a@b\.c\| >$/);
   });
 
   it("reads the remaining single-parser elements", () => {
