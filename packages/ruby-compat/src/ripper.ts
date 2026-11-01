@@ -29,10 +29,9 @@ const DEF_HEAD = new RegExp(
   `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})(\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
   "y",
 );
+const PATTERN_END = /(?:then|if|unless)\b/y;
+const PATTERN_VALUE = /:[ \t]*[^\s,})]/y;
 const LAMBDA_DO = /do\b/y;
-const PATTERN_LITERAL = /"[^"]*"|'[^']*'|(?<!\w):\w+/g;
-const PATTERN_KEY = /\w+:(?=\s*[^\s,})])/g;
-const IN_PATTERN = /[^\n]*?(?=\bthen\b|\bif\b|\bunless\b|;|$)/my;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
 const RESCUE_VAR = new RegExp(`[^\\n]*?=>\\s*(${IDENT})`, "y");
 const ASSIGNMENT = new RegExp(
@@ -47,6 +46,14 @@ const OPERATOR_KEYWORDS = new Set(
     " ",
   ),
 );
+
+interface Binder {
+  close: string;
+  pattern: boolean;
+  depth: number;
+  destructuring: number;
+  expected: boolean;
+}
 
 /**
  * `Ripper` (`vendor/ruby/v3.3.11/ext/ripper/lib/ripper/core.rb:14`), reduced to
@@ -65,6 +72,7 @@ export class Ripper {
   private _error = false;
   private _state = EXPR_BEG;
   private _forIn = false;
+  private _binder: Binder | null = null;
   private _pending: Array<{ id: string; indent: boolean; raw: boolean }> = [];
   private _locals = new Set<string>();
 
@@ -127,62 +135,76 @@ export class Ripper {
     }
   }
 
-  private _paramList(start: number, close: string): void {
-    const src = this._src;
-    let depth = 0;
-    let destructuring = 0;
-    let expected = true;
-    for (let i = start; i < src.length; i++) {
-      const c = src[i];
-      if (depth === 0 && destructuring === 0 && c === close) return;
-      if (depth === 0 && close === "\n" && c === ";") return;
-      LAMBDA_DO.lastIndex = i;
-      if (depth === 0 && close === "{" && LAMBDA_DO.test(src)) return;
-      if (c === "#") {
-        const eol = src.indexOf("\n", i);
-        if (eol === -1) return;
-        i = eol - 1;
-        continue;
+  private _bind(close: string, pattern = false): void {
+    this._binder = { close, pattern, depth: 0, destructuring: 0, expected: true };
+    this._state = EXPR_BEG;
+  }
+
+  private _scanBinder(binder: Binder, c: string): boolean {
+    const atTop = binder.depth === 0;
+    if (atTop && binder.destructuring === 0 && c === binder.close) {
+      this._binder = null;
+      if (c === ")" || c === "|") {
+        this._pos += 1;
+        this._state = c === ")" ? EXPR_END : EXPR_BEG;
+        return true;
       }
-      if (c === '"' || c === "'") {
-        for (i += 1; i < src.length && src[i] !== c; i++) {
-          if (src[i] === "\\") i += 1;
-        }
-        continue;
-      }
-      WORD.lastIndex = i;
-      const word = expected && depth === 0 ? WORD.exec(src) : null;
-      if (word) {
-        this._locals.add(word[0]);
-        i += word[0].length - 1;
-        expected = false;
-      } else if (c === "(" && expected && depth === 0) {
-        destructuring += 1;
-      } else if (c === ")" && depth === 0 && destructuring > 0) {
-        destructuring -= 1;
-      } else if ("([{".includes(c)) {
-        depth += 1;
-      } else if (")]}".includes(c)) {
-        depth -= 1;
-        if (depth < 0) return;
-      } else if (depth === 0 && (c === "," || c === ";")) {
-        expected = true;
+      return false;
+    }
+    if (atTop && (binder.close === "\n" || binder.close === "{")) {
+      const stop = binder.pattern
+        ? c === ";" || this._match(PATTERN_END) !== null
+        : c === ";" || (binder.close === "{" && this._match(LAMBDA_DO) !== null);
+      if (stop) {
+        this._binder = null;
+        return false;
       }
     }
+    if (binder.pattern || (atTop && binder.expected)) {
+      const word = this._match(WORD);
+      if (word) {
+        this._pos += word[0].length;
+        const key = binder.pattern && this._match(PATTERN_VALUE) !== null;
+        if (!key && !/^[A-Z]/.test(word[0])) this._locals.add(word[0]);
+        binder.expected = false;
+        this._state = EXPR_END;
+        return true;
+      }
+    }
+    if (c === "(" && atTop && binder.expected) {
+      binder.destructuring += 1;
+    } else if (c === ")" && atTop && binder.destructuring > 0) {
+      binder.destructuring -= 1;
+    } else if (c === "(" || c === "[" || c === "{") {
+      binder.depth += 1;
+    } else if (c === ")" || c === "]" || c === "}") {
+      binder.depth -= 1;
+    } else if (atTop && (c === "," || c === ";")) {
+      binder.expected = true;
+    }
+    return false;
   }
 
   private _blockParams(): void {
     const m = this._match(BLOCK_OPEN);
-    if (m) this._paramList(this._pos + m[0].length, "|");
+    if (m) {
+      this._pos += m[0].length;
+      this._bind("|");
+    }
   }
 
   private _code(interpolated: boolean): void {
     const src = this._src;
     let depth = 0;
-    if (interpolated) this._state = EXPR_BEG;
+    const outerBinder = this._binder;
+    if (interpolated) {
+      this._state = EXPR_BEG;
+      this._binder = null;
+    }
     while (this._pos < src.length && !this._error) {
       const pos = this._pos;
       const c = src[pos];
+      if (this._binder && this._scanBinder(this._binder, c)) continue;
       if (pos === 0 || src[pos - 1] === "\n") {
         if (this._match(END_MARKER)) {
           this._pos = src.length;
@@ -264,6 +286,7 @@ export class Ripper {
         this._state = EXPR_DOT;
       } else if (c === "}" && interpolated && depth === 0) {
         this._pos += 1;
+        this._binder = outerBinder;
         return;
       } else if (c === ")" || c === "]" || c === "}") {
         if (c === "}") depth -= 1;
@@ -273,7 +296,11 @@ export class Ripper {
         if (c === "{") depth += 1;
         if (c === "-") {
           const lambda = this._match(LAMBDA_OPEN);
-          if (lambda) this._paramList(pos + lambda[0].length, lambda[1] ? ")" : "{");
+          if (lambda) {
+            this._pos += lambda[0].length;
+            this._bind(lambda[1] ? ")" : "{");
+            continue;
+          }
         }
         this._pos += 1;
         this._state = EXPR_BEG;
@@ -340,7 +367,10 @@ export class Ripper {
       this._state = EXPR_FNAME;
       this._locals = new Set();
       const head = this._match(DEF_HEAD);
-      if (head?.[1]) this._paramList(this._pos + head[0].length, head[1] === "(" ? ")" : "\n");
+      if (head?.[1]) {
+        this._pos += head[0].length;
+        this._bind(head[1] === "(" ? ")" : "\n");
+      }
     } else if (name === "class") {
       this._state = EXPR_CLASS;
     } else if (VALUE_KEYWORDS.has(name)) {
@@ -356,9 +386,7 @@ export class Ripper {
       } else if (name === "in" && this._forIn) {
         this._forIn = false;
       } else if (name === "in") {
-        this._localVars(
-          this._match(IN_PATTERN)![0].replace(PATTERN_LITERAL, "").replace(PATTERN_KEY, ""),
-        );
+        this._bind("\n", true);
       }
       const rescued = name === "rescue" ? this._match(RESCUE_VAR) : null;
       if (rescued) this._localVars(rescued[1]);
