@@ -134,6 +134,18 @@ describe("autoload artifacts", () => {
     });
   });
 
+  it("raises when the inflector no longer answers a row's cname", async () => {
+    await withFiles(FILES, async () => {
+      await loader.pushDir(".");
+      const manifest = await buildManifest(loader);
+      const camelize = loader.inflector.camelize.bind(loader.inflector);
+      loader.inflector.camelize = (basename, abspath) =>
+        basename === "users_controller" ? "UsersCONTROLLER" : camelize(basename, abspath);
+      loader.manifest = manifest;
+      await expect(loader.setup()).rejects.toBeInstanceOf(ZeitwerkError);
+    });
+  });
+
   it("resolves rows against the manifest root from another directory", async () => {
     await withFiles(FILES, async () => {
       const root = Dir.pwd();

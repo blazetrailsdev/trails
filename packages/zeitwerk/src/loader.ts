@@ -213,9 +213,19 @@ export class Loader {
   private async _defineAutoloadsFromManifest(source: Manifest | string): Promise<void> {
     const manifest =
       typeof source === "string"
-        ? (JSON.parse(await getFs().readFile(source, "utf8")) as Manifest)
+        ? (JSON.parse(
+            await getFs().readFile(File.expandPath(source, manifestRoot(this)), "utf8"),
+          ) as Manifest)
         : source;
-    if (manifest.digest !== configurationDigest(this)) {
+    const root = manifestRoot(this);
+    const stale = Object.entries(manifest.constants).some(([cpath, row]) => {
+      const basename = File.basename(row.path)
+        .replace(/\.[jt]s$/, "")
+        .replaceAll("-", "_");
+      const cname = cpath.slice(cpath.lastIndexOf("::") + (cpath.includes("::") ? 2 : 1));
+      return this.inflector.camelize(basename, File.expandPath(row.path, root)) !== cname;
+    });
+    if (stale || manifest.digest !== configurationDigest(this)) {
       throw new ZeitwerkError(
         `the autoload manifest of loader ${this.tag} does not match its configuration, run trails build`,
       );
@@ -226,7 +236,6 @@ export class Loader {
       namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;
     }
 
-    const root = manifestRoot(this);
     for (const file of manifest.shadowed) this.shadowedFiles.add(File.expandPath(file, root));
 
     for (const [cpath, row] of Object.entries(manifest.constants)) {
@@ -246,9 +255,7 @@ export class Loader {
             this.log(`file ${abspath} is ignored because ${cref} is already defined`);
           }
         }
-        if (row.dirs != null && cref.isAutoload() == null) {
-          namespaces[cpath] = cref.get() as object;
-        }
+        if (row.dirs != null) namespaces[cpath] = cref.get() as object;
         continue;
       }
 

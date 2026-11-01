@@ -34,8 +34,11 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   }
   if (cmd === "build-autoload") {
     try {
-      const cwd = argv[1] === "--cwd" ? argv[2] : undefined;
-      const dirs = await buildAutoload(cwd === undefined ? {} : { cwd });
+      if (argv.length > 1 && (argv[1] !== "--cwd" || argv.length !== 3)) {
+        stderr.write(USAGE);
+        return 1;
+      }
+      const dirs = await buildAutoload(argv.length === 3 ? { cwd: argv[2] } : {});
       stdout.write(`trails-tsc-views: wrote ${dirs.length} autoload manifest(s)\n`);
       return 0;
     } catch (err) {
