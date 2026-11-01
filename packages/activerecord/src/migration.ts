@@ -1834,7 +1834,7 @@ export class Migrator {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Rails seats the pool on Base via migration_connection; trails pools migrate without one.
+   * @noRailsEquivalent PERMANENT
    */
   seatedOn(pool?: ConnectionPool): this {
     this._pool = pool;
