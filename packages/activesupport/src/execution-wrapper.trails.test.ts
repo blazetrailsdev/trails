@@ -1,3 +1,4 @@
+import { Executor } from "./executor.js";
 import { describe, it, expect } from "vitest";
 import { ExecutionWrapper } from "./execution-wrapper.js";
 
@@ -28,4 +29,25 @@ describe("ExecutionWrapper.perform (trails)", () => {
     expect(result).toBe("done");
     expect(called).toEqual(["body", "complete"]);
   });
+});
+
+describe("a hook whose complete answers a promise", () => {
+  for (const outer of [false, true]) {
+    it(`is awaited when outer is ${outer}`, async () => {
+      const executor = class extends Executor {};
+      let completed = false;
+      executor.registerHook(
+        {
+          run: () => null,
+          complete: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            completed = true;
+          },
+        },
+        { outer },
+      );
+      await executor.wrap(async () => {});
+      expect(completed).toBe(true);
+    });
+  }
 });

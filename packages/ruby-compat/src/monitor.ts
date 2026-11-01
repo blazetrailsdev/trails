@@ -106,6 +106,43 @@ export function isMonOwned(this: object): boolean {
 }
 
 /**
+ * `monitor_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`). Answers a
+ * promise only when it has to wait for the monitor. The entry is owned by the
+ * `Thread`, not the fiber MRI records: `enter` has no block for
+ * `AsyncContext#run` to scope, so flows sharing a `Thread` re-enter until
+ * `executor-wrap-flows-own-a-thread` gives each its own.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#enter`
+ * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`).
+ */
+export function enter(this: object): Promise<void> | void {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const entry = data.entries.find((entry) => entry.owner === owner);
+  if (entry) {
+    entry.count += 1;
+    return;
+  }
+  return acquire(data, null, { owner, count: 1, thread: Thread.current() });
+}
+
+/**
+ * `monitor_exit` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:98`), after
+ * `monitor_check_owner` (`:88`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#exit`
+ * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:98`).
+ */
+export function exit(this: object): void {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const entry = data.entries.find((entry) => entry.owner === owner);
+  if (!entry) throw new ThreadError("current fiber not owner");
+  entry.count -= 1;
+  if (entry.count === 0) release(data, owner);
+}
+
+/**
  * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`
  * (`monitor_synchronize`, `ext/monitor/monitor.c:236`), aliased `synchronize`
  * at `:203`.
@@ -156,6 +193,8 @@ export interface MonitorMixin {
  * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:256`).
  */
 export class Monitor implements MonitorMixin {
+  enter = enter;
+  exit = exit;
   isMonOwned = isMonOwned;
   synchronize = synchronize;
 }

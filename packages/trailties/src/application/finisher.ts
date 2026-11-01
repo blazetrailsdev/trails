@@ -1,6 +1,18 @@
-import { DescendantsTracker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
+import {
+  Dependencies,
+  DescendantsTracker,
+  runLoadHooks,
+  TopLevel,
+  type ExecutionHook,
+} from "@blazetrails/activesupport";
 import { Base as JobBase, registerJob } from "@blazetrails/activejob";
-import { getFs, getPath, isRegisteredConstant, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  getFs,
+  getPath,
+  isRegisteredConstant,
+  Monitor,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -30,7 +42,12 @@ export interface FinisherReloader {
   prepareBang(): void;
 }
 
+export interface FinisherExecutor {
+  registerHook(hook: ExecutionHook, options?: { outer?: boolean }): void;
+}
+
 export interface FinisherConfig {
+  allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
   eagerLoadNamespaces: unknown[];
@@ -53,6 +70,7 @@ export interface FinisherHost {
   readonly constructor: { name: string };
   readonly railtieName: string;
   routes(): FinisherRoutes;
+  executor: FinisherExecutor;
   reloader: FinisherReloader;
   readonly reloaders: unknown[];
   routesReloader(): FinisherRoutesReloader;
@@ -120,6 +138,44 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
 
 Finisher.initializer("finisher_hook", function (this: FinisherHost) {
   runLoadHooks("after_initialize", this);
+});
+
+export class MonitorHook {
+  private monitor: Monitor;
+
+  constructor(monitor: Monitor = new Monitor()) {
+    this.monitor = monitor;
+  }
+
+  run(): unknown {
+    return this.monitor.enter();
+  }
+
+  complete(_state: unknown): void {
+    this.monitor.exit();
+  }
+}
+
+export const InterlockHook = {
+  run(): unknown {
+    return Dependencies.interlock.startRunning();
+  },
+
+  complete(_state: unknown): unknown {
+    return Dependencies.interlock.doneRunning();
+  },
+};
+
+Finisher.initializer("configure_executor_for_concurrency", function (this: FinisherHost) {
+  if (this.config.allowConcurrency === false) {
+    this.executor.registerHook(new MonitorHook(), { outer: true });
+  } else if (this.config.allowConcurrency === "unsafe") {
+    return;
+  } else {
+    if (this.config.isReloadingEnabled()) {
+      this.executor.registerHook(InterlockHook, { outer: true });
+    }
+  }
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {

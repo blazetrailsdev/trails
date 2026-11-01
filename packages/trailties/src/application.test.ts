@@ -340,7 +340,7 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-12)).toEqual([
+      expect(names.slice(-13)).toEqual([
         "add_generator_templates",
         "setup_main_autoloader",
         "setup_default_session_store",
@@ -350,6 +350,7 @@ describe("Application", () => {
         "run_prepare_callbacks",
         "eager_load!",
         "finisher_hook",
+        "configure_executor_for_concurrency",
         "add_internal_routes",
         "set_routes_reloader_hook",
         "set_clear_dependencies_hook",

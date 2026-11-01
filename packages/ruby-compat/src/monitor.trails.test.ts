@@ -168,3 +168,35 @@ describe("Monitor#synchronize after the holder's block returns", () => {
     expect(served).toEqual(["first", "second"]);
   });
 });
+
+describe("Monitor#enter", () => {
+  it("counts a re-entry, and leaves on the matching exit", () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    monitor.enter();
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(true);
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(false);
+  });
+
+  it("holds another thread out until exit", async () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    const order: string[] = [];
+    const other = new Thread(async () => {
+      await monitor.enter();
+      order.push("entered");
+      monitor.exit();
+    });
+    await Thread.pass();
+    order.push("exiting");
+    monitor.exit();
+    await other.join();
+    expect(order).toEqual(["exiting", "entered"]);
+  });
+
+  it("raises ThreadError from exit when not the owner", () => {
+    expect(() => new Monitor().exit()).toThrow("current fiber not owner");
+  });
+});

@@ -54,7 +54,7 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
-  allowConcurrency: boolean | null = null;
+  allowConcurrency: boolean | "unsafe" | null = null;
   assetHost: string | null = null;
   considerAllRequestsLocal = false;
   filterParameters: Array<string | RegExp | ((key: string, value: unknown) => unknown)> = [];

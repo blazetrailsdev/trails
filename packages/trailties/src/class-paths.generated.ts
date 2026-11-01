@@ -34,6 +34,8 @@ registerClassPaths([
   [() => m3.Custom, "Rails::Application::Configuration::Custom"],
   [() => m4.DefaultMiddlewareStack, "Rails::Application::DefaultMiddlewareStack"],
   [() => m5.Finisher, "Rails::Application::Finisher"],
+  [() => m5.InterlockHook, "Rails::Application::Finisher::InterlockHook"],
+  [() => m5.MonitorHook, "Rails::Application::Finisher::MonitorHook"],
   [() => m6.RoutesReloader, "Rails::Application::RoutesReloader"],
   [() => m0.ApplicationController, "Rails::ApplicationController"],
   [() => m7.Inflector, "Rails::Autoloaders::Inflector"],

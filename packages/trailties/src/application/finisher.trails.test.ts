@@ -1,14 +1,23 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import {
   Finisher,
+  InterlockHook,
+  MonitorHook,
   type FinisherConfig,
   type FinisherReloader,
   type FinisherReloaderInstance,
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
-import { FileUpdateChecker, onLoad, Reloader, resetLoadHooks } from "@blazetrails/activesupport";
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
+import {
+  Dependencies,
+  Executor,
+  FileUpdateChecker,
+  onLoad,
+  Reloader,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
+import { Dir, FileUtils, Monitor, Thread } from "@blazetrails/ruby-compat";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -22,7 +31,14 @@ import { ActiveRecord, AssociationRelation } from "@blazetrails/activerecord";
 
 class TestApp extends Finisher {
   sessionStoreArgs: unknown[] | null = null;
+  hooks: [unknown, { outer?: boolean } | undefined][] = [];
+  executor = {
+    registerHook: (hook: unknown, options?: { outer?: boolean }) => {
+      this.hooks.push([hook, options]);
+    },
+  };
   config: FinisherConfig = {
+    allowConcurrency: null,
     toPrepareBlocks: [],
     eagerLoad: null,
     eagerLoadNamespaces: [],
@@ -132,6 +148,7 @@ describe("Finisher", () => {
       "run_prepare_callbacks",
       "eager_load!",
       "finisher_hook",
+      "configure_executor_for_concurrency",
       "add_internal_routes",
       "set_routes_reloader_hook",
       "set_clear_dependencies_hook",
@@ -140,9 +157,7 @@ describe("Finisher", () => {
 
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
-    for (const skipped of ["configure_executor_for_concurrency", "enable_yjit"]) {
-      expect(names).not.toContain(skipped);
-    }
+    expect(names).not.toContain("enable_yjit");
   });
 
   it("add_generator_templates calls ensureGeneratorTemplatesAdded", async () => {
@@ -394,5 +409,82 @@ describe("Finisher", () => {
       expect(app.reloaders).toEqual([]);
       expect(app.toRun).toEqual([]);
     });
+  });
+});
+
+describe("configure_executor_for_concurrency", () => {
+  const name = "configure_executor_for_concurrency";
+
+  it("registers an outer MonitorHook when concurrency is off", async () => {
+    const app = new TestApp();
+    app.config.allowConcurrency = false;
+    await run(app, name);
+    expect(app.hooks[0][0]).toBeInstanceOf(MonitorHook);
+    expect(app.hooks[0][1]).toEqual({ outer: true });
+  });
+
+  it("registers nothing when concurrency is unsafe", async () => {
+    const app = new TestApp();
+    app.config.allowConcurrency = "unsafe";
+    app.reloadingEnabled = true;
+    await run(app, name);
+    expect(app.hooks).toEqual([]);
+  });
+
+  it("registers an outer InterlockHook only when reloading", async () => {
+    const app = new TestApp();
+    await run(app, name);
+    expect(app.hooks).toEqual([]);
+    app.reloadingEnabled = true;
+    await run(app, name);
+    expect(app.hooks).toEqual([[InterlockHook, { outer: true }]]);
+  });
+});
+
+describe("InterlockHook", () => {
+  it("shares the interlock from run to complete", async () => {
+    await InterlockHook.run();
+    const held = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(held?.sharing).toBe(1);
+    await InterlockHook.complete(null);
+    const left = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(left?.sharing ?? 0).toBe(0);
+  });
+});
+
+describe("MonitorHook", () => {
+  it("excludes a second thread's executor until the first completes", async () => {
+    const executor = class extends Executor {};
+    executor.registerHook(new MonitorHook(), { outer: true });
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const first = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("first");
+        await gate;
+        order.push("first done");
+      }),
+    );
+    await Thread.pass();
+    const second = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("second");
+      }),
+    );
+    await Thread.pass();
+    release();
+    await first.join();
+    await second.join();
+    expect(order).toEqual(["first", "first done", "second"]);
+  });
+
+  it("holds its monitor from run to complete", () => {
+    const monitor = new Monitor();
+    const hook = new MonitorHook(monitor);
+    hook.run();
+    expect(monitor.isMonOwned()).toBe(true);
+    hook.complete(null);
+    expect(monitor.isMonOwned()).toBe(false);
   });
 });

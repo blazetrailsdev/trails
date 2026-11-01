@@ -158,7 +158,9 @@ describe("AsynchronousQueriesTracker", () => {
       await new Promise<void>((resolve) => (finish = resolve));
       log.push("query");
     });
-    const finalizing = tracker.finalizeSession(true).then(() => log.push("finalized"));
+    const finalizing = Promise.resolve(tracker.finalizeSession(true)).then(() =>
+      log.push("finalized"),
+    );
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(log).toEqual([]);
     finish();
