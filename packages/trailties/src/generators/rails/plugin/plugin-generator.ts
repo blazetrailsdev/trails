@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { indent } from "@blazetrails/activesupport";
-import { AppGenerator } from "../../app-generator.js";
+import { AppGenerator } from "../app/app-generator.js";
 
 interface PluginBuilderHost {
   options: Record<string, unknown>;
