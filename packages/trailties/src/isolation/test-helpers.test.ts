@@ -28,16 +28,16 @@ describe("GenerationTest", () => {
     await t.buildApp();
 
     const appPath = await t.appPath();
-    expect(await fs.exists(`${appPath}/config/database.ts`)).toBe(true);
-    expect(await fs.exists(`${appPath}/config/routes.ts`)).toBe(true);
-    expect(await fs.exists(`${appPath}/config/initializers`)).toBe(true);
+    expect(await fs.exists(`${appPath}/config/database.ts`)).toBeTruthy();
+    expect(await fs.exists(`${appPath}/config/routes.ts`)).toBeTruthy();
+    expect(await fs.exists(`${appPath}/config/initializers`)).toBeTruthy();
   });
 
   it("teardown app", { timeout: 120_000 }, async () => {
     await t.buildApp();
     await t.teardownApp();
 
-    expect(await fs.exists(await t.appPath())).toBe(false);
+    expect(await fs.exists(await t.appPath())).toBeFalsy();
   });
 
   it("add to config", { timeout: 120_000 }, async () => {
@@ -45,7 +45,7 @@ describe("GenerationTest", () => {
 
     const configFile = `${await t.appPath()}/config/application.ts`;
 
-    expect(await fs.readFile(configFile, "utf-8")).not.toHaveLength(0);
+    expect(await fs.readFile(configFile, "utf-8")).not.toBeEmpty();
 
     await t.addToConfig(`
         this.config.zomg = "zomg";
@@ -61,7 +61,7 @@ describe("GenerationTest", () => {
 
     const configFile = `${await t.appPath()}/config/application.ts`;
 
-    expect(await fs.readFile(configFile, "utf-8")).not.toHaveLength(0);
+    expect(await fs.readFile(configFile, "utf-8")).not.toBeEmpty();
 
     await t.addToConfig(`
         this.config.zomg = "zomg";
