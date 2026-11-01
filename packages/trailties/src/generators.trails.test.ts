@@ -29,7 +29,9 @@ async function generatorDirectories(): Promise<string[]> {
     const isDir = (e: string): boolean => fs.statSync(path.join(dir, e)).isDirectory();
     const isGenerator = (e: string): boolean => /-generator\.ts$/.test(e);
     const files = entries.filter((e) => !isDir(e));
-    out.push(...files.filter(isGenerator).map(() => namespace.join(":")));
+    if (namespace.join(":") !== "plugin") {
+      out.push(...files.filter(isGenerator).map(() => namespace.join(":")));
+    }
     for (const entry of entries.filter(isDir)) {
       await walk(path.join(dir, entry), [...namespace, entry]);
     }

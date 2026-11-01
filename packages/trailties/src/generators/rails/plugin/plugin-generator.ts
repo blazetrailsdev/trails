@@ -231,7 +231,6 @@ this.config.actionController.includeAllHelpers = false;
     }
   }
 
-  /** @missingRailsCall umask — CONVERGEABLE ruby-compat-file-umask */
   async bin(this: PluginBuilderHost): Promise<void> {
     const excludePattern = new RegExp(
       [this.isEngine() ? "test\\.tt" : "rails\\.tt", this.skipEslint() ? "eslint" : null]
@@ -244,10 +243,7 @@ this.config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  /**
-   * @missingRailsArgs join — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
-   * @missingRailsCall append_file — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
-   */
+  /** @missingRailsArgs join — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
   async gemfileEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 
