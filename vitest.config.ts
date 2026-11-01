@@ -691,6 +691,7 @@ export default defineConfig({
           exclude: SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/src/test-helpers/build-templates.ts",
+            "./packages/trailties/src/test-helpers/isolation/abstract-unit.ts",
             "./packages/solid-cable/src/test-helpers/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
