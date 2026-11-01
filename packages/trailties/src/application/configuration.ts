@@ -599,7 +599,7 @@ export class Configuration extends EngineConfiguration {
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 
-  /** @missingRailsCall mkdir_p — PERMANENT */
+  /** @missingRailsCall mkdir_p — CONVERGEABLE generate-local-secret-is-one-sync-body */
   private generateLocalSecret(): string {
     if (this._localSecret === undefined) {
       throw new RuntimeError(
