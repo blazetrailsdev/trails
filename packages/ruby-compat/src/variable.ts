@@ -250,7 +250,7 @@ export function rbConstMissing(klass: object): void {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstMissing(klass: { name?: string } | null, name: string): never {
-  if (klass != null && klass !== globalThis && klass !== Object) {
+  if (klass != null && klass !== globalThis && klass !== Object && klass !== TopLevel) {
     throw new NameError(`uninitialized constant ${rbModName(klass) ?? klass.name}::${name}`, name, {
       receiver: klass,
     });
@@ -272,14 +272,14 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbConstGet(klass: object, id: string, exclude = false): unknown {
-  if (id in klass) {
+export function rbConstGet(klass: object, id: string, exclude = false, recurse = true): unknown {
+  if (recurse ? id in klass : Object.hasOwn(klass, id)) {
     let tmp: object | null = klass;
     while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
     if (tmp !== null) rbConstWarnIfDeprecated(tmp, id);
     return (klass as Record<string, unknown>)[id];
   }
-  if (typeof klass === "function") {
+  if (recurse && typeof klass === "function") {
     for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
       if (Object.hasOwn(tmp, id)) {
         rbConstWarnIfDeprecated(tmp, id);

@@ -3,9 +3,9 @@ import {
   File,
   Pathname,
   TypeError,
-  rbCModule,
+  isModuleObject,
   rbInspect,
-  rbObjIsKindOf,
+  stdout,
 } from "@blazetrails/ruby-compat";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
@@ -20,11 +20,14 @@ export const Config = {
     path: PathArg,
     { namespace = Object as unknown }: { namespace?: unknown } = {},
   ): Promise<void> {
-    if (!rbObjIsKindOf(namespace, rbCModule)) {
+    if (
+      typeof namespace !== "function" &&
+      !(typeof namespace === "object" && namespace !== null && isModuleObject(namespace))
+    ) {
       throw new ZeitwerkError(`${rbInspect(namespace)} is not a class or module object, should be`);
     }
 
-    if (this.realModName(namespace as object) == null) {
+    if (this.realModName(namespace) == null) {
       throw new ZeitwerkError("root namespaces cannot be anonymous");
     }
 
@@ -32,7 +35,7 @@ export const Config = {
     const abspath = File.expandPath(path);
     if (await this.isDir(abspath)) {
       this.raiseIfConflictingDirectory(abspath);
-      this.roots[abspath] = namespace as object;
+      this.roots[abspath] = namespace;
     } else {
       throw new ZeitwerkError(`the root directory ${abspath} does not exist`);
     }
@@ -89,19 +92,19 @@ export const Config = {
 
   async ignore(this: Loader, ...globPatterns: GlobArg[]): Promise<void> {
     globPatterns = this.expandPaths(globPatterns);
-    await this.mutex.synchronize(async () => {
+    const paths = await this.expandGlobPatterns(globPatterns as string[]);
+    this.mutex.synchronize(() => {
       for (const pattern of globPatterns as string[]) this.ignoredGlobPatterns.add(pattern);
-      for (const path of await this.expandGlobPatterns(globPatterns as string[]))
-        this.ignoredPaths.add(path);
+      for (const path of paths) this.ignoredPaths.add(path);
     });
   },
 
   async collapse(this: Loader, ...globPatterns: GlobArg[]): Promise<void> {
     globPatterns = this.expandPaths(globPatterns);
-    await this.mutex.synchronize(async () => {
+    const paths = await this.expandGlobPatterns(globPatterns as string[]);
+    this.mutex.synchronize(() => {
       for (const pattern of globPatterns as string[]) this.collapseGlobPatterns.add(pattern);
-      for (const dir of await this.expandGlobPatterns(globPatterns as string[]))
-        this.collapseDirs.add(dir);
+      for (const path of paths) this.collapseDirs.add(path);
     });
   },
 
@@ -116,9 +119,8 @@ export const Config = {
     if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_load only accepts strings");
 
-    const key = cpath;
     this.mutex.synchronize(() => {
-      (this.onLoadCallbacks[key] ??= []).push(block!);
+      (this.onLoadCallbacks[cpath] ??= []).push(block!);
     });
   },
 
@@ -126,17 +128,16 @@ export const Config = {
     if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_unload only accepts strings");
 
-    const key = cpath;
     this.mutex.synchronize(() => {
-      (this.onUnloadCallbacks[key] ??= []).push(block!);
+      (this.onUnloadCallbacks[cpath] ??= []).push(block!);
     });
   },
 
   logBang(this: Loader): void {
-    this.logger = (msg: string) => console.log(msg);
+    this.logger = (msg: string) => stdout.write(`${msg}\n`);
   },
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @internal */
   isIgnores(this: Loader, abspath: string): boolean {
     if (this.ignoredPaths.size === 0) return false;
 
@@ -187,7 +188,7 @@ export const Config = {
 
   /** @internal */
   expandPaths(this: Loader, paths: GlobArg[]): string[] {
-    return paths.flat().map((path) => File.expandPath(path.toString()));
+    return (paths.flat(Infinity) as PathArg[]).map((path) => File.expandPath(path.toString()));
   },
 
   /** @internal */
@@ -199,11 +200,15 @@ export const Config = {
 
   /** @internal */
   async recomputeIgnoredPaths(this: Loader): Promise<void> {
-    this.ignoredPaths = new Set(await this.expandGlobPatterns(this.ignoredGlobPatterns));
+    const paths = await this.expandGlobPatterns(this.ignoredGlobPatterns);
+    this.ignoredPaths.clear();
+    for (const path of paths) this.ignoredPaths.add(path);
   },
 
   /** @internal */
   async recomputeCollapseDirs(this: Loader): Promise<void> {
-    this.collapseDirs = new Set(await this.expandGlobPatterns(this.collapseGlobPatterns));
+    const dirs = await this.expandGlobPatterns(this.collapseGlobPatterns);
+    this.collapseDirs.clear();
+    for (const dir of dirs) this.collapseDirs.add(dir);
   },
 };

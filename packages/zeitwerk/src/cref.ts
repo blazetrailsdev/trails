@@ -3,11 +3,16 @@ import {
   constDefined,
   constSet,
   include,
-  rbModConstMissing,
+  rbConstGet,
   rbModRemoveConst,
   type Included,
 } from "@blazetrails/ruby-compat";
 import { RealModName } from "./real-mod-name.js";
+
+/** @noRailsEquivalent PERMANENT */
+function _seat(mod: object): object {
+  return mod === Object ? TopLevel : mod;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface Cref extends Included<typeof RealModName> {}
@@ -19,27 +24,26 @@ export class Cref {
   private _path: string | null;
 
   constructor(mod: object, cname: string) {
-    this.mod = mod === Object ? TopLevel : mod;
+    this.mod = mod;
     this.cname = cname;
     this._path = null;
   }
 
   path(): string {
     return (this._path ??=
-      this.mod === TopLevel ? this.cname : `${this.realModName(this.mod)}::${this.cname}`);
+      this.mod === Object ? this.cname : `${this.realModName(this.mod) ?? ""}::${this.cname}`);
   }
 
   isDefined(): boolean {
-    return constDefined(this.mod as { readonly name: string }, this.cname, false);
+    return constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false);
   }
 
   set<T>(value: T): T {
-    return constSet(this.mod as { readonly name: string }, this.cname, value);
+    return constSet(_seat(this.mod) as { readonly name: string }, this.cname, value);
   }
 
   get(): unknown {
-    if (this.isDefined()) return (this.mod as Record<string, unknown>)[this.cname];
-    return rbModConstMissing(this.mod === TopLevel ? null : this.mod, this.cname);
+    return rbConstGet(_seat(this.mod), this.cname, true, false);
   }
 
   remove(): unknown {

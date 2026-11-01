@@ -10,7 +10,7 @@ describe("TestCref", () => {
   class klass extends LoaderTest {}
   registerConstant("TestCref", klass);
 
-  const newCref = (mod: object = klass, _cname = "Foo") => new Cref(mod, "Foo");
+  const newCref = (mod: object = klass, cname = "Foo") => new Cref(mod, cname);
 
   afterEach(() => {
     delete (klass as unknown as Record<string, unknown>).Foo;

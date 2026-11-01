@@ -65,12 +65,13 @@ export const Helpers = {
   async hasAtLeastOneRubyFile(this: Loader, dir: string): Promise<boolean> {
     const toVisit = [dir];
 
-    let current: string | undefined;
-    while ((current = toVisit.shift()) !== undefined) {
-      for (const basename of await Dir.childrenAsync(current)) {
+    let next: string | undefined;
+    while ((next = toVisit.shift()) !== undefined) {
+      dir = next;
+      for (const basename of await Dir.childrenAsync(dir)) {
         if (this.isHidden(basename)) continue;
 
-        const abspath = File.join(current, basename);
+        const abspath = File.join(dir, basename);
         if (this.isIgnoredPath(abspath)) continue;
 
         if (await this.isDir(abspath)) {

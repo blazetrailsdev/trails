@@ -1,6 +1,9 @@
 import type { Loader } from "./loader.js";
+import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
+  ExplicitNamespaces,
+
   loaders: new Set<Loader>(),
   gemLoadersByRootFile: new Map<string, Loader>(),
   autoloads: new Map<string, Loader>(),
@@ -28,8 +31,8 @@ export const Registry = {
     this.autoloads.delete(abspath);
   },
 
-  loaderFor(path: string): Loader | undefined {
-    return this.autoloads.get(path);
+  loaderFor(path: string): Loader | null {
+    return this.autoloads.get(path) ?? null;
   },
 
   onUnload(loader: Loader): void {

@@ -10,6 +10,7 @@ import * as m7 from "./loader/helpers.js";
 import * as m8 from "./null-inflector.js";
 import * as m9 from "./real-mod-name.js";
 import * as m10 from "./registry.js";
+import * as m11 from "./registry/explicit-namespaces.js";
 
 registerClassPaths([
   [() => m0.Cref, "Zeitwerk::Cref"],
@@ -24,6 +25,7 @@ registerClassPaths([
   [() => m8.NullInflector, "Zeitwerk::NullInflector"],
   [() => m9.RealModName, "Zeitwerk::RealModName"],
   [() => m10.Registry, "Zeitwerk::Registry"],
+  [() => m11.ExplicitNamespaces, "Zeitwerk::Registry::ExplicitNamespaces"],
   [() => m2.ReloadingDisabledError, "Zeitwerk::ReloadingDisabledError"],
   [() => m2.SetupRequired, "Zeitwerk::SetupRequired"],
 ]);
