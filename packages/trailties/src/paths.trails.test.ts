@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { include, registerConstant } from "@blazetrails/ruby-compat";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Application } from "./application.js";
 import { Engine } from "./engine.js";
@@ -61,6 +62,12 @@ describe("Engine#helpers", () => {
     expect(paths).toBe(app.config.helpersPaths);
     const helpers = await app.helpers();
     expect(await app.helpers()).toBe(helpers);
+    (app as unknown as { _helpers?: object })._helpers = undefined;
+    app.config.helpersPaths.push(`${import.meta.dirname}/__fixtures__/helpers`);
+    registerConstant("ShoutHelper", { shout: () => "HEY" });
+    class Includer {}
+    include(Includer, await app.helpers());
+    expect((new Includer() as unknown as { shout(): string }).shout()).toBe("HEY");
     expect(app).toBeInstanceOf(Engine);
   });
 });

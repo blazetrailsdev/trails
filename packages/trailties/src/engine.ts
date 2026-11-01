@@ -230,7 +230,7 @@ export class Engine extends Trailtie {
   async helpers(): Promise<object> {
     if (this._helpers) return this._helpers;
     const helpers = {};
-    for (const mod of AbstractController.Resolution.helperModulesFromPaths(
+    for (const mod of AbstractController.Helpers.helperModulesFromPaths(
       await this.helpersPaths(),
     )) {
       include(helpers, mod);
@@ -247,10 +247,8 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
-  async loadGenerators(app: Engine = this): Promise<this> {
-    const { Generators } = await import("./generators.js");
-    this.runGeneratorsBlocks(app);
-    Generators.configureBang(app.config.generators());
+  loadConsole(app: unknown = this): this {
+    this.runConsoleBlocks(app);
     return this;
   }
 
@@ -259,8 +257,10 @@ export class Engine extends Trailtie {
     return this;
   }
 
-  loadConsole(app: unknown = this): this {
-    this.runConsoleBlocks(app);
+  async loadGenerators(app: Engine = this): Promise<this> {
+    const { Generators } = await import("./generators.js");
+    this.runGeneratorsBlocks(app);
+    Generators.configureBang(app.config.generators());
     return this;
   }
 

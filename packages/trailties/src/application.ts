@@ -247,6 +247,10 @@ export class Application extends Engine {
     return this;
   }
 
+  override async helpersPaths(): Promise<string[]> {
+    return this.config.helpersPaths;
+  }
+
   /** @internal */
   railtiesInitializers(current: Collection): Collection {
     let initializers = new Collection();
@@ -314,10 +318,6 @@ export class Application extends Engine {
     const libTemplates = this.paths().get("lib/templates");
     const existent = libTemplates ? await libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
-  }
-
-  override async helpersPaths(): Promise<string[]> {
-    return this.config.helpersPaths;
   }
 
   rakeTasks(block: TrailtieBlock): void {
