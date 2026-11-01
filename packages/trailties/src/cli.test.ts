@@ -35,19 +35,12 @@ describe("CLI", () => {
     expect(names).toContain("server");
     expect(names).toContain("db");
     expect(names).toContain("routes");
-    expect(names).toContain("console");
   });
 
   it("server command has alias s", () => {
     const program = createProgram();
     const srv = program.commands.find((c) => c.name() === "server");
     expect(srv?.aliases()).toContain("s");
-  });
-
-  it("console command has alias c", () => {
-    const program = createProgram();
-    const con = program.commands.find((c) => c.name() === "console");
-    expect(con?.aliases()).toContain("c");
   });
 
   it("db command has subcommands", () => {

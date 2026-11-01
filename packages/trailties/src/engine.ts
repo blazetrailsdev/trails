@@ -230,6 +230,11 @@ export class Engine extends Trailtie {
     return this;
   }
 
+  loadConsole(app: unknown = this): this {
+    this.runConsoleBlocks(app);
+    return this;
+  }
+
   async loadServer(app: unknown = this): Promise<this> {
     await this.runServerBlocks(app);
     return this;

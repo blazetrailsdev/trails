@@ -245,6 +245,7 @@ export default defineConfig(
       "packages/ruby-compat/src/http-adapter.ts",
       "packages/ruby-compat/src/os-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
+      "packages/ruby-compat/src/repl-adapter.ts",
       "packages/ruby-compat/src/zlib-adapter.ts",
       "packages/activesupport/src/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
@@ -806,6 +807,7 @@ export default defineConfig(
       "packages/ruby-compat/src/http-adapter.ts",
       "packages/ruby-compat/src/os-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
+      "packages/ruby-compat/src/repl-adapter.ts",
       "packages/ruby-compat/src/zlib-adapter.ts",
     ],
     rules: {

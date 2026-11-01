@@ -1,84 +1,165 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
-import { Command } from "commander";
-import { pathToFileURL } from "node:url";
-import { createRequire } from "node:module";
+import { isPresent } from "@blazetrails/activesupport";
+import {
+  NotImplementedError,
+  STDOUT,
+  exit,
+  include,
+  rbArgv,
+  type Included,
+} from "@blazetrails/ruby-compat";
+import type { ThorClass } from "@blazetrails/thor";
+import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
+import { environment } from "../command.js";
+import { Base } from "../command/base.js";
+import { EnvironmentArgument } from "../command/environment-argument.js";
+import { Trails } from "../rails.js";
+import { IRBConsole } from "./console/irb-console.js";
 
-export function consoleCommand(): Command {
-  const cmd = new Command("console");
-  cmd.alias("c");
-  cmd.description("Start an interactive console with the application loaded").action(async () => {
-    const repl = await import("node:repl");
+interface ConsoleOptions {
+  sandbox?: boolean | null;
+  environment?: string;
+}
 
-    let dbAdapter: any;
-    try {
-      const { loadDatabaseConfig } = await import("../database.js");
-      const config = await loadDatabaseConfig();
-      const { Base } = await import("@blazetrails/activerecord");
-      await Base.establishConnection(config);
-      dbAdapter = await Base.leaseConnection();
-      console.log(
-        `Connected to ${config.adapter ?? "sqlite3"} (${config.database ?? "in-memory"})`,
+interface ConsoleRunner {
+  start(): unknown;
+}
+
+interface ConsoleApp {
+  sandbox: boolean | null | undefined;
+  config: {
+    console?: ConsoleRunner | null;
+    disableSandbox?: boolean;
+    sandboxByDefault?: boolean;
+  };
+  name(): string;
+  loadConsole(): unknown;
+}
+
+export class Console {
+  static start(...args: [app: ConsoleApp, options?: ConsoleOptions]): Promise<void> {
+    return new this(...args).start();
+  }
+
+  readonly options: ConsoleOptions;
+  readonly app: ConsoleApp;
+  readonly console: ConsoleRunner;
+
+  constructor(app: ConsoleApp, options: ConsoleOptions = {}) {
+    this.app = app;
+    this.options = options;
+
+    app.sandbox = this.isSandbox();
+
+    if (this.isSandbox() && app.config.disableSandbox) {
+      STDOUT.puts(
+        "Error: Unable to start console in sandbox mode as sandbox mode is disabled (config.disable_sandbox is true).",
       );
-    } catch (error) {
-      console.log("Could not connect to database.");
-      if (error instanceof Error) {
-        console.log(error.message);
-      }
+      exit(1);
     }
 
-    console.log("Loading trails console...");
+    app.loadConsole();
 
-    const context: Record<string, unknown> = {};
-    try {
-      const ar = await import("@blazetrails/activerecord");
-      context.Base = ar.Base;
-      context.Migration = ar.Migration;
-    } catch {
-      /** @empty */
+    this.console = app.config.console || new IRBConsole(app);
+  }
+
+  isSandbox(): boolean | undefined {
+    if (this.options.sandbox != null) return this.options.sandbox;
+
+    if (Trails.env["local?"]()) return false;
+
+    return this.app.config.sandboxByDefault;
+  }
+
+  environment(): string | undefined {
+    return this.options.environment;
+  }
+
+  isEnvironment(): string | undefined {
+    return this.environment();
+  }
+
+  setEnvironmentBang(): void {
+    Trails.env = this.environment()!;
+  }
+
+  async start(): Promise<void> {
+    if (this.isEnvironment()) this.setEnvironmentBang();
+
+    if (this.isSandbox()) {
+      STDOUT.puts(`Loading ${Trails.env} environment in sandbox (Trails ${Trails.version()})`);
+      STDOUT.puts("Any modifications you make will be rolled back on exit");
+    } else {
+      STDOUT.puts(`Loading ${Trails.env} environment (Trails ${Trails.version()})`);
     }
 
-    const modelsDir = File.join(Dir.pwd(), "app", "models");
-    let loadedCount = 0;
-    if (File.isExist(modelsDir)) {
-      const files = Dir.children(modelsDir).filter(
-        (f: string) => f.endsWith(".ts") || f.endsWith(".js"),
-      );
-      for (const file of files) {
-        try {
-          const mod = await import(pathToFileURL(File.join(modelsDir, file)).href);
-          for (const [name, value] of Object.entries(mod)) {
-            if (typeof value === "function") {
-              context[name] = value;
-            }
-          }
-          loadedCount++;
-        } catch {
-          /** @empty */
-        }
-      }
-      if (loadedCount > 0) {
-        console.log(`Loaded ${loadedCount} model(s) from app/models/`);
-      }
-    }
+    await this.console.start();
+  }
+}
 
-    console.log("Supports top-level await (e.g., await User.all())");
-    console.log('Type ".exit" or Ctrl+D to quit.');
-    console.log("");
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface ConsoleCommand extends Included<typeof EnvironmentArgument> {
+  /** @internal */
+  _environment?: string;
+  /** @internal */
+  _environmentSpecified?: boolean;
+  /** @internal */
+  _availableEnvironments?: string[];
+}
 
-    const r = repl.start({
-      prompt: "trails> ",
-      useGlobal: true,
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export class ConsoleCommand extends Base {
+  declare options: ThorOptions<Record<string, unknown> & ConsoleOptions>;
+
+  static {
+    const klass = this as unknown as ThorClass;
+    include(this, EnvironmentArgument);
+    klass.classOption("sandbox", {
+      aliases: "-s",
+      type: "boolean",
+      default: null,
+      desc: "Rollback database modifications on exit.",
     });
+    klass.desc("console", "Start the Trails console");
+    klass.methodAdded("perform");
+  }
 
-    Object.assign(r.context, context);
-    r.context.require = createRequire(File.join(Dir.pwd(), "package.json"));
+  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
+  constructor(...[args = [], localOptions = {}, config = {}]: ConstructorParameters<typeof Base>) {
+    let consoleOptions: string[] = [];
 
-    r.on("exit", async () => {
-      if (dbAdapter && typeof dbAdapter.close === "function") {
-        await dbAdapter.close();
+    if (Array.isArray(localOptions)) {
+      const termination = localOptions.indexOf("--");
+      if (termination !== -1) {
+        consoleOptions = localOptions.slice(termination + 1);
+        localOptions = localOptions.slice(0, termination);
       }
-    });
-  });
+    }
 
-  return cmd;
+    rbArgv().splice(0, rbArgv().length, ...consoleOptions);
+    super(args, localOptions, config);
+
+    this._environmentSpecified = isPresent(this.options.environment);
+
+    if (!this._environmentSpecified) {
+      this.options = this.options.merge({ environment: environment() });
+    } else if (!this.availableEnvironments().includes(this.options.environment!)) {
+      this.options = this.options.merge({
+        environment: this.expandEnvironmentName(this.options.environment!),
+      });
+    }
+  }
+
+  /**
+   * @missingRailsArgs start — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm if — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   * @inventedArm throw — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
+   */
+  async perform(): Promise<void> {
+    await this.bootApplicationBang();
+    const railsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
+    if (railsConsole.isSandbox()) {
+      throw new NotImplementedError("console sandbox rollback is not ported");
+    }
+    await railsConsole.start();
+  }
 }

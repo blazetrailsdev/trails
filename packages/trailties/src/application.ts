@@ -53,6 +53,12 @@ export class Application extends Engine {
   private _deprecators?: Deprecators;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
+  sandbox: boolean | null | undefined = undefined;
+
+  isSandbox(): boolean | null | undefined {
+    return this.sandbox;
+  }
+
   readonly reloaders: unknown[] = [];
 
   constructor() {
@@ -117,6 +123,12 @@ export class Application extends Engine {
     return bootstrap
       .plus(this.railtiesInitializers(inherited))
       .plus(Finisher.initializersFor(this));
+  }
+
+  /** @internal */
+  override runConsoleBlocks(app: unknown): void {
+    for (const r of this.railties()) r.runConsoleBlocks(app);
+    super.runConsoleBlocks(app);
   }
 
   /** @internal */
