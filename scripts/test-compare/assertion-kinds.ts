@@ -190,6 +190,7 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
 };
 
 const RSPEC_MAP: Record<string, CanonicalKind> = {
+  expect_to_break_down_to: "equal",
   expect_to_eq: "equal",
   expect_not_to_eq: "notEqual",
   expect_to_eql: "equal",
