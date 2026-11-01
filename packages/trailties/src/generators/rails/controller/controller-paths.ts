@@ -1,17 +1,5 @@
 import { dasherize } from "../../base.js";
-import { camelize, classify, underscore } from "@blazetrails/activesupport";
-import {
-  ref,
-  tsBody,
-  tsClass,
-  tsMethod,
-  tsModule,
-  type Body,
-  type Field,
-  type Import,
-  type Method,
-  type Ref,
-} from "../../../template-builder/index.js";
+import { camelize, underscore } from "@blazetrails/activesupport";
 
 export interface ControllerPaths {
   className: string;
@@ -53,57 +41,5 @@ export function controllerPathHelpers(name: string): ControllerPaths {
     helperName,
     helperFile,
     namespaceParts: parts,
-  };
-}
-
-export interface EmitControllerClassOpts {
-  className: string;
-  parent: { ref: Ref; import?: Import };
-  imports?: Import[];
-  staticBlock?: Body;
-  fields?: Field[];
-  methods: Method[];
-}
-
-export function emitControllerClass(opts: EmitControllerClassOpts): string {
-  const imports: Import[] = [
-    ...(opts.parent.import ? [opts.parent.import] : []),
-    ...(opts.imports ?? []),
-  ];
-  return tsModule({
-    imports,
-    declarations: [
-      tsClass({
-        name: opts.className,
-        extends: opts.parent.ref,
-        staticBlock: opts.staticBlock,
-        body: [...(opts.fields ?? []), ...opts.methods],
-      }),
-    ],
-  });
-}
-
-export function actionMethod(name: string, ts: boolean): Method {
-  return tsMethod({
-    name,
-    params: [],
-    async: true,
-    returnType: ts ? "Promise<void>" : undefined,
-    body: tsBody`// TODO: implement`,
-  });
-}
-
-export function parentRefForRelative(
-  parent: string,
-  depth: number,
-  ext: string,
-): { ref: Ref; import: Import } {
-  const parentClass = classify(parent.replace(/::/g, "_").replace(/\//g, "_"));
-  const parentPath = dasherize(underscore(parent.replace(/::/g, "_").replace(/\//g, "_")));
-  const prefix = depth > 0 ? "../".repeat(depth) : "./";
-  const from = `${prefix}${parentPath}${ext}`;
-  return {
-    ref: ref(parentClass, from),
-    import: { from, named: { [parentClass]: "named" } },
   };
 }

@@ -1,6 +1,6 @@
-import { <%= this.parentClass() %> } from "<%= "../".repeat(this.classPathParts.length) || "./" %><%= this.parentPath() %><%= this.ext() %>";
+import { <%= ActiveSupport.Inflector.classify(this.parentClassName()) %> } from "<%= "../".repeat(this.classPathParts.length) || "./" %><%= ActiveSupport.Inflector.dasherize(ActiveSupport.Inflector.underscore(this.parentClassName())) %><%= this.ext() %>";
 
-export class <%= this.className().split("::").pop() %>Job extends <%= this.parentClass() %> {
+export class <%= this.className().split("::").pop() %>Job extends <%= ActiveSupport.Inflector.classify(this.parentClassName()) %> {
   static {
     this.queueAs("<%= this.options.queue %>");
   }

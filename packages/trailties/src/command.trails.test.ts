@@ -3,6 +3,7 @@ import { setAppPath, setEngineRoot } from "./app-path.js";
 import { root } from "./command.js";
 import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
+import type { Base } from "./command/base.js";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
 import { findByNamespace, hiddenCommands, invoke } from "./command.js";
@@ -21,7 +22,8 @@ function programName(command: Awaited<ReturnType<typeof findByNamespace>>): unkn
 
 describe("Rails::Command.find_by_namespace", () => {
   it("loads only the candidate command, as lookup requires only its file", async () => {
-    expect(programName(await findByNamespace("server", "server"))).toBe("server");
+    const server = (await findByNamespace("server", "server")) as typeof Base;
+    expect(server.namespace()).toBe("server");
     expect(loaded).toEqual([]);
   }, 30_000);
 

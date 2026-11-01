@@ -3,12 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ControllerGenerator } from "./controller-generator.js";
-import {
-  actionMethod,
-  controllerPathHelpers,
-  emitControllerClass,
-  parentRefForRelative,
-} from "./controller-paths.js";
+import { controllerPathHelpers } from "./controller-paths.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -75,20 +70,5 @@ describe("controllerPathHelpers", () => {
 
   it("strips a trailing Controller suffix", async () => {
     expect(controllerPathHelpers("account_controller").controllerFile).toBe("account-controller");
-  });
-});
-
-describe("emitControllerClass (direct helper surface)", () => {
-  it("emits a relative parent import when parent ref is provided", async () => {
-    const parent = parentRefForRelative("admin_controller", 0, ".ts");
-    const src = emitControllerClass({
-      className: "PostsController",
-      parent,
-      methods: [actionMethod("show", false)],
-    });
-    expect(src).toContain('import { AdminController } from "./admin-controller.ts";');
-    expect(src).toContain("extends AdminController");
-    expect(src).not.toContain("ActionController");
-    expect(parseTs(src).diagnostics).toEqual([]);
   });
 });

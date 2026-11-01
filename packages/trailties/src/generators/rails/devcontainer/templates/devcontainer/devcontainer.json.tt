@@ -1,0 +1,37 @@
+// For format details, see https://containers.dev/implementors/json_reference/.
+// For config options, see the README at: https://github.com/devcontainers/templates/tree/main/src/javascript-node
+{
+  "name": "<%= this.options.appName %>",
+  "dockerComposeFile": "compose.yaml",
+  "service": "rails-app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+
+  // Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    <%= Object.entries(this.features()).map(([key, value]) => `"${key}": ${JSON.stringify(value)}`).join(",\n    ") %>
+  },
+
+<% if (Object.keys(this.containerEnv()).length > 0) { -%>
+  "containerEnv": {
+    <%= Object.entries(this.containerEnv()).map(([key, value]) => `"${key}": "${value}"`).join(",\n    ") %>
+  },
+<% } -%>
+
+  // Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": <%= JSON.stringify(this.forwardPorts()) %>,
+
+  // Configure tool-specific properties.
+  // "customizations": {},
+
+  // Uncomment to connect as root instead. More info: https://containers.dev/implementors/json_reference/#remoteUser.
+  // "remoteUser": "root",
+
+<% if (this.mounts().length > 0) { -%>
+  "mounts": [
+    <%= this.mounts().map((mount) => "{\n      " + Object.entries(mount).map(([key, value]) => `"${key}": "${value}"`).join(",\n      ") + "\n    }").join(",\n    ") %>
+  ],
+<% } -%>
+
+  // Use 'postCreateCommand' to run commands after the container is created.
+  "postCreateCommand": "bin/setup --skip-server"
+}

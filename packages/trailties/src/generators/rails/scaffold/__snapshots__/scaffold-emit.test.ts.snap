@@ -13,18 +13,23 @@ export class PostsController extends ApplicationController {
 
   declare post: Post;
 
+  // GET /posts
   async index(): Promise<void> {
     this.posts = await Post.all();
   }
 
+  // GET /posts/1
   async show(): Promise<void> {}
 
+  // GET /posts/new
   async new(): Promise<void> {
     this.post = new Post();
   }
 
+  // GET /posts/1/edit
   async edit(): Promise<void> {}
 
+  // POST /posts
   async create(): Promise<void> {
     this.post = new Post(this.postParams());
 
@@ -35,6 +40,7 @@ export class PostsController extends ApplicationController {
     }
   }
 
+  // PATCH/PUT /posts/1
   async update(): Promise<void> {
     if (await this.post.update(this.postParams())) {
       this.redirectTo(this.post, { notice: "Post was successfully updated.", status: "see_other" });
@@ -43,15 +49,18 @@ export class PostsController extends ApplicationController {
     }
   }
 
+  // DELETE /posts/1
   async destroy(): Promise<void> {
     await this.post.destroyBang();
     this.redirectTo(this.postsPath(), { notice: "Post was successfully destroyed.", status: "see_other" });
   }
 
+  // Use callbacks to share common setup or constraints between actions.
   private async setPost(): Promise<void> {
     this.post = await Post.find(this.params.expect("id"));
   }
 
+  // Only allow a list of trusted parameters through.
   private postParams() {
     return this.params.expect({ post: ["title", "views"] });
   }

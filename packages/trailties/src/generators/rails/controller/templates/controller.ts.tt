@@ -1,6 +1,7 @@
-import { <%= this.parentClass() %> } from "<%= this.parentPath() %>";
+<% const parentClassName = this.parentClassName().replace(/::|\//g, "_"); -%>
+import { <%= ActiveSupport.Inflector.classify(parentClassName) %> } from "<%= "../".repeat(this.classPathParts.length) || "./" %><%= ActiveSupport.Inflector.dasherize(ActiveSupport.Inflector.underscore(parentClassName)) %><%= this.ext() %>";
 
-export class <%= this.controllerClassName() %> extends <%= this.parentClass() %> {
+export class <%= this.className().split("::").join("") %>Controller extends <%= ActiveSupport.Inflector.classify(parentClassName) %> {
 <% for (const action of this.actions) { -%>
   async <%= action %>()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
     // TODO: implement
