@@ -181,16 +181,17 @@ async function invokeRake(
 ): Promise<void> {
   await lookupBang();
   const program = createProgram();
-  const colon = task.indexOf(":");
+  const taskName = /[^[]+/.exec(task)?.[0] ?? "";
+  const colon = taskName.indexOf(":");
   if (colon > 0) {
-    const command = program.commands.find((c) => c.name() === task.slice(0, colon));
-    const subcommand = task.slice(colon + 1);
+    const command = program.commands.find((c) => c.name() === taskName.slice(0, colon));
+    const subcommand = taskName.slice(colon + 1);
     if (command?.commands.some((c) => c.name() === subcommand)) {
       await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
       return;
     }
   }
-  if (task !== "" && !program.commands.some((c) => c.name() === /[^[]+/.exec(task)?.[0])) {
+  if (task !== "" && !program.commands.some((c) => c.name() === taskName)) {
     throw new UnrecognizedCommandError(
       task,
       (await printingCommands()).map(([name]) => name),
