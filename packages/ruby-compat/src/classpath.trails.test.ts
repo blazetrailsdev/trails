@@ -50,6 +50,16 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName(Later)).toBe("Deferred::Later");
   });
 
+  it("resolves another class's pending entry on the next registration", () => {
+    registerClassPaths([[() => Actual, "Deferred::Swept"]]);
+    class Probe {}
+    expect(rbModName(Probe)).toBe("Probe");
+    class Actual {}
+    expect(rbModName(Actual)).toBe("Actual");
+    registerClassPaths([]);
+    expect(rbModName(Actual)).toBe("Deferred::Swept");
+  });
+
   it("reports a thunk still unresolved when the check runs", () => {
     registerClassPaths([
       [
