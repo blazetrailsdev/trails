@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, it, expect } from "vitest";
 import { env } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
@@ -130,6 +133,21 @@ describe("AppBase run tasks", () => {
   it("run tasks do nothing without bundle_install?", async () => {
     expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
     expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
+  });
+
+  it("dockerfile_binfile_fixups writes a literal backslash-r", () => {
+    const generator = new T(["app"]) as unknown as Record<string, any>;
+    const dir = process.cwd();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fixups-"));
+    fs.mkdirSync(path.join(tmp, "bin"));
+    fs.writeFileSync(path.join(tmp, "bin/x"), "#!/usr/bin/env ruby\r\n", { mode: 0o755 });
+    process.chdir(tmp);
+    try {
+      expect(generator.dockerfileBinfileFixups()[0]).toBe('sed -i "s/\\\\r$//g" bin/*');
+    } finally {
+      process.chdir(dir);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 
   it("node_version prefers NODE_VERSION", async () => {

@@ -1,5 +1,4 @@
 import { getChildProcess } from "./child-process-adapter.js";
-import { Errno } from "./errno.js";
 import type { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { Process, rbExecargNew, rbLastStatusSet } from "./process.js";
@@ -47,24 +46,28 @@ export async function rbFSystem(
 }
 
 /**
- * ``Kernel#` `` (`vendor/ruby/v3.3.11/io.c:10484` `rb_f_backquote`): the
- * command's standard output, with `$?` set. It is awaited where MRI blocks. A
- * command line runs through `/bin/sh -c`, so a command the shell cannot find
- * (status 127) raises the `Errno::ENOENT` MRI's direct exec raises.
+ * ``Kernel#` `` (`vendor/ruby/v3.3.11/io.c:10585` `rb_f_backquote`): the
+ * command's standard output, with `$?` set, awaited where MRI blocks. A command
+ * line with no shell metacharacter is exec'd directly (`rb_exec_fillarg`,
+ * `vendor/ruby/v3.3.11/process.c:2648`), so a missing command raises `Errno::ENOENT`;
+ * any other runs through `/bin/sh -c`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFBackquote(str: string): Promise<string> {
-  const [prog, env, args] = rbExecargNew([str]);
   const adapter = getChildProcess();
   if (adapter.capture3 === undefined) {
     throw new NotImplementedError("spawn() function is unimplemented on this machine");
   }
 
-  const [stdout, , data] = await adapter.capture3(prog, env, args, "");
+  const [prog, env, args] = rbExecargNew([str]);
+  const words = str.trim().split(/\s+/);
+  const direct = !/[*?{}[\]<>()~&|\\$;'`"\n#]/.test(str);
+  const [stdout, , data] = direct
+    ? await adapter.capture3(words[0], env, words.slice(1), "")
+    : await adapter.capture3(prog, env, args, "");
   if (data.error !== undefined) throw data.error;
   rbLastStatusSet(new Process.Status(data));
-  if (data.status === 127) throw new Errno.ENOENT(str.split(/\s+/)[0]);
 
   return stdout as string;
 }

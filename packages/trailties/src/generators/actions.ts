@@ -169,7 +169,6 @@ export interface RailsCommandOptions extends RakeOptions {
   inline?: boolean;
 }
 
-/** @missingRailsArgs invoke — PERMANENT */
 export async function railsCommand(
   this: ActionsHost,
   command: string,
@@ -177,8 +176,10 @@ export async function railsCommand(
 ): Promise<unknown> {
   if (options.inline) {
     log.call(this, "rails", command);
-    const [namespace, ...args] = Shellwords.shellwords(command);
-    return await this.inRoot(() => silenceWarnings(() => invoke(namespace, args)));
+    let args: string[];
+    [command, ...args] = Shellwords.shellwords(command);
+    const fullNamespace = command;
+    return await this.inRoot(() => silenceWarnings(() => invoke(fullNamespace, args, options)));
   } else {
     return await executeCommand.call(this, "rails", command, options);
   }

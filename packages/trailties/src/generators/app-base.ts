@@ -589,7 +589,7 @@ ${requireStatements.join("\n")}`;
 
     const hasCr = Dir.glob("bin/*").some((file) => File.read(file).includes("\r"));
     if (hasCr || (Gem.isWinPlatform() && binfixups.length > 0)) {
-      binfixups.unshift('sed -i "s/\r$//g" bin/*');
+      binfixups.unshift('sed -i "s/\\r$//g" bin/*');
     }
 
     if (!Dir.glob("bin/*").every((file) => File.isExecutable(file))) {
@@ -758,7 +758,7 @@ ${requireStatements.join("\n")}`;
 
   /** @internal */
   protected async userDefaultBranch(): Promise<string> {
-    return (this._userDefaultBranch ||= await rbFBackquote("git config init.defaultbranch"));
+    return (this._userDefaultBranch ??= await rbFBackquote("git config init.defaultbranch"));
   }
 
   /** @internal */

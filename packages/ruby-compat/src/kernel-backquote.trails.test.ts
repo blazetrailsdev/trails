@@ -7,6 +7,10 @@ describe("Kernel#`", () => {
     expect(await rbFBackquote("echo hello")).toBe("hello\n");
   });
 
+  it("answers a shell command that exits 127", async () => {
+    expect(await rbFBackquote("echo out; exit 127")).toBe("out\n");
+  });
+
   it("raises Errno::ENOENT for a command that does not exist", async () => {
     await expect(rbFBackquote("no-such-command-trails --version")).rejects.toBeInstanceOf(
       Errno.ENOENT,

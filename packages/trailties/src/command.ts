@@ -69,7 +69,11 @@ export function applicationRoot(): Pathname | undefined {
  * @missingRailsArgs invoke_rake — PERMANENT
  * @inventedArm replaceAll — PERMANENT
  */
-export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
+export async function invoke(
+  fullNamespace: string,
+  args: string[] = [],
+  config: Record<string, unknown> = {},
+): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
@@ -77,7 +81,7 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   await withArgv(args, async () => {
     if (command && "perform" in command) {
       if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-        await command.perform(name, args, {});
+        await command.perform(name, args, config);
       } else {
         await invokeRake(fullNamespace, args);
       }
