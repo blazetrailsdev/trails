@@ -2025,6 +2025,33 @@ extend(Base, {
 });
 extend(Base, DynamicMatchers);
 extend(Base, Querying);
+const _recordPlaceholders: object = Object.create(null);
+Object.setPrototypeOf(
+  _recordPlaceholders,
+  new Proxy(Object.getPrototypeOf(Model.prototype) as object, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (value !== undefined || typeof prop === "symbol") return value;
+      if (prop === "_attributes") return value;
+      const attrs = receiver?._attributes;
+      if (attrs != null && typeof attrs.isKey === "function" && attrs.isKey(prop)) {
+        return receiver._readAttribute(prop);
+      }
+      return value;
+    },
+    set(target, prop, value, receiver) {
+      if (typeof prop === "string") {
+        Object.defineProperty(_recordPlaceholders, prop, {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+      }
+      return Reflect.set(target, prop, value, receiver);
+    },
+  }),
+);
+Object.setPrototypeOf(Model.prototype, _recordPlaceholders);
 Object.setPrototypeOf(
   Base,
   new Proxy(Object.getPrototypeOf(Base) as object, {
