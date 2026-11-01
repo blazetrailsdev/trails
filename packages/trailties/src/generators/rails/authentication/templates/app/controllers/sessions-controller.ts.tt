@@ -1,0 +1,32 @@
+import { minutes } from "@blazetrails/activesupport";
+import { ApplicationController } from "./application-controller.ts";
+import { User } from "../models/user.ts";
+
+export class SessionsController extends ApplicationController {
+  static {
+    this.allowUnauthenticatedAccess({ only: ["new", "create"] });
+    this.rateLimit({
+      to: 10, within: minutes(3), only: "create",
+      with: function (this: SessionsController) {
+        this.redirectTo("/session/new", { alert: "Try again later." });
+      },
+    });
+  }
+
+  async new(): Promise<void> {}
+
+  async create(): Promise<void> {
+    const user = await User.authenticateBy(this.params.permit("email_address", "password"));
+    if (user) {
+      await this.startNewSessionFor(user);
+      this.redirectTo(this.afterAuthenticationUrl());
+    } else {
+      this.redirectTo("/session/new", { alert: "Try another email address or password." });
+    }
+  }
+
+  async destroy(): Promise<void> {
+    await this.terminateSession();
+    this.redirectTo("/session/new");
+  }
+}

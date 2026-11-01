@@ -1,5 +1,7 @@
 import { env as ENV, File, Gem, regexpEscape, Shellwords } from "@blazetrails/ruby-compat";
 import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
+import { Trails } from "../rails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
@@ -131,6 +133,7 @@ export async function initializer(
   );
 }
 
+/** @missingRailsCall rails_command — CONVERGEABLE converge-generators-actions-generate-onto-rails-command */
 export function generate(
   this: ActionsHost & GeneratorActionsState,
   what: string,
@@ -160,6 +163,27 @@ export function rake(
   options: RakeOptions = {},
 ): Promise<string | boolean | null | undefined> {
   return executeCommand.call(this, "rake", command, options);
+}
+
+export interface RailsCommandOptions extends RakeOptions {
+  inline?: boolean;
+}
+
+export async function railsCommand(
+  this: ActionsHost,
+  command: string,
+  options: RailsCommandOptions = {},
+): Promise<unknown> {
+  if (options.inline) {
+    log.call(this, "rails", command);
+    let args: string[];
+    [command, ...args] = Shellwords.shellwords(command);
+    return await this.inRoot(() =>
+      silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
+    );
+  } else {
+    return await executeCommand.call(this, "rails", command, options);
+  }
 }
 
 export interface RouteOptions {

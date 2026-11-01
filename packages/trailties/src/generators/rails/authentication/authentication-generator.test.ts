@@ -36,7 +36,7 @@ const listFiles = (root: string): string[] =>
   (fs.readdirSync(root, { recursive: true }) as string[])
     .filter((f) => fs.statSync(path.join(root, f)).isFile())
     .sort();
-const makeGen = (options: { api?: boolean } = {}) => ({
+const makeGen = (options: { api?: boolean; skip?: boolean } = {}) => ({
   run: async () => {
     await new AuthenticationGenerator([], options, { destinationRoot: tmpDir }).invokeAll();
     return listFiles(tmpDir);
@@ -164,7 +164,7 @@ describe("AuthenticationGenerator", () => {
 
   it("does not clobber a pre-existing application-cable Connection", async () => {
     write("app/channels/application-cable/connection.ts", "// user\n");
-    await withActionCableEngine(() => makeGen().run());
+    await withActionCableEngine(() => makeGen({ skip: true }).run());
     expect(read("app/channels/application-cable/connection.ts")).toBe("// user\n");
   });
 
@@ -200,7 +200,7 @@ describe("AuthenticationGenerator", () => {
 
   it("does not silently overwrite an existing file", async () => {
     write("app/models/user.ts", "// mine\n");
-    await makeGen().run();
+    await makeGen({ skip: true }).run();
     expect(read("app/models/user.ts")).toBe("// mine\n");
   });
 });

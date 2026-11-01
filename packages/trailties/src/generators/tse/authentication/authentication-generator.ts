@@ -1,19 +1,18 @@
+import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "../../base.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export class AuthenticationGenerator extends GeneratorBase {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("createFiles");
-    this.noCommands(() => this.methodAdded("template"));
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async createFiles(): Promise<void> {
-    await this.template("app/views/passwords/new.html.erb");
-    await this.template("app/views/passwords/edit.html.erb");
-    await this.template("app/views/sessions/new.html.erb");
-  }
-
-  override async template(file: string): Promise<void> {
-    await this.createFile(file.replace(/\.erb$/, ".tse"), TEMPLATES[file]);
+    await this.template("app/views/passwords/new.html.tse");
+    await this.template("app/views/passwords/edit.html.tse");
+    await this.template("app/views/sessions/new.html.tse");
   }
 }

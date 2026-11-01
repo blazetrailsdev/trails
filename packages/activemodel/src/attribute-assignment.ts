@@ -36,6 +36,7 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
     } else if (assigned instanceof Promise) {
       void assigned.catch(() => {});
       capture.assigned = assigned;
+      pendingCaptures.set(this, capture);
     }
   } finally {
     host[assigningSynchronously] = outer;
@@ -48,6 +49,7 @@ interface AssignmentCapture {
 }
 
 let assignmentCapture: AssignmentCapture | null = null;
+const pendingCaptures = new WeakMap<object, AssignmentCapture>();
 
 export const assigningSynchronously: unique symbol = Symbol.for(
   "@blazetrails/activemodel:assigningSynchronously",
@@ -147,7 +149,7 @@ export function assertAssignedSynchronously(pending: unknown, methodName: string
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE create-after-initialize-sees-awaited-attachment-writers
+ * @noRailsEquivalent PERMANENT
  */
 export function capturingAssignment<R>(build: () => R): [R, Promise<void> | undefined] {
   const capture: AssignmentCapture = { attributes: undefined };
@@ -162,12 +164,25 @@ export function capturingAssignment<R>(build: () => R): [R, Promise<void> | unde
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE create-after-initialize-sees-awaited-attachment-writers
+ * @noRailsEquivalent PERMANENT
+ */
+export function deferringToAssignment(record: object, rest: () => unknown): boolean {
+  const capture = pendingCaptures.get(record);
+  if (capture === undefined) return false;
+  pendingCaptures.delete(record);
+  capture.assigned = capture.assigned!.then(rest).then(() => {});
+  void capture.assigned.catch(() => {});
+  return true;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
  */
 export async function awaitingAssignment<R, K = never>(
   attributes: unknown,
   block: ((record: K) => void | Promise<void>) | undefined,
-  build: (block?: (record: K) => void) => R,
+  build: (block?: (record: K) => unknown) => R,
 ): Promise<R> {
   const capture: AssignmentCapture = { attributes };
   let yielded: unknown;
@@ -177,13 +192,13 @@ export async function awaitingAssignment<R, K = never>(
     record = build(
       block &&
         ((record: K) => {
-          yielded = capture.assigned ? capture.assigned.then(() => block(record)) : block(record);
+          return (yielded = block(record));
         }),
     );
   } finally {
     assignmentCapture = null;
   }
-  await yielded;
   await capture.assigned;
+  await yielded;
   return record;
 }

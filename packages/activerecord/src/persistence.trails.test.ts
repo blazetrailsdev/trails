@@ -81,6 +81,27 @@ describe("PersistenceTest (trails)", () => {
     expect([initialized, yielded]).toEqual([1, 1]);
   });
 
+  it("after_initialize sees every attribute when an earlier writer is async", async () => {
+    let seen: unknown[] = [];
+    class Deferred extends Topic {
+      async setAttachment(_value: unknown): Promise<void> {
+        await Promise.resolve();
+        this.writeAttribute("content", "attached");
+      }
+    }
+    Deferred.afterInitialize((record: Deferred) => {
+      seen = [record.title, record.content, record.author_name];
+    });
+    const topic = await Deferred.create(
+      { attachment: "file", title: "after" } as Record<string, unknown>,
+      async (record: Base) => {
+        (record as Deferred).author_name = "block";
+      },
+    );
+    expect(seen).toEqual(["after", "attached", "block"]);
+    expect(topic.isPersisted()).toBe(true);
+  });
+
   it("create inside a scope keeps an explicit attribute over the scope's", async () => {
     const scope = Topic.where({ title: "scoped", author_name: "Scope" });
     const topic = await scope.scoping(() => Topic.create({ title: "explicit" }));

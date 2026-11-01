@@ -44,3 +44,26 @@ export async function rbFSystem(
 
   return null;
 }
+
+/**
+ * ``Kernel#` `` (`vendor/ruby/v3.3.11/io.c:10585` `rb_f_backquote`): the
+ * command's standard output, with `$?` set, awaited where MRI blocks. A command
+ * line with no shell metacharacter is exec'd directly (`rb_exec_fillarg`,
+ * `vendor/ruby/v3.3.11/process.c:2640-2672`), so a missing command raises `Errno::ENOENT`;
+ * any other runs through `/bin/sh -c`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function rbFBackquote(str: string): Promise<string> {
+  const adapter = getChildProcess();
+  if (adapter.capture3 === undefined) {
+    throw new NotImplementedError("spawn() function is unimplemented on this machine");
+  }
+
+  const [prog, env, args] = rbExecargNew([str]);
+  const [stdout, , data] = await adapter.capture3(prog, env, args, "");
+  if (data.error !== undefined) throw data.error;
+  rbLastStatusSet(new Process.Status(data));
+
+  return stdout as string;
+}

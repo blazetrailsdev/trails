@@ -7,7 +7,9 @@ import { AppGenerator } from "./rails/app/app-generator.js";
 
 let tmpDir: string | undefined;
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   tmpDir = undefined;
 });

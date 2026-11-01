@@ -1,4 +1,8 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, it, expect } from "vitest";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
@@ -93,5 +97,71 @@ describe("AppBase", () => {
     expect(g["ciPackages"]()).toContain("google-chrome-stable");
     expect(g["dockerfileChownDirectories"]()).toEqual(["db", "log", "storage", "tmp"]);
     expect(AppBase.strictArgsPosition()).toBe(false);
+  });
+});
+
+describe("AppBase run tasks", () => {
+  const commandsFor = async (options: Record<string, unknown>, method: string) => {
+    const generator = new T(["app"], options) as unknown as Record<string, any>;
+    const commands: string[] = [];
+    generator.railsCommand = async (command: string) => commands.push(command);
+    await generator[method]();
+    return commands;
+  };
+
+  it("run_javascript installs through the selected bundler", async () => {
+    expect(await commandsFor({ javascript: "esbuild" }, "runJavascript")).toEqual([
+      "javascript:install:esbuild",
+    ]);
+    expect(await commandsFor({ javascript: "importmap" }, "runJavascript")).toEqual([
+      "importmap:install",
+    ]);
+  });
+
+  it("run_css picks the standalone installer without a JS runtime", async () => {
+    expect(await commandsFor({ css: "tailwind" }, "runCss")).toEqual(["tailwindcss:install"]);
+    expect(await commandsFor({ css: "bulma" }, "runCss")).toEqual(["css:install:bulma"]);
+  });
+
+  it("run_solid leaves out solid_cable when Action Cable is skipped", async () => {
+    expect(await commandsFor({ skipActionCable: true }, "runSolid")).toEqual([
+      "solid_cache:install solid_queue:install",
+    ]);
+  });
+
+  it("run tasks do nothing without bundle_install?", async () => {
+    expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
+    expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
+  });
+
+  it("dockerfile_binfile_fixups writes a literal backslash-r", () => {
+    const generator = new T(["app"]) as unknown as Record<string, any>;
+    const dir = process.cwd();
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fixups-"));
+    fs.mkdirSync(path.join(tmp, "bin"));
+    fs.writeFileSync(path.join(tmp, "bin/x"), "#!/usr/bin/env ruby\r\n", { mode: 0o755 });
+    process.chdir(tmp);
+    try {
+      expect(generator.dockerfileBinfileFixups()[0]).toBe('sed -i "s/\\r$//g" bin/*');
+    } finally {
+      process.chdir(dir);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("node_version prefers NODE_VERSION", async () => {
+    const generator = new T(["app"], { javascript: "esbuild" }) as unknown as Record<string, any>;
+    const before = env.NODE_VERSION;
+    setEnv("NODE_VERSION", "1.2.3");
+    try {
+      expect(await generator.nodeVersion()).toBe("1.2.3");
+    } finally {
+      setEnv("NODE_VERSION", before);
+    }
+  });
+
+  it("node_version is nil without a JS runtime", async () => {
+    const generator = new T(["app"]) as unknown as Record<string, any>;
+    expect(await generator.nodeVersion()).toBeUndefined();
   });
 });

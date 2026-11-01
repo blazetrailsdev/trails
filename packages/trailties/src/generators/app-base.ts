@@ -3,15 +3,19 @@ import {
   Dir,
   Errno,
   File,
+  FileUtils,
+  Gem,
   LoadError,
   RuntimeError,
   env,
   include,
   type Included,
+  rbFBackquote,
   rbFSend,
   rbObjRespondTo,
+  regexpEscape,
 } from "@blazetrails/ruby-compat";
-import { dasherize, underscore } from "@blazetrails/activesupport";
+import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
@@ -60,6 +64,8 @@ export abstract class AppBase extends GeneratorBase {
   protected _argv: unknown[];
   /** @internal */
   protected _gemFilter: (gem: unknown) => boolean;
+  /** @internal */
+  private _userDefaultBranch?: string;
 
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, AppName);
@@ -79,6 +85,7 @@ export abstract class AppBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("applyRailsTemplate"));
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
+    this.noCommands(() => this.methodAdded("createRoot"));
   }
 
   static strictArgsPosition(): boolean {
@@ -370,6 +377,13 @@ export abstract class AppBase extends GeneratorBase {
     }
   }
 
+  async createRoot(): Promise<void> {
+    this.isValidConst();
+
+    await this.emptyDirectory(".");
+    if (!this.options.pretend) FileUtils.cd(this.destinationRoot);
+  }
+
   private _requiredRailties?: Record<string, boolean>;
 
   /** @internal */
@@ -520,6 +534,71 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  protected async nodeVersion(): Promise<string | null | undefined> {
+    if (this.usingNode()) {
+      if (env.NODE_VERSION != null) return env.NODE_VERSION;
+      try {
+        return (await rbFBackquote("node --version")).match(/\d+\.\d+\.\d+/)?.[0];
+      } catch {
+        return NODE_LTS_VERSION;
+      }
+    }
+  }
+
+  /** @internal */
+  protected async dockerfilePnpmVersion(): Promise<string | false | undefined> {
+    try {
+      return this.usingNode() && (await rbFBackquote("pnpm --version")).match(/\d+\.\d+\.\d+/)?.[0];
+    } catch {
+      return "latest";
+    }
+  }
+
+  /** @internal */
+  protected async isPnpmThroughCorepack(): Promise<boolean> {
+    const version = await this.dockerfilePnpmVersion();
+    if (version === "latest") return true;
+    return new Gem.Version(version as string).compare("2")! >= 0;
+  }
+
+  /** @internal */
+  protected async dockerfileBunVersion(): Promise<string | false | undefined> {
+    try {
+      return this.usingBun() && (await rbFBackquote("bun --version")).match(/\d+\.\d+\.\d+/)?.[0];
+    } catch {
+      return BUN_VERSION;
+    }
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
+  protected dockerfileBinfileFixups(): string[] {
+    const shebangs = Dir.glob("bin/*")
+      .map((file) => File.read(file).split(/(?<=\n)/)[0] ?? "")
+      .join("");
+    const rubies = [
+      ...new Set([...shebangs.matchAll(/#!\/usr\/bin\/env (ruby.*)/g)].map((match) => match[1])),
+    ];
+
+    const binfixups = rubies
+      .filter((ruby) => ruby !== "ruby")
+      .map((ruby) => `sed -i 's/${regexpEscape(ruby)}$/ruby/' bin/*`);
+
+    const hasCr = Dir.glob("bin/*").some((file) => File.read(file).includes("\r"));
+    if (hasCr || (Gem.isWinPlatform() && binfixups.length > 0)) {
+      binfixups.unshift('sed -i "s/\\r$//g" bin/*');
+    }
+
+    if (!Dir.glob("bin/*").every((file) => File.isExecutable(file))) {
+      binfixups.unshift("chmod +x bin/*");
+    }
+
+    return binfixups;
+  }
+
+  /** @internal */
   protected dockerfileBasePackages(): string[] {
     const packages: Array<string | undefined> = ["curl"];
 
@@ -611,6 +690,58 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  protected isBundleInstall(): boolean {
+    return !(this.options.skipBundle || this.options.pretend);
+  }
+
+  /** @internal */
+  protected async runJavascript(): Promise<void> {
+    if (this.options.skipJavascript || !this.isBundleInstall()) return;
+
+    switch (this.options.javascript) {
+      case "importmap":
+        await this.railsCommand("importmap:install");
+        break;
+      case "webpack":
+      case "bun":
+      case "esbuild":
+      case "rollup":
+        await this.railsCommand(`javascript:install:${this.options.javascript}`);
+        break;
+    }
+  }
+
+  /** @internal */
+  protected async runHotwire(): Promise<void> {
+    if (this.options.skipHotwire || !this.isBundleInstall()) return;
+
+    await this.railsCommand("turbo:install stimulus:install");
+  }
+
+  /** @internal */
+  protected async runCss(): Promise<void> {
+    if (!this.options.css || !this.isBundleInstall()) return;
+
+    if (!this.usingJsRuntime() && this.options.css === "tailwind") {
+      await this.railsCommand("tailwindcss:install");
+    } else if (!this.usingJsRuntime() && this.options.css === "sass") {
+      await this.railsCommand("dartsass:install");
+    } else {
+      await this.railsCommand(`css:install:${this.options.css}`);
+    }
+  }
+
+  /** @internal */
+  protected async runSolid(): Promise<void> {
+    if (this.skipSolid() || !this.isBundleInstall()) return;
+
+    let commands = "solid_cache:install solid_queue:install";
+    if (!this.skipActionCable()) commands += " solid_cable:install";
+
+    await this.railsCommand(commands);
+  }
+
+  /** @internal */
   protected async emptyDirectoryWithKeepFile(
     destination: string,
     config: { verbose?: boolean } = {},
@@ -622,6 +753,24 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected async keepFile(destination: string): Promise<unknown> {
     return this.keeps() ? await this.createFile(`${destination}/.keep`, "") : null;
+  }
+
+  /** @internal */
+  protected async userDefaultBranch(): Promise<string> {
+    return (this._userDefaultBranch ??= await rbFBackquote("git config init.defaultbranch"));
+  }
+
+  /** @internal */
+  protected async gitInitCommand(): Promise<string> {
+    if (isPresent((await this.userDefaultBranch()).trim())) return "git init";
+
+    const gitVersion = (await rbFBackquote("git --version")).match(/\d+\.\d+\.\d+/)?.[0];
+
+    if (new Gem.Version(gitVersion!).compare(new Gem.Version("2.28.0"))! >= 0) {
+      return "git init -b main";
+    } else {
+      return "git init && git symbolic-ref HEAD refs/heads/main";
+    }
   }
 
   /** @internal */

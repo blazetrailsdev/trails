@@ -362,9 +362,9 @@ shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps th
 build in each create path, and the constructor's `assignAttributes` hands it
 the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
 nothing is parked on the record. `new` and `build` still raise.
-The block and any key after that writer run after `after_initialize`, which is
-not ratified here: `create-after-initialize-sees-awaited-attachment-writers`
-converges it.
+The constructor hands the block and `_runInitializeCallbacks` to
+`deferringToAssignment`, so they run after the writer and any key following it,
+in Rails' order.
 
 This is a genuine language shortcoming — JS has no synchronous await — ratified
 repo-wide here. This section is the wrapper's receipt: the wrapper raises no

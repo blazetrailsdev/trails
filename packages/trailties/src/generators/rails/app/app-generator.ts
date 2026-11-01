@@ -204,7 +204,7 @@ export class AppGenerator extends AppBase {
     });
     this.publicCommand("reportImpliedOptions");
     this.methodAdded("setDefaultAccessorsBang");
-    this.methodAdded("createRoot");
+    this.publicCommand("createRoot");
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
     this.methodAdded("createBinFiles");
@@ -281,14 +281,6 @@ export class AppGenerator extends AppBase {
       : this.packageManager === "yarn"
         ? "yarn.lock"
         : "package-lock.json";
-  }
-
-  async createRoot(): Promise<void> {
-    this.isValidConst();
-    const name = File.basename(this.appPath);
-
-    this.say(`Creating new trails application: ${name}`);
-    this.say("");
   }
 
   private railsGemfileEntries(names: string[]): Record<string, string> {

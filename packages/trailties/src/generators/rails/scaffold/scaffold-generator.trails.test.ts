@@ -28,7 +28,11 @@ beforeEach(() => {
     "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
-afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+const startDir = process.cwd();
+afterEach(() => {
+  process.chdir(startDir);
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+});
 const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativePath), "utf-8");
 
 describe("ScaffoldGenerator (namespaced)", () => {

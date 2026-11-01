@@ -1,3 +1,4 @@
+import { Trails } from "./rails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { File, Pathname, StandardError, env, prepend, rbArgv } from "@blazetrails/ruby-compat";
@@ -65,11 +66,12 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/**
- * @missingRailsArgs invoke_rake — PERMANENT
- * @inventedArm replaceAll — PERMANENT
- */
-export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
+/** @inventedArm replaceAll — PERMANENT */
+export async function invoke(
+  fullNamespace: string,
+  args: string[] = [],
+  config: Record<string, unknown> = {},
+): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
@@ -77,16 +79,16 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   await withArgv(args, async () => {
     if (command && "perform" in command) {
       if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-        await command.perform(name, args, {});
+        await command.perform(name, args, config);
       } else {
-        await invokeRake(fullNamespace, args);
+        await invokeRake(fullNamespace, args, config);
       }
     } else if (command && command.name() === name) {
       await command.parent!.parseAsync([name, ...args], { from: "user" });
     } else if (command && command.commands.some((c) => c.name() === name)) {
       await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
     } else {
-      await invokeRake(fullNamespace, args);
+      await invokeRake(fullNamespace, args, config);
     }
   });
 }
@@ -141,7 +143,11 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
 }
 
 /** @internal */
-async function invokeRake(task: string, args: string[]): Promise<void> {
+async function invokeRake(
+  task: string,
+  args: string[],
+  _config: Record<string, unknown>,
+): Promise<void> {
   await lookupBang();
   const program = createProgram();
   const colon = task.indexOf(":");
@@ -155,3 +161,5 @@ async function invokeRake(task: string, args: string[]): Promise<void> {
   }
   await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
 }
+
+Trails.Command = { invoke };
