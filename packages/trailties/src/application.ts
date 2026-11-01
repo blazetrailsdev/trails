@@ -157,6 +157,14 @@ export class Application extends Engine {
     return this._deprecators;
   }
 
+  initialized(): boolean {
+    return this._initialized;
+  }
+
+  name(): string {
+    return dasherize(underscore(this.constructor.name)).replace(/-application$/, "");
+  }
+
   runLoadHooksBang(): this {
     if (this._ranLoadHooks) return this;
     this._ranLoadHooks = true;
@@ -169,14 +177,6 @@ export class Application extends Engine {
 
     if (this._block) this._block.call(this);
     return this;
-  }
-
-  initialized(): boolean {
-    return this._initialized;
-  }
-
-  name(): string {
-    return dasherize(underscore(this.constructor.name)).replace(/-application$/, "");
   }
 
   get initializers(): Collection {
@@ -225,20 +225,6 @@ export class Application extends Engine {
     return this._orderedRailties;
   }
 
-  toApp(): this {
-    return this;
-  }
-
-  override async helpersPaths(): Promise<string[]> {
-    return this.config.helpersPaths;
-  }
-
-  migrationRailties(): Array<Trailtie | string> {
-    return this.orderedRailties()
-      .flat()
-      .filter((railtie) => railtie !== this);
-  }
-
   /** @internal */
   railtiesInitializers(current: Collection): Collection {
     let initializers = new Collection();
@@ -272,12 +258,12 @@ export class Application extends Engine {
     (this.constructor as typeof Application).generators(blk);
   }
 
-  isolateNamespace(mod: Parameters<typeof Application.isolateNamespace>[0]): void {
-    (this.constructor as typeof Application).isolateNamespace(mod);
-  }
-
   server(blk: TrailtieBlock): void {
     (this.constructor as typeof Application).server(blk);
+  }
+
+  isolateNamespace(mod: Parameters<typeof Application.isolateNamespace>[0]): void {
+    (this.constructor as typeof Application).isolateNamespace(mod);
   }
 
   static addLibToLoadPathBang(root: string): void {
@@ -297,6 +283,20 @@ export class Application extends Engine {
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;
+  }
+
+  toApp(): this {
+    return this;
+  }
+
+  override async helpersPaths(): Promise<string[]> {
+    return this.config.helpersPaths;
+  }
+
+  migrationRailties(): Array<Trailtie | string> {
+    return this.orderedRailties()
+      .flat()
+      .filter((railtie) => railtie !== this);
   }
 
   /** @internal */
