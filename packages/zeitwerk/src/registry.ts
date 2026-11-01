@@ -23,7 +23,6 @@ export const Registry = {
     return (this.autoloads[abspath] = loader);
   },
 
-  /** @missingRailsCall delete — CONVERGEABLE call-set-credits-delete-expression */
   unregisterAutoload(abspath: string): void {
     delete this.autoloads[abspath];
   },
