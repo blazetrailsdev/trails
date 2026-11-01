@@ -372,6 +372,7 @@ export class Application extends Engine {
     return gen;
   }
 
+  /** @missingRailsArgs new — PERMANENT */
   messageVerifiers(): MessageVerifiers {
     if (this._messageVerifiers) return this._messageVerifiers;
     const secretGenerator = Object.assign(
