@@ -15,6 +15,7 @@ import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 import { AppName } from "../../../../app-name.js";
+import { GeneratorError } from "../../../../generated-attribute.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
@@ -54,7 +55,7 @@ export class ChangeGenerator extends GeneratorBase {
     super(args, localOptions, config);
 
     if (!(DATABASES as readonly string[]).includes((this.options as ChangeGeneratorOptions).to)) {
-      throw new Error(
+      throw new GeneratorError(
         `Invalid value for --to option. Supported preconfigurations are: ${DATABASES.join(", ")}.`,
       );
     }
