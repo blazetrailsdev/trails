@@ -266,7 +266,11 @@ Finisher.initializer(
 
 /** @noRailsEquivalent PERMANENT */
 async function loadControllers(paths: Root): Promise<void> {
-  for (const [prefix, klass] of await loadAppClasses(paths, "controllers", ActionController.Base)) {
+  for (const [prefix, klass] of await loadAppClasses(
+    paths,
+    "controllers",
+    ActionController.Metal,
+  )) {
     if (prefix) registerController(`${prefix}${klass.name}`, klass);
     else registerController(klass);
     await defineController(klass);
