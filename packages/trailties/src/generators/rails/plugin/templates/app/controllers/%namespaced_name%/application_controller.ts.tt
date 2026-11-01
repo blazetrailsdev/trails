@@ -1,0 +1,3 @@
+import { ActionController } from "@blazetrails/actionpack";
+
+<%= this.wrapInModules(`export class ApplicationController extends ActionController.${this.isApi() ? "API" : "Base"} {}`) %>
