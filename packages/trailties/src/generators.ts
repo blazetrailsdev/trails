@@ -213,7 +213,7 @@ export class Generators {
     }
     if (args.length === 0 && klass.arguments().some((a) => a.isRequired())) args.push("--help");
     await klass.start(args, config);
-    if (config.behavior === "invoke") Generators.runAfterGenerateCallback();
+    if (config.behavior === "invoke") await Generators.runAfterGenerateCallback();
   }
 
   static addGeneratedFile(file: string): string {
@@ -286,10 +286,10 @@ export class Generators {
     }
   }
 
-  private static runAfterGenerateCallback(): void {
+  private static async runAfterGenerateCallback(): Promise<void> {
     if (_generatedFiles !== undefined && _generatedFiles.length !== 0) {
       for (const callback of Generators.afterGenerateCallbacks()) {
-        callback(_generatedFiles);
+        await callback(_generatedFiles);
       }
       _generatedFiles = [];
     }

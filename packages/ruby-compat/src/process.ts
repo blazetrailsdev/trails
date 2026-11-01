@@ -31,12 +31,22 @@ export function rbExecargNew(
   prog: string,
   env: Record<string, string | undefined>,
   args: string[] | null,
-  opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown },
+  opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown; exception?: boolean },
 ] {
   const rest = [...argv];
-  let opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown } = {};
+  let opthash: {
+    out?: string | IO;
+    err?: string | IO;
+    unsetenvOthers?: unknown;
+    exception?: boolean;
+  } = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
-    opthash = rest.pop() as { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown };
+    opthash = rest.pop() as {
+      out?: string | IO;
+      err?: string | IO;
+      unsetenvOthers?: unknown;
+      exception?: boolean;
+    };
     for (const key of Object.keys(opthash)) {
       if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);

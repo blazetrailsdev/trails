@@ -15,6 +15,7 @@ import { NotImplementedError } from "./not-implemented-error.js";
 import { Open3 } from "./open3.js";
 import { rbObjDup } from "./include.js";
 import { Process } from "./process.js";
+import { RuntimeError } from "./runtime-error.js";
 
 afterEach(() => {
   childProcessAdapterConfig.adapter = null;
@@ -33,6 +34,19 @@ describe("Kernel#system", () => {
   it("is false for a command that exits with anything else", async () => {
     expect(await rbFSystem("exit 3")).toBe(false);
     expect(await rbFSystem("kill -9 $$")).toBe(false);
+  });
+
+  it("raises each failed answer with exception: true", async () => {
+    expect(await rbFSystem("exit 0", { exception: true })).toBe(true);
+    await expect(rbFSystem("sh", "-c", "exit 3", { exception: true })).rejects.toThrow(
+      new RuntimeError("Command failed with exit 3: sh"),
+    );
+    await expect(rbFSystem("kill -9 $$", { exception: true })).rejects.toThrow(
+      new RuntimeError("Command failed with SIGKILL: kill -9 $$"),
+    );
+    await expect(
+      rbFSystem("trails-no-such-program", "--version", { exception: true }),
+    ).rejects.toBeInstanceOf(Errno.ENOENT);
   });
 
   it("is nil when the command could not be executed", async () => {
