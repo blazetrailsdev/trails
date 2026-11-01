@@ -202,6 +202,14 @@ describe("AppGenerator", () => {
     ).rejects.toThrow(/conflicting option/i);
   });
 
+  it("--api implies its options and a default run reports nothing", async () => {
+    const api = new AppGenerator(["my-app"], { api: true }, { destinationRoot: tmpDir });
+    expect(api.options.skipAssetPipeline).toBe(true);
+    expect(api.options.skipJavascript).toBe(true);
+    await makeGen().reportImpliedOptions();
+    expect(lines.join("\n")).not.toMatch(/will also be activated/);
+  });
+
   it("skip active job option", async () => {
     await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
 

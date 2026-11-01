@@ -43,13 +43,6 @@ export const BUN_VERSION = "1.0.1";
 export const JAVASCRIPT_OPTIONS = ["importmap", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
-export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOptions>> = {
-  skipActiveJob: ["skipActionMailer", "skipActiveStorage"],
-  skipActiveRecord: ["skipActiveStorage", "skipSolid"],
-  skipActiveStorage: ["skipActionMailbox", "skipActionText"],
-  skipJavascript: ["skipHotwire"],
-};
-
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
@@ -79,6 +72,13 @@ export abstract class AppBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
   }
+
+  static OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
+    skipActiveJob: ["skipActionMailer", "skipActiveStorage"],
+    skipActiveRecord: ["skipActiveStorage", "skipSolid"],
+    skipActiveStorage: ["skipActionMailbox", "skipActionText"],
+    skipJavascript: ["skipHotwire"],
+  };
 
   static strictArgsPosition(): boolean {
     return false;
@@ -247,10 +247,16 @@ export abstract class AppBase extends GeneratorBase {
     config: GeneratorConfig = {},
   ) {
     super(positionalArgv, optionArgv, config);
-    this.options = {
+    const options = {
       ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
       ...Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
     } as unknown as AppBaseOptions;
+    const skipDependents = options.skipActiveStorage ? true : undefined;
+    this.options = {
+      skipActionMailbox: skipDependents,
+      skipActionText: skipDependents,
+      ...options,
+    };
   }
 
   /** @internal */
@@ -319,7 +325,7 @@ export abstract class AppBase extends GeneratorBase {
 
   /** @internal */
   protected implyOptions(
-    optionImplications: Record<string, ReadonlyArray<unknown>> = OPTION_IMPLICATIONS,
+    optionImplications: Record<string, readonly string[]> = AppBase.OPTION_IMPLICATIONS,
     { metaOptions = [] }: { metaOptions?: string[] } = {},
   ): void {
     const optionReasons: Record<string, string[]> = {};
@@ -359,12 +365,6 @@ export abstract class AppBase extends GeneratorBase {
     if (this._impliedOptionsConflicts.length > 0) {
       throw new RuntimeError("Cannot proceed due to conflicting options");
     }
-  }
-
-  /** @internal */
-  get database(): Database {
-    if (!this._database) this._database = Database.build(this.options.database ?? "sqlite3");
-    return this._database;
   }
 
   private _requiredRailties?: Record<string, boolean>;
@@ -460,6 +460,10 @@ ${requireStatements.join("\n")}`;
     return this.options.skipEslint;
   }
   /** @internal */
+  protected skipBrakeman(): boolean | undefined {
+    return this.options.skipBrakeman;
+  }
+  /** @internal */
   protected skipCi(): boolean | undefined {
     return this.options.skipCi;
   }
@@ -544,28 +548,13 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected dependOnBootsnap(): boolean {
-    return !this.options.skipBootsnap && !this.options.dev;
-  }
-
-  /** @internal */
-  protected edgeBranch(): string {
-    return (this.constructor as typeof AppBase).edgeBranch();
-  }
-
-  /** @internal */
-  protected dockerfileChownDirectories(): string[] {
-    const directories = ["log", "tmp"];
-
-    if (!this.skipStorage()) directories.push("storage");
-    if (!this.skipActiveRecord()) directories.push("db");
-
-    return directories.sort();
-  }
-
-  /** @internal */
   dependsOnSystemTest(): boolean {
     return !(this.options.skipSystemTest || this.options.skipTest || this.options.api);
+  }
+
+  /** @internal */
+  protected dependOnBootsnap(): boolean {
+    return !this.options.skipBootsnap && !this.options.dev;
   }
 
   /** @internal */
@@ -630,5 +619,26 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected async keepFile(destination: string): Promise<unknown> {
     return this.keeps() ? await this.createFile(`${destination}/.keep`, "") : null;
+  }
+
+  /** @internal */
+  protected edgeBranch(): string {
+    return (this.constructor as typeof AppBase).edgeBranch();
+  }
+
+  /** @internal */
+  protected dockerfileChownDirectories(): string[] {
+    const directories = ["log", "tmp"];
+
+    if (!this.skipStorage()) directories.push("storage");
+    if (!this.skipActiveRecord()) directories.push("db");
+
+    return directories.sort();
+  }
+
+  /** @internal */
+  get database(): Database {
+    if (!this._database) this._database = Database.build(this.options.database ?? "sqlite3");
+    return this._database;
   }
 }

@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
-import { AppBase, OPTION_IMPLICATIONS, type AppBaseOptions } from "./app-base.js";
+import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "./app-base.js";
 import type { GeneratorConfig } from "./base.js";
 import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
@@ -11,7 +11,7 @@ import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-const META_OPTIONS = ["skipActionMailer", "skipActiveStorage"];
+const META_OPTIONS = ["minimal"];
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
@@ -134,10 +134,72 @@ export class AppGenerator extends AppBase {
   private _configTargetVersion: string | null = null;
   readonly sqliteDriver: SqliteDriver;
 
+  static override OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
+    ...AppBase.OPTION_IMPLICATIONS,
+    skipGit: ["skipDecryptedDiffs"],
+    minimal: [
+      "skipActionCable",
+      "skipActionMailbox",
+      "skipActionMailer",
+      "skipActionText",
+      "skipActiveJob",
+      "skipActiveStorage",
+      "skipBootsnap",
+      "skipBrakeman",
+      "skipCi",
+      "skipDevGems",
+      "skipDocker",
+      "skipHotwire",
+      "skipJavascript",
+      "skipJbuilder",
+      "skipKamal",
+      "skipEslint",
+      "skipSolid",
+      "skipSystemTest",
+      "skipThruster",
+    ],
+    api: ["skipAssetPipeline", "skipJavascript"],
+  };
+
   static {
     void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
     this.addSharedOptionsFor("application");
-    this.methodAdded("reportImpliedOptions");
+    this.classOption("version", {
+      type: "boolean",
+      aliases: "-v",
+      group: "rails",
+      desc: "Show Trails version number and quit",
+    });
+    this.classOption("api", {
+      type: "boolean",
+      desc: "Preconfigure smaller stack for API only apps",
+    });
+    this.classOption("minimal", { type: "boolean", desc: "Preconfigure a minimal trails app" });
+    this.classOption("javascript", {
+      type: "string",
+      aliases: ["-j", "--js"],
+      default: "importmap",
+      enum: JAVASCRIPT_OPTIONS,
+      desc: "Choose JavaScript approach",
+    });
+    this.classOption("css", {
+      type: "string",
+      aliases: "-c",
+      enum: CSS_OPTIONS,
+      desc: "Choose CSS processor. Check https://github.com/rails/cssbundling-rails for more options",
+    });
+    this.classOption("skipBundle", {
+      type: "boolean",
+      aliases: "-B",
+      default: null,
+      desc: "Don't run bundle install",
+    });
+    this.classOption("skipDecryptedDiffs", {
+      type: "boolean",
+      default: null,
+      desc: "Don't configure git to show decrypted diffs of encrypted credentials",
+    });
+    this.publicCommand("reportImpliedOptions");
     this.methodAdded("setDefaultAccessorsBang");
     this.methodAdded("createRoot");
     this.methodAdded("createRootFiles");
@@ -183,7 +245,7 @@ export class AppGenerator extends AppBase {
     super(args, localOptions, config);
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
-    this.implyOptions(OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
+    this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
     this.packageManager = this.options.packageManager ?? "pnpm";
     this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {

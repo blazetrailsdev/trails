@@ -22,7 +22,6 @@ export type { AttrOptions, IndexType } from "./generated-attribute.js";
 export { ActiveModel } from "./active-model.js";
 export { AppBase } from "./app-base.js";
 export type { AppBaseOptions } from "./app-base.js";
-export { OPTION_IMPLICATIONS } from "./app-base.js";
 export { Database, MySQL2, PostgreSQL, SQLite3, MariaDBMySQL2, DATABASES } from "./database.js";
 export type { DatabaseName, PkgDependency, DockerService } from "./database.js";
 export * from "./migration.js";
