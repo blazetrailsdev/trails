@@ -1,5 +1,4 @@
-import { BacktraceCleaner as Base, TopLevel } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { BacktraceCleaner as Base, getEnv, TopLevel } from "@blazetrails/activesupport";
 
 type CleanKind = Parameters<Base["clean"]>[1];
 
@@ -23,7 +22,7 @@ export class BacktraceCleaner extends Base {
   }
 
   override clean<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {
-    if (env.BACKTRACE != null) return backtrace;
+    if (getEnv("BACKTRACE") != null) return backtrace;
 
     return super.clean(backtrace, kind);
   }
@@ -36,7 +35,7 @@ export class BacktraceCleaner extends Base {
     frame: Parameters<Base["cleanFrame"]>[0],
     kind: CleanKind = "silent",
   ): ReturnType<Base["cleanFrame"]> {
-    if (env.BACKTRACE != null) return frame as string;
+    if (getEnv("BACKTRACE") != null) return frame as string;
 
     return super.cleanFrame(frame, kind);
   }
