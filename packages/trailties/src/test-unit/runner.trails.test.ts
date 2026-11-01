@@ -36,6 +36,7 @@ describe("Runner", () => {
     setEnv("TRAILS_ENV", originalEnv);
     Dir.chdir(originalCwd);
     Runner.filters.length = 0;
+    vi.restoreAllMocks();
   });
 
   it("parseOptions removes the environment and warnings flags", () => {
@@ -131,6 +132,17 @@ describe("Runner", () => {
     expect(await internals.testLocations([file], /b$/)).toEqual([`${file}:1`, `${file}:3`]);
   });
 
+  it("testLocations keeps one location for a chained or tagged test call", async () => {
+    await app();
+    const file = "test/models/chained.test.ts";
+    await getFs().writeFile!(
+      file,
+      'const t = it.extend({});\nit.skipIf(false)("a", () => {});\nit.each`x\n${1}`("b", () => {});\n',
+    );
+    await Runner.loadTests([`${file}:1-4`]);
+    expect(await internals.testLocations([file], null)).toEqual([`${file}:2`, `${file}:3`]);
+  });
+
   it("testLocations matches an it.each title under its full name", async () => {
     await app();
     const file = "test/models/each.test.ts";
@@ -160,7 +172,6 @@ describe("Runner", () => {
     await expect(Runner.run(["-b"])).rejects.toThrow("process.exit");
     expect(puts.mock.calls[1]).toEqual(["invalid option: -b"]);
     expect(puts.mock.calls[3][0]).toContain("Usage:");
-    puts.mockRestore();
   });
 
   it("run does not start Vitest with no tests", async () => {

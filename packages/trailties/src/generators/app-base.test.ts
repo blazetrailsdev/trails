@@ -102,6 +102,14 @@ describe("AppBase", () => {
 });
 
 describe("AppBase dockerfilePackageManagerVersion", () => {
+  it("reads the packageManager option", async () => {
+    const generator = build({ javascript: "esbuild", packageManager: "not-a-package-manager" });
+    const version = (
+      generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
+    ).dockerfilePackageManagerVersion();
+    expect(await version).toBe("latest");
+  });
+
   it("answers for the selected package manager", async () => {
     const previous = packageManagerAdapterConfig.adapter;
     registerPackageManagerAdapter({

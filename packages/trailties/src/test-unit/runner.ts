@@ -248,6 +248,8 @@ export class Runner {
         STDOUT.puts("    -n, --name PATTERN   Filter run on /regexp/ or string.");
         STDOUT.puts("    -f, --fail-fast      Abort test run on first failure or error.");
         STDOUT.puts("    -v, --verbose        Verbose.");
+        STDOUT.puts("    -w, --warnings       Run with Ruby warnings enabled.");
+        STDOUT.puts("    -e, --environment    Run tests in the ENV environment.");
         exit(1);
       }
     });

@@ -53,12 +53,16 @@ export class TestParser {
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
     const calls: [number, number, string][] = [];
-    const visit = (node: ts.Node, names: string[]): void => {
+    const visit = (node: ts.Node, names: string[], isCallee: boolean): void => {
       let scope = names;
-      if (ts.isCallExpression(node)) {
+      if (ts.isCallExpression(node) && !isCallee) {
         let callee: ts.Node = node.expression;
-        while (ts.isCallExpression(callee) || ts.isPropertyAccessExpression(callee)) {
-          callee = callee.expression;
+        while (
+          ts.isCallExpression(callee) ||
+          ts.isPropertyAccessExpression(callee) ||
+          ts.isTaggedTemplateExpression(callee)
+        ) {
+          callee = ts.isTaggedTemplateExpression(callee) ? callee.tag : callee.expression;
         }
         const argument = node.arguments[0];
         const title =
@@ -72,7 +76,10 @@ export class TestParser {
           ts.isIdentifier(callee) &&
           (callee.text === "it" || callee.text === "test") &&
           argument != null &&
-          !(ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === "each")
+          !(
+            ts.isPropertyAccessExpression(node.expression) &&
+            ["each", "extend"].includes(node.expression.name.text)
+          )
         ) {
           calls.push([
             line(node.getStart(sourceFile)),
@@ -81,11 +88,20 @@ export class TestParser {
           ]);
         }
       }
+      const chained =
+        ts.isCallExpression(node) ||
+        ts.isPropertyAccessExpression(node) ||
+        ts.isTaggedTemplateExpression(node);
+      const inner = ts.isTaggedTemplateExpression(node)
+        ? node.tag
+        : chained
+          ? node.expression
+          : undefined;
       node.forEachChild((child) => {
-        visit(child, scope);
+        visit(child, scope, child === inner);
       });
     };
-    visit(sourceFile, []);
+    visit(sourceFile, [], false);
     return calls;
   }
 }
