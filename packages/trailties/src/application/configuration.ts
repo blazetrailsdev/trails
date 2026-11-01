@@ -560,6 +560,7 @@ export class Configuration extends EngineConfiguration {
     return paths;
   }
 
+  /** @missingRailsCall mkdir_p — CONVERGEABLE call-gate-credits-file-utils-async */
   async defaultLogFile(): Promise<File> {
     const path = (await this.paths().get("log")!.first())!;
     if (!File.isExist(File.dirname(path))) {
@@ -598,6 +599,7 @@ export class Configuration extends EngineConfiguration {
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 
+  /** @missingRailsCall mkdir_p — CONVERGEABLE call-gate-credits-file-utils-async */
   private generateLocalSecret(): string {
     if (this._localSecret === undefined) {
       throw new RuntimeError(

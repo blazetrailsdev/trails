@@ -2090,4 +2090,7 @@ export class FileUtils {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface FileUtils extends Omit<typeof FileUtils, "prototype"> {}
+export interface FileUtils extends Omit<
+  typeof FileUtils,
+  "prototype" | "fileutilsOutput" | "fileutilsLabel"
+> {}

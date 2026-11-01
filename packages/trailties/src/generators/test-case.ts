@@ -16,7 +16,8 @@ export class TestCase extends ActiveSupportTestCase {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface TestCase extends Included<typeof Behavior>, Included<typeof Assertions> {
+export interface TestCase
+  extends Included<typeof Behavior>, Included<typeof Assertions>, Included<FileUtils> {
   destinationRoot: string;
 }
 

@@ -46,6 +46,7 @@ export class CreateMigration extends CreateFile {
       : this.relativeExistingMigration();
   }
 
+  /** @missingRailsCall rm_rf — CONVERGEABLE call-gate-credits-file-utils-async */
   override async revokeBang(): Promise<string | undefined> {
     const sayDestination = (await this.isExists())
       ? this.relativeExistingMigration()
@@ -70,7 +71,10 @@ export class CreateMigration extends CreateFile {
     return rtest(this.existingMigration());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall rm_rf — CONVERGEABLE call-gate-credits-file-utils-async
+   */
   protected override async onConflictBehavior(block: () => unknown): Promise<void> {
     // eslint-disable-next-line blazetrails/ruby-compat-native-required -- base.options is a HashWithIndifferentAccess, which merge dispatches on
     const options = merge(this.base.options, this.config);
