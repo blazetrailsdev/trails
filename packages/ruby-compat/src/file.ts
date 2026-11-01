@@ -1,3 +1,4 @@
+import { getProcessAdapter } from "./process-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, getPath } from "./fs-adapter.js";
@@ -767,6 +768,16 @@ export class File extends IO {
       else fs.unlinkSync(file);
     }
     return files.length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:3279` `rb_file_s_umask`, reading only. A backend
+   * with no permission bits answers 0, as `chmod` below is a no-op there.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static umask(): number {
+    return getProcessAdapter().umask?.() ?? 0;
   }
 
   /**

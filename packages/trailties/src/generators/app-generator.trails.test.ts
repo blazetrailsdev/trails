@@ -37,6 +37,7 @@ describe("AppGenerator (trails-only)", () => {
     expect(fs.existsSync(path.join(tmpDir, "my-app/app/channels"))).toBe(false);
     const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
     expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
   });
 
   it("writes config/boot.ts and imports it first from config/application.ts", async () => {
@@ -248,5 +249,58 @@ describe("AppGenerator (trails-only)", () => {
     expect(File.isExist(File.join(tmpDir, "my-app", "custom-keep", ".keep"))).toBe(true);
     expect(kept).toBe("custom-keep/.keep");
     expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
+  });
+
+  it("honors the skip options create_* guards read", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipGit: true, skipActiveRecord: true, skipTest: true, dummyApp: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    const exists = (file: string) => File.isExist(File.join(tmpDir, "my-app", file));
+    expect(exists(".gitignore")).toBe(false);
+    expect(exists(".gitattributes")).toBe(false);
+    expect(exists("config/database.ts")).toBe(false);
+    expect(exists("db/seeds.ts")).toBe(false);
+    expect(exists("test/test-helper.ts")).toBe(false);
+    expect(exists("Dockerfile")).toBe(false);
+  });
+
+  it("writes the system test keep file unless skipKeeps", async () => {
+    await new AppGenerator(["kept"], {}, { destinationRoot: tmpDir }).invokeAll();
+    await new AppGenerator(["bare"], { skipKeeps: true }, { destinationRoot: tmpDir }).invokeAll();
+    expect(File.isExist(File.join(tmpDir, "kept/test/system/.keep"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "bare/test/system/.keep"))).toBe(false);
+    expect(File.isExist(File.join(tmpDir, "bare/test/application-system-test-case.ts"))).toBe(true);
+  });
+
+  it("dispatches Rails' root steps to a builder that answers them", async () => {
+    const calls: string[] = [];
+    TopLevel.AppBuilder = class extends AppBuilder {
+      async rakefile(): Promise<void> {
+        calls.push("rakefile");
+      }
+      async rubyVersion(): Promise<void> {
+        calls.push("rubyVersion");
+      }
+      async versionControl(): Promise<void> {
+        calls.push("versionControl");
+      }
+    };
+    try {
+      await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
+  });
+
+  it("writes .node-version twice without a conflict when usingNode", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { javascript: "esbuild" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(fs.readFileSync(path.join(tmpDir, "my-app/.node-version"), "utf-8")).toBe("24.16.0\n");
   });
 });

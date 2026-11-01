@@ -2105,6 +2105,28 @@ The decision is unchanged; the heading stays here so code citing it still
 resolves. It is about the application loader only; framework-internal
 call-time constant resolution is § "Call-time constant resolution" above.
 
+## `Module#autoload` is a build step (`Zeitwerk::Loader#define_autoload`)
+
+`define_autoload` calls `Module#autoload`
+(`vendor/zeitwerk/v2.7.2/lib/zeitwerk/loader.rb:542`), which binds a name and
+runs `require` synchronously at first reference. JS has no hook on an unresolved
+identifier and no synchronous `import()`. **The asynchrony goes at the load, and
+the walk's result can be built ahead of time.** In development and test the walk
+runs in process at `setup`. `trails build` (`trails-tsc-views build-autoload`)
+boots the application up to `setup_main_autoloader`, runs the same walk, and
+writes `manifest.json`, `imports.generated.js` and `constants.generated.d.ts` to
+`.trails/autoload/<tag>/` for each loader, with paths relative to
+`Loader#manifestRoot`, the application root. Every path names the file the walk
+found: Node runs a `.ts` file as it stands, and a bundler resolves it.
+The digest leaves the tag out, so an untagged loader's manifest still matches
+when it is named by path. A namespace's load is what reveals the constants below it in
+Ruby, so the step seats an empty module for each namespace and descends.
+`Loader#manifest`, a parsed manifest or a path to one, makes `setup` fill
+`autoloads`, `namespace_dirs` and `shadowed_files` from its rows, and a digest that differs from
+the running configuration raises. New names the step needs carry
+`@noRailsEquivalent PERMANENT` against this section. This is a genuine language
+shortcoming, ratified repo-wide by RFC 0213.
+
 ## An action's name is its method's name (`AbstractController::Base#action_methods`)
 
 Moved to [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#an-actions-name-is-its-methods-name-abstractcontrollerbaseaction_methods).

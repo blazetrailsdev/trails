@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
-import { camelize, transformKeys } from "@blazetrails/activesupport";
+import { registerConstant, type Hash } from "@blazetrails/ruby-compat";
+import { camelize } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Configuration } from "./configuration.js";
 import { Supervisor } from "./supervisor.js";
@@ -39,8 +39,10 @@ export class Cli extends Thor {
   }
 
   async start(): Promise<void> {
-    const options = (this as unknown as { options: { [key: string]: unknown } }).options;
-    await Supervisor.start(transformKeys({ ...options }, (key) => camelize(key, false)));
+    const options = (this as unknown as { options: Hash<string, unknown> }).options;
+    await Supervisor.start(
+      Object.fromEntries(options.toA().map(([key, value]) => [camelize(key, false), value])),
+    );
   }
 }
 

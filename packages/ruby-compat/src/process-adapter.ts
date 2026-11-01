@@ -31,6 +31,7 @@ export interface ProcessAdapter {
   chdir(dir: string): void;
   platform(): string;
   execPath?(): string;
+  umask?(): number;
   pid(): number;
   ppid?(): number;
   kill?(pid: number, signal: number | string): void;
@@ -529,6 +530,7 @@ interface NodeProcessLike {
   chdir(dir: string): void;
   platform: string;
   execPath: string;
+  umask(): number;
   pid: number;
   ppid: number;
   kill(pid: number, signal: number | string): boolean;
@@ -601,6 +603,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     chdir: (dir) => proc.chdir(dir),
     platform: () => proc.platform,
     execPath: () => proc.execPath,
+    umask: () => proc.umask(),
     pid: () => proc.pid,
     ppid: () => proc.ppid,
     kill: (pid, signal) => {

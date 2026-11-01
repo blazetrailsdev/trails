@@ -43,4 +43,61 @@ export class TestParser {
     }
     return beginsToEnds;
   }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static calls(filepath: string): [number, number, string][] {
+    api ??= new API();
+    const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
+    const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
+    const calls: [number, number, string][] = [];
+    const visit = (node: ts.Node, names: string[], isCallee: boolean): void => {
+      let scope = names;
+      if (ts.isCallExpression(node) && !isCallee) {
+        let callee: ts.Node = node.expression;
+        while (
+          ts.isCallExpression(callee) ||
+          ts.isPropertyAccessExpression(callee) ||
+          ts.isTaggedTemplateExpression(callee)
+        ) {
+          callee = ts.isTaggedTemplateExpression(callee) ? callee.tag : callee.expression;
+        }
+        const argument = node.arguments[0];
+        const title =
+          argument != null &&
+          (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))
+            ? argument.text
+            : "";
+        if (ts.isIdentifier(callee) && callee.text === "describe" && title !== "") {
+          scope = [...names, title];
+        } else if (
+          ts.isIdentifier(callee) &&
+          (callee.text === "it" || callee.text === "test") &&
+          argument != null &&
+          !(
+            ts.isPropertyAccessExpression(node.expression) &&
+            ["each", "extend"].includes(node.expression.name.text)
+          )
+        ) {
+          calls.push([
+            line(node.getStart(sourceFile)),
+            line(node.end),
+            title === "" ? "" : [...names, title].join(" "),
+          ]);
+        }
+      }
+      const inner = ts.isTaggedTemplateExpression(node)
+        ? node.tag
+        : ts.isCallExpression(node) || ts.isPropertyAccessExpression(node)
+          ? node.expression
+          : undefined;
+      node.forEachChild((child) => {
+        visit(child, scope, child === inner);
+      });
+    };
+    visit(sourceFile, [], false);
+    return calls;
+  }
 }

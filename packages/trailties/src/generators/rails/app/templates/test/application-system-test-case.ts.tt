@@ -1,0 +1,8 @@
+import "./test-helper.ts";
+import { SystemTestCase } from "@blazetrails/actionpack/system-testing";
+
+export class ApplicationSystemTestCase extends SystemTestCase {
+  static {
+    this.drivenBy("playwright", { screenSize: [1400, 1400] });
+  }
+}

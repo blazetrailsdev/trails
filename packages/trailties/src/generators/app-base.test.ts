@@ -4,6 +4,8 @@ import * as path from "node:path";
 import { describe, it, expect } from "vitest";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { AppGenerator } from "./rails/app/app-generator.js";
+import { packageManagerAdapterConfig, registerPackageManagerAdapter } from "../package-manager.js";
 
 class T extends AppBase {
   static {
@@ -97,6 +99,43 @@ describe("AppBase", () => {
     expect(g["ciPackages"]()).toContain("google-chrome-stable");
     expect(g["dockerfileChownDirectories"]()).toEqual(["db", "log", "storage", "tmp"]);
     expect(AppBase.strictArgsPosition()).toBe(false);
+  });
+});
+
+describe("AppBase dockerfilePackageManagerVersion", () => {
+  it("defaults the app generator's packageManager option to pnpm", () => {
+    expect(AppGenerator.classOptions()["packageManager"].default).toBe("pnpm");
+  });
+
+  it("reads the packageManager option", async () => {
+    const generator = build({
+      javascript: "esbuild",
+      packageManager: "not-a-package-manager",
+    } as Partial<AppBaseOptions>);
+    const version = (
+      generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
+    ).dockerfilePackageManagerVersion();
+    expect(await version).toBe("latest");
+  });
+
+  it("answers for the selected package manager", async () => {
+    const previous = packageManagerAdapterConfig.adapter;
+    registerPackageManagerAdapter({
+      name: "not-a-package-manager",
+      installArgs: [],
+      addArgs: [],
+      runArgs: [],
+    });
+    packageManagerAdapterConfig.adapter = "not-a-package-manager";
+    try {
+      const generator = build({ javascript: "esbuild" });
+      const version = (
+        generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
+      ).dockerfilePackageManagerVersion();
+      expect(await version).toBe("latest");
+    } finally {
+      packageManagerAdapterConfig.adapter = previous;
+    }
   });
 });
 

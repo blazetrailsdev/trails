@@ -36,3 +36,4 @@ export { watchViews, type WatchHandle, type WatchViewsOptions } from "./watch-vi
 export { init as lspPluginInit } from "./lsp-plugin.js";
 export { buildTemplates } from "./build-templates.js";
 export { runCli } from "./cli.js";
+export { buildAutoload } from "./build-autoload.js";
