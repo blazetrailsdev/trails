@@ -157,6 +157,8 @@ export class AppBuilder extends ActionMethods {
   /** @internal */
   declare private readonly skipEslint: () => boolean | undefined;
   /** @internal */
+  declare private readonly skipSolid: () => boolean | undefined;
+  /** @internal */
   private _configTargetVersion: string | null = null;
 
   /** @internal */
