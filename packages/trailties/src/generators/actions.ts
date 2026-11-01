@@ -179,7 +179,9 @@ export async function railsCommand(
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
     const fullNamespace = command;
-    return await this.inRoot(() => silenceWarnings(() => invoke(fullNamespace, args, options)));
+    return await this.inRoot(() =>
+      silenceWarnings(() => invoke(fullNamespace, args, { ...options })),
+    );
   } else {
     return await executeCommand.call(this, "rails", command, options);
   }

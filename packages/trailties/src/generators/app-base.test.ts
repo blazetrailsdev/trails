@@ -2,7 +2,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it, expect } from "vitest";
-import { env } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
@@ -143,7 +142,7 @@ describe("AppBase run tasks", () => {
     fs.writeFileSync(path.join(tmp, "bin/x"), "#!/usr/bin/env ruby\r\n", { mode: 0o755 });
     process.chdir(tmp);
     try {
-      expect(generator.dockerfileBinfileFixups()[0]).toBe('sed -i "s/\\\\r$//g" bin/*');
+      expect(generator.dockerfileBinfileFixups()[0]).toBe('sed -i "s/\\r$//g" bin/*');
     } finally {
       process.chdir(dir);
       fs.rmSync(tmp, { recursive: true, force: true });
@@ -152,13 +151,13 @@ describe("AppBase run tasks", () => {
 
   it("node_version prefers NODE_VERSION", async () => {
     const generator = new T(["app"], { javascript: "esbuild" }) as unknown as Record<string, any>;
-    const before = env.NODE_VERSION;
-    env.NODE_VERSION = "1.2.3";
+    const before = process.env.NODE_VERSION;
+    process.env.NODE_VERSION = "1.2.3";
     try {
       expect(await generator.nodeVersion()).toBe("1.2.3");
     } finally {
-      if (before === undefined) delete env.NODE_VERSION;
-      else env.NODE_VERSION = before;
+      if (before === undefined) delete process.env.NODE_VERSION;
+      else process.env.NODE_VERSION = before;
     }
   });
 });
