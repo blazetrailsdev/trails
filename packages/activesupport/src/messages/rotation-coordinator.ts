@@ -107,7 +107,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
 
     options.secretGenerator ??= this.#secretGenerator;
 
-    const secretGeneratorKwargs = options.secretGenerator.parameters ?? ["secretKeyBase"];
+    const secretGeneratorKwargs = options.secretGenerator.parameters ?? [];
     options.secretGeneratorOptions = extractBang(options, ...secretGeneratorKwargs);
 
     options.onRotation = this.#onRotation;

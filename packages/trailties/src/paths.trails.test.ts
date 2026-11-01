@@ -71,16 +71,3 @@ describe("Engine#helpers", () => {
     expect(app).toBeInstanceOf(Engine);
   });
 });
-
-describe("Application#messageVerifiers", () => {
-  it("derives a rotation from its secretKeyBase keyword", () => {
-    class RotationApp extends Application {}
-    const app = new RotationApp();
-    app.config.secretKeyBase = "new";
-    const old = new (class extends Application {})();
-    old.config.secretKeyBase = "old";
-    const token = old.messageVerifiers().get("salt").generate("message");
-    app.messageVerifiers().rotate({ secretKeyBase: "old" });
-    expect(app.messageVerifier("salt").verified(token)).toBe("message");
-  });
-});

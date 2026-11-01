@@ -372,10 +372,14 @@ export class Application extends Engine {
     return gen;
   }
 
+  /** @missingRailsArgs new — CONVERGEABLE message-verifiers-rotation-secret-key-base-keyword */
   messageVerifiers(): MessageVerifiers {
     return (this._messageVerifiers ??= new MessageVerifiers(
-      (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
-        this.keyGenerator(secretKeyBase).generateKey(salt),
+      Object.assign(
+        (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
+          this.keyGenerator(secretKeyBase).generateKey(salt),
+        { parameters: ["secretKeyBase"] },
+      ),
     ).rotateDefaults());
   }
 
