@@ -172,8 +172,10 @@ export class PluginBuilder {
     );
   }
 
-  /** @missingRailsArgs indent — PERMANENT */
-  /** @inventedArm insertIntoFile — CONVERGEABLE app-generator-writes-config-boot */
+  /**
+   * @missingRailsArgs indent — PERMANENT
+   * @inventedArm insertIntoFile — CONVERGEABLE app-generator-writes-config-boot
+   */
   async testDummyConfig(this: PluginBuilderHost): Promise<void> {
     await this.template("rails/boot.ts", File.join(this.dummyPath(), "config/boot.ts"), {
       force: true,
