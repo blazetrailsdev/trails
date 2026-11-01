@@ -73,7 +73,8 @@ export class Directory extends EmptyDirectory {
       if (await File.isDirectoryAsync(fileSource)) continue;
       const excludePattern = this.config["excludePattern"] as RegExp | null | undefined;
       if (rtest(excludePattern) && fileSource.match(excludePattern)) continue;
-      if (/\.tt\.(js|js\.map|d\.ts)$/.test(fileSource)) continue;
+      const compiled = /^(.*\.tt)\.(js|js\.map|d\.ts)$/.exec(fileSource);
+      if (compiled && files.includes(compiled[1])) continue;
       let fileDestination = File.join(this.givenDestination, fileSource.replaceAll(source, "."));
       fileDestination = fileDestination.replaceAll("/./", "/");
 

@@ -198,9 +198,12 @@ describe("PluginBuilder", () => {
     const g = generator("plain");
     await FileUtils.mkdirP(`${root}/source`);
     await File.writeAsync(`${root}/source/plain.txt`, "x");
-    await File.writeAsync(`${root}/source/plain.tt.js`, "x");
+    await File.writeAsync(`${root}/source/kept.tt.js`, "x");
+    await File.writeAsync(`${root}/source/view.tt`, "y");
+    await File.writeAsync(`${root}/source/view.tt.js`, "export default () => 'y';");
     await (g as unknown as ActionsHost).directory(`${root}/source`, "out");
-    expect(Dir.children(`${root}/out`)).toEqual(["plain.txt"]);
+    expect(Dir.children(`${root}/out`)).not.toContain("view.tt.js");
+    expect(Dir.children(`${root}/out`)).toContain("kept.tt.js");
   });
 
   it("copies the app directory for a mountable engine", async () => {
