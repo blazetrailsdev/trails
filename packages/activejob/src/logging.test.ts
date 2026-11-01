@@ -68,6 +68,21 @@ class LoggingTest extends TestCase {
   declare logger: TaggedTestLogger;
   oldLogger: unknown;
 
+  override setup(): void {
+    logSubscriberTestHelperSetup.call(this as never);
+    JobBuffer.clear();
+    this.oldLogger = Base.logger;
+    this.logger = TaggedLogging.new(new TestLogger()) as TaggedTestLogger;
+    this.setLogger(this.logger);
+    LogSubscriber.attachTo("active_job");
+  }
+
+  override teardown(): void {
+    logSubscriberTestHelperTeardown.call(this as never);
+    LogSubscriber.logSubscribers().pop();
+    this.setLogger(this.oldLogger);
+  }
+
   setLogger(logger: unknown): void {
     Base.logger = logger;
   }
@@ -85,21 +100,6 @@ class LoggingTest extends TestCase {
 include(LoggingTest, TestHelper);
 include(LoggingTest, LogSubscriberTestHelper);
 registerConstant("LoggingTest", LoggingTest);
-
-LoggingTest.setup(function (this: LoggingTest) {
-  logSubscriberTestHelperSetup.call(this as never);
-  JobBuffer.clear();
-  this.oldLogger = Base.logger;
-  this.logger = TaggedLogging.new(new TestLogger()) as TaggedTestLogger;
-  this.setLogger(this.logger);
-  LogSubscriber.attachTo("active_job");
-});
-
-LoggingTest.teardown(function (this: LoggingTest) {
-  logSubscriberTestHelperTeardown.call(this as never);
-  LogSubscriber.logSubscribers().pop();
-  this.setLogger(this.oldLogger);
-});
 
 type Ctx = TestContext & { testCase: LoggingTest & TestHelper };
 type Configured = { performLater(...args: unknown[]): Promise<unknown> };
