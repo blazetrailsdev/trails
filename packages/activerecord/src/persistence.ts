@@ -2,7 +2,6 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
-  keys,
   rbEqual,
   rbFSend,
   rbObjAsString,
@@ -965,15 +964,8 @@ export function instantiateInstanceOf(
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
-  // eslint-disable-next-line blazetrails/ruby-compat-native-required -- attributes may be a Hash
-  const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
-  for (const name of names) {
-    if (!basicObjRespondTo(record, name)) {
-      (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-    }
-  }
   return record.initWithAttributes(attributes, false, block);
 }
 
