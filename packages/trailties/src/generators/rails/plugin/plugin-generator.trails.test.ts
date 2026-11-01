@@ -20,6 +20,7 @@ class Host extends AppBase {
     this.methodAdded("author");
     this.methodAdded("email");
     this.methodAdded("railsVersionSpecifier");
+    this.methodAdded("shebang");
     this.methodAdded("isApi");
     this.methodAdded("isFull");
     this.methodAdded("isMountable");
@@ -27,8 +28,6 @@ class Host extends AppBase {
     this.methodAdded("isWithDummyApp");
     this.methodAdded("isInsideApplication");
     this.methodAdded("testCommand");
-    this.methodAdded("run");
-    this.methodAdded("build");
   }
   mode: "plain" | "full" | "mountable" = "plain";
   getBuilderClass() {
@@ -64,6 +63,9 @@ class Host extends AppBase {
   railsVersionSpecifier() {
     return ">= 8.0.2";
   }
+  shebang() {
+    return "#!/usr/bin/env node";
+  }
   isApi() {
     return false;
   }
@@ -85,12 +87,6 @@ class Host extends AppBase {
   testCommand() {
     return "bin/test";
   }
-  run(b: string) {
-    return b;
-  }
-  build(meth: string) {
-    return super.build(meth);
-  }
 }
 
 describe("PluginBuilder", () => {
@@ -110,23 +106,30 @@ describe("PluginBuilder", () => {
 
   it("writes the manifest and workspace in place of the gemspec and Gemfile", async () => {
     const g = generator("plain");
-    await g.build("gemspec");
-    await g.build("gemfile");
+    await g["build"]("gemspec");
+    await g["build"]("gemfile");
     expect(JSON.parse(await File.readAsync(`${root}/package.json`)).name).toBe("blog-admin");
     expect(await File.readAsync(`${root}/pnpm-workspace.yaml`)).toContain("- test/dummy");
   });
 
   it("generates a railtie unless the plugin is an engine", async () => {
     const g = generator("plain");
-    await g.build("lib");
+    await g["build"]("lib");
     expect(await File.isExistAsync(`${root}/lib/blog/admin/railtie.ts`)).toBe(true);
     expect(await File.isExistAsync(`${root}/lib/blog/admin/engine.ts`)).toBe(false);
   });
 
+  it("keeps only the engine's bin script and prepends the shebang", async () => {
+    const g = generator("full");
+    await g["build"]("bin");
+    expect(await File.isExistAsync(`${root}/bin/test`)).toBe(false);
+    expect(await File.readAsync(`${root}/bin/rails`)).toMatch(/^#!\/usr\/bin\/env node\n/);
+  });
+
   it("copies the app directory for a mountable engine", async () => {
     const g = generator("mountable");
-    await g.build("app");
-    await g.build("config");
+    await g["build"]("app");
+    await g["build"]("config");
     expect(
       await File.readAsync(`${root}/app/views/layouts/blog/admin/application.html.tse`),
     ).toContain('stylesheetLinkTag("blog/admin/application"');

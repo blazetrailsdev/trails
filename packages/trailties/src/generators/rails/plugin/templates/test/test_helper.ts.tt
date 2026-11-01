@@ -3,3 +3,16 @@ import { setEnv } from "@blazetrails/ruby-compat";
 setEnv("TRAILS_ENV", "test");
 
 await import("<%= `../${this.options.dummyPath}/config/environment.js` %>");
+<% if (!this.options.skipActiveRecord) { -%>
+const { File } = await import("@blazetrails/ruby-compat");
+const { ActiveRecord } = await import("@blazetrails/activerecord");
+const { ActiveSupport } = await import("@blazetrails/activesupport");
+ActiveRecord.Migrator.migrationsPaths = [File.expandPath("../<%= this.options.dummyPath %>/db/migrate", import.meta.dirname)];
+<% if (this.options.mountable) { -%>
+ActiveRecord.Migrator.migrationsPaths.push(File.expandPath("../db/migrate", import.meta.dirname));
+<% } -%>
+
+// Load fixtures from the engine
+ActiveSupport.TestCase.fixturePaths = [File.expandPath("fixtures", import.meta.dirname)];
+ActiveSupport.TestCase.fileFixturePath = File.expandPath("fixtures", import.meta.dirname) + "/files";
+<% } -%>

@@ -23,6 +23,26 @@ jobs:
 <% if (!this.options.skipTest) { -%>
   test:
     runs-on: ubuntu-latest
+<% if (this.options.database === "mysql") { -%>
+    services:
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+<% } else if (this.options.database === "postgresql") { -%>
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+<% } -%>
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,5 +53,10 @@ jobs:
       - name: Run tests
         env:
           TRAILS_ENV: test
+<% if (this.options.database === "mysql") { -%>
+          DATABASE_URL: mysql2://127.0.0.1:3306
+<% } else if (this.options.database === "postgresql") { -%>
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+<% } -%>
         run: <%= this.testCommand() %>
 <% } -%>
