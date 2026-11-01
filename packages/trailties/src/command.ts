@@ -9,6 +9,7 @@ import {
   prepend,
   rbArgv,
   rbInspect,
+  stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
