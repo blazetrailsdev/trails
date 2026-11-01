@@ -20,7 +20,6 @@ type Options = Partial<Record<"verbose" | "outputInline" | "failFast" | "color",
 
 const codes = { red: 31, green: 32, yellow: 33 };
 
-/** @noRailsEquivalent CONVERGEABLE minitest-port-and-assertions-to-expect */
 export class TestUnitReporter {
   declare static appRoot: string | null | undefined;
   declare static executable: string;

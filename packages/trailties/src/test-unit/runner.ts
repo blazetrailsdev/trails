@@ -192,10 +192,7 @@ export class Runner {
     return filter;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   private static async testLocations(tests: string[]): Promise<string[]> {
     const locations: string[] = [];
     for (const path of tests) {
@@ -217,10 +214,7 @@ export class Runner {
     return locations;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   private static nameFilter(argv: string[]): string[] {
     const index = argv.findIndex((arg) => arg === "-n" || arg === "--name");
     if (index === -1 || argv[index + 1] === undefined) return [];
