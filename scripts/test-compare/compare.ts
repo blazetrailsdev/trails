@@ -211,7 +211,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     );
   }
 
-  if (pkg === "chronic" || pkg === "builder") {
+  if (pkg === "chronic" || pkg === "builder" || pkg === "zeitwerk") {
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
   }
@@ -1711,6 +1711,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "et-orbi": "packages/et-orbi/src/",
   raabro: "packages/raabro/src/",
   fugit: "packages/fugit/src/",
+  zeitwerk: "packages/zeitwerk/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

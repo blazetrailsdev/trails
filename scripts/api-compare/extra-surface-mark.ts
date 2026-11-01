@@ -167,6 +167,7 @@ export const ROWLESS_PACKAGES = [
   "did-you-mean",
   "et-orbi",
   "raabro",
+  "zeitwerk",
   "fugit",
   "globalid",
   "marcel",

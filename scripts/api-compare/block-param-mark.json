@@ -105,5 +105,9 @@
     "byFile": {
       "initializable.rb": 1
     }
+  },
+  "zeitwerk": {
+    "total": 0,
+    "byFile": {}
   }
 }

@@ -20,6 +20,7 @@
     "@blazetrails/et-orbi": "workspace:*",
     "@blazetrails/fugit": "workspace:*",
     "@blazetrails/raabro": "workspace:*",
+    "@blazetrails/zeitwerk": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
