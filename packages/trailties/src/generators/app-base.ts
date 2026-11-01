@@ -548,18 +548,26 @@ ${requireStatements.join("\n")}`;
     }
   }
 
-  /** @internal */
-  protected async dockerfileYarnVersion(): Promise<string | false | undefined> {
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  protected async dockerfilePnpmVersion(): Promise<string | false | undefined> {
     try {
-      return this.usingNode() && (await rbFBackquote("yarn --version")).match(/\d+\.\d+\.\d+/)?.[0];
+      return this.usingNode() && (await rbFBackquote("pnpm --version")).match(/\d+\.\d+\.\d+/)?.[0];
     } catch {
       return "latest";
     }
   }
 
-  /** @internal */
-  protected async isYarnThroughCorepack(): Promise<boolean> {
-    return ((await this.dockerfileYarnVersion()) as string) >= "2";
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  protected async isPnpmThroughCorepack(): Promise<boolean> {
+    const version = await this.dockerfilePnpmVersion();
+    if (version === "latest") return true;
+    return new Gem.Version(version as string).compare("2")! >= 0;
   }
 
   /** @internal */
