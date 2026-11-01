@@ -8698,3 +8698,16 @@ describe("an interface extending a same-file accessor interface", () => {
     ]);
   });
 });
+
+describe("extractClass — a delete expression", () => {
+  it("credits `delete` to the call set", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        drop(h: Record<string, number>): void {
+          delete h.k;
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "drop")!.calls).toContain("delete");
+  });
+});

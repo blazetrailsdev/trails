@@ -7577,8 +7577,6 @@ function collectCalls(
       if (settler !== undefined) promiseSettlers.pop();
       return;
     } else if (ts.isDeleteExpression(n)) {
-      // `delete h.k` is the native form of Ruby's `h.delete(:k)` (CLAUDE.md,
-      // the Hash table); the target is walked first, as a receiver is.
       visit(n.expression);
       names.add("delete");
       tally(occurrences, "delete");

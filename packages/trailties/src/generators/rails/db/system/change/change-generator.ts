@@ -26,7 +26,7 @@ export interface ChangeGeneratorOptions extends GeneratorOptions {
   database?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the class/interface merge carries `include AppName`.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ChangeGenerator extends Included<typeof AppName> {}
 
 export class ChangeGenerator extends GeneratorBase {
