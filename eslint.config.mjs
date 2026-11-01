@@ -355,7 +355,7 @@ export default defineConfig(
       // trailties: app-generator.ts contains template strings emitting
       // user-app code (which legitimately uses process.* at runtime in
       // the user's app).
-      "packages/trailties/src/generators/app-generator.ts",
+      "packages/trailties/src/generators/rails/app/app-generator.ts",
     ],
     rules: {
       "blazetrails/no-process-bypass": "error",

@@ -69,7 +69,7 @@ describe("the production server entry point", () => {
   it("cannot reach the generator that imports vite, however it reaches the others", () => {
     const generators = rel(server.files).filter((f) => f.startsWith("generators/"));
     expect(generators).not.toEqual([]);
-    expect(generators).not.toContain("generators/app-generator.ts");
+    expect(generators).not.toContain("generators/rails/app/app-generator.ts");
   });
 
   it("is not reached by the CLI's server command, which stays the ported file", () => {
