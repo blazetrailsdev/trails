@@ -1108,6 +1108,11 @@ class ApiExtractor
       return
     end
 
+    if cmd_name == "internal"
+      apply_visibility_to_named(extract_symbol_args(args), :private)
+      return
+    end
+
     case cmd_name
     when "private", "protected", "public"
       # No-args form (`private`) flips the default visibility for the scope.

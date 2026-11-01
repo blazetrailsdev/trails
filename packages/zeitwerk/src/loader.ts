@@ -33,7 +33,7 @@ export class Loader {
   logger: Logger | null;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
-  roots: Record<string, object>;
+  /** @internal */ roots: Record<string, object>;
   /** @internal */ ignoredGlobPatterns: Set<string>;
   /** @internal */ ignoredPaths: Set<string>;
   /** @internal */ collapseGlobPatterns: Set<string>;
@@ -44,11 +44,11 @@ export class Loader {
   /** @internal */ onLoadCallbacks: Record<string, ((...args: never[]) => unknown)[]>;
   /** @internal */ onUnloadCallbacks: Record<string, ((...args: never[]) => unknown)[]>;
 
-  autoloads: Record<string, Cref>;
-  autoloadedDirs: string[];
-  toUnload: Record<string, Cref>;
-  namespaceDirs: Map<string[]>;
-  shadowedFiles: Set<string>;
+  /** @internal */ autoloads: Record<string, Cref>;
+  /** @internal */ autoloadedDirs: string[];
+  /** @internal */ toUnload: Record<string, Cref>;
+  /** @internal */ namespaceDirs: Map<string[]>;
+  /** @internal */ shadowedFiles: Set<string>;
   /** @internal */ _setup: boolean;
   /** @internal */ _eagerLoaded: boolean;
   /** @internal */ mutex: Mutex;

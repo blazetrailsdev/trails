@@ -1,4 +1,4 @@
-import { aryDelete } from "@blazetrails/ruby-compat";
+import { aryDelete, deleteIf } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
@@ -15,19 +15,15 @@ export const Registry = {
 
   unregisterLoader(loader: Loader): void {
     aryDelete(this.loaders, loader);
-    for (const [k, l] of Object.entries(this.gemLoadersByRootFile)) {
-      if (l === loader) delete this.gemLoadersByRootFile[k];
-    }
-    for (const [k, l] of Object.entries(this.autoloads)) {
-      if (l === loader) delete this.autoloads[k];
-    }
+    deleteIf(this.gemLoadersByRootFile, (_k, l) => l === loader);
+    deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {
     return (this.autoloads[abspath] = loader);
   },
 
-  /** @missingRailsCall delete — PERMANENT */
+  /** @missingRailsCall delete — CONVERGEABLE call-set-credits-delete-expression */
   unregisterAutoload(abspath: string): void {
     delete this.autoloads[abspath];
   },
@@ -37,8 +33,6 @@ export const Registry = {
   },
 
   onUnload(loader: Loader): void {
-    for (const [path, object] of Object.entries(this.autoloads)) {
-      if (object === loader) delete this.autoloads[path];
-    }
+    deleteIf(this.autoloads, (_path, object) => object === loader);
   },
 };
