@@ -57,9 +57,7 @@ describe("AppBase", () => {
     const g = build({ skipActiveRecord: true, skipActiveStorage: false });
     const said: string[] = [];
     g.say = ((message: string) => void said.push(message)) as never;
-    await expect(g.reportImpliedOptions()).rejects.toThrow(
-      "Cannot proceed due to conflicting options",
-    );
+    expect(() => g.reportImpliedOptions()).toThrow("Cannot proceed due to conflicting options");
     expect(said).toContain("  --skip-active-storage [due to --skip-active-record]");
     expect(said).toContain("    ERROR: Conflicts with --no-skip-active-storage");
   });

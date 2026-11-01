@@ -206,8 +206,14 @@ describe("AppGenerator", () => {
     const api = new AppGenerator(["my-app"], { api: true }, { destinationRoot: tmpDir });
     expect(api.options.skipAssetPipeline).toBe(true);
     expect(api.options.skipJavascript).toBe(true);
-    await makeGen().reportImpliedOptions();
+    makeGen().reportImpliedOptions();
     expect(lines.join("\n")).not.toMatch(/will also be activated/);
+    const minimal = new AppGenerator(
+      ["my-app"],
+      { minimal: true, skipActionText: false },
+      { destinationRoot: tmpDir },
+    );
+    expect(() => minimal.reportImpliedOptions()).not.toThrow();
   });
 
   it("skip active job option", async () => {

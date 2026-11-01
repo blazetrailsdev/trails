@@ -33,6 +33,13 @@ export function newCommand(): Command {
     .option("--skip-docker", AppGenerator.classOptions().skipDocker.description ?? undefined)
     .option("--skip-eslint", AppGenerator.classOptions().skipEslint.description ?? undefined)
     .option("--no-skip-eslint")
+    .option("--api", AppGenerator.classOptions().api.description ?? undefined)
+    .option("--minimal", AppGenerator.classOptions().minimal.description ?? undefined)
+    .option(
+      "-j, --javascript <type>",
+      AppGenerator.classOptions().javascript.description ?? undefined,
+    )
+    .option("-c, --css <type>", AppGenerator.classOptions().css.description ?? undefined)
     .option("--dev", AppGenerator.classOptions().dev.description ?? undefined)
     .action(async (name: string, options) => {
       const pm = options.packageManager as PackageManager;
@@ -62,6 +69,10 @@ export function newCommand(): Command {
           sqliteDriver: driver,
           skipDocker: options.skipDocker,
           skipEslint: options.skipEslint,
+          api: options.api,
+          minimal: options.minimal,
+          javascript: options.javascript,
+          css: options.css,
           dev: options.dev,
         },
         { destinationRoot: cwd },

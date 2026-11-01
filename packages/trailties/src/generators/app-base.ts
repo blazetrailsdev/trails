@@ -73,13 +73,6 @@ export abstract class AppBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
   }
 
-  static OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
-    skipActiveJob: ["skipActionMailer", "skipActiveStorage"],
-    skipActiveRecord: ["skipActiveStorage", "skipSolid"],
-    skipActiveStorage: ["skipActionMailbox", "skipActionText"],
-    skipJavascript: ["skipHotwire"],
-  };
-
   static strictArgsPosition(): boolean {
     return false;
   }
@@ -247,16 +240,9 @@ export abstract class AppBase extends GeneratorBase {
     config: GeneratorConfig = {},
   ) {
     super(positionalArgv, optionArgv, config);
-    const options = {
-      ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
-      ...Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
-    } as unknown as AppBaseOptions;
-    const skipDependents = options.skipActiveStorage ? true : undefined;
-    this.options = {
-      skipActionMailbox: skipDependents,
-      skipActionText: skipDependents,
-      ...options,
-    };
+    this.options = Object.fromEntries(
+      this.options as unknown as Iterable<[string, unknown]>,
+    ) as unknown as AppBaseOptions;
   }
 
   /** @internal */
@@ -323,6 +309,13 @@ export abstract class AppBase extends GeneratorBase {
     return implied;
   }
 
+  static OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
+    skipActiveJob: ["skipActionMailer", "skipActiveStorage"],
+    skipActiveRecord: ["skipActiveStorage", "skipSolid"],
+    skipActiveStorage: ["skipActionMailbox", "skipActionText"],
+    skipJavascript: ["skipHotwire"],
+  };
+
   /** @internal */
   protected implyOptions(
     optionImplications: Record<string, readonly string[]> = AppBase.OPTION_IMPLICATIONS,
@@ -340,14 +333,21 @@ export abstract class AppBase extends GeneratorBase {
     this._impliedOptionsConflicts = Object.keys(this._impliedOptions).filter(
       (name) => options[name] === false,
     );
-    this.options = Object.freeze({
+    const merged: Record<string, unknown> = {
+      ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS,
       ...options,
       ...Object.fromEntries(Object.keys(this._impliedOptions).map((name) => [name, true])),
+    };
+    const skipDependents = merged.skipActiveStorage ? true : undefined;
+    this.options = Object.freeze({
+      skipActionMailbox: skipDependents,
+      skipActionText: skipDependents,
+      ...merged,
     }) as unknown as AppBaseOptions;
   }
 
   /** @internal */
-  async reportImpliedOptions(): Promise<void> {
+  reportImpliedOptions(): void {
     if (this._impliedOptions === undefined || Object.keys(this._impliedOptions).length === 0)
       return;
 
@@ -489,6 +489,16 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  railsGemfileEntry(name: string, packageManager: string): string {
+    if (this.options.dev) {
+      const path = this.railsDevPackages()[name];
+      return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
+    } else {
+      return "*";
+    }
+  }
+
+  /** @internal */
   protected usingJsRuntime(): boolean {
     const { javascript, css } = this.options;
     return (
@@ -555,16 +565,6 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected dependOnBootsnap(): boolean {
     return !this.options.skipBootsnap && !this.options.dev;
-  }
-
-  /** @internal */
-  railsGemfileEntry(name: string, packageManager: string): string {
-    if (this.options.dev) {
-      const path = this.railsDevPackages()[name];
-      return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
-    } else {
-      return "*";
-    }
   }
 
   /** @noRailsEquivalent PERMANENT */
