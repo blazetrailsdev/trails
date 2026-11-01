@@ -18,7 +18,7 @@ export class Parser extends Ripper {
 
   constructor(source: string, { pattern }: { pattern: RegExp }) {
     super(source);
-    this.pattern = pattern;
+    this.pattern = pattern.multiline ? pattern : new RegExp(pattern.source, `${pattern.flags}m`);
   }
 
   onComment(value: string): void {
@@ -102,7 +102,7 @@ function registerDefaults(): void {
     "rb",
     "rake",
     "ruby",
-    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`, "m")),
+    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`)),
   );
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", slash);

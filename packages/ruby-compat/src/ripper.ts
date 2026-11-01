@@ -1,3 +1,9 @@
+const EXPR_BEG = 0;
+const EXPR_END = 1;
+const EXPR_ARG = 2;
+const EXPR_FNAME = 3;
+const EXPR_DOT = 4;
+const EXPR_CLASS = 5;
 const IDENT = "[A-Za-z_\\u0080-\\uffff][\\w\\u0080-\\uffff]*";
 const OPERATOR = "\\[\\]=?|\\*\\*|<=>|===?|=~|![=~]?|<<|>>|<=|>=|[+\\-]@|[+\\-*/%<>~^&|`!]";
 const END_MARKER = /__END__(?:\r?\n|$)/y;
@@ -17,20 +23,26 @@ const HEREDOC = new RegExp(
   `<<([~-]?)(?:"([^"\\n]+)"|'([^'\\n]+)'|\`([^\`\\n]+)\`|(${IDENT}))`,
   "y",
 );
+const BLOCK_PARAMS = /\s*\|([^|\n]*)\|/y;
+const LAMBDA_PARAMS = /->\s*\(?([^){\n]*)/y;
+const DEF_PARAMS = /[^(\n]*\(([^)\n]*)\)|[^\n]*/y;
+const FOR_VARS = /([^\n]*?)\bin\b/y;
+const RESCUE_VAR = new RegExp(`[^\\n]*?=>\\s*(${IDENT})`, "y");
 const REGEXP_FLAGS = /[a-z]*/y;
 const CLOSERS: Record<string, string> = { "(": ")", "[": "]", "{": "}", "<": ">" };
 const VALUE_KEYWORDS = new Set(["end", "self", "true", "false", "nil", "__FILE__", "__LINE__"]);
 const OPERATOR_KEYWORDS = new Set(
-  "if unless while until and or not return when case then do else elsif begin ensure rescue in yield break next defined? module".split(
+  "for if unless while until and or not return when case then do else elsif begin ensure rescue in yield break next defined? module".split(
     " ",
   ),
 );
 
 /**
  * `Ripper` (`vendor/ruby/v3.3.11/ext/ripper/lib/ripper/core.rb:15`), reduced to
- * the lexer states of `parser_yylex` (`vendor/ruby/v3.3.11/parse.y:10411`) that
- * decide where a literal starts, so only the comment event fires. An `=begin`
- * block fires it too, as `Prism.parse_file`'s `comments` holds one.
+ * the lexer states of `parser_yylex` (`vendor/ruby/v3.3.11/parse.y:10420`) that
+ * decide where a literal starts. Its comment event mirrors the Prism arm of
+ * `ParserExtractor#annotations`: the value is `comment.location.slice`, so it
+ * has no trailing newline, and an `=begin` block is one comment.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -40,11 +52,7 @@ export class Ripper {
   private _line = 1;
   private _counted = 0;
   private _error = false;
-  private _beg = true;
-  private _cmdarg = false;
-  private _fname = false;
-  private _def = false;
-  private _class = false;
+  private _state = EXPR_BEG;
   private _pending: Array<{ id: string; indent: boolean; raw: boolean }> = [];
   private _locals = new Set<string>();
 
@@ -73,14 +81,14 @@ export class Ripper {
    * `ripper_error_p` (`vendor/ruby/v3.3.11/ext/ripper/ripper_init.c.tmpl:150`).
    * Only an unterminated literal is an error here.
    *
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE ripper-reports-syntax-errors-beyond-unterminated-literals
    */
   isError(): boolean {
     return this._error;
   }
 
   /**
-   * `Ripper#on_comment` (`vendor/ruby/v3.3.11/ext/ripper/lib/ripper/core.rb:15`).
+   * The `comment` scanner event (`vendor/ruby/v3.3.11/ext/ripper/eventids2.c:280`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -93,6 +101,7 @@ export class Ripper {
    */
   parse(): void {
     this._code(false);
+    if (this._pending.length > 0) this._error = true;
   }
 
   private _match(re: RegExp): RegExpExecArray | null {
@@ -100,23 +109,19 @@ export class Ripper {
     return re.exec(this._src);
   }
 
-  private _value(cmdarg = false): void {
-    this._beg = false;
-    this._cmdarg = cmdarg;
-    this._fname = false;
-    this._def = false;
-    this._class = false;
+  private _localVars(text: string): void {
+    for (const [name] of text.matchAll(new RegExp(IDENT, "g"))) this._locals.add(name);
   }
 
-  private _operator(): void {
-    this._value();
-    this._beg = true;
+  private _blockParams(): void {
+    const m = this._match(BLOCK_PARAMS);
+    if (m) this._localVars(m[1]);
   }
 
   private _code(interpolated: boolean): void {
     const src = this._src;
     let depth = 0;
-    if (interpolated) this._operator();
+    if (interpolated) this._state = EXPR_BEG;
     while (this._pos < src.length && !this._error) {
       const pos = this._pos;
       const c = src[pos];
@@ -132,86 +137,90 @@ export class Ripper {
       }
       const next = src[pos + 1];
       const spaced = pos > 0 && /\s/.test(src[pos - 1]);
-      const argument = this._cmdarg && spaced && next !== undefined && !/[\s=]/.test(next);
-      const literal = !this._fname && (this._beg || argument);
+      const state = this._state;
+      const fname = state === EXPR_FNAME || state === EXPR_DOT;
+      const argument = state === EXPR_ARG && spaced && next !== undefined && !/[\s=]/.test(next);
+      const literal = state === EXPR_BEG || state === EXPR_CLASS || argument;
       if (c === "\n") {
         this._pos += 1;
-        if (this._pending.length > 0) this._heredocs();
-        this._beg = true;
-        this._cmdarg = false;
+        if (this._pending.length > 0) this._hereDocument();
+        if (!fname) this._state = EXPR_BEG;
       } else if (c === " " || c === "\t" || c === "\r") {
         this._pos += 1;
       } else if (c === "\\" && next === "\n") {
         this._pos += 2;
+        if (this._pending.length > 0) this._hereDocument();
       } else if (c === "#") {
         let eol = src.indexOf("\n", pos);
         if (eol === -1) eol = src.length;
         this._comment(pos, eol);
-      } else if (this._fname && this._match(FNAME_OPERATOR)) {
+      } else if (fname && this._match(FNAME_OPERATOR)) {
         this._pos += this._match(FNAME_OPERATOR)![0].length;
-        this._value();
+        this._state = EXPR_END;
       } else if (c === '"' || c === "`") {
         this._pos += 1;
         this._literal(c, null, true);
-        this._value();
+        this._state = EXPR_END;
       } else if (c === "'") {
         this._pos += 1;
         this._literal(c, null, false);
-        this._value();
+        this._state = EXPR_END;
       } else if (c === ":") {
         this._colon();
       } else if (c === "?") {
-        const character = this._beg ? this._match(CHARACTER) : null;
+        const character = state === EXPR_END ? null : this._match(CHARACTER);
         this._pos += character ? character[0].length : 1;
-        if (character) this._value();
-        else this._operator();
+        this._state = character ? EXPR_END : EXPR_BEG;
       } else if (c === "/" && literal) {
         this._pos += 1;
         this._literal("/", null, true);
         this._pos += this._match(REGEXP_FLAGS)![0].length;
-        this._value();
+        this._state = EXPR_END;
       } else if (c === "%" && literal && this._match(PERCENT)) {
-        this._percent();
-      } else if (c === "<" && !this._class && literal && this._match(HEREDOC)) {
+        this._parsePercent();
+      } else if (c === "<" && state !== EXPR_CLASS && literal && this._match(HEREDOC)) {
         const m = this._match(HEREDOC)!;
         this._pos += m[0].length;
         const id = m[2] ?? m[3] ?? m[4] ?? m[5];
         this._pending.push({ id, indent: m[1] !== "", raw: m[3] !== undefined });
-        this._value();
+        this._state = EXPR_END;
       } else if (this._match(WORD)) {
-        this._word();
+        this._parseIdent();
       } else if (this._match(VARIABLE)) {
         this._pos += this._match(VARIABLE)![0].length;
-        this._value();
+        this._state = EXPR_END;
       } else if (this._match(NUMBER)) {
         this._pos += this._match(NUMBER)![0].length;
-        this._value();
+        this._state = EXPR_END;
       } else if (c === ".") {
         const range = next === ".";
         this._pos += range ? 2 : 1;
-        if (range) this._operator();
-        else this._fname = true;
+        this._state = range ? EXPR_BEG : EXPR_DOT;
       } else if (c === "&" && next === ".") {
         this._pos += 2;
-        this._fname = true;
+        this._state = EXPR_DOT;
       } else if (c === "}" && interpolated && depth === 0) {
         this._pos += 1;
         return;
       } else if (c === ")" || c === "]" || c === "}") {
         if (c === "}") depth -= 1;
         this._pos += 1;
-        this._value();
+        this._state = EXPR_END;
       } else {
         if (c === "{") depth += 1;
+        if (c === "-") {
+          const lambda = this._match(LAMBDA_PARAMS);
+          if (lambda) this._localVars(lambda[1]);
+        }
         this._pos += 1;
-        this._operator();
+        this._state = EXPR_BEG;
+        if (c === "{") this._blockParams();
       }
     }
     if (interpolated) this._error = true;
   }
 
   private _comment(start: number, end: number): void {
-    this._pos = start;
     this.onComment(this._src.slice(start, end));
     this._pos = end;
   }
@@ -231,23 +240,22 @@ export class Ripper {
   private _colon(): void {
     if (this._src[this._pos + 1] === ":") {
       this._pos += 2;
-      this._fname = true;
+      this._state = EXPR_DOT;
       return;
     }
     const quote = this._src[this._pos + 1];
     if (quote === '"' || quote === "'") {
       this._pos += 2;
       this._literal(quote, null, quote === '"');
-      this._value();
+      this._state = EXPR_END;
       return;
     }
     const symbol = this._match(SYMBOL);
     this._pos += symbol ? symbol[0].length : 1;
-    if (symbol) this._value();
-    else this._operator();
+    this._state = symbol ? EXPR_END : EXPR_BEG;
   }
 
-  private _word(): void {
+  private _parseIdent(): void {
     const word = this._match(WORD)![0];
     this._pos += word.length;
     const src = this._src;
@@ -258,37 +266,42 @@ export class Ripper {
       name += c;
       this._pos += 1;
     }
-    const wasFname = this._fname;
-    const wasDef = this._def;
-    if (src[this._pos] === ":" && src[this._pos + 1] !== ":" && !wasFname) {
+    const state = this._state;
+    const fname = state === EXPR_FNAME || state === EXPR_DOT;
+    if (src[this._pos] === ":" && src[this._pos + 1] !== ":" && !fname) {
       this._pos += 1;
-      this._operator();
-    } else if (wasFname) {
-      this._value(!wasDef);
+      this._state = EXPR_BEG;
+    } else if (fname) {
+      this._state = state === EXPR_FNAME ? EXPR_END : EXPR_ARG;
     } else if (name === "def") {
-      this._value();
-      this._fname = true;
-      this._def = true;
+      this._state = EXPR_FNAME;
+      this._locals = new Set();
+      const params = this._match(DEF_PARAMS);
+      if (params) this._localVars(params[1] ?? params[0]);
     } else if (name === "class") {
-      this._operator();
-      this._class = true;
+      this._state = EXPR_CLASS;
     } else if (VALUE_KEYWORDS.has(name)) {
-      this._value();
+      this._state = EXPR_END;
     } else if (OPERATOR_KEYWORDS.has(name)) {
-      this._operator();
+      this._state = EXPR_BEG;
+      if (name === "do") this._blockParams();
+      const vars = name === "for" ? this._match(FOR_VARS) : null;
+      if (vars) this._localVars(vars[1]);
+      const rescued = name === "rescue" ? this._match(RESCUE_VAR) : null;
+      if (rescued) this._localVars(rescued[1]);
     } else {
       if (/^\s*=(?![=~>])/.test(src.slice(this._pos, this._pos + 40))) this._locals.add(name);
-      this._value(!this._locals.has(name));
+      this._state = this._locals.has(name) ? EXPR_END : EXPR_ARG;
     }
   }
 
-  private _percent(): void {
+  private _parsePercent(): void {
     const [text, type, open] = this._match(PERCENT)!;
     this._pos += text.length;
     const close = CLOSERS[open] ?? open;
     this._literal(close, close === open ? null : open, !"qwis".includes(type || "Q"));
     if (type === "r") this._pos += this._match(REGEXP_FLAGS)![0].length;
-    this._value();
+    this._state = EXPR_END;
   }
 
   private _literal(close: string, open: string | null, interpolated: boolean): void {
@@ -296,7 +309,12 @@ export class Ripper {
     let nest = 0;
     while (this._pos < src.length && !this._error) {
       const c = src[this._pos];
-      if (c === "\\") {
+      if (c === "\n" && this._pending.length > 0) {
+        this._pos += 1;
+        this._hereDocument();
+      } else if (c === "\\" && src[this._pos + 1] === "\n" && this._pending.length > 0) {
+        this._pos += 1;
+      } else if (c === "\\") {
         this._pos += 2;
       } else if (interpolated && c === "#" && src[this._pos + 1] === "{") {
         this._pos += 2;
@@ -315,7 +333,7 @@ export class Ripper {
     this._error = true;
   }
 
-  private _heredocs(): void {
+  private _hereDocument(): void {
     const src = this._src;
     const pending = this._pending;
     this._pending = [];

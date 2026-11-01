@@ -126,10 +126,16 @@ describe("SourceAnnotationExtractor", () => {
 
 test("Parser reads Ruby comments past heredocs, percent literals and an apostrophe", () => {
   const source = "x = <<~T\n  it's # TODO: no\nT\ny = %q(# TODO: no)\nz = /'/ # TODO: yes\n";
-  const parser = new Parser(source, { pattern: /#\s*(TODO):?\s*(.*)$/m });
+  const parser = new Parser(source, { pattern: /#\s*(TODO):?\s*(.*)$/ });
   parser.parse();
   expect(parser.isError()).toBe(false);
   expect(parser.comments).toEqual([new Annotation(5, "TODO", "yes")]);
+});
+
+test("Parser reads a dollar anchor as a line end in an =begin block", () => {
+  const parser = new Parser("=begin\n# TODO: a\n=end\n", { pattern: /#\s*(TODO):?\s*(.*)$/ });
+  parser.parse();
+  expect(parser.comments).toEqual([new Annotation(1, "TODO", "a")]);
 });
 
 test("Annotation#toString — line padding + optional tag prefix", () => {

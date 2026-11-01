@@ -53,8 +53,45 @@ describe("Ripper", () => {
     ]);
   });
 
+  it("reads a character after a command call", () => {
+    for (const source of ["puts ?'\n# a\n", 'x.foo ?"\n# a\n']) {
+      const ripper = lex(source);
+      expect(ripper.isError()).toBe(false);
+      expect(ripper.comments).toEqual([[2, "# a"]]);
+    }
+  });
+
+  it("reads parameters as locals, so a slash after one divides", () => {
+    for (const source of [
+      "def f(a)\n  a /2\nend\n# a\n",
+      "def self.a(b) b /2 end\n# a\n",
+      "for i in x do i /2 end\n# a\n",
+      "begin\nrescue => e\n e /2\nend\n# a\n",
+      "[1].map { |a| a /2 }\n# a\nb = 1 / 2\n",
+      "x.each do |a|\n a /2\nend\n# a\n",
+      "-> (a) { a /2 }\n# a\n",
+    ]) {
+      const ripper = lex(source);
+      expect(ripper.isError()).toBe(false);
+      expect(ripper.comments.map(([, value]) => value)).toEqual(["# a"]);
+    }
+  });
+
+  it("reads a heredoc body inside a multi-line literal", () => {
+    const ripper = lex("foo(<<A, 'b\nbody\nA\nc')\n# a\n");
+    expect(ripper.isError()).toBe(false);
+    expect(ripper.comments).toEqual([[5, "# a"]]);
+  });
+
   it("answers error? for an unterminated literal", () => {
-    for (const source of ["x = 'a\n", 'x = "a#{\n', "x = <<~T\n a\n", "=begin\n", "x = %q(a\n"]) {
+    for (const source of [
+      "x = 'a\n",
+      'x = "a#{\n',
+      "x = <<~T\n a\n",
+      "x = <<~T",
+      "=begin\n",
+      "x = %q(a\n",
+    ]) {
       expect(lex(source).isError()).toBe(true);
     }
   });
