@@ -130,7 +130,7 @@ export class TestUnitReporter {
     return (this._appRoot ??=
       (this.constructor as typeof TestUnitReporter).appRoot ??
       ENGINE_ROOT ??
-      Trails.root?.toString());
+      Trails.root()?.toString());
   }
 
   /** @internal */

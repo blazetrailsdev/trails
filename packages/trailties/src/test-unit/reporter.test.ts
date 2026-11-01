@@ -51,8 +51,15 @@ describe("TestUnitReporterTest", () => {
     record(result);
     reporter.report();
   };
-  const rerunSnippetCount = () =>
-    output.string().match(/^(bin\/rails test|bin\/test) /gm)?.length ?? 0;
+  const assertRerunSnippetCount = (snippetCount: number) =>
+    expect(output.string().match(/^(bin\/rails test|bin\/test) /gm)?.length ?? 0).toBe(
+      snippetCount,
+    );
+
+  const ttyReporter = () => {
+    output.isTty = () => true;
+    reporter = new TestUnitReporter(output, { color: true, outputInline: true });
+  };
 
   beforeEach(() => {
     output = new StringIO();
@@ -62,27 +69,27 @@ describe("TestUnitReporterTest", () => {
   it("prints rerun snippet to run a single failed test", () => {
     run(failedTest());
     expect(output.string()).toMatch(/^bin\/rails test .*test\/test_unit\/reporter_test\.rb:\d+$/m);
-    expect(rerunSnippetCount()).toBe(1);
+    assertRerunSnippetCount(1);
   });
 
   it("prints rerun snippet for every failed test", () => {
     record(failedTest());
     record(failedTest());
     run(failedTest());
-    expect(rerunSnippetCount()).toBe(3);
+    assertRerunSnippetCount(3);
   });
 
   it("does not print snippet for successful and skipped tests", () => {
     record(passingTest());
     run(skippedTest());
     expect(output.string()).not.toMatch("Failed tests:");
-    expect(rerunSnippetCount()).toBe(0);
+    assertRerunSnippetCount(0);
   });
 
   it("prints rerun snippet for skipped tests if run in verbose mode", () => {
     reporter = new TestUnitReporter(output, { verbose: true });
     run(skippedTest());
-    expect(rerunSnippetCount()).toBe(1);
+    assertRerunSnippetCount(1);
   });
 
   it("allows to customize the executable in the rerun snippet", () => {
@@ -151,30 +158,28 @@ describe("TestUnitReporterTest", () => {
     expect(output.string()).not.toMatch("Failed tests:");
   });
 
-  describe("with a tty", () => {
-    beforeEach(() => {
-      output.isTty = () => true;
-      reporter = new TestUnitReporter(output, { color: true, outputInline: true });
-    });
-    it("outputs colored passing results", () => {
-      record(passingTest());
-      expect(output.string()).toMatch("\x1b[32m.\x1b[0m");
-    });
-    it("outputs colored skipped results", () => {
-      record(skippedTest());
-      expect(output.string()).toMatch("\x1b[33mS\x1b[0m");
-    });
-    it("outputs colored failed results", () => {
-      record(failedTest());
-      expect(output.string()).toMatch(
-        `\x1b[31mF\x1b[0m\n\n\x1b[31mFailure:\n${heading} [${location}]:\nboo\n\x1b[0m\n\n${snippet}`,
-      );
-    });
-    it("outputs colored error results", () => {
-      record(erroredTest());
-      expect(output.string()).toMatch(
-        `\x1b[31mE\x1b[0m\n\n\x1b[31mError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\x1b[0m`,
-      );
-    });
+  it("outputs colored passing results", () => {
+    ttyReporter();
+    record(passingTest());
+    expect(output.string()).toMatch("\x1b[32m.\x1b[0m");
+  });
+  it("outputs colored skipped results", () => {
+    ttyReporter();
+    record(skippedTest());
+    expect(output.string()).toMatch("\x1b[33mS\x1b[0m");
+  });
+  it("outputs colored failed results", () => {
+    ttyReporter();
+    record(failedTest());
+    expect(output.string()).toMatch(
+      `\x1b[31mF\x1b[0m\n\n\x1b[31mFailure:\n${heading} [${location}]:\nboo\n\x1b[0m\n\n${snippet}`,
+    );
+  });
+  it("outputs colored error results", () => {
+    ttyReporter();
+    record(erroredTest());
+    expect(output.string()).toMatch(
+      `\x1b[31mE\x1b[0m\n\n\x1b[31mError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\x1b[0m`,
+    );
   });
 });

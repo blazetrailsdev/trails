@@ -85,6 +85,7 @@ export class Runner {
   /** @inventedArm rbFSystem — PERMANENT */
   static async run(argv: string[] = []): Promise<void> {
     const tests = await this.loadTests(argv);
+    this.rejectUnknownOptions(argv);
     const name = this.nameFilter(argv);
     const locations = await this.testLocations(tests, name);
     if (locations.length === 0) return;
@@ -209,7 +210,8 @@ export class Runner {
     const locations: string[] = [];
     for (const path of tests) {
       const patterns = this.filters.filter(([file]) => file === path);
-      if (patterns.length === 0 || patterns.some(([, lines]) => lines.length === 0)) {
+      const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
+      if (!lineFiltered || patterns.some(([, lines]) => lines.length === 0)) {
         locations.push(path);
         continue;
       }
@@ -224,16 +226,29 @@ export class Runner {
       );
       for (const [begin, end] of Object.entries(ranges)) {
         const test = new Range(Number(begin), end);
-        const title = /^\s*(?:it|test)(?:\.\w+)*\(\s*["'`]?(.*?)["'`]?,/.exec(
-          source[Number(begin) - 1],
-        );
-        if (title == null) continue;
-        if (wanted.some((range) => range.overlaps(test)) || name?.test(title[1])) {
+        if (!/^\s*(?:it|test)\b/.test(source[Number(begin) - 1])) continue;
+        const call = source.slice(Number(begin) - 1, end).join("\n");
+        const title = /^[^(]*\(\s*(["'`])((?:\\.|(?!\1)[^])*)\1/.exec(call)?.[2] ?? "";
+        if (wanted.some((range) => range.overlaps(test)) || (title !== "" && name?.test(title))) {
           locations.push(`${path}:${begin}`);
         }
       }
     }
     return locations;
+  }
+
+  /** @internal */
+  private static rejectUnknownOptions(argv: string[]): void {
+    argv.forEach((arg, index) => {
+      const value = argv[index - 1] === "-n" || argv[index - 1] === "--name";
+      if (
+        arg.startsWith("-") &&
+        !value &&
+        !/^(-n|--name\b|-f$|--fail-fast$|-v$|--verbose$)/.test(arg)
+      ) {
+        throw new ArgumentError(`invalid option: ${arg}`);
+      }
+    });
   }
 
   /** @internal */

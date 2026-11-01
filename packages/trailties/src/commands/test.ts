@@ -1,4 +1,4 @@
-import { rbFSystem } from "@blazetrails/ruby-compat";
+import { LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { TestUnitReporter } from "../test-unit/reporter.js";
@@ -36,24 +36,19 @@ export class TestCommand extends Base {
     klass.methodAdded("generators");
   }
 
-  /** @internal */
-  private static readonly EXACT_TEST_ARGUMENT_PATTERN = new RegExp(
-    `^-n|^--name\\b|${Runner.PATH_ARGUMENT_PATTERN.source}`,
-    "m",
-  );
-
   static executable(...args: [string?]): string {
     return args.length === 0 ? TestUnitReporter.executable : super.executable(...args);
   }
 
-  /** @missingRailsCall run — PERMANENT */
   async help(commandName: string | null = null, ..._rest: unknown[]): Promise<void> {
     await super.help(commandName);
     if (commandName === "test") {
       this.say("");
     }
     this.say("");
-    await rbFSystem("vitest", "--help");
+    if ((await rbFSystem("vitest", "--help")) == null) {
+      throw new LoadError("cannot load such file -- vitest");
+    }
   }
 
   async perform(...args: string[]): Promise<void> {
@@ -80,4 +75,10 @@ export class TestCommand extends Base {
   async generators(...args: string[]): Promise<void> {
     await this.perform("test/lib/generators", ...args);
   }
+
+  /** @internal */
+  private static readonly EXACT_TEST_ARGUMENT_PATTERN = new RegExp(
+    `^-n|^--name\\b|${Runner.PATH_ARGUMENT_PATTERN.source}`,
+    "m",
+  );
 }

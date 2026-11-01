@@ -1,6 +1,7 @@
 import { Formatter } from "@blazetrails/did-you-mean";
-import { Dir, File, LoadError, env, getFs, setEnv } from "@blazetrails/ruby-compat";
+import { Dir, File, LoadError, StringIO, env, getFs, setEnv } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestUnitReporter } from "./reporter.js";
 import { CompositeFilter, Filter, InvalidTestError, Runner } from "./runner.js";
 
 const internals = Runner as unknown as {
@@ -102,6 +103,37 @@ describe("Runner", () => {
       "test/models/user.test.ts:2",
       "test/models/user.test.ts:6",
     ]);
+  });
+
+  it("a line filter leaves other listed files unselected", async () => {
+    await app();
+    const tests = await Runner.loadTests(["test/system", "test/models/user.test.ts:3"]);
+    expect(await internals.testLocations(tests, null)).toEqual(["test/models/user.test.ts:2"]);
+  });
+
+  it("keeps a line match whose title spans lines or has a comma", async () => {
+    await app();
+    const file = "test/models/wrapped.test.ts";
+    await getFs().writeFile!(
+      file,
+      'it.each([1])("x", () => {\n});\nit(\n  "a, b",\n  () => {},\n);\n',
+    );
+    await Runner.loadTests([`${file}:1`]);
+    expect(await internals.testLocations([file], /b$/)).toEqual([`${file}:1`, `${file}:3`]);
+  });
+
+  it("relativePathFor strips the application root", () => {
+    TestUnitReporter.appRoot = "/app";
+    try {
+      const reporter = new TestUnitReporter(new StringIO());
+      expect(reporter.relativePathFor("/app/test/a.test.ts")).toBe("test/a.test.ts");
+    } finally {
+      TestUnitReporter.appRoot = undefined;
+    }
+  });
+
+  it("run rejects an unknown option", async () => {
+    await expect(Runner.run(["-b"])).rejects.toThrow("invalid option: -b");
   });
 
   it("run does not start Vitest with no tests", async () => {
