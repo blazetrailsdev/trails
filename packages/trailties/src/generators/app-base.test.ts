@@ -149,15 +149,8 @@ describe("AppBase run tasks", () => {
     }
   });
 
-  it("node_version prefers NODE_VERSION", async () => {
-    const generator = new T(["app"], { javascript: "esbuild" }) as unknown as Record<string, any>;
-    const before = process.env.NODE_VERSION;
-    process.env.NODE_VERSION = "1.2.3";
-    try {
-      expect(await generator.nodeVersion()).toBe("1.2.3");
-    } finally {
-      if (before === undefined) delete process.env.NODE_VERSION;
-      else process.env.NODE_VERSION = before;
-    }
+  it("node_version is nil without a JS runtime", async () => {
+    const generator = new T(["app"]) as unknown as Record<string, any>;
+    expect(await generator.nodeVersion()).toBeUndefined();
   });
 });

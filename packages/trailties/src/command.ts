@@ -83,14 +83,14 @@ export async function invoke(
       if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
         await command.perform(name, args, config);
       } else {
-        await invokeRake(fullNamespace, args);
+        await invokeRake(fullNamespace, args, config);
       }
     } else if (command && command.name() === name) {
       await command.parent!.parseAsync([name, ...args], { from: "user" });
     } else if (command && command.commands.some((c) => c.name() === name)) {
       await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
     } else {
-      await invokeRake(fullNamespace, args);
+      await invokeRake(fullNamespace, args, config);
     }
   });
 }
@@ -145,7 +145,11 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
 }
 
 /** @internal */
-async function invokeRake(task: string, args: string[]): Promise<void> {
+async function invokeRake(
+  task: string,
+  args: string[],
+  _config: Record<string, unknown>,
+): Promise<void> {
   await lookupBang();
   const program = createProgram();
   const colon = task.indexOf(":");

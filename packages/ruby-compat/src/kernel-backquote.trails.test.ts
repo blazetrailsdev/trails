@@ -11,6 +11,11 @@ describe("Kernel#`", () => {
     expect(await rbFBackquote("echo out; exit 127")).toBe("out\n");
   });
 
+  it("hands an assignment prefix and a shell builtin to the shell", async () => {
+    expect(await rbFBackquote("FOO=1 true")).toBe("");
+    expect(await rbFBackquote("exit 0")).toBe("");
+  });
+
   it("raises Errno::ENOENT for a command that does not exist", async () => {
     await expect(rbFBackquote("no-such-command-trails --version")).rejects.toBeInstanceOf(
       Errno.ENOENT,

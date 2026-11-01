@@ -49,7 +49,7 @@ export async function rbFSystem(
  * ``Kernel#` `` (`vendor/ruby/v3.3.11/io.c:10585` `rb_f_backquote`): the
  * command's standard output, with `$?` set, awaited where MRI blocks. A command
  * line with no shell metacharacter is exec'd directly (`rb_exec_fillarg`,
- * `vendor/ruby/v3.3.11/process.c:2648`), so a missing command raises `Errno::ENOENT`;
+ * `vendor/ruby/v3.3.11/process.c:2640-2672`), so a missing command raises `Errno::ENOENT`;
  * any other runs through `/bin/sh -c`.
  *
  * @noRailsEquivalent PERMANENT
@@ -61,11 +61,7 @@ export async function rbFBackquote(str: string): Promise<string> {
   }
 
   const [prog, env, args] = rbExecargNew([str]);
-  const words = str.trim().split(/\s+/);
-  const direct = !/[*?{}[\]<>()~&|\\$;'`"\n#]/.test(str);
-  const [stdout, , data] = direct
-    ? await adapter.capture3(words[0], env, words.slice(1), "")
-    : await adapter.capture3(prog, env, args, "");
+  const [stdout, , data] = await adapter.capture3(prog, env, args, "");
   if (data.error !== undefined) throw data.error;
   rbLastStatusSet(new Process.Status(data));
 
