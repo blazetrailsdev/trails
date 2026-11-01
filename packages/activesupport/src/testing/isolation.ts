@@ -114,4 +114,4 @@ export const Subprocess = {
   },
 };
 
-export const Isolation = { run, ...Subprocess };
+export const Isolation = { SubprocessCrashed, run, ...Subprocess };
