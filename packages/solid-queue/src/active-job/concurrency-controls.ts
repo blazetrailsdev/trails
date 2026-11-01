@@ -22,6 +22,17 @@ const DEFAULT_CONCURRENCY_GROUP = function (this: ConcurrencyControls): unknown 
   return rbModName(this.constructor);
 };
 
+declare module "@blazetrails/activejob/base" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Base {
+    let concurrencyKey: unknown;
+    let concurrencyGroup: unknown;
+    let concurrencyLimit: number | null;
+    let concurrencyDuration: Duration;
+    const limitsConcurrency: typeof ClassMethods.limitsConcurrency;
+  }
+}
+
 export class ClassMethods {
   static limitsConcurrency(
     this: ConcurrencyControlsClass,

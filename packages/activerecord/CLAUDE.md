@@ -716,3 +716,18 @@ section at each builder: `exclusionConstraintsInCreate` and
 `uniqueConstraintsInCreate` in `postgresql/schema-dumper.ts`, and the base
 dumper's builders in `schema-dumper.ts`. It is the brace arm only. Any other
 extra branch in a builder is still a deviation to converge.
+
+## SQLite's busy handler runs between steps (`busy_handler`, `execute_batch2`)
+
+sqlite3-ruby's `busy_handler` runs inside the native step
+(`sqlite3 lib/sqlite3/database.rb:692-705`). A JS callback there could not
+await, so a wait would block the event loop holding the lock's other side.
+**`retryBusy` runs the handler between steps instead**, and the driver's own
+`busy_timeout` is always 0, so every config behaves as sqlite3 does: `timeout`
+waits and yields, `retries` retries, and no config raises at once. `execBatch`
+splits a batch with `sqlite3_complete`'s state machine and steps each statement,
+so a retry resumes at the blocked one. SQLite skips the handler where waiting
+would deadlock, and no driver reports that case apart from an ordinary
+`SQLITE_BUSY`, so the adapter tracks it: a write that follows a read in an open
+transaction raises at once. This is a genuine language shortcoming, ratified
+here, and `@noRailsEquivalent PERMANENT` on those functions points at it.

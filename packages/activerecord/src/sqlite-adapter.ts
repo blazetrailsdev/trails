@@ -32,6 +32,7 @@ export interface SqliteStatement {
 
 export interface SqliteConnection {
   prepare(sql: string): SqliteStatement | Promise<SqliteStatement>;
+  busyHandler?: (count: number) => boolean | Promise<boolean>;
   busyHandlerTimeout?: number;
   exec(sql: string): void | Promise<void>;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[] | Promise<readonly unknown[]>;
@@ -68,6 +69,7 @@ export interface SyncSqliteStatement {
 
 export interface SyncSqliteConnection {
   prepare(sql: string): SyncSqliteStatement;
+  busyHandler?: (count: number) => boolean | Promise<boolean>;
   busyHandlerTimeout?: number;
   exec(sql: string): void;
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];

@@ -10,6 +10,7 @@ import {
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
+import { setBusyHandlerTimeout } from "../sqlite/busy-wait.js";
 import { BusyException } from "../sqlite/errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -244,6 +245,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _connectionParameters: SQLite3ConnectionParameters;
   /** @internal */
   _lastAffectedRows = 0;
+
+  /** @internal */
+  _sharedLockHeld = false;
   /** @internal */
   _memoryDatabase: boolean;
   /** @internal */
@@ -1043,8 +1047,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall busy_handler — PERMANENT
+   */
   override async configureConnection(): Promise<void> {
+    await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
     } else if (rtest(this._config["timeout"])) {
@@ -1052,12 +1060,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
-      this._rawConnection!.busyHandlerTimeout = timeout;
-      await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
+      setBusyHandlerTimeout(this._rawConnection!, timeout);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
+      const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
+      this._rawConnection!.busyHandler = (count) => count <= retries;
     }
     await super.configureConnection();
 

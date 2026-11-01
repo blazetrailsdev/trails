@@ -124,6 +124,9 @@ interface PerformQueryHost {
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
   verifiedBang(): void;
   _lastAffectedRows: number;
+  _sharedLockHeld: boolean;
+  isWriteQuery(sql: string): boolean;
+  isTransactionOpen(): boolean;
 }
 
 interface ExecuteBatchHost {
@@ -191,36 +194,37 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  const timeout = rawConnection.busyHandlerTimeout ?? 0;
+  const retry = <T>(step: () => T | Promise<T>) =>
+    retryBusy(rawConnection, step, this._sharedLockHeld && this.isWriteQuery(sql));
   let result: Result;
   if (batch) {
-    await execBatch(rawConnection, sql, timeout);
+    await execBatch(rawConnection, sql);
     result = Result.empty();
   } else if (prepare) {
-    const stmt = await retryBusy(timeout, () => this._cachedStatement(rawConnection, sql));
+    const stmt = await retry(() => this._cachedStatement(rawConnection, sql));
     stmt.bindParams(typeCastedBinds);
 
     if (!stmt.reader) {
-      await retryBusy(timeout, () => stmt.step());
+      await retry(() => stmt.step());
       result = Result.empty();
     } else {
       const columns = stmt.columns().map((c) => c.name);
-      const toA = await retryBusy(timeout, () => stmt.toA());
+      const toA = await retry(() => stmt.toA());
       result = new Result(columns, toA);
       this._narrowSpilledBigInts(stmt, result.rows);
     }
   } else {
-    const stmt = await retryBusy(timeout, () => this._freshStatement(rawConnection, sql));
+    const stmt = await retry(() => this._freshStatement(rawConnection, sql));
     try {
       if (!(binds == null || binds.length === 0)) {
         stmt.bindParams(typeCastedBinds);
       }
       if (!stmt.reader) {
-        await retryBusy(timeout, () => stmt.step());
+        await retry(() => stmt.step());
         result = Result.empty();
       } else {
         const columns = stmt.columns().map((c) => c.name);
-        const toA = await retryBusy(timeout, () => stmt.toA());
+        const toA = await retry(() => stmt.toA());
         result = new Result(columns, toA);
         this._narrowSpilledBigInts(stmt, result.rows);
       }
@@ -228,6 +232,8 @@ export async function performQuery(
       await stmt.close();
     }
   }
+  this._sharedLockHeld =
+    result.columns.length > 0 && !this.isWriteQuery(sql) && this.isTransactionOpen();
   this._lastAffectedRows = await rawConnection.changes();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;
