@@ -1,7 +1,17 @@
 import { Trails } from "./rails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
-import { File, Pathname, StandardError, env, prepend, rbArgv } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Pathname,
+  StandardError,
+  env,
+  exit,
+  prepend,
+  rbArgv,
+  rbInspect,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
@@ -33,6 +43,12 @@ export class CorrectableNameError extends StandardError {
 }
 
 prepend(CorrectableNameError, Correctable);
+
+export class UnrecognizedCommandError extends CorrectableNameError {
+  constructor(name: string, commands: string[]) {
+    super(`Unrecognized command ${rbInspect(name)}`, name, commands);
+  }
+}
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 
@@ -76,21 +92,36 @@ export async function invoke(
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
-  await withArgv(args, async () => {
-    if (command && "perform" in command) {
-      if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-        await command.perform(name, args, config);
+  try {
+    await withArgv(args, async () => {
+      if (command && "perform" in command) {
+        if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+          await command.perform(name, args, config);
+        } else {
+          await invokeRake(fullNamespace, args, config);
+        }
+      } else if (command && command.name() === name) {
+        await command.parent!.parseAsync([name, ...args], { from: "user" });
+      } else if (command && command.commands.some((c) => c.name() === name)) {
+        await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
       } else {
         await invokeRake(fullNamespace, args, config);
       }
-    } else if (command && command.name() === name) {
-      await command.parent!.parseAsync([name, ...args], { from: "user" });
-    } else if (command && command.commands.some((c) => c.name() === name)) {
-      await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
+    });
+  } catch (error) {
+    if (!(error instanceof UnrecognizedCommandError)) throw error;
+    if (
+      error.name === fullNamespace &&
+      command &&
+      "perform" in command &&
+      commandName === fullNamespace
+    ) {
+      await command.perform("help", [], config);
     } else {
-      await invokeRake(fullNamespace, args, config);
+      stdout.write(`${error.detailedMessage()}\n`);
     }
-  });
+    exit(1);
+  }
 }
 
 /** @inventedArm replaceAll — PERMANENT */
@@ -150,16 +181,23 @@ async function invokeRake(
 ): Promise<void> {
   await lookupBang();
   const program = createProgram();
-  const colon = task.indexOf(":");
+  const taskName = /[^[]+/.exec(task)?.[0] ?? "";
+  const colon = taskName.indexOf(":");
   if (colon > 0) {
-    const command = program.commands.find((c) => c.name() === task.slice(0, colon));
-    const subcommand = task.slice(colon + 1);
+    const command = program.commands.find((c) => c.name() === taskName.slice(0, colon));
+    const subcommand = taskName.slice(colon + 1);
     if (command?.commands.some((c) => c.name() === subcommand)) {
       await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
       return;
     }
   }
-  await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
+  if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
+    throw new UnrecognizedCommandError(
+      task,
+      (await printingCommands()).map(([name]) => name),
+    );
+  }
+  await program.parseAsync(taskName === "" ? args : [taskName, ...args], { from: "user" });
 }
 
 Trails.Command = { invoke };
