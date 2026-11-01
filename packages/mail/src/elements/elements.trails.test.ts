@@ -10,13 +10,15 @@ import { MessageIdsElement } from "./message-ids-element.js";
 import { MimeVersionElement } from "./mime-version-element.js";
 import { ReceivedElement } from "./received-element.js";
 
-describe("elements with no spec of their own", () => {
+describe("Mail::Address", () => {
   it("inspects an address with its class, object id and formatted value", () => {
     expect(new Address("Mikel <test@lindsaar.net>").inspect()).toMatch(
       /^#<Mail::Address:\d+ Address: \|Mikel <test@lindsaar\.net>\| >$/,
     );
   });
+});
 
+describe("elements with no spec of their own", () => {
   it("cleans a trailing semicolon off a content type and disposition", () => {
     const type = new ContentTypeElement("text/plain; charset=utf-8;  ");
     expect([type.mainType, type.subType]).toEqual(["text", "plain"]);
