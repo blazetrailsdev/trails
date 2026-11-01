@@ -665,11 +665,6 @@ process.exit(status ?? 1);
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
-  /** @missingRailsArgs template — PERMANENT */
-  async createBootFile(): Promise<void> {
-    await this.template("config/boot.ts");
-  }
-
   async createConfigFiles(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
@@ -1138,6 +1133,11 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
         2,
       ) + "\n",
     );
+  }
+
+  /** @missingRailsArgs template — PERMANENT */
+  async createBootFile(): Promise<void> {
+    await this.template("config/boot.ts");
   }
 
   async createAppFiles(): Promise<void> {
