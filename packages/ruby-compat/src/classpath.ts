@@ -53,7 +53,9 @@ export function generatedClassPath(klass: object): string | undefined {
         pendingClassPaths[unresolved++] = entry;
         continue;
       }
-      if (
+      if (value === undefined) {
+        pendingClassPaths[unresolved++] = entry;
+      } else if (
         (typeof value === "function" || (typeof value === "object" && value !== null)) &&
         !generatedClassPaths.has(value)
       ) {
@@ -61,8 +63,19 @@ export function generatedClassPath(klass: object): string | undefined {
       }
     }
     pendingClassPaths.length = unresolved;
+    classPathsRegistered = unresolved > 0;
   }
   return generatedClassPaths.get(klass);
+}
+
+/**
+ * Whether `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) may yet miss a
+ * class whose generated path has not resolved.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isClassPathPending(): boolean {
+  return pendingClassPaths.length > 0;
 }
 
 /**

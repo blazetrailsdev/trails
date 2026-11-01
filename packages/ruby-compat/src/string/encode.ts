@@ -42,7 +42,7 @@ function dump(b: number[]): string {
  * and ISO-8859-1 hold no invalid byte, so their scrub is the receiver. The
  * converters here are the ones between UTF-8, US-ASCII, ASCII-8BIT and
  * ISO-8859-1, from any encoding `TextDecoder` has a label for, or UTF-32, to
- * those through UTF-8, and from UTF-8 to UTF-16BE and UTF-16LE; `replace` is the `:replace` option; any other pair raises `Encoding::ConverterNotFoundError`, as
+ * those through UTF-8, and from UTF-8 to UTF-16BE, UTF-16LE and ISO-2022-JP; `replace` is the `:replace` option; any other pair raises `Encoding::ConverterNotFoundError`, as
  * `rb_econv_open_exc` (`transcode.c:2097`) does for a pair MRI has no
  * transcoder for.
  *
@@ -113,6 +113,42 @@ export function encode(
     }
     return forceEncoding(dest, denc);
   }
+  if (typeof str === "string" && denc.name === "ISO-2022-JP") {
+    const table = _jisX0208Table();
+    const dest: number[] = [];
+    let kanji = false;
+    const shift = (to: boolean): void => {
+      if (kanji !== to) dest.push(...(to ? [0x1b, 0x24, 0x42] : [0x1b, 0x28, 0x42]));
+      kanji = to;
+    };
+    const put = (text: string): void => {
+      for (const char of text) {
+        const c = char.codePointAt(0)!;
+        const cell = table.get(c);
+        if (c < 0x80) {
+          shift(false);
+          dest.push(c);
+        } else if (cell !== undefined) {
+          shift(true);
+          dest.push(cell >> 8, cell & 0xff);
+        } else if (undefReplace) {
+          put(opts.replace ?? "?");
+        } else {
+          const rep = opts.fallback?.(char);
+          if (rep == null) {
+            const u = `U+${c.toString(16).toUpperCase().padStart(4, "0")}`;
+            throw new UndefinedConversionError(
+              `${u} to EUC-JP in conversion from UTF-8 to EUC-JP to stateless-ISO-2022-JP to ${denc}`,
+            );
+          }
+          put(rep);
+        }
+      }
+    };
+    put(str);
+    shift(false);
+    return forceEncoding(Uint8Array.from(dest), denc);
+  }
   if (
     !(unicode(senc) || senc.name in SINGLE_BYTE) ||
     !(unicode(denc) || denc.name in SINGLE_BYTE)
@@ -180,6 +216,35 @@ export function encode(
 
   if (unicode(denc) || denc === Encoding.US_ASCII) return String.fromCodePoint(...dest);
   return forceEncoding(Uint8Array.from(dest), denc);
+}
+
+const JIS_X_0208_MRI: Record<number, number> = {
+  0x2015: 0x2014,
+  0xff5e: 0x301c,
+  0x2225: 0x2016,
+  0xff0d: 0x2212,
+  0xffe0: 0xa2,
+  0xffe1: 0xa3,
+  0xffe2: 0xac,
+};
+
+let jisX0208: Map<number, number> | null = null;
+
+/** @perf 13ms — PERMANENT */
+function _jisX0208Table(): Map<number, number> {
+  if (jisX0208 === null) {
+    const decoder = new TextDecoder("iso-2022-jp");
+    jisX0208 = new Map([[0x2015, 0x213d]]);
+    for (let lead = 0x21; lead <= 0x78; lead++) {
+      if (lead === 0x2d) continue;
+      for (let trail = 0x21; trail <= 0x7e; trail++) {
+        const cell = Uint8Array.of(0x1b, 0x24, 0x42, lead, trail);
+        const c = decoder.decode(cell).codePointAt(0)!;
+        if (c !== 0xfffd) jisX0208.set(JIS_X_0208_MRI[c] ?? c, (lead << 8) | trail);
+      }
+    }
+  }
+  return jisX0208;
 }
 
 /** `make_econv_exception`'s invalid-byte-sequence arm (`vendor/ruby/v3.3.11/transcode.c:2108-2144`). */

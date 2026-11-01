@@ -80,3 +80,24 @@ describe("String#encode", () => {
     expect(() => encode("é", "EUC-TW")).toThrow("code converter not found (UTF-8 to EUC-TW)");
   });
 });
+
+describe("encode to ISO-2022-JP", () => {
+  const ascii = (b: unknown) => String.fromCharCode(...(b as Uint8Array));
+
+  it("shifts into JIS X 0208 and back to ASCII", () => {
+    const encoded = encode("aあb", "ISO-2022-JP") as Uint8Array;
+    expect(ascii(encoded)).toBe('a\x1b$B$"\x1b(Bb');
+    expect(rbObjEncoding(encoded).name).toBe("ISO-2022-JP");
+  });
+
+  it("uses MRI's mapping where WHATWG's differs", () => {
+    expect(ascii(encode("〜", "ISO-2022-JP"))).toBe("\x1b$B!A\x1b(B");
+    expect(() => encode("～", "ISO-2022-JP")).toThrow(
+      "U+FF5E to EUC-JP in conversion from UTF-8 to EUC-JP to stateless-ISO-2022-JP to ISO-2022-JP",
+    );
+  });
+
+  it("replaces an undefined character in ASCII mode", () => {
+    expect(ascii(encode("あéa", "ISO-2022-JP", { undef: ":replace" }))).toBe('\x1b$B$"\x1b(B?a');
+  });
+});

@@ -122,8 +122,9 @@ describe("TestRakeTestTask", () => {
       t.loader = "direct";
     });
 
-    expect(testTask.runCode()).toBe(
-      `-e "process.argv.slice(1).forEach((f) => require(require('path').resolve(f)))"`,
+    expect(testTask.runCode()).toContain(`LOAD_PATH.unshift('${File.expandPath("lib")}');`);
+    expect(testTask.runCode()).toContain(
+      "process.argv.slice(1).forEach((f) => require(require('path').resolve(f)));",
     );
     expect(await testTask.fileList()).toEqual(globbed);
   });

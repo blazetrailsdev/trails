@@ -29,6 +29,7 @@ type Connection = SMTPConnection & {
   _responseActions: Array<(str: string) => void>;
   _actionGreeting(str: string): void;
   _clearPhase(): void;
+  _onConnect(): void;
   _upgradeConnection(callback: (err: Error | null) => void): void;
 };
 
@@ -473,8 +474,6 @@ export class SMTP {
   /**
    * @internal
    * @inventedArm rescue — PERMANENT
-   * @missingRailsCall order:critical,tlsconnect — CONVERGEABLE net-smtp-smtps-tlsconnect-in-do-start
-   * @missingRailsArgs tlsconnect — CONVERGEABLE net-smtp-smtps-tlsconnect-in-do-start
    */
   private async doStart(
     heloDomain: string,
@@ -486,24 +485,35 @@ export class SMTP {
     if (user != null || secret != null || authtype != null) {
       this.checkAuthArgs(authtype, user, secret);
     }
-    const { verifyMode, ...tls } = this._sslContextTls ?? {};
     const s = new SMTPConnection({
       host: this.address,
       port: this.port,
       name: heloDomain,
-      secure: this.isTls(),
+      secure: false,
       connectionTimeout: this.openTimeout * 1000,
       greetingTimeout: this.openTimeout * 1000,
       socketTimeout: this._readTimeout * 1000,
-      tls: {
-        ...tls,
-        rejectUnauthorized: verifyMode !== "VERIFY_NONE",
-        servername: this.tlsHostname ?? this.address,
-      },
     }) as Connection;
     this._socket = s;
+    const onConnect = s._onConnect;
     try {
-      this.logging(`Connection opened: ${this.address}:${this.port}`);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          s.once("error", reject);
+          s._onConnect = () => {
+            s.removeListener("error", reject);
+            resolve();
+          };
+          s.connect();
+        });
+        this.logging(`Connection opened: ${this.address}:${this.port}`);
+        if (this.isTls()) await this.tlsconnect(s, this._sslContextTls);
+      } catch (err) {
+        if ((err as ConnectionError).code === "ETIMEDOUT") {
+          throw new OpenTimeout("execution expired");
+        }
+        throw err;
+      }
       this.checkResponse(
         await this.critical(async () => {
           let onError: (err: Error) => void;
@@ -515,12 +525,9 @@ export class SMTP {
                 s._clearPhase();
                 resolve(Response.parse(`${str}\n`));
               };
-              s.connect();
+              onConnect.call(s);
             });
           } catch (err) {
-            if ((err as ConnectionError).code === "ETIMEDOUT") {
-              throw new OpenTimeout("execution expired");
-            }
             if ((err as ConnectionError).code === "ECONNECTION") {
               throw new EOFError("end of file reached");
             }

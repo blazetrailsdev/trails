@@ -19,6 +19,7 @@ import { DiskService } from "../service/disk-service.js";
 import { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
+  directlyUploadFileBlob,
   fileFixture,
   fixtureFileUpload,
   withService,
@@ -28,18 +29,19 @@ import {
 import type { ClassMethods } from "./model.js";
 import type { One } from "./one.js";
 
-// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-Object.assign(Blob.prototype, {
-  isAnalyzed: () => false,
-  analyzeLater: async () => {},
-  isPreviewImageNeededBeforeProcessingVariants: () => false,
-});
+Object.assign(Blob.prototype, { isPreviewImageNeededBeforeProcessingVariants: () => false });
 
 type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;
 
 const blobOf = async (one: One): Promise<Blob> => (await (await one.attachment)!.blob)!;
 const filename = async (one: One): Promise<string> => (await blobOf(one)).filename.toString();
+const expectAnalyzed = async (one: One): Promise<void> => {
+  const blob = await (await blobOf(one)).reload();
+  expect(blob.isAnalyzed()).toBeTruthy();
+  expect(blob.metadata.get("width")).toBe(4104);
+  expect(blob.metadata.get("height")).toBe(2736);
+};
 const exist = (key: string) => Blob.service!.isExist(key);
 const townHash = () => ({
   io: new StringIO("STUFF"),
@@ -393,11 +395,33 @@ describe("ActiveStorage::OneAttachedTest", () => {
     expect(await user.coverPhoto.isAttached()).toBe(false);
   });
 
-  // BLOCKED: attached-analyzing-tests
-  it.skip("analyzing a new blob from an uploaded file after attaching it to an existing record", () => {});
-  it.skip("analyzing a new blob from an uploaded file after attaching it to an existing record via update", () => {});
-  it.skip("analyzing a directly-uploaded blob after attaching it to an existing record", () => {});
-  it.skip("analyzing a directly-uploaded blob after attaching it to an existing record via updates", () => {});
+  it("analyzing a new blob from an uploaded file after attaching it to an existing record", async () => {
+    await performEnqueuedJobs(() => user.avatar.attach(fixtureFileUpload("racecar.jpg")));
+
+    await expectAnalyzed(user.avatar);
+  });
+
+  it("analyzing a new blob from an uploaded file after attaching it to an existing record via update", async () => {
+    await performEnqueuedJobs(() => user.updateBang({ avatar: fixtureFileUpload("racecar.jpg") }));
+
+    await expectAnalyzed(user.avatar);
+  });
+
+  it("analyzing a directly-uploaded blob after attaching it to an existing record", async () => {
+    await performEnqueuedJobs(async () =>
+      user.avatar.attach(await directlyUploadFileBlob({ filename: "racecar.jpg" })),
+    );
+
+    await expectAnalyzed(user.avatar);
+  });
+
+  it("analyzing a directly-uploaded blob after attaching it to an existing record via updates", async () => {
+    await performEnqueuedJobs(async () =>
+      user.updateBang({ avatar: await directlyUploadFileBlob({ filename: "racecar.jpg" }) }),
+    );
+
+    await expectAnalyzed(user.avatar);
+  });
   it("creating an attachment as part of an autosave association through nested attributes", async () => {
     const group = await Group.createBang({
       usersAttributes: [
@@ -413,7 +437,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
     });
     await group.saveBang();
     const newUser = (await User.findBy({ name: "John" })) as User;
-    expect(await newUser.avatar.isAttached()).toBe(true);
+    await newUser.avatar.load();
+    expect(newUser.avatar.isAttached()).toBe(true);
   });
 
   it("updating an attachment as part of an autosave association", async () => {
@@ -421,7 +446,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await user.setAvatar(fixtureFileUpload("racecar.jpg"));
     await group.saveBang();
     await user.reload();
-    expect(await user.avatar.isAttached()).toBe(true);
+    await user.avatar.load();
+    expect(user.avatar.isAttached()).toBe(true);
   });
 
   const attachToNew = async (attachable: unknown, name: string) => {
@@ -511,9 +537,25 @@ describe("ActiveStorage::OneAttachedTest", () => {
     );
   });
 
-  // BLOCKED: attached-analyzing-tests
-  it.skip("analyzing a new blob from an uploaded file after attaching it to a new record", () => {});
-  it.skip("analyzing a directly-uploaded blob after attaching it to a new record", () => {});
+  it("analyzing a new blob from an uploaded file after attaching it to a new record", async () => {
+    await performEnqueuedJobs(async () => {
+      const user = await User.createBang({
+        name: "Jason",
+        avatar: fixtureFileUpload("racecar.jpg"),
+      });
+      await expectAnalyzed(user.avatar);
+    });
+  });
+
+  it("analyzing a directly-uploaded blob after attaching it to a new record", async () => {
+    await performEnqueuedJobs(async () => {
+      const user = await User.createBang({
+        name: "Jason",
+        avatar: await directlyUploadFileBlob({ filename: "racecar.jpg" }),
+      });
+      await expectAnalyzed(user.avatar);
+    });
+  });
 
   it("detaching", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
@@ -682,7 +724,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
     expect(await user.avatar.isAttached()).toBe(true);
 
     await user.reload();
-    expect(await user.avatar.isAttached()).toBe(false);
+    await user.avatar.load();
+    expect(user.avatar.isAttached()).toBe(false);
   });
 
   it("overriding attached reader", async () => {

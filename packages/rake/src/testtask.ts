@@ -1,5 +1,6 @@
 import {
   File,
+  LOAD_PATH,
   RUBY_VERSION,
   RuntimeError,
   SignalException,
@@ -19,6 +20,8 @@ import { FileUtilsExt } from "./file-utils-ext.js";
 import type { FileUtils } from "./file-utils.js";
 import { Rake } from "./rake-module.js";
 import { TaskLib } from "./tasklib.js";
+
+export { LOAD_PATH };
 
 type RunStatus = {
   exitstatus(): number | null;
@@ -144,7 +147,13 @@ export class TestTask extends TaskLib {
   runCode(): string | undefined {
     switch (this.loader) {
       case "direct":
-        return `-e "process.argv.slice(1).forEach((f) => require(require('path').resolve(f)))"`;
+        return (
+          `-e "import('${import.meta.url}').then(({ LOAD_PATH }) => { ` +
+          `LOAD_PATH.unshift(${flatten(this.libs)
+            .map((lib) => `'${File.expandPath(String(lib))}'`)
+            .join(", ")}); ` +
+          `process.argv.slice(1).forEach((f) => require(require('path').resolve(f))); })"`
+        );
       case "testrb":
         return "-S testrb";
       case "rake":

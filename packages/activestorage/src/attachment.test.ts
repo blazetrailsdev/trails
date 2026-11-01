@@ -1,28 +1,33 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestCase } from "@blazetrails/activejob/test-case";
+import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
-import { createBlob, User } from "./test-helpers/test-helper.js";
+import { createBlob, directlyUploadFileBlob, User } from "./test-helpers/test-helper.js";
 
-// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-const unported = {
-  isAnalyzed: () => false,
-  analyzeLater: async () => {},
-  isPreviewImageNeededBeforeProcessingVariants: () => false,
-};
-Object.assign(Blob.prototype, unported);
+Object.assign(Blob.prototype, { isPreviewImageNeededBeforeProcessingVariants: () => false });
 Object.defineProperty(User.prototype, "attachmentReflections", {
   value: {},
   configurable: true,
 });
 
+class AttachmentTest extends TestCase {
+  attachment(): void {}
+}
+
 describe("ActiveStorage::AttachmentTest", () => {
   let user: User;
+  let t: TestHelper;
+
+  afterEach(() => t.afterTeardown());
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
+    t = new AttachmentTest("attachment") as unknown as TestHelper;
+    await t.beforeSetup();
     user = await User.createBang({ name: "Josh" });
   });
 
@@ -36,8 +41,28 @@ describe("ActiveStorage::AttachmentTest", () => {
   });
 
   // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-  it.skip("analyzing a directly-uploaded blob after attaching it", () => {});
-  it.skip("attaching a un-analyzable blob", () => {});
+  it("analyzing a directly-uploaded blob after attaching it", async () => {
+    const blob = await directlyUploadFileBlob({ filename: "racecar.jpg" });
+    expect(blob.isAnalyzed()).toBeFalsy();
+
+    await t.performEnqueuedJobs({}, () => user.highlights.attach(blob));
+
+    await blob.reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+    expect(blob.metadata.get("width")).toBe(4104);
+    expect(blob.metadata.get("height")).toBe(2736);
+  });
+
+  it("attaching a un-analyzable blob", async () => {
+    const blob = await createBlob({ filename: "blank.txt" });
+
+    expect(blob.isAnalyzed()).toBeFalsy();
+
+    await t.assertNoEnqueuedJobs({}, () => user.highlights.attach(blob));
+
+    await blob.reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+  });
   it.skip("attaching a blob doesn't touch the record", () => {});
   it.skip("attaching a record doesn't reset the previously_new_record flag", () => {});
   it.skip("mirroring a directly-uploaded blob after attaching it", () => {});

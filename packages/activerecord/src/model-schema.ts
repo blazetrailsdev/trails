@@ -6,6 +6,7 @@ import {
   rbObjAsString,
   rbClassSuperclass,
   rbObjRespondTo,
+  isClassPathPending,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
@@ -595,7 +596,11 @@ function loadSchemaFromCacheSync(host: SchemaKlass): boolean {
 }
 
 export function tableName(this: SchemaKlass): string | null {
-  if (!Object.hasOwn(this, "_tableName")) resetTableName.call(this);
+  if (!Object.hasOwn(this, "_tableName")) {
+    const computed = resetTableName.call(this);
+    if (isClassPathPending()) delete (this as { _tableName?: string | null })._tableName;
+    return computed;
+  }
   return this._tableName;
 }
 

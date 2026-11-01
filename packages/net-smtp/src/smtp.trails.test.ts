@@ -49,7 +49,13 @@ describe("SMTP (trails)", () => {
 
   it("nodemailer's private members the session drives still exist", () => {
     const connection = new SMTPConnection({}) as unknown as Record<string, unknown>;
-    for (const name of ["_sendCommand", "_actionGreeting", "_clearPhase", "_upgradeConnection"]) {
+    for (const name of [
+      "_sendCommand",
+      "_actionGreeting",
+      "_clearPhase",
+      "_onConnect",
+      "_upgradeConnection",
+    ]) {
       expect(typeof connection[name], name).toBe("function");
     }
     expect(Array.isArray(connection._responseActions)).toBe(true);

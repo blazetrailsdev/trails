@@ -1,3 +1,4 @@
+import { isBlank } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { StringIO } from "@blazetrails/ruby-compat";
@@ -135,10 +136,22 @@ describe("ActiveStorage::Attached::One", () => {
   it("isAttached does not load the blob", async () => {
     await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
     const reloaded = (await Member.find(user.id)) as AvatarUser;
-    expect(await reloaded.avatar.isAttached()).toBe(true);
+    await reloaded.avatar.load();
+    expect(reloaded.avatar.isAttached()).toBe(true);
     const attachment = (await (reloaded as unknown as { avatarAttachment: unknown })
       .avatarAttachment) as { association(name: string): { isLoaded(): boolean } };
     expect(attachment.association("blob").isLoaded()).toBe(false);
+  });
+
+  it("raises from a sync read of an unloaded attachment", async () => {
+    await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
+    const reloaded = (await Member.find(user.id)) as AvatarUser;
+    expect(() => isBlank(reloaded.avatar)).toThrow("await avatar.load()");
+    expect(() => (reloaded.avatar as unknown as { blobId: unknown }).blobId).toThrow(
+      "await avatar.load()",
+    );
+    await reloaded.avatar.load();
+    expect(isBlank(reloaded.avatar)).toBe(false);
   });
 
   it("detach keeps the blob and purge removes it", async () => {
