@@ -24,6 +24,7 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
   });
 }
 
+/** @missingRailsArgs generate_method_missing — PERMANENT */
 export function delegateMissingTo<T extends object>(
   this: T,
   target: string,

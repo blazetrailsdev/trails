@@ -1,4 +1,4 @@
-import { File, TopLevel, rbModConstDefined } from "@blazetrails/ruby-compat";
+import { File, TopLevel, constDefined } from "@blazetrails/ruby-compat";
 import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { GeneratorError } from "./generated-attribute.js";
 
@@ -59,10 +59,7 @@ export const AppName = {
           `name which does not match one of the reserved trails ` +
           `words: ${AppName.RESERVED_NAMES.join(", ")}`,
       );
-    } else if (
-      rbModConstDefined(TopLevel, this.appConstBase()) ||
-      this.appConstBase() in globalThis
-    ) {
+    } else if (constDefined(TopLevel, this.appConstBase()) || this.appConstBase() in globalThis) {
       throw new GeneratorError(
         `Invalid application name ${this.originalAppName()}, constant ${this.appConstBase()} is already in use. Please choose another application name.`,
       );
