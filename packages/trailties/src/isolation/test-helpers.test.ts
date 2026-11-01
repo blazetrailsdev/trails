@@ -53,7 +53,10 @@ describe("GenerationTest", () => {
 
     const config = await fs.readFile(configFile, "utf-8");
 
-    expect(config).toMatch(/ {7}this\.config\.zomg = "zomg";$/m);
+    expect(
+      config,
+      `Expected \`${configFile}\` to include \`this.config.zomg = "zomg";\`, but did not:\n ${config}`,
+    ).toMatch(/ {7}this\.config\.zomg = "zomg";$/m);
   });
 
   it("remove from config", { timeout: 120_000 }, async () => {
@@ -71,7 +74,10 @@ describe("GenerationTest", () => {
 
     let config = await fs.readFile(configFile, "utf-8");
 
-    expect(config).not.toMatch(/this\.config\.zomg = "zomg";$/m);
+    expect(
+      config,
+      `Expected \`${configFile}\` to include \`this.config.zomg = "zomg";\`, but did not:\n ${config}`,
+    ).not.toMatch(/this\.config\.zomg = "zomg";$/m);
 
     await t.addToConfig(`
         this.config.duplicates = "none";
@@ -82,6 +88,9 @@ describe("GenerationTest", () => {
 
     config = await fs.readFile(configFile, "utf-8");
 
-    expect(config).not.toMatch(/this\.config\.duplicates = "none";$/m);
+    expect(
+      config,
+      `Expected \`${configFile}\` to include \`this.config.duplicates = "none";\`, but did not:\n ${config}`,
+    ).not.toMatch(/this\.config\.duplicates = "none";$/m);
   });
 });
