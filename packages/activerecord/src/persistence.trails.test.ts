@@ -89,13 +89,13 @@ describe("PersistenceTest (trails)", () => {
         this.writeAttribute("content", "attached");
       }
     }
-    Deferred.afterInitialize((record: any) => {
+    Deferred.afterInitialize((record: Deferred) => {
       seen = [record.title, record.content, record.author_name];
     });
     const topic = await Deferred.create(
       { attachment: "file", title: "after" } as Record<string, unknown>,
-      async (record: any) => {
-        record.author_name = "block";
+      async (record: Base) => {
+        (record as Deferred).author_name = "block";
       },
     );
     expect(seen).toEqual(["after", "attached", "block"]);
