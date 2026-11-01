@@ -51,10 +51,7 @@ export class IRBConsole {
     }
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE console-sandbox-rollback-and-irb-helpers
-   */
+  /** @internal */
   private async loadModels(context: Record<string, unknown>): Promise<Record<string, unknown>> {
     const fs = getFs();
     const path = getPath();
