@@ -8,6 +8,7 @@ import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
 import { createBlob, directlyUploadFileBlob, User } from "./test-helpers/test-helper.js";
 
+// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, { isPreviewImageNeededBeforeProcessingVariants: () => false });
 Object.defineProperty(User.prototype, "attachmentReflections", {
   value: {},

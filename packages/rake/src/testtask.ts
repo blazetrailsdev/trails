@@ -21,6 +21,7 @@ import type { FileUtils } from "./file-utils.js";
 import { Rake } from "./rake-module.js";
 import { TaskLib } from "./tasklib.js";
 
+/** @noRailsEquivalent PERMANENT */
 export { LOAD_PATH };
 
 type RunStatus = {

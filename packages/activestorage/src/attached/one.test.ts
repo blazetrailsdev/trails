@@ -29,6 +29,7 @@ import {
 import type { ClassMethods } from "./model.js";
 import type { One } from "./one.js";
 
+// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, { isPreviewImageNeededBeforeProcessingVariants: () => false });
 
 type Attachable = Extended<typeof ClassMethods>;
