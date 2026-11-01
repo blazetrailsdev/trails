@@ -1,12 +1,14 @@
 import {
+  File,
   Monitor,
   Mutex,
   SecureRandom,
   include,
   rbInspect,
   type Included,
+  type Pathname,
 } from "@blazetrails/ruby-compat";
-import type { Cref } from "./cref.js";
+import { Cref } from "./cref.js";
 import { Map } from "./cref/map.js";
 import { Error as ZeitwerkError } from "./error.js";
 import { Inflector } from "./inflector.js";
@@ -83,6 +85,225 @@ export class Loader {
     this.dirsAutoloadMonitor = new Monitor();
 
     Registry.registerLoader(this);
+  }
+
+  async setup(): Promise<void> {
+    await this.mutex.synchronize(async () => {
+      if (this._setup) return;
+
+      const roots = await this.actualRoots();
+      for (const [rootDir, rootNamespace] of Object.entries(roots)) {
+        await this.defineAutoloadsForDir(rootDir, rootNamespace);
+      }
+
+      for (const callback of this.onSetupCallbacks) await callback();
+
+      this._setup = true;
+    });
+  }
+
+  async allExpectedCpaths(): Promise<Record<string, string>> {
+    const result: Record<string, string> = {};
+
+    const roots = await this.actualRoots();
+    for (const [rootDir, rootNamespace] of Object.entries(roots)) {
+      const queue: [string, string][] = [[rootDir, this.realModName(rootNamespace)!]];
+
+      let next: [string, string] | undefined;
+      while ((next = queue.shift()) !== undefined) {
+        const [dir, cpath] = next;
+        result[dir] = cpath;
+
+        const prefix = cpath === "Object" ? "" : `${cpath}::`;
+
+        await this.ls(dir, (basename, abspath, ftype) => {
+          if (ftype === "file") {
+            basename = basename.replace(/\.[jt]s$/, "");
+            result[abspath] = prefix + this.inflector.camelize(basename, abspath);
+          } else {
+            if (this.isCollapse(abspath)) {
+              queue.push([abspath, cpath]);
+            } else {
+              queue.push([abspath, prefix + this.inflector.camelize(basename, abspath)]);
+            }
+          }
+        });
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * @missingRailsArgs basename — PERMANENT
+   * @inventedArm replaceAll — PERMANENT
+   */
+  async cpathExpectedAt(path: string | Pathname): Promise<string | null> {
+    path = path.toString();
+    const abspath = File.expandPath(path);
+
+    if (!(await File.isExistAsync(abspath))) {
+      throw new ZeitwerkError(`${abspath} does not exist`);
+    }
+
+    if (!(await this.isDir(abspath)) && !(await this.isRuby(abspath))) return null;
+    if (this.isIgnoredPath(abspath)) return null;
+
+    const paths: [string, string][] = [];
+
+    let walkUpFrom: string;
+    if (await this.isRuby(abspath)) {
+      const basename = File.basename(abspath, ".*");
+      if (this.isHidden(basename)) return null;
+
+      paths.push([basename.replaceAll("-", "_"), abspath]);
+      walkUpFrom = File.dirname(abspath);
+    } else {
+      walkUpFrom = abspath;
+    }
+
+    let rootNamespace: object | null = null;
+
+    for (const dir of this.walkUp(walkUpFrom)) {
+      rootNamespace = this.roots[dir] ?? null;
+      if (rootNamespace != null) break;
+      if (this.isIgnoredPath(dir)) return null;
+
+      const basename = File.basename(dir);
+      if (this.isHidden(basename)) return null;
+
+      if (!this.isCollapse(dir)) paths.push([basename.replaceAll("-", "_"), abspath]);
+    }
+
+    if (rootNamespace == null) return null;
+
+    if (paths.length === 0) {
+      return this.realModName(rootNamespace);
+    } else {
+      const cnames: string[] = [];
+      for (const [b, a] of paths.reverse()) cnames.push(await this.cnameFor(b, a));
+
+      if (rootNamespace === Object) {
+        return cnames.join("::");
+      } else {
+        return `${this.realModName(rootNamespace)}::${cnames.join("::")}`;
+      }
+    }
+  }
+
+  /** @internal */
+  isShadowedFile(file: string): boolean {
+    return this.shadowedFiles.has(file);
+  }
+
+  /** @internal */
+  private async defineAutoloadsForDir(dir: string, parent: object): Promise<void> {
+    await this.ls(dir, async (basename, abspath, ftype) => {
+      if (ftype === "file") {
+        basename = basename.replace(/\.[jt]s$/, "");
+        const cref = new Cref(parent, await this.cnameFor(basename, abspath));
+        await this.autoloadFile(cref, abspath);
+      } else {
+        if (this.isCollapse(abspath)) {
+          await this.defineAutoloadsForDir(abspath, parent);
+        } else {
+          const cref = new Cref(parent, await this.cnameFor(basename, abspath));
+          await this.autoloadSubdir(cref, abspath);
+        }
+      }
+    });
+  }
+
+  /** @internal */
+  private async autoloadSubdir(cref: Cref, subdir: string): Promise<void> {
+    const autoloadPath = this.isAutoloadPathSetByMeFor(cref);
+    if (autoloadPath != null) {
+      if (await this.isRuby(autoloadPath)) {
+        this.registerExplicitNamespace(cref);
+      }
+      this.namespaceDirs.getOrSet(cref, () => []).push(subdir);
+    } else if (!cref.isDefined()) {
+      this.namespaceDirs.getOrSet(cref, () => []).push(subdir);
+      await this.defineAutoload(cref, subdir);
+    } else {
+      if (this.logger != null) {
+        this.log(`the namespace ${cref} already exists, descending into ${subdir}`);
+      }
+      await this.defineAutoloadsForDir(subdir, cref.get() as object);
+    }
+  }
+
+  /** @internal */
+  private async autoloadFile(cref: Cref, file: string): Promise<void> {
+    const autoloadPath = cref.isAutoload();
+    if (autoloadPath != null) {
+      if (await this.isRuby(autoloadPath)) {
+        this.shadowedFiles.add(file);
+        if (this.logger != null) {
+          this.log(`file ${file} is ignored because ${autoloadPath} has precedence`);
+        }
+      } else {
+        await this.promoteNamespaceFromImplicitToExplicit({ dir: autoloadPath, file, cref });
+      }
+    } else if (cref.isDefined()) {
+      this.shadowedFiles.add(file);
+      if (this.logger != null) {
+        this.log(`file ${file} is ignored because ${cref} is already defined`);
+      }
+    } else {
+      await this.defineAutoload(cref, file);
+    }
+  }
+
+  /** @internal */
+  private async promoteNamespaceFromImplicitToExplicit({
+    dir,
+    file,
+    cref,
+  }: {
+    dir: string;
+    file: string;
+    cref: Cref;
+  }): Promise<void> {
+    delete this.autoloads[dir];
+    Registry.unregisterAutoload(dir);
+
+    if (this.logger != null) {
+      this.log(
+        `earlier autoload for ${cref} discarded, it is actually an explicit namespace defined in ${file}`,
+      );
+    }
+
+    await this.defineAutoload(cref, file);
+    this.registerExplicitNamespace(cref);
+  }
+
+  /** @internal */
+  private async defineAutoload(cref: Cref, abspath: string): Promise<void> {
+    cref.autoload(abspath);
+
+    if (this.logger != null) {
+      if (await this.isRuby(abspath)) {
+        this.log(`autoload set for ${cref}, to be loaded from ${abspath}`);
+      } else {
+        this.log(`autoload set for ${cref}, to be autovivified from ${abspath}`);
+      }
+    }
+
+    this.autoloads[abspath] = cref;
+    Registry.registerAutoload(this, abspath);
+  }
+
+  /** @internal */
+  private isAutoloadPathSetByMeFor(cref: Cref): string | null {
+    const autoloadPath = cref.isAutoload();
+    if (autoloadPath != null && Object.hasOwn(this.autoloads, autoloadPath)) return autoloadPath;
+    return null;
+  }
+
+  /** @internal */
+  private registerExplicitNamespace(cref: Cref): void {
+    Registry.ExplicitNamespaces.register(cref, this);
   }
 
   /** @internal */
