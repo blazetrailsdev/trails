@@ -51,7 +51,8 @@ describe("TestCref", () => {
     cref.autoload("/foo");
     constSet(klass, "Foo", 1);
     expect(cref.isAutoload()).toBeNull();
-    expect(cref.autoload("/bar")).toBe(false);
+    cref.autoload("/bar");
+    expect(cref.isAutoload()).toBeNull();
     expect(cref.remove()).toEqual(1);
     expect(cref.isDefined()).toBe(false);
   });

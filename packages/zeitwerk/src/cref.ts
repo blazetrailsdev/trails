@@ -42,12 +42,11 @@ export class Cref {
     return _autoloads.get(this.mod)?.get(this.cname) ?? null;
   }
 
-  autoload(abspath: string): boolean {
-    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return false;
+  autoload(abspath: string): void {
+    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return;
     let cnames = _autoloads.get(this.mod);
     if (cnames === undefined) _autoloads.set(this.mod, (cnames = new Map()));
     cnames.set(this.cname, abspath);
-    return true;
   }
 
   /** @inventedArm if — PERMANENT */
