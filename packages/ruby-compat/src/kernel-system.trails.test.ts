@@ -47,6 +47,12 @@ describe("Kernel#system", () => {
     const missing = rbFSystem("trails-no-such-program", "--version", { exception: true });
     await expect(missing).rejects.toBeInstanceOf(Errno.ENOENT);
     await expect(missing).rejects.toThrow("No such file or directory - trails-no-such-program");
+    const denied = rbFSystem("/etc/passwd", "a", { exception: true });
+    await expect(denied).rejects.toBeInstanceOf(Errno.EACCES);
+    await expect(denied).rejects.toThrow("Permission denied - /etc/passwd");
+    await expect(rbFSystem("true", { exception: 1, foo: 1 } as never)).rejects.toThrow(
+      "expected true or false as exception: 1",
+    );
     await expect(rbFSystem("true", { exception: 1 as never })).rejects.toThrow(
       "expected true or false as exception: 1",
     );
