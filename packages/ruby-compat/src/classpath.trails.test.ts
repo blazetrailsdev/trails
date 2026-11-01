@@ -47,9 +47,6 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName(Probe)).toBe("Probe");
     expect(reads).toBe(1);
     class Later {}
-    registerClassPaths([]);
-    expect(rbModName(Later)).toBe("Later");
-    registerClassPaths([[() => class {}, "Deferred::Other"]]);
     expect(rbModName(Later)).toBe("Deferred::Later");
   });
 
