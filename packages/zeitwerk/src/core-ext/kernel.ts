@@ -5,6 +5,7 @@ import { Registry } from "../registry.js";
 /** @noRailsEquivalent PERMANENT */
 const _requiring = new Map<string, Promise<void>>();
 
+/** @inventedArm if — PERMANENT */
 export async function require(path: string): Promise<boolean> {
   const loader = Registry.loaderFor(path);
   if (loader == null) return false;
@@ -15,6 +16,7 @@ export async function require(path: string): Promise<boolean> {
       await loading;
       return false;
     }
+    if (!Object.hasOwn(loader.autoloads, path)) return false;
     const load = (async () => {
       const exports = (await import(getPath().pathToFileURL!(path).href)) as Record<
         string,
