@@ -23,8 +23,9 @@ describe("TestCustomInflector", () => {
 
       await loader.pushDir(".");
 
-      const error = await loader.setup().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(TypeError);
+      const setup = loader.setup();
+      await expect(setup).rejects.toThrow(TypeError);
+      const error = await setup.catch((e: unknown) => e);
       expect((error as TypeError).message).toContain("#camelize must return a String");
     });
   });
@@ -43,8 +44,9 @@ describe("TestCustomInflector", () => {
 
       await loader.pushDir(".");
 
-      const error = await loader.setup().catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(NameError);
+      const setup = loader.setup();
+      await expect(setup).rejects.toThrow(NameError);
+      const error = await setup.catch((e: unknown) => e);
       expect((error as NameError).message).toContain("wrong constant name Foo::Bar");
       expect((error as NameError).message).toContain(
         "#camelize should return a simple constant name",
