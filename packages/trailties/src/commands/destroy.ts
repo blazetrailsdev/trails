@@ -18,7 +18,6 @@ export class DestroyCommand extends Base {
     await Generators.help((this.constructor as typeof Base).commandName());
   }
 
-  /** @missingRailsCall root — CONVERGEABLE rails-command-root-and-argv-replace-for-generate-destroy */
   async perform(..._args: string[]): Promise<void> {
     const generator = this.args.shift() as string | undefined;
     if (generator == null) return this.help();
