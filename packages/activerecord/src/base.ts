@@ -2032,6 +2032,7 @@ Object.setPrototypeOf(
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);
       if (value !== undefined || typeof prop === "symbol") return value;
+      if (prop === "_attributes") return value;
       const attrs = receiver?._attributes;
       if (attrs != null && typeof attrs.isKey === "function" && attrs.isKey(prop)) {
         return receiver._readAttribute(prop);
