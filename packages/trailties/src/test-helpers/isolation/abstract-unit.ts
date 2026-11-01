@@ -108,16 +108,18 @@ export class Generation {
     await FileUtils.cpRAsync(this.appTemplatePath(), appPath);
 
     if (!options.initializers) {
-      for (const initializer of await Dir.globAsync(`${appPath}/config/initializers/**/*.ts`)) {
+      for (const initializer of await Dir.globAsync(
+        File.join(appPath, "config/initializers/**/*.ts"),
+      )) {
         await fs.unlink!(initializer);
       }
     }
 
-    const routes = await fs.readFile(`${appPath}/config/routes.ts`, "utf-8");
+    const routes = await fs.readFile(File.join(appPath, "config/routes.ts"), "utf-8");
     const match = /(\n\s*\}\);\s*)$/.exec(routes);
     if (match) {
       await puts(
-        `${appPath}/config/routes.ts`,
+        File.join(appPath, "config/routes.ts"),
         `import { ActionDispatch } from "@blazetrails/actionpack";\n` +
           routes.slice(0, match.index) +
           `\nActionDispatch.deprecator().silence(() => this.match(":controller(/:action(/:id))(.:format)", { via: ":all" }));\n` +
@@ -126,9 +128,9 @@ export class Generation {
     }
 
     if (options.multiDb) {
-      await puts(`${appPath}/config/database.ts`, this.multiDbDatabaseConfigs());
+      await puts(File.join(appPath, "config/database.ts"), this.multiDbDatabaseConfigs());
     } else {
-      await puts(`${appPath}/config/database.ts`, this.defaultDatabaseConfigs());
+      await puts(File.join(appPath, "config/database.ts"), this.defaultDatabaseConfigs());
     }
 
     await this.addToConfig(`
@@ -223,10 +225,12 @@ export default { development: env("development"), test: env("test"), production:
     const dir = `${appPath}/random/${name}`;
     await FileUtils.mkdirPAsync(dir);
 
-    const app = (await fs.readFile(`${appPath}/config/application.ts`, "utf-8")).split("\n");
-    app.splice(4, 0, `import ${rbInspect(`${dir}/lib/${name}.ts`)};`);
+    const app = (await fs.readFile(File.join(appPath, "config/application.ts"), "utf-8")).split(
+      "\n",
+    );
+    app.splice(4, 0, `import ${rbInspect(File.join(dir, "lib", `${name}.ts`))};`);
 
-    await fs.writeFile!(`${appPath}/config/application.ts`, app.join("\n"));
+    await fs.writeFile!(File.join(appPath, "config/application.ts"), app.join("\n"));
 
     const bukkit = new Bukkit(dir);
     if (block != null) await block(bukkit);
@@ -235,11 +239,14 @@ export default { development: env("development"), test: env("test"), production:
 
   async addToTopOfConfig(str: string): Promise<void> {
     const appPath = await this.appPath();
-    const environment = await getFs().readFile(`${appPath}/config/application.ts`, "utf-8");
+    const environment = await getFs().readFile(
+      File.join(appPath, "config/application.ts"),
+      "utf-8",
+    );
     const match = /(extends Application \{\s*static \{\s*)/.exec(environment);
     if (match) {
       await puts(
-        `${appPath}/config/application.ts`,
+        File.join(appPath, "config/application.ts"),
         environment.slice(0, match.index) +
           match[1] +
           `\n${str}\n` +
@@ -250,20 +257,23 @@ export default { development: env("development"), test: env("test"), production:
 
   async addToConfig(str: string): Promise<void> {
     const appPath = await this.appPath();
-    const environment = await getFs().readFile(`${appPath}/config/application.ts`, "utf-8");
+    const environment = await getFs().readFile(
+      File.join(appPath, "config/application.ts"),
+      "utf-8",
+    );
     const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*\}\n\nApplication\.register[\s\S]*)$/.exec(
       environment,
     );
     if (match) {
       await puts(
-        `${appPath}/config/application.ts`,
+        File.join(appPath, "config/application.ts"),
         environment.slice(0, match.index) + `\n${str}\n` + match[1],
       );
     }
   }
 
   async addToEnvConfig(env: string, str: string): Promise<void> {
-    const file = `${await this.appPath()}/config/environments/${env}.ts`;
+    const file = File.join(await this.appPath(), "config/environments", `${env}.ts`);
     const environment = await getFs().readFile(file, "utf-8");
     const match = /(\n\s*\}\);\s*)$/.exec(environment);
     if (match) {
@@ -272,11 +282,14 @@ export default { development: env("development"), test: env("test"), production:
   }
 
   async removeFromConfig(str: string): Promise<void> {
-    await this.removeFromFile(`${await this.appPath()}/config/application.ts`, str);
+    await this.removeFromFile(File.join(await this.appPath(), "config/application.ts"), str);
   }
 
   async removeFromEnvConfig(env: string, str: string): Promise<void> {
-    await this.removeFromFile(`${await this.appPath()}/config/environments/${env}.ts`, str);
+    await this.removeFromFile(
+      File.join(await this.appPath(), "config/environments", `${env}.ts`),
+      str,
+    );
   }
 
   async removeFromFile(file: string, str: string): Promise<void> {
@@ -300,7 +313,7 @@ export default { development: env("development"), test: env("test"), production:
   }
 
   controller(name: string, contents: string): Promise<string> {
-    return this.appFile(`app/controllers/${name}-controller.ts`, contents);
+    return this.appFile(File.join("app/controllers", `${name}-controller.ts`), contents);
   }
 
   /** @missingRailsCall reject! — PERMANENT */
@@ -322,7 +335,7 @@ export default { development: env("development"), test: env("test"), production:
     const databaseName = `railties_${Process.pid}`;
     if (multiDb) {
       await puts(
-        `${await this.appPath()}/config/database.ts`,
+        File.join(await this.appPath(), "config/database.ts"),
         `const defaults = { adapter: "postgresql", pool: 5 };
 export default {
   development: {
@@ -338,7 +351,7 @@ export default {
       );
     } else {
       await puts(
-        `${await this.appPath()}/config/database.ts`,
+        File.join(await this.appPath(), "config/database.ts"),
         `const defaults = { adapter: "postgresql", pool: 5 };
 export default {
   development: { ...defaults, database: "${databaseName}_development" },
@@ -354,7 +367,7 @@ export default {
     const databaseName = `railties_${Process.pid}`;
     if (multiDb) {
       await puts(
-        `${await this.appPath()}/config/database.ts`,
+        File.join(await this.appPath(), "config/database.ts"),
         `import { env } from "@blazetrails/ruby-compat";
 const defaults = {
   adapter: "mysql2",
@@ -377,7 +390,7 @@ export default {
       );
     } else {
       await puts(
-        `${await this.appPath()}/config/database.ts`,
+        File.join(await this.appPath(), "config/database.ts"),
         `import { env } from "@blazetrails/ruby-compat";
 const defaults = {
   adapter: "mysql2",
@@ -417,7 +430,7 @@ export default async function setup(): Promise<void> {
   } finally {
     Dir.chdir(pwd);
   }
-  await puts(`${appTemplatePath}/config/boot.ts`, `import "@blazetrails/trailties/all";`);
+  await puts(File.join(appTemplatePath, "config/boot.ts"), `import "@blazetrails/trailties/all";`);
 
   await FileUtils.mkdirPAsync(`${appTemplatePath}/app/javascript`);
   await getFs().writeFile!(`${appTemplatePath}/app/javascript/application.js`, "\n");
