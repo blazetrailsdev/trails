@@ -14,7 +14,7 @@ describe("rails/all", () => {
     class AllBootApp extends Application {}
     Application.register(AllBootApp);
     const app = AllBootApp.instance();
-    await app.initialize();
+    await app.initializeBang();
 
     for (const framework of [
       "activeSupport",

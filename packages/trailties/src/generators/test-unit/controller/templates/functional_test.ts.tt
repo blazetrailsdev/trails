@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { <%= this.paths().className %> } from "<%= this.importPrefix() %>app/controllers/<%= this.paths().controllerFile %>.js";
+import { <%= this.className().split("::").join("") %>Controller } from "<%= "../".repeat(this.classPathParts.length + 2) %>app/controllers/<%= [...this.classPathParts, this.fileName].map((part) => ActiveSupport.Inflector.dasherize(part)).join("/") %>-controller.js";
 
-describe("<%= this.paths().displayName %>", () => {
+describe("<%= this.className() %>Controller", () => {
 <% for (const action of this.actions) { -%>
   it("<%= action %>", () => {
     // TODO: test <%= action %> action

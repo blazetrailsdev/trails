@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
-  camelize,
   include,
   type Included,
   pluralize,
@@ -9,7 +8,7 @@ import {
 } from "@blazetrails/activesupport";
 import { GeneratorError } from "../../generated-attribute.js";
 import { ModelHelpers } from "../../model-helpers.js";
-import { format } from "@blazetrails/ruby-compat";
+import { File, format, partition } from "@blazetrails/ruby-compat";
 import {
   dasherize,
   type GeneratorBase,
@@ -20,8 +19,8 @@ import { NamedBase } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import type { GeneratorClass } from "../../../generators.js";
-import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
-import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface ScaffoldControllerGeneratorOptions extends GeneratorOptions, ModelHelpersOptions {
   api?: boolean;
@@ -79,53 +78,39 @@ export class ScaffoldControllerGenerator extends NamedBase {
     ModelHelpers.skipWarn = true;
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-remainder-onto-thor-template */
   async createControllerFiles(): Promise<void> {
-    const { api } = this.options;
-    const modelClassName = this.className().split("::").join("");
-    const singular = this.singularTableName();
-    const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
-    const controllerFileName = dasherize(this.controllerFilePath()) + "-controller";
-    const ext = this.ext();
-    const ts = this.isTypeScript();
-    const attrNames = this.attributes.map((a) => a.name);
-    const modelPath = "../".repeat(this.controllerClassPath().length + 1) + "models/";
-
-    await this.createFile(
-      `app/controllers/${controllerFileName}${ext}`,
-      emitControllerClass({
-        className: controllerClassName,
-        parent: parentRefForRelative(
-          "ApplicationController",
-          this.controllerClassPath().length,
-          this.ext(),
-        ),
-        imports: [
-          {
-            from: `${modelPath}${this.filePath()}${this.ext()}`,
-            named: { [modelClassName]: "named" },
-          },
-        ],
-        staticBlock: api
-          ? tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "update", "destroy"] });`
-          : tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "edit", "update", "destroy"] });`,
-        fields: ts
-          ? [
-              tsField(this.pluralTableName(), `${modelClassName}[]`, { declare: true }),
-              tsField(singular, modelClassName, { declare: true }),
-            ]
-          : [],
-        methods: api
-          ? apiCrudMethods.call(this, modelClassName, attrNames, ts)
-          : crudMethods.call(this, modelClassName, attrNames, ts),
-      }),
+    const templateFile = this.options.api ? "api_controller.ts" : "controller.ts";
+    await this.template(
+      templateFile,
+      File.join(
+        "app/controllers",
+        ...this.controllerClassPath().map((p) => dasherize(p)),
+        `${dasherize(this.controllerFileName)}-controller${this.ext()}`,
+      ),
     );
+  }
+
+  /** @internal */
+  private permittedParams(): string {
+    const [attachments, others] = partition(this.attributesNames(), (name) =>
+      this.isAttachments(name),
+    );
+    const params = others.map((name) => `"${name}"`);
+    params.push(...attachments.map((name) => `{ ${name}: [] }`));
+    return params.join(", ");
+  }
+
+  /** @internal */
+  private isAttachments(name: string): boolean | undefined {
+    const attribute = this.attributes.find((attr) => attr.name === name);
+    return attribute?.attachments();
   }
 }
 
 Object.defineProperty(ScaffoldControllerGenerator, "name", {
   value: "Rails::Generators::ScaffoldControllerGenerator",
 });
+void ScaffoldControllerGenerator.sourceRoot(File.expandPath("templates", __dir__));
 include(ScaffoldControllerGenerator, ResourceHelpers);
 ScaffoldControllerGenerator.checkClassCollision({ suffix: "Controller" });
 ScaffoldControllerGenerator.classOption("helper", { type: "boolean" });
@@ -172,113 +157,3 @@ ScaffoldControllerGenerator.hookFor(
     return this.invoke(invoked, [(this as ScaffoldControllerGenerator).controllerName]);
   },
 );
-
-function mk(name: string, body: string, ts: boolean): Method {
-  return tsMethod({
-    name,
-    params: [],
-    async: true,
-    returnType: ts ? "Promise<void>" : undefined,
-    body: tsBody`${body}`,
-  });
-}
-
-function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
-  const returnType = ts && attrs.length === 0 ? "Record<string, unknown>" : undefined;
-  const cast = returnType ? ` as ${returnType}` : "";
-  const list =
-    attrs.length === 0
-      ? `return this.params.fetch("${singular}", {})${cast};`
-      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
-  return tsMethod({
-    name: `${camelize(singular, false)}Params`,
-    visibility: "private",
-    params: [],
-    returnType,
-    body: tsBody`${list}`,
-  });
-}
-
-function crudMethods(
-  this: ScaffoldControllerGenerator,
-  model: string,
-  attrs: string[],
-  ts: boolean,
-): Method[] {
-  const ormClass = this.ormClass();
-  const ormInstance = this.ormInstance();
-  const singular = this.singularTableName();
-  const humanName = this.humanName();
-  const params = `this.${camelize(singular, false)}Params()`;
-  return [
-    mk("index", `this.${this.pluralTableName()} = await ${ormClass.all(model)};`, ts),
-    mk("show", "", ts),
-    mk("new", `this.${singular} = ${ormClass.build(model)};`, ts),
-    mk("edit", "", ts),
-    mk(
-      "create",
-      `this.${singular} = ${ormClass.build(model, params)};\n\nif (await this.${ormInstance.save()}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render("new", { status: "unprocessable_entity" });\n}`,
-      ts,
-    ),
-    mk(
-      "update",
-      `if (await this.${ormInstance.update(params)}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render("edit", { status: "unprocessable_entity" });\n}`,
-      ts,
-    ),
-    mk(
-      "destroy",
-      `await this.${ormInstance.destroy()};\nthis.redirectTo(this.${this.indexHelper()}Path(), { notice: "${humanName} was successfully destroyed.", status: "see_other" });`,
-      ts,
-    ),
-    {
-      ...mk(
-        `set${camelize(singular)}`,
-        `this.${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`,
-        ts,
-      ),
-      visibility: "private",
-    },
-    paramsMethod(singular, attrs, ts),
-  ];
-}
-
-function apiCrudMethods(
-  this: ScaffoldControllerGenerator,
-  model: string,
-  attrs: string[],
-  ts: boolean,
-): Method[] {
-  const ormClass = this.ormClass();
-  const ormInstance = this.ormInstance();
-  const singular = this.singularTableName();
-  const plural = this.pluralTableName();
-  const params = `this.${camelize(singular, false)}Params()`;
-  return [
-    mk(
-      "index",
-      `this.${plural} = await ${ormClass.all(model)};\n\nawait this.render({ json: this.${plural} });`,
-      ts,
-    ),
-    mk("show", `await this.render({ json: this.${singular} });`, ts),
-    mk(
-      "create",
-      `this.${singular} = ${ormClass.build(model, params)};\n\nif (await this.${ormInstance.save()}) {\n  await this.render({ json: this.${singular}, status: "created", location: this.${singular} });\n} else {\n  await this.render({ json: this.${ormInstance.errors()}, status: "unprocessable_entity" });\n}`,
-      ts,
-    ),
-    mk(
-      "update",
-      `if (await this.${ormInstance.update(params)}) {\n  await this.render({ json: this.${singular} });\n} else {\n  await this.render({ json: this.${ormInstance.errors()}, status: "unprocessable_entity" });\n}`,
-      ts,
-    ),
-    mk("destroy", `await this.${ormInstance.destroy()};`, ts),
-    {
-      ...mk(
-        `set${camelize(singular)}`,
-        `this.${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`,
-        ts,
-      ),
-      visibility: "private",
-    },
-    paramsMethod(singular, attrs, ts),
-  ];
-}

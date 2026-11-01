@@ -22,9 +22,10 @@ import * as m19 from "./paths.js";
 import * as m20 from "./pwa-controller.js";
 import * as m21 from "./rack/logger.js";
 import * as m22 from "./rack/silence-request.js";
-import * as m23 from "./trailtie.js";
-import * as m24 from "./trailtie/configuration.js";
-import * as m25 from "./welcome-controller.js";
+import * as m23 from "./source-annotation-extractor.js";
+import * as m24 from "./trailtie.js";
+import * as m25 from "./trailtie/configuration.js";
+import * as m26 from "./welcome-controller.js";
 
 registerClassPaths([
   [() => m1.Application, "Rails::Application"],
@@ -54,8 +55,10 @@ registerClassPaths([
   [() => m20.PwaController, "Rails::PwaController"],
   [() => m21.Logger, "Rails::Rack::Logger"],
   [() => m22.SilenceRequest, "Rails::Rack::SilenceRequest"],
-  [() => m23.Trailtie, "Rails::Trailtie"],
-  [() => m24.Configuration, "Rails::Trailtie::Configuration"],
+  [() => m23.SourceAnnotationExtractor, "Rails::SourceAnnotationExtractor"],
+  [() => m23.Annotation, "Rails::SourceAnnotationExtractor::Annotation"],
+  [() => m24.Trailtie, "Rails::Trailtie"],
+  [() => m25.Configuration, "Rails::Trailtie::Configuration"],
   [() => m14.VERSION, "Rails::VERSION"],
-  [() => m25.WelcomeController, "Rails::WelcomeController"],
+  [() => m26.WelcomeController, "Rails::WelcomeController"],
 ]);

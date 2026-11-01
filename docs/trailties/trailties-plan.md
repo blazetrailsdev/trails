@@ -415,7 +415,7 @@ Non-blocking; bundle into boot-chain PRs when ceiling permits.
 - **Primary signal:** `bash scripts/api-compare/run.sh --package trailties`.
   Target: all boot-chain files at 100%.
 - **Final acceptance:** integration test passes — hello-world fixture imports
-  `Trails`, calls `await Trails.application.initialize()`, serves a route
+  `Trails`, calls `await Trails.application.initializeBang()`, serves a route
   through `actionpack`.
 
 ## Conventions for amending this doc

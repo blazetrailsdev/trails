@@ -92,7 +92,7 @@ export class Trails {
     const app = Trails.application;
     if (!app)
       throw new Error("Trails.application is not set — register an Application subclass first.");
-    return app.initialize(group);
+    return app.initializeBang(group);
   }
 
   static initialized(): boolean {

@@ -35,8 +35,20 @@ export class Root {
     return this._entries.get(path);
   }
 
+  values(): Path[] {
+    return [...this._entries.values()];
+  }
+
+  keys(): string[] {
+    return [...this._entries.keys()];
+  }
+
+  valuesAt(...list: string[]): Array<Path | undefined> {
+    return list.map((key) => this._entries.get(key));
+  }
+
   allPaths(): Path[] {
-    return Array.from(new Set(this._entries.values()));
+    return Array.from(new Set(this.values()));
   }
 
   autoloadOnce(): Promise<string[]> {
@@ -98,15 +110,23 @@ export class Path {
     else this.skipLoadPathBang();
   }
 
+  absoluteCurrent(): string {
+    return File.expandPath(this._current, this._root.path!);
+  }
+
   children(): Path[] {
-    return [...this._root._entries.keys()]
-      .filter((k) => k.startsWith(this._current) && k !== this._current)
-      .sort()
-      .map((k) => this._root._entries.get(k)!);
+    const keys = this._root
+      .keys()
+      .filter((k) => k.startsWith(this._current) && k !== this._current);
+    return this._root.valuesAt(...keys.sort()) as Path[];
   }
 
   async first(): Promise<string | undefined> {
     return (await this.expanded())[0];
+  }
+
+  async last(): Promise<string | undefined> {
+    return (await this.expanded()).at(-1);
   }
 
   /** @noRailsEquivalent CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
@@ -156,9 +176,24 @@ export class Path {
     return this._loadPath;
   }
 
+  each(block: (path: string) => void): void {
+    this._paths.forEach((path) => block(path));
+  }
+
   push(path: string): void {
     this._paths.push(path);
   }
+
+  concat(paths: string[]): string[] {
+    this._paths.push(...paths);
+    return this._paths;
+  }
+
+  unshift(...paths: string[]): string[] {
+    this._paths.unshift(...paths);
+    return this._paths;
+  }
+
   toAry(): string[] {
     return this._paths;
   }
@@ -166,20 +201,22 @@ export class Path {
     return this.expanded();
   }
 
+  extensions(): string[] | undefined {
+    return this.glob?.match(/\{([\S]+)\}/)?.[1].split(",");
+  }
+
   async expanded(): Promise<string[]> {
     if (this._root.path === null) throw new Error("You need to set a path root");
-    const out: string[] = [];
+    const result: string[] = [];
     for (const raw of this._paths) {
-      const abs = File.expandPath(raw, this._root.path);
-      if (this.glob && File.isDirectory(abs)) {
-        let files = await fsGlob(this.glob, { cwd: abs });
-        if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
-        out.push(...files.map((f) => File.join(abs, f)).sort());
+      const path = File.expandPath(raw, this._root.path);
+      if (this.glob && File.isDirectory(path)) {
+        result.push(...(await this.filesIn(path)));
       } else {
-        out.push(abs);
+        result.push(path);
       }
     }
-    return Array.from(new Set(out));
+    return Array.from(new Set(result));
   }
 
   async existent(): Promise<string[]> {
@@ -197,5 +234,12 @@ export class Path {
     const out: string[] = [];
     for (const f of await this.expanded()) if (File.isDirectory(f)) out.push(f);
     return out;
+  }
+
+  /** @internal */
+  private async filesIn(path: string): Promise<string[]> {
+    let files = await fsGlob(this.glob!, { cwd: path });
+    if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
+    return files.map((file) => File.join(path, file)).sort();
   }
 }

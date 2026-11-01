@@ -73,6 +73,10 @@ export class Collection extends Array<Initializer> {
     return new Collection(...this, ...other);
   }
 
+  tsortEachNode(block: (initializer: Initializer) => void): void {
+    this.forEach((initializer) => block(initializer));
+  }
+
   tsortEachChild(initializer: Initializer): Initializer[] {
     return this.filter((i) => i.before === initializer.name || i.name === initializer.after);
   }
@@ -90,7 +94,7 @@ export class Collection extends Array<Initializer> {
       visited.add(n);
       out.push(n);
     };
-    for (const n of this) visit(n);
+    this.tsortEachNode(visit);
     return out;
   }
 }

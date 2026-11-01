@@ -3,6 +3,9 @@ import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
 export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 export interface DevcontainerGeneratorOptions extends GeneratorOptions {
   appName?: string;
@@ -17,8 +20,6 @@ export interface DevcontainerGeneratorOptions extends GeneratorOptions {
   nodeVersion?: string;
 }
 
-type JsonObject = { [k: string]: JsonValue };
-type JsonValue = string | number | boolean | null | JsonValue[] | JsonObject;
 type ResolvedOptions = Required<Omit<DevcontainerGeneratorOptions, keyof GeneratorOptions>>;
 
 export class DevcontainerGenerator extends GeneratorBase {
@@ -66,6 +67,9 @@ export class DevcontainerGenerator extends GeneratorBase {
       desc: "Skip Solid Cache, Queue, and Cable setup",
     });
 
+    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourcePaths().push(File.expandPath("../app/templates", __dir__));
+
     this.methodAdded("createDevcontainer");
     this.methodAdded("updateApplicationSystemTestCase");
     this.methodAdded("updateDatabaseYml");
@@ -74,7 +78,11 @@ export class DevcontainerGenerator extends GeneratorBase {
   declare options: DevcontainerGeneratorOptions;
   readonly opts: ResolvedOptions;
   private _dependencies?: string[];
+  private _containerEnv?: Record<string, string>;
   private _volumes?: string[];
+  private _features?: Record<string, object>;
+  private _mounts?: Record<string, string>[];
+  private _forwardPorts?: number[];
   /** @internal */
   readonly database: Database;
 
@@ -99,137 +107,41 @@ export class DevcontainerGenerator extends GeneratorBase {
     this.database = Database.build(database);
   }
 
-  /**
-   * @missingRailsCall empty_directory — CONVERGEABLE converge-generators-remainder-onto-thor-template
-   * @missingRailsCall template — CONVERGEABLE converge-generators-remainder-onto-thor-template
-   */
   async createDevcontainer(): Promise<void> {
-    await this.createFile(".devcontainer/devcontainer.json", this.devcontainerJson());
-    await this.createFile(".devcontainer/Dockerfile", this.dockerfileContent());
-    await this.createFile(".devcontainer/compose.yaml", this.composeYaml());
+    await this.emptyDirectory(".devcontainer");
+
+    await this.template("devcontainer/devcontainer.json", ".devcontainer/devcontainer.json");
+    await this.template("devcontainer/Dockerfile", ".devcontainer/Dockerfile");
+    await this.template("devcontainer/compose.yaml", ".devcontainer/compose.yaml");
   }
 
-  updateApplicationSystemTestCase(): void {
-    this.gsubFile(
+  /** @missingRailsArgs expand_path — PERMANENT */
+  async updateApplicationSystemTestCase(): Promise<void> {
+    if (!this.options.systemTest) return;
+
+    const systemTestCasePath = File.expandPath(
       "test/application_system_test_case.ts",
-      /^\s*drivenBy\b.*$/m,
-      this.systemTestConfiguration(),
-      this.opts.systemTest,
+      this.destinationRoot,
     );
+    if (!File.isExist(systemTestCasePath)) return;
+
+    await this.gsubFile(systemTestCasePath, /^\s*drivenBy\b.*/gm, this.systemTestConfiguration());
   }
 
-  /** @missingRailsCall template — CONVERGEABLE converge-generators-remainder-onto-thor-template */
-  updateDatabaseYml(): void {
-    this.gsubFile(
-      "config/database.ts",
-      /host:\s*"localhost"/g,
-      'host: process.env.DB_HOST ?? "localhost"',
-      this.opts.database !== "sqlite3",
-    );
+  async updateDatabaseYml(): Promise<void> {
+    if (this.options.database !== "postgresql") return;
+
+    await this.template(`config/databases/${this.options.database}.yml`, "config/database.ts");
   }
 
-  private gsubFile(rel: string, re: RegExp, replacement: string, enabled: boolean): void {
-    if (!enabled || !File.isExist(File.join(this.destinationRoot, rel))) return;
-    const full = File.join(this.destinationRoot, rel);
-    File.write(full, File.read(full).replace(re, replacement));
-    this.sayStatus("update", rel);
+  /** @internal */
+  private isDevcontainer(): boolean {
+    return true;
   }
 
-  private dockerfileContent(): string {
-    return [
-      `ARG NODE_VERSION=${this.opts.nodeVersion}`,
-      "FROM mcr.microsoft.com/devcontainers/javascript-node:1-${NODE_VERSION}",
-      "",
-    ].join("\n");
-  }
-
-  private devcontainerJson(): string {
-    const { appName, dev, systemTest, redis, activeStorage, node, kamal } = this.opts;
-    const features: JsonObject = { "ghcr.io/devcontainers/features/github-cli:1": {} };
-    if (activeStorage) features["ghcr.io/rails/devcontainer/features/activestorage"] = {};
-    if (node) features["ghcr.io/devcontainers/features/node:1"] = {};
-    if (kamal) features["ghcr.io/devcontainers/features/docker-outside-of-docker:1"] = {};
-    const includeDb =
-      this.opts.database !== "sqlite3" || this.opts.sqliteDriver === "better-sqlite3";
-    if (this.database.feature && includeDb) Object.assign(features, this.database.feature);
-
-    const env: Record<string, string> = {};
-    if (systemTest)
-      Object.assign(env, { TRAILS_SYSTEM_TESTING_SERVER_PORT: "45678", SELENIUM_HOST: "selenium" });
-    if (redis) env.REDIS_URL = "redis://redis:6379/1";
-    if (kamal) env.KAMAL_REGISTRY_PASSWORD = "$KAMAL_REGISTRY_PASSWORD";
-    if (this.database.service) env.DB_HOST = this.database.name;
-    const ports: number[] = [3000];
-    if (this.database.port) ports.push(this.database.port);
-    if (redis) ports.push(6379);
-    const json: JsonObject = {
-      name: appName,
-      dockerComposeFile: "compose.yaml",
-      service: "rails-app",
-      workspaceFolder: "/workspaces/${localWorkspaceFolderBasename}",
-      features,
-    };
-    if (Object.keys(env).length > 0) json.containerEnv = env;
-    json.forwardPorts = ports;
-    if (dev)
-      json.mounts = [
-        { type: "bind", source: Generators.RAILS_DEV_PATH, target: Generators.RAILS_DEV_PATH },
-      ];
-    json.postCreateCommand = "bin/setup --skip-server";
-    return JSON.stringify(json, null, 2) + "\n";
-  }
-
-  private composeYaml(): string {
-    const { appName, systemTest, redis } = this.opts;
-    const dependencies = this.dependencies();
-    const volumes = this.volumes();
-    let out = `name: "${appName}"
-
-services:
-  rails-app:
-    build:
-      context: ..
-      dockerfile: .devcontainer/Dockerfile
-
-    volumes:
-    - ../..:/workspaces:cached
-
-    # Overrides default command so things don't shut down after the process ends.
-    command: sleep infinity
-
-    # Uncomment the next line to use a non-root user for all processes.
-    # user: vscode
-
-    # Use "forwardPorts" in **devcontainer.json** to forward an app port locally.
-    # (Adding the "ports" property to this file will not forward from a Codespace.)
-`;
-    if (dependencies.length > 0) {
-      out += "    depends_on:\n";
-      for (const dependency of dependencies) out += `    - ${dependency}\n`;
-    }
-    if (systemTest) {
-      out += `
-  selenium:
-    image: selenium/standalone-chromium
-    restart: unless-stopped
-`;
-    }
-    out += "\n";
-    if (redis) {
-      out += `  redis:
-    image: redis:7.2
-    restart: unless-stopped
-    volumes:
-    - redis-data:/data
-
-`;
-    }
-    out += `  ${this.devcontainerDbServiceYaml({ indentation: 4 }) ?? ""}\n`;
-    if (volumes.length > 0) {
-      out += "volumes:\n";
-      for (const volume of volumes) out += `  ${volume}:\n`;
-    }
-    return out;
+  /** @internal */
+  private appName(): string {
+    return this.options.appName!;
   }
 
   private dependencies(): string[] {
@@ -244,6 +156,21 @@ services:
     return this._dependencies;
   }
 
+  private containerEnv(): Record<string, string> {
+    if (this._containerEnv) return this._containerEnv;
+
+    this._containerEnv = {};
+
+    const options = this.options;
+    if (options.systemTest) this._containerEnv.TRAILS_SYSTEM_TESTING_SERVER_PORT = "45678";
+    if (options.systemTest) this._containerEnv.SELENIUM_HOST = "selenium";
+    if (options.redis) this._containerEnv.REDIS_URL = "redis://redis:6379/1";
+    if (options.kamal) this._containerEnv.KAMAL_REGISTRY_PASSWORD = "$KAMAL_REGISTRY_PASSWORD";
+    if (this.database.service) this._containerEnv.DB_HOST = this.database.name;
+
+    return this._containerEnv;
+  }
+
   private volumes(): string[] {
     if (this._volumes) return this._volumes;
 
@@ -256,6 +183,45 @@ services:
     return this._volumes;
   }
 
+  private features(): Record<string, object> {
+    if (this._features) return this._features;
+
+    this._features = { "ghcr.io/devcontainers/features/github-cli:1": {} };
+
+    const options = this.options;
+    if (options.activeStorage)
+      this._features["ghcr.io/rails/devcontainer/features/activestorage"] = {};
+    if (options.node) this._features["ghcr.io/devcontainers/features/node:1"] = {};
+    if (options.kamal)
+      this._features["ghcr.io/devcontainers/features/docker-outside-of-docker:1"] = {};
+
+    const includeDb =
+      this.opts.database !== "sqlite3" || this.opts.sqliteDriver === "better-sqlite3";
+    if (this.database.feature && includeDb) Object.assign(this._features, this.database.feature);
+
+    return this._features;
+  }
+
+  private mounts(): Record<string, string>[] {
+    if (this._mounts) return this._mounts;
+
+    this._mounts = [];
+
+    if (this.options.dev) this._mounts.push(this.localRailsMount());
+
+    return this._mounts;
+  }
+
+  private forwardPorts(): number[] {
+    if (this._forwardPorts) return this._forwardPorts;
+
+    this._forwardPorts = [3000];
+    if (this.database.port) this._forwardPorts.push(this.database.port);
+    if (this.options.redis) this._forwardPorts.push(6379);
+
+    return this._forwardPorts;
+  }
+
   private devcontainerDbServiceYaml(
     options: Parameters<typeof toYaml>[1] = {},
   ): string | undefined {
@@ -263,6 +229,14 @@ services:
     if (!service) return;
 
     return toYaml({ [this.database.name]: service }, options).slice(4);
+  }
+
+  private localRailsMount(): Record<string, string> {
+    return {
+      type: "bind",
+      source: Generators.RAILS_DEV_PATH,
+      target: Generators.RAILS_DEV_PATH,
+    };
   }
 
   private systemTestConfiguration(): string {

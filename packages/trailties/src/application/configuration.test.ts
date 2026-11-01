@@ -196,7 +196,7 @@ describe("ConfigurationTest", () => {
   it("config.action_view.cache_template_loading with config.enable_reloading default", async () => {
     const application = await app("development");
     application.config.enableReloading = false;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(true);
@@ -205,7 +205,7 @@ describe("ConfigurationTest", () => {
   it("config.action_view.cache_template_loading without config.enable_reloading default", async () => {
     const application = await app("development");
     application.config.enableReloading = true;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(false);
@@ -215,7 +215,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.enableReloading = false;
     application.config.actionView.cacheTemplateLoading = false;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(false);
@@ -225,7 +225,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.enableReloading = true;
     application.config.actionView.cacheTemplateLoading = true;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(true);
@@ -279,7 +279,7 @@ describe("ConfigurationTest", () => {
   it("sanitizer_vendor is set to best supported vendor in new apps", async () => {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(HTML.Sanitizer.bestSupportedVendor());
   });
@@ -287,7 +287,7 @@ describe("ConfigurationTest", () => {
   it("sanitizer_vendor is set to HTML4 in upgraded apps", async () => {
     const application = await app("development");
     application.config.loadDefaults("7.0");
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(HTML4.Sanitizer);
   });
@@ -301,7 +301,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
     application.config.actionView.sanitizerVendor = MySanitizerVendor;
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(MySanitizerVendor);
   });
@@ -337,7 +337,7 @@ describe("ConfigurationTest", () => {
   it("ActionCable.server.config.cable is set when missing configuration for the current environment", async () => {
     await writeFile(join(appPath, "config", "cable.ts"), "export default { test: {} };\n");
     const application = await app("missing");
-    await application.initialize();
+    await application.initializeBang();
 
     expect((ActionCable.server() as CableServer).config.cable).toBeInstanceOf(Object);
   });

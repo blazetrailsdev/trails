@@ -37,9 +37,9 @@ from `ruby_opts_string` to behind the `:rake` loader in `run_code`, and
 `rake-test-loader.ts` does what Ruby's `-I` does (`vendor/ruby/v3.3.11/ruby.c`,
 `proc_options`): it expands each entry onto the front of `LOAD_PATH` before any test file
 loads. `rbFRequireFile` reads `LOAD_PATH`; a plain ES import does not. The
-`:direct` and `:testrb` loaders run no trails code, so they take no `-I`. The `:direct` loader's `-e` program is the
-JS spelling of Ruby's, and `:testrb` stays Rake's string, since `testrb` has no
-Node counterpart. The default `pattern` keeps `test/test*.rb`.
+`:direct` loader's `-e` program is the JS spelling of Ruby's, preceded by the
+same `LOAD_PATH` unshift on the test process's ruby-compat, and `:testrb` stays
+Rake's string and takes no `-I`, since `testrb` has no Node counterpart. The default `pattern` keeps `test/test*.rb`.
 
 `file_list`'s `@test_files.to_a` (`testtask.rb:134-145`) keeps an
 `Array.isArray` arm: a JS Array answers no `toA`, a `FileList`'s is async

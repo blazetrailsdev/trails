@@ -22,7 +22,7 @@ export async function loadEnvironmentConfigBang(this: {
   requireApplicationBang(): Promise<void>;
 }): Promise<void> {
   await this.requireApplicationBang();
-  if (APP_PATH != null) await Trails.application!.initialize("_");
+  if (APP_PATH != null) await Trails.application!.initializeBang("_");
 }
 
 /** @missingRailsCall find — CONVERGEABLE generators-configure-bang-api-only-no-color-fallbacks-templates */

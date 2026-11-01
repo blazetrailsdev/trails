@@ -2,7 +2,6 @@ import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { NamedBase } from "../../named-base.js";
-import { controllerPathHelpers, parentRefForRelative } from "./controller-paths.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -73,22 +72,6 @@ export class ControllerGenerator extends NamedBase {
   /** @internal */
   private parentClassName(): string {
     return this.options.parent!;
-  }
-
-  private parentRef() {
-    return parentRefForRelative(this.parentClassName(), this.classPathParts.length, this.ext());
-  }
-
-  private parentClass(): string {
-    return Object.keys(this.parentRef().import.named!)[0];
-  }
-
-  private parentPath(): string {
-    return this.parentRef().import.from;
-  }
-
-  private controllerClassName(): string {
-    return controllerPathHelpers(this.name).className;
   }
 
   /** @internal */

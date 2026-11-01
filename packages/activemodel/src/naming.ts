@@ -12,6 +12,7 @@ import {
   moduleParents,
 } from "@blazetrails/activesupport";
 import {
+  isClassPathPending,
   rbModName,
   rbObjNotMatch,
   rbObjRespondTo,
@@ -33,7 +34,9 @@ function modelName(this: NamingHost): ModelName {
       ).isUseRelativeModelNaming();
       return relative != null && relative !== false;
     });
-    this._modelName = new ModelName(this as unknown as ModelLike, namespace ?? null);
+    const name = new ModelName(this as unknown as ModelLike, namespace ?? null);
+    if (isClassPathPending(this)) return name;
+    this._modelName = name;
   }
   return this._modelName;
 }

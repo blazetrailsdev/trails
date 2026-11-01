@@ -27,7 +27,7 @@ describe("Application framework railtie initializers", () => {
     class RailtieBridgeApp extends Application {}
     Application.register(RailtieBridgeApp);
     const app = RailtieBridgeApp.instance();
-    await app.initialize();
+    await app.initializeBang();
 
     expect(seen).toEqual([app]);
   });
@@ -50,7 +50,7 @@ describe("Application framework railtie initializers", () => {
     class ConfigBridgeApp extends Application {}
     Application.register(ConfigBridgeApp);
     const app = ConfigBridgeApp.instance();
-    await app.initialize();
+    await app.initializeBang();
 
     expect(seen).toEqual([app.root, ["a"]]);
   });
@@ -73,7 +73,7 @@ describe("Application framework railtie initializers", () => {
     Application.register(OrderedBridgeApp);
     const app = OrderedBridgeApp.instance();
     app.config.railtiesOrder = [":all", ":main_app"];
-    await app.initialize();
+    await app.initializeBang();
 
     expect(ran).toEqual(["app", "framework"]);
   });
@@ -84,7 +84,7 @@ describe("Application framework railtie initializers", () => {
     class ActiveRecordBootApp extends Application {}
     Application.register(ActiveRecordBootApp);
     const app = ActiveRecordBootApp.instance();
-    await app.initialize();
+    await app.initializeBang();
 
     expect(app.deprecators.get("activeRecord")).toBeDefined();
   });
@@ -93,7 +93,7 @@ describe("Application framework railtie initializers", () => {
     class FirstDeprecatorApp extends Application {}
     Application.register(FirstDeprecatorApp);
     const first = FirstDeprecatorApp.instance();
-    await first.initialize();
+    await first.initializeBang();
 
     class SecondDeprecatorApp extends Application {}
     Application.register(SecondDeprecatorApp);
@@ -228,5 +228,18 @@ describe("Application server blocks", () => {
     });
     await app.loadServer();
     expect(ran).toEqual(["railtie", "application"]);
+  });
+});
+
+describe("Application#messageVerifiers", () => {
+  it("derives a rotation from its secretKeyBase keyword", () => {
+    class RotationApp extends Application {}
+    const app = new RotationApp();
+    app.config.secretKeyBase = "new";
+    const old = new (class extends Application {})();
+    old.config.secretKeyBase = "old";
+    const token = old.messageVerifiers().get("salt").generate("message");
+    app.messageVerifiers().rotate({ secretKeyBase: "old" });
+    expect(app.messageVerifier("salt").verified(token)).toBe("message");
   });
 });

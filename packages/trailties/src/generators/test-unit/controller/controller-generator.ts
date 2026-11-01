@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
+import { dasherize } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { controllerPathHelpers } from "../../rails/controller/controller-paths.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -21,17 +21,12 @@ export class ControllerGenerator extends NamedBase {
   async createTestFiles(): Promise<void> {
     await this.template(
       "functional_test.ts",
-      `test/controllers/${this.paths().controllerFile}.test${this.ext()}`,
+      File.join(
+        "test/controllers",
+        ...this.classPathParts.map((p) => dasherize(p)),
+        `${dasherize(this.fileName)}-controller.test${this.ext()}`,
+      ),
     );
-  }
-
-  private paths() {
-    return controllerPathHelpers(this.name);
-  }
-
-  private importPrefix(): string {
-    const { namespaceParts } = this.paths();
-    return "../".repeat((namespaceParts.length > 1 ? namespaceParts.length - 1 : 0) + 2);
   }
 }
 

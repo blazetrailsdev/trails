@@ -196,8 +196,28 @@ describe("AppGenerator", () => {
     });
   });
 
+  it("implied options with conflicting option", async () => {
+    await expect(
+      makeGen("sqlite", { skipActiveJob: true, skipActiveStorage: false }).invokeAll(),
+    ).rejects.toThrow(/conflicting option/i);
+  });
+
+  it("--api implies its options and a default run reports nothing", async () => {
+    const api = new AppGenerator(["my-app"], { api: true }, { destinationRoot: tmpDir });
+    expect(api.options.skipAssetPipeline).toBe(true);
+    expect(api.options.skipJavascript).toBe(true);
+    makeGen().reportImpliedOptions();
+    expect(lines.join("\n")).not.toMatch(/will also be activated/);
+    const minimal = new AppGenerator(
+      ["my-app"],
+      { minimal: true, skipActionText: false },
+      { destinationRoot: tmpDir },
+    );
+    expect(() => minimal.reportImpliedOptions()).not.toThrow();
+  });
+
   it("skip active job option", async () => {
-    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).invokeAll();
+    await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
 
     for (const env of ["production", "development", "test"]) {
       await assertFile(`my-app/config/environments/${env}.ts`, (content) => {

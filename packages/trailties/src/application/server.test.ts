@@ -1,12 +1,15 @@
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
-import { env, setEnv, StringIO } from "@blazetrails/ruby-compat";
+import { Dir, env, setEnv, StringIO } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rack";
 import { Trails } from "../rails.js";
 import { Application } from "../application.js";
 import { assertOutput } from "../support/console-helpers.js";
 
-vi.mock("../command/actions.js", () => ({ requireApplicationBang: async () => {} }));
+vi.mock("../command/actions.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../command/actions.js")>()),
+  requireApplicationBang: async () => {},
+}));
 vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
 const output = vi.hoisted(() => [] as string[]);
 vi.mock("../server/dev-server.js", () => ({
@@ -17,7 +20,7 @@ vi.mock("../server/dev-server.js", () => ({
   },
 }));
 
-const { serverCommand } = await import("../commands/server.js");
+const { ServerCommand } = await import("../commands/server.js");
 
 describe("ServerTest", () => {
   let app: Application;
@@ -47,10 +50,11 @@ describe("ServerTest", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(Handler.Node, "run").mockImplementation((async () => {
       output.push("Listening");
-      return { address: () => null };
+      return { on() {} };
     }) as never);
 
-    await serverCommand().parseAsync(["-b", "localhost"], { from: "user" });
+    vi.spyOn(Trails, "root").mockReturnValue(Dir.mktmpdir());
+    await ServerCommand.perform("server", ["-b", "localhost"], {});
 
     const primary = new StringIO(output.join("\n"));
     assertOutput("Hello world", primary, 100);

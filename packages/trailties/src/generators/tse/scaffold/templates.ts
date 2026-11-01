@@ -110,7 +110,8 @@ ${this.attributes
   .map((attribute) => {
     let body: string;
     if (attribute.attachment()) {
-      body = `    <%= ${singularName}.${attribute.columnName()}.isAttached() ? linkTo(${singularName}.${attribute.columnName()}.filename, ${singularName}.${attribute.columnName()}) : null %>
+      body = `    <% await (await ${singularName}.${attribute.columnName()}.attachment)?.blob; %>
+    <%= ${singularName}.${attribute.columnName()}.isAttached() ? linkTo(${singularName}.${attribute.columnName()}.filename, ${singularName}.${attribute.columnName()}) : null %>
 `;
     } else if (attribute.attachments()) {
       body = `    <% for (const ${attribute.singularName()} of ${singularName}.${attribute.columnName()}) { %>

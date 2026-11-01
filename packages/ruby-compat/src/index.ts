@@ -13,6 +13,7 @@ export {
   classPathMismatches,
   generatedClass,
   generatedClassPath,
+  isClassPathPending,
   registerClassPaths,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";

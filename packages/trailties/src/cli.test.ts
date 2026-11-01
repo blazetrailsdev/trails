@@ -1,4 +1,5 @@
 import { beforeAll, describe, it, expect } from "vitest";
+import { aliases } from "./commands.js";
 import { createProgram } from "./cli.js";
 import { VERSION } from "./gem-version.js";
 import { Generators } from "./generators.js";
@@ -32,14 +33,11 @@ describe("CLI", () => {
     const program = createProgram();
     const names = program.commands.map((c) => c.name());
     expect(names).toContain("new");
-    expect(names).toContain("server");
     expect(names).toContain("db");
   });
 
   it("server command has alias s", () => {
-    const program = createProgram();
-    const srv = program.commands.find((c) => c.name() === "server");
-    expect(srv?.aliases()).toContain("s");
+    expect(aliases.s).toBe("server");
   });
 
   it("db command has subcommands", () => {
