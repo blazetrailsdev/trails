@@ -61,7 +61,7 @@ export class Configuration extends EngineConfiguration {
   filterRedirect: Array<string | RegExp> = [];
   precompileFilterParameters: boolean | null = null;
   helpersPaths: string[] = [];
-  hosts: Array<string | RegExp> = [];
+  hosts: Array<string | RegExp | ((host: string) => boolean)> = [];
   hostAuthorization: Record<string, unknown> = {};
   publicFileServer: PublicFileServer = { enabled: true, indexName: "index", headers: null };
   assumeSsl = false;

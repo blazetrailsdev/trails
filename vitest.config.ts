@@ -118,6 +118,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/core-ext/numeric/bytes.ts",
   ),
+  "@blazetrails/activesupport/testing/isolation": path.resolve(
+    __dirname,
+    "packages/activesupport/src/testing/isolation.ts",
+  ),
   "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
     __dirname,
     "packages/activesupport/src/testing/file-fixtures.ts",
@@ -691,6 +695,7 @@ export default defineConfig({
           exclude: SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/src/test-helpers/build-templates.ts",
+            "./packages/trailties/src/test-helpers/isolation/abstract-unit.ts",
             "./packages/solid-cable/src/test-helpers/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
