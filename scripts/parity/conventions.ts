@@ -999,6 +999,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "callbacks. The port reads TypeScript through the compiler API in the " +
       "Prism arm's `ranges`, so no Ripper event exists to handle.",
     names: [
+      "initialize",
       "parse",
       "on_def",
       "on_method_add_block",

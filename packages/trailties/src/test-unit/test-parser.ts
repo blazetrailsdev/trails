@@ -19,11 +19,7 @@ export class TestParser {
     return [filepath, new Range(startLine, endLine)];
   }
 
-  /**
-   * @internal
-   * @missingRailsCall parse_file — PERMANENT
-   * @missingRailsCall compact_child_nodes — PERMANENT
-   */
+  /** @internal */
   static async ranges(filepath: string): Promise<Record<number, number>> {
     api ??= new API();
     const sourceFile = api.createSourceFile(filepath, await getFs().readFile(filepath, "utf8"));
