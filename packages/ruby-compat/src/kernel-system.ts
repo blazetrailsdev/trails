@@ -71,7 +71,7 @@ export async function rbFSystem(
   }
 }
 
-/** @inventedArm throw — CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern */
+/** @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code */
 function rbSyserrFailStr(error: Error | undefined, mesg: string): never {
   const code = (error as { code?: string } | undefined)?.code;
   const klass = Errno[code as keyof typeof Errno];
