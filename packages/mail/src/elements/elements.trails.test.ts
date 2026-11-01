@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Address } from "./address.js";
 import { ContentDispositionElement } from "./content-disposition-element.js";
 import { ContentLocationElement } from "./content-location-element.js";
 import { ContentTransferEncodingElement } from "./content-transfer-encoding-element.js";
@@ -10,6 +11,12 @@ import { MimeVersionElement } from "./mime-version-element.js";
 import { ReceivedElement } from "./received-element.js";
 
 describe("elements with no spec of their own", () => {
+  it("inspects an address with its class, object id and formatted value", () => {
+    expect(new Address("Mikel <test@lindsaar.net>").inspect()).toMatch(
+      /^#<Mail::Address:\d+ Address: \|Mikel <test@lindsaar\.net>\| >$/,
+    );
+  });
+
   it("cleans a trailing semicolon off a content type and disposition", () => {
     const type = new ContentTypeElement("text/plain; charset=utf-8;  ");
     expect([type.mainType, type.subType]).toEqual(["text", "plain"]);
