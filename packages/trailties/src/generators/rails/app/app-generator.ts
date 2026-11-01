@@ -242,6 +242,11 @@ built module raises \`LoadError\`.
   }
 
   /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async rubyVersion(): Promise<void> {
+    await this.createFile(".node-version", "24.16.0\n");
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async gemfile(): Promise<void> {
     const name = File.basename(this.appPath);
     const dep = this.database.pkgDependency;
@@ -1620,7 +1625,7 @@ export class AppGenerator extends AppBase {
   async createRootFiles(): Promise<void> {
     await this.build("readme");
     await this.build("rakefile");
-    await this.build("nodeVersion");
+    if (this.usingNode()) await this.build("nodeVersion");
     await this.build("rubyVersion");
     await this.build("configru");
 
