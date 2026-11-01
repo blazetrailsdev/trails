@@ -8,6 +8,7 @@
   "include": ["src"],
   "references": [
     { "path": "../ruby-compat" },
+    { "path": "../rake" },
     { "path": "../activesupport" },
     { "path": "../activerecord" },
     { "path": "../activejob" },

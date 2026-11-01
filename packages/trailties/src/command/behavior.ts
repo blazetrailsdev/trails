@@ -22,6 +22,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   credentials: async () => (await import("../commands/credentials.js"), null),
   encrypted: async () => (await import("../commands/encrypted.js"), null),
   dev: async () => (await import("../commands/dev.js"), null),
+  test: async () => (await import("../commands/test.js"), null),
 };
 
 export function noColorBang(): void {
