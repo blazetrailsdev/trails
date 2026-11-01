@@ -249,4 +249,48 @@ describe("AppGenerator (trails-only)", () => {
     expect(kept).toBe("custom-keep/.keep");
     expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
   });
+
+  it("honors the skip options create_* guards read", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipGit: true, skipActiveRecord: true, skipTest: true, dummyApp: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    const exists = (file: string) => File.isExist(File.join(tmpDir, "my-app", file));
+    expect(exists(".gitignore")).toBe(false);
+    expect(exists(".gitattributes")).toBe(false);
+    expect(exists("config/database.ts")).toBe(false);
+    expect(exists("db/seeds.ts")).toBe(false);
+    expect(exists("test/test-helper.ts")).toBe(false);
+    expect(exists("Dockerfile")).toBe(false);
+  });
+
+  it("writes the system test keep file unless skipKeeps", async () => {
+    await new AppGenerator(["kept"], {}, { destinationRoot: tmpDir }).invokeAll();
+    await new AppGenerator(["bare"], { skipKeeps: true }, { destinationRoot: tmpDir }).invokeAll();
+    expect(File.isExist(File.join(tmpDir, "kept/test/system/.keep"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "bare/test/system/.keep"))).toBe(false);
+    expect(File.isExist(File.join(tmpDir, "bare/test/application-system-test-case.ts"))).toBe(true);
+  });
+
+  it("dispatches Rails' root steps to a builder that answers them", async () => {
+    const calls: string[] = [];
+    TopLevel.AppBuilder = class extends AppBuilder {
+      async rakefile(): Promise<void> {
+        calls.push("rakefile");
+      }
+      async rubyVersion(): Promise<void> {
+        calls.push("rubyVersion");
+      }
+      async versionControl(): Promise<void> {
+        calls.push("versionControl");
+      }
+    };
+    try {
+      await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
+  });
 });

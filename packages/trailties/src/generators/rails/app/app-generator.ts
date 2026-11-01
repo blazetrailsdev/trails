@@ -157,7 +157,7 @@ export class AppBuilder extends ActionMethods {
   /** @internal */
   declare private readonly skipEslint: () => boolean | undefined;
   /** @internal */
-  declare private readonly _configTargetVersion?: string;
+  private _configTargetVersion: string | null = null;
 
   /** @internal */
   private pmRun(): string {
@@ -485,6 +485,206 @@ db/schema.ts linguist-generated
 
   /**
    * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async dockerfiles(): Promise<void> {
+    await this.createFile(
+      "Dockerfile",
+      `# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24.16.0
+FROM node:${"${NODE_VERSION}"}-slim AS base
+
+LABEL fly_launch_runtime="Trails"
+
+WORKDIR /app
+
+ENV TRAILS_ENV="production" \\
+    NODE_ENV="production"
+
+FROM base AS build
+
+RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
+
+COPY package.json ${this.pmLockFile()}* ./
+RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.packageManager === "yarn" ? "corepack enable yarn && yarn" : this.pmInstall()}
+
+COPY . .
+RUN ${this.packageManager === "pnpm" ? "pnpm" : this.packageManager} run build
+
+FROM base
+
+COPY --from=build /app /app
+
+EXPOSE 3000
+CMD ["npx", "trails", "server"]
+`,
+    );
+
+    await this.createFile(
+      ".dockerignore",
+      `# See https://docs.docker.com/engine/reference/builder/#dockerignore-file
+.git
+.gitignore
+node_modules
+log/*
+tmp/*
+dist
+`,
+    );
+  }
+
+  async cifiles(): Promise<void> {
+    await this.emptyDirectory(".github/workflows");
+    await this.template("github/ci.yml", ".github/workflows/ci.yml");
+    await this.template("github/dependabot.yml", ".github/dependabot.yml");
+  }
+
+  /** @missingRailsArgs template — PERMANENT */
+  async eslint(): Promise<void> {
+    await this.template("eslint.config.mjs");
+  }
+
+  /**
+   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async app(): Promise<void> {
+    const name = File.basename(this.appPath);
+    await this.createFile(
+      "app/controllers/application-controller.ts",
+      tsModule({
+        imports: [{ from: "@blazetrails/actionpack", named: { ActionController: "named" } }],
+        declarations: [
+          tsClass({
+            name: "ApplicationController",
+            extends: ref("ActionController.Base"),
+            body: [],
+          }),
+        ],
+      }),
+    );
+
+    await this.createFile("app/controllers/concerns/.gitkeep", "");
+
+    await this.createFile(
+      "app/models/application-record.ts",
+      tsModule({
+        imports: [{ from: "@blazetrails/activerecord", named: { Base: "named" } }],
+        declarations: [
+          tsRaw(
+            `export class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}`,
+          ),
+        ],
+      }),
+    );
+
+    await this.createFile("app/models/concerns/.gitkeep", "");
+
+    await this.createFile(
+      "app/helpers/application-helper.ts",
+      tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
+    );
+
+    if (!this.options.skipActiveJob) {
+      await this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
+    }
+
+    if (!this.skipActionMailer()) {
+      await this.createFile(
+        "app/mailers/application-mailer.ts",
+        tsModule({
+          declarations: [
+            tsClass({
+              name: "ApplicationMailer",
+              body: [
+                tsField("defaultFrom", "string", {
+                  inferType: true,
+                  initializer: '"from@example.com"',
+                }),
+                tsField("layout", "string", { inferType: true, initializer: '"mailer"' }),
+              ],
+            }),
+          ],
+        }),
+      );
+    }
+
+    await this.createFile(
+      "app/views/layouts/application.html.tse",
+      `<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= contentFor("title") ?? "${titleize(this.appName())}" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrfMetaTags() %>
+    <%= cspMetaTag() %>
+
+    <%= yield("head") %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.ts too!) %>
+    <%#= tag.link({ rel: "manifest", href: pwaManifestPath({ format: "json" }) }) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheetLinkTag("application") %>
+  </head>
+
+  <body>
+    <%= yield %>
+  </body>
+</html>
+`,
+    );
+
+    if (!this.skipActionMailer()) {
+      await this.createFile(
+        "app/views/layouts/mailer.html.tse",
+        `<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <style>
+    /* Email styles */
+  </style>
+</head>
+<body>
+  <%= yield %>
+</body>
+</html>
+`,
+      );
+
+      await this.createFile(
+        "app/views/layouts/mailer.text.tse",
+        `<%= yield %>
+`,
+      );
+    }
+
+    await this.createFile(
+      "app/assets/stylesheets/application.css",
+      `/*
+ * This is a manifest file that'll be compiled into application.css,
+ * which will include all the files listed below.
+ *
+ * Any CSS (and SCSS, if configured) file within app/assets/stylesheets
+ * or any plugin's vendor/assets/stylesheets directory can be referenced here.
+ */
+`,
+    );
+
+    await this.createFile("app/assets/images/.gitkeep", "");
+  }
+
+  /**
+   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
    * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
    * @missingRailsCall shebang — CONVERGEABLE app-builder-bodies-use-rails-file-actions
    */
@@ -569,10 +769,6 @@ process.exit(status ?? 1);
 `,
       { perm: 0o755 },
     );
-  }
-
-  configTargetVersion(): string {
-    return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 
   /**
@@ -1049,142 +1245,9 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  /**
-   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
-  async app(): Promise<void> {
-    const name = File.basename(this.appPath);
-    await this.createFile(
-      "app/controllers/application-controller.ts",
-      tsModule({
-        imports: [{ from: "@blazetrails/actionpack", named: { ActionController: "named" } }],
-        declarations: [
-          tsClass({
-            name: "ApplicationController",
-            extends: ref("ActionController.Base"),
-            body: [],
-          }),
-        ],
-      }),
-    );
-
-    await this.createFile("app/controllers/concerns/.gitkeep", "");
-
-    await this.createFile(
-      "app/models/application-record.ts",
-      tsModule({
-        imports: [{ from: "@blazetrails/activerecord", named: { Base: "named" } }],
-        declarations: [
-          tsRaw(
-            `export class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}`,
-          ),
-        ],
-      }),
-    );
-
-    await this.createFile("app/models/concerns/.gitkeep", "");
-
-    await this.createFile(
-      "app/helpers/application-helper.ts",
-      tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
-    );
-
-    if (!this.options.skipActiveJob) {
-      await this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
-    }
-
-    if (!this.skipActionMailer()) {
-      await this.createFile(
-        "app/mailers/application-mailer.ts",
-        tsModule({
-          declarations: [
-            tsClass({
-              name: "ApplicationMailer",
-              body: [
-                tsField("defaultFrom", "string", {
-                  inferType: true,
-                  initializer: '"from@example.com"',
-                }),
-                tsField("layout", "string", { inferType: true, initializer: '"mailer"' }),
-              ],
-            }),
-          ],
-        }),
-      );
-    }
-
-    await this.createFile(
-      "app/views/layouts/application.html.tse",
-      `<!DOCTYPE html>
-<html>
-  <head>
-    <title><%= contentFor("title") ?? "${titleize(this.appName())}" %></title>
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <%= csrfMetaTags() %>
-    <%= cspMetaTag() %>
-
-    <%= yield("head") %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.ts too!) %>
-    <%#= tag.link({ rel: "manifest", href: pwaManifestPath({ format: "json" }) }) %>
-
-    <link rel="icon" href="/icon.png" type="image/png">
-    <link rel="icon" href="/icon.svg" type="image/svg+xml">
-    <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
-    <%= stylesheetLinkTag("application") %>
-  </head>
-
-  <body>
-    <%= yield %>
-  </body>
-</html>
-`,
-    );
-
-    if (!this.skipActionMailer()) {
-      await this.createFile(
-        "app/views/layouts/mailer.html.tse",
-        `<!DOCTYPE html>
-<html>
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <style>
-    /* Email styles */
-  </style>
-</head>
-<body>
-  <%= yield %>
-</body>
-</html>
-`,
-      );
-
-      await this.createFile(
-        "app/views/layouts/mailer.text.tse",
-        `<%= yield %>
-`,
-      );
-    }
-
-    await this.createFile(
-      "app/assets/stylesheets/application.css",
-      `/*
- * This is a manifest file that'll be compiled into application.css,
- * which will include all the files listed below.
- *
- * Any CSS (and SCSS, if configured) file within app/assets/stylesheets
- * or any plugin's vendor/assets/stylesheets directory can be referenced here.
- */
-`,
-    );
-
-    await this.createFile("app/assets/images/.gitkeep", "");
+  /** @missingRailsArgs template — PERMANENT */
+  async databaseYml(): Promise<void> {
+    await this.template(this.database.template, "config/database.ts");
   }
 
   /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
@@ -1201,56 +1264,17 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
-  /** @missingRailsArgs template — PERMANENT */
-  async systemTest(): Promise<void> {
-    await this.emptyDirectoryWithKeepFile("test/system");
-
-    await this.template("test/application-system-test-case.ts");
+  /**
+   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async lib(): Promise<void> {
+    await this.createFile("lib/tasks/.gitkeep", "");
   }
 
-  /**
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
-  async test(): Promise<void> {
-    await this.createFile(
-      "test/test-helper.ts",
-      `import { TestCase } from "@blazetrails/activesupport/test-case";
-import { env, setEnv } from "@blazetrails/ruby-compat";
-
-if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-await import("../config/environment.ts");
-await import("@blazetrails/trailties/test-help");
-
-// Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
-TestCase.fixtures(":all");
-
-// Add more helper methods to be used by all tests here...
-`,
-    );
-
-    await this.createFile(
-      "test/global-setup.ts",
-      `import { Base } from "@blazetrails/activerecord";
-import { env, setEnv } from "@blazetrails/ruby-compat";
-
-export async function setup(): Promise<void> {
-  if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-  await import("../config/environment.ts");
-  await import("@blazetrails/trailties/testing/maintain-test-schema");
-}
-
-export async function teardown(): Promise<void> {
-  await Base.connectionHandler.clearAllConnectionsBang("all");
-}
-`,
-    );
-
-    await this.createFile("test/models/.gitkeep", "");
-    await this.createFile("test/controllers/.gitkeep", "");
-    await this.createFile("test/helpers/.gitkeep", "");
-    await this.createFile("test/integration/.gitkeep", "");
-    await this.createFile("test/fixtures/files/.gitkeep", "");
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async log(): Promise<void> {
+    await this.createFile("log/.gitkeep", "");
   }
 
   /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
@@ -1371,17 +1395,61 @@ export async function teardown(): Promise<void> {
     await this.createFile("public/favicon.ico", "");
   }
 
-  /**
-   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
-  async lib(): Promise<void> {
-    await this.createFile("lib/tasks/.gitkeep", "");
+  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async storage(): Promise<void> {
+    await this.createFile("storage/.gitkeep", "");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
-  async log(): Promise<void> {
-    await this.createFile("log/.gitkeep", "");
+  /**
+   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   */
+  async test(): Promise<void> {
+    await this.createFile(
+      "test/test-helper.ts",
+      `import { TestCase } from "@blazetrails/activesupport/test-case";
+import { env, setEnv } from "@blazetrails/ruby-compat";
+
+if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
+await import("../config/environment.ts");
+await import("@blazetrails/trailties/test-help");
+
+// Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
+TestCase.fixtures(":all");
+
+// Add more helper methods to be used by all tests here...
+`,
+    );
+
+    await this.createFile(
+      "test/global-setup.ts",
+      `import { Base } from "@blazetrails/activerecord";
+import { env, setEnv } from "@blazetrails/ruby-compat";
+
+export async function setup(): Promise<void> {
+  if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
+  await import("../config/environment.ts");
+  await import("@blazetrails/trailties/testing/maintain-test-schema");
+}
+
+export async function teardown(): Promise<void> {
+  await Base.connectionHandler.clearAllConnectionsBang("all");
+}
+`,
+    );
+
+    await this.createFile("test/models/.gitkeep", "");
+    await this.createFile("test/controllers/.gitkeep", "");
+    await this.createFile("test/helpers/.gitkeep", "");
+    await this.createFile("test/integration/.gitkeep", "");
+    await this.createFile("test/fixtures/files/.gitkeep", "");
+  }
+
+  /** @missingRailsArgs template — PERMANENT */
+  async systemTest(): Promise<void> {
+    await this.emptyDirectoryWithKeepFile("test/system");
+
+    await this.template("test/application-system-test-case.ts");
   }
 
   /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
@@ -1395,76 +1463,8 @@ export async function teardown(): Promise<void> {
     await this.createFile("vendor/.gitkeep", "");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
-  async storage(): Promise<void> {
-    await this.createFile("storage/.gitkeep", "");
-  }
-
-  /**
-   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
-  async dockerfiles(): Promise<void> {
-    await this.createFile(
-      "Dockerfile",
-      `# syntax=docker/dockerfile:1
-
-ARG NODE_VERSION=24.16.0
-FROM node:${"${NODE_VERSION}"}-slim AS base
-
-LABEL fly_launch_runtime="Trails"
-
-WORKDIR /app
-
-ENV TRAILS_ENV="production" \\
-    NODE_ENV="production"
-
-FROM base AS build
-
-RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
-
-COPY package.json ${this.pmLockFile()}* ./
-RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.packageManager === "yarn" ? "corepack enable yarn && yarn" : this.pmInstall()}
-
-COPY . .
-RUN ${this.packageManager === "pnpm" ? "pnpm" : this.packageManager} run build
-
-FROM base
-
-COPY --from=build /app /app
-
-EXPOSE 3000
-CMD ["npx", "trails", "server"]
-`,
-    );
-
-    await this.createFile(
-      ".dockerignore",
-      `# See https://docs.docker.com/engine/reference/builder/#dockerignore-file
-.git
-.gitignore
-node_modules
-log/*
-tmp/*
-dist
-`,
-    );
-  }
-
-  /** @missingRailsArgs template — PERMANENT */
-  async eslint(): Promise<void> {
-    await this.template("eslint.config.mjs");
-  }
-
-  /** @missingRailsArgs template — PERMANENT */
-  async databaseYml(): Promise<void> {
-    await this.template(this.database.template, "config/database.ts");
-  }
-
-  async cifiles(): Promise<void> {
-    await this.emptyDirectory(".github/workflows");
-    await this.template("github/ci.yml", ".github/workflows/ci.yml");
-    await this.template("github/dependabot.yml", ".github/dependabot.yml");
+  configTargetVersion(): string {
+    return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
 }
 
@@ -1619,7 +1619,9 @@ export class AppGenerator extends AppBase {
 
   async createRootFiles(): Promise<void> {
     await this.build("readme");
+    await this.build("rakefile");
     await this.build("nodeVersion");
+    await this.build("rubyVersion");
     await this.build("configru");
 
     if (!this.options.skipGit) {
@@ -1628,6 +1630,7 @@ export class AppGenerator extends AppBase {
     }
 
     await this.build("gemfile");
+    await this.build("versionControl");
   }
 
   async createAppFiles(): Promise<void> {
@@ -1649,7 +1652,7 @@ export class AppGenerator extends AppBase {
   }
 
   async createCifiles(): Promise<void> {
-    if (this.options.skipCi) return;
+    if (this.skipCi()) return;
     await this.build("cifiles");
   }
 
