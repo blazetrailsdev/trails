@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, it, expect } from "vitest";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
@@ -146,6 +147,17 @@ describe("AppBase run tasks", () => {
     } finally {
       process.chdir(dir);
       fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("node_version prefers NODE_VERSION", async () => {
+    const generator = new T(["app"], { javascript: "esbuild" }) as unknown as Record<string, any>;
+    const before = env.NODE_VERSION;
+    setEnv("NODE_VERSION", "1.2.3");
+    try {
+      expect(await generator.nodeVersion()).toBe("1.2.3");
+    } finally {
+      setEnv("NODE_VERSION", before);
     }
   });
 
