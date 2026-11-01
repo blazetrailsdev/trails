@@ -58,8 +58,8 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected async template(source: string, destination: string): Promise<void> {
-    await this.generator["template"](source, destination);
+  protected async template(source: string, ...args: unknown[]): Promise<void> {
+    await this.generator.template(source, ...args);
   }
 
   /** @internal */
@@ -97,8 +97,8 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected createFile(relativePath: string, content: string): unknown {
-    return this.generator["createFile"](relativePath, content);
+  protected createFile(...args: Parameters<AppGenerator["createFile"]>): unknown {
+    return this.generator.createFile(...args);
   }
 
   /** @internal */
@@ -1572,9 +1572,9 @@ export default defineConfig([
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
-  override async template(source: string, destination: string): Promise<void> {
+  override async template(source: string, ...args: unknown[]): Promise<void> {
     await this.createFile(
-      destination,
+      args[0] as string,
       TEMPLATES[source]({
         appName: this.appName(),
         database: this.database,

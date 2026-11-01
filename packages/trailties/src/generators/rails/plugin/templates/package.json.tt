@@ -1,0 +1,26 @@
+{
+  "name": <%= JSON.stringify(this.name()) %>,
+  "version": "0.1.0",
+  "type": "module",
+  "author": <%= JSON.stringify(`${this.author()} <${this.email()}>`) %>,
+  "homepage": "TODO",
+  "description": "TODO: Description of <%= this.camelizedModules() %>.",
+<% if (!this.isInsideApplication()) { -%>
+  "license": "MIT",
+<% } -%>
+  "files": ["app", "config", "db", "lib", "MIT-LICENSE", "Rakefile.ts", "README.md"],
+  "dependencies": {
+<% const packages = ["activerecord", "activesupport", "actionpack", "activejob", "ruby-compat", "trailties"]; -%>
+<% packages.forEach((pkg, i) => { -%>
+    "@blazetrails/<%= pkg %>": <%= JSON.stringify([this.railsVersionSpecifier()].flat().join(" ")) %><%= i < packages.length - 1 ? "," : "" %>
+<% }); -%>
+  },
+  "devDependencies": {
+<% if (!this.skipEslint()) { -%>
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.0.3",
+    "typescript-eslint": "^8.57.0",
+<% } -%>
+    "vitest": "^3.0.0"
+  }
+}

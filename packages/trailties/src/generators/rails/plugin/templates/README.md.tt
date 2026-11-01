@@ -1,0 +1,18 @@
+# <%= this.camelizedModules() %>
+Short description and motivation.
+
+## Usage
+How to use my plugin.
+
+## Installation
+Add this package to your application:
+
+```bash
+$ pnpm add <%= this.name() %>
+```
+
+## Contributing
+Contribution directions go here.
+
+## License
+The package is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
