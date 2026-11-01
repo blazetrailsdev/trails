@@ -179,12 +179,12 @@ const env = (name) => ({
   animals: {
     ...defaults,
     database: \`storage/\${name}_animals.sqlite3\`,
-    migrations_paths: "db/animals_migrate",
+    migrationsPaths: "db/animals_migrate",
   },
   animals_readonly: {
     ...defaults,
     database: \`storage/\${name}_animals.sqlite3\`,
-    migrations_paths: "db/animals_migrate",
+    migrationsPaths: "db/animals_migrate",
     replica: true,
   },
 });
@@ -320,64 +320,79 @@ export default { development: env("development"), test: env("test"), production:
 
   async usePostgresql({ multiDb = false }: { multiDb?: boolean } = {}): Promise<string> {
     const databaseName = `railties_${Process.pid}`;
-    const defaults = `const defaults = { adapter: "postgresql", pool: 5 };`;
-    await puts(
-      `${await this.appPath()}/config/database.ts`,
-      multiDb
-        ? `${defaults}
+    if (multiDb) {
+      await puts(
+        `${await this.appPath()}/config/database.ts`,
+        `const defaults = { adapter: "postgresql", pool: 5 };
 export default {
   development: {
     primary: { ...defaults, database: "${databaseName}_test" },
     animals: {
       ...defaults,
       database: "${databaseName}_animals_test",
-      migrations_paths: "db/animals_migrate",
+      migrationsPaths: "db/animals_migrate",
     },
   },
 };
-`
-        : `${defaults}
+`,
+      );
+    } else {
+      await puts(
+        `${await this.appPath()}/config/database.ts`,
+        `const defaults = { adapter: "postgresql", pool: 5 };
 export default {
   development: { ...defaults, database: "${databaseName}_development" },
   test: { ...defaults, database: "${databaseName}_test" },
 };
 `,
-    );
+      );
+    }
     return databaseName;
   }
 
   async useMysql2({ multiDb = false }: { multiDb?: boolean } = {}): Promise<string> {
     const databaseName = `railties_${Process.pid}`;
-    const defaults = `import { env } from "@blazetrails/ruby-compat";
+    if (multiDb) {
+      await puts(
+        `${await this.appPath()}/config/database.ts`,
+        `import { env } from "@blazetrails/ruby-compat";
 const defaults = {
   adapter: "mysql2",
   pool: 5,
   username: "root",
-  ...(env.MYSQL_HOST ? { host: env.MYSQL_HOST } : {}),
-  ...(env.MYSQL_SOCK ? { socket: env.MYSQL_SOCK } : {}),
-};`;
-    await puts(
-      `${await this.appPath()}/config/database.ts`,
-      multiDb
-        ? `${defaults}
+  ...(env.MYSQL_HOST != null ? { host: env.MYSQL_HOST } : {}),
+  ...(env.MYSQL_SOCK != null ? { socket: env.MYSQL_SOCK } : {}),
+};
 export default {
   development: {
     primary: { ...defaults, database: "${databaseName}_test" },
     animals: {
       ...defaults,
       database: "${databaseName}_animals_test",
-      migrations_paths: "db/animals_migrate",
+      migrationsPaths: "db/animals_migrate",
     },
   },
 };
-`
-        : `${defaults}
+`,
+      );
+    } else {
+      await puts(
+        `${await this.appPath()}/config/database.ts`,
+        `import { env } from "@blazetrails/ruby-compat";
+const defaults = {
+  adapter: "mysql2",
+  pool: 5,
+  username: "root",
+  ...(env.MYSQL_HOST != null ? { host: env.MYSQL_HOST } : {}),
+  ...(env.MYSQL_SOCK != null ? { socket: env.MYSQL_SOCK } : {}),
+};
 export default {
   development: { ...defaults, database: "${databaseName}_development" },
   test: { ...defaults, database: "${databaseName}_test" },
 };
 `,
-    );
+      );
+    }
     return databaseName;
   }
 }
@@ -385,16 +400,23 @@ export default {
 export const TestHelpers = { Paths, Generation };
 
 export default async function setup(): Promise<void> {
+  if (env["ISOLATION_TEST"] != null) return;
+
   const appTemplatePath = Paths.prototype.appTemplatePath();
 
   await FileUtils.rmRfAsync(appTemplatePath);
   await FileUtils.mkdirPAsync(appTemplatePath);
 
-  await new AppGenerator(
-    [File.basename(appTemplatePath)],
-    { skipBundle: true, quiet: true },
-    { destinationRoot: File.dirname(appTemplatePath) },
-  ).invokeAll();
+  const pwd = Dir.pwd();
+  try {
+    await new AppGenerator(
+      [File.basename(appTemplatePath)],
+      { skipBundle: true, quiet: true },
+      { destinationRoot: File.dirname(appTemplatePath) },
+    ).invokeAll();
+  } finally {
+    Dir.chdir(pwd);
+  }
   await puts(`${appTemplatePath}/config/boot.ts`, `import "@blazetrails/trailties/all";`);
 
   await FileUtils.mkdirPAsync(`${appTemplatePath}/app/javascript`);

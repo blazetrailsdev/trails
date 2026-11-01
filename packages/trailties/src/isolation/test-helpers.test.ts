@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { getFs, include } from "@blazetrails/ruby-compat";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
 
@@ -9,8 +11,10 @@ interface GenerationTest extends Generation {}
 class GenerationTest extends TestCase {}
 include(GenerationTest, Paths);
 include(GenerationTest, Generation);
+include(GenerationTest, Isolation);
+registerSpecType(/^GenerationTest$/, GenerationTest);
 
-describe("TestHelpersTests::GenerationTest", () => {
+describe("GenerationTest", () => {
   const fs = getFs();
   let t: GenerationTest;
 
@@ -20,7 +24,7 @@ describe("TestHelpersTests::GenerationTest", () => {
 
   afterEach(() => t.teardownApp());
 
-  it("build app", async () => {
+  it("build app", { timeout: 120_000 }, async () => {
     await t.buildApp();
 
     const appPath = await t.appPath();
@@ -29,14 +33,14 @@ describe("TestHelpersTests::GenerationTest", () => {
     expect(await fs.exists(`${appPath}/config/initializers`)).toBe(true);
   });
 
-  it("teardown app", async () => {
+  it("teardown app", { timeout: 120_000 }, async () => {
     await t.buildApp();
     await t.teardownApp();
 
     expect(await fs.exists(await t.appPath())).toBe(false);
   });
 
-  it("add to config", async () => {
+  it("add to config", { timeout: 120_000 }, async () => {
     await t.buildApp();
 
     const configFile = `${await t.appPath()}/config/application.ts`;
@@ -52,7 +56,7 @@ describe("TestHelpersTests::GenerationTest", () => {
     expect(config).toMatch(/ {7}this\.config\.zomg = "zomg";$/m);
   });
 
-  it("remove from config", async () => {
+  it("remove from config", { timeout: 120_000 }, async () => {
     await t.buildApp();
 
     const configFile = `${await t.appPath()}/config/application.ts`;

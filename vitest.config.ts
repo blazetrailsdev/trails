@@ -118,6 +118,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/core-ext/numeric/bytes.ts",
   ),
+  "@blazetrails/activesupport/testing/isolation": path.resolve(
+    __dirname,
+    "packages/activesupport/src/testing/isolation.ts",
+  ),
   "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
     __dirname,
     "packages/activesupport/src/testing/file-fixtures.ts",

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { getFs, include } from "@blazetrails/ruby-compat";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
@@ -11,8 +11,12 @@ include(GenerationTest, Paths);
 include(GenerationTest, Generation);
 
 describe("TestHelpers::Generation#build_app", () => {
+  let t: GenerationTest;
+
+  afterEach(() => t.teardownApp());
+
   it("strips the ESLint autocorrect line and keeps the app's config writable", async () => {
-    const t = new GenerationTest("test");
+    t = new GenerationTest("test");
     await t.buildApp();
     const appPath = await t.appPath();
 
@@ -26,7 +30,5 @@ describe("TestHelpers::Generation#build_app", () => {
       ":controller(/:action(/:id))(.:format)",
     );
     expect(await getFs().readdir!(`${appPath}/config/initializers`)).toEqual([]);
-
-    await t.teardownApp();
   });
 });
