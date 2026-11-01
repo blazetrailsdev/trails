@@ -1,0 +1,15 @@
+<% const adapter = (this.sqliteDriver ?? "better-sqlite3") === "better-sqlite3" ? "sqlite3" : this.sqliteDriver; -%>
+export default {
+  development: {
+    adapter: "<%= adapter %>",
+    database: "storage/development.sqlite3",
+  },
+  test: {
+    adapter: "<%= adapter %>",
+    database: "storage/test.sqlite3",
+  },
+  production: {
+    adapter: "<%= adapter %>",
+    database: "storage/production.sqlite3",
+  },
+};

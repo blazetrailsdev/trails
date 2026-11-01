@@ -141,7 +141,6 @@ export abstract class Store {
   protected coder: CacheCoder;
   protected coderSupportsCompression: boolean;
 
-  /** @missingRailsCall delete — PERMANENT */
   constructor(options?: StoreOptions) {
     this.options = options ? this.validateOptions(Store.normalizeOptions({ ...options })) : {};
 

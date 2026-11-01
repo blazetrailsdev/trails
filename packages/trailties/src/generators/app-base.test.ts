@@ -35,7 +35,7 @@ describe("AppBase", () => {
     const g = build({ skipActionCable: true, skipKeeps: true, devcontainer: true });
     expect(g["skipActionCable"]()).toBe(true);
     expect(g.keeps()).toBe(false);
-    expect(g.devcontainer()).toBe(true);
+    expect(g.isDevcontainer()).toBe(true);
     expect(g.skipDevcontainer()).toBe(false);
     expect(build({ database: "postgresql" }).database.name).toBe("postgres");
     expect(build({ database: "postgresql" }).sqlite3()).toBe(false);

@@ -67,7 +67,11 @@ async function invokeAll(generator: ChangeGenerator): Promise<void> {
 
 function run(to: string, opts: { appName?: string } = {}) {
   return invokeAll(
-    new ChangeGenerator([], { to, appName: opts.appName ?? "tmp" }, { destinationRoot: tmpDir }),
+    new ChangeGenerator(
+      [],
+      { to, name: opts.appName ?? "tmp", force: true },
+      { destinationRoot: tmpDir },
+    ),
   );
 }
 
@@ -82,10 +86,14 @@ describe("ChangeGeneratorTest", () => {
   });
 
   it("appName defaults to basename of cwd", async () => {
-    await invokeAll(new ChangeGenerator([], { to: "postgresql" }, { destinationRoot: tmpDir }));
-    expect(read("config/database.ts")).toContain(
-      `database: "${path.basename(tmpDir)}_development"`,
+    const generator = new ChangeGenerator(
+      [],
+      { to: "postgresql", force: true },
+      { destinationRoot: tmpDir },
     );
+    await invokeAll(generator);
+    expect(generator.originalAppName()).toBe(path.basename(tmpDir));
+    expect(read("config/database.ts")).toContain(`database: "${generator.appName()}_development"`);
   });
 
   it("change to postgresql", async () => {

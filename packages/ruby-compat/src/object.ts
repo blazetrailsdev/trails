@@ -1,6 +1,6 @@
 import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, generatedClassPath, isModuleObject } from "./classpath.js";
-import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
+import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
@@ -1388,13 +1388,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if (mid === "each" && typeof args[0] === "function") {
     const block = args[0] as AnyFunction;
-    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map) {
-      for (const i of recv) block(i);
-      return recv;
-    }
-    if (isPlainHash(recv)) {
-      for (const key of Object.keys(recv)) block([key, recv[key]]);
-      return recv;
+    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map || isPlainHash(recv)) {
+      return aryEach(recv as object, block as (item: unknown) => unknown);
     }
   }
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
