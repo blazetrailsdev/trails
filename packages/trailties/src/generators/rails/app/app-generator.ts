@@ -167,7 +167,7 @@ export class AppGenerator extends AppBase {
   };
 
   static {
-    void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.addSharedOptionsFor("application");
     this.classOption("version", {
       type: "boolean",

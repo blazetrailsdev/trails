@@ -20,6 +20,12 @@ describe("AppGenerator (trails-only)", () => {
     FileUtils.rmRf(tmpDir);
   });
 
+  it("sourceRoot names the existing templates directory", async () => {
+    const root = (await AppGenerator.sourceRoot()) as string;
+    expect(root.endsWith("/generators/rails/app/templates")).toBe(true);
+    expect(await File.isDirectory(root)).toBe(true);
+  });
+
   it("generates action cable files by default", async () => {
     await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
 
