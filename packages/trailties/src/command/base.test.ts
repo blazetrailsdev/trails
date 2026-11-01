@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbArgv, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "./base.js";
+import { invoke } from "../command.js";
 import { CredentialsCommand } from "../commands/credentials.js";
 import { GenerateCommand } from "../commands/generate.js";
 import { NotesCommand } from "../commands/notes.js";
@@ -38,6 +39,7 @@ describe("Rails::Command::BaseTest", () => {
       command(): void {}
 
       static {
+        rbSetClassPathString(this, { name: "Rails::Command" }, "HiddenCommand");
         const klass = this as unknown as ThorClass;
         klass.desc("command", "Hidden command", { hide: true });
         klass.methodAdded("command");
@@ -52,6 +54,7 @@ describe("Rails::Command::BaseTest", () => {
       bar(..._paths: string[]): void {}
 
       static {
+        rbSetClassPathString(this, { name: "Rails::Command" }, "HelpfulCommand");
         const klass = this as unknown as ThorClass;
         klass.desc("foo PATH", "description of foo");
         klass.methodAdded("foo");
@@ -79,13 +82,11 @@ describe("Rails::Command::BaseTest", () => {
 
   it("help usage banner shows full command name", async () => {
     class NestedCommand extends Base {
-      static override namespace(name: string | null = null): string {
-        return name ?? "nesting:nested";
-      }
       perform(..._args: unknown[]): void {}
       foo(..._args: unknown[]): void {}
 
       static {
+        rbSetClassPathString(this, { name: "Rails::Command::Nesting" }, "NestedCommand");
         const klass = this as unknown as ThorClass;
         klass.methodAdded("perform");
         klass.methodAdded("foo");
@@ -117,5 +118,75 @@ describe("Rails::Command::BaseTest", () => {
     }
 
     expect(CustomBinCommand.executable()).toBe("FOO custom-bin");
+  });
+
+  it("#current_subcommand reflects current subcommand", async () => {
+    class LastSubcommandCommand extends Base {
+      static lastSubcommand: string | null | undefined;
+
+      setLastSubcommand(): void {
+        LastSubcommandCommand.lastSubcommand = this.currentSubcommand;
+      }
+
+      declare foo: () => void;
+      declare bar: () => void;
+
+      static {
+        rbSetClassPathString(this, { name: "Rails::Command" }, "LastSubcommandCommand");
+        this.prototype.foo = this.prototype.setLastSubcommand;
+        this.prototype.bar = this.prototype.setLastSubcommand;
+        const klass = this as unknown as ThorClass;
+        klass.methodAdded("setLastSubcommand");
+        klass.methodAdded("foo");
+        klass.methodAdded("bar");
+      }
+    }
+
+    await invoke("last_subcommand:foo");
+    expect(LastSubcommandCommand.lastSubcommand).toEqual("foo");
+
+    await invoke("last_subcommand:bar");
+    expect(LastSubcommandCommand.lastSubcommand).toEqual("bar");
+  });
+
+  it("ARGV is populated", async () => {
+    class ArgvCommand extends Base {
+      checkPopulated(...args: string[]): void {
+        const argv = rbArgv();
+        if (argv.length === 0 || argv.join() !== args.join()) throw new Error("not populated");
+      }
+
+      static {
+        rbSetClassPathString(this, { name: "Rails::Command" }, "ArgvCommand");
+        (this as unknown as ThorClass).methodAdded("checkPopulated");
+      }
+    }
+    void ArgvCommand;
+
+    await expect(invoke("argv:check_populated", ["foo", "bar"])).resolves.not.toThrow();
+  });
+
+  it("ARGV is isolated", async () => {
+    class ArgvCommand extends Base {
+      checkIsolated(): void {
+        rbArgv().push("isolate this");
+      }
+
+      static {
+        rbSetClassPathString(this, { name: "Rails::Command" }, "ArgvCommand");
+        (this as unknown as ThorClass).methodAdded("checkIsolated");
+      }
+    }
+    void ArgvCommand;
+
+    const originalArgv = [...rbArgv()];
+    rbArgv().length = 0;
+
+    try {
+      await invoke("argv:check_isolated");
+      expect(rbArgv()).toBeEmpty();
+    } finally {
+      rbArgv().splice(0, rbArgv().length, ...originalArgv);
+    }
   });
 });

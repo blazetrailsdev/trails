@@ -49,6 +49,9 @@ const SUBPATH_ENTRIES: Record<string, string> = {
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
 
+/** A directory whose files load one at a time, so each carries its own table and loads no sibling. */
+const LAZY_DIRS: Record<string, string> = { trailties: "commands/" };
+
 function separateTable(subpath: string): string {
   return `class-paths.${path.basename(subpath, ".ts")}.generated.ts`;
 }
@@ -254,9 +257,14 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (ambiguous.has(key)) continue;
       const rel = path.join("src", entry.file);
       const separated = !reachable.has(entry.file) && separateGraph.has(entry.file);
+      const lazy =
+        !fallbackModules.has(key) &&
+        !reachable.has(entry.file) &&
+        entry.file.startsWith(LAZY_DIRS[dir] ?? "\0");
       const ownTable =
         excluded.includes(rel) ||
         separated ||
+        lazy ||
         (!reachable.has(entry.file) && subpathGraph.has(entry.file));
       if (
         !ownTable &&
@@ -273,6 +281,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsName: reached,
           excluded: ownTable,
           ...(separated ? { table: separateTable(separate) } : {}),
+          ...(lazy ? { table: separateTable(entry.file) } : {}),
         });
       } else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
         entries.push({ ...entry, namespace: true });
@@ -425,15 +434,12 @@ async function main(): Promise<void> {
   const targets = [...tables].flatMap(([dir, entries]) => [
     [dir, GENERATED, entries.filter((e) => !e.excluded)] as const,
     [dir, EXCLUDED_GENERATED, entries.filter((e) => e.excluded && !e.table)] as const,
-    ...(SEPARATE_SUBPATH_ENTRIES[dir]
-      ? [
-          [
-            dir,
-            separateTable(SEPARATE_SUBPATH_ENTRIES[dir]),
-            entries.filter((e) => e.table === separateTable(SEPARATE_SUBPATH_ENTRIES[dir])),
-          ] as const,
-        ]
-      : []),
+    ...[
+      ...new Set([
+        ...(SEPARATE_SUBPATH_ENTRIES[dir] ? [separateTable(SEPARATE_SUBPATH_ENTRIES[dir])] : []),
+        ...entries.flatMap((e) => (e.table ? [e.table] : [])),
+      ]),
+    ].map((table) => [dir, table, entries.filter((e) => e.table === table)] as const),
   ]);
   if (only === undefined || only === "ruby-compat") {
     const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);

@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["@blazetrails/vitest-matchers"]
   },
   "include": ["src"],
   "references": [
@@ -23,6 +24,7 @@
     { "path": "../nokogiri" },
     { "path": "../did-you-mean" },
     { "path": "../thor" },
-    { "path": "../et-orbi" }
+    { "path": "../et-orbi" },
+    { "path": "../vitest-matchers" }
   ]
 }

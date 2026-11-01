@@ -1,3 +1,4 @@
+import "../class-paths.console.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
 import {
   NotImplementedError,
@@ -6,7 +7,6 @@ import {
   include,
   rbArgv,
   type Included,
-  rbSetClassPathString,
 } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
@@ -164,5 +164,3 @@ export class ConsoleCommand extends Base {
     await railsConsole.start();
   }
 }
-
-rbSetClassPathString(ConsoleCommand, { name: "Rails::Command" }, "ConsoleCommand");

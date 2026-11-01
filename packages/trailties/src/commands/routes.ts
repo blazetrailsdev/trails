@@ -1,10 +1,11 @@
+import "../class-paths.routes.generated.js";
 import {
   ConsoleFormatter,
   RoutesInspector,
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { rbArgv, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Command } from "@blazetrails/thor/command";
 import { invoke } from "../command.js";
@@ -78,5 +79,3 @@ export class RoutesCommand extends Base {
     return filter;
   }
 }
-
-rbSetClassPathString(RoutesCommand, { name: "Rails::Command" }, "RoutesCommand");

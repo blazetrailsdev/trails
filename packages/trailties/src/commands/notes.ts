@@ -1,4 +1,5 @@
-import { stdout, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import "../class-paths.notes.generated.js";
+import { stdout } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
@@ -42,5 +43,3 @@ export class NotesCommand extends Base {
     return Annotation.directories;
   }
 }
-
-rbSetClassPathString(NotesCommand, { name: "Rails::Command" }, "NotesCommand");

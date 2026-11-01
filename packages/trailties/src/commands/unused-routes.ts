@@ -1,3 +1,4 @@
+import "../class-paths.unused-routes.generated.js";
 import {
   ConsoleFormatter,
   RoutesInspector,
@@ -6,7 +7,7 @@ import {
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
 import { camelize, dasherize, safeConstantize, underscore } from "@blazetrails/activesupport";
-import { getPath, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
@@ -142,5 +143,3 @@ export class UnusedRoutesCommand extends Base {
     return filter;
   }
 }
-
-rbSetClassPathString(UnusedRoutesCommand, { name: "Rails::Command" }, "UnusedRoutesCommand");

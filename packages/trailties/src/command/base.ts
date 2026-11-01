@@ -140,7 +140,7 @@ export class Base extends Thor {
   }
 
   static async help(shell: Basic, ...rest: unknown[]): Promise<void> {
-    (Thor as unknown as ThorClass).help.call(this as unknown as ThorClass, shell, ...rest);
+    await (Thor as unknown as ThorClass).help.call(this as unknown as ThorClass, shell, ...rest);
     if ((await this.classUsage()) != null) shell.say(await this.classUsage());
   }
 
@@ -161,12 +161,14 @@ export class Base extends Thor {
     return this._commandName!;
   }
 
+  /** @inventedArm assign — PERMANENT */
   static async classUsage(): Promise<string | null> {
     const usagePath = await this.usagePath();
     if (usagePath != null) {
       if (!Object.hasOwn(this, "_classUsage") || this._classUsage == null) {
-        const erb = new TSE(await File.readAsync(usagePath), { trimMode: "-" });
-        erb.filename = usagePath;
+        const erb = Object.assign(new TSE(await File.readAsync(usagePath), { trimMode: "-" }), {
+          filename: usagePath,
+        });
         this._classUsage = await erb.result(rbFBinding(this));
       }
       return this._classUsage;
@@ -235,10 +237,11 @@ export class Base extends Thor {
 
   /** @internal */
   private static async resolvePath(path: string): Promise<string | null> {
-    const namespace = this.namespace();
     path = File.join(
       "../commands",
-      ...(namespace.startsWith("rails:") ? namespace.slice("rails:".length) : namespace).split(":"),
+      ...this.namespace()
+        .replace(/^rails:/, "")
+        .split(":"),
       path,
     );
     path = File.expandPath(path, __dir__);

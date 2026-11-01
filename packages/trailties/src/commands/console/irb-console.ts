@@ -1,3 +1,4 @@
+import "../../class-paths.irb-console.generated.js";
 import { Dir, STDERR, getFs, getPath, getReplAsync } from "@blazetrails/ruby-compat";
 import { Trails } from "../../rails.js";
 
