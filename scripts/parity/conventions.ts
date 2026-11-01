@@ -714,6 +714,15 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no " +
+      "hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, " +
+      '"`Module#autoload` is a build step"). PERMANENT.',
+    names: ["autoload", "require", "const_added"],
+    rubyFiles: ["core_ext/kernel.rb", "core_ext/module.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
       "`Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node " +
       'counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess ' +
       "arm's `runInIsolation` exists. PERMANENT.",

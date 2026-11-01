@@ -3,6 +3,8 @@ import {
   Monitor,
   Mutex,
   SecureRandom,
+  constGet,
+  getFs,
   include,
   rbInspect,
   type Included,
@@ -14,6 +16,7 @@ import { Error as ZeitwerkError } from "./error.js";
 import { Inflector } from "./inflector.js";
 import { Config } from "./loader/config.js";
 import { Helpers } from "./loader/helpers.js";
+import { configurationDigest, type Manifest } from "./loader/manifest.js";
 import { RealModName } from "./real-mod-name.js";
 import { Registry } from "./registry.js";
 
@@ -33,6 +36,8 @@ export class Loader {
 
   inflector: Inflector;
   logger: Logger | null;
+  /** @noRailsEquivalent PERMANENT */
+  manifest: Manifest | string | null;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
   /** @internal */ roots: Record<string, object>;
@@ -60,6 +65,7 @@ export class Loader {
   constructor() {
     this.inflector = new Inflector();
     this.logger = (this.constructor as typeof Loader).defaultLogger;
+    this.manifest = null;
     this._tag = SecureRandom.hex(3);
     this._initializedAt = new Date();
     this.roots = {};
@@ -87,13 +93,18 @@ export class Loader {
     Registry.registerLoader(this);
   }
 
+  /** @inventedArm if — PERMANENT */
   async setup(): Promise<void> {
     await this.mutex.synchronize(async () => {
       if (this._setup) return;
 
-      const roots = await this.actualRoots();
-      for (const [rootDir, rootNamespace] of Object.entries(roots)) {
-        await this.defineAutoloadsForDir(rootDir, rootNamespace);
+      if (this.manifest != null) {
+        await this._defineAutoloadsFromManifest(this.manifest);
+      } else {
+        const roots = await this.actualRoots();
+        for (const [rootDir, rootNamespace] of Object.entries(roots)) {
+          await this.defineAutoloadsForDir(rootDir, rootNamespace);
+        }
       }
 
       for (const callback of this.onSetupCallbacks) await callback();
@@ -194,6 +205,39 @@ export class Loader {
   /** @internal */
   isShadowedFile(file: string): boolean {
     return this.shadowedFiles.has(file);
+  }
+
+  private async _defineAutoloadsFromManifest(source: Manifest | string): Promise<void> {
+    const manifest =
+      typeof source === "string"
+        ? (JSON.parse(await getFs().readFile(source, "utf8")) as Manifest)
+        : source;
+    if (manifest.digest !== configurationDigest(this)) {
+      throw new ZeitwerkError(
+        `the autoload manifest of loader ${this.tag} does not match its configuration, run trails build`,
+      );
+    }
+
+    const namespaces: Record<string, object> = {};
+    for (const rootNamespace of Object.values(this.roots)) {
+      namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;
+    }
+
+    for (const [cpath, row] of Object.entries(manifest.constants)) {
+      const index = cpath.lastIndexOf("::");
+      const parentPath = index < 0 ? "" : cpath.slice(0, index);
+      if (Object.hasOwn(manifest.constants, parentPath)) continue;
+      const parent = namespaces[parentPath] ?? (constGet(Object, parentPath) as object);
+
+      const cref = new Cref(parent, index < 0 ? cpath : cpath.slice(index + 2));
+      if (row.dirs != null) {
+        for (const dir of row.dirs) {
+          this.namespaceDirs.getOrSet(cref, () => []).push(File.expandPath(dir));
+        }
+      }
+      await this.defineAutoload(cref, File.expandPath(row.path));
+      if (row.kind === "explicit") this.registerExplicitNamespace(cref);
+    }
   }
 
   /** @internal */

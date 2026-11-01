@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
+import { stderr, stdout } from "@blazetrails/ruby-compat";
+import { buildAutoload } from "./build-autoload.js";
 import { buildTemplates } from "./build-templates.js";
 import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
 
 const USAGE =
   "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place]\n" +
-  "       trails-tsc-views build-templates <template|dir>...\n";
+  "       trails-tsc-views build-templates <template|dir>...\n" +
+  "       trails-tsc-views build-autoload\n";
 
 const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
 
@@ -26,6 +29,16 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`trails-tsc-views: ${msg}\n`);
+      return 1;
+    }
+  }
+  if (cmd === "build-autoload") {
+    try {
+      const dirs = await buildAutoload();
+      stdout.write(`trails-tsc-views: wrote ${dirs.length} autoload manifest(s)\n`);
+      return 0;
+    } catch (err) {
+      stderr.write(`trails-tsc-views: ${err instanceof Error ? err.message : String(err)}\n`);
       return 1;
     }
   }
