@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import {
   Annotation,
+  Parser,
   SourceAnnotationExtractor,
   resetAnnotationRegistry,
 } from "./source-annotation-extractor.js";
@@ -121,6 +122,14 @@ describe("SourceAnnotationExtractor", () => {
       `app/a.ts:\n  * [1] [TESTME] yes\n\n`,
     );
   });
+});
+
+test("Parser reads Ruby comments past heredocs, percent literals and an apostrophe", () => {
+  const source = "x = <<~T\n  it's # TODO: no\nT\ny = %q(# TODO: no)\nz = /'/ # TODO: yes\n";
+  const parser = new Parser(source, { pattern: /#\s*(TODO):?\s*(.*)$/m });
+  parser.parse();
+  expect(parser.isError()).toBe(false);
+  expect(parser.comments).toEqual([new Annotation(5, "TODO", "yes")]);
 });
 
 test("Annotation#toString — line padding + optional tag prefix", () => {

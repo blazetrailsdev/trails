@@ -1,4 +1,4 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, Ripper } from "@blazetrails/ruby-compat";
 
 export interface AnnotationOptions {
   tag?: boolean;
@@ -12,46 +12,18 @@ export type ExtensionBuilder = (
 const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
 const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
 
-export class Parser {
+export class Parser extends Ripper {
   comments: Annotation[] = [];
   pattern: RegExp;
-  private source: string;
-  private lineno = 0;
-  private _quote: string | null = null;
 
   constructor(source: string, { pattern }: { pattern: RegExp }) {
-    this.source = source;
+    super(source);
     this.pattern = pattern;
   }
 
   onComment(value: string): void {
     const m = value.match(this.pattern);
-    if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
-  isError(): boolean {
-    return this._quote !== null;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
-  parse(): void {
-    for (const line of this.source.split("\n")) {
-      this.lineno += 1;
-      if (this._quote === null && line === "__END__") break;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (this._quote !== null) {
-          if (char === "\\") i += 1;
-          else if (char === this._quote) this._quote = null;
-        } else if (char === '"' || char === "'") {
-          this._quote = char;
-        } else if (char === "#") {
-          this.onComment(line.slice(i));
-          break;
-        }
-      }
-    }
+    if (m) this.comments.push(new Annotation(this.lineno(), m[1], m[2]));
   }
 }
 
@@ -130,7 +102,7 @@ function registerDefaults(): void {
     "rb",
     "rake",
     "ruby",
-    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`)),
+    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`, "m")),
   );
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", slash);
