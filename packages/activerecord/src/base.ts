@@ -20,6 +20,7 @@ import {
   AttributeMethodPattern,
   type AttributeMethodsClassHalf,
   AttributeRegistration,
+  deferringToAssignment,
   type AttributeRegistrationClassHalf,
   Dirty as AMDirty,
   JSONSerializer,
@@ -1383,8 +1384,14 @@ export class Base extends Model {
     if (attributes != null) this.assignAttributes(attributes);
 
     if (!allocating) {
-      initBlock?.(this);
-      this._runInitializeCallbacks();
+      const deferred = deferringToAssignment(this, async () => {
+        await initBlock?.(this);
+        this._runInitializeCallbacks();
+      });
+      if (!deferred) {
+        initBlock?.(this);
+        this._runInitializeCallbacks();
+      }
     }
   }
 

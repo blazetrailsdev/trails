@@ -225,6 +225,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   generate = Actions.generate;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+  railsCommand = Actions.railsCommand;
   route = Actions.route;
   readme = Actions.readme;
   log = Actions.log;

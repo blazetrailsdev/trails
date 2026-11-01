@@ -14,7 +14,9 @@ import {
 
 let tmpDir: string | undefined;
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   setViteManifest(new ViteManifest());
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   tmpDir = undefined;

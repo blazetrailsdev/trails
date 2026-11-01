@@ -16,7 +16,9 @@ describe("AppGenerator (trails-only)", () => {
     FileUtils.mkdirP(tmpDir);
   });
 
+  const startDir = process.cwd();
   afterEach(() => {
+    process.chdir(startDir);
     FileUtils.rmRf(tmpDir);
   });
 

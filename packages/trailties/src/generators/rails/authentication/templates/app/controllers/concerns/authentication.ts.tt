@@ -1,0 +1,69 @@
+import { defineModule, extend, included } from "@blazetrails/activesupport";
+import { Current } from "../../models/current.ts";
+import { Session } from "../../models/session.ts";
+
+/** Rails' `class_methods do ... end` block. */
+export const ClassMethods = {
+  allowUnauthenticatedAccess(this: any, options: Record<string, unknown> = {}): void {
+    this.skipBeforeAction("requireAuthentication", options);
+  },
+};
+
+export const Authentication = defineModule(
+  {
+    [included](base: any): void {
+      extend(base, ClassMethods);
+      base.beforeAction("requireAuthentication");
+      base.helperMethod("authenticated");
+    },
+  },
+  undefined,
+  {
+    async authenticated(this: any): Promise<unknown> {
+      return await this.resumeSession();
+    },
+
+    async requireAuthentication(this: any): Promise<unknown> {
+      return (await this.resumeSession()) || this.requestAuthentication();
+    },
+
+    async resumeSession(this: any): Promise<unknown> {
+      return (Current.session ??= await this.findSessionByCookie());
+    },
+
+    async findSessionByCookie(this: any): Promise<unknown> {
+      const sessionId = this.cookies().signed.get("session_id");
+      return sessionId ? await Session.findBy({ id: sessionId }) : null;
+    },
+
+    requestAuthentication(this: any): void {
+      this.session["return_to_after_authenticating"] = this.request.url;
+      this.redirectTo("/session/new");
+    },
+
+    afterAuthenticationUrl(this: any): string {
+      const url = this.session["return_to_after_authenticating"];
+      delete this.session["return_to_after_authenticating"];
+      return url || "/";
+    },
+
+    async startNewSessionFor(this: any, user: any): Promise<unknown> {
+      const session = await user.sessions.createBang({
+        user_agent: this.request.getHeader("HTTP_USER_AGENT"),
+        ip_address: this.request.remoteIp,
+      });
+      Current.session = session;
+      this.cookies().signed.permanent.set("session_id", {
+        value: session.id,
+        httpOnly: true,
+        sameSite: ":lax",
+      });
+      return session;
+    },
+
+    async terminateSession(this: any): Promise<void> {
+      await (Current.session as any).destroy();
+      this.cookies().delete("session_id");
+    },
+  },
+);

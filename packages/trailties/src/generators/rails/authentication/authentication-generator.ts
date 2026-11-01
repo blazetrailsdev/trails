@@ -4,7 +4,8 @@ import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/acti
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { MigrationGenerator } from "../../active-record/migration/migration-generator.js";
 import type { GeneratorClass } from "../../../generators.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
@@ -14,6 +15,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   declare options: AuthenticationGeneratorOptions;
 
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.classOption("api", {
       type: "boolean",
       desc: "Generate API-only controllers and models, with no view templates",
@@ -33,7 +35,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("configureAuthenticationRoutes");
     this.methodAdded("enableBcrypt");
     this.methodAdded("addMigrations");
-    this.noCommands(() => this.methodAdded("template"));
   }
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
@@ -42,36 +43,25 @@ export class AuthenticationGenerator extends GeneratorBase {
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async createAuthenticationFiles(): Promise<void> {
-    await this.template("app/models/session.rb");
-    await this.template("app/models/user.rb");
-    await this.template("app/models/current.rb");
+    await this.template("app/models/session.ts");
+    await this.template("app/models/user.ts");
+    await this.template("app/models/current.ts");
 
-    await this.template("app/controllers/sessions_controller.rb");
-    await this.template("app/controllers/concerns/authentication.rb");
-    await this.template("app/controllers/passwords_controller.rb");
+    await this.template("app/controllers/sessions-controller.ts");
+    await this.template("app/controllers/concerns/authentication.ts");
+    await this.template("app/controllers/passwords-controller.ts");
 
     if (TopLevel.ActionCable?.Engine !== undefined)
-      await this.template("app/channels/application_cable/connection.rb");
+      await this.template("app/channels/application-cable/connection.ts");
 
-    await this.template("app/mailers/passwords_mailer.rb");
+    await this.template("app/mailers/passwords-mailer.ts");
 
-    await this.template("app/views/passwords_mailer/reset.html.erb");
-    await this.template("app/views/passwords_mailer/reset.text.erb");
+    await this.template("app/views/passwords-mailer/reset.html.tse");
+    await this.template("app/views/passwords-mailer/reset.text.tse");
 
-    await this.template("test/mailers/previews/passwords_mailer_preview.rb");
-  }
-
-  override async template(file: string): Promise<void> {
-    const destination = file
-      .replace(/\.rb$/, ".ts")
-      .replace(/\.erb$/, ".tse")
-      .replace(/[^/]+(?=\/|\.)/g, (segment) => segment.replace(/_/g, "-"));
-    if (File.isExist(File.join(this.destinationRoot, destination))) {
-      this.sayStatus("skip", `${destination} (already exists)`);
-      return;
-    }
-    await this.createFile(destination, TEMPLATES[file]);
+    await this.template("test/mailers/previews/passwords-mailer-preview.ts");
   }
 
   configureApplicationController(): void {

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 
 class T extends AppBase {
+  protected isValidConst(): void {}
   static {
     this.addSharedOptionsFor("application");
   }

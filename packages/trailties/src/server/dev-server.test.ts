@@ -41,10 +41,12 @@ function upgrade(origin: string, path: string, protocol?: string): Promise<strin
   });
 }
 
+const startDir = process.cwd();
 let tmpDir: string | undefined;
 let server: DevServer | undefined;
 
 afterEach(async () => {
+  process.chdir(startDir);
   await server?.stop();
   server = undefined;
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -60,6 +62,7 @@ async function generateApp(): Promise<string> {
     { database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
+  process.chdir(startDir);
   return path.join(tmpDir, "my-app");
 }
 

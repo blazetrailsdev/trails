@@ -29,6 +29,7 @@ export {
   assigningSynchronously,
   awaitingAssignment,
   capturingAssignment,
+  deferringToAssignment,
   attributeWriterMissing,
   ArgumentError,
   NoMethodError,

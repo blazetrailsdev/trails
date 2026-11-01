@@ -33,7 +33,9 @@ beforeEach(() => {
   );
 });
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
