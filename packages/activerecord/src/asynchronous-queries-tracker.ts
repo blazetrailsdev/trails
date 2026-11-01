@@ -38,7 +38,7 @@ export class AsynchronousQueriesTracker {
 
   static complete(
     asynchronousQueriesTracker: AsynchronousQueriesTracker,
-  ): Promise<AsynchronousQueriesTracker> {
+  ): AsynchronousQueriesTracker | Promise<AsynchronousQueriesTracker> {
     return asynchronousQueriesTracker.finalizeSession();
   }
 
@@ -55,9 +55,10 @@ export class AsynchronousQueriesTracker {
     return this.#stack;
   }
 
-  async finalizeSession(wait = false): Promise<this> {
+  finalizeSession(wait = false): this | Promise<this> {
     const session = this.#stack.pop();
-    await session?.finalize(wait);
+    const finalized = session?.finalize(wait);
+    if (finalized) return finalized.then(() => this);
     return this;
   }
 }
@@ -80,10 +81,10 @@ export class Session {
     return this.#lock.withReadLock(block);
   }
 
-  async finalize(wait = false): Promise<void> {
+  finalize(wait = false): Promise<void> | void {
     this.#active.makeFalse();
     if (wait) {
-      await this.#lock.withWriteLock(() => {});
+      return Promise.resolve(this.#lock.withWriteLock(() => {}));
     }
   }
 }
