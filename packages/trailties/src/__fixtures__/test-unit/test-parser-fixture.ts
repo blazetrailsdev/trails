@@ -1,4 +1,3 @@
-export {};
 declare function test(name: string, block: () => void): void;
 declare function assert(value: boolean): void;
 declare function assertNot(value: boolean): void;
@@ -22,6 +21,10 @@ test("declarative", () => {
   assert(true);
 });
 
+test("declarative w/parens", () => {
+  assert(true);
+});
+
 self.test("declarative explicit receiver", () => {
   assert(true);
 
@@ -29,6 +32,9 @@ self.test("declarative explicit receiver", () => {
 });
 
 test("declarative oneline", () => assert(true));
+
+// prettier-ignore
+test("declarative oneline do", function () { assert(true); });
 
 test("declarative multiline w/ braces", () => {
   assert(true);
