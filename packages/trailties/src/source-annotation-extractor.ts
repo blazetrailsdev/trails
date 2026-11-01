@@ -29,12 +29,12 @@ export class Parser {
     if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
   }
 
-  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
+  /** @noRailsEquivalent CONVERGEABLE source-annotation-extractor-reads-ts-comments */
   isError(): boolean {
     return this._quote !== null;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE parser-extractor-reads-ruby-comments-with-a-real-parser */
+  /** @noRailsEquivalent CONVERGEABLE source-annotation-extractor-reads-ts-comments */
   parse(): void {
     for (const line of this.source.split("\n")) {
       this.lineno += 1;
