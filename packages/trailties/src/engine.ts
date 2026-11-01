@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import { File, getFs, getPath, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import {
+  AbstractController,
   MiddlewareStack,
   type DrawCallback,
   type RackApp,
@@ -41,11 +42,17 @@ export class Engine extends Trailtie {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
-  private _railtiesCollection?: Trailties;
+  protected _railties?: Trailties;
+  protected _helpers?: object;
+  private _allAutoloadPathsCache?: string[];
   private _allLoadPathsCache?: string[];
-  private _routes?: RouteSet;
+  protected _routes?: RouteSet;
   private _app?: RackApp | RackAppObject;
   private _envConfig?: Record<string, unknown>;
+
+  static eagerLoadBang(): void {
+    this.instance().eagerLoadBang();
+  }
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
@@ -179,6 +186,10 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).isolated();
   }
 
+  get middleware(): EngineConfiguration["middleware"] {
+    return this.config.middleware;
+  }
+
   root(): string | null {
     return this.config.root;
   }
@@ -209,9 +220,22 @@ export class Engine extends Trailtie {
     return node ? await node.existent() : [];
   }
 
+  eagerLoadBang(): void {}
+
   railties(): Trailties {
-    if (!this._railtiesCollection) this._railtiesCollection = new Trailties();
-    return this._railtiesCollection;
+    if (!this._railties) this._railties = new Trailties();
+    return this._railties;
+  }
+
+  async helpers(): Promise<object> {
+    if (this._helpers) return this._helpers;
+    const helpers = {};
+    for (const mod of AbstractController.Helpers.helperModulesFromPaths(
+      await this.helpersPaths(),
+    )) {
+      include(helpers, mod);
+    }
+    return (this._helpers = helpers);
   }
 
   routes(block?: DrawCallback): RouteSet {
@@ -227,6 +251,11 @@ export class Engine extends Trailtie {
     const { Generators } = await import("./generators.js");
     this.runGeneratorsBlocks(app);
     Generators.configureBang(app.config.generators());
+    return this;
+  }
+
+  loadRunner(app: unknown = this): this {
+    this.runRunnerBlocks(app);
     return this;
   }
 
@@ -301,14 +330,34 @@ export class Engine extends Trailtie {
   }
 
   /** @internal */
+  protected async isHasMigrations(): Promise<boolean> {
+    return ((await this.paths().get("db/migrate")?.existent()) ?? []).length > 0;
+  }
+
+  /** @internal */
+  async _allAutoloadOncePaths(): Promise<string[]> {
+    return Array.from(new Set(await this.config.allAutoloadOncePaths()));
+  }
+
+  /** @internal */
+  async _allAutoloadPaths(): Promise<string[]> {
+    if (this._allAutoloadPathsCache) return this._allAutoloadPathsCache;
+    const autoloadOncePaths = await this.config.allAutoloadOncePaths();
+    const autoloadPaths = [
+      ...(await this.config.allAutoloadPaths()),
+      ...(await this.config.allEagerLoadPaths()),
+    ].filter((path) => !autoloadOncePaths.includes(path));
+    return (this._allAutoloadPathsCache = Array.from(new Set(autoloadPaths)));
+  }
+
+  /** @internal */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = this.paths();
-    const cfg = this.config;
     const out = [...(await paths.loadPaths())];
     if (addAutoloadPathsToLoadPath) {
-      for (const p of await cfg.allAutoloadPaths()) out.push(p);
-      for (const p of await cfg.allAutoloadOncePaths()) out.push(p);
+      out.push(...(await this._allAutoloadPaths()));
+      out.push(...(await this._allAutoloadOncePaths()));
     }
     this._allLoadPathsCache = Array.from(new Set(out));
     return this._allLoadPathsCache;

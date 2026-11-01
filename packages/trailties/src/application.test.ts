@@ -237,7 +237,7 @@ describe("Application", () => {
       class IApp2 extends Application {}
       Application.register(IApp2);
       const app = IApp2.instance();
-      await app.initialize();
+      await app.initializeBang();
       expect(app.initialized()).toBe(true);
       expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
       expect(Trails.cache).toBeInstanceOf(FileStore);
@@ -251,7 +251,7 @@ describe("Application", () => {
         seen.push(base);
       });
       const app = IApp3.instance();
-      await app.initialize();
+      await app.initializeBang();
       expect(seen).toEqual([app]);
     });
 
@@ -261,7 +261,7 @@ describe("Application", () => {
       class RootPubApp extends Application {}
       Application.register(RootPubApp, "/app/src");
       try {
-        await RootPubApp.instance().initialize();
+        await RootPubApp.instance().initializeBang();
         expect(trailsRoot()).toBe("/app");
       } finally {
         setTrailsRoot(null);
@@ -280,7 +280,7 @@ describe("Application", () => {
       const app = RootOverrideApp.instance();
       app.config.setRoot("/override");
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/override");
       } finally {
         setTrailsRoot(null);
@@ -295,7 +295,7 @@ describe("Application", () => {
       const app = RelRootApp.instance();
       app.config.setRoot("rel");
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/cwd/rel");
       } finally {
         setTrailsRoot(null);
@@ -309,7 +309,7 @@ describe("Application", () => {
       Application.register(LiveRootApp, "/app/src");
       const app = LiveRootApp.instance();
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/app");
         app.config.setRoot("/later");
         expect(trailsRoot()).toBe("/later");
@@ -322,8 +322,8 @@ describe("Application", () => {
       class IApp4 extends Application {}
       Application.register(IApp4);
       const app = IApp4.instance();
-      await app.initialize();
-      await expect(app.initialize()).rejects.toThrow(/already initialized/);
+      await app.initializeBang();
+      await expect(app.initializeBang()).rejects.toThrow(/already initialized/);
     });
 
     it("splices Bootstrap initializers ahead of inherited Engine ones", () => {
@@ -360,7 +360,7 @@ describe("Application", () => {
       class IApp7 extends Application {}
       Application.register(IApp7);
       const app = IApp7.instance();
-      await app.initialize();
+      await app.initializeBang();
       const middleware = app.config.middleware as MiddlewareStack;
       expect(middleware.middlewares.length).toBeGreaterThan(0);
       expect(middleware.middlewares.map((m) => m.klass)).toContain(RequestId);

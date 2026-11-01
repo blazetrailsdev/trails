@@ -1,4 +1,7 @@
 import { BacktraceCleaner as Base, TopLevel } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
+
+type CleanKind = Parameters<Base["clean"]>[1];
 
 export const APP_DIRS_PATTERN = /^(?:\.\/)?(?:app|config|lib|test|\(\w+(?:-\w+)*\))/;
 export const RENDER_TEMPLATE_PATTERN = /:in [`'].*_\w+_{2,3}\d+_\d+'/;
@@ -17,6 +20,25 @@ export class BacktraceCleaner extends Base {
       RENDER_TEMPLATE_PATTERN.test(line) ? line.replace(RENDER_TEMPLATE_PATTERN, "") : line,
     );
     this.addSilencer((line) => !APP_DIRS_PATTERN.test(line));
+  }
+
+  override clean<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {
+    if (env.BACKTRACE != null) return backtrace;
+
+    return super.clean(backtrace, kind);
+  }
+
+  override filter<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {
+    return this.clean(backtrace, kind);
+  }
+
+  override cleanFrame(
+    frame: Parameters<Base["cleanFrame"]>[0],
+    kind: CleanKind = "silent",
+  ): ReturnType<Base["cleanFrame"]> {
+    if (env.BACKTRACE != null) return frame as string;
+
+    return super.cleanFrame(frame, kind);
   }
 
   override dup(): this {

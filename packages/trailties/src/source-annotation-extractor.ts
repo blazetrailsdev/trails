@@ -5,10 +5,75 @@ export interface AnnotationOptions {
   indent?: number;
 }
 
-export type ExtensionBuilder = (tagPattern: string) => RegExp;
+export type ExtensionBuilder = (
+  tagPattern: string,
+) => RegExp | { annotations(file: string): Annotation[] } | null | undefined;
 
 const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
 const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
+
+export class Parser {
+  comments: Annotation[] = [];
+  pattern: RegExp;
+  private source: string;
+  private lineno = 0;
+
+  constructor(source: string, { pattern }: { pattern: RegExp }) {
+    this.source = source;
+    this.pattern = pattern;
+  }
+
+  onComment(value: string): void {
+    const m = value.match(this.pattern);
+    if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  parse(): void {
+    for (const line of this.source.split("\n")) {
+      this.lineno += 1;
+      let quote: string | null = null;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (quote !== null) {
+          if (char === "\\") i += 1;
+          else if (char === quote) quote = null;
+        } else if (char === '"' || char === "'") {
+          quote = char;
+        } else if (char === "#") {
+          this.onComment(line.slice(i));
+          break;
+        }
+      }
+    }
+  }
+}
+
+export class ParserExtractor {
+  constructor(public pattern: RegExp) {}
+
+  annotations(file: string): Annotation[] {
+    const contents = File.read(file);
+    const parser = new Parser(contents, { pattern: this.pattern });
+    parser.parse();
+    return parser.comments;
+  }
+}
+
+export class PatternExtractor {
+  constructor(public pattern: RegExp) {}
+
+  annotations(file: string): Annotation[] {
+    const list: Annotation[] = [];
+    let lineno = 0;
+    for (const line of File.readlines(file)) {
+      lineno += 1;
+      const m = line.match(this.pattern);
+      if (m) list.push(new Annotation(lineno, m[1], m[2]));
+    }
+    return list;
+  }
+}
 
 export class Annotation {
   static directories: string[] = [...DEFAULT_DIRECTORIES];
@@ -54,6 +119,13 @@ export function resetAnnotationRegistry(): void {
 }
 
 function registerDefaults(): void {
+  Annotation.registerExtensions(
+    "builder",
+    "rb",
+    "rake",
+    "ruby",
+    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`)),
+  );
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", slash);
   Annotation.registerExtensions("css", "scss", "sass", "less", slash);
@@ -95,10 +167,17 @@ export class SourceAnnotationExtractor {
         for (const [k, v] of this.findIn(item)) results.set(k, v);
         continue;
       }
-      const ext = Annotation.extensions.find((e) => e.test.test(item));
-      if (!ext) continue;
-      const annotations = extractFromFile(item, ext.builder(this.tag));
-      if (annotations.length > 0) results.set(item, annotations);
+      const extension = Annotation.extensions.find((e) => e.test.test(item));
+      if (extension) {
+        let pattern = extension.builder(this.tag);
+
+        if (pattern == null) continue;
+
+        if (pattern instanceof RegExp) pattern = new PatternExtractor(pattern);
+
+        const annotations = pattern.annotations(item);
+        if (annotations.length > 0) results.set(item, annotations);
+      }
     }
     return results;
   }
@@ -117,15 +196,4 @@ export class SourceAnnotationExtractor {
     }
     return lines.map((l) => `${l}\n`).join("");
   }
-}
-
-function extractFromFile(file: string, pattern: RegExp): Annotation[] {
-  const out: Annotation[] = [];
-  let lineno = 0;
-  for (const line of File.readlines(file)) {
-    lineno++;
-    const m = line.match(pattern);
-    if (m) out.push(new Annotation(lineno, m[1], m[2]));
-  }
-  return out;
 }

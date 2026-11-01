@@ -11,8 +11,10 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import {
+  File,
   getFs,
   getPath,
+  LOAD_PATH,
   Pathname,
   rbConstGet,
   RuntimeError,
@@ -22,6 +24,7 @@ import {
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { MessageVerifiers } from "@blazetrails/activesupport";
 import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
@@ -43,6 +46,16 @@ let _appClass: typeof Application | null = null;
 /** @internal */
 const _registered = new WeakSet<typeof Application>();
 
+const INITIAL_VARIABLES = [
+  "config",
+  "railties",
+  "routesReloader",
+  "reloaders",
+  "routes",
+  "helpers",
+  "appEnvConfig",
+];
+
 export class Application extends Engine {
   private _initialized = false;
   private _routesReloader?: RoutesReloader;
@@ -51,6 +64,12 @@ export class Application extends Engine {
   private _appEnvConfig?: Record<string, unknown>;
   private _credentials?: EncryptedConfiguration;
   private _deprecators?: Deprecators;
+  private _messageVerifiers?: MessageVerifiers;
+  private _ranLoadHooks = false;
+  private _initialVariableValues: Record<string, unknown>;
+  private _block?: (this: this) => void;
+  private _reloaders: unknown[] = [];
+  assets: unknown = undefined;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
   sandbox: boolean | null | undefined = undefined;
@@ -59,11 +78,39 @@ export class Application extends Engine {
     return this.sandbox;
   }
 
-  readonly reloaders: unknown[] = [];
+  get reloaders(): unknown[] {
+    return this._reloaders;
+  }
 
-  constructor() {
+  get defaultUrlOptions(): Record<string, unknown> {
+    return this.routes().defaultUrlOptions;
+  }
+
+  set defaultUrlOptions(value: Record<string, unknown>) {
+    this.routes().defaultUrlOptions = value;
+  }
+
+  /** @missingRailsCall new — PERMANENT */
+  constructor(
+    initialVariableValues: Record<string, unknown> = {},
+    block?: (this: Application) => void,
+  ) {
     super();
     this.reloader.executor = this.executor;
+    this._initialVariableValues = initialVariableValues;
+    this._block = block;
+  }
+
+  static override instance<T extends typeof Trailtie>(this: T): InstanceType<T> {
+    const instance = super.instance.call(this) as unknown as Application;
+    return instance.runLoadHooksBang() as unknown as InstanceType<T>;
+  }
+
+  static create(
+    initialVariableValues: Record<string, unknown> = {},
+    block?: (this: Application) => void,
+  ): Application {
+    return new this(initialVariableValues, block).runLoadHooksBang();
   }
 
   static get appClass(): typeof Application | null {
@@ -79,6 +126,7 @@ export class Application extends Engine {
     _appClass = subclass;
     if (fresh) {
       _registered.add(subclass);
+      this.addLibToLoadPathBang(subclass.findRoot(subclass.calledFrom()));
       runLoadHooks("before_configuration", subclass);
     }
   }
@@ -107,6 +155,27 @@ export class Application extends Engine {
       this._deprecators.set("trailties", deprecator());
     }
     return this._deprecators;
+  }
+
+  runLoadHooksBang(): this {
+    if (this._ranLoadHooks) return this;
+    this._ranLoadHooks = true;
+
+    for (const [variableName, value] of Object.entries(this._initialVariableValues)) {
+      if (INITIAL_VARIABLES.includes(variableName)) {
+        (this as unknown as Record<string, unknown>)[`_${variableName}`] = value;
+      }
+    }
+
+    if (this._block) this._block.call(this);
+    return this;
+  }
+
+  messageVerifiers(): MessageVerifiers {
+    return (this._messageVerifiers ??= new MessageVerifiers(
+      (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
+        this.keyGenerator(secretKeyBase).generateKey(salt),
+    ).rotateDefaults());
   }
 
   initialized(): boolean {
@@ -163,6 +232,16 @@ export class Application extends Engine {
     return this._orderedRailties;
   }
 
+  migrationRailties(): Array<Trailtie | string> {
+    return this.orderedRailties()
+      .flat()
+      .filter((railtie) => railtie !== this);
+  }
+
+  toApp(): this {
+    return this;
+  }
+
   /** @internal */
   railtiesInitializers(current: Collection): Collection {
     let initializers = new Collection();
@@ -176,7 +255,14 @@ export class Application extends Engine {
     return initializers;
   }
 
-  async initialize(group: InitializerGroup = "default"): Promise<this> {
+  static addLibToLoadPathBang(root: string): void {
+    const path = File.join(root, "lib");
+    if (File.isExist(path) && !LOAD_PATH.includes(path)) {
+      LOAD_PATH.unshift(path);
+    }
+  }
+
+  async initializeBang(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root);

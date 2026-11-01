@@ -23,8 +23,10 @@ import {
   OpenSSL,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
+import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import { LogSubscriber } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
+import { Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../rails.js";
 import type { Root } from "../paths.js";
 
@@ -428,6 +430,23 @@ export class Configuration extends EngineConfiguration {
 
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);
+  }
+
+  get colorizeLogging(): boolean {
+    return LogSubscriber.colorizeLogging;
+  }
+
+  set colorizeLogging(val: boolean) {
+    LogSubscriber.colorizeLogging = val;
+    (this.generators() as unknown as { colorizeLogging: boolean }).colorizeLogging = val;
+  }
+
+  annotations(): typeof Annotation {
+    return Annotation;
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
   }
 
   /** @internal */
