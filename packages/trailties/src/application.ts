@@ -171,18 +171,6 @@ export class Application extends Engine {
     return this;
   }
 
-  messageVerifiers(): MessageVerifiers {
-    return (this._messageVerifiers ??= new MessageVerifiers(
-      Object.assign(
-        (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
-          this.keyGenerator(secretKeyBase).generateKey(salt),
-        {
-          parameters: ["secretKeyBase"],
-        },
-      ),
-    ).rotateDefaults());
-  }
-
   initialized(): boolean {
     return this._initialized;
   }
@@ -237,18 +225,18 @@ export class Application extends Engine {
     return this._orderedRailties;
   }
 
-  migrationRailties(): Array<Trailtie | string> {
-    return this.orderedRailties()
-      .flat()
-      .filter((railtie) => railtie !== this);
-  }
-
   toApp(): this {
     return this;
   }
 
   override async helpersPaths(): Promise<string[]> {
     return this.config.helpersPaths;
+  }
+
+  migrationRailties(): Array<Trailtie | string> {
+    return this.orderedRailties()
+      .flat()
+      .filter((railtie) => railtie !== this);
   }
 
   /** @internal */
@@ -262,6 +250,34 @@ export class Application extends Engine {
       }
     }
     return initializers;
+  }
+
+  rakeTasks(block: TrailtieBlock): void {
+    (this.constructor as typeof Application).rakeTasks(block);
+  }
+
+  initializer(...args: Parameters<typeof Application.initializer>): void {
+    (this.constructor as typeof Application).initializer(...args);
+  }
+
+  runner(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).runner(blk);
+  }
+
+  console(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).console(blk);
+  }
+
+  generators(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).generators(blk);
+  }
+
+  isolateNamespace(mod: Parameters<typeof Application.isolateNamespace>[0]): void {
+    (this.constructor as typeof Application).isolateNamespace(mod);
+  }
+
+  server(blk: TrailtieBlock): void {
+    (this.constructor as typeof Application).server(blk);
   }
 
   static addLibToLoadPathBang(root: string): void {
@@ -320,34 +336,6 @@ export class Application extends Engine {
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
 
-  rakeTasks(block: TrailtieBlock): void {
-    (this.constructor as typeof Application).rakeTasks(block);
-  }
-
-  initializer(...args: Parameters<typeof Application.initializer>): void {
-    (this.constructor as typeof Application).initializer(...args);
-  }
-
-  runner(blk: TrailtieBlock): void {
-    (this.constructor as typeof Application).runner(blk);
-  }
-
-  console(blk: TrailtieBlock): void {
-    (this.constructor as typeof Application).console(blk);
-  }
-
-  generators(blk: TrailtieBlock): void {
-    (this.constructor as typeof Application).generators(blk);
-  }
-
-  isolateNamespace(mod: Parameters<typeof Application.isolateNamespace>[0]): void {
-    (this.constructor as typeof Application).isolateNamespace(mod);
-  }
-
-  server(blk: TrailtieBlock): void {
-    (this.constructor as typeof Application).server(blk);
-  }
-
   async requireEnvironmentBang(): Promise<void> {
     const environment = (await (await this.paths()).get("config/environment")!.existent())[0];
     if (environment) await import(getPath().pathToFileURL!(environment).href);
@@ -382,6 +370,18 @@ export class Application extends Engine {
       this._keyGenerators.set(secretKeyBase, gen);
     }
     return gen;
+  }
+
+  messageVerifiers(): MessageVerifiers {
+    return (this._messageVerifiers ??= new MessageVerifiers(
+      Object.assign(
+        (salt: string, { secretKeyBase = this.secretKeyBase() }: { secretKeyBase?: string } = {}) =>
+          this.keyGenerator(secretKeyBase).generateKey(salt),
+        {
+          parameters: ["secretKeyBase"],
+        },
+      ),
+    ).rotateDefaults());
   }
 
   messageVerifier(verifierName: string): MessageVerifier {
