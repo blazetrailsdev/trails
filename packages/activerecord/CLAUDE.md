@@ -731,6 +731,7 @@ so a retry resumes at the blocked one. SQLite skips the handler where waiting
 would deadlock, and no driver reports that case apart from an ordinary
 `SQLITE_BUSY`, so the adapter tracks it: a write that follows a `SELECT` or
 `WITH` in an open transaction raises at once, including a `SELECT` that took no
-lock. This is a genuine language shortcoming, ruled
+lock. A SAVEPOINT after the read clears the tracking, and a `-- ` comment before
+the `SELECT` hides it, so those writes wait for the deadline. This is a genuine language shortcoming, ruled
 permanent by the repo owner on 2026-11-01 (trails#9582), and
 `@noRailsEquivalent PERMANENT` on those functions points at it.
