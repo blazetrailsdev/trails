@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
-/** @noRailsEquivalent CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks */
+/** @noRailsEquivalent CONVERGEABLE new-command-run-bundle-is-a-public-task */
 class NewAppGenerator extends AppGenerator {
   declare static generator: AppGenerator | undefined;
 
