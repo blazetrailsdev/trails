@@ -11,7 +11,6 @@ export class StatsCommand extends Base {
   }
 
   /**
-   * @missingRailsCall application_root — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
    * @missingRailsCall new — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
    * @missingRailsArgs join — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
    * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
