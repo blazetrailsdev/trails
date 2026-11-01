@@ -1,5 +1,12 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { STDOUT, exit, include, rbArgv, type Included } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  STDOUT,
+  exit,
+  include,
+  rbArgv,
+  type Included,
+} from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
@@ -142,8 +149,13 @@ export class ConsoleCommand extends Base {
     }
   }
 
+  /** @missingRailsArgs start — CONVERGEABLE console-sandbox-rollback-and-irb-helpers */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
-    await Console.start(Trails.application as unknown as ConsoleApp, this.options);
+    const railsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
+    if (railsConsole.isSandbox()) {
+      throw new NotImplementedError("console sandbox rollback is not ported");
+    }
+    await railsConsole.start();
   }
 }

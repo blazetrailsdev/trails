@@ -7,7 +7,8 @@ import { join } from "node:path";
 import { capture, isPlainObject } from "@blazetrails/activesupport";
 import { Dir, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
 import { invoke } from "../command.js";
-import { Console } from "./console.js";
+import { Trails } from "../rails.js";
+import { Console, ConsoleCommand } from "./console.js";
 
 const io = vi.hoisted(() => ({ server: null as REPLServer | null, output: "", piped: "" }));
 
@@ -37,8 +38,20 @@ function startConsole(): Promise<void> {
 
 describe("ConsoleCommand (trails)", () => {
   it("refuses --sandbox rather than promising a rollback it cannot perform", async () => {
-    const app = { sandbox: null, config: {}, name: () => "app", loadConsole() {} };
-    await expect(new Console(app, { sandbox: true }).start()).rejects.toThrow("sandbox");
+    Trails.application = {
+      sandbox: null,
+      config: {},
+      name: () => "app",
+      loadConsole() {},
+    } as never;
+    try {
+      const printed = await capture(":stdout", () =>
+        expect(new ConsoleCommand([], ["--sandbox"]).perform()).rejects.toThrow("sandbox"),
+      );
+      expect(printed).not.toContain("rolled back");
+    } finally {
+      Trails.application = null;
+    }
   });
 
   it("--help reaches Thor's help through Rails::Command.invoke", async () => {

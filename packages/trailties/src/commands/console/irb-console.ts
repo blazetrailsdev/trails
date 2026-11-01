@@ -1,12 +1,4 @@
-import { Base as ActiveRecordBase, Migration } from "@blazetrails/activerecord";
-import {
-  Dir,
-  NotImplementedError,
-  STDERR,
-  getFs,
-  getPath,
-  getReplAsync,
-} from "@blazetrails/ruby-compat";
+import { Dir, STDERR, getFs, getPath, getReplAsync } from "@blazetrails/ruby-compat";
 import { Trails } from "../../rails.js";
 
 const BLUE = "\u001b[34m";
@@ -15,9 +7,9 @@ const CLEAR = "\u001b[0m";
 
 export class IRBConsole {
   /** @internal */
-  private app: { name(): string; sandbox?: boolean | null };
+  private app: { name(): string };
 
-  constructor(app: { name(): string; sandbox?: boolean | null }) {
+  constructor(app: { name(): string }) {
     this.app = app;
   }
 
@@ -33,14 +25,11 @@ export class IRBConsole {
    * @inventedArm clearAllConnectionsBang — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
    */
   async start(): Promise<void> {
-    if (this.app.sandbox) {
-      throw new NotImplementedError("console sandbox rollback is not ported");
-    }
-
+    const { Base: ActiveRecordBase, Migration } = await import("@blazetrails/activerecord");
     const env = this.colorizedEnv();
     const promptPrefix = `${this.app.name()}(${env})`;
 
-    const context = await this.loadModels();
+    const context = await this.loadModels({ Base: ActiveRecordBase, Migration });
     const repl = await getReplAsync();
     const server = repl.start({ prompt: `${promptPrefix}> `, useGlobal: true });
     Object.assign(server.context, context);
@@ -66,11 +55,7 @@ export class IRBConsole {
    * @internal
    * @noRailsEquivalent CONVERGEABLE console-sandbox-rollback-and-irb-helpers
    */
-  private async loadModels(): Promise<Record<string, unknown>> {
-    const context: Record<string, unknown> = {
-      Base: ActiveRecordBase,
-      Migration,
-    };
+  private async loadModels(context: Record<string, unknown>): Promise<Record<string, unknown>> {
     const fs = getFs();
     const path = getPath();
     const modelsDir = path.join(Dir.pwd(), "app", "models");
