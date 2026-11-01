@@ -20,6 +20,8 @@ import { RuntimeError } from "./runtime-error.js";
  *
  * `exception: true` raises each of those answers (`process.c:4868-4896`). Node
  * reports no core-dump flag, so the failure message has no `(core dumped)`.
+ * A host whose process adapter has no `signo` spawns no child, so it never
+ * reaches the signal arm.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#system`
  * (`vendor/ruby/v3.3.11/process.c:4841`).
@@ -69,6 +71,7 @@ export async function rbFSystem(
   }
 }
 
+/** @inventedArm throw — CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern */
 function rbSyserrFailStr(error: Error | undefined, mesg: string): never {
   const code = (error as { code?: string } | undefined)?.code;
   const klass = Errno[code as keyof typeof Errno];
