@@ -293,4 +293,13 @@ describe("AppGenerator (trails-only)", () => {
     }
     expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
   });
+
+  it("writes .node-version twice without a conflict when usingNode", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { javascript: "esbuild" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(fs.readFileSync(path.join(tmpDir, "my-app/.node-version"), "utf-8")).toBe("24.16.0\n");
+  });
 });
