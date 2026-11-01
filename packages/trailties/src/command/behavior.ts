@@ -19,8 +19,8 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   app: async () => (await import("../commands/app.js")).appTemplateCommand,
   notes: async () => (await import("../commands/notes.js"), null),
   stats: async () => (await import("../commands/stats.js"), null),
-  credentials: async () => (await import("../commands/credentials.js")).credentialsCommand,
-  encrypted: async () => (await import("../commands/encrypted.js")).encryptedCommand,
+  credentials: async () => (await import("../commands/credentials.js"), null),
+  encrypted: async () => (await import("../commands/encrypted.js"), null),
   dev: async () => (await import("../commands/dev.js"), null),
 };
 
