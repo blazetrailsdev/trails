@@ -63,6 +63,8 @@ describe("AppGeneratorTest", () => {
   it("skip git", async () => {
     await makeGen("sqlite", { skipGit: true }).invokeAll();
     expect(exists(".git")).toBe(false);
+    expect(exists(".gitignore")).toBe(false);
+    expect(exists(".gitattributes")).toBe(false);
   });
 });
 
