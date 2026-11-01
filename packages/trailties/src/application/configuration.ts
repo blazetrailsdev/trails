@@ -586,7 +586,7 @@ export class Configuration extends EngineConfiguration {
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE generate-local-secret-is-one-sync-body */
   async loadLocalSecret(): Promise<string> {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
