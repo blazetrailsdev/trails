@@ -994,6 +994,36 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`class TestParser < Ripper` (test_unit/test_parser.rb:52-133) is the " +
+      "fallback for a Ruby without Prism, parsing Ruby through Ripper's event " +
+      "callbacks. The port reads TypeScript through the compiler API in the " +
+      "Prism arm's `ranges`, so no Ripper event exists to handle.",
+    names: [
+      "initialize",
+      "parse",
+      "on_def",
+      "on_method_add_block",
+      "on_command_call",
+      "first_arg",
+      "just_lineno",
+      "on_method_add_arg",
+      "on_command",
+      "on_stmts_add",
+      "on_arg_paren",
+      "on_bodystmt",
+      "on_ident",
+      "on_do_block",
+      "on_stmts_new",
+      "on_brace_block",
+      "on_args_new",
+      "on_args_add",
+      "on_args_add_block",
+    ],
+    rubyFiles: ["test_unit/test_parser.rb"],
+    packages: ["trailties"],
+  },
+  {
+    reason:
       "ActiveSupport::Dependencies (dependencies.rb), " +
       "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
       "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
