@@ -65,10 +65,7 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/**
- * @missingRailsArgs invoke_rake — PERMANENT
- * @inventedArm replaceAll — PERMANENT
- */
+/** @inventedArm replaceAll — PERMANENT */
 export async function invoke(
   fullNamespace: string,
   args: string[] = [],
