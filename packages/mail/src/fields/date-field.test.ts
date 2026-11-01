@@ -8,7 +8,7 @@ describe("Mail::DateField", () => {
       expect(() => new DateField("12 Aug 2009 00:00:02 GMT")).not.toThrow();
     });
     it("should be able to tell the time", () => {
-      expect(new DateField("12 Aug 2009 00:00:02 GMT").dateTime()).toBeInstanceOf(
+      expect(new DateField("12 Aug 2009 00:00:02 GMT").dateTime()?.constructor).toEqual(
         Temporal.PlainDateTime,
       );
     });
@@ -16,7 +16,7 @@ describe("Mail::DateField", () => {
       const t = new DateField("12 Aug 2009 00:00:02 GMT");
       expect(t.name).toEqual("Date");
       expect(t.value).toEqual("Wed, 12 Aug 2009 00:00:02 +0000");
-      expect(t.dateTime()?.equals(DateTime.parse("12 Aug 2009 00:00:02 GMT") as never)).toBe(true);
+      expect(String(t.dateTime())).toEqual(String(DateTime.parse("12 Aug 2009 00:00:02 GMT")));
     });
     it("should accept nil as a value", () => {
       const t = new DateField(null);
@@ -36,10 +36,11 @@ describe("Mail::DateField", () => {
     });
     it("should give today's date if no date is specified", () => {
       const now = DateTime.now();
-      vi.spyOn(DateTime, "now").mockReturnValue(now);
-      expect(
-        new DateField().dateTime()?.equals(DateTime.parse(strftime(now, "%FT%T%:z")) as never),
-      ).toBe(true);
+      const spy = vi.spyOn(DateTime, "now").mockReturnValue(now);
+      expect(String(new DateField().dateTime())).toEqual(
+        String(DateTime.parse(strftime(now, "%FT%T%:z"))),
+      );
+      expect(spy).toHaveBeenCalled();
     });
     it("should handle invalid date", () => {
       const field = new DateField("12 Aug 2009 30:00:02 GMT");
