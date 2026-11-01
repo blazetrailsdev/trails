@@ -80,6 +80,11 @@ export async function invoke(
     if (command && "perform" in command) {
       if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
         await command.perform(name, args, config);
+      } else if (
+        commandName === fullNamespace &&
+        !createProgram().commands.some((c) => c.name() === fullNamespace)
+      ) {
+        await command.perform("help", [], config);
       } else {
         await invokeRake(fullNamespace, args, config);
       }
