@@ -50,7 +50,7 @@ describe("ServerTest", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(Handler.Node, "run").mockImplementation((async () => {
       output.push("Listening");
-      return { once() {} };
+      return { on() {} };
     }) as never);
 
     vi.spyOn(Trails, "root").mockReturnValue(Dir.mktmpdir());

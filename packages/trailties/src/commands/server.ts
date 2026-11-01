@@ -75,7 +75,7 @@ export class Server {
     const { Port: port, Host: host } = this.options;
     if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
       const server = await Handler.Node.run(railsApp, { Port: port, Host: host });
-      if (afterStopCallback != null) server.once("close", afterStopCallback);
+      if (afterStopCallback != null) server.on("close", afterStopCallback);
       return;
     }
     const { DevServer } = await import("../server/dev-server.js");

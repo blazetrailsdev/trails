@@ -87,7 +87,7 @@ describe("trails server environment (trails)", () => {
     ) => {
       runApps.push(app);
       runOptions.push(options);
-      return { once() {} };
+      return { on() {} };
     }) as never);
     vi.spyOn(Trails, "root").mockReturnValue(tmpDir);
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -159,7 +159,7 @@ describe("trails server environment (trails)", () => {
     } as never);
     vi.mocked(Handler.Node.run).mockImplementation((async () => {
       order.push("run");
-      return { once() {} };
+      return { on() {} };
     }) as never);
 
     await run("-e", "production");
