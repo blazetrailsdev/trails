@@ -739,4 +739,11 @@ describe("each", () => {
     each(new Set(["c"]), (i) => seen.push(i));
     expect(seen).toEqual([["a", 1], ["b", 2], "c"]);
   });
+
+  it("calls a receiver's own each", () => {
+    const seen: unknown[] = [];
+    const recv = { each: (block: (i: unknown) => void) => block("own") };
+    each(recv, (i) => seen.push(i));
+    expect(seen).toEqual(["own"]);
+  });
 });

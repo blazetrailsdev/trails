@@ -894,6 +894,11 @@ export function each<R extends object>(
 ): R {
   if (!block) return recv;
   const yielder = block as (item: unknown) => unknown;
+  const own = (recv as { each?: unknown }).each;
+  if (typeof own === "function") {
+    own.call(recv, yielder);
+    return recv;
+  }
   for (const i of isPlainHash(recv) ? Object.entries(recv) : (recv as Iterable<unknown>)) {
     yielder(i);
   }

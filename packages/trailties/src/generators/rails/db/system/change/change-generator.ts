@@ -19,8 +19,6 @@ import { AppName } from "../../../../app-name.js";
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface ChangeGeneratorOptions extends GeneratorOptions {
   to: string;
   database?: string;
@@ -30,9 +28,10 @@ export interface ChangeGeneratorOptions extends GeneratorOptions {
 export interface ChangeGenerator extends Included<typeof AppName> {}
 
 export class ChangeGenerator extends GeneratorBase {
+  static override readonly name = "Rails::Generators::Db::System::ChangeGenerator";
+
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, AppName);
-    void this.sourceRoot(File.expandPath("../../../app/templates", __dir__));
     this.classOption("to", { required: true, desc: "The database system to switch to." });
 
     this.noCommands(() => this.methodAdded("isDevcontainer"));
@@ -40,6 +39,12 @@ export class ChangeGenerator extends GeneratorBase {
     this.methodAdded("editPackageJson");
     this.methodAdded("editDockerfile");
     this.methodAdded("editDevcontainerFiles");
+  }
+
+  /** @internal */
+  protected static override async defaultGeneratorRoot(): Promise<string | undefined> {
+    const path = File.expandPath(File.join(this.baseName()!, "app"), this.baseRoot());
+    if (File.isExist(path)) return path;
   }
 
   private _database?: Database;
@@ -151,7 +156,7 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   editDevcontainerFiles(): void {
-    if (!File.isExist(File.join(this.destinationRoot, ".devcontainer"))) return;
+    if (!this.isDevcontainer()) return;
     this.editDevcontainerJson();
     this.editComposeYaml();
   }

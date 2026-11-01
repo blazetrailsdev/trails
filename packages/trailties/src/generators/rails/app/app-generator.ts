@@ -224,7 +224,6 @@ export class AppGenerator extends AppBase {
     this.methodAdded("applyRailsTemplate");
     this.noCommands(() => this.methodAdded("eslint"));
     this.noCommands(() => this.methodAdded("databaseYml"));
-    this.noCommands(() => this.methodAdded("template"));
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
