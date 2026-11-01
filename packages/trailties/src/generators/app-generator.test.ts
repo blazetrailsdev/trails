@@ -196,6 +196,12 @@ describe("AppGenerator", () => {
     });
   });
 
+  it("implied options with conflicting option", async () => {
+    await expect(
+      makeGen("sqlite", { skipActiveJob: true, skipActiveStorage: false }).invokeAll(),
+    ).rejects.toThrow(/conflicting option/i);
+  });
+
   it("skip active job option", async () => {
     await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
 

@@ -85,15 +85,6 @@ export abstract class AppBase extends GeneratorBase {
   }
 
   static addSharedOptionsFor(name: string): void {
-    const skip = (option: string, desc: string, aliases?: string | string[]): void => {
-      this.classOption(option, {
-        type: "boolean",
-        ...(aliases === undefined ? {} : { aliases }),
-        default: null,
-        desc,
-      });
-    };
-
     this.classOption("name", { type: "string", aliases: "-n", desc: "Name of the app" });
     this.classOption("template", {
       type: "string",
@@ -107,16 +98,56 @@ export abstract class AppBase extends GeneratorBase {
       enum: [...DATABASES],
       desc: "Preconfigure for selected database",
     });
-    skip("skipGit", "Skip git init, .gitignore and .gitattributes", "-G");
-    skip("skipDocker", "Skip Dockerfile, .dockerignore and bin/docker-entrypoint");
-    skip("skipKeeps", "Skip source control .keep files");
-    skip("skipActionMailer", "Skip Action Mailer files", "-M");
-    skip("skipActionMailbox", "Skip Action Mailbox gem");
-    skip("skipActionText", "Skip Action Text gem");
-    skip("skipActiveRecord", "Skip Active Record files", "-O");
-    skip("skipActiveJob", "Skip Active Job");
-    skip("skipActiveStorage", "Skip Active Storage files");
-    skip("skipActionCable", "Skip Action Cable files", "-C");
+    this.classOption("skipGit", {
+      type: "boolean",
+      aliases: "-G",
+      default: null,
+      desc: "Skip git init, .gitignore and .gitattributes",
+    });
+    this.classOption("skipDocker", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Dockerfile, .dockerignore and bin/docker-entrypoint",
+    });
+    this.classOption("skipKeeps", {
+      type: "boolean",
+      default: null,
+      desc: "Skip source control .keep files",
+    });
+    this.classOption("skipActionMailer", {
+      type: "boolean",
+      aliases: "-M",
+      default: null,
+      desc: "Skip Action Mailer files",
+    });
+    this.classOption("skipActionMailbox", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Action Mailbox gem",
+    });
+    this.classOption("skipActionText", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Action Text gem",
+    });
+    this.classOption("skipActiveRecord", {
+      type: "boolean",
+      aliases: "-O",
+      default: null,
+      desc: "Skip Active Record files",
+    });
+    this.classOption("skipActiveJob", { type: "boolean", default: null, desc: "Skip Active Job" });
+    this.classOption("skipActiveStorage", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Active Storage files",
+    });
+    this.classOption("skipActionCable", {
+      type: "boolean",
+      aliases: "-C",
+      default: null,
+      desc: "Skip Action Cable files",
+    });
     this.classOption("skipAssetPipeline", { type: "boolean", aliases: "-A", default: null });
     this.classOption("skipJavascript", {
       type: "boolean",
@@ -124,35 +155,78 @@ export abstract class AppBase extends GeneratorBase {
       default: name === "plugin" ? true : null,
       desc: "Skip JavaScript files",
     });
-    skip("skipHotwire", "Skip Hotwire integration");
-    skip("skipJbuilder", "Skip jbuilder gem");
-    skip("skipTest", "Skip test files", "-T");
-    skip("skipSystemTest", "Skip system test files");
-    skip("skipBootsnap", "Skip bootsnap gem");
-    skip("skipDevGems", "Skip development gems (e.g., web-console)");
-    skip("skipThruster", "Skip Thruster setup");
-    skip("skipEslint", "Skip ESLint setup");
-    skip("skipBrakeman", "Skip brakeman setup");
-    skip("skipCi", "Skip GitHub CI files");
-    skip("skipKamal", "Skip Kamal setup");
-    skip("skipSolid", "Skip Solid Cache, Queue, and Cable setup");
-    skip("dev", `Set up the ${name} with package.json pointing to your Trails checkout`);
-    skip("devcontainer", "Generate devcontainer files");
-    skip(
-      "edge",
-      `Set up the ${name} with a package.json pointing to the ${this.edgeBranch()} branch on the Trails repository`,
-    );
-    skip(
-      "main",
-      `Set up the ${name} with package.json pointing to Trails repository main branch`,
-      "--master",
-    );
+    this.classOption("skipHotwire", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Hotwire integration",
+    });
+    this.classOption("skipJbuilder", { type: "boolean", default: null, desc: "Skip jbuilder gem" });
+    this.classOption("skipTest", {
+      type: "boolean",
+      aliases: "-T",
+      default: null,
+      desc: "Skip test files",
+    });
+    this.classOption("skipSystemTest", {
+      type: "boolean",
+      default: null,
+      desc: "Skip system test files",
+    });
+    this.classOption("skipBootsnap", { type: "boolean", default: null, desc: "Skip bootsnap gem" });
+    this.classOption("skipDevGems", {
+      type: "boolean",
+      default: null,
+      desc: "Skip development gems (e.g., web-console)",
+    });
+    this.classOption("skipThruster", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Thruster setup",
+    });
+    this.classOption("skipEslint", { type: "boolean", default: null, desc: "Skip ESLint setup" });
+    this.classOption("skipBrakeman", {
+      type: "boolean",
+      default: null,
+      desc: "Skip brakeman setup",
+    });
+    this.classOption("skipCi", { type: "boolean", default: null, desc: "Skip GitHub CI files" });
+    this.classOption("skipKamal", { type: "boolean", default: null, desc: "Skip Kamal setup" });
+    this.classOption("skipSolid", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Solid Cache, Queue, and Cable setup",
+    });
+    this.classOption("dev", {
+      type: "boolean",
+      default: null,
+      desc: `Set up the ${name} with package.json pointing to your Trails checkout`,
+    });
+    this.classOption("devcontainer", {
+      type: "boolean",
+      default: null,
+      desc: "Generate devcontainer files",
+    });
+    this.classOption("edge", {
+      type: "boolean",
+      default: null,
+      desc: `Set up the ${name} with a package.json pointing to the ${this.edgeBranch()} branch on the Trails repository`,
+    });
+    this.classOption("main", {
+      type: "boolean",
+      aliases: "--master",
+      default: null,
+      desc: `Set up the ${name} with package.json pointing to Trails repository main branch`,
+    });
     this.classOption("rc", {
       type: "string",
       default: null,
       desc: "Path to file containing extra configuration options for rails command",
     });
-    skip("noRc", "Skip loading of extra configuration options from .railsrc file");
+    this.classOption("noRc", {
+      type: "boolean",
+      default: null,
+      desc: "Skip loading of extra configuration options from .railsrc file",
+    });
     this.classOption("help", {
       type: "boolean",
       aliases: "-h",
@@ -268,17 +342,16 @@ export abstract class AppBase extends GeneratorBase {
 
   /** @internal */
   async reportImpliedOptions(): Promise<void> {
-    const dasherized = (name: string): string => dasherize(underscore(name));
     if (this._impliedOptions === undefined || Object.keys(this._impliedOptions).length === 0)
       return;
 
     this.say("Based on the specified options, the following options will also be activated:");
     this.say("");
     for (const [name, reasons] of Object.entries(this._impliedOptions)) {
-      const dueTo = reasons.map((reason) => `--${dasherized(reason)}`).join(", ");
-      this.say(`  --${dasherized(name)} [due to ${dueTo}]`);
+      const dueTo = reasons.map((reason) => `--${dasherize(underscore(reason))}`).join(", ");
+      this.say(`  --${dasherize(underscore(name))} [due to ${dueTo}]`);
       if (this._impliedOptionsConflicts.includes(name)) {
-        this.say(`    ERROR: Conflicts with --no-${dasherized(name)}`, "red");
+        this.say(`    ERROR: Conflicts with --no-${dasherize(underscore(name))}`, "red");
       }
     }
     this.say("");
