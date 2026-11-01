@@ -24,21 +24,21 @@ describe("TesPushDir", () => {
 
     let dirs = loader.dirs();
     expect(dirs).toEqual(Object.keys(nonIgnoredRoots));
-    expect(Object.isFrozen(dirs)).toBe(true);
+    expect(Object.isFrozen(dirs)).toBeTruthy();
 
     dirs = loader.dirs({ namespaces: true });
     expect(dirs).toEqual(nonIgnoredRoots);
-    expect(Object.isFrozen(dirs)).toBe(true);
-    expect(dirs).not.toBe(roots);
+    expect(Object.isFrozen(dirs)).toBeTruthy();
+    expect(dirs !== roots).toBeTruthy();
 
     dirs = loader.dirs({ ignored: true });
     expect(dirs).toEqual(Object.keys(roots));
-    expect(Object.isFrozen(dirs)).toBe(true);
+    expect(Object.isFrozen(dirs)).toBeTruthy();
 
     dirs = loader.dirs({ namespaces: true, ignored: true });
     expect(dirs).toEqual(roots);
-    expect(Object.isFrozen(dirs)).toBe(true);
-    expect(dirs).not.toBe(roots);
+    expect(Object.isFrozen(dirs)).toBeTruthy();
+    expect(dirs !== roots).toBeTruthy();
   }
 
   it("accepts dirs as strings and associates them to the Object namespace", async () => {
@@ -97,18 +97,23 @@ describe("TesPushDir", () => {
 
   it("raises on non-existing directories", async () => {
     const dir = File.expandPath("non-existing");
-    const e = await loader.pushDir(dir).catch((error: unknown) => error);
-    expect(e).toBeInstanceOf(ZeitwerkError);
-    expect((e as ZeitwerkError).message).toBe(`the root directory ${dir} does not exist`);
+    const promise = loader.pushDir(dir);
+    await expect(promise).rejects.toThrow(ZeitwerkError);
+    const e = await promise.catch((error: unknown) => error);
+    expect((e as ZeitwerkError).message).toEqual(`the root directory ${dir} does not exist`);
   });
 
   it("raises if the namespace is not a class or module object", async () => {
-    const e = await loader.pushDir(".", { namespace: ":foo" }).catch((error: unknown) => error);
-    expect((e as ZeitwerkError).message).toBe(":foo is not a class or module object, should be");
+    const promise = loader.pushDir(".", { namespace: ":foo" });
+    await expect(promise).rejects.toThrow(ZeitwerkError);
+    const e = await promise.catch((error: unknown) => error);
+    expect((e as ZeitwerkError).message).toEqual(":foo is not a class or module object, should be");
   });
 
   it("raises if the namespace is anonymous", async () => {
-    const e = await loader.pushDir(".", { namespace: class {} }).catch((error: unknown) => error);
-    expect((e as ZeitwerkError).message).toBe("root namespaces cannot be anonymous");
+    const promise = loader.pushDir(".", { namespace: class {} });
+    await expect(promise).rejects.toThrow(ZeitwerkError);
+    const e = await promise.catch((error: unknown) => error);
+    expect((e as ZeitwerkError).message).toEqual("root namespaces cannot be anonymous");
   });
 });

@@ -18,15 +18,15 @@ describe("TestCref", () => {
   });
 
   it("#cname", () => {
-    expect(newCref().cname).toBe("Foo");
+    expect(newCref().cname).toEqual("Foo");
   });
 
   it("#path for Object", () => {
-    expect(newCref(Object).path()).toBe("Foo");
+    expect(newCref(Object).path()).toEqual("Foo");
   });
 
   it("#path for another namespace", () => {
-    expect(newCref().path()).toBe(`${rbModName(klass)}::Foo`);
+    expect(newCref().path()).toEqual(`${rbModName(klass)}::Foo`);
   });
 
   it("#to_s is #path", () => {
@@ -38,23 +38,23 @@ describe("TestCref", () => {
 
   it("#defined? finds a constant defined in mod", () => {
     constSet(klass, "Foo", 1);
-    expect(newCref().isDefined()).toBe(true);
+    expect(newCref().isDefined()).toBeTruthy();
   });
 
   it("#defined? ignores the ancestors", () => {
     const cname = "TMP_DIR";
-    expect(cname in Object.getPrototypeOf(klass)).toBe(true);
-    expect(newCref(klass, cname).isDefined()).toBe(false);
+    expect(cname in Object.getPrototypeOf(klass)).toBeTruthy();
+    expect(!newCref(klass, cname).isDefined()).toBeTruthy();
   });
 
   it("#set", () => {
-    expect(newCref().set(1)).toBe(1);
-    expect((klass as unknown as { Foo: number }).Foo).toBe(1);
+    expect(newCref().set(1)).toEqual(1);
+    expect((klass as unknown as { Foo: number }).Foo).toEqual(1);
   });
 
   it("#get", () => {
     constSet(klass, "Foo", 1);
-    expect(newCref().get()).toBe(1);
+    expect(newCref().get()).toEqual(1);
   });
 
   it("#get with unknown cname", () => {
@@ -65,10 +65,10 @@ describe("TestCref", () => {
     const cref = newCref();
 
     cref.set(1);
-    expect(cref.isDefined()).toBe(true);
+    expect(cref.isDefined()).toBeTruthy();
 
     cref.remove();
-    expect(cref.isDefined()).toBe(false);
+    expect(!cref.isDefined()).toBeTruthy();
   });
 
   it("#remove with unknown cname", () => {

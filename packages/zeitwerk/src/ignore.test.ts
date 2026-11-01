@@ -39,36 +39,36 @@ describe("TestIgnore", () => {
 
   it("returns true if a directory is ignored as is", async () => {
     await loader.ignore(thisDir);
-    expect(loader.isIgnores(thisDir)).toBe(true);
+    expect(loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns true if a file is ignored as is", async () => {
     await loader.ignore(thisFile);
-    expect(loader.isIgnores(thisFile)).toBe(true);
+    expect(loader.isIgnores(thisFile)).toBeTruthy();
   });
 
   it("returns true for a descendant of an ignored directory", async () => {
     await loader.ignore(ascendant);
-    expect(loader.isIgnores(thisDir)).toBe(true);
+    expect(loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns true for a file in a descendant of an ignored directory", async () => {
     await loader.ignore(ascendant);
-    expect(loader.isIgnores(thisFile)).toBe(true);
+    expect(loader.isIgnores(thisFile)).toBeTruthy();
   });
 
   it("returns false for the directory of an ignored file", async () => {
     await loader.ignore(thisFile);
-    expect(loader.isIgnores(thisDir)).toBe(false);
+    expect(!loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns false for an ascendant directory of an ignored directory", async () => {
     await loader.ignore(thisDir);
-    expect(loader.isIgnores(ascendant)).toBe(false);
+    expect(!loader.isIgnores(ascendant)).toBeTruthy();
   });
 
   it("returns false if nothing is ignored", () => {
-    expect(loader.isIgnores(thisDir)).toBe(false);
-    expect(loader.isIgnores(thisFile)).toBe(false);
+    expect(!loader.isIgnores(thisDir)).toBeTruthy();
+    expect(!loader.isIgnores(thisFile)).toBeTruthy();
   });
 });
