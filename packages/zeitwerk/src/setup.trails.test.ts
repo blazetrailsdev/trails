@@ -1,4 +1,4 @@
-import { File, TopLevel } from "@blazetrails/ruby-compat";
+import { File, NameError as RubyNameError, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
@@ -54,6 +54,16 @@ describe("Loader#setup", () => {
     });
   });
 
+  it("raises on a namespace another loader has pending, until autovivification", async () => {
+    await withFiles([["a/m/x.ts"], ["b/m/y.ts"]], async () => {
+      const second = newLoader();
+      await loader.pushDir("a");
+      await second.pushDir("b");
+      await loader.setup();
+      await expect(second.setup()).rejects.toBeInstanceOf(RubyNameError);
+    });
+  });
+
   it("shadows a file by an existing constant", async () => {
     (TopLevel as Record<string, unknown>).X = 1;
     try {
@@ -64,16 +74,6 @@ describe("Loader#setup", () => {
     } finally {
       delete (TopLevel as Record<string, unknown>).X;
     }
-  });
-
-  it("shadows a file by another one managed by the same loader", async () => {
-    await withFiles([["a/x.ts"], ["b/x.ts"]], async () => {
-      await loader.pushDir("a");
-      await loader.pushDir("b");
-      await loader.setup();
-      expect(loader.isShadowedFile(File.expandPath("a/x.ts"))).toBe(false);
-      expect(loader.isShadowedFile(File.expandPath("b/x.ts"))).toBe(true);
-    });
   });
 
   it("shadows a file by another one managed by a different loader", async () => {

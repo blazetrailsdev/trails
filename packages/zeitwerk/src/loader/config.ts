@@ -108,10 +108,10 @@ export const Config = {
     });
   },
 
-  onSetup(this: Loader, block: () => unknown): void {
-    this.mutex.synchronize(() => {
+  async onSetup(this: Loader, block: () => unknown): Promise<void> {
+    await this.mutex.synchronize(async () => {
       this.onSetupCallbacks.push(block);
-      if (this._setup) block();
+      if (this._setup) await block();
     });
   },
 

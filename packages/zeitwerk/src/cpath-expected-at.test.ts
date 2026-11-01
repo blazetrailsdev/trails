@@ -100,83 +100,52 @@ describe("TestCpathExpectedAtString", () => {
 
   const s = hooks();
 
-  it("returns the name of the root namespace for a root directory (Object)", async () => {
-    await withSetup(s.loader, [["README.md"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt(".")).toEqual("Object");
+  const expectCpath = (
+    files: [string][],
+    options: { dirs?: string[]; namespace?: object },
+    path: string | Pathname,
+    expected: string,
+  ) =>
+    withSetup(s.loader, files, options, async () => {
+      expect(await s.loader.cpathExpectedAt(path)).toEqual(expected);
     });
-  });
 
-  it("returns the name of the root namespace for a root directory (Object, Pathname)", async () => {
-    await withSetup(s.loader, [["README.md"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt(new Pathname("."))).toEqual("Object");
-    });
-  });
+  it("returns the name of the root namespace for a root directory (Object)", () =>
+    expectCpath([["README.md"]], {}, ".", "Object"));
 
-  it("returns the name of the root namespace for a root directory (Custom)", async () => {
-    await withSetup(s.loader, [], { dirs: ["."], namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt(".")).toEqual(M_REAL_NAME);
-    });
-  });
+  it("returns the name of the root namespace for a root directory (Object, Pathname)", () =>
+    expectCpath([["README.md"]], {}, new Pathname("."), "Object"));
 
-  it("returns the name of the root namespace for a root directory (Custom, Pathname)", async () => {
-    await withSetup(s.loader, [], { dirs: ["."], namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt(new Pathname("."))).toEqual(M_REAL_NAME);
-    });
-  });
+  it("returns the name of the root namespace for a root directory (Custom)", () =>
+    expectCpath([], { dirs: ["."], namespace: M }, ".", M_REAL_NAME));
 
-  it("returns the name of the root directory even if it is hidden", async () => {
-    await withSetup(s.loader, [[".foo/x.ts"]], { dirs: [".foo"] }, async () => {
-      expect(await s.loader.cpathExpectedAt(".foo")).toEqual("Object");
-    });
-  });
+  it("returns the name of the root namespace for a root directory (Custom, Pathname)", () =>
+    expectCpath([], { dirs: ["."], namespace: M }, new Pathname("."), M_REAL_NAME));
 
-  it("returns the cpath to a root file (Object)", async () => {
-    await withSetup(s.loader, [["x.ts"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt("x.ts")).toEqual("X");
-    });
-  });
+  it("returns the name of the root directory even if it is hidden", () =>
+    expectCpath([[".foo/x.ts"]], { dirs: [".foo"] }, ".foo", "Object"));
 
-  it("returns the cpath to a root file (Custom)", async () => {
-    await withSetup(s.loader, [["x.ts"]], { namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt("x.ts")).toEqual(`${M_REAL_NAME}::X`);
-    });
-  });
+  it("returns the cpath to a root file (Object)", () => expectCpath([["x.ts"]], {}, "x.ts", "X"));
 
-  it("returns the cpath to a subdirectory (Object)", async () => {
-    await withSetup(s.loader, [["a/x.ts"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt("a")).toEqual("A");
-    });
-  });
+  it("returns the cpath to a root file (Custom)", () =>
+    expectCpath([["x.ts"]], { namespace: M }, "x.ts", `${M_REAL_NAME}::X`));
 
-  it("returns the cpath to a subdirectory (Custom)", async () => {
-    await withSetup(s.loader, [["a/x.ts"]], { namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt("a")).toEqual(`${M_REAL_NAME}::A`);
-    });
-  });
+  it("returns the cpath to a subdirectory (Object)", () => expectCpath([["a/x.ts"]], {}, "a", "A"));
 
-  it("returns the cpath to a nested file (Object)", async () => {
-    await withSetup(s.loader, [["a/b/c/x.ts"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt("a/b/c/x.ts")).toEqual("A::B::C::X");
-    });
-  });
+  it("returns the cpath to a subdirectory (Custom)", () =>
+    expectCpath([["a/x.ts"]], { namespace: M }, "a", `${M_REAL_NAME}::A`));
 
-  it("returns the cpath to a nested file (Custom)", async () => {
-    await withSetup(s.loader, [["a/b/c/x.ts"]], { namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt("a/b/c/x.ts")).toEqual(`${M_REAL_NAME}::A::B::C::X`);
-    });
-  });
+  it("returns the cpath to a nested file (Object)", () =>
+    expectCpath([["a/b/c/x.ts"]], {}, "a/b/c/x.ts", "A::B::C::X"));
 
-  it("returns the cpath to a nested directory (Object)", async () => {
-    await withSetup(s.loader, [["a/b/c/x.ts"]], {}, async () => {
-      expect(await s.loader.cpathExpectedAt("a/b/c")).toEqual("A::B::C");
-    });
-  });
+  it("returns the cpath to a nested file (Custom)", () =>
+    expectCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c/x.ts", `${M_REAL_NAME}::A::B::C::X`));
 
-  it("returns the cpath to a nested directory (Custom)", async () => {
-    await withSetup(s.loader, [["a/b/c/x.ts"]], { namespace: M }, async () => {
-      expect(await s.loader.cpathExpectedAt("a/b/c")).toEqual(`${M_REAL_NAME}::A::B::C`);
-    });
-  });
+  it("returns the cpath to a nested directory (Object)", () =>
+    expectCpath([["a/b/c/x.ts"]], {}, "a/b/c", "A::B::C"));
+
+  it("returns the cpath to a nested directory (Custom)", () =>
+    expectCpath([["a/b/c/x.ts"]], { namespace: M }, "a/b/c", `${M_REAL_NAME}::A::B::C`));
 
   it("supports collapsed directories (Object)", async () => {
     await withSetup(s.loader, [["a/b/collapsed/x.ts"]], {}, async () => {

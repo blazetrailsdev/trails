@@ -46,6 +46,16 @@ describe("TestCref", () => {
     cref.remove();
   });
 
+  it("a seated constant outranks an autoload row", () => {
+    const cref = newCref();
+    cref.autoload("/foo");
+    constSet(klass, "Foo", 1);
+    expect(cref.isAutoload()).toBeNull();
+    expect(cref.autoload("/bar")).toBe(false);
+    expect(cref.remove()).toEqual(1);
+    expect(cref.isDefined()).toBe(false);
+  });
+
   it("#defined? finds a constant defined in mod", () => {
     constSet(klass, "Foo", 1);
     expect(newCref().isDefined()).toBeTruthy();

@@ -96,7 +96,7 @@ export class Loader {
         await this.defineAutoloadsForDir(rootDir, rootNamespace);
       }
 
-      for (const callback of this.onSetupCallbacks) callback();
+      for (const callback of this.onSetupCallbacks) await callback();
 
       this._setup = true;
     });
@@ -216,7 +216,7 @@ export class Loader {
 
   /** @internal */
   private async autoloadSubdir(cref: Cref, subdir: string): Promise<void> {
-    const autoloadPath = this.autoloadPathSetByMeFor(cref);
+    const autoloadPath = this.isAutoloadPathSetByMeFor(cref);
     if (autoloadPath != null) {
       if (await this.isRuby(autoloadPath)) {
         this.registerExplicitNamespace(cref);
@@ -295,7 +295,7 @@ export class Loader {
   }
 
   /** @internal */
-  private autoloadPathSetByMeFor(cref: Cref): string | null {
+  private isAutoloadPathSetByMeFor(cref: Cref): string | null {
     const autoloadPath = cref.isAutoload();
     if (autoloadPath != null && Object.hasOwn(this.autoloads, autoloadPath)) return autoloadPath;
     return null;

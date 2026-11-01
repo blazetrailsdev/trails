@@ -38,10 +38,12 @@ export class Cref {
   }
 
   isAutoload(): string | null {
+    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return null;
     return _autoloads.get(this.mod)?.get(this.cname) ?? null;
   }
 
   autoload(abspath: string): boolean {
+    if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return false;
     let cnames = _autoloads.get(this.mod);
     if (cnames === undefined) _autoloads.set(this.mod, (cnames = new Map()));
     cnames.set(this.cname, abspath);
@@ -65,7 +67,9 @@ export class Cref {
 
   /** @inventedArm if — PERMANENT */
   remove(): unknown {
-    if (_autoloads.get(this.mod)?.delete(this.cname)) return null;
+    const autoloadPath = this.isAutoload();
+    _autoloads.get(this.mod)?.delete(this.cname);
+    if (autoloadPath != null) return null;
     return rbModRemoveConst(this.mod, this.cname);
   }
 }
