@@ -79,6 +79,7 @@ type GroupStatics = {
   addRuntimeOptionsBang(): void;
   strictArgsPositionBang(): void;
   methodAdded(meth: string): void;
+  publicCommand(...names: string[]): void;
   namespace(name?: string | null): string;
   start(givenArgs?: string[], config?: GeneratorConfig): Promise<unknown>;
   sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;

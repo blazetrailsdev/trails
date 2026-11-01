@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
-import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "./app-base.js";
 import type { GeneratorConfig } from "./base.js";
 import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
@@ -10,6 +10,13 @@ import { TEMPLATES } from "./rails/app/templates/index.js";
 import { LOAD_DEFAULTS_VERSION } from "../application/configuration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
+const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
+  skipActionMailer: true,
+  skipActiveStorage: true,
+};
+
+const META_OPTIONS = ["minimal"];
 
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
@@ -132,8 +139,72 @@ export class AppGenerator extends AppBase {
   private _configTargetVersion: string | null = null;
   readonly sqliteDriver: SqliteDriver;
 
+  static override OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
+    ...AppBase.OPTION_IMPLICATIONS,
+    skipGit: ["skipDecryptedDiffs"],
+    minimal: [
+      "skipActionCable",
+      "skipActionMailbox",
+      "skipActionMailer",
+      "skipActionText",
+      "skipActiveJob",
+      "skipActiveStorage",
+      "skipBootsnap",
+      "skipBrakeman",
+      "skipCi",
+      "skipDevGems",
+      "skipDocker",
+      "skipHotwire",
+      "skipJavascript",
+      "skipJbuilder",
+      "skipKamal",
+      "skipEslint",
+      "skipSolid",
+      "skipSystemTest",
+      "skipThruster",
+    ],
+    api: ["skipAssetPipeline", "skipJavascript"],
+  };
+
   static {
     void this.sourceRoot(File.expandPath("rails/app/templates", __dir__));
+    this.addSharedOptionsFor("application");
+    this.classOption("version", {
+      type: "boolean",
+      aliases: "-v",
+      group: "rails",
+      desc: "Show Trails version number and quit",
+    });
+    this.classOption("api", {
+      type: "boolean",
+      desc: "Preconfigure smaller stack for API only apps",
+    });
+    this.classOption("minimal", { type: "boolean", desc: "Preconfigure a minimal trails app" });
+    this.classOption("javascript", {
+      type: "string",
+      aliases: ["-j", "--js"],
+      default: "importmap",
+      enum: JAVASCRIPT_OPTIONS,
+      desc: "Choose JavaScript approach",
+    });
+    this.classOption("css", {
+      type: "string",
+      aliases: "-c",
+      enum: CSS_OPTIONS,
+      desc: "Choose CSS processor. Check https://github.com/rails/cssbundling-rails for more options",
+    });
+    this.classOption("skipBundle", {
+      type: "boolean",
+      aliases: "-B",
+      default: null,
+      desc: "Don't run bundle install",
+    });
+    this.classOption("skipDecryptedDiffs", {
+      type: "boolean",
+      default: null,
+      desc: "Don't configure git to show decrypted diffs of encrypted credentials",
+    });
+    this.publicCommand("reportImpliedOptions");
     this.methodAdded("setDefaultAccessorsBang");
     this.methodAdded("createRoot");
     this.methodAdded("createRootFiles");
@@ -179,6 +250,14 @@ export class AppGenerator extends AppBase {
     super(args, localOptions, config);
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
+    this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
+    const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
+    const skipDependents = options.skipActiveStorage ? true : undefined;
+    this.options = Object.freeze({
+      skipActionMailbox: skipDependents,
+      skipActionText: skipDependents,
+      ...options,
+    });
     this.packageManager = this.options.packageManager ?? "pnpm";
     this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
@@ -299,8 +378,8 @@ export class AppGenerator extends AppBase {
               "@blazetrails/actionpack",
               "@blazetrails/actionview",
               "@blazetrails/trailties",
-              ...(this.skip("ActiveJob") ? [] : ["@blazetrails/activejob"]),
-              ...(this.skip("ActionCable") ? [] : ["@blazetrails/actioncable"]),
+              ...(this.options.skipActiveJob ? [] : ["@blazetrails/activejob"]),
+              ...(this.skipActionCable() ? [] : ["@blazetrails/actioncable"]),
             ]),
             ...dbDep,
           },
@@ -313,7 +392,7 @@ export class AppGenerator extends AppBase {
             typescript: "^5.8.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
-            ...(this.skip("Eslint")
+            ...(this.skipEslint()
               ? {}
               : { "@eslint/js": "^10.0.1", eslint: "^10.0.3", "typescript-eslint": "^8.57.0" }),
           },
@@ -535,7 +614,7 @@ ${
   }
 
   async createBinFiles(): Promise<void> {
-    const excludePattern = [this.skip("Eslint") ? /eslint/ : null].filter((p) => p != null);
+    const excludePattern = [this.skipEslint() ? /eslint/ : null].filter((p) => p != null);
 
     await this.createFile(
       "bin/trails",
@@ -687,7 +766,7 @@ Trails.application.routes().draw(function () {
 
     await this.databaseYml();
 
-    if (!this.skip("ActionCable")) {
+    if (!this.skipActionCable()) {
       await this.createFile(
         "config/cable.ts",
         `export default {
@@ -707,7 +786,7 @@ Trails.application.routes().draw(function () {
       );
     }
 
-    if (!this.skip("ActiveStorage")) {
+    if (!this.skipActiveStorage()) {
       await this.createFile(
         "config/storage.ts",
         `export default {
@@ -763,14 +842,14 @@ ${
   // Change to :null_store to avoid any caching.
   this.config.cacheStore = ":memory_store";
 ${
-  this.skip("ActiveStorage")
+  this.skipActiveStorage()
     ? ""
     : `
   // Store uploaded files on the local file system (see config/storage.ts for options).
   this.config.activeStorage.service = "local";
 `
 }${
-        this.skip("ActionMailer")
+        this.skipActionMailer()
           ? ""
           : `
   // Don't care if the mailer can't send.
@@ -787,7 +866,7 @@ ${
   this.config.activeSupport.deprecation = "log";
 
 ${
-  this.skip("ActiveRecord")
+  this.skipActiveRecord()
     ? ""
     : `  // Raise an error on page load if there are pending migrations.
   this.config.activeRecord.migrationError = "page_load";
@@ -800,7 +879,7 @@ ${
 
 `
 }${
-        this.skip("ActiveJob")
+        this.options.skipActiveJob
           ? ""
           : `  // Highlight code that enqueued background job in logs.
   this.config.activeJob.verboseEnqueueLogs = true;
@@ -813,7 +892,7 @@ ${
   this.config.actionView.annotateRenderedViewWithFilenames = true;
 
 ${
-  this.skip("ActionCable")
+  this.skipActionCable()
     ? ""
     : `  // Uncomment if you wish to allow Action Cable access from any origin.
   // this.config.actionCable.disableRequestForgeryProtection = true;
@@ -822,7 +901,7 @@ ${
 }  // Raise error when a before_action's only/except options reference missing actions.
   this.config.actionController.raiseOnMissingCallbackActions = true;
 ${
-  this.skip("Eslint")
+  this.skipEslint()
     ? ""
     : `
   // Apply autocorrection by ESLint to files generated by \`bin/trails generate\`.
@@ -868,14 +947,14 @@ Trails.application.configure(function () {
   this.config.actionController.allowForgeryProtection = false;
 
 ${
-  this.skip("ActiveStorage")
+  this.skipActiveStorage()
     ? ""
     : `  // Store uploaded files on the local file system in a temporary directory.
   this.config.activeStorage.service = "test";
 
 `
 }${
-        this.skip("ActionMailer")
+        this.skipActionMailer()
           ? ""
           : `  // Tell Action Mailer not to deliver emails to the real world.
   // The "test" delivery method accumulates sent emails in the
@@ -932,7 +1011,7 @@ ${
   // this.config.assetHost = "http://assets.example.com";
 
 ${
-  this.skip("ActiveStorage")
+  this.skipActiveStorage()
     ? ""
     : `  // Store uploaded files on the local file system (see config/storage.ts for options).
   this.config.activeStorage.service = "local";
@@ -961,14 +1040,14 @@ ${
   this.config.activeSupport.reportDeprecations = false;
 
 ${
-  this.skip("ActiveJob")
+  this.options.skipActiveJob
     ? ""
     : `  // Replace the default in-process and non-durable queuing backend for Active Job.
   // this.config.activeJob.queueAdapter = "resque";
 
 `
 }${
-        this.skip("ActionMailer")
+        this.skipActionMailer()
           ? ""
           : `  // Ignore bad email addresses and do not raise email delivery errors.
   // Set this to true and configure the email server for immediate delivery to raise delivery errors.
@@ -991,7 +1070,7 @@ ${
   // the I18n.defaultLocale when a translation cannot be found).
   this.config.i18n.fallbacks = true;
 ${
-  this.skip("ActiveRecord")
+  this.skipActiveRecord()
     ? ""
     : `
   // Do not dump schema after migrations.
@@ -1126,11 +1205,11 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
       tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
     );
 
-    if (!this.skip("ActiveJob")) {
+    if (!this.options.skipActiveJob) {
       await this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
     }
 
-    if (!this.skip("ActionMailer")) {
+    if (!this.skipActionMailer()) {
       await this.createFile(
         "app/mailers/application-mailer.ts",
         tsModule({
@@ -1182,7 +1261,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    if (!this.skip("ActionMailer")) {
+    if (!this.skipActionMailer()) {
       await this.createFile(
         "app/views/layouts/mailer.html.tse",
         `<!DOCTYPE html>
@@ -1507,7 +1586,7 @@ export default defineConfig([
   }
 
   async createEslintFile(): Promise<void> {
-    if (this.skip("Eslint")) return;
+    if (this.skipEslint()) return;
     await this.eslint();
   }
 
@@ -1533,7 +1612,7 @@ export default defineConfig([
         database: this.database,
         sqliteDriver: this.sqliteDriver,
         packageManager: this.packageManager,
-        skipEslint: this.skip("Eslint"),
+        skipEslint: !!this.skipEslint(),
         skipTest: !!this.options.skipTest,
       }),
     );
