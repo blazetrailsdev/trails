@@ -1567,7 +1567,12 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/v3.3.11/io.c:2263`).
    */
-  async writeAsync(buffer: Uint8Array): Promise<number> {
+  async writeAsync(string: string | Uint8Array): Promise<number> {
+    const buffer = typeof string === "string" ? doWriteconv(string, this.enc) : string;
+    if (this.stdioFile != null) {
+      this.stdioFile.write(new TextDecoder().decode(buffer));
+      return buffer.length;
+    }
     let n = 0;
     while (n < buffer.length) {
       n += await getFs().writeAsync(this.fd, buffer, n, buffer.length - n, this._pos + n);
