@@ -1137,7 +1137,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 
   /** @missingRailsArgs template — PERMANENT */
   async createBootFile(): Promise<void> {
-    await this.template("config/boot.ts");
+    await this.template("config/boot.ts", "config/boot.ts");
   }
 
   async createAppFiles(): Promise<void> {
@@ -1578,7 +1578,7 @@ export default defineConfig([
 
   override async template(source: string, ...args: unknown[]): Promise<void> {
     await this.createFile(
-      (args[0] as string | undefined) ?? source,
+      args[0] as string,
       TEMPLATES[source]({
         appName: this.appName(),
         database: this.database,
