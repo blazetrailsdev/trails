@@ -56,7 +56,7 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName(Probe)).toBe("Probe");
     class Actual {}
     expect(rbModName(Actual)).toBe("Actual");
-    registerClassPaths([]);
+    registerClassPaths([[() => class {}, "Deferred::Other"]]);
     expect(rbModName(Actual)).toBe("Deferred::Swept");
   });
 
