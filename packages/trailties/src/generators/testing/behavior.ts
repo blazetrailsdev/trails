@@ -1,12 +1,12 @@
 import {
   Dir,
   File,
-  FileUtils,
   RuntimeError,
   env,
   extend,
   include,
   included,
+  type FileUtils,
 } from "@blazetrails/ruby-compat";
 import { Stream, capture, classAttribute } from "@blazetrails/activesupport";
 import type { GeneratorBase, GeneratorConfig } from "../base.js";
@@ -89,13 +89,13 @@ export function isDestinationRootIsSet(this: BehaviorHost): void {
 }
 
 /** @internal */
-export function ensureCurrentPath(this: BehaviorHost): void {
-  FileUtils.cd(this.currentPath!);
+export function ensureCurrentPath(this: BehaviorHost & Pick<FileUtils, "cd">): void {
+  this.cd(this.currentPath!);
 }
 
-export function prepareDestination(this: BehaviorHost): void {
-  FileUtils.rmRf(this.destinationRoot);
-  FileUtils.mkdirP(this.destinationRoot);
+export function prepareDestination(this: BehaviorHost & Pick<FileUtils, "rmRf" | "mkdirP">): void {
+  this.rmRf(this.destinationRoot);
+  this.mkdirP(this.destinationRoot);
 }
 
 /** @internal */
