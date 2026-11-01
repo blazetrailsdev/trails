@@ -18,3 +18,5 @@ export class ProtoServerError extends ProtocolError {}
 export class ProtoAuthError extends ProtocolError {}
 /** @noRailsEquivalent PERMANENT */
 export class OpenTimeout extends Timeout.Error {}
+/** @noRailsEquivalent PERMANENT */
+export class ReadTimeout extends Timeout.Error {}

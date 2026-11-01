@@ -144,4 +144,11 @@ describe("Mail::UnstructuredField", () => {
       expect(field.encoded()).toEqual(result);
     });
   });
+  describe("iso-2022-jp Subject", () => {
+    it("should encoded with ISO-2022-JP encoding", () => {
+      field = new UnstructuredField("Subject", "あいうえお");
+      field.charset = "iso-2022-jp";
+      expect(field.encoded()).toEqual("Subject: =?ISO-2022-JP?Q?=1B$B$=22$$$&$=28$*=1B=28B?=\r\n");
+    });
+  });
 });

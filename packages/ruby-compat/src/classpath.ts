@@ -22,8 +22,8 @@ const generatedClasses = new Map<string, () => unknown>();
  * `pnpm parity:class-paths` from `rails-api.json` (RFC 0205). Each class is
  * read through a thunk on the first lookup after a registration. A table is
  * imported last by its package entry, after every module it names has been
- * evaluated, so a thunk still in TDZ then is retried only on the next
- * registration, never on every lookup.
+ * evaluated, so a thunk still in TDZ then is retried on the next registration,
+ * or by a lookup of a class bearing the entry's last path segment.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -53,7 +53,9 @@ export function generatedClassPath(klass: object): string | undefined {
         pendingClassPaths[unresolved++] = entry;
         continue;
       }
-      if (
+      if (value === undefined) {
+        pendingClassPaths[unresolved++] = entry;
+      } else if (
         (typeof value === "function" || (typeof value === "object" && value !== null)) &&
         !generatedClassPaths.has(value)
       ) {
@@ -62,7 +64,39 @@ export function generatedClassPath(klass: object): string | undefined {
     }
     pendingClassPaths.length = unresolved;
   }
+  const path = generatedClassPaths.get(klass);
+  if (path !== undefined || pendingClassPaths.length === 0) return path;
+  const { name } = klass as { name?: unknown };
+  for (const entry of pendingClassPaths.filter(
+    ([, path]) => name === path.slice(path.lastIndexOf(":") + 1),
+  )) {
+    let value: unknown;
+    try {
+      value = entry[0]();
+    } catch {
+      continue;
+    }
+    if (value === undefined) continue;
+    pendingClassPaths.splice(pendingClassPaths.indexOf(entry), 1);
+    if (
+      (typeof value === "function" || (typeof value === "object" && value !== null)) &&
+      !generatedClassPaths.has(value)
+    ) {
+      generatedClassPaths.set(value, entry[1]);
+    }
+  }
   return generatedClassPaths.get(klass);
+}
+
+/**
+ * Whether `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) may yet miss
+ * `klass`, a class whose generated path has not resolved.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isClassPathPending(klass: object): boolean {
+  const { name } = klass as { name?: unknown };
+  return pendingClassPaths.some(([, path]) => name === path.slice(path.lastIndexOf(":") + 1));
 }
 
 /**

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { createServer } from "node:net";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
+import { ReadTimeout } from "./protocol.js";
 import { SMTP, SMTPFatalError } from "./smtp.js";
 
 const servers: SMTPServer[] = [];
@@ -49,12 +50,28 @@ describe("SMTP (trails)", () => {
 
   it("nodemailer's private members the session drives still exist", () => {
     const connection = new SMTPConnection({}) as unknown as Record<string, unknown>;
-    for (const name of ["_sendCommand", "_actionGreeting", "_clearPhase", "_upgradeConnection"]) {
+    for (const name of [
+      "_sendCommand",
+      "_actionGreeting",
+      "_clearPhase",
+      "_onConnect",
+      "_upgradeConnection",
+    ]) {
       expect(typeof connection[name], name).toBe("function");
     }
     expect(Array.isArray(connection._responseActions)).toBe(true);
     expect(connection._destroyed).toBe(false);
     expect("_socket" in connection).toBe(true);
+    expect(String(connection._remainingSetupTime)).toContain("_connectionDeadline");
+  });
+
+  it("raises ReadTimeout when the greeting never comes", async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const smtp = new SMTP("127.0.0.1", (server.address() as { port: number }).port);
+    smtp.readTimeout = 0.05;
+    await expect(smtp.start()).rejects.toThrow(ReadTimeout);
+    server.close();
   });
 
   it("open message stream writes through data's block", async () => {

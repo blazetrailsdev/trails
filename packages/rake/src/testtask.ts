@@ -143,8 +143,17 @@ export class TestTask extends TaskLib {
 
   runCode(): string | undefined {
     switch (this.loader) {
-      case "direct":
-        return `-e "process.argv.slice(1).forEach((f) => require(require('path').resolve(f)))"`;
+      case "direct": {
+        const literal = (value: string): string =>
+          JSON.stringify(value).replace(/[\\"$`]/g, "\\$&");
+        const paths = flatten(this.libs).map((lib) => literal(File.expandPath(String(lib))));
+        const compat = `require.resolve('@blazetrails/ruby-compat', { paths: [${literal(import.meta.dirname)}] })`;
+        return (
+          `-e "import(require('url').pathToFileURL(${compat}).href).then(({ LOAD_PATH }) => { ` +
+          `LOAD_PATH.unshift(${paths.join(", ")}); ` +
+          `process.argv.slice(1).forEach((f) => require(require('path').resolve(f))); })"`
+        );
+      }
       case "testrb":
         return "-S testrb";
       case "rake":

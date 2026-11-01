@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { KERNEL_METHODS, PROTOCOL_PROBES, rbFSend } from "@blazetrails/ruby-compat";
+import { KERNEL_METHODS, PROTOCOL_PROBES, RuntimeError, rbFSend } from "@blazetrails/ruby-compat";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../attachment.js";
 import type { CreateOne } from "./changes/create-one.js";
@@ -36,8 +36,8 @@ export class One extends Attached {
     await this.attachment;
   }
 
-  async isBlank(): Promise<boolean> {
-    return !(await this.isAttached());
+  isBlank(): boolean {
+    return !this.isAttached();
   }
 
   async attach(attachable: unknown): Promise<this | null> {
@@ -48,8 +48,21 @@ export class One extends Attached {
     return rbFSend(this.record, this.name) as this;
   }
 
-  async isAttached(): Promise<boolean> {
-    return isPresent(await this.attachment);
+  isAttached(): boolean {
+    return isPresent(this.loadedAttachment("attached?"));
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  loadedAttachment(method: string): Attachment | null {
+    const attachment = this.attachment;
+    if (!(attachment instanceof Promise)) return attachment;
+    void attachment.catch(() => {});
+    throw new RuntimeError(
+      `${method} needs ${this.name}'s attachment loaded; \`await ${this.name}.load()\` first.`,
+    );
   }
 
   /** @internal */
@@ -79,8 +92,10 @@ Object.setPrototypeOf(
       ) {
         return value;
       }
-      const attachment = receiver.attachment as unknown as { [k: string]: unknown } | null;
-      if (attachment == null || attachment instanceof Promise) return value;
+      const attachment = receiver.loadedAttachment(prop) as unknown as {
+        [k: string]: unknown;
+      } | null;
+      if (attachment == null) return value;
       const member = attachment[prop];
       return typeof member === "function" ? member.bind(attachment) : member;
     },
