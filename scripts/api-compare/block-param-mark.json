@@ -101,9 +101,8 @@
     "byFile": {}
   },
   "trailties": {
-    "total": 2,
+    "total": 1,
     "byFile": {
-      "application.rb": 1,
       "initializable.rb": 1
     }
   }

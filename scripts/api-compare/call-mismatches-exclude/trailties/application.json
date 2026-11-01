@@ -18,5 +18,12 @@
       "ref:pwd"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "message_verifiers",
+    "call": "order:keyGenerator,constructor",
+    "reason": "The gate reads the block only as new's direct argument; Object.assign around it, which seats the parameters stand-in, flips the pair. Story message-verifiers-rotation-secret-key-base-keyword."
   }
 ]

@@ -1,10 +1,10 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, getFs, sprintf } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];
 
-export const DEFAULT_DIRECTORIES: DirectoryPair[] = [
+export const DIRECTORIES: DirectoryPair[] = [
   ["Controllers", "app/controllers"],
   ["Helpers", "app/helpers"],
   ["Jobs", "app/jobs"],
@@ -29,7 +29,7 @@ export const DEFAULT_DIRECTORIES: DirectoryPair[] = [
   ["System tests", "test/system"],
 ];
 
-export const DEFAULT_TEST_TYPES: string[] = [
+export const TEST_TYPES: string[] = [
   "Controller tests",
   "Helper tests",
   "Model tests",
@@ -41,14 +41,11 @@ export const DEFAULT_TEST_TYPES: string[] = [
   "System tests",
 ];
 
-const HEADERS = [
-  { key: "lines", label: " Lines" },
-  { key: "codeLines", label: "   LOC" },
-  { key: "classes", label: "Classes" },
-  { key: "methods", label: "Methods" },
-] as const;
+const HEADERS = { lines: " Lines", codeLines: "   LOC", classes: "Classes", methods: "Methods" };
 
-const FILE_PATTERN = /^(?!\.).*?\.(rb|js|ts|tsx|css|scss|coffee|rake|tse)$/;
+type HeaderKey = keyof typeof HEADERS;
+
+const HEADER_KEYS = Object.keys(HEADERS) as HeaderKey[];
 
 export class CodeStatistics {
   declare static directories: DirectoryPair[];
@@ -57,8 +54,8 @@ export class CodeStatistics {
   declare static isTestTypes: boolean;
 
   static {
-    classAttribute.call(this, "directories", { default: DEFAULT_DIRECTORIES });
-    classAttribute.call(this, "testTypes", { default: DEFAULT_TEST_TYPES });
+    classAttribute.call(this, "directories", { default: DIRECTORIES });
+    classAttribute.call(this, "testTypes", { default: TEST_TYPES });
   }
 
   static registerDirectory(
@@ -72,87 +69,129 @@ export class CodeStatistics {
 
   private statistics = new Map<string, CodeStatisticsCalculator>();
   private total: CodeStatisticsCalculator | null = null;
+  private pairs: DirectoryPair[];
 
-  private constructor(private pairs: DirectoryPair[]) {}
+  private constructor(...pairs: DirectoryPair[]) {
+    this.pairs = pairs;
+  }
 
   static async create(...pairs: DirectoryPair[]): Promise<CodeStatistics> {
-    const inst = new CodeStatistics(pairs);
-    for (const [label, dir] of pairs) inst.statistics.set(label, await inst.walk(dir));
-    if (pairs.length > 1) {
-      inst.total = new CodeStatisticsCalculator();
-      for (const v of inst.statistics.values()) inst.total.add(v);
-    }
+    const inst = new CodeStatistics(...pairs);
+    inst.statistics = await inst.calculateStatistics();
+    if (pairs.length > 1) inst.total = inst.calculateTotal();
     return inst;
   }
 
-  private async walk(directory: string): Promise<CodeStatisticsCalculator> {
-    const stats = new CodeStatisticsCalculator();
-    const fs = getFs();
-    const path = getPath();
-    if (!fs.readdir || !fs.stat || !fs.readFile) {
-      throw new Error("CodeStatistics requires async fsAdapter (readdir/stat/readFile).");
+  toString(): string {
+    const out = [this.printHeader()];
+    for (const pair of this.pairs) out.push(this.printLine(pair[0], this.statistics.get(pair[0])!));
+    out.push(this.printSplitter());
+
+    if (this.total) {
+      out.push(this.printLine("Total", this.total));
+      out.push(this.printSplitter());
     }
-    if (!(await fs.exists(directory))) return stats;
-    const entries = await fs.readdir(directory);
-    for (const name of entries) {
-      const full = path.join(directory, name);
-      const st = await fs.stat(full);
-      if (st.isDirectory()) {
-        if (!name.startsWith(".")) stats.add(await this.walk(full));
-      } else if (FILE_PATTERN.test(name)) {
-        await stats.addByFilePath(full, (p) => fs.readFile(p, "utf-8"));
+
+    out.push(this.printCodeTestStats());
+    return out.join("\n");
+  }
+
+  /** @internal */
+  private async calculateStatistics(): Promise<Map<string, CodeStatisticsCalculator>> {
+    const statistics = new Map<string, CodeStatisticsCalculator>();
+    for (const pair of this.pairs) {
+      statistics.set(pair[0], await this.calculateDirectoryStatistics(pair[1]));
+    }
+    return statistics;
+  }
+
+  /** @internal */
+  private async calculateDirectoryStatistics(
+    directory: string,
+    pattern = /^(?!\.).*?\.(rb|js|ts|tsx|css|scss|coffee|rake|tse)$/,
+  ): Promise<CodeStatisticsCalculator> {
+    const stats = new CodeStatisticsCalculator();
+
+    for (const fileName of await getFs().readdir!(directory)) {
+      const path = `${directory}/${fileName}`;
+
+      if (File.isDirectory(path) && !fileName.startsWith(".")) {
+        stats.add(await this.calculateDirectoryStatistics(path, pattern));
+      } else if (pattern.test(fileName)) {
+        await stats.addByFilePath(path);
       }
     }
+
     return stats;
   }
 
-  private widthFor(key: (typeof HEADERS)[number]["key"], label: string): number {
-    let sum = 0;
-    for (const s of this.statistics.values()) sum += s[key];
-    return Math.max(String(sum).length, label.length);
+  /** @internal */
+  private calculateTotal(): CodeStatisticsCalculator {
+    const total = new CodeStatisticsCalculator();
+    for (const pair of this.statistics) total.add(pair[1]);
+    return total;
   }
 
-  private splitter(): string {
+  /** @internal */
+  private calculateCode(): number {
+    let codeLoc = 0;
+    for (const [k, v] of this.statistics) {
+      if (!CodeStatistics.testTypes.includes(k)) codeLoc += v.codeLines;
+    }
+    return codeLoc;
+  }
+
+  /** @internal */
+  private calculateTests(): number {
+    let testLoc = 0;
+    for (const [k, v] of this.statistics) {
+      if (CodeStatistics.testTypes.includes(k)) testLoc += v.codeLines;
+    }
+    return testLoc;
+  }
+
+  /** @internal */
+  private widthFor(label: HeaderKey): number {
+    let sum = 0;
+    for (const s of this.statistics.values()) sum += s[label];
+    return Math.max(String(sum).length, HEADERS[label].length);
+  }
+
+  /** @internal */
+  private printHeader(): string {
+    const header =
+      "| Name                " +
+      HEADER_KEYS.map((k) => ` | ${HEADERS[k].padStart(this.widthFor(k))}`).join("") +
+      " | M/C | LOC/M |";
+    return [this.printSplitter(), header, this.printSplitter()].join("\n");
+  }
+
+  /** @internal */
+  private printSplitter(): string {
     return (
       "+----------------------" +
-      HEADERS.map((h) => "+" + "-".repeat(this.widthFor(h.key, h.label) + 2)).join("") +
+      HEADER_KEYS.map((k) => `+${"-".repeat(this.widthFor(k) + 2)}`).join("") +
       "+-----+-------+"
     );
   }
 
-  private line(name: string, s: CodeStatisticsCalculator): string {
-    const mOverC = s.classes > 0 ? Math.trunc(s.methods / s.classes) : 0;
-    const locOverM = s.methods > 0 ? Math.trunc(s.codeLines / s.methods) - 2 : 0;
-    const cells = HEADERS.map(
-      (h) => `| ${String(s[h.key]).padStart(this.widthFor(h.key, h.label))} `,
+  /** @internal */
+  private printLine(name: string, statistics: CodeStatisticsCalculator): string {
+    const mOverC = statistics.classes > 0 ? Math.floor(statistics.methods / statistics.classes) : 0;
+    const locOverM =
+      statistics.methods > 0 ? Math.floor(statistics.codeLines / statistics.methods) - 2 : 0;
+
+    const cells = HEADER_KEYS.map(
+      (k) => `| ${String(statistics[k]).padStart(this.widthFor(k))} `,
     ).join("");
     return `| ${name.padEnd(20)} ${cells}| ${String(mOverC).padStart(3)} | ${String(locOverM).padStart(5)} |`;
   }
 
-  toString(): string {
-    const out: string[] = [];
-    const splitter = this.splitter();
-    out.push(splitter);
-    out.push(
-      "| Name                " +
-        HEADERS.map((h) => ` | ${h.label.padStart(this.widthFor(h.key, h.label))}`).join("") +
-        " | M/C | LOC/M |",
-    );
-    out.push(splitter);
-    for (const [label] of this.pairs) out.push(this.line(label, this.statistics.get(label)!));
-    out.push(splitter);
-    if (this.total) {
-      out.push(this.line("Total", this.total));
-      out.push(splitter);
-    }
-    let code = 0,
-      tests = 0;
-    for (const [k, v] of this.statistics) {
-      if (CodeStatistics.testTypes.includes(k)) tests += v.codeLines;
-      else code += v.codeLines;
-    }
-    const ratio = code > 0 ? (tests / code).toFixed(1) : "0.0";
-    out.push(`  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${ratio}`);
-    return out.join("\n");
+  /** @internal */
+  private printCodeTestStats(): string {
+    const code = this.calculateCode();
+    const tests = this.calculateTests();
+
+    return `  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${sprintf("%.1f", tests / code)}`;
   }
 }

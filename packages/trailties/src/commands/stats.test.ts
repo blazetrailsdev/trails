@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, FileUtils, stdout } from "@blazetrails/ruby-compat";
-import { CodeStatistics, DEFAULT_DIRECTORIES, DEFAULT_TEST_TYPES } from "../code-statistics.js";
+import { CodeStatistics, DIRECTORIES, TEST_TYPES } from "../code-statistics.js";
 import { invoke } from "../command.js";
 
 let appPath: string;
@@ -10,15 +10,15 @@ beforeEach(() => {
   appPath = Dir.mktmpdir("trails-stats-");
   originalCwd = Dir.pwd();
   Dir.chdir(appPath);
-  CodeStatistics.directories = [...DEFAULT_DIRECTORIES];
-  CodeStatistics.testTypes = [...DEFAULT_TEST_TYPES];
+  CodeStatistics.directories = [...DIRECTORIES];
+  CodeStatistics.testTypes = [...TEST_TYPES];
 });
 
 afterEach(() => {
   Dir.chdir(originalCwd);
   FileUtils.rmRf(appPath);
-  CodeStatistics.directories = [...DEFAULT_DIRECTORIES];
-  CodeStatistics.testTypes = [...DEFAULT_TEST_TYPES];
+  CodeStatistics.directories = [...DIRECTORIES];
+  CodeStatistics.testTypes = [...TEST_TYPES];
 });
 
 async function rails(): Promise<string> {
