@@ -13,4 +13,5 @@ Trails.application!.routes().draw(function () {
   this.get("up", { to: "rails/health#show", as: "rails_health_check" });
   this.get("/legacy", { to: "legacy#index", as: "legacy" });
   this.get("/ping", { to: "pings#show" });
+  this.get("/posts/likes", { to: "posts/likes#show" });
 });

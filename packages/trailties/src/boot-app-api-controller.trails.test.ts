@@ -25,4 +25,14 @@ describe("a booted app dispatches to an ActionController::API controller", () =>
     expect(status).toBe(200);
     expect([...(body as Iterable<string>)].join("")).toBe('{"pong":true}');
   });
+
+  it("registers an API controller under a nested prefix", async () => {
+    const [status, , body] = await Trails.application!.call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/likes",
+      HTTP_ACCEPT: "*/*",
+    });
+    expect(status).toBe(200);
+    expect([...(body as Iterable<string>)].join("")).toBe('{"liked":true}');
+  });
 });

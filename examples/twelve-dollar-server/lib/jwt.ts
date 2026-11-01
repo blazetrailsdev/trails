@@ -4,6 +4,7 @@ import { ArgumentError, Base64, toI } from "@blazetrails/ruby-compat";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 class DecodeError extends Error {}
+/** Hierarchy from jwt-3.3.0 `lib/jwt/error.rb:15-50`, the version the submission pins. */
 class TokenError extends DecodeError {}
 class MalformedTokenError extends TokenError {}
 class Base64DecodeError extends MalformedTokenError {}
@@ -35,6 +36,7 @@ function decodeSegment(segment: string): unknown {
   }
 }
 
+/** `SignatureError` on a missing key is jwt-3.3.0 `lib/jwt/decode.rb:54`. */
 function decode(
   token: string,
   key: string | null | undefined,
