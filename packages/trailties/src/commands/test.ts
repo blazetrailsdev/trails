@@ -45,6 +45,7 @@ export class TestCommand extends Base {
     await super.help(commandName);
     if (commandName === "test") {
       this.say("");
+      this.say(await (this.constructor as typeof TestCommand).classUsage());
     }
     this.say("");
     if ((await rbFSystem("vitest", "--help")) == null) {
