@@ -142,7 +142,7 @@ export class Ripper {
       pattern,
       depth: 0,
       destructuring: 0,
-      expected: !pattern,
+      expected: true,
       outer: this._binder,
     };
     this._state = EXPR_BEG;
@@ -196,7 +196,8 @@ export class Ripper {
     } else if (atTop && (c === "," || c === ";")) {
       binder.expected = true;
     }
-    if (binder.pattern && c !== "," && c.trim() !== "") binder.expected = false;
+    if (binder.pattern && (c === "|" || c === "=")) binder.expected = true;
+    else if (binder.pattern && !",#>".includes(c) && c.trim() !== "") binder.expected = false;
     return false;
   }
 

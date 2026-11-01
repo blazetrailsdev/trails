@@ -85,6 +85,9 @@ describe("Ripper", () => {
       "def a(b = [1].map do |x| x end, c)\n c /2\nend\n# a\n",
       "def foo (a)\n a /2\nend\n# a\n",
       "case x\nin a,\n b\n b /2\nend\n# a\n",
+      "case x\nin\n a\n a /2\nend\n# a\n",
+      "case x\nin Integer =>\n b\n b /2\nend\n# a\n",
+      "case x\nin 1 |\n 2\n puts 1\nend\n# a\n",
       "def a(b = %w[#], c)\n c /2\nend\n# a\n",
       "def a(b = /'/, c)\n c /2\nend\n# a\n",
       "def a(b = %q('), c)\n c /2\nend\n# a\n",
@@ -144,6 +147,12 @@ describe("Ripper", () => {
     for (const source of ["def a(b, # x\n c)\n c /2\nend\n", "foo { |a,\n # d\n b| b /2 }\n"]) {
       expect(lex(source).isError()).toBe(false);
     }
+  });
+
+  it("continues a pattern past a comment after its comma", () => {
+    const ripper = lex("case x\nin a, # n\n b\n b /2\nend\n# c\n");
+    expect(ripper.isError()).toBe(false);
+    expect(ripper.comments.map(([, value]) => value)).toEqual(["# n", "# c"]);
   });
 
   it("reads a heredoc body inside a multi-line literal", () => {
