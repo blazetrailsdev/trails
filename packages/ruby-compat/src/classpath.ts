@@ -75,7 +75,10 @@ export function generatedClassPath(klass: object): string | undefined {
     }
     if (value === undefined) continue;
     pendingClassPaths.splice(pendingClassPaths.indexOf(entry), 1);
-    if (typeof value === "function" || (typeof value === "object" && value !== null)) {
+    if (
+      (typeof value === "function" || (typeof value === "object" && value !== null)) &&
+      !generatedClassPaths.has(value)
+    ) {
       generatedClassPaths.set(value, entry[1]);
     }
   }

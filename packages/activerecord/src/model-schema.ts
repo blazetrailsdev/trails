@@ -595,6 +595,7 @@ function loadSchemaFromCacheSync(host: SchemaKlass): boolean {
   return true;
 }
 
+/** @inventedArm if — PERMANENT */
 export function tableName(this: SchemaKlass): string | null {
   if (!Object.hasOwn(this, "_tableName")) {
     if (isClassPathPending(this)) return computeTableName.call(this);

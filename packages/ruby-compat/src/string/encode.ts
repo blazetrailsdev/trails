@@ -146,6 +146,12 @@ export function encode(
                 : `${u} to EUC-JP ${chain}`,
             );
           }
+          if (
+            typeof rep === "string" &&
+            !Array.from(rep).every((r) => table.has(r.codePointAt(0)!) || r.codePointAt(0)! < 0x80)
+          ) {
+            throw new ArgumentError("too big fallback string");
+          }
           put(rep);
         }
       }

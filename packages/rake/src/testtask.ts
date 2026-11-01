@@ -1,6 +1,5 @@
 import {
   File,
-  LOAD_PATH,
   RUBY_VERSION,
   RuntimeError,
   SignalException,
@@ -20,9 +19,6 @@ import { FileUtilsExt } from "./file-utils-ext.js";
 import type { FileUtils } from "./file-utils.js";
 import { Rake } from "./rake-module.js";
 import { TaskLib } from "./tasklib.js";
-
-/** @noRailsEquivalent PERMANENT */
-export { LOAD_PATH };
 
 type RunStatus = {
   exitstatus(): number | null;
@@ -147,14 +143,17 @@ export class TestTask extends TaskLib {
 
   runCode(): string | undefined {
     switch (this.loader) {
-      case "direct":
+      case "direct": {
+        const literal = (value: string): string =>
+          JSON.stringify(value).replace(/[\\"$`]/g, "\\$&");
+        const paths = flatten(this.libs).map((lib) => literal(File.expandPath(String(lib))));
+        const compat = `require.resolve('@blazetrails/ruby-compat', { paths: [${literal(import.meta.dirname)}] })`;
         return (
-          `-e "import('${import.meta.url}').then(({ LOAD_PATH }) => { ` +
-          `LOAD_PATH.unshift(${flatten(this.libs)
-            .map((lib) => JSON.stringify(File.expandPath(String(lib))).replace(/[\\"$`]/g, "\\$&"))
-            .join(", ")}); ` +
+          `-e "import(require('url').pathToFileURL(${compat}).href).then(({ LOAD_PATH }) => { ` +
+          `LOAD_PATH.unshift(${paths.join(", ")}); ` +
           `process.argv.slice(1).forEach((f) => require(require('path').resolve(f))); })"`
         );
+      }
       case "testrb":
         return "-S testrb";
       case "rake":

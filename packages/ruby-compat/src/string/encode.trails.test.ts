@@ -104,6 +104,12 @@ describe("encode to ISO-2022-JP", () => {
     expect(() => encode("\x0e", "ISO-2022-JP")).toThrow(UndefinedConversionError);
   });
 
+  it("refuses a fallback the destination cannot hold", () => {
+    expect(() => encode("é", "ISO-2022-JP", { fallback: (c) => c })).toThrow(
+      "too big fallback string",
+    );
+  });
+
   it("refuses a replacement the destination cannot hold", () => {
     expect(() => encode("é", "ISO-2022-JP", { undef: ":replace", replace: "é" })).toThrow(
       ConverterNotFoundError,

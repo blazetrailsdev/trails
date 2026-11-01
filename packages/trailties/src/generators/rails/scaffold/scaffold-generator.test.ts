@@ -223,7 +223,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     const partial = readFile("app/views/messages/_message.html.tse");
     expect(partial).toMatch(
-      /^\W{4}<%= message\.video\.isAttached\(\) \? linkTo\(message\.video\.filename, message\.video\) : null %>/m,
+      /^\W{4}<% await \(await message\.video\.attachment\)\?\.blob; %>\n\W{4}<%= message\.video\.isAttached\(\) \? linkTo\(message\.video\.filename, message\.video\) : null %>/m,
     );
     expect(partial).toMatch(/^\W{6}<div><%= linkTo\(photo\.filename, photo\) %>/m);
   });

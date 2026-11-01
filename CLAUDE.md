@@ -1831,7 +1831,8 @@ Rules that apply across the table:
   a JS read cannot. `isAttached`, `isBlank` and a delegated read are sync and
   raise `RuntimeError` on an unloaded attachment until `await one.load()`, so
   activesupport's `isBlank(one)` never reads a promise. Ruled by the repo owner
-  on 2026-10-31.
+  on 2026-10-31. `load` does not load the blob: a delegated blob read such as
+  `filename` also needs `await (await one.attachment)?.blob`.
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` is
   `delegateMissingTo` over a prototype, so its trap is synchronous. An unloaded
   `blob` is a promise that answers nothing: a forwarded name raises
