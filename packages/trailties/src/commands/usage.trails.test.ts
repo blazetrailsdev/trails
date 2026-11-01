@@ -16,7 +16,9 @@ async function helpOutput(klass: typeof Base, namespace: string): Promise<string
     expect(source).toMatch(new RegExp(`commands/${namespace}/USAGE$`));
     await getFs().writeFile!(usage, await getFs().readFile(source!, "utf8"));
     await buildTemplates([usage]);
-    return await capture(":stdout", () => invoke(namespace, ["--help"]));
+    return await capture(":stdout", () =>
+      expect(invoke(namespace, ["--help"])).rejects.toThrow('called with "1"'),
+    );
   } finally {
     usagePath.mockRestore();
     await getFs().rm!(dir, { recursive: true, force: true });
@@ -24,6 +26,13 @@ async function helpOutput(klass: typeof Base, namespace: string): Promise<string
 }
 
 describe("command USAGE files", () => {
+  it("prints an unrecognized command and exits 1", async () => {
+    const out = await capture(":stdout", () =>
+      expect(invoke("db:nope")).rejects.toThrow('called with "1"'),
+    );
+    expect(out).toContain('Unrecognized command "db:nope"');
+  });
+
   it("credentials --help prints its USAGE", async () => {
     const out = await helpOutput(CredentialsCommand as unknown as typeof Base, "credentials");
     expect(out).toContain("Environment Specific Credentials:");

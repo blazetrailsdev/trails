@@ -58,7 +58,7 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(rake).not.toHaveBeenCalled();
 
     perform.mockClear();
-    await invoke("unused_routes:constructor");
+    await expect(invoke("unused_routes:constructor")).rejects.toThrow('called with "1"');
     expect(perform).not.toHaveBeenCalled();
     expect(rake).not.toHaveBeenCalled();
   }, 30_000);

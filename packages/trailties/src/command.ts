@@ -6,6 +6,7 @@ import {
   Pathname,
   StandardError,
   env,
+  exit,
   prepend,
   rbArgv,
   rbInspect,
@@ -119,6 +120,7 @@ export async function invoke(
     } else {
       stdout.write(`${error.detailedMessage()}\n`);
     }
+    exit(1);
   }
 }
 
@@ -188,7 +190,7 @@ async function invokeRake(
       return;
     }
   }
-  if (task !== "" && !program.commands.some((c) => c.name() === task.split(":")[0])) {
+  if (task !== "" && !program.commands.some((c) => c.name() === /[^[]+/.exec(task)?.[0])) {
     throw new UnrecognizedCommandError(
       task,
       (await printingCommands()).map(([name]) => name),
