@@ -46,12 +46,14 @@ export function rbExecargNew(
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
     opthash = rest.pop() as ExecargOpthash;
     for (const key of Object.keys(opthash)) {
+      if (key === "exception") {
+        const { exception } = opthash;
+        if (exception != null && exception !== true && exception !== false) {
+          throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+        }
+      }
       if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);
-    }
-    const { exception } = opthash;
-    if (exception != null && exception !== true && exception !== false) {
-      throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
     }
     if (!allowExcOpt && "exception" in opthash) {
       throw new ArgumentError("exception option is not allowed");
