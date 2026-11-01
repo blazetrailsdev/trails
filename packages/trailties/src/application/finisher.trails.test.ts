@@ -10,6 +10,7 @@ import {
   type FinisherRoutesReloader,
 } from "./finisher.js";
 import {
+  Dependencies,
   Executor,
   FileUpdateChecker,
   onLoad,
@@ -437,6 +438,17 @@ describe("configure_executor_for_concurrency", () => {
     app.reloadingEnabled = true;
     await run(app, name);
     expect(app.hooks).toEqual([[InterlockHook, { outer: true }]]);
+  });
+});
+
+describe("InterlockHook", () => {
+  it("shares the interlock from run to complete", async () => {
+    await InterlockHook.run();
+    const held = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(held?.sharing).toBe(1);
+    await InterlockHook.complete(null);
+    const left = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(left?.sharing ?? 0).toBe(0);
   });
 });
 

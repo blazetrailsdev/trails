@@ -47,7 +47,7 @@ export interface FinisherExecutor {
 }
 
 export interface FinisherConfig {
-  allowConcurrency: boolean | string | null;
+  allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
   eagerLoadNamespaces: unknown[];
@@ -169,8 +169,8 @@ export const InterlockHook = {
 Finisher.initializer("configure_executor_for_concurrency", function (this: FinisherHost) {
   if (this.config.allowConcurrency === false) {
     this.executor.registerHook(new MonitorHook(), { outer: true });
-    // eslint-disable-next-line no-empty
   } else if (this.config.allowConcurrency === "unsafe") {
+    return;
   } else {
     if (this.config.isReloadingEnabled()) {
       this.executor.registerHook(InterlockHook, { outer: true });
