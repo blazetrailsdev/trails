@@ -787,7 +787,7 @@ export class Thor {
 
     const thorArgs = new Arguments(klass.arguments());
     for (const [k, v] of Object.entries(thorArgs.parse(toParse))) rbFSend(this, `${k}=`, v);
-    (this as unknown as Host).args = thorArgs.remaining();
+    (this as unknown as Host)._args = thorArgs.remaining();
 
     (this as unknown as Host).shell = config.shell as Basic;
     if (rbObjRespondTo((this as unknown as Host).shell, "base"))

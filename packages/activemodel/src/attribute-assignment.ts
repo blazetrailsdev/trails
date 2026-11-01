@@ -19,7 +19,10 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
-  const capture = assignmentCapture?.attributes === newAttributes ? assignmentCapture : null;
+  const capture =
+    assignmentCapture?.attributes === newAttributes || assignmentCapture?.attributes === undefined
+      ? assignmentCapture
+      : null;
   if (capture != null) assignmentCapture = null;
   if (isEmpty(newAttributes)) return;
 
@@ -140,6 +143,21 @@ export function assertAssignedSynchronously(pending: unknown, methodName: string
   throw new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
   );
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE create-after-initialize-sees-awaited-attachment-writers
+ */
+export function capturingAssignment<R>(build: () => R): [R, Promise<void> | undefined] {
+  const capture: AssignmentCapture = { attributes: undefined };
+  assignmentCapture = capture;
+  try {
+    const record = build();
+    return [record, capture.assigned];
+  } finally {
+    assignmentCapture = null;
+  }
 }
 
 /**

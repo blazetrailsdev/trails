@@ -857,9 +857,28 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/thor/src/**/*.ts", "packages/trailties/src/**/*.ts"],
+    files: ["packages/thor/src/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": "error",
+    },
+  },
+
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    rules: {
+      "blazetrails/thor-command-registration": [
+        "error",
+        {
+          baseClasses: [
+            "GeneratorBase",
+            "NamedBase",
+            "AppBase",
+            "ModelGenerator",
+            "ResourceGenerator",
+          ],
+          baseImports: ["command/base.js", "generators/tse.js", "/tse.js"],
+        },
+      ],
     },
   },
 

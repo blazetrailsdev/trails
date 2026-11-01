@@ -23,6 +23,7 @@ import {
   rbObjClone,
   rbObjDup,
   rbObjIsKindOf,
+  rbObjIvarGet,
   rbObjRespondTo,
   rbProgname,
   rtest,
@@ -95,6 +96,8 @@ export interface Base {
   options: ThorOptions<Record<string, unknown>>;
   parentOptions: unknown;
   args: unknown[];
+  /** @internal */
+  _args: unknown[];
 }
 
 export interface BaseClass {
@@ -300,21 +303,20 @@ export const ClassMethods = {
   },
 
   arguments(this: BaseClass): Argument[] {
-    if (!Object.hasOwn(this, "_arguments")) {
-      this._arguments = this.fromSuperclass("arguments", []) as Argument[];
-    }
-    return this._arguments!;
+    return (this._arguments =
+      (rbObjIvarGet(this, "@_arguments") as Argument[] | null) ||
+      (this.fromSuperclass("arguments", []) as Argument[]));
   },
 
   classOptions(
     this: BaseClass,
     options: Record<string, unknown> | null = null,
   ): Record<string, Option> {
-    if (!Object.hasOwn(this, "_classOptions")) {
-      this._classOptions = this.fromSuperclass("classOptions", {}) as Record<string, Option>;
-    }
-    if (rtest(options)) this.buildOptions(options, this._classOptions!);
-    return this._classOptions!;
+    this._classOptions =
+      (rbObjIvarGet(this, "@_class_options") as Record<string, Option> | null) ||
+      (this.fromSuperclass("classOptions", {}) as Record<string, Option>);
+    if (rtest(options)) this.buildOptions(options, this._classOptions);
+    return this._classOptions;
   },
 
   classOption(this: BaseClass, name: string, options: OptionOptions = {}): Option {
@@ -333,23 +335,15 @@ export const ClassMethods = {
   },
 
   classExclusiveOptionNames(this: BaseClass): string[][] {
-    if (!Object.hasOwn(this, "_classExclusiveOptionNames")) {
-      this._classExclusiveOptionNames = this.fromSuperclass(
-        "classExclusiveOptionNames",
-        [],
-      ) as string[][];
-    }
-    return this._classExclusiveOptionNames!;
+    return (this._classExclusiveOptionNames =
+      (rbObjIvarGet(this, "@_class_exclusive_option_names") as string[][] | null) ||
+      (this.fromSuperclass("classExclusiveOptionNames", []) as string[][]));
   },
 
   classAtLeastOneOptionNames(this: BaseClass): string[][] {
-    if (!Object.hasOwn(this, "_classAtLeastOneOptionNames")) {
-      this._classAtLeastOneOptionNames = this.fromSuperclass(
-        "classAtLeastOneOptionNames",
-        [],
-      ) as string[][];
-    }
-    return this._classAtLeastOneOptionNames!;
+    return (this._classAtLeastOneOptionNames =
+      (rbObjIvarGet(this, "@_class_at_least_one_option_names") as string[][] | null) ||
+      (this.fromSuperclass("classAtLeastOneOptionNames", []) as string[][]));
   },
 
   removeArgument(this: BaseClass, ...names: unknown[]): void {
@@ -429,8 +423,8 @@ export const ClassMethods = {
   noTasks: undefined as unknown as BaseClass["noCommands"],
 
   noCommandsContext(this: BaseClass): NestedContext {
-    if (!Object.hasOwn(this, "_noCommandsContext")) this._noCommandsContext = new NestedContext();
-    return this._noCommandsContext!;
+    return (this._noCommandsContext =
+      (rbObjIvarGet(this, "@_no_commands_context") as NestedContext | null) || new NestedContext());
   },
 
   isNoCommands(this: BaseClass): boolean {

@@ -33,6 +33,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("configureAuthenticationRoutes");
     this.methodAdded("enableBcrypt");
     this.methodAdded("addMigrations");
+    this.noCommands(() => this.methodAdded("template"));
   }
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {

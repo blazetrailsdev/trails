@@ -87,6 +87,9 @@ describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
 
 describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)", () => {
   class Writer extends GeneratorBase {
+    static {
+      this.methodAdded("write");
+    }
     async write(content: string): Promise<void> {
       await this.createFile("app/x.ts", content);
     }
@@ -103,7 +106,9 @@ describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)
         await make({ behavior: "skip" }).write("one ✓\n");
         expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
         await make({ behavior: "force" }).write("two\n");
-        await make().write("three\n");
+        const yes = make();
+        (yes.shell as unknown as { ask(): unknown }).ask = async () => "y";
+        await yes.write("three\n");
       });
       expect(File.read(File.join(cwd, "app/x.ts"))).toBe("three\n");
       expect(

@@ -28,6 +28,7 @@ export class JobGenerator extends NamedBase {
     this.checkClassCollision({ suffix: "Job" });
     this.hookFor("testFramework");
     this.methodAdded("createJobFile");
+    this.noCommands(() => this.methodAdded("parentClassName"));
   }
 
   /** @internal */

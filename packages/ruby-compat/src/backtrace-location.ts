@@ -68,6 +68,8 @@ export class Location {
   }
 }
 
+const SEND_FRAME = /^\s+at\s+(?:async\s+)?(?:sendInternal|rbFSend)\s.*\bobject\.[jt]s:/;
+
 const setBacktraces = new WeakMap<Error, string[] | null>();
 
 /**
@@ -85,7 +87,7 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
   if (stack == null) return null;
   return stack
     .split("\n")
-    .filter((line) => /^\s+at\s/.test(line))
+    .filter((line) => /^\s+at\s/.test(line) && !SEND_FRAME.test(line))
     .map((line) => new Location(line));
 }
 

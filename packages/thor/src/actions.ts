@@ -109,8 +109,7 @@ export const ClassMethods = {
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.hasOwn(this, "_sourceRoot")) this._sourceRoot = null;
-    return this._sourceRoot ?? null;
+    return (this._sourceRoot = (rbObjIvarGet(this, "@_source_root") as string | null) ?? null);
   },
 
   async sourcePathsForSearch(this: ActionsClassHost): Promise<string[]> {

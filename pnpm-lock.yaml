@@ -942,6 +942,9 @@ importers:
       '@blazetrails/activerecord-cli':
         specifier: workspace:*
         version: link:../activerecord-cli
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../activestorage
       '@blazetrails/et-orbi':
         specifier: workspace:*
         version: link:../et-orbi

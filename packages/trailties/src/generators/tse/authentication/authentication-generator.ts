@@ -4,6 +4,7 @@ import { TEMPLATES } from "./templates.js";
 export class AuthenticationGenerator extends GeneratorBase {
   static {
     this.methodAdded("createFiles");
+    this.noCommands(() => this.methodAdded("template"));
   }
 
   async createFiles(): Promise<void> {

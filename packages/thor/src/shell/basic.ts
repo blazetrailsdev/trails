@@ -1,19 +1,26 @@
 import {
   chomp,
+  env,
+  File,
   Hash,
   isSymbol,
   matchOperator,
+  NotImplementedError,
+  Open3,
   print,
   puts,
   rbConstGet,
   rbEnsure,
   rbEqual,
+  rbFSystem,
   rbObjAsString as toS,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
   strip,
   symbolToS,
+  SystemExit,
+  Tempfile,
   type StdStream,
   uniq,
   rbObjIsKindOf,
@@ -32,6 +39,8 @@ export class Basic {
   protected _padding: number;
   /** @internal */
   protected _alwaysForce: boolean;
+  /** @internal */
+  protected _mergeTool?: string;
 
   get padding(): number {
     return this._padding;
@@ -141,9 +150,48 @@ export class Basic {
     );
   }
 
-  /** @missingRailsCall ask — CONVERGEABLE thor-create-file-conflict-has-no-file-collision-prompt */
-  fileCollision(destination: string, block?: () => unknown): unknown {
-    return true;
+  async fileCollision(destination: string, block?: () => unknown): Promise<boolean | null> {
+    if (this._alwaysForce) return true;
+    const options = block != null ? "[Ynaqdhm]" : "[Ynaqh]";
+
+    for (;;) {
+      const answer = await this.ask(`Overwrite ${destination}? (enter "h" for help) ${options}`, {
+        addToHistory: false,
+      });
+
+      if (answer == null) {
+        this.say("");
+        return true;
+      } else if (
+        rtest(matchOperator(answer, this.is("yes"))) ||
+        rtest(matchOperator(answer, this.is("force"))) ||
+        answer === ""
+      ) {
+        return true;
+      } else if (
+        rtest(matchOperator(answer, this.is("no"))) ||
+        rtest(matchOperator(answer, this.is("skip")))
+      ) {
+        return false;
+      } else if (rtest(matchOperator(answer, this.is("always")))) {
+        return (this._alwaysForce = true);
+      } else if (rtest(matchOperator(answer, this.is("quit")))) {
+        this.say("Aborting...");
+        throw new SystemExit(0);
+      } else if (rtest(matchOperator(answer, this.is("diff")))) {
+        if (block != null) await this.showDiff(destination, await block());
+        this.say("Retrying...");
+      } else if (rtest(matchOperator(answer, this.is("merge")))) {
+        if (block != null && (await this.mergeTool()).length !== 0) {
+          await this.merge(destination, await block());
+          return null;
+        }
+
+        this.say("Please specify merge tool to `THOR_MERGE` env.");
+      } else {
+        this.say(this.fileCollisionHelp(block != null));
+      }
+    }
   }
 
   printInColumns(array: unknown[]): void {
@@ -205,6 +253,33 @@ export class Basic {
     } else {
       return new RegExp(`^(${value}|${[...(value as string)].slice(0, 1).join("")})$`, "i");
     }
+  }
+
+  /** @internal */
+  protected fileCollisionHelp(blockGiven: boolean): string {
+    let help = `        Y - yes, overwrite
+        n - no, do not overwrite
+        a - all, overwrite this and all others
+        q - quit, abort
+        h - help, show this help
+`;
+    if (blockGiven) {
+      help += `        d - diff, show the differences between the old and the new
+        m - merge, run merge tool
+`;
+    }
+    return help;
+  }
+
+  /** @internal */
+  protected async showDiff(destination: string, content: unknown): Promise<void> {
+    const diffCmd = env["THOR_DIFF"] ?? env["RAILS_DIFF"] ?? "diff -u";
+
+    await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
+      temp.write(content as string | Uint8Array);
+      temp.rewind();
+      await rbFSystem(`${diffCmd} "${destination}" "${temp.path()}"`);
+    });
   }
 
   /** @internal */
@@ -279,6 +354,34 @@ export class Basic {
       );
     } else {
       return possibilities.find((possibility) => rbEqual(possibility, answer)) ?? null;
+    }
+  }
+
+  /** @internal */
+  protected async merge(destination: string, content: unknown): Promise<void> {
+    await Tempfile.open(
+      [File.basename(destination), File.extname(destination)],
+      File.dirname(destination),
+      async (temp) => {
+        temp.write(content as string | Uint8Array);
+        temp.rewind();
+        await rbFSystem(`${await this.mergeTool()} "${temp.path()}" "${destination}"`);
+      },
+    );
+  }
+
+  /** @internal */
+  protected async mergeTool(): Promise<string> {
+    return (this._mergeTool ??= env["THOR_MERGE"] ?? (await this.gitMergeTool()));
+  }
+
+  /** @internal */
+  protected async gitMergeTool(): Promise<string> {
+    try {
+      return toS((await Open3.capture3("git config merge.tool"))[0]).trimEnd();
+    } catch (e) {
+      if (e instanceof NotImplementedError) throw e;
+      return "";
     }
   }
 }

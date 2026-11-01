@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, onTestFinished } from "vitest";
 import {
   ArgumentError,
   NoMethodError,
@@ -80,6 +80,11 @@ describe("Thor::Command", () => {
     });
 
     it("re-raises an ArgumentError raised inside the method, synchronously or not", async () => {
+      const fileRegexp = Command.FILE_REGEXP;
+      Command.FILE_REGEXP = /\/thor\/src\/[a-z-]+\.ts/;
+      onTestFinished(() => {
+        Command.FILE_REGEXP = fileRegexp;
+      });
       const error = new ArgumentError("wrong number of arguments (given 3, expected 0)");
       const deeper = {
         raise: () => {

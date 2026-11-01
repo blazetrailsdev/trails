@@ -22,7 +22,7 @@ import {
   size,
 } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
-import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
+import { ArgumentError, BooleanType, capturingAssignment } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {}
 
@@ -315,8 +315,13 @@ export function assignNestedAttributesForOneToOneAssociation(
     } else {
       const method = `build${camelize(associationName, true)}`;
       if (rbObjRespondTo(this, method)) {
-        const built = rbFSend(this, method, assignableAttributes);
-        if (built instanceof Promise) return built.then(() => {});
+        const [built, assigned] = capturingAssignment(() =>
+          rbFSend(this, method, assignableAttributes),
+        );
+        if (built instanceof Promise) {
+          return built.then(() => assigned).then(() => {});
+        }
+        return assigned;
       } else {
         throw new ArgumentError(
           `Cannot build association \`${associationName}'. ` +
@@ -382,7 +387,11 @@ export function assignNestedAttributesForCollectionAssociation(
 
       if (isBlank(hashAref(a, "id"))) {
         if (!isRejectNewRecord.call(this, associationName, a)) {
-          nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
+          const [built, assigned] = capturingAssignment(() =>
+            association.reader.build(except(a, ...UNASSIGNABLE_KEYS)),
+          );
+          nestedTarget.push(built);
+          if (assigned) pending = pending ? pending.then(() => assigned) : assigned;
         } else {
           nestedTarget.push(null);
         }

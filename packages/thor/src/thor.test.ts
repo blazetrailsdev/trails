@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, isEmpty, rbGvSet } from "@blazetrails/ruby-compat";
-import type { Command } from "./command.js";
+import { Command } from "./command.js";
 import type { Base as ThorBase } from "./base.js";
 import { UndefinedCommandError } from "./error.js";
 import { Base } from "./shell.js";
@@ -708,7 +708,15 @@ describe("Thor", () => {
     });
 
     it("raises when an exception happens within the command call", async () => {
-      await expect(myScript.start(["call_myself_with_wrong_arity"])).rejects.toThrow(ArgumentError);
+      const fileRegexp = Command.FILE_REGEXP;
+      Command.FILE_REGEXP = /\/thor\/src\/[a-z-]+\.ts/;
+      try {
+        await expect(myScript.start(["call_myself_with_wrong_arity"])).rejects.toThrow(
+          ArgumentError,
+        );
+      } finally {
+        Command.FILE_REGEXP = fileRegexp;
+      }
     });
 
     describe("when the user enters an unambiguous substring of a command", () => {

@@ -78,10 +78,16 @@ export class EmptyDirectory {
     this.relativeDestination = this.base.relativeToOriginalDestinationRoot(this._destination);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm replace — PERMANENT
+   */
   protected convertEncodedInstructions(filename: string): string {
     return filename.replace(/%(.*?)%/g, (initialString: string, $1: string) => {
-      const method = strip($1);
+      const name = strip($1);
+      const method = rbObjRespondTo(this.base, name)
+        ? name
+        : name.replace(/(?<=[a-zA-Z\d])_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
       return rbObjRespondTo(this.base, method) ? toS(rbFSend(this.base, method)) : initialString;
     });
   }

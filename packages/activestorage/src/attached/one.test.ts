@@ -398,8 +398,23 @@ describe("ActiveStorage::OneAttachedTest", () => {
   it.skip("analyzing a new blob from an uploaded file after attaching it to an existing record via update", () => {});
   it.skip("analyzing a directly-uploaded blob after attaching it to an existing record", () => {});
   it.skip("analyzing a directly-uploaded blob after attaching it to an existing record via updates", () => {});
-  // BLOCKED: activestorage-one-test-nested-attachment-attributes
-  it.skip("creating an attachment as part of an autosave association through nested attributes", () => {});
+  it("creating an attachment as part of an autosave association through nested attributes", async () => {
+    const group = await Group.createBang({
+      usersAttributes: [
+        {
+          name: "John",
+          avatar: {
+            io: new StringIO("STUFF"),
+            filename: "town.jpg",
+            contentType: "image/jpeg",
+          },
+        },
+      ],
+    });
+    await group.saveBang();
+    const newUser = (await User.findBy({ name: "John" })) as User;
+    expect(await newUser.avatar.isAttached()).toBe(true);
+  });
 
   it("updating an attachment as part of an autosave association", async () => {
     const group = await Group.createBang({ users: [user] });
