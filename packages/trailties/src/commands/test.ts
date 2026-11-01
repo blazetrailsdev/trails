@@ -1,3 +1,4 @@
+import "../class-paths.test.generated.js";
 import { LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
