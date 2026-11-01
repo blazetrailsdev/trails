@@ -432,6 +432,6 @@ export default async function setup(): Promise<void> {
   }
   await puts(File.join(appTemplatePath, "config/boot.ts"), `import "@blazetrails/trailties/all";`);
 
-  await FileUtils.mkdirPAsync(`${appTemplatePath}/app/javascript`);
-  await getFs().writeFile!(`${appTemplatePath}/app/javascript/application.js`, "\n");
+  await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
+  await getFs().writeFile!(File.join(appTemplatePath, "app/javascript/application.js"), "\n");
 }
