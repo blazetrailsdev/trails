@@ -1617,7 +1617,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** @missingRailsCall using_node? — PERMANENT */
   async createRootFiles(): Promise<void> {
     await this.build("readme");
     await this.build("nodeVersion");
