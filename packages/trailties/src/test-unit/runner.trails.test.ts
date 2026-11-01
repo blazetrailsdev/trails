@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CompositeFilter, Filter, InvalidTestError, Runner } from "./runner.js";
 
 const internals = Runner as unknown as {
-  testLocations(tests: string[]): Promise<string[]>;
-  nameFilter(argv: string[]): string[];
+  testLocations(tests: string[], name: RegExp | null): Promise<string[]>;
+  nameFilter(argv: string[]): RegExp | null;
 };
 
 describe("Runner", () => {
+  const runnable = {
+    isMethodDefined: (method: string) => method === "test_a",
+    instanceMethod: () => ({
+      sourceLocation: () => [File.expandPath("test/a.test.ts"), 3] as [string, number],
+    }),
+  };
+
   const originalEnv = env.TRAILS_ENV;
   const originalCwd = Dir.pwd();
 
@@ -74,24 +81,44 @@ describe("Runner", () => {
   it("selects every test a line range overlaps", async () => {
     await app();
     const tests = await Runner.loadTests(["test/models/user.test.ts:3-6"]);
-    expect(await internals.testLocations(tests)).toEqual([
+    expect(await internals.testLocations(tests, null)).toEqual([
       "test/models/user.test.ts:2",
       "test/models/user.test.ts:6",
     ]);
   });
 
-  it("hands -n to Vitest as a regexp", () => {
-    expect(internals.nameFilter(["-n", "/a.b/"])).toEqual(["-t", "a.b"]);
-    expect(internals.nameFilter(["--name", "a.b"])).toEqual(["-t", "a\\.b"]);
-    expect(internals.nameFilter(["test/a.test.ts"])).toEqual([]);
+  it("reads -n in each spelling", () => {
+    expect(internals.nameFilter(["-n", "/a.b/"])).toEqual(/a.b/);
+    expect(internals.nameFilter(["--name", "a.b"])).toEqual(/a\.b/);
+    expect(internals.nameFilter(["-nfoo"])).toEqual(/foo/);
+    expect(internals.nameFilter(["--name=foo"])).toEqual(/foo/);
+    expect(internals.nameFilter(["test/a.test.ts"])).toBeNull();
   });
 
-  const runnable = {
-    isMethodDefined: (method: string) => method === "test_a",
-    instanceMethod: () => ({
-      sourceLocation: () => [File.expandPath("test/a.test.ts"), 3] as [string, number],
-    }),
-  };
+  it("a name filter unions with a line filter", async () => {
+    await app();
+    const tests = await Runner.loadTests(["test/models/user.test.ts:3"]);
+    expect(await internals.testLocations(tests, /^b$/)).toEqual([
+      "test/models/user.test.ts:2",
+      "test/models/user.test.ts:6",
+    ]);
+  });
+
+  it("run does not start Vitest with no tests", async () => {
+    await app();
+    await getFs().mkdir!("test/empty", { recursive: true });
+    await expect(Runner.run(["test/empty"])).resolves.toBeUndefined();
+  });
+
+  it("Filter answers false for a line with no definition", () => {
+    const location = () => [import.meta.filename, 1] as [string, number];
+    const filter = new Filter(
+      { ...runnable, instanceMethod: () => ({ sourceLocation: location }) },
+      import.meta.filename,
+      "1",
+    );
+    expect(filter.caseEquals("test_a")).toBe(false);
+  });
 
   it("composeFilter normalizes a declarative name", () => {
     expect(Runner.composeFilter(runnable, "some test")).toBe("test_some_test");

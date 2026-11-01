@@ -10,6 +10,7 @@ import {
   exit,
   getFs,
   rbFSystem,
+  rbObjRespondTo,
   regexpEscape,
   setEnv,
   setVerbose,
@@ -65,19 +66,18 @@ export class Runner {
       argv.splice(envIndex, 1);
       environment = argv.splice(envIndex, 1)[0].trim();
     }
-    setEnv("TRAILS_ENV", environment || "test");
+    setEnv("TRAILS_ENV", environment ?? "test");
 
     const wIndex = index("--warnings") ?? index("-w");
     if (wIndex != null) setVerbose(argv.splice(wIndex, 1)[0]);
   }
 
-  /** @missingRailsCall system — PERMANENT */
   static async runFromRake(testCommand: string, argv: string[] = []): Promise<boolean> {
     const success = await rbFSystem(
       "trails",
       testCommand,
       ...argv,
-      ...Shellwords.shellwords(env.TESTOPTS || ""),
+      ...Shellwords.shellwords(env.TESTOPTS ?? ""),
     );
     return success || exit(false);
   }
@@ -85,16 +85,26 @@ export class Runner {
   /** @inventedArm rbFSystem — PERMANENT */
   static async run(argv: string[] = []): Promise<void> {
     const tests = await this.loadTests(argv);
-    const locations = await this.testLocations(tests);
-    if (tests.length > 0 && locations.length === 0) return;
+    const name = this.nameFilter(argv);
+    const locations = await this.testLocations(tests, name);
+    if (locations.length === 0) return;
 
-    const success = await rbFSystem("vitest", "run", ...locations, ...this.nameFilter(argv));
+    const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
+    const success = await rbFSystem(
+      "vitest",
+      "run",
+      ...locations,
+      ...(name != null && !lineFiltered ? ["-t", name.source] : []),
+      ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
+      ...(argv.includes("-v") || argv.includes("--verbose") ? ["--reporter", "verbose"] : []),
+    );
+    if (success == null) throw new LoadError("cannot load such file -- vitest");
     if (!success) exit(false);
   }
 
   static async loadTests(argv: string[]): Promise<string[]> {
     const patterns = await this.extractFilters(argv);
-    const tests = this.listTests(patterns);
+    const tests = await this.listTests(patterns);
     const paths = (await tests.toA()) as string[];
     for (const path of paths) {
       const absPath = File.expandPath(path);
@@ -106,7 +116,9 @@ export class Runner {
         }
       } catch (exception) {
         if (exception instanceof LoadError && exception.path === absPath) {
-          const allTests = (await this.listTests([this.defaultTestGlob()]).toA()) as string[];
+          const allTests = (await (
+            await this.listTests([this.defaultTestGlob()])
+          ).toA()) as string[];
           const corrections = new SpellChecker({ dictionary: allTests }).correct(path);
 
           if (corrections.length === 0) {
@@ -154,12 +166,12 @@ export class Runner {
 
   /** @internal */
   private static defaultTestGlob(): string {
-    return env.DEFAULT_TEST || "test/**/*.test.ts";
+    return env.DEFAULT_TEST ?? "test/**/*.test.ts";
   }
 
   /** @internal */
   private static defaultTestExcludeGlob(): string {
-    return env.DEFAULT_TEST_EXCLUDE || "test/{system,dummy,fixtures}/**/*.test.ts";
+    return env.DEFAULT_TEST_EXCLUDE ?? "test/{system,dummy,fixtures}/**/*.test.ts";
   }
 
   /** @internal */
@@ -173,10 +185,10 @@ export class Runner {
   }
 
   /** @internal */
-  private static listTests(patterns: string[]): FileList {
+  private static async listTests(patterns: string[]): Promise<FileList> {
     const tests = FileList.get(patterns.length > 0 ? patterns : this.defaultTestGlob());
-    if (patterns.length === 0) void tests.exclude(this.defaultTestExcludeGlob());
-    void tests.exclude(/test\/isolation\/assets\/node_modules/);
+    if (patterns.length === 0) await tests.exclude(this.defaultTestExcludeGlob());
+    await tests.exclude(/test\/isolation\/assets\/node_modules/);
     return tests;
   }
 
@@ -193,7 +205,7 @@ export class Runner {
   }
 
   /** @internal */
-  private static async testLocations(tests: string[]): Promise<string[]> {
+  private static async testLocations(tests: string[], name: RegExp | null): Promise<string[]> {
     const locations: string[] = [];
     for (const path of tests) {
       const patterns = this.filters.filter(([file]) => file === path);
@@ -204,28 +216,34 @@ export class Runner {
 
       const source = (await getFs().readFile(path, "utf8")).split("\n");
       const ranges = TestParser.ranges(path);
-      const wanted = patterns.flatMap(([, lines]) => lines.map(lineRange));
+      const wanted = patterns.flatMap(([, lines]) =>
+        lines.map((line) => {
+          const [first, last] = line.split("-").map(Number);
+          return new Range(first, last ?? first);
+        }),
+      );
       for (const [begin, end] of Object.entries(ranges)) {
         const test = new Range(Number(begin), end);
-        if (!/^\s*(?:it|test)(?:\.\w+)*\(/.test(source[Number(begin) - 1])) continue;
-        if (wanted.some((range) => range.overlaps(test))) locations.push(`${path}:${begin}`);
+        const title = /^\s*(?:it|test)(?:\.\w+)*\(\s*["'`]?(.*?)["'`]?,/.exec(
+          source[Number(begin) - 1],
+        );
+        if (title == null) continue;
+        if (wanted.some((range) => range.overlaps(test)) || name?.test(title[1])) {
+          locations.push(`${path}:${begin}`);
+        }
       }
     }
     return locations;
   }
 
   /** @internal */
-  private static nameFilter(argv: string[]): string[] {
-    const index = argv.findIndex((arg) => arg === "-n" || arg === "--name");
-    if (index === -1 || argv[index + 1] === undefined) return [];
-    const name = argv[index + 1];
-    return ["-t", this.isRegexpFilter(name) ? name.slice(1, -1) : regexpEscape(name)];
+  private static nameFilter(argv: string[]): RegExp | null {
+    const index = argv.findIndex((arg) => /^(-n|--name)$/.test(arg));
+    const inline = argv.map((arg) => /^(?:-n|--name=)(.+)$/.exec(arg)).find((match) => match);
+    const name = index === -1 ? inline?.[1] : argv[index + 1];
+    if (name == null) return null;
+    return new RegExp(this.isRegexpFilter(name) ? name.slice(1, -1) : regexpEscape(name));
   }
-}
-
-function lineRange(lineOrRange: string): Range<number> {
-  const [first, last] = lineOrRange.split("-").map(Number);
-  return new Range(first, last ?? first);
 }
 
 export class CompositeFilter {
@@ -253,8 +271,8 @@ export class CompositeFilter {
 
   /** @internal */
   private deriveNamedFilter(filter: unknown): string | RegExp | null | undefined {
-    if (filter instanceof CompositeFilter) {
-      return filter.namedFilter;
+    if (rbObjRespondTo(filter, "namedFilter")) {
+      return (filter as CompositeFilter).namedFilter;
     }
     const match = typeof filter === "string" ? /\/(.*)\//.exec(filter) : null;
     if (match) {
@@ -289,7 +307,8 @@ export class Filter {
     this._runnable = runnable;
     this._file = File.expandPath(file);
     if (lineOrRange != null) {
-      this._lineRange = lineRange(lineOrRange);
+      const [first, last] = lineOrRange.split("-").map(Number);
+      this._lineRange = new Range(first, last ?? first);
     }
   }
 
@@ -297,8 +316,8 @@ export class Filter {
     if (!this._runnable.isMethodDefined(method)) return false;
 
     if (this._lineRange) {
-      const [testFile, testRange] = this.definitionFor(this._runnable.instanceMethod(method))!;
-      return testFile === this._file && this._lineRange.overlaps(testRange);
+      const definition = this.definitionFor(this._runnable.instanceMethod(method));
+      return definition?.[0] === this._file && this._lineRange.overlaps(definition[1]);
     } else {
       return this._runnable.instanceMethod(method).sourceLocation()![0] === this._file;
     }

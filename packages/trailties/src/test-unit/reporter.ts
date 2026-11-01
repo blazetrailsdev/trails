@@ -1,5 +1,5 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { Interrupt, type StringIO } from "@blazetrails/ruby-compat";
+import { Interrupt, rbObjMethod, rbObjRespondTo, type StringIO } from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../rails.js";
 
@@ -23,13 +23,6 @@ const codes = { red: 31, green: 32, yellow: 33 };
 export class TestUnitReporter {
   declare static appRoot: string | null | undefined;
   declare static executable: string;
-
-  static readonly COLOR_BY_RESULT_CODE: Record<string, number> = {
-    ".": codes.green,
-    E: codes.red,
-    F: codes.red,
-    S: codes.yellow,
-  };
 
   static {
     classAttribute.call(this, "appRoot", { instanceAccessor: false });
@@ -101,7 +94,7 @@ export class TestUnitReporter {
 
   relativePathFor(file: string): string {
     const appRoot = this.appRoot();
-    if (appRoot) {
+    if (appRoot != null) {
       return file.replace(new RegExp(`^${appRoot}/?`), "");
     } else {
       return file;
@@ -125,7 +118,9 @@ export class TestUnitReporter {
 
   /** @internal */
   private formatRerunSnippet(result: Result): string {
-    const [location, line] = result.sourceLocation;
+    const [location, line] = rbObjRespondTo(result, "sourceLocation")
+      ? result.sourceLocation
+      : rbObjMethod(result, result.name).sourceLocation()!;
 
     return `${this.executable} ${this.relativePathFor(location)}:${line}`;
   }
@@ -142,6 +137,13 @@ export class TestUnitReporter {
   private isColoredOutput(): boolean | undefined {
     return this.options.color && this.io.isTty !== undefined && this.io.isTty();
   }
+
+  static readonly COLOR_BY_RESULT_CODE: Record<string, number> = {
+    ".": codes.green,
+    E: codes.red,
+    F: codes.red,
+    S: codes.yellow,
+  };
 
   /** @internal */
   private colorOutput(string: unknown, { by }: { by: Result }): unknown {

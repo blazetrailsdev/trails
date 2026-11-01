@@ -36,6 +36,12 @@ export class TestCommand extends Base {
     klass.methodAdded("generators");
   }
 
+  /** @internal */
+  private static readonly EXACT_TEST_ARGUMENT_PATTERN = new RegExp(
+    `^-n|^--name\\b|${Runner.PATH_ARGUMENT_PATTERN.source}`,
+    "m",
+  );
+
   static executable(...args: [string?]): string {
     return args.length === 0 ? TestUnitReporter.executable : super.executable(...args);
   }

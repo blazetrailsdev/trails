@@ -62,12 +62,10 @@ export const Diffing = defineModule(
       );
     },
 
-    /** @missingRailsCall system — PERMANENT */
     async isDiffingDriverConfigured(): Promise<boolean | null> {
       return rbFSystem("git config --get diff.rails_credentials.textconv", { out: File.NULL });
     },
 
-    /** @missingRailsCall system — PERMANENT */
     async configureDiffingDriver(this: DiffingHost): Promise<void> {
       await rbFSystem(`git config diff.rails_credentials.textconv '${this.executable("diff")}'`);
       this.say("Configured Git diff driver for credentials.");

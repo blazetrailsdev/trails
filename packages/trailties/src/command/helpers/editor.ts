@@ -40,7 +40,6 @@ export const Editor = defineModule(
      * @inventedArm if — PERMANENT
      * @inventedArm try — PERMANENT
      * @inventedArm onSignal — PERMANENT
-     * @missingRailsCall system — PERMANENT
      */
     async systemEditor(this: EditorHost, filePath: string): Promise<boolean | null> {
       let interrupted = false;

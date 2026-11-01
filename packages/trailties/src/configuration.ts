@@ -165,7 +165,7 @@ export class Generators {
     this._afterGenerateCallbacks.push(block);
   }
 
-  /** @missingRailsCall system — PERMANENT */
+  /** @missingRailsCall system — CONVERGEABLE configuration-eslint-autocorrect-calls-system */
   applyEslintAutocorrectAfterGenerateBang(): void {
     this.afterGenerate((files) => {
       const parsableFiles = files.filter(

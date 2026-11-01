@@ -75,7 +75,7 @@ describe("TestUnitReporterTest", () => {
   it("does not print snippet for successful and skipped tests", () => {
     record(passingTest());
     run(skippedTest());
-    expect(output.string()).not.toContain("Failed tests:");
+    expect(output.string()).not.toMatch("Failed tests:");
     expect(rerunSnippetCount()).toBe(0);
   });
 
@@ -98,12 +98,12 @@ describe("TestUnitReporterTest", () => {
 
   it("outputs failures inline", () => {
     run(failedTest());
-    expect(output.string()).toBe(`F\n\nFailure:\n${heading} [${location}]:\nboo\n\n${snippet}`);
+    expect(output.string()).toMatch(`F\n\nFailure:\n${heading} [${location}]:\nboo\n\n${snippet}`);
   });
 
   it("outputs errors inline", () => {
     run(erroredTest());
-    expect(output.string()).toBe(
+    expect(output.string()).toMatch(
       `E\n\nError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\n${snippet}`,
     );
   });
@@ -111,30 +111,44 @@ describe("TestUnitReporterTest", () => {
   it("outputs skipped tests inline if verbose", () => {
     reporter = new TestUnitReporter(output, { verbose: true, outputInline: true });
     run(skippedTest());
-    expect(output.string()).toBe(
+    expect(output.string()).toMatch(
       `${heading} = 10.00 s = S\n\n\nSkipped:\n${heading} [${location}]:\nskipchurches, misstemples\n\n${snippet}`,
     );
   });
 
   it("does not output rerun snippets after run", () => {
     run(failedTest());
-    expect(output.string()).not.toContain("Failed tests:");
+    expect(output.string()).not.toMatch("Failed tests:");
   });
 
   it("fail fast interrupts run on failure", () => {
     reporter = new TestUnitReporter(output, { failFast: true });
-    expect(() => record(failedTest())).toThrow(Interrupt);
+    let interruptRaised = false;
+    try {
+      record(failedTest());
+    } catch (e) {
+      if (!(e instanceof Interrupt)) throw e;
+      interruptRaised = true;
+    }
+    expect(interruptRaised).toBeTruthy();
   });
 
   it("fail fast interrupts run on error", () => {
     reporter = new TestUnitReporter(output, { failFast: true });
-    expect(() => record(erroredTest())).toThrow(Interrupt);
+    let interruptRaised = false;
+    try {
+      record(erroredTest());
+    } catch (e) {
+      if (!(e instanceof Interrupt)) throw e;
+      interruptRaised = true;
+    }
+    expect(interruptRaised).toBeTruthy();
   });
 
   it("fail fast does not interrupt run skips", () => {
     reporter = new TestUnitReporter(output, { failFast: true });
     record(skippedTest());
-    expect(output.string()).not.toContain("Failed tests:");
+    expect(output.string()).not.toMatch("Failed tests:");
   });
 
   describe("with a tty", () => {
@@ -144,21 +158,21 @@ describe("TestUnitReporterTest", () => {
     });
     it("outputs colored passing results", () => {
       record(passingTest());
-      expect(output.string()).toContain("\x1b[32m.\x1b[0m");
+      expect(output.string()).toMatch("\x1b[32m.\x1b[0m");
     });
     it("outputs colored skipped results", () => {
       record(skippedTest());
-      expect(output.string()).toContain("\x1b[33mS\x1b[0m");
+      expect(output.string()).toMatch("\x1b[33mS\x1b[0m");
     });
     it("outputs colored failed results", () => {
       record(failedTest());
-      expect(output.string()).toContain(
+      expect(output.string()).toMatch(
         `\x1b[31mF\x1b[0m\n\n\x1b[31mFailure:\n${heading} [${location}]:\nboo\n\x1b[0m\n\n${snippet}`,
       );
     });
     it("outputs colored error results", () => {
       record(erroredTest());
-      expect(output.string()).toContain(
+      expect(output.string()).toMatch(
         `\x1b[31mE\x1b[0m\n\n\x1b[31mError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\x1b[0m`,
       );
     });

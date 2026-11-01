@@ -117,11 +117,12 @@ const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
  * which is a call to Ruby's `load`, and `rbProcCall`, Ruby's
  * `callable.call(*args)` (`rb_proc_call`, vendor/ruby/v3.3.11/proc.c:990),
- * which is a call to Ruby's `call`.
+ * which is a call to Ruby's `call`, and `rbFSystem`, Ruby's `system`.
  */
 const KERNEL_CALLEES = new Map([
   ["rbFLoad", "load"],
   ["rbProcCall", "call"],
+  ["rbFSystem", "system"],
 ]);
 /**
  * ruby-compat's `Module#const_get` family. The module is Ruby's receiver, so it
