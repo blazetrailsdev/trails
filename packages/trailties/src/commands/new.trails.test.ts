@@ -7,7 +7,7 @@ await lookupBang();
 
 async function trailsNew(...args: string[]) {
   await createProgram().parseAsync(
-    ["new", "my-app", "--skip-git", "--skip-install", "--skip-docker", ...args],
+    ["new", "my-app", "--skip-git", "--skip-bundle", "--skip-docker", ...args],
     { from: "user" },
   );
 }

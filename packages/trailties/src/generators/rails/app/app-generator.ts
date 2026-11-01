@@ -1,3 +1,4 @@
+import type { ThorClass } from "@blazetrails/thor";
 import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, titleize } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../../../template-builder/index.js";
@@ -192,7 +193,7 @@ export class AppGenerator extends AppBase {
     });
     this.classOption("skipBundle", {
       type: "boolean",
-      aliases: ["-B", "--skip-install"],
+      aliases: "-B",
       default: null,
       desc: "Don't run bundle install",
     });
@@ -247,6 +248,13 @@ export class AppGenerator extends AppBase {
     generator.setDefaultAccessorsBang();
     await generator.applyRailsTemplate();
     return generator;
+  }
+
+  static banner(): string {
+    return `trails new ${(this as unknown as ThorClass)
+      .arguments()
+      .map((a) => a.usage())
+      .join(" ")} [options]`;
   }
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {

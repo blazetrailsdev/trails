@@ -1,24 +1,24 @@
-import { File, Dir, getChildProcess } from "@blazetrails/ruby-compat";
+import { File, getChildProcess } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
-/** @noRailsEquivalent CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks */
+/** @noRailsEquivalent CONVERGEABLE app-generator-version-control-runs-git-init */
 class NewAppGenerator extends AppGenerator {
-  declare static generator: AppGenerator;
-
-  static {
-    const klass = AppGenerator as unknown as { sourceRoot(path?: string): unknown };
-    void klass.sourceRoot.call(this, klass.sourceRoot() as string);
-  }
+  declare static generator: AppGenerator | undefined;
 
   static isExitOnFailure(): boolean {
     return true;
   }
 
+  static sourceRoot(): Promise<string | null | undefined> {
+    return AppGenerator.sourceRoot();
+  }
+
   static dispatch(...[command, givenArgs, givenOpts, config]: Parameters<ThorClass["dispatch"]>) {
-    return (AppGenerator as unknown as ThorClass).dispatch.call(
+    const parent = (AppGenerator as unknown as ThorClass).dispatch;
+    return parent.call(
       this as unknown as ThorClass,
       command,
       givenArgs,
@@ -40,15 +40,13 @@ export function newCommand(): Command {
     .allowUnknownOption()
     .allowExcessArguments()
     .action(async (_options, command: Command) => {
-      const cwd = Dir.pwd();
-      await (NewAppGenerator as unknown as ThorClass).start(command.args, {
-        destinationRoot: cwd,
-      });
-      const generator = NewAppGenerator.generator;
+      NewAppGenerator.generator = undefined;
+      await (NewAppGenerator as unknown as ThorClass).start(command.args);
+      const generator = NewAppGenerator.generator as AppGenerator | undefined;
       if (generator === undefined || generator.options.pretend) return;
 
       const name = String(generator.appPath);
-      const appDir = File.expandPath(name, cwd);
+      const appDir = File.expandPath(name);
       const pm = generator.packageManager;
 
       if (!generator.options.skipGit) {
