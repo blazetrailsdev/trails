@@ -7,6 +7,14 @@ import { CredentialsCommand } from "./credentials.js";
 
 const DEFAULT_CREDENTIALS_PATTERN = /access_key_id: 123\n[\s\S]*secret_key_base: [0-9a-f]{128}\n/;
 
+function assertFile(relative: string): void {
+  expect(File.isExist(relative)).toBeTruthy();
+}
+
+function assertNoFile(relative: string): void {
+  expect(File.isExist(relative)).toBeFalsy();
+}
+
 describe("Rails::Command::CredentialsTest", () => {
   let appPath: string, cwd: string, output: string[];
   const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR };
@@ -33,10 +41,16 @@ describe("Rails::Command::CredentialsTest", () => {
     const config = {
       root: appPath,
       credentials: { contentPath: null, keyPath: null },
-      credentialsDefaults: async () => ({
-        contentPath: `${appPath}/config/credentials.yml.enc`,
-        keyPath: `${appPath}/config/master.key`,
-      }),
+      credentialsDefaults: async () =>
+        File.isExist("config/credentials/production.yml.enc")
+          ? {
+              contentPath: `${appPath}/config/credentials/production.yml.enc`,
+              keyPath: `${appPath}/config/credentials/production.key`,
+            }
+          : {
+              contentPath: `${appPath}/config/credentials.yml.enc`,
+              keyPath: `${appPath}/config/master.key`,
+            },
     };
     vi.spyOn(Trails, "application", "get").mockReturnValue({
       config,
@@ -64,22 +78,22 @@ describe("Rails::Command::CredentialsTest", () => {
 
   it("edit without visual or editor gives hint", async () => {
     const out = await edit([], "", "");
-    expect(out).toContain("No $VISUAL or $EDITOR to open file in");
-    expect(out).toContain("rails credentials:edit");
+    expect(out).toMatch("No $VISUAL or $EDITOR to open file in");
+    expect(out).toMatch("rails credentials:edit");
   });
 
   it("edit with visual but not editor does not give hint", async () => {
-    expect(await edit([], "true", "")).not.toContain("No $VISUAL or $EDITOR to open file in");
+    expect(await edit([], "true", "")).not.toMatch("No $VISUAL or $EDITOR to open file in");
   });
 
   it("edit with editor but not visual does not give hint", async () => {
-    expect(await edit([], "", "true")).not.toContain("No $VISUAL or $EDITOR to open file in");
+    expect(await edit([], "", "true")).not.toMatch("No $VISUAL or $EDITOR to open file in");
   });
 
   it("edit command adds master key", async () => {
     await edit();
-    expect(File.isExist("config/master.key")).toBe(true);
-    expect(File.read(".gitignore")).toContain("config/master.key");
+    assertFile("config/master.key");
+    expect(File.read(".gitignore")).toMatch("config/master.key");
   });
 
   it("edit command does not overwrite master key file if it already exists", async () => {
@@ -92,26 +106,29 @@ describe("Rails::Command::CredentialsTest", () => {
   it("edit command does not add duplicate master key entries to gitignore", async () => {
     await edit();
     await edit();
-    expect(File.read(".gitignore").match(/config\/master\.key/g)).toHaveLength(1);
+    expect(File.read(".gitignore").match(/config\/master\.key/g)?.length).toBe(1);
   });
 
   it("edit command modifies file specified by environment option", async () => {
     await edit(["--environment", "production"]);
-    expect(File.isExist("config/credentials.yml.enc")).toBe(false);
-    expect(File.isExist("config/credentials/production.key")).toBe(true);
-    expect(File.isExist("config/credentials/production.yml.enc")).toBe(true);
+    expect(await show(["--environment", "production"])).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+    assertNoFile("config/credentials.yml.enc");
+    assertFile("config/credentials/production.key");
+    assertFile("config/credentials/production.yml.enc");
   });
 
   it("edit command properly expands environment option", async () => {
     await edit(["--environment", "prod"]);
-    expect(File.isExist("config/credentials.yml.enc")).toBe(false);
-    expect(File.isExist("config/credentials/production.key")).toBe(true);
-    expect(File.isExist("config/credentials/production.yml.enc")).toBe(true);
+    expect(await show(["--environment", "prod"])).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+    assertNoFile("config/credentials.yml.enc");
+    assertFile("config/credentials/production.key");
+    assertFile("config/credentials/production.yml.enc");
   });
 
   it("edit command generates credentials file when it does not exist", async () => {
     await edit();
-    expect(File.isExist("config/credentials.yml.enc")).toBe(true);
+    expect(await show()).toMatch(DEFAULT_CREDENTIALS_PATTERN);
+    assertFile("config/credentials.yml.enc");
   });
 
   it("show credentials", async () => {
@@ -133,13 +150,13 @@ describe("Rails::Command::CredentialsTest", () => {
   it("diff enroll diffing when already enrolled", async () => {
     await diff("--enroll");
     expect(await diff("--enroll")).toMatch(/already enrolled/i);
-    expect(File.read(".gitattributes").match(/config\/credentials\.yml\.enc/g)).toHaveLength(1);
+    expect(File.read(".gitattributes").match(/config\/credentials\.yml\.enc/g)?.length).toBe(1);
   });
 
   it("diff disenroll diffing", async () => {
     await diff("--enroll");
     expect(await diff("--disenroll")).toMatch(/\bdisenrolled project/i);
-    expect(File.isExist(".gitattributes")).toBe(false);
+    expect(File.isExist(".gitattributes")).toBeFalsy();
   });
 
   it("diff disenroll diffing with existing .gitattributes", async () => {
@@ -151,7 +168,7 @@ describe("Rails::Command::CredentialsTest", () => {
 
   it("diff disenroll diffing when not enrolled", async () => {
     expect(await diff("--disenroll")).toMatch(/not enrolled/i);
-    expect(File.isExist(".gitattributes")).toBe(false);
+    expect(File.isExist(".gitattributes")).toBeFalsy();
   });
 
   it("diff for main credentials", async () => {
@@ -163,13 +180,13 @@ describe("Rails::Command::CredentialsTest", () => {
     await edit();
     File.delete("config/master.key");
     const rawContent = File.read("config/credentials.yml.enc");
-    expect(await diff("config/credentials.yml.enc")).toContain(rawContent);
+    expect(await diff("config/credentials.yml.enc")).toMatch(rawContent);
   });
 
   it("diff returns raw encrypted content when errors occur", async () => {
     await edit();
     const encryptedContent = File.read("config/credentials.yml.enc");
     File.write("config/credentials.yml.enc", `${encryptedContent}ruin decryption`);
-    expect(await diff("config/credentials.yml.enc")).toContain(encryptedContent);
+    expect(await diff("config/credentials.yml.enc")).toMatch(encryptedContent);
   });
 });

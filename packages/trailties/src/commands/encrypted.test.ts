@@ -7,6 +7,14 @@ import { EncryptedCommand } from "./encrypted.js";
 
 const encryptedFile = "config/tokens.yml.enc";
 
+function assertFile(relative: string): void {
+  expect(File.isExist(relative)).toBeTruthy();
+}
+
+function assertNoFile(relative: string): void {
+  expect(File.isExist(relative)).toBeFalsy();
+}
+
 describe("Rails::Command::EncryptedTest", () => {
   let appPath: string, cwd: string, output: string[];
   const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR };
@@ -55,34 +63,35 @@ describe("Rails::Command::EncryptedTest", () => {
 
   it("edit without visual or editor gives hint", async () => {
     const out = await edit(undefined, "", "");
-    expect(out).toContain("No $VISUAL or $EDITOR to open file in");
-    expect(out).toContain("rails encrypted:edit");
+    expect(out).toMatch("No $VISUAL or $EDITOR to open file in");
+    expect(out).toMatch("rails encrypted:edit");
   });
 
   it("edit with visual but not editor does not give hint", async () => {
-    expect(await edit(undefined, "true", "")).not.toContain("No $VISUAL or $EDITOR");
+    expect(await edit(undefined, "true", "")).not.toMatch("No $VISUAL or $EDITOR");
   });
 
   it("edit with editor but not visual does not give hint", async () => {
-    expect(await edit(undefined, "", "true")).not.toContain("No $VISUAL or $EDITOR");
+    expect(await edit(undefined, "", "true")).not.toMatch("No $VISUAL or $EDITOR");
   });
 
   it("edit command adds master key", async () => {
     await edit();
-    expect(File.isExist("config/master.key")).toBe(true);
-    expect(File.read(".gitignore")).toContain("config/master.key");
+    assertFile("config/master.key");
+    expect(File.read(".gitignore")).toMatch("config/master.key");
   });
 
   it("edit command does not add duplicate master key entries to gitignore", async () => {
     await edit();
     await edit();
-    expect(File.read(".gitignore").match(/config\/master\.key/g)).toHaveLength(1);
+    expect(File.read(".gitignore").match(/config\/master\.key/g)?.length).toBe(1);
   });
 
   it("edit encrypts file with custom key", async () => {
     await edit("config/tokens.key");
-    expect(File.isExist("config/tokens.key")).toBe(true);
-    expect(File.read(".gitignore")).toContain("/config/tokens.key");
+    expect(File.isExist("config/tokens.key")).toBeTruthy();
+    expect(File.read(".gitignore")).toMatch("/config/tokens.key");
+    expect(await show("config/tokens.key")).toMatch(/access_key_id: 123/);
   });
 
   it("show encrypted file with custom key", async () => {
@@ -96,7 +105,8 @@ describe("Rails::Command::EncryptedTest", () => {
 
   it("won't corrupt encrypted file when passed wrong key", async () => {
     await edit("config/tokens.key");
-    await invoke("encrypted:edit", prepareArgs("config/other.key")).catch(() => {});
+    File.write("config/master.key", "0".repeat(32));
+    expect(await edit()).toMatch("passed the wrong key");
     expect(await show("config/tokens.key")).toMatch(/access_key_id: 123/);
   });
 });
