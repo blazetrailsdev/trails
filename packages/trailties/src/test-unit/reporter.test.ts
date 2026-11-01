@@ -25,7 +25,8 @@ class FakeResult {
 }
 
 const location = `${FILE}:9`;
-const heading = `${"TestUnitReporterTest::ExampleTest"}#woot`;
+const heading = "TestUnitReporterTest::ExampleTest#woot";
+const snippet = `bin/rails test ${location}\n\n`;
 const failedTest = () => new FakeResult("F", `Failure:\n${heading} [${location}]:\nboo\n`);
 const erroredTest = () =>
   new FakeResult("E", `Error:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n`);
@@ -46,6 +47,10 @@ describe("TestUnitReporterTest", () => {
     reporter.prerecord({ name: result.klass }, result.name);
     reporter.record(result);
   };
+  const run = (result: FakeResult) => {
+    record(result);
+    reporter.report();
+  };
   const rerunSnippetCount = () =>
     output.string().match(/^(bin\/rails test|bin\/test) /gm)?.length ?? 0;
 
@@ -55,8 +60,7 @@ describe("TestUnitReporterTest", () => {
   });
 
   it("prints rerun snippet to run a single failed test", () => {
-    record(failedTest());
-    reporter.report();
+    run(failedTest());
     expect(output.string()).toMatch(/^bin\/rails test .*test\/test_unit\/reporter_test\.rb:\d+$/m);
     expect(rerunSnippetCount()).toBe(1);
   });
@@ -64,23 +68,20 @@ describe("TestUnitReporterTest", () => {
   it("prints rerun snippet for every failed test", () => {
     record(failedTest());
     record(failedTest());
-    record(failedTest());
-    reporter.report();
+    run(failedTest());
     expect(rerunSnippetCount()).toBe(3);
   });
 
   it("does not print snippet for successful and skipped tests", () => {
     record(passingTest());
-    record(skippedTest());
-    reporter.report();
+    run(skippedTest());
     expect(output.string()).not.toContain("Failed tests:");
     expect(rerunSnippetCount()).toBe(0);
   });
 
   it("prints rerun snippet for skipped tests if run in verbose mode", () => {
     reporter = new TestUnitReporter(output, { verbose: true });
-    record(skippedTest());
-    reporter.report();
+    run(skippedTest());
     expect(rerunSnippetCount()).toBe(1);
   });
 
@@ -88,8 +89,7 @@ describe("TestUnitReporterTest", () => {
     const originalExecutable = TestUnitReporter.executable;
     try {
       TestUnitReporter.executable = "bin/test";
-      record(failedTest());
-      reporter.report();
+      run(failedTest());
       expect(output.string()).toMatch(/^bin\/test .*test\/test_unit\/reporter_test\.rb:\d+$/m);
     } finally {
       TestUnitReporter.executable = originalExecutable;
@@ -97,33 +97,27 @@ describe("TestUnitReporterTest", () => {
   });
 
   it("outputs failures inline", () => {
-    record(failedTest());
-    reporter.report();
-    expect(output.string()).toBe(
-      `F\n\nFailure:\n${heading} [${location}]:\nboo\n\nbin/rails test ${location}\n\n`,
-    );
+    run(failedTest());
+    expect(output.string()).toBe(`F\n\nFailure:\n${heading} [${location}]:\nboo\n\n${snippet}`);
   });
 
   it("outputs errors inline", () => {
-    record(erroredTest());
-    reporter.report();
+    run(erroredTest());
     expect(output.string()).toBe(
-      `E\n\nError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\nbin/rails test ${location}\n\n`,
+      `E\n\nError:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n\n${snippet}`,
     );
   });
 
   it("outputs skipped tests inline if verbose", () => {
     reporter = new TestUnitReporter(output, { verbose: true, outputInline: true });
-    record(skippedTest());
-    reporter.report();
+    run(skippedTest());
     expect(output.string()).toBe(
-      `${heading} = 10.00 s = S\n\n\nSkipped:\n${heading} [${location}]:\nskipchurches, misstemples\n\nbin/rails test ${location}\n\n`,
+      `${heading} = 10.00 s = S\n\n\nSkipped:\n${heading} [${location}]:\nskipchurches, misstemples\n\n${snippet}`,
     );
   });
 
   it("does not output rerun snippets after run", () => {
-    record(failedTest());
-    reporter.report();
+    run(failedTest());
     expect(output.string()).not.toContain("Failed tests:");
   });
 
@@ -159,7 +153,7 @@ describe("TestUnitReporterTest", () => {
     it("outputs colored failed results", () => {
       record(failedTest());
       expect(output.string()).toContain(
-        `\x1b[31mF\x1b[0m\n\n\x1b[31mFailure:\n${heading} [${location}]:\nboo\n\x1b[0m\n\nbin/rails test ${location}\n\n`,
+        `\x1b[31mF\x1b[0m\n\n\x1b[31mFailure:\n${heading} [${location}]:\nboo\n\x1b[0m\n\n${snippet}`,
       );
     });
     it("outputs colored error results", () => {

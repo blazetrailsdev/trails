@@ -1,13 +1,9 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { Interrupt } from "@blazetrails/ruby-compat";
+import { Interrupt, type StringIO } from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../rails.js";
 
-interface Io {
-  print(...args: unknown[]): unknown;
-  puts(...args: unknown[]): unknown;
-  isTty?(): boolean;
-}
+type Io = Pick<StringIO, "print" | "puts"> & { isTty?(): boolean };
 
 interface Result {
   name: string;
@@ -20,12 +16,7 @@ interface Result {
   isPassed(): boolean;
 }
 
-interface Options {
-  verbose?: boolean;
-  outputInline?: boolean;
-  failFast?: boolean;
-  color?: boolean;
-}
+type Options = Partial<Record<"verbose" | "outputInline" | "failFast" | "color", boolean>>;
 
 const codes = { red: 31, green: 32, yellow: 33 };
 

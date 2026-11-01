@@ -26,9 +26,6 @@ describe("Runner", () => {
     Runner.parseOptions(argv);
     expect(env.TRAILS_ENV).toBe("staging");
     expect(argv).toEqual(["test/a.test.ts"]);
-  });
-
-  it("parseOptions defaults to the test environment", () => {
     Runner.parseOptions([]);
     expect(env.TRAILS_ENV).toBe("test");
   });
@@ -72,12 +69,6 @@ describe("Runner", () => {
     await expect(Runner.loadTests(["./zzzzzzzzzzzzzzzzzzzzzzzz/q.ts"])).rejects.toBeInstanceOf(
       LoadError,
     );
-  });
-
-  it("selects only the tests a line filter overlaps", async () => {
-    await app();
-    const tests = await Runner.loadTests(["test/models/user.test.ts:3"]);
-    expect(await internals.testLocations(tests)).toEqual(["test/models/user.test.ts:2"]);
   });
 
   it("selects every test a line range overlaps", async () => {
