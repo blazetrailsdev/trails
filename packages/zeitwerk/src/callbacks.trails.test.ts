@@ -1,12 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { File, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import { Error as ZeitwerkError, NameError } from "./error.js";
 import { Loader } from "./loader.js";
-import { isRequired, newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
+import {
+  type Constants,
+  isRequired,
+  newLoader,
+  teardown,
+  withSetup,
+} from "./test-helpers/loader-test.js";
 
-const top = TopLevel as Record<string, any>;
+const top = TopLevel as unknown as Constants;
 
 describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
   let loader: Loader;

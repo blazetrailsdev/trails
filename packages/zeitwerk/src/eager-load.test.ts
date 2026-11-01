@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Dir, TopLevel, getFs } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cref } from "./cref.js";
 import { SetupRequired } from "./error.js";
 import { Loader } from "./loader.js";
 import {
+  type Constants,
   isRequired,
   newLoader,
   setupLoader,
@@ -14,7 +14,7 @@ import {
 } from "./test-helpers/loader-test.js";
 
 type Files = [string, string][];
-const top = TopLevel as Record<string, any>;
+const top = TopLevel as unknown as Constants;
 
 describe("TestEagerLoad", () => {
   class Namespace {}
@@ -22,7 +22,6 @@ describe("TestEagerLoad", () => {
 
   beforeEach(() => {
     loader = newLoader();
-    delete (Namespace as any).App0;
   });
   afterEach(teardown);
 
@@ -193,7 +192,7 @@ describe("TestEagerLoad", () => {
 
   it("eager loading skips files that would map to already loaded constants", async () => {
     const files: Files = [["x.ts", "export const X = 1"]];
-    top.X = 1;
+    (TopLevel as Record<string, unknown>).X = 1;
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoad();
       expect(isRequired(files[0])).toBe(false);

@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { File, TopLevel, TypeError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
 import {
+  type Constants,
   newLoader,
   setupLoader,
   teardown,
@@ -11,7 +11,7 @@ import {
   withSetup,
 } from "./test-helpers/loader-test.js";
 
-const top = TopLevel as Record<string, any>;
+const top = TopLevel as unknown as Constants;
 
 describe("TestOnLoad", () => {
   let loader: Loader;

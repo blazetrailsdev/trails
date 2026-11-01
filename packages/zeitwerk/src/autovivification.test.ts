@@ -1,25 +1,28 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { FileUtils, TopLevel, isModuleObject } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
-import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
+import {
+  type Constants,
+  newLoader,
+  teardown,
+  withFiles,
+  withSetup,
+} from "./test-helpers/loader-test.js";
 
-const top = TopLevel as Record<string, any>;
+const top = TopLevel as unknown as Constants;
 const autoload = (cname: string) => new Cref(Object, cname).isAutoload();
 
 describe("TestAutovivification", () => {
-  class Namespace {
-    declare static Admin: any;
-    declare static Foo: any;
-  }
+  class Namespace {}
+  const ns = Namespace as unknown as Constants;
   let loader: Loader;
 
   beforeEach(() => {
     loader = newLoader();
-    delete Namespace.Admin;
-    delete Namespace.Foo;
+    delete ns.Admin;
+    delete ns.Foo;
   });
   afterEach(teardown);
 
@@ -35,8 +38,8 @@ describe("TestAutovivification", () => {
     const files: [string, string][] = [["admin/x.ts", "export const X = true"]];
     await withSetup(loader, files, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(isModuleObject(Namespace.Admin)).toBe(true);
-      expect(Namespace.Admin.X).toBe(true);
+      expect(isModuleObject(ns.Admin)).toBe(true);
+      expect(ns.Admin.X).toBe(true);
     });
   });
 
@@ -51,7 +54,7 @@ describe("TestAutovivification", () => {
     const files: [string, string][] = [["foo/bar/baz/woo.ts", "export const Woo = true"]];
     await withSetup(loader, files, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(Namespace.Foo.Bar.Baz.Woo).toBe(true);
+      expect(ns.Foo.Bar.Baz.Woo).toBe(true);
     });
   });
 
@@ -71,8 +74,8 @@ describe("TestAutovivification", () => {
   it("autoloads several constants from the same namespace (Namespace)", async () => {
     await withSetup(loader, shared, { namespace: Namespace }, async () => {
       await loader.eagerLoad();
-      expect(Namespace.Admin.Hotel).toBeDefined();
-      expect(Namespace.Admin.HotelsController).toBeDefined();
+      expect(ns.Admin.Hotel).toBeDefined();
+      expect(ns.Admin.HotelsController).toBeDefined();
     });
   });
 

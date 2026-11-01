@@ -3,6 +3,10 @@ import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
 
+export interface Constants {
+  [cname: string]: Constants;
+}
+
 export function newLoader(): Loader {
   const loader = new Loader();
   loader.enableReloading();

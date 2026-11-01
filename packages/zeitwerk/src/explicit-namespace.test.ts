@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { File, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Error as ZeitwerkError } from "./error.js";
 import type { Loader } from "./loader.js";
 import { Registry } from "./registry.js";
 import {
+  type Constants,
   newLoader,
   setupLoader,
   teardown,
@@ -12,24 +12,23 @@ import {
   withSetup,
 } from "./test-helpers/loader-test.js";
 
-const top = TopLevel as Record<string, any>;
+const top = TopLevel as unknown as Constants;
 
 describe("TestExplicitNamespace", () => {
-  class Namespace {
-    declare static Hotel: any;
-  }
+  class Namespace {}
+  const ns = Namespace as unknown as Constants;
   let loader: Loader;
 
   beforeEach(() => {
     loader = newLoader();
-    delete Namespace.Hotel;
+    delete ns.Hotel;
   });
   afterEach(teardown);
 
   const hotel = "export class Hotel { static X = 1 }";
   const pricing = "export class Pricing {}";
 
-  async function assertHotel(ns: any) {
+  async function assertHotel(ns: Constants) {
     await loader.eagerLoad();
     expect(typeof ns.Hotel).toEqual("function");
     expect(ns.Hotel.X).toEqual(1);
@@ -49,7 +48,7 @@ describe("TestExplicitNamespace", () => {
       ["hotel.ts", hotel],
       ["hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(Namespace));
+    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(ns));
   });
 
   it("explicit namespaces are loaded correctly (file first, Object)", async () => {
@@ -65,7 +64,7 @@ describe("TestExplicitNamespace", () => {
       ["rd1/hotel.ts", hotel],
       ["rd2/hotel/pricing.ts", pricing],
     ];
-    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(Namespace));
+    await withSetup(loader, files, { namespace: Namespace }, () => assertHotel(ns));
   });
 
   it("explicit namespaces defined with an explicit constant assignment are loaded correctly", async () => {
