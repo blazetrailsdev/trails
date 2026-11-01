@@ -1521,3 +1521,73 @@ Reachability is the only lever, so the entry must not reach the CLI:
 
 Both are framework changes and belong in trails, not in an application or a
 Perry flag. Neither is filed yet.
+
+## Wall 16, measured: the init chain and the throw are not in the same frame (2026-11-01)
+
+`PERRY_DEBUG_INIT=1` is a compile-time flag, so this cost a second full build
+of `08-serve`: `COMPILE_RC=0`, 1795s, the same 1937 modules, same 235 MB.
+Running it with stdout and stderr in separate files — not a pipe, which is what
+made wall 15 hard to read — gives a clean trace: 249 `INIT:` lines on stdout, 2
+lines on stderr.
+
+Three facts come out of it:
+
+- **activerecord never initializes.** Zero `INIT: packages_activerecord_*`
+  lines, yet the stderr frame is `at new Base` reading `_allocation`, which only
+  `activerecord/src/core.ts:736` defines. Its constructor ran against a module
+  that had not been initialized.
+- **The chain stops at `packages_i18n_src_backend_simple_ts`.** `INIT:` is
+  printed _before_ the initializer is dispatched (`perry-codegen/src/codegen/entry.rs:418-425`,
+  "print the next initializer before dispatching it"), and the order of the
+  `INIT:` constants in the binary matches the runtime order exactly, so the next
+  module in the chain, `packages_i18n_src_config_ts`, never ran.
+- **The throw is not `simple.ts`'s own code.** The obvious reading — that
+  `simple.ts:120`'s mixin loop, `new (Base as unknown as new () => Base)()`, is
+  the `new Base` in the frame — is wrong, and a smaller graph proves it: a probe
+  importing only `packages/i18n/src/backend/simple.js` compiles to 202 modules
+  and exits 0, initializing `simple.ts` normally. i18n's `Base`
+  (`i18n/src/backend/base.ts:192 export abstract class Base`) has no connection
+  to activerecord's.
+
+So the code that threw was running _between_ two module initializers, not
+inside one. That points at a microtask or async continuation — the boot's own
+`await` chain — being drained during the eager init chain, far ahead of the
+modules it depends on. That is the hypothesis to test next, and it is a much
+worse defect than an ordering mistake inside the chain.
+
+Four hypotheses were refuted before this one, all of them variants of "two
+classes named `Base` collide" (the graph has ~20): a minimal two-module
+collision, instantiating an `abstract` class through a cast, 24 same-named
+`Base` classes to put `layout_ordinals` under pressure, and the real 202-module
+i18n subgraph. All four compile and run clean. The name is not the mechanism.
+
+## Wall 17: activerecord's own init fails in a mid-sized graph
+
+A probe importing i18n's `simple.js` _and_ `@blazetrails/activerecord` compiles
+to 1107 modules (1001s) and fails differently:
+
+```
+TypeError: Cannot read properties of undefined (reading 'path')
+    at <anonymous>
+```
+
+754 `INIT:` lines, 193 of them activerecord's, with `simple.ts` at 205 and
+`core.ts` at 676 — both fine. The chain dies dispatching
+`associations/has_many_through_association.ts`. This is a second, independent
+init defect, and it is the cheaper one to chase: 1107 modules instead of 1937.
+
+Note what it also proves: `simple.ts` initialized at 205 while activerecord was
+still uninitialized, without throwing. That is the measurement that rules
+`simple.ts:120` out as wall 16's cause.
+
+## A bare import that cannot be resolved compiles anyway
+
+Found by accident while building the probes above, and filable on its own.
+`@blazetrails/i18n` is not resolvable from `examples/perry-native` (it is not in
+that `node_modules`; only 11 `@blazetrails/*` packages are). Node refuses it
+outright. `perry compile` reports `Found 1 module`, exits 0, writes a 6.2 MB
+binary, and that binary prints `typeof I18n` as `"boolean"`.
+
+An unresolvable bare specifier should be a compile error, not a silent bogus
+value — and silently compiling one module instead of several hundred is exactly
+the failure that looks like a passing rung.
