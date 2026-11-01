@@ -1,10 +1,10 @@
-import { File, getChildProcess } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/rails/app/app-generator.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
-/** @noRailsEquivalent CONVERGEABLE app-generator-version-control-runs-git-init */
+/** @noRailsEquivalent CONVERGEABLE app-generator-run-bundle-and-after-bundle-callbacks */
 class NewAppGenerator extends AppGenerator {
   declare static generator: AppGenerator | undefined;
 
@@ -48,11 +48,6 @@ export function newCommand(): Command {
       const name = String(generator.appPath);
       const appDir = File.expandPath(name);
       const pm = generator.packageManager;
-
-      if (!generator.options.skipGit) {
-        const result = getChildProcess().spawnSync("git", ["init"], { cwd: appDir });
-        if (result.status === 0) console.log("  Initialized git repository");
-      }
 
       if (!generator.options.skipBundle) {
         console.log(`  Installing dependencies with ${pm}...`);

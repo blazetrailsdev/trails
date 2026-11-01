@@ -18,7 +18,7 @@ interface PluginBuilderHost {
   run(command: string, config: object): Promise<unknown>;
   inside(path: string, block: () => Promise<void>): Promise<unknown>;
   invoke(klass: unknown, args: unknown[], opts: object): Promise<unknown>;
-  gitInitCommand(): string;
+  gitInitCommand(): Promise<string>;
   shebang(): string;
   namespacedName(): string;
   dummyPath(): string;
@@ -103,7 +103,7 @@ export class PluginBuilder {
 
   async versionControl(this: PluginBuilderHost): Promise<void> {
     if (!this.options.skipGit && !this.options.pretend) {
-      await this.run(this.gitInitCommand(), {
+      await this.run(await this.gitInitCommand(), {
         capture: this.options.quiet,
         abortOnFailure: false,
       });

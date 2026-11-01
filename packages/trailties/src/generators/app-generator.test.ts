@@ -54,6 +54,18 @@ function makeGen(
   return new AppGenerator(["my-app"], { database, ...opts }, { destinationRoot: tmpDir });
 }
 
+describe("AppGeneratorTest", () => {
+  it("version control initializes git repo", async () => {
+    await makeGen().invokeAll();
+    expect(exists(".git")).toBe(true);
+  });
+
+  it("skip git", async () => {
+    await makeGen("sqlite", { skipGit: true }).invokeAll();
+    expect(exists(".git")).toBe(false);
+  });
+});
+
 function appPath(...segments: string[]) {
   return path.join(tmpDir, "my-app", ...segments);
 }
