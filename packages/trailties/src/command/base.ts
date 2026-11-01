@@ -38,12 +38,12 @@ export class Base extends Thor {
     });
   }
 
-  static isEngine(): boolean {
-    return ENGINE_ROOT != null;
-  }
-
   static isExitOnFailure(): boolean {
     return false;
+  }
+
+  static isEngine(): boolean {
+    return ENGINE_ROOT != null;
   }
 
   /** @inventedArm replaceAll — PERMANENT */
