@@ -88,7 +88,6 @@ export class Configuration extends EngineConfiguration {
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
   private _secretKeyBase: string | null = null;
-  private _localSecret?: string;
   credentials: { contentPath: string | null; keyPath: string | null } = {
     contentPath: null,
     keyPath: null,
@@ -586,27 +585,17 @@ export class Configuration extends EngineConfiguration {
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE generate-local-secret-converges-on-rails-body */
-  async loadLocalSecret(): Promise<string> {
+  /** @internal */
+  private generateLocalSecret(): string {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
-    if (!(await getFs().exists(keyFile))) {
+    if (!File.isExist(keyFile)) {
       const randomKey = SecureRandom.hex(64);
-      await FileUtils.mkdirPAsync(getPath().dirname(keyFile));
-      await getFs().writeFile!(keyFile, randomKey);
+      FileUtils.mkdirP(File.dirname(keyFile));
+      File.binwrite(keyFile, randomKey);
     }
 
-    return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
-  }
-
-  /** @missingRailsCall mkdir_p — CONVERGEABLE generate-local-secret-converges-on-rails-body */
-  private generateLocalSecret(): string {
-    if (this._localSecret === undefined) {
-      throw new RuntimeError(
-        "tmp/local_secret.txt is not loaded; await Application#initialize first",
-      );
-    }
-    return this._localSecret;
+    return new TextDecoder().decode(File.binread(keyFile));
   }
 }
 

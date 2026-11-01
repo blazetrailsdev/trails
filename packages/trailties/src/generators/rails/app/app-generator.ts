@@ -200,6 +200,7 @@ export class AppGenerator extends AppBase {
     this.classOption("packageManager", {
       type: "string",
       enum: [...VALID_PACKAGE_MANAGERS],
+      default: "pnpm",
       desc: "Package manager to use",
     });
     this.classOption("sqliteDriver", {

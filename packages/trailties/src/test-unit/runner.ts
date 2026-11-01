@@ -5,10 +5,10 @@ import {
   File,
   LoadError,
   Range,
+  STDOUT,
   Shellwords,
   env,
   exit,
-  getFs,
   rbFSystem,
   rbObjRespondTo,
   regexpEscape,
@@ -216,20 +216,18 @@ export class Runner {
         continue;
       }
 
-      const source = (await getFs().readFile(path, "utf8")).split("\n");
-      const ranges = TestParser.ranges(path);
       const wanted = patterns.flatMap(([, lines]) =>
         lines.map((line) => {
           const [first, last] = line.split("-").map(Number);
           return new Range(first, last ?? first);
         }),
       );
-      for (const [begin, end] of Object.entries(ranges)) {
-        const test = new Range(Number(begin), end);
-        if (!/^\s*(?:it|test)\b/.test(source[Number(begin) - 1])) continue;
-        const call = source.slice(Number(begin) - 1, end).join("\n");
-        const title = /^[^(]*\(\s*(["'`])((?:\\.|(?!\1)[^])*)\1/.exec(call)?.[2] ?? "";
+      const seen = new Set<number>();
+      for (const [begin, end, title] of TestParser.calls(path)) {
+        const test = new Range(begin, end);
         if (wanted.some((range) => range.overlaps(test)) || (title !== "" && name?.test(title))) {
+          if (seen.has(begin)) continue;
+          seen.add(begin);
           locations.push(`${path}:${begin}`);
         }
       }
@@ -246,7 +244,16 @@ export class Runner {
         !value &&
         !/^(-n|--name\b|-f$|--fail-fast$|-v$|--verbose$)/.test(arg)
       ) {
-        throw new ArgumentError(`invalid option: ${arg}`);
+        STDOUT.puts();
+        STDOUT.puts(`invalid option: ${arg}`);
+        STDOUT.puts();
+        STDOUT.puts("Usage: trails test [PATHS...] [options]");
+        STDOUT.puts("    -n, --name PATTERN   Filter run on /regexp/ or string.");
+        STDOUT.puts("    -f, --fail-fast      Abort test run on first failure or error.");
+        STDOUT.puts("    -v, --verbose        Verbose.");
+        STDOUT.puts("    -w, --warnings       Run with Ruby warnings enabled.");
+        STDOUT.puts("    -e, --environment    Run tests in the ENV environment.");
+        exit(1);
       }
     });
   }
