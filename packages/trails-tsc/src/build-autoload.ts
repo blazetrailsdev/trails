@@ -12,9 +12,9 @@ interface BootApplication {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export async function buildAutoload(): Promise<string[]> {
+export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}): Promise<string[]> {
   for (const ext of ["ts", "js"]) {
-    const application = File.join(Dir.pwd(), `config/application.${ext}`);
+    const application = File.join(cwd, `config/application.${ext}`);
     if (await File.isExistAsync(application)) {
       await import(getPath().pathToFileURL!(application).href);
       break;
@@ -31,6 +31,9 @@ export async function buildAutoload(): Promise<string[]> {
   }
 
   const dirs: string[] = [];
-  for (const loader of [...Registry.loaders]) dirs.push(await writeArtifacts(loader));
+  for (const loader of [...Registry.loaders]) {
+    loader.manifestRoot ??= cwd;
+    dirs.push(await writeArtifacts(loader));
+  }
   return dirs;
 }

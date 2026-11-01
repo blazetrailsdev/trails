@@ -10,6 +10,7 @@ export { Registry } from "./registry.js";
 export {
   buildManifest,
   configurationDigest,
+  manifestRoot,
   writeArtifacts,
   type Manifest,
   type ManifestRow,

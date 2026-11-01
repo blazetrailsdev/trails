@@ -9,7 +9,7 @@ import { watchViews, type WatchHandle } from "./watch-views.js";
 const USAGE =
   "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place]\n" +
   "       trails-tsc-views build-templates <template|dir>...\n" +
-  "       trails-tsc-views build-autoload\n";
+  "       trails-tsc-views build-autoload [--cwd <dir>]\n";
 
 const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
 
@@ -34,7 +34,8 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   }
   if (cmd === "build-autoload") {
     try {
-      const dirs = await buildAutoload();
+      const cwd = argv[1] === "--cwd" ? argv[2] : undefined;
+      const dirs = await buildAutoload(cwd === undefined ? {} : { cwd });
       stdout.write(`trails-tsc-views: wrote ${dirs.length} autoload manifest(s)\n`);
       return 0;
     } catch (err) {

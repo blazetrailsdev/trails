@@ -717,7 +717,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no " +
       "hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, " +
       '"`Module#autoload` is a build step"). PERMANENT.',
-    names: ["autoload", "require", "const_added"],
+    names: ["require", "const_added"],
     rubyFiles: ["core_ext/kernel.rb", "core_ext/module.rb"],
     packages: ["zeitwerk"],
   },

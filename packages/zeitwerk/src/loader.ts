@@ -16,7 +16,7 @@ import { Error as ZeitwerkError } from "./error.js";
 import { Inflector } from "./inflector.js";
 import { Config } from "./loader/config.js";
 import { Helpers } from "./loader/helpers.js";
-import { configurationDigest, type Manifest } from "./loader/manifest.js";
+import { configurationDigest, manifestRoot, type Manifest } from "./loader/manifest.js";
 import { RealModName } from "./real-mod-name.js";
 import { Registry } from "./registry.js";
 
@@ -38,6 +38,8 @@ export class Loader {
   logger: Logger | null;
   /** @noRailsEquivalent PERMANENT */
   manifest: Manifest | string | null;
+  /** @noRailsEquivalent PERMANENT */
+  manifestRoot: string | null;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
   /** @internal */ roots: Record<string, object>;
@@ -66,6 +68,7 @@ export class Loader {
     this.inflector = new Inflector();
     this.logger = (this.constructor as typeof Loader).defaultLogger;
     this.manifest = null;
+    this.manifestRoot = null;
     this._tag = SecureRandom.hex(3);
     this._initializedAt = new Date();
     this.roots = {};
@@ -223,19 +226,38 @@ export class Loader {
       namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;
     }
 
+    const root = manifestRoot(this);
+    for (const file of manifest.shadowed) this.shadowedFiles.add(File.expandPath(file, root));
+
     for (const [cpath, row] of Object.entries(manifest.constants)) {
       const index = cpath.lastIndexOf("::");
       const parentPath = index < 0 ? "" : cpath.slice(0, index);
-      if (Object.hasOwn(manifest.constants, parentPath)) continue;
+      if (!Object.hasOwn(namespaces, parentPath) && Object.hasOwn(manifest.constants, parentPath)) {
+        continue;
+      }
       const parent = namespaces[parentPath] ?? (constGet(Object, parentPath) as object);
 
       const cref = new Cref(parent, index < 0 ? cpath : cpath.slice(index + 2));
+      const abspath = File.expandPath(row.path, root);
+      if (cref.isDefined()) {
+        if (row.export != null) {
+          this.shadowedFiles.add(abspath);
+          if (this.logger != null) {
+            this.log(`file ${abspath} is ignored because ${cref} is already defined`);
+          }
+        }
+        if (row.dirs != null && cref.isAutoload() == null) {
+          namespaces[cpath] = cref.get() as object;
+        }
+        continue;
+      }
+
       if (row.dirs != null) {
         for (const dir of row.dirs) {
-          this.namespaceDirs.getOrSet(cref, () => []).push(File.expandPath(dir));
+          this.namespaceDirs.getOrSet(cref, () => []).push(File.expandPath(dir, root));
         }
       }
-      await this.defineAutoload(cref, File.expandPath(row.path));
+      await this.defineAutoload(cref, abspath);
       if (row.kind === "explicit") this.registerExplicitNamespace(cref);
     }
   }

@@ -1,10 +1,11 @@
-import { File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, TopLevel, getFs } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import { Error as ZeitwerkError } from "./error.js";
 import type { Loader } from "./loader.js";
 import { buildManifest, writeArtifacts, type Manifest } from "./loader/manifest.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
+import { Registry } from "./registry.js";
 import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
 
 const FILES: [string, string?][] = [
@@ -25,6 +26,13 @@ describe("autoload artifacts", () => {
   afterEach(teardown);
 
   const cref = (cname: string) => new Cref(Object, cname);
+
+  const fresh = async () => {
+    Registry.unregisterLoader(loader);
+    const reader = newLoader();
+    await reader.pushDir(".");
+    return reader;
+  };
 
   it("records every constant in walk order, nested namespaces included", async () => {
     await withFiles(FILES, async () => {
@@ -66,7 +74,11 @@ describe("autoload artifacts", () => {
       expect(types).toContain(`declare module "@blazetrails/ruby-compat"`);
       expect(types).toContain(`"Admin": object;`);
       expect(types).toContain(`"X": typeof import("../../../x.js").X;`);
-      expect(Object.keys(JSON.parse(await read("manifest.json")))).toEqual(["digest", "constants"]);
+      expect(Object.keys(JSON.parse(await read("manifest.json")))).toEqual([
+        "digest",
+        "constants",
+        "shadowed",
+      ]);
     });
   });
 
@@ -75,7 +87,7 @@ describe("autoload artifacts", () => {
       await loader.pushDir(".");
       const dir = await writeArtifacts(loader);
 
-      const reader = loader;
+      const reader = await fresh();
       reader.manifest = File.join(dir, "manifest.json");
       await reader.setup();
 
@@ -93,10 +105,102 @@ describe("autoload artifacts", () => {
       await loader.pushDir(".");
       const manifest: Manifest = await buildManifest(loader);
 
-      const reader = loader;
+      const reader = await fresh();
       await reader.collapse("admin");
       reader.manifest = manifest;
       await expect(reader.setup()).rejects.toBeInstanceOf(ZeitwerkError);
+    });
+  });
+
+  it("builds with a stale manifest set and runs no on_setup callback", async () => {
+    await withFiles(FILES, async () => {
+      await loader.pushDir(".");
+      let called = false;
+      await loader.onSetup(() => (called = true));
+      loader.manifest = { digest: "stale", constants: {}, shadowed: [] };
+      const { constants } = await buildManifest(loader);
+      expect(constants).toHaveProperty("M::Y");
+      expect(called).toBe(false);
+    });
+  });
+
+  it("digests the inflector's overrides", async () => {
+    await withFiles(FILES, async () => {
+      await loader.pushDir(".");
+      const manifest = await buildManifest(loader);
+      loader.inflector.inflect({ x: "XX" });
+      loader.manifest = manifest;
+      await expect(loader.setup()).rejects.toBeInstanceOf(ZeitwerkError);
+    });
+  });
+
+  it("resolves rows against the manifest root from another directory", async () => {
+    await withFiles(FILES, async () => {
+      const root = Dir.pwd();
+      await loader.pushDir(".");
+      const manifest = await buildManifest(loader);
+      const reader = await fresh();
+      reader.manifestRoot = root;
+      reader.manifest = manifest;
+      Dir.chdir("admin");
+      try {
+        await reader.setup();
+      } finally {
+        Dir.chdir(root);
+      }
+      expect(cref("X").isAutoload()).toEqual(File.join(root, "x.ts"));
+    });
+  });
+
+  it("shadows a row whose constant is defined and reads through a defined namespace", async () => {
+    const seats = TopLevel as Record<string, unknown>;
+    await withFiles(FILES, async () => {
+      await loader.pushDir(".");
+      const manifest = await buildManifest(loader);
+      const reader = await fresh();
+      const admin = {};
+      seats.X = 1;
+      new Cref(Object, "Admin").set(admin);
+      try {
+        reader.manifest = manifest;
+        await reader.setup();
+        expect(reader.isShadowedFile(File.expandPath("x.ts"))).toBe(true);
+        expect(new Cref(admin, "UsersController").isAutoload()).toEqual(
+          File.expandPath("admin/users-controller.ts"),
+        );
+      } finally {
+        delete seats.X;
+        delete seats.Admin;
+      }
+    });
+  });
+
+  it("reads rows under a namespace root and a namespace the manifest does not hold", async () => {
+    const seats = TopLevel as Record<string, unknown>;
+    await withFiles([["y.ts"]], async () => {
+      const root = {};
+      new Cref(Object, "Root").set(root);
+      try {
+        await loader.pushDir(".", { namespace: root });
+        const manifest = await buildManifest(loader);
+        expect(Object.keys(manifest.constants)).toEqual(["Root::Y"]);
+        const reader = newLoader();
+        Registry.unregisterLoader(loader);
+        await reader.pushDir(".", { namespace: root });
+        reader.manifest = {
+          ...manifest,
+          constants: {
+            ...manifest.constants,
+            "Root::Other::Z": { path: "z.ts", export: "Z", kind: "file" },
+          },
+        };
+        new Cref(root, "Other").set({});
+        await reader.setup();
+        expect(new Cref(root, "Y").isAutoload()).toEqual(File.expandPath("y.ts"));
+        expect(reader.autoloads).toHaveProperty([File.expandPath("z.ts")]);
+      } finally {
+        delete seats.Root;
+      }
     });
   });
 });
