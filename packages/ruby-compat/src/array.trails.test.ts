@@ -742,8 +742,16 @@ describe("each", () => {
 
   it("calls a receiver's own each", () => {
     const seen: unknown[] = [];
-    const recv = { each: (block: (i: unknown) => void) => block("own") };
-    each(recv, (i) => seen.push(i));
+    class Own {
+      each(block: (i: unknown) => void): string {
+        block("own");
+        return "answer";
+      }
+    }
+    expect(each(new Own(), (i) => seen.push(i))).toBe("answer");
     expect(seen).toEqual(["own"]);
+    const hash = { each: "data" };
+    each(hash, (i) => seen.push(i));
+    expect(seen.at(-1)).toEqual(["each", "data"]);
   });
 });
