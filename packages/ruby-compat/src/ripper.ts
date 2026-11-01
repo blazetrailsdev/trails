@@ -29,7 +29,7 @@ const DEF_HEAD = new RegExp(
   `\\s*(?:${IDENT}\\.)?(?:${IDENT}[?!=]?|${OPERATOR})([ \\t]*\\(|[ \\t]+(?=[A-Za-z_*&]))?`,
   "y",
 );
-const PATTERN_END = /(?:then|if|unless|and|or)\b/y;
+const PATTERN_END = /(?:then|if|unless|and|or|do|while|until|rescue)\b/y;
 const PATTERN_VALUE = /:[ \t]*[^\s,})]/y;
 const LAMBDA_DO = /do\b/y;
 const FOR_VARS = /([^\n]*?)\bin\b/y;
@@ -142,7 +142,7 @@ export class Ripper {
       pattern,
       depth: 0,
       destructuring: 0,
-      expected: true,
+      expected: !pattern,
       outer: this._binder,
     };
     this._state = EXPR_BEG;
@@ -155,7 +155,8 @@ export class Ripper {
 
   private _scanBinder(binder: Binder, c: string): boolean {
     const atTop = binder.depth === 0;
-    if (atTop && binder.destructuring === 0 && c === binder.close) {
+    const continued = binder.pattern && binder.expected;
+    if (atTop && binder.destructuring === 0 && c === binder.close && !continued) {
       if (c === ")" || c === "|") {
         this._binder = binder.outer;
         this._pos += 1;
@@ -195,6 +196,7 @@ export class Ripper {
     } else if (atTop && (c === "," || c === ";")) {
       binder.expected = true;
     }
+    if (binder.pattern && c !== "," && c.trim() !== "") binder.expected = false;
     return false;
   }
 
