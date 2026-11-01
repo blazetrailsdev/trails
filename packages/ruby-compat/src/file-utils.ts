@@ -735,6 +735,9 @@ function fuOutputMessage(msg: string): void {
  * `FileUtils` is synchronous exactly as Ruby's is, and a caller reads the same
  * `FileUtils.mkdir_p(dir)` a Rails dev reads.
  *
+ * Each method is `module_function` (`vendor/ruby/v3.3.11/lib/fileutils.rb:185-188`),
+ * so it is both a static and a prototype member, and `include FileUtils` answers `cd`.
+ *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `FileUtils` ships with
  * the interpreter, so no Rails file defines it and no port can remove the need
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
@@ -2077,8 +2080,6 @@ export class FileUtils {
     }
   }
 
-  /** `module_function` (`vendor/ruby/v3.3.11/lib/fileutils.rb:185-188`): every method is
-   * both a singleton and an instance method, so `include FileUtils` answers `cd`. */
   static {
     const proto = FileUtils.prototype as unknown as Record<string, unknown>;
     for (const name of Object.getOwnPropertyNames(FileUtils)) {
