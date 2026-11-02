@@ -17,8 +17,8 @@ const top = TopLevel as unknown as Constants;
 describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 

@@ -1,12 +1,14 @@
-import { aryDelete, deleteIf } from "@blazetrails/ruby-compat";
+import { File, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
+  Loader: undefined as typeof Loader | undefined,
 
   loaders: [] as Loader[],
-  gemLoadersByRootFile: {} as Record<string, Loader>,
+  /** @noRailsEquivalent PERMANENT */
+  loadersByPackageFile: {} as Record<string, Loader>,
   autoloads: {} as Record<string, Loader>,
 
   registerLoader(loader: Loader): void {
@@ -15,8 +17,27 @@ export const Registry = {
 
   unregisterLoader(loader: Loader): void {
     aryDelete(this.loaders, loader);
-    deleteIf(this.gemLoadersByRootFile, (_k, l) => l === loader);
+    for (const [packageFile, l] of Object.entries(this.loadersByPackageFile)) {
+      if (l === loader) delete this.loadersByPackageFile[packageFile];
+    }
     deleteIf(this.autoloads, (_k, l) => l === loader);
+  },
+
+  /** @noRailsEquivalent CONVERGEABLE loader-for-package-memoizes-across-await */
+  async loaderForPackage(
+    packageFile: string,
+    { namespace }: { namespace: object },
+  ): Promise<Loader> {
+    if (Object.hasOwn(this.loadersByPackageFile, packageFile)) {
+      return this.loadersByPackageFile[packageFile];
+    }
+
+    const { name } = JSON.parse(await getFs().readFile(packageFile, "utf8")) as { name: string };
+    const loader = new this.Loader!();
+    loader.tag = name.slice(name.lastIndexOf("/") + 1);
+    if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
+    await loader.pushDir(File.join(File.dirname(packageFile), "src"), { namespace });
+    return (this.loadersByPackageFile[packageFile] = loader);
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {

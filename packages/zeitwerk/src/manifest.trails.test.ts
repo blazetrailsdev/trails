@@ -32,8 +32,8 @@ const FILES: [string, string?][] = [
 describe("autoload artifacts", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
     loader.tag = "main";
   });
   afterEach(teardown);
@@ -42,7 +42,7 @@ describe("autoload artifacts", () => {
 
   const fresh = async () => {
     Registry.unregisterLoader(loader);
-    const reader = newLoader();
+    const reader = await newLoader({ setup: false });
     await reader.pushDir(".");
     return reader;
   };
@@ -228,7 +228,7 @@ describe("autoload artifacts", () => {
       registerFsAdapter("raising", raising, getPath());
       fsAdapterConfig.adapter = "raising";
       try {
-        const reader = newLoader();
+        const reader = await newLoader({ setup: false });
         reader.manifest = manifest;
         reader.imports = imports;
         await reader.pushDir(".");
@@ -259,7 +259,7 @@ describe("autoload artifacts", () => {
         await loader.pushDir(".", { namespace: root });
         const manifest = await buildManifest(loader);
         expect(Object.keys(manifest.constants)).toEqual(["Root::Y"]);
-        const reader = newLoader();
+        const reader = await newLoader({ setup: false });
         Registry.unregisterLoader(loader);
         await reader.pushDir(".", { namespace: root });
         reader.manifest = {

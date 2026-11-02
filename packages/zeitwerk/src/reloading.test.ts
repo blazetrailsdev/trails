@@ -10,13 +10,7 @@ import {
 } from "./error.js";
 import { Loader } from "./loader.js";
 import { Registry } from "./registry.js";
-import {
-  newLoader,
-  setupLoader,
-  teardown,
-  withFiles,
-  withSetup,
-} from "./test-helpers/loader-test.js";
+import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
 
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
@@ -53,8 +47,8 @@ describe("TestReloading", () => {
     expect(await get(mod, "X")).toEqual(2);
   }
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
     (globalThis as Record<string, unknown>).testEagerLoadAfterReload = 0;
   });
   afterEach(teardown);
@@ -107,7 +101,7 @@ describe("TestReloading", () => {
 
   it("if reloading is disabled, autoloading metadata shrinks while autoloading (performance test)", async () => {
     await withFiles(FILES, async () => {
-      const other = await setupLoader(".", { enableReloading: false });
+      const other = await newLoader({ dirs: ".", enableReloading: false });
 
       expect(Object.keys(other.autoloads).length !== 0).toBeTruthy();
 
@@ -124,7 +118,7 @@ describe("TestReloading", () => {
 
   it("if reloading is disabled, autoloading metadata shrinks while eager loading (performance test)", async () => {
     await withFiles(FILES, async () => {
-      const other = await setupLoader(".", { enableReloading: false });
+      const other = await newLoader({ dirs: ".", enableReloading: false });
 
       expect(Object.keys(other.autoloads).length !== 0).toBeTruthy();
       expect(Object.keys(Registry.autoloads).length !== 0).toBeTruthy();

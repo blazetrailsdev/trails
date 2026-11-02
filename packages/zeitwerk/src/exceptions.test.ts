@@ -7,8 +7,8 @@ import { get, newLoader, teardown, withSetup } from "./test-helpers/loader-test.
 describe("TestExceptions", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 

@@ -8,7 +8,6 @@ import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 import {
   isRequired,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -25,8 +24,8 @@ const USERS: [string, string][] = [
 describe("TestUnload", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -126,11 +125,11 @@ describe("TestUnload", () => {
       ["b/x/y.ts", "export const Y = true;"],
     ];
     await withFiles(files, async () => {
-      const la = await setupLoader("a");
+      const la = await newLoader({ dirs: "a" });
       const crefM = new Cref(Object, "M");
       expect(ExplicitNamespaces.isRegistered(crefM) === la).toBeTruthy();
 
-      const lb = await setupLoader("b");
+      const lb = await newLoader({ dirs: "b" });
       const crefX = new Cref(Object, "X");
       expect(ExplicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
 

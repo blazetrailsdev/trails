@@ -9,8 +9,8 @@ import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader
 describe("Loader#setup", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -56,7 +56,7 @@ describe("Loader#setup", () => {
 
   it("descends into a namespace another loader has pending", async () => {
     await withFiles([["a/m/x.ts"], ["b/m/y.ts"]], async () => {
-      const second = newLoader();
+      const second = await newLoader({ setup: false });
       await loader.pushDir("a");
       await second.pushDir("b");
       await loader.setup();
@@ -81,7 +81,7 @@ describe("Loader#setup", () => {
 
   it("shadows a file by another one managed by a different loader", async () => {
     await withFiles([["a/x.ts"], ["b/x.ts"]], async () => {
-      const second = newLoader();
+      const second = await newLoader({ setup: false });
       await loader.pushDir("a");
       await second.pushDir("b");
       await loader.setup();

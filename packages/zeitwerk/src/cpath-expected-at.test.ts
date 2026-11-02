@@ -6,8 +6,8 @@ import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader
 
 function hooks() {
   const state = { loader: null as unknown as Loader };
-  beforeEach(() => {
-    state.loader = newLoader();
+  beforeEach(async () => {
+    state.loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
   return state;

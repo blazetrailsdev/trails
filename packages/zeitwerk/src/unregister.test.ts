@@ -6,34 +6,34 @@ import { teardown } from "./test-helpers/loader-test.js";
 import { withLoader } from "./zeitwerk.js";
 
 describe("TestUnregister", () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
-    Registry.gemLoadersByRootFile = {};
-    teardown();
+    Registry.loadersByPackageFile = {};
+    await teardown();
   });
 
   it("unregister removes the loader from internal state", () => {
     const registry = Registry;
     const loader1 = new Loader();
     const cref1 = new Cref(Object, "dummy1");
-    registry.gemLoadersByRootFile["dummy1"] = loader1;
+    registry.loadersByPackageFile["dummy1"] = loader1;
     registry.registerAutoload(loader1, "dummy1");
     Registry.ExplicitNamespaces.register(cref1, loader1);
 
     const loader2 = new Loader();
     const cref2 = new Cref(Object, "dummy2");
-    registry.gemLoadersByRootFile["dummy2"] = loader2;
+    registry.loadersByPackageFile["dummy2"] = loader2;
     registry.registerAutoload(loader2, "dummy2");
     Registry.ExplicitNamespaces.register(cref2, loader2);
 
     loader1.unregister();
 
     expect(!registry.loaders.includes(loader1)).toBeTruthy();
-    expect(!Object.values(registry.gemLoadersByRootFile).includes(loader1)).toBeTruthy();
+    expect(!Object.values(registry.loadersByPackageFile).includes(loader1)).toBeTruthy();
     expect(!Object.values(registry.autoloads).includes(loader1)).toBeTruthy();
     expect(!Registry.ExplicitNamespaces.isRegistered(cref1)).toBeTruthy();
     expect(registry.loaders.includes(loader2)).toBeTruthy();
-    expect(Object.values(registry.gemLoadersByRootFile).includes(loader2)).toBeTruthy();
+    expect(Object.values(registry.loadersByPackageFile).includes(loader2)).toBeTruthy();
     expect(Object.values(registry.autoloads).includes(loader2)).toBeTruthy();
     expect(Registry.ExplicitNamespaces.isRegistered(cref2) === loader2).toBeTruthy();
   });

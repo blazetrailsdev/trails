@@ -595,3 +595,4 @@ include(Loader, Callbacks);
 include(Loader, Helpers);
 include(Loader, Config);
 include(Loader, EagerLoad);
+Registry.Loader = Loader;

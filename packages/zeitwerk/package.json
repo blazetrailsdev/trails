@@ -1,7 +1,7 @@
 {
   "name": "@blazetrails/zeitwerk",
   "version": "0.1.0",
-  "description": "Build-time autoloader for Trails, mirroring the zeitwerk gem",
+  "description": "Build-time autoloader for Trails, mirroring Zeitwerk",
   "type": "module",
   "main": "dist/zeitwerk.js",
   "types": "dist/zeitwerk.d.ts",

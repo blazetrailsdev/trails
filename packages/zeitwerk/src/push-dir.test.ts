@@ -2,7 +2,7 @@ import { File, Pathname, registerConstant } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Error as ZeitwerkError } from "./error.js";
 import type { Loader } from "./loader.js";
-import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
+import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
 
 describe("TesPushDir", () => {
   class Namespace {}
@@ -10,8 +10,8 @@ describe("TesPushDir", () => {
 
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -51,7 +51,16 @@ describe("TesPushDir", () => {
     checkDirs();
   });
 
-  it.skip("there can be several root directories", () => {});
+  it("there can be several root directories", async () => {
+    const files: [string, string][] = [
+      ["rd1/x.ts", "export const X = 1;"],
+      ["rd2/y.ts", "export const Y = 1;"],
+      ["rd3/z.ts", "export const Z = 1;"],
+    ];
+    await withSetup(loader, files, {}, () => {
+      checkDirs();
+    });
+  });
 
   it("there can be several root directories, some of them may be ignored", async () => {
     const files: [string, string][] = [
@@ -78,7 +87,16 @@ describe("TesPushDir", () => {
     checkDirs();
   });
 
-  it.skip("there can be several root directories, with custom namespaces", () => {});
+  it("there can be several root directories, with custom namespaces", async () => {
+    const files: [string, string][] = [
+      ["rd1/x.ts", "export const X = 1;"],
+      ["rd2/y.ts", "export const Y = 1;"],
+      ["rd3/z.ts", "export const Z = 1;"],
+    ];
+    await withSetup(loader, files, { namespace: Namespace }, () => {
+      checkDirs();
+    });
+  });
 
   it("there can be several root directories, with custom namespaces, some of them may be ignored", async () => {
     const files: [string, string][] = [

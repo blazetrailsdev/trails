@@ -5,7 +5,6 @@ import {
   type Constants,
   get,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -16,8 +15,8 @@ const top = TopLevel as unknown as Constants;
 describe("TestSharedNamespaces", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -38,8 +37,8 @@ describe("TestSharedNamespaces", () => {
       ["b/m/y.ts", "export const Y = true"],
     ];
     await withFiles(files, async () => {
-      await setupLoader("a");
-      const loader = await setupLoader("b");
+      await newLoader({ dirs: "a" });
+      const loader = await newLoader({ dirs: "b" });
       const mod = await get(Object, "M");
       expect(await get(await get(Object, "M"), "X")).toBeTruthy();
       expect(await get(await get(Object, "M"), "Y")).toBeTruthy();

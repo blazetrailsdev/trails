@@ -5,7 +5,6 @@ import {
   type Constants,
   get,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -16,8 +15,8 @@ const top = TopLevel as unknown as Constants;
 describe("TestShadowedFiles", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -51,8 +50,8 @@ describe("TestShadowedFiles", () => {
 
   it("does not autoload from a file shadowed by another one managed by a different loader", async () => {
     await withFiles(files, async () => {
-      const firstLoader = await setupLoader("a");
-      const secondLoader = await setupLoader("b");
+      const firstLoader = await newLoader({ dirs: "a" });
+      const secondLoader = await newLoader({ dirs: "b" });
       expect(!firstLoader.isShadowedFile(File.expandPath("a/x.ts"))).toBeTruthy();
       expect(secondLoader.isShadowedFile(File.expandPath("b/x.ts"))).toBeTruthy();
       expect(await get(Object, "X")).toEqual(1);

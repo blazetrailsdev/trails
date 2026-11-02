@@ -7,7 +7,7 @@ describe("Zeitwerk::Loader::Helpers", () => {
   afterEach(teardown);
 
   it("ruby? answers source files only", async () => {
-    const loader = newLoader();
+    const loader = await newLoader({ setup: false });
     await withFiles(
       [["post.ts"], ["post.js"], ["alone.js"], ["post.d.ts"], ["post.test.ts"], ["x.rb"]],
       async () => {
@@ -22,7 +22,7 @@ describe("Zeitwerk::Loader::Helpers", () => {
   });
 
   it("ls yields Ruby's basename, sorted, skipping what is not source", async () => {
-    const loader = newLoader();
+    const loader = await newLoader({ setup: false });
     await withFiles(
       [["html-parser.ts"], ["a/b.ts"], ["empty/notes.txt"], [".hidden.ts"], ["ignored.ts"]],
       async () => {
@@ -39,12 +39,12 @@ describe("Zeitwerk::Loader::Helpers", () => {
     );
   });
 
-  it("walk_up climbs to the root", () => {
-    expect([...newLoader().walkUp("/a/b")]).toEqual(["/a/b", "/a", "/"]);
+  it("walk_up climbs to the root", async () => {
+    expect([...(await newLoader({ setup: false })).walkUp("/a/b")]).toEqual(["/a/b", "/a", "/"]);
   });
 
   it("cname_for inflects and validates", async () => {
-    const loader = newLoader();
+    const loader = await newLoader({ setup: false });
     expect(await loader.cnameFor("html_parser", "/x/html-parser.ts")).toBe("HtmlParser");
     await expect(loader.cnameFor("1x", "/x/1x.ts")).rejects.toThrow(NameError);
     await expect(loader.cnameFor("1x", "/x/1x.ts")).rejects.toThrow(
@@ -56,8 +56,8 @@ describe("Zeitwerk::Loader::Helpers", () => {
 describe("Zeitwerk::Loader::Config", () => {
   afterEach(teardown);
 
-  it("tag reads and writes through the included accessor", () => {
-    const loader = newLoader();
+  it("tag reads and writes through the included accessor", async () => {
+    const loader = await newLoader({ setup: false });
     const lines: string[] = [];
     loader.tag = "main";
     loader.logger = (message) => lines.push(message);

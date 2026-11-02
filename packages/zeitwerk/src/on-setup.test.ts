@@ -5,8 +5,8 @@ import { get, newLoader, teardown, withFiles } from "./test-helpers/loader-test.
 describe("TestOnSetup", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
