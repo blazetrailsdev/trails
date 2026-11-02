@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { include, registerConstant } from "@blazetrails/ruby-compat";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Application } from "./application.js";
 import { Engine } from "./engine.js";
 import { Root } from "./paths.js";
-import { Annotation, Parser, ParserExtractor } from "./source-annotation-extractor.js";
+import {
+  Annotation,
+  Parser,
+  ParserExtractor,
+  SourceAnnotationExtractor,
+} from "./source-annotation-extractor.js";
 
 describe("Paths remaining surface", () => {
   it("edits a path's list and reads Root's hash surface", async () => {
@@ -36,6 +41,8 @@ describe("BacktraceCleaner", () => {
 });
 
 describe("Parser", () => {
+  beforeAll(() => SourceAnnotationExtractor.enumerate(null, { dirs: [] }));
+
   const pattern = /(?:\/\/|\/\*|^\s*\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
 
   it("skips a // in a multi-line template and a regexp", () => {
@@ -91,7 +98,9 @@ describe("Annotation", () => {
     vi.resetModules();
     vi.doMock("typescript/unstable/sync", missing);
     try {
-      const { Annotation: Fallback } = await import("./source-annotation-extractor.js");
+      const { Annotation: Fallback, SourceAnnotationExtractor: Extractor } =
+        await import("./source-annotation-extractor.js");
+      await Extractor.enumerate(null, { dirs: [] });
       const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
       expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
     } finally {
@@ -100,7 +109,8 @@ describe("Annotation", () => {
     }
   });
 
-  it("registers a ParserExtractor for ts files", () => {
+  it("registers a ParserExtractor for ts files", async () => {
+    await SourceAnnotationExtractor.enumerate(null, { dirs: [] });
     const extension = Annotation.extensions.find((e) => e.test.test("a.tsx"))!;
     expect(extension.builder("TODO")).toBeInstanceOf(ParserExtractor);
   });

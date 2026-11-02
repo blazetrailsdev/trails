@@ -238,3 +238,12 @@ Vitest reports no assertion count or Minitest timing, so the adapter's closing
 summary as far as Vitest allows, built from the results it recorded. The
 `executable` default is `bin/trails test`, where `reporter.rb:9` says
 `bin/rails test`, because generated applications ship `bin/trails`.
+
+## `SourceAnnotationExtractor.enumerate` is async (`begin require "prism"`)
+
+`source_annotation_extractor.rb:3-9` requires Prism at load, rescuing
+`LoadError`. ESM has no synchronous `require` for an optional peer, and a
+top-level `await` is barred from a package's root import graph
+(`scripts/test-deps/yaml-optional-dependency.test.ts`), so `enumerate` awaits
+the `typescript` import, the shape of § "An adapter file is loaded by an awaited
+step" in the root `CLAUDE.md`.

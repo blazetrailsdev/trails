@@ -26,7 +26,7 @@ async function requireTokenizer() {
   }
 }
 
-const tokenizer = await requireTokenizer();
+let tokenizer: Awaited<ReturnType<typeof requireTokenizer>> | undefined;
 let api: API | undefined;
 
 export interface AnnotationOptions {
@@ -189,10 +189,12 @@ function registerDefaults(): void {
 registerDefaults();
 
 export class SourceAnnotationExtractor {
-  static enumerate(
+  /** @inventedArm requireTokenizer — PERMANENT */
+  static async enumerate(
     tag: string | null = null,
     options: AnnotationOptions & { dirs?: readonly string[] } = {},
-  ): string {
+  ): Promise<string> {
+    tokenizer ??= await requireTokenizer();
     tag ??= Annotation.tags.join("|");
     const extractor = new SourceAnnotationExtractor(tag);
     const dirs = options.dirs ?? Annotation.directories;
