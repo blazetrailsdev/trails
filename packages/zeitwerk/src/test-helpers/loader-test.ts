@@ -1,7 +1,12 @@
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { expect } from "vitest";
+import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
 import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
+
+export interface Constants {
+  [cname: string]: Constants;
+}
 
 export function newLoader(): Loader {
   const loader = new Loader();
@@ -9,12 +14,36 @@ export function newLoader(): Loader {
   return loader;
 }
 
+export async function setupLoader(
+  dirs: string | string[],
+  { enableReloading = true }: { enableReloading?: boolean } = {},
+): Promise<Loader> {
+  const loader = new Loader();
+  if (enableReloading) loader.enableReloading();
+  for (const dir of [dirs].flat()) await loader.pushDir(dir);
+  await loader.setup();
+  return loader;
+}
+
+export function assertAbspath(expected: string, actual: unknown): void {
+  expect(actual).toEqual(File.expandPath(expected));
+}
+
+export function isRequired(...files: [string, string?][]): boolean {
+  return files.every(([file]) => LOADED_FEATURES.includes(File.expandPath(file)));
+}
+
+const topLevelConstants = new Set(Object.keys(TopLevel));
+
 export function teardown(): void {
   for (const loader of Registry.loaders) {
     for (const cref of Object.values(loader.autoloads)) cref.remove();
   }
   Registry.loaders.length = 0;
   ExplicitNamespaces.clear();
+  for (const cname of Object.keys(TopLevel)) {
+    if (!topLevelConstants.has(cname)) delete (TopLevel as Record<string, unknown>)[cname];
+  }
 }
 
 export async function withFiles(files: [string, string?][], block: () => unknown): Promise<void> {

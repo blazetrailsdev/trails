@@ -1,12 +1,5 @@
-import {
-  Dir,
-  File,
-  Pathname,
-  TypeError,
-  isModuleObject,
-  rbInspect,
-  stdout,
-} from "@blazetrails/ruby-compat";
+import { Dir, File, Pathname, TypeError, rbInspect, stdout } from "@blazetrails/ruby-compat";
+import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
 
@@ -20,10 +13,7 @@ export const Config = {
     path: PathArg,
     { namespace = Object as unknown }: { namespace?: unknown } = {},
   ): Promise<object> {
-    if (
-      typeof namespace !== "function" &&
-      !(typeof namespace === "object" && namespace !== null && isModuleObject(namespace))
-    ) {
+    if (!_isModule(namespace)) {
       throw new ZeitwerkError(`${rbInspect(namespace)} is not a class or module object, should be`);
     }
 
@@ -116,7 +106,7 @@ export const Config = {
   },
 
   onLoad(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
-    if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
+    if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_load only accepts strings");
 
     this.mutex.synchronize(() => {
@@ -125,7 +115,7 @@ export const Config = {
   },
 
   onUnload(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
-    if (typeof cpath === "function") [cpath, block] = [":ANY", cpath];
+    if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_unload only accepts strings");
 
     this.mutex.synchronize(() => {

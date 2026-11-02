@@ -1,4 +1,4 @@
-import { File, NameError as RubyNameError, TopLevel } from "@blazetrails/ruby-compat";
+import { File, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
@@ -54,13 +54,16 @@ describe("Loader#setup", () => {
     });
   });
 
-  it("raises on a namespace another loader has pending, until autovivification", async () => {
+  it("descends into a namespace another loader has pending", async () => {
     await withFiles([["a/m/x.ts"], ["b/m/y.ts"]], async () => {
       const second = newLoader();
       await loader.pushDir("a");
       await second.pushDir("b");
       await loader.setup();
-      await expect(second.setup()).rejects.toBeInstanceOf(RubyNameError);
+      await second.setup();
+      expect(new Cref(cref("M").get() as object, "Y").isAutoload()).toEqual(
+        File.expandPath("b/m/y.ts"),
+      );
     });
   });
 
