@@ -45,7 +45,18 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const cwd = opts.cwd ?? process.cwd();
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
-  const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
+  const appViewsAt = `${viewsDir}${path.sep}`.lastIndexOf(
+    `${path.sep}app${path.sep}views${path.sep}`,
+  );
+  const outViews = !opts.inPlace
+    ? path.join(outDir, "views")
+    : appViewsAt === -1
+      ? viewsDir
+      : path.join(
+          viewsDir.slice(0, appViewsAt),
+          ".trails/views",
+          viewsDir.slice(appViewsAt + "/app/views".length),
+        );
   const { Base, PathParser, Template, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
   for (const ext of ["ts", "js"]) {
