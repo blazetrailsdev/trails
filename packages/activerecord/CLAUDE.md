@@ -294,7 +294,7 @@ A JS `class Foo extends Base {}` does neither, so each half has its own port
 (RFC 0213):
 
 - **The constant.** An application model is seated by Zeitwerk (root
-  § "The application loader is Zeitwerk"). A framework class is seated on its namespace with `constSet`. A class no loader
+  § "The application loader is Zeitwerk"). A framework class is seated on its namespace. A class no loader
   manages is seated with `constSet(TopLevel, "Post", Post)`, the keyword's own
   `rb_const_set`, or `constSet` on its namespace. A reader asks `constantize`.
 - **The subclass.** `_defaultAttributes` registers a model on its first read,
