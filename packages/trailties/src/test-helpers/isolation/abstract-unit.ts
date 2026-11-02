@@ -424,7 +424,7 @@ export default async function setup(): Promise<void> {
   try {
     await new AppGenerator(
       [File.basename(appTemplatePath)],
-      { skipBundle: true, quiet: true },
+      { skipInstall: true, quiet: true },
       { destinationRoot: File.dirname(appTemplatePath) },
     ).invokeAll();
   } finally {

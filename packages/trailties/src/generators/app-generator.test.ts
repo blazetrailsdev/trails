@@ -52,7 +52,11 @@ function makeGen(
   database: AppDatabase = "sqlite",
   opts: { skipDocker?: boolean; [k: `skip${string}`]: boolean | undefined } = {},
 ) {
-  return new AppGenerator(["my-app"], { database, ...opts }, { destinationRoot: tmpDir });
+  return new AppGenerator(
+    ["my-app"],
+    { database, skipInstall: true, ...opts },
+    { destinationRoot: tmpDir },
+  );
 }
 
 describe("AppGeneratorTest", () => {
@@ -221,14 +225,18 @@ describe("AppGenerator", () => {
   });
 
   it("--api implies its options and a default run reports nothing", async () => {
-    const api = new AppGenerator(["my-app"], { api: true }, { destinationRoot: tmpDir });
+    const api = new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, api: true },
+      { destinationRoot: tmpDir },
+    );
     expect(api.options.skipAssetPipeline).toBe(true);
     expect(api.options.skipJavascript).toBe(true);
     makeGen().reportImpliedOptions();
     expect(lines.join("\n")).not.toMatch(/will also be activated/);
     const minimal = new AppGenerator(
       ["my-app"],
-      { minimal: true, skipActionText: false },
+      { skipInstall: true, minimal: true, skipActionText: false },
       { destinationRoot: tmpDir },
     );
     expect(() => minimal.reportImpliedOptions()).not.toThrow();
@@ -357,7 +365,7 @@ describe("AppGenerator", () => {
   it("--package-manager npm uses npm install in bin/setup", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { packageManager: "npm" },
+      { skipInstall: true, packageManager: "npm" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -369,7 +377,7 @@ describe("AppGenerator", () => {
   it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { packageManager: "yarn" },
+      { skipInstall: true, packageManager: "yarn" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -383,7 +391,7 @@ describe("AppGenerator", () => {
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { sqliteDriver: "node-sqlite" },
+      { skipInstall: true, sqliteDriver: "node-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -399,7 +407,7 @@ describe("AppGenerator", () => {
       () =>
         new AppGenerator(
           ["my-app"],
-          { sqliteDriver: "bogus-driver" as never },
+          { skipInstall: true, sqliteDriver: "bogus-driver" as never },
           { destinationRoot: tmpDir },
         ),
     ).toThrow(/Unknown SQLite driver/);
@@ -408,7 +416,7 @@ describe("AppGenerator", () => {
   it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { database: "sqlite", sqliteDriver: "expo-sqlite" },
+      { skipInstall: true, database: "sqlite", sqliteDriver: "expo-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -492,7 +500,11 @@ describe("AppGenerator", () => {
 
   it("rejects a name whose constant is already in use", async () => {
     await expect(
-      new AppGenerator(["string"], {}, { destinationRoot: "/tmp/string" }).createRoot(),
+      new AppGenerator(
+        ["string"],
+        { skipInstall: true },
+        { destinationRoot: "/tmp/string" },
+      ).createRoot(),
     ).rejects.toThrow(
       "Invalid application name string, constant String is already in use. Please choose another application name.",
     );
@@ -519,7 +531,7 @@ describe("AppGenerator", () => {
   it("invalid application name raises an error", async () => {
     const gen = new AppGenerator(
       ["43-things"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await expect(gen.invokeAll()).rejects.toThrow(
@@ -530,7 +542,7 @@ describe("AppGenerator", () => {
   it("invalid application name is fixed", async () => {
     const gen = new AppGenerator(
       ["things-43"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -541,7 +553,7 @@ describe("AppGenerator", () => {
   it("name option", async () => {
     const gen = new AppGenerator(
       ["app-dir"],
-      { name: "my-app", database: "sqlite" },
+      { skipInstall: true, name: "my-app", database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();

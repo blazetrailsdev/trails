@@ -125,6 +125,14 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("compile_erb")).toBe("compileTse");
   });
 
+  it("spells the Bundler phrases as install", () => {
+    expect(snakeToCamel("run_bundle")).toBe("runInstall");
+    expect(snakeToCamel("bundle_command")).toBe("installCommand");
+    expect(snakeToCamel("bundle_install")).toBe("install");
+    expect(snakeToCamel("skip_bundle")).toBe("skipInstall");
+    expect(snakeToCamel("load_bundle")).toBe("loadBundle");
+  });
+
   it("honors every TOKEN_RENAMES entry", () => {
     // The `rb: js` entry was dead code on main until #6043 — the table and the
     // substitution's alternation were two sources of truth and drifted. The

@@ -130,8 +130,29 @@ const TOKEN_RENAME_PATTERN = new RegExp(`(^|_)(${tokenRenameAlternation()})(?=_|
  */
 const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\b`, "g");
 
+/**
+ * Multi-word renames, for a word that is only renamed in these phrases. trails
+ * installs through a package manager, never Bundler: `run_bundle`
+ * (generators/app_base.rb:705-707), `bundle_command` (:645), `bundle_install?`
+ * (:671) and the `skip_bundle` option credit at the install spelling, while
+ * `bundle` itself stays free for a JS bundle.
+ */
+export const PHRASE_RENAMES: Record<string, string> = {
+  run_bundle: "run_install",
+  bundle_command: "install_command",
+  bundle_install: "install",
+  skip_bundle: "skip_install",
+};
+
+const PHRASE_RENAME_PATTERN = new RegExp(
+  `(^|_)(${Object.keys(PHRASE_RENAMES).join("|")})(?=_|$)`,
+  "g",
+);
+
 export function applyTokenRenames(snake: string): string {
-  return snake.replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
+  return snake
+    .replace(PHRASE_RENAME_PATTERN, (_m, pre, phrase: string) => pre + PHRASE_RENAMES[phrase])
+    .replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
 }
 
 function applyFileTokenRenames(segment: string): string {

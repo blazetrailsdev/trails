@@ -45,8 +45,8 @@ export async function runGenerator(
   args: string[] = this.defaultArguments!,
   config: GeneratorConfig = {},
 ): Promise<unknown> {
-  if (!(args.includes("--no-skip-bundle") || args.includes("--dev")))
-    args = [...args, "--skip-bundle"];
+  if (!(args.includes("--no-skip-install") || args.includes("--dev")))
+    args = [...args, "--skip-install"];
   if (!(args.includes("--no-skip-bootsnap") || args.includes("--skip-bootsnap")))
     args = [...args, "--skip-bootsnap"];
 
