@@ -15,6 +15,6 @@ describe("Mail.new", () => {
       this.to("to@someemail.com");
     });
     expect(mail.subject()).toEqual("source");
-    expect(mail.to()).toEqual(["to@someemail.com"]);
+    expect([...(mail.to() as string[])]).toEqual(["to@someemail.com"]);
   });
 });
