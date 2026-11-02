@@ -1,5 +1,13 @@
 import { compact } from "@blazetrails/activesupport";
-import { Errno, File, IO, JSON, kernelFloat, kernelInteger } from "@blazetrails/ruby-compat";
+import {
+  Errno,
+  File,
+  IO,
+  JSON,
+  kernelFloat,
+  kernelHash,
+  kernelInteger,
+} from "@blazetrails/ruby-compat";
 import type { Tempfile } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Analyzer } from "../analyzer.js";
@@ -46,7 +54,7 @@ export class AudioAnalyzer extends Analyzer {
   /** @internal */
   protected async tags(): Promise<Stream | null> {
     const tags = (await this.audioStream())["tags"];
-    return tags != null ? (tags as Stream) : null;
+    return tags != null ? (kernelHash(tags) as Stream) : null;
   }
 
   /** @internal */

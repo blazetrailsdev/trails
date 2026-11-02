@@ -1,7 +1,9 @@
 import { compact, isPresent } from "@blazetrails/activesupport";
+import { find } from "@blazetrails/ruby-compat/enumerable";
 import {
   Errno,
   File,
+  Hash,
   IO,
   JSON,
   kernelFloat,
@@ -21,7 +23,7 @@ export class VideoAnalyzer extends Analyzer {
   private _encodedHeight?: number;
   private _displayHeightScale?: number;
   private _tags?: Stream;
-  private _sideData?: Stream[];
+  private _sideData?: Stream[] | Hash<string, Stream>;
   private _videoStream?: Stream;
   private _audioStream?: Stream;
   private _probe?: Promise<Probe>;
@@ -69,10 +71,11 @@ export class VideoAnalyzer extends Analyzer {
   /** @internal */
   protected async angle(): Promise<number | null> {
     const tags = await this.tags();
-    const displayMatrix = await this.displayMatrix();
     if (tags["rotate"] != null) {
       return kernelInteger(tags["rotate"]);
-    } else if (displayMatrix != null && displayMatrix["rotation"] != null) {
+    }
+    const displayMatrix = await this.displayMatrix();
+    if (displayMatrix != null && displayMatrix["rotation"] != null) {
       return kernelInteger(displayMatrix["rotation"]);
     }
     return null;
@@ -80,9 +83,10 @@ export class VideoAnalyzer extends Analyzer {
 
   /** @internal */
   protected async displayMatrix(): Promise<Stream | null> {
-    return (
-      (await this.sideData()).find((data) => data["side_data_type"] === "Display Matrix") ?? null
-    );
+    return find(
+      (await this.sideData()) as Iterable<Stream>,
+      (data: Stream) => data["side_data_type"] === "Display Matrix",
+    ) as Stream | null;
   }
 
   /** @internal */
@@ -154,9 +158,10 @@ export class VideoAnalyzer extends Analyzer {
   }
 
   /** @internal */
-  protected async sideData(): Promise<Stream[]> {
+  protected async sideData(): Promise<Stream[] | Hash<string, Stream>> {
     return (this._sideData ??=
-      ((await this.videoStream())["side_data_list"] as Stream[] | undefined) ?? []);
+      ((await this.videoStream())["side_data_list"] as Stream[] | undefined) ??
+      new Hash<string, Stream>());
   }
 
   /** @internal */
