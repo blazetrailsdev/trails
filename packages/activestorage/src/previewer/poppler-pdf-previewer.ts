@@ -19,6 +19,7 @@ export class PopplerPDFPreviewer extends Previewer {
     return (ActiveStorage.paths["pdftoppm"] ?? "pdftoppm") as string;
   }
 
+  /** @inventedArm spawnSync — PERMANENT */
   static isPdftoppmExists(): boolean | null {
     if (this._pdftoppmExists !== undefined && this._pdftoppmExists !== null) {
       return this._pdftoppmExists;

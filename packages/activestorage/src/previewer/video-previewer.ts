@@ -15,6 +15,7 @@ export class VideoPreviewer extends Previewer {
     return blob.isVideo() && (this.isFfmpegExists() ?? false);
   }
 
+  /** @inventedArm spawnSync — PERMANENT */
   static isFfmpegExists(): boolean | null {
     if (this._ffmpegExists !== undefined && this._ffmpegExists !== null) return this._ffmpegExists;
 

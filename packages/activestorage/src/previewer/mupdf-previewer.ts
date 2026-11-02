@@ -19,6 +19,7 @@ export class MuPDFPreviewer extends Previewer {
     return (ActiveStorage.paths["mutool"] ?? "mutool") as string;
   }
 
+  /** @inventedArm spawnSync — PERMANENT */
   static isMutoolExists(): boolean | null {
     if (this._mutoolExists !== undefined && this._mutoolExists !== null) return this._mutoolExists;
 

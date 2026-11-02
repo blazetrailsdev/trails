@@ -111,7 +111,10 @@ export class Preview {
     return isPresent(this.variation.transformations);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm isProcessed — PERMANENT
+   */
   private async presentation(): Promise<Presented> {
     await this.isProcessed();
     return (this.isVariant()
