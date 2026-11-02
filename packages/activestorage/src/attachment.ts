@@ -16,12 +16,6 @@ interface AttachmentReflection {
 interface AttachedBlob extends Blob {
   isAnalyzed(): unknown;
   analyzeLater(): Promise<void>;
-  variant(transformations: unknown): unknown;
-  preview(transformations: unknown): unknown;
-  representation(transformations: unknown): unknown;
-  isPreviewImageNeededBeforeProcessingVariants(): boolean;
-  createPreviewImageLater(variations: unknown[]): Promise<void>;
-  preprocessed(transformations: unknown): Promise<void>;
 }
 
 type AttachedRecord = Base & {
@@ -119,7 +113,10 @@ export class Attachment extends Record {
       .map((namedVariant) => namedVariant.transformations);
 
     const blob = (await this.blob)!;
-    if (blob.isPreviewImageNeededBeforeProcessingVariants() && preprocessedVariations.length > 0) {
+    if (
+      (await blob.isPreviewImageNeededBeforeProcessingVariants()) &&
+      preprocessedVariations.length > 0
+    ) {
       await blob.createPreviewImageLater(preprocessedVariations);
     } else {
       for (const transformations of preprocessedVariations) {
