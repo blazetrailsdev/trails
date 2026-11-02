@@ -1,4 +1,6 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { SolidQueue } from "./solid-queue.js";
+import { constSet } from "@blazetrails/ruby-compat";
+import { type Relation } from "@blazetrails/activerecord";
 import { indexBy } from "@blazetrails/activesupport";
 import { Execution } from "./execution.js";
 import { QueueSelector } from "./queue-selector.js";
@@ -9,7 +11,7 @@ export class ReadyExecution extends Execution {
   declare static queuedAs: (queueName: unknown) => Relation<ReadyExecution>;
 
   static {
-    registerModel("SolidQueue::ReadyExecution", this);
+    constSet(SolidQueue, "ReadyExecution", this);
 
     this.scope("queuedAs", function (queueName: unknown) {
       return this.where({ queue_name: queueName });

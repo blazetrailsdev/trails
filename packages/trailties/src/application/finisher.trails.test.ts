@@ -1,3 +1,7 @@
+import { Base as JobBase } from "@blazetrails/activejob";
+import { constantize, TopLevel } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Base } from "@blazetrails/activerecord";
 import { Autoloaders } from "../autoloaders.js";
 import { afterEach, beforeEach, describe, it, expect, onTestFinished, vi } from "vitest";
 import {
@@ -343,6 +347,24 @@ describe("Finisher", () => {
     });
     await _registerAutoloaded("OnLoadedController", OnLoadedController);
     expect(assigned).toBeInstanceOf(Array);
+  });
+
+  it("registers an autoloaded model with its superclass, as a class definition does", async () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    await _registerAutoloaded("Child", Child);
+    await _registerAutoloaded("Child", Child);
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Child]);
+  });
+
+  it("leaves an autoloaded job resolving through the loader's seat", async () => {
+    class SeatedJob extends JobBase {}
+    constSet(TopLevel, "SeatedJob", SeatedJob);
+    onTestFinished(() => {
+      delete (TopLevel as Record<string, unknown>).SeatedJob;
+    });
+    await _registerAutoloaded("SeatedJob", SeatedJob);
+    expect(constantize("SeatedJob")).toBe(SeatedJob);
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {

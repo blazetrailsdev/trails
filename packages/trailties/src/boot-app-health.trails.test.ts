@@ -1,6 +1,7 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import "./index.js";
 import { Application } from "./application.js";
 import { HealthController } from "./health-controller.js";
 import { Trails } from "./rails.js";

@@ -1,4 +1,5 @@
-import { Base, registerJob } from "@blazetrails/activejob";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Base } from "@blazetrails/activejob";
 import { Message } from "./message.js";
 import { SolidCable } from "./solid-cable.js";
 
@@ -27,4 +28,4 @@ export class TrimJob extends Base {
     return Math.random() < expiresPerWrite - Math.floor(expiresPerWrite);
   }
 }
-registerJob("SolidCable::TrimJob", TrimJob);
+constSet(SolidCable, "TrimJob", TrimJob);

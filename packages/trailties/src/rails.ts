@@ -1,3 +1,7 @@
+import type { HealthController } from "./health-controller.js";
+import type { InfoController } from "./info-controller.js";
+import type { PwaController } from "./pwa-controller.js";
+import type { WelcomeController } from "./welcome-controller.js";
 import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
@@ -36,6 +40,11 @@ let _env: EnvironmentInquirer | undefined;
 let _backtraceCleaner: BacktraceCleaner | undefined;
 
 export class Trails {
+  declare static HealthController: typeof HealthController;
+  declare static InfoController: typeof InfoController;
+  declare static PwaController: typeof PwaController;
+  declare static WelcomeController: typeof WelcomeController;
+
   declare static eagerLoadBang: () => Promise<void>;
 
   private constructor() {
@@ -82,7 +91,7 @@ export class Trails {
 
   static VERSION = VERSION;
   static gemVersion = gemVersion;
-  static Command?: {
+  declare static Command?: {
     invoke(fullNamespace: string, args?: string[], config?: Record<string, unknown>): Promise<void>;
   };
   static version = version;

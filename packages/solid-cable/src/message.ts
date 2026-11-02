@@ -1,6 +1,6 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { Digest, Range, unpack1 } from "@blazetrails/ruby-compat";
+import { constSet, Digest, Range, unpack1 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCable } from "./solid-cable.js";
 
@@ -14,7 +14,7 @@ export class Message extends Record {
   declare channel_hash: number | bigint;
 
   static {
-    registerModel("SolidCable::Message", this);
+    constSet(SolidCable, "Message", this);
 
     this.scope("trimmable", function () {
       return this.where({ created_at: new Range(null, SolidCable.messageRetention().ago(), true) });

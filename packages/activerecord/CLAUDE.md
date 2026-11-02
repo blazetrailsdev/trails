@@ -280,7 +280,7 @@ The guard is the port of `inherited`, not a deviation to retire. Where the arms
 report flags a guarded read or a first-read seed in one of these readers, it
 carries `@inventedArm … — PERMANENT` against this section.
 
-## A model is seated by `registerModel` (the `class` keyword's constant and its `inherited`)
+## A model is seated by the loader or `constSet` (the `class` keyword's constant and its `inherited`)
 
 A Ruby `class Foo < ActiveRecord::Base` does two things at the `class` keyword.
 It binds the constant `Foo`, which is what `compute_type`
@@ -290,47 +290,21 @@ it makes `Foo` a subclass of its parent as Ruby sees it: `inherited`
 (`inheritance.rb:287-294`) fires, and `Foo` is in the parent's
 `Class#subclasses`, which `DescendantsTracker` reads.
 
-A JS `class Foo extends Base {}` does neither. It binds a module-scope
-identifier, seats nothing a `rbConstGet` / `computeType` lookup can find, and
-fires no hook. Zeitwerk seats only a file its loader manages (root CLAUDE.md
-§ "The application loader is Zeitwerk"), which a model defined by hand or in a
-framework package is not, and there is no `inherited` (§ "`inherited` is
-deferred to own-property memo guards" above).
+A JS `class Foo extends Base {}` does neither, so each half has its own port
+(RFC 0213):
 
-**`registerModel` (`associations.ts`) is the port of that pair.** One call
-seats the constant and registers the subclass:
+- **The constant.** An application model is seated by Zeitwerk (root
+  § "The application loader is Zeitwerk"). A framework class is seated on its namespace. A class no loader
+  manages is seated with `constSet(TopLevel, "Post", Post)`, the keyword's own
+  `rb_const_set`, or `constSet` on its namespace. A reader asks `constantize`.
+- **The subclass.** `_defaultAttributes` registers a model on its first read,
+  by own-property memo (`attributes.ts`). A parent's `descendants` cannot see a
+  child nothing has read, so trailties' `_registerAutoloaded` registers each
+  model the loader seats, and a test that needs it calls
+  `DescendantsTracker.registerSubclass`.
 
-- `registerModel(Foo)` seats `Foo` under its JS name, and under its `rbModName`
-  when a namespace gives it a different one. `registerModel("Name", Foo)` seats
-  it under the name given. `registerModel([Foo, Bar])` is one call per model.
-- Every form then registers the model with its `rbClassSuperclass` through
-  `DescendantsTracker.registerSubclass`, for every model, a direct child of
-  `Base` included, as Ruby does for every subclass. `Base` itself registers
-  nothing: Rails' `Base` has no model superclass
-  (`activerecord/lib/active_record/base.rb:282`), where trails' extends
-  ActiveModel's `Model`.
-
-`registerModel` is the interface application and test code uses to define a
-model, and its call sites in the test suite are correct as written. There is no
-separate one-argument `registerSubclass`: activesupport's two-argument
-`registerSubclass(parent, child)` is the port of
-`DescendantsTracker.register_subclass`, and the callers that have a parent and a
-child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
-calling it.
-
-A namespaced model is `registerModel((Sharded.Blog = this))`, a plain
-assignment, as `test-helpers/models/sharded/*.ts` do. `registerConstant` is not
-a seat for anything else: it is being deleted, and a reader that needs a model
-by name asks the `registerModel` registry, never `constantize` (root CLAUDE.md
-§ "Constant lookup is an import or a registry", 2026-10-28).
-
-This is a genuine language shortcoming, ratified here by the repo owner
-(2026-10-09). The ruling is recorded in the tasks-repo story
-`register-model-wrapper-is-deleted-tests-seat-constants` (RFC 0180), under
-"Direction change (Dean, 2026-10-09)" and "Register always, as `inherited`
-does". `registerModel` carries `@noRailsEquivalent PERMANENT` against
-this section; there is no story to delete it or to rewrite its callers to
-`registerConstant`.
+`registerModel` (`associations.ts`) retires. It stays defined, and tests keep
+calling it, until the test sweeps land; do not add a caller.
 
 ## A create path awaits its block before saving (`create`'s `&block`)
 

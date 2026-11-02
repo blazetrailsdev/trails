@@ -55,6 +55,7 @@ import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
+import type { DestroyAssociationAsyncJob } from "./destroy-association-async-job.js";
 import type { Cipher } from "./encryption/cipher.js";
 import type { Configurable, DeclarationListener } from "./encryption/configurable.js";
 import type { Contexts } from "./encryption/contexts.js";
@@ -219,6 +220,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
+  DestroyAssociationAsyncJob: typeof DestroyAssociationAsyncJob;
   Encryption: typeof Encryption;
   Fixture: typeof Fixture;
   FixtureSet: typeof FixtureSet;

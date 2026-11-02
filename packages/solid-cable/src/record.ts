@@ -1,4 +1,5 @@
-import { Base, registerModel, type Relation } from "@blazetrails/activerecord";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Base, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { SolidCable } from "./solid-cable.js";
 
@@ -16,7 +17,7 @@ export class Record extends Base {
   }
 }
 
-registerModel("SolidCable::Record", Record);
+constSet(SolidCable, "Record", Record);
 
 declare module "@blazetrails/activerecord" {
   // eslint-disable-next-line unused-imports/no-unused-vars
