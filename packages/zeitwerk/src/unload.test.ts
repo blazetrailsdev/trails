@@ -162,9 +162,12 @@ describe("TestUnload", () => {
   it("unload clears state even if the autoload failed and the exception was rescued", async () => {
     const files: [string, string][] = [["x.ts", "export const X_IS_NOT_DEFINED = true;"]];
     await withSetup(loader, files, {}, async () => {
-      await get(Object, "X").catch((error: unknown) => {
-        if (!(error instanceof NameError)) throw error;
-      });
+      await get(Object, "X").then(
+        () => expect.unreachable(),
+        (error: unknown) => {
+          if (!(error instanceof NameError)) throw error;
+        },
+      );
 
       await loader.unload();
 
