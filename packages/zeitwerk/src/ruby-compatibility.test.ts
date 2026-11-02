@@ -1,4 +1,4 @@
-import { Dir, File, LOADED_FEATURES } from "@blazetrails/ruby-compat";
+import { Dir, File, LOADED_FEATURES, constDefined } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
@@ -50,8 +50,9 @@ describe("TestRubyCompatibility", () => {
   // PERMANENT-SKIP: `Object.autoload` has no port; JS has no hook on an unresolved identifier (CLAUDE.md, "`Module#autoload` is a build step").
   it.skip("const_defined? is true for autoloads and does not load the file, if the file exists", () => {});
 
-  // PERMANENT-SKIP: `Object.autoload` has no port; JS has no hook on an unresolved identifier (CLAUDE.md, "`Module#autoload` is a build step").
-  it.skip("const_defined? raises NameError for invalid cnames", () => {});
+  it("const_defined? raises NameError for invalid cnames", () => {
+    expect(() => constDefined(class {}, "Foo-Bar", false)).toThrow("wrong constant name Foo-Bar");
+  });
 
   // PERMANENT-SKIP: `Object.autoload` has no port; JS has no hook on an unresolved identifier (CLAUDE.md, "`Module#autoload` is a build step").
   it.skip("remove_const does not trigger an autoload", () => {});
