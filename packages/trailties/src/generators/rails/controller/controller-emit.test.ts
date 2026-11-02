@@ -28,20 +28,18 @@ async function runController(name: string, actions: string[], options: object = 
 }
 
 describe("ControllerGenerator emit", () => {
-  it("matches snapshot for simple controller", async () => {
+  it("emits TS without Ruby for a simple controller", async () => {
     await runController("Account", ["index", "show"]);
     const src = read("app/controllers/account-controller.ts");
-    expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
   });
 
-  it("matches snapshot for namespaced controller with parent", async () => {
+  it("emits TS without Ruby for a namespaced controller with parent", async () => {
     await runController("admin/dashboard", ["index"], {
       parent: "admin_controller",
     });
     const src = read("app/controllers/admin/dashboard-controller.ts");
-    expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
   });

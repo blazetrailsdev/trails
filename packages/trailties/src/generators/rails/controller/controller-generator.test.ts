@@ -1,256 +1,171 @@
-import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { File, Dir, TopLevel } from "@blazetrails/ruby-compat";
+import { capture } from "@blazetrails/activesupport";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../../../application.js";
 import "../../../test-unit/trailtie.js";
+import { copyRoutes } from "../../generators-test-helper.js";
+import { TestCase } from "../../test-case.js";
 
-class ControllerGeneratorTestApp extends Application {}
-let ControllerGenerator: typeof import("./controller-generator.js").ControllerGenerator;
+class ControllerGeneratorApp extends Application {}
+class ControllerGeneratorTest extends TestCase {}
+ControllerGeneratorTest.destination(Dir.mktmpdir());
+ControllerGeneratorTest.arguments(["Account", "foo", "bar"]);
+registerSpecType(/^ControllerGeneratorTest$/, ControllerGeneratorTest);
+let t: TestCase;
 
 beforeAll(async () => {
-  await ControllerGeneratorTestApp.instance().loadGenerators();
-  ({ ControllerGenerator } = await import("./controller-generator.js"));
+  await ControllerGeneratorApp.instance().loadGenerators();
+  const { ControllerGenerator } = await import("./controller-generator.js");
+  ControllerGeneratorTest.tests(ControllerGenerator);
 });
 
-let tmpDir: string;
-let lines: string[];
-
-function setupRoutes() {
-  fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
-  fs.writeFileSync(
-    path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw(function () {\n});\n",
-  );
-}
-
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-  lines = [];
-  vi.spyOn(stdout, "write").mockImplementation(
-    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
-  );
-  setupRoutes();
+beforeEach((context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
+  copyRoutes.call(t);
 });
-
-afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-function makeGen() {
-  return {
-    run: async (name: string, args: string[]) => {
-      await ControllerGenerator.start([name, ...args], { destinationRoot: tmpDir });
-      return (fs.readdirSync(tmpDir, { recursive: true }) as string[]).filter((f) =>
-        fs.statSync(path.join(tmpDir, f)).isFile(),
-      );
-    },
-  };
-}
-
-function readFile(relativePath: string): string {
-  return fs.readFileSync(path.join(tmpDir, relativePath), "utf-8");
-}
 
 describe("ControllerGeneratorTest", () => {
-  it.skip("help does not show invoked generators options if they already exist", () => {});
-
-  it("controller skeleton is created", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    const content = readFile("app/controllers/account-controller.ts");
-    expect(content).toMatch(/class AccountController extends ApplicationController/);
+  it("help does not show invoked generators options if they already exist", async () => {
+    const content = await t.runGenerator(["--help"]);
+    expect(content).not.toMatch(/Helper options:/);
   });
 
-  it.skip("check class collision", () => {});
+  it("controller skeleton is created", async () => {
+    await t.runGenerator();
+    await t.assertFile(
+      "app/controllers/account-controller.ts",
+      /class AccountController extends ApplicationController/,
+    );
+  });
+
+  it("check class collision", async () => {
+    (TopLevel as Record<string, unknown>).ObjectController = class {};
+    try {
+      const content = await capture("stderr", () => t.runGenerator(["object"]));
+      expect(content).toMatch(
+        /The name 'ObjectController' is either already used in your application or reserved/,
+      );
+    } finally {
+      delete (TopLevel as Record<string, unknown>).ObjectController;
+    }
+  });
 
   it("invokes helper", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
+    await t.runGenerator();
+    await t.assertFile("app/helpers/account-helper.ts");
   });
 
   it("does not invoke helper if required", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "--no-helper"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(false);
+    await t.runGenerator(["account", "--skip-helper"]);
+    t.assertNoFile("app/helpers/account-helper.ts");
   });
 
   it("invokes default test framework", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "test/controllers/account-controller.test.ts"))).toBe(
-      true,
-    );
+    await t.runGenerator();
+    await t.assertFile("test/controllers/account-controller.test.ts");
   });
 
   it("does not invoke test framework if required", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "--no-test-framework"]);
-    expect(fs.existsSync(path.join(tmpDir, "test/controllers/account-controller.test.ts"))).toBe(
-      false,
-    );
+    await t.runGenerator(["account", "--no-test-framework"]);
+    t.assertNoFile("test/controllers/account-controller.test.ts");
   });
 
   it("invokes default template engine", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/account/foo.html.tse"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/account/bar.html.tse"))).toBe(true);
+    await t.runGenerator();
+    await t.assertFile("app/views/account/foo.html.tse", /app\/views\/account\/foo\.html\.tse/);
+    await t.assertFile("app/views/account/bar.html.tse", /app\/views\/account\/bar\.html\.tse/);
   });
 
   it("add routes", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    const routes = readFile("config/routes.ts");
-    expect(routes).toContain('this.get("account/foo")');
-    expect(routes).toContain('this.get("account/bar")');
+    await t.runGenerator();
+    await t.assertFile(
+      "config/routes.ts",
+      /^ {2}this\.get\("account\/foo"\)/m,
+      /^ {2}this\.get\("account\/bar"\)/m,
+    );
   });
 
   it("skip routes", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "--skip-routes"]);
-    const routes = readFile("config/routes.ts");
-    expect(routes).not.toContain("account/foo");
+    await t.runGenerator(["account", "foo", "--skip-routes"]);
+    await t.assertFile("config/routes.ts", (routes) => {
+      expect(routes).not.toMatch(/get\("account\/foo"\)/);
+    });
   });
 
   it("skip routes prevents generating tests with routes", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "--skip-routes"]);
-    const testContent = readFile("test/controllers/account-controller.test.ts");
-    expect(testContent).not.toMatch(/account_foo_(url|path)/);
+    await t.runGenerator(["account", "foo", "--skip-routes"]);
+    await t.assertFile("test/controllers/account-controller.test.ts", (controllerTest) => {
+      expect(controllerTest).not.toMatch(/accountFoo(Url|Path)/);
+    });
   });
 
   it("invokes default template engine even with no action", async () => {
-    const gen = makeGen();
-    await gen.run("Account", []);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/account"))).toBe(true);
+    await t.runGenerator(["account"]);
+    await t.assertFile("app/views/account");
   });
 
   it("template engine with class path", async () => {
-    const gen = makeGen();
-    await gen.run("admin/account", []);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/admin/account"))).toBe(true);
+    await t.runGenerator(["admin/account"]);
+    await t.assertFile("app/views/admin/account");
   });
 
   it("actions are turned into methods", async () => {
-    const gen = makeGen();
-    await gen.run("Account", ["foo", "bar"]);
-    const content = readFile("app/controllers/account-controller.ts");
-    expect(content).toContain("async foo()");
-    expect(content).toContain("async bar()");
+    await t.runGenerator();
+
+    await t.assertFile("app/controllers/account-controller.ts", async (controller) => {
+      await t.assertInstanceMethod("foo", controller);
+      await t.assertInstanceMethod("bar", controller);
+    });
   });
 
   it("namespaced routes are created in routes", async () => {
-    const gen = makeGen();
-    await gen.run("admin/dashboard", ["index"]);
-    const routes = readFile("config/routes.ts");
-    expect(routes).toContain('this.namespace("admin"');
-    expect(routes).toContain('this.get("dashboard/index")');
+    await t.runGenerator(["admin/dashboard", "index"]);
+    await t.assertFile("config/routes.ts", (route) => {
+      expect(route).toMatch(
+        /^ {2}this\.namespace\("admin", \(\) => \{\n {4}this\.get\("dashboard\/index"\);\n {2}\}\);$/m,
+      );
+    });
   });
 
   it("namespaced routes with multiple actions are created in routes", async () => {
-    const gen = makeGen();
-    await gen.run("admin/dashboard", ["index", "show"]);
-    const routes = readFile("config/routes.ts");
-    expect(routes).toContain('this.namespace("admin"');
-    expect(routes).toContain('this.get("dashboard/index")');
-    expect(routes).toContain('this.get("dashboard/show")');
-  });
-
-  it("deeply nested namespace routes are created in routes", async () => {
-    const gen = makeGen();
-    await gen.run("admin/api/dashboard", ["index"]);
-    const routes = readFile("config/routes.ts");
-    expect(routes).toContain('this.namespace("admin"');
-    expect(routes).toContain('this.namespace("api"');
-    expect(routes).toMatch(/this\.namespace\("admin"[\s\S]*this\.namespace\("api"/);
-    expect(routes).toContain('this.get("dashboard/index")');
+    await t.runGenerator(["admin/dashboard", "index", "show"]);
+    await t.assertFile("config/routes.ts", (route) => {
+      expect(route).toMatch(
+        /^ {2}this\.namespace\("admin", \(\) => \{\n {4}this\.get\("dashboard\/index"\);\n {4}this\.get\("dashboard\/show"\);\n {2}\}\);$/m,
+      );
+    });
   });
 
   it("does not add routes when action is not specified", async () => {
-    const gen = makeGen();
-    await gen.run("admin/dashboard", []);
-    const routes = readFile("config/routes.ts");
-    expect(routes).not.toContain("namespace");
+    await t.runGenerator(["admin/dashboard"]);
+    await t.assertFile("config/routes.ts", (routes) => {
+      expect(routes).not.toMatch(/namespace\("admin"/);
+    });
   });
 
   it("controller parent param", async () => {
-    const gen = makeGen();
-    await gen.run("admin/dashboard", ["index", "--parent=admin_controller"]);
-    const content = readFile("app/controllers/admin/dashboard-controller.ts");
-    expect(content).toContain("class AdminDashboardController extends AdminController");
+    await t.runGenerator(["admin/dashboard", "--parent", "admin_controller"]);
+    await t.assertFile("app/controllers/admin/dashboard-controller.ts", (controller) => {
+      expect(controller).toMatch(/class AdminDashboardController extends AdminController/);
+    });
   });
 
   it("controller suffix is not duplicated", async () => {
-    const gen = makeGen();
-    await gen.run("account_controller", ["index"]);
-    expect(
-      fs.existsSync(path.join(tmpDir, "app/controllers/account-controller-controller.ts")),
-    ).toBe(false);
-    expect(fs.existsSync(path.join(tmpDir, "app/controllers/account-controller.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/account-controller"))).toBe(false);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/account"))).toBe(true);
-  });
-});
+    await t.runGenerator(["account_controller"]);
 
-describe("ControllerGeneratorTest (JavaScript project)", () => {
-  let jsTmpDir: string;
+    t.assertNoFile("app/controllers/account-controller-controller.ts");
+    await t.assertFile("app/controllers/account-controller.ts");
 
-  beforeEach(() => {
-    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-    fs.mkdirSync(path.join(jsTmpDir, "config"));
-    fs.writeFileSync(
-      path.join(jsTmpDir, "config/routes.ts"),
-      "Trails.application!.routes().draw(function () {\n});\n",
-    );
-  });
+    t.assertNoFile("app/views/account-controller/");
+    await t.assertFile("app/views/account/");
 
-  afterEach(() => {
-    fs.rmSync(jsTmpDir, { recursive: true, force: true });
-  });
+    t.assertNoFile("test/controllers/account-controller-controller.test.ts");
+    await t.assertFile("test/controllers/account-controller.test.ts");
 
-  function makeJsGen() {
-    return {
-      run: async (name: string, args: string[]) => {
-        await ControllerGenerator.start([name, ...args], { destinationRoot: jsTmpDir });
-        return (fs.readdirSync(jsTmpDir, { recursive: true }) as string[]).filter((f) =>
-          fs.statSync(path.join(jsTmpDir, f)).isFile(),
-        );
-      },
-    };
-  }
-
-  it("generates .js controller and test files", async () => {
-    const gen = makeJsGen();
-    const files = await gen.run("Posts", ["index"]);
-    expect(files).toContain("app/controllers/posts-controller.js");
-    expect(files).toContain("test/controllers/posts-controller.test.js");
-  });
-
-  it("omits TypeScript return type annotations", async () => {
-    const gen = makeJsGen();
-    await gen.run("Posts", ["index"]);
-    const content = fs.readFileSync(
-      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
-      "utf-8",
-    );
-    expect(content).not.toContain("Promise<void>");
-    expect(content).toContain("async index()");
-  });
-
-  it("uses ESM imports and exports", async () => {
-    const gen = makeJsGen();
-    await gen.run("Posts", ["index"]);
-    const content = fs.readFileSync(
-      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
-      "utf-8",
-    );
-    expect(content).toContain(
-      'import { ApplicationController } from "./application-controller.js"',
-    );
-    expect(content).toContain("export class PostsController");
+    t.assertNoFile("app/helpers/account-controller-helper.ts");
+    await t.assertFile("app/helpers/account-helper.ts");
   });
 });

@@ -90,13 +90,17 @@ export class ScaffoldControllerGenerator extends NamedBase {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private permittedParams(): string {
     const [attachments, others] = partition(this.attributesNames(), (name) =>
       this.isAttachments(name),
     );
     const params = others.map((name) => `"${name}"`);
-    params.push(...attachments.map((name) => `{ ${name}: [] }`));
+    if (attachments.length > 0)
+      params.push(`{ ${attachments.map((name) => `${name}: []`).join(", ")} }`);
     return params.join(", ");
   }
 
