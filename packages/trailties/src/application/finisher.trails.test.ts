@@ -18,7 +18,14 @@ import {
   Reloader,
   resetLoadHooks,
 } from "@blazetrails/activesupport";
-import { Dir, FileUtils, Monitor, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  FileUtils,
+  Monitor,
+  Thread,
+  ThreadPoolExecutor,
+  TimerTask,
+} from "@blazetrails/ruby-compat";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -543,5 +550,34 @@ describe("executor.wrap on pool threads outside a request", () => {
     await executor.waitForTermination();
 
     expect(events).toEqual(["running", "done", "unloading"]);
+  });
+
+  it("excludes overlapping TimerTask flows started on one thread", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(new MonitorHook(), { outer: true });
+    const events: string[] = [];
+    const threads = new Set<Thread>();
+    const finished: Promise<void>[] = [];
+    const tasks = ["a", "b"].map((name) => {
+      let finish!: () => void;
+      finished.push(new Promise((resolve) => (finish = resolve)));
+      return new TimerTask({ executionInterval: 0.001, runNow: true }, (task) => {
+        task.shutdown();
+        return PoolExecutor.wrap(async () => {
+          threads.add(Thread.current());
+          events.push(`enter ${name}`);
+          await pause();
+          events.push(`leave ${name}`);
+          finish();
+        });
+      });
+    });
+
+    for (const task of tasks) task.execute();
+    await Promise.all(finished);
+
+    expect(events).toEqual(["enter a", "leave a", "enter b", "leave b"]);
+    expect(threads.size).toBe(2);
+    expect(threads.has(Thread.current())).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { constSet } from "../include.js";
+import { globalIoExecutor, type ThreadPoolExecutor } from "../thread-pool-executor.js";
 import { Concurrent } from "./map.js";
 
 const MAX_TIMEOUT = 2 ** 31 - 1;
@@ -15,7 +16,9 @@ const MAX_TIMEOUT = 2 ** 31 - 1;
  * (`timer_task.rb:330-345` `execute_task`). The wait is an unref'd
  * `setTimeout`, so a pending run does not hold the process open, where
  * concurrent-ruby's timer thread waits through `rb_mutex_sleep`
- * (`vendor/ruby/v3.3.11/thread_sync.c:626`).
+ * (`vendor/ruby/v3.3.11/thread_sync.c:626`). Each run is posted to `executor`,
+ * by default {@link globalIoExecutor} (`timer_task.rb:312`, `:334`), so it owns
+ * a pool `Thread` rather than the one that called {@link execute}.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -23,6 +26,7 @@ export class TimerTask {
   /** @noRailsEquivalent PERMANENT */
   readonly executionInterval: number;
   private readonly _runNow: boolean;
+  private readonly _executor: Pick<ThreadPoolExecutor, "post">;
   private readonly _task: (task: TimerTask) => unknown;
   private _running = false;
   private _timer: ReturnType<typeof setTimeout> | undefined;
@@ -32,7 +36,15 @@ export class TimerTask {
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    { executionInterval, runNow = false }: { executionInterval: number; runNow?: boolean },
+    {
+      executionInterval,
+      runNow = false,
+      executor,
+    }: {
+      executionInterval: number;
+      runNow?: boolean;
+      executor?: Pick<ThreadPoolExecutor, "post">;
+    },
     task: (task: TimerTask) => unknown,
   ) {
     if (typeof task !== "function") throw new ArgumentError("no block given");
@@ -41,6 +53,7 @@ export class TimerTask {
     }
     this.executionInterval = executionInterval;
     this._runNow = runNow;
+    this._executor = executor ?? globalIoExecutor();
     this._task = task;
   }
 
@@ -78,7 +91,7 @@ export class TimerTask {
   private _scheduleNextTask(interval = this.executionInterval): void {
     const generation = this._generation;
     const timer: unknown = setTimeout(
-      () => void this._executeTask(generation),
+      () => this._executor.post(() => this._executeTask(generation)),
       Math.min(interval * 1000, MAX_TIMEOUT),
     );
     this._timer = timer as ReturnType<typeof setTimeout>;
