@@ -13,7 +13,6 @@ import {
   stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
-import { Rake } from "@blazetrails/rake";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -83,7 +82,10 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/** @inventedArm replaceAll — PERMANENT */
+/**
+ * @inventedArm replaceAll — PERMANENT
+ * @inventedArm if — CONVERGEABLE port-help-and-version-commands-for-split-namespace
+ */
 export async function invoke(
   fullNamespace: string,
   args: string[] = [],
@@ -95,6 +97,30 @@ export async function invoke(
 
   try {
     await withArgv(args, async () => {
+      if (
+        fullNamespace === "" ||
+        fullNamespace === "help" ||
+        HELP_MAPPINGS.has(fullNamespace) ||
+        VERSION_MAPPINGS.has(fullNamespace)
+      ) {
+        const rake = (await findByNamespace("rake")) as typeof Base;
+        await lookupBang();
+        const program = createProgram();
+        if (fullNamespace !== "" && !VERSION_MAPPINGS.has(fullNamespace)) {
+          const tasks = await rake.printingCommands();
+          const width = Math.max(0, ...tasks.map(([name]) => name.length));
+          program.addHelpText(
+            "after",
+            ["", "In addition to those commands, there are:", ""]
+              .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
+              .join("\n"),
+          );
+        }
+        await program.parseAsync(fullNamespace === "" ? args : [fullNamespace, ...args], {
+          from: "user",
+        });
+        return;
+      }
       if (command && "perform" in command) {
         if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
           await command.perform(name, args, config);
@@ -148,9 +174,12 @@ export async function findByNamespace(
 
 export async function printingCommands(): Promise<[string, string | null][]> {
   await lookupBang();
-  return subclasses()
-    .filter((klass) => !hiddenCommands().includes(klass))
-    .flatMap((klass) => klass.printingCommands());
+  const commands = await Promise.all(
+    subclasses()
+      .filter((klass) => !hiddenCommands().includes(klass))
+      .map((klass) => klass.printingCommands()),
+  );
+  return commands.flat();
 }
 
 /** @internal */
@@ -180,31 +209,8 @@ async function invokeRake(
   args: string[],
   config: Record<string, unknown>,
 ): Promise<void> {
-  await lookupBang();
-  const program = createProgram();
-  const taskName = /[^[]+/.exec(task)?.[0] ?? "";
-  const colon = taskName.indexOf(":");
-  if (colon > 0) {
-    const command = program.commands.find((c) => c.name() === taskName.slice(0, colon));
-    const subcommand = taskName.slice(colon + 1);
-    if (command?.commands.some((c) => c.name() === subcommand)) {
-      await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
-      return;
-    }
-  }
-  if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
-    if ((await Rake.application!.findRakefileLocation()) != null) {
-      if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
-      const { RakeCommand } = await import("./commands/rake.js");
-      await RakeCommand.perform(task, args, config);
-      return;
-    }
-    throw new UnrecognizedCommandError(
-      task,
-      (await printingCommands()).map(([name]) => name),
-    );
-  }
-  await program.parseAsync(taskName === "" ? args : [taskName, ...args], { from: "user" });
+  if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
+  await ((await findByNamespace("rake")) as typeof Base).perform(task, args, config);
 }
 
 Trails.Command = { invoke };

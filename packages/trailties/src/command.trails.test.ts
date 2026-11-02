@@ -3,6 +3,7 @@ import { setAppPath, setEngineRoot } from "./app-path.js";
 import { root } from "./command.js";
 import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
+import { Rake } from "@blazetrails/rake";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
 import { findByNamespace, hiddenCommands, invoke } from "./command.js";
@@ -63,15 +64,49 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(rake).not.toHaveBeenCalled();
   }, 30_000);
 
-  it("looks a task up without its bracketed arguments", async () => {
-    const rake = vi.spyOn(Program.prototype, "parseAsync").mockResolvedValue(createProgram());
-    onTestFinished(() => rake.mockRestore());
+  it("hands an unknown name to the rake command, with --describe for help", async () => {
+    const { RakeCommand } = await import("./commands/rake.js");
+    const location = vi.spyOn(Rake.application!, "findRakefileLocation");
+    location.mockResolvedValue(["Rakefile.ts", "/app"] as never);
+    const perform = vi.spyOn(RakeCommand, "perform").mockResolvedValue();
+    onTestFinished(() => (location.mockRestore(), perform.mockRestore()));
 
-    await invoke("db:migrate[1]");
-    expect(rake).toHaveBeenLastCalledWith(["db", "migrate"], { from: "user" });
+    await invoke("db:migrate[1]", ["x"]);
+    expect(perform).toHaveBeenLastCalledWith("db:migrate[1]", ["x"], {});
 
-    await invoke("db[1]");
-    expect(rake).toHaveBeenLastCalledWith(["db"], { from: "user" });
+    await invoke("zeitwerk:check", ["--help"]);
+    expect(perform).toHaveBeenLastCalledWith(
+      "zeitwerk:check",
+      ["--describe", "zeitwerk:check"],
+      {},
+    );
+  }, 30_000);
+
+  it("prints rake tasks with a comment defined outside the application", async () => {
+    const { RakeCommand } = await import("./commands/rake.js");
+    const location = vi.spyOn(Rake.application!, "findRakefileLocation");
+    location.mockResolvedValue(["Rakefile.ts", "/app"] as never);
+    onTestFinished(() => location.mockRestore());
+    setAppPath("/app/config/application.ts");
+    const host = RakeCommand as unknown as { _rakeTasks: unknown };
+    const task = (name: string, comment: string | null, file: string) => ({
+      comment,
+      locations: [file],
+      nameWithArgs: () => name,
+    });
+    host._rakeTasks = [
+      task("zeitwerk:check", "Check project structure", "/gem/zeitwerk.ts:1"),
+      task("mine", "Application task", "/app/lib/tasks/mine.ts:1"),
+      task("quiet", null, "/gem/quiet.ts:1"),
+    ];
+    onTestFinished(() => {
+      host._rakeTasks = undefined;
+      setAppPath(undefined);
+    });
+
+    expect(await RakeCommand.printingCommands()).toEqual([
+      ["zeitwerk:check", "Check project structure"],
+    ]);
   }, 30_000);
 
   it("finds nothing for an unknown namespace", async () => {
