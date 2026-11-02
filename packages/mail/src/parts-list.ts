@@ -126,7 +126,6 @@ export class PartsList extends Array<PartsListPart> {
     this.recursiveDeleteIf((part) => part.isAttachment());
   }
 
-  /** @missingRailsArgs sort — PERMANENT */
   override sort(compareFn?: (a: PartsListPart, b: PartsListPart) => number): this {
     return new (this.constructor as typeof PartsList)(
       Array.from(this).sort(compareFn ?? ((a, b) => cmp(a, b) ?? 0)),
