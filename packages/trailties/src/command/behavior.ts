@@ -17,6 +17,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
   destroy: async () => (await import("../commands/destroy.js"), null),
   app: async () => (await import("../commands/app.js")).appTemplateCommand,
+  runner: async () => (await import("../commands/runner.js"), null),
   notes: async () => (await import("../commands/notes.js"), null),
   stats: async () => (await import("../commands/stats.js"), null),
   credentials: async () => (await import("../commands/credentials.js"), null),

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { getFs, include } from "@blazetrails/ruby-compat";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
@@ -31,4 +33,16 @@ describe("TestHelpers::Generation#build_app", () => {
     );
     expect(await getFs().readdir!(`${appPath}/config/initializers`)).toEqual([]);
   });
+
+  it("boots the copied app in the test's own process", async () => {
+    t = new GenerationTest("test");
+    await t.buildApp();
+
+    await t.addToConfig(`this.config.cacheStore = ":memory_store";`);
+    await t.bootTrails();
+
+    expect(Trails.application).not.toBeNull();
+    expect(Application.appClass).not.toBeNull();
+    expect(String(Trails.application!.config.root)).toBe(await t.appPath());
+  }, 60_000);
 });
