@@ -64,7 +64,12 @@ export class PartsList extends Array<PartsListPart> {
       .map((part, i) => {
         i = i + 1;
         const id = parentId.length === 0 ? `${i}` : `${parentId}.${i}`;
-        const subList = this.subList(part);
+        let subList: PartsList;
+        if (part.contentType() === "message/rfc822") {
+          subList = Mail.new(part.body).parts;
+        } else {
+          subList = part.parts;
+        }
         return `${id}. ${part.inspect()}${subList.length > 0 ? `\n${subList.inspectStructure(id)}` : ""}`;
       })
       .join("\n");
@@ -72,7 +77,12 @@ export class PartsList extends Array<PartsListPart> {
 
   recursiveEach(block: (part: PartsListPart) => void): void {
     for (const part of Array.from(this)) {
-      const subList = this.subList(part);
+      let subList: PartsList;
+      if (part.contentType() === "message/rfc822") {
+        subList = Mail.new(part.body).parts;
+      } else {
+        subList = part.parts;
+      }
       block(part);
       subList.recursiveEach(block);
     }
@@ -88,7 +98,12 @@ export class PartsList extends Array<PartsListPart> {
 
   recursiveDeleteIf(block: (part: PartsListPart) => unknown): void {
     const kept = Array.from(this).filter((part) => {
-      const subList = this.subList(part);
+      let subList: PartsList;
+      if (part.contentType() === "message/rfc822") {
+        subList = Mail.new(part.body).parts;
+      } else {
+        subList = part.parts;
+      }
       const result = block(part);
       if (subList.length > 0) subList.recursiveDeleteIf(block);
       return result == null || result === false;
@@ -114,11 +129,6 @@ export class PartsList extends Array<PartsListPart> {
     this.length = 0;
     for (const p of sorted) this.push(p);
     return this;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  private subList(part: PartsListPart): PartsList {
-    return part.contentType() === "message/rfc822" ? Mail.new(part.body).parts : part.parts;
   }
 
   /** @internal */

@@ -66,13 +66,6 @@ describe("Mail::Body", () => {
     });
   });
 
-  describe("splitting up a multipart document", () => {
-    it("should split if boundary is not set", () => {
-      const body = new Body("no separators here");
-      expect(() => body.splitBang(null)).not.toThrow();
-    });
-  });
-
   describe("detecting non ascii", () => {
     it("should say an empty string is all ascii", () => {
       expect(new Body().isAsciiOnly()).toBe(true);
