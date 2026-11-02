@@ -60,7 +60,7 @@ describe("controllerPathHelpers", () => {
 
   it("flattens namespace for the TS class name but preserves :: for display", async () => {
     expect(controllerPathHelpers("admin/dashboard")).toMatchObject({
-      className: "AdminDashboardController",
+      className: "DashboardController",
       displayName: "Admin::DashboardController",
       controllerFile: "admin/dashboard-controller",
     });

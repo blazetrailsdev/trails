@@ -242,8 +242,8 @@ describe("ScaffoldGeneratorTest", () => {
     await t.runGenerator(["admin/role", "name:string", "description:string"]);
 
     await t.assertFile("app/models/admin.ts", /export const Admin/);
-    await t.assertFile("app/models/admin/role.ts", /class AdminRole extends ApplicationRecord/);
-    await t.assertFile("test/models/admin/role.test.ts", /describe\("AdminRoleTest"/);
+    await t.assertFile("app/models/admin/role.ts", /class Role extends ApplicationRecord/);
+    await t.assertFile("test/models/admin/role.test.ts", /describe\("Admin::RoleTest"/);
     await t.assertFile("test/fixtures/admin/roles.yml");
     await t.assertMigration("db/migrate/create_admin_roles.ts");
 
@@ -254,22 +254,22 @@ describe("ScaffoldGeneratorTest", () => {
     });
 
     await t.assertFile("app/controllers/admin/roles-controller.ts", async (content) => {
-      expect(content).toMatch(/class AdminRolesController extends ApplicationController/);
+      expect(content).toMatch(/class RolesController extends ApplicationController/);
 
       await t.assertInstanceMethod("index", content, (m) => {
-        expect(m).toMatch(/this\.admin_roles = await AdminRole\.all\(\)/);
+        expect(m).toMatch(/this\.admin_roles = await Role\.all\(\)/);
       });
 
       await t.assertInstanceMethod("show", content);
 
       await t.assertInstanceMethod("new", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = new AdminRole\(\)/);
+        expect(m).toMatch(/this\.admin_role = new Role\(\)/);
       });
 
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = new AdminRole\(this\.adminRoleParams\(\)\)/);
+        expect(m).toMatch(/this\.admin_role = new Role\(this\.adminRoleParams\(\)\)/);
         expect(m).toMatch(/this\.admin_role\.save\(\)/);
       });
 
@@ -282,15 +282,13 @@ describe("ScaffoldGeneratorTest", () => {
       });
 
       await t.assertInstanceMethod("setAdminRole", content, (m) => {
-        expect(m).toMatch(
-          /this\.admin_role = await AdminRole\.find\(this\.params\.expect\("id"\)\)/,
-        );
+        expect(m).toMatch(/this\.admin_role = await Role\.find\(this\.params\.expect\("id"\)\)/);
       });
     });
 
     await t.assertFile(
       "test/controllers/admin/roles-controller.test.ts",
-      /class AdminRolesControllerTest extends IntegrationTest/,
+      /class RolesControllerTest extends IntegrationTest/,
     );
 
     await t.assertFile("app/views/admin/roles/index.html.tse", (content) => {

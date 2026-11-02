@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { <%= this.className().split("::").join("") %>Controller } from "<%= "../".repeat(this.classPathParts.length + 2) %>app/controllers/<%= [...this.classPathParts, this.fileName].map((part) => ActiveSupport.Inflector.dasherize(part)).join("/") %>-controller.js";
+import { <%= this.className().split("::").pop() %>Controller } from "<%= "../".repeat(this.classPathParts.length + 2) %>app/controllers/<%= [...this.classPathParts, this.fileName].map((part) => ActiveSupport.Inflector.dasherize(part)).join("/") %>-controller.js";
 
 describe("<%= this.className() %>Controller", () => {
 <% for (const action of this.actions) { -%>

@@ -3,8 +3,9 @@ import type { ScaffoldGenerator } from "./scaffold-generator.js";
 type Template = (this: ScaffoldGenerator) => string;
 
 function header(this: ScaffoldGenerator) {
-  const testClassName = `${this.controllerClassName().split("::").join("")}ControllerTest`;
-  const modelClassName = this.className().split("::").join("");
+  const testClassName = `${this.controllerClassName().split("::").pop()}ControllerTest`;
+  const testPath = `${this.controllerClassName()}ControllerTest`;
+  const modelClassName = this.className().split("::").pop();
   const singular = this.singularTableName();
   const fixtureName = this.fixtureName();
   const root = "../".repeat(this.controllerClassPath().length + 1);
@@ -21,20 +22,20 @@ export class ${testClassName} extends IntegrationTest {
   declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 
   static {
-    registerConstant("${testClassName}", this);
+    registerConstant("${testPath}", this);
     this.setup(async function (this: ${testClassName}) {
       this["@${singular}"] = await this.${fixtureName}("one");
     });
   }
 }
 `;
-  return { testClassName, modelClassName, singular, record: `t["@${singular}"]`, preamble };
+  return { testPath, modelClassName, singular, record: `t["@${singular}"]`, preamble };
 }
 
 const functionalTest: Template = function () {
-  const { testClassName, modelClassName, singular, record, preamble } = header.call(this);
+  const { testPath, modelClassName, singular, record, preamble } = header.call(this);
   return `${preamble}
-describe("${testClassName}", () => {
+describe("${testPath}", () => {
   it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper({ type: "url" })}());
     t.assertResponse("success");
@@ -80,9 +81,9 @@ describe("${testClassName}", () => {
 };
 
 const apiFunctionalTest: Template = function () {
-  const { testClassName, modelClassName, singular, record, preamble } = header.call(this);
+  const { testPath, modelClassName, singular, record, preamble } = header.call(this);
   return `${preamble}
-describe("${testClassName}", () => {
+describe("${testPath}", () => {
   it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper()}Url(), { as: "json" });
     t.assertResponse("success");

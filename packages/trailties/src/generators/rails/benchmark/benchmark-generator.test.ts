@@ -1,36 +1,45 @@
-import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { Dir, File } from "@blazetrails/ruby-compat";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { capture } from "@blazetrails/activesupport";
+import { beforeEach, describe, expect, it } from "vitest";
 import { BenchmarkGenerator } from "./benchmark-generator.js";
+import { TestCase } from "../../test-case.js";
 
-let tmpDir: string;
-let lines: string[];
+class BenchmarkGeneratorTest extends TestCase {}
+BenchmarkGeneratorTest.destination(Dir.mktmpdir());
+BenchmarkGeneratorTest.tests(BenchmarkGenerator);
+registerSpecType(/^BenchmarkGeneratorTest$/, BenchmarkGeneratorTest);
+let t: TestCase;
 
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-bench-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-  lines = [];
-  vi.spyOn(stdout, "write").mockImplementation(
-    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
-  );
-});
-
-afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+beforeEach((context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
 });
 
 describe("BenchmarkGeneratorTest", () => {
   it("generate benchmark", async () => {
-    const gen = new BenchmarkGenerator(["my_benchmark"], {}, { destinationRoot: tmpDir });
-    await gen.generateLayout();
-    const content = fs.readFileSync(
-      path.join(tmpDir, "script/benchmarks/my_benchmark.ts"),
-      "utf-8",
-    );
-    expect(content).toContain("before: () => {}");
-    expect(content).toContain("after: () => {}");
-    expect(content).toContain("performance.now()");
+    await t.runGenerator(["my_benchmark"]);
+
+    await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
+      expect(content).toContain("before: () => {}");
+      expect(content).toContain("after: () => {}");
+      expect(content).toContain("performance.now()");
+    });
+  });
+
+  it("generate benchmark with no name", async () => {
+    const output = await capture("stderr", () => t.runGenerator([]));
+
+    expect(output).toBe("No value provided for required arguments 'name'\n");
+  });
+
+  it("generate benchmark with reports", async () => {
+    await t.runGenerator(["my_benchmark", "with_patch", "without_patch"]);
+
+    await t.assertFile("script/benchmarks/my_benchmark.ts", (content) => {
+      expect(content).toContain("with_patch: () => {}");
+      expect(content).toContain("without_patch: () => {}");
+    });
   });
 });

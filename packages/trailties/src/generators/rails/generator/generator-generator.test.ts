@@ -1,74 +1,84 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { Dir, File } from "@blazetrails/ruby-compat";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { beforeEach, describe, it } from "vitest";
 import { GeneratorGenerator } from "./generator-generator.js";
+import { TestCase } from "../../test-case.js";
 
-let tmpDir: string;
+class GeneratorGeneratorTest extends TestCase {}
+GeneratorGeneratorTest.destination(Dir.mktmpdir());
+GeneratorGeneratorTest.tests(GeneratorGenerator);
+GeneratorGeneratorTest.arguments(["awesome"]);
+registerSpecType(/^GeneratorGeneratorTest$/, GeneratorGeneratorTest);
+let t: TestCase;
 
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-gen-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-});
-
-afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+beforeEach((context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
 });
 
 describe("GeneratorGeneratorTest", () => {
-  it("generator_skeleton_is_created", async () => {
-    const gen = new GeneratorGenerator(["awesome"], {}, { destinationRoot: tmpDir });
-    await gen.createGeneratorFiles();
-    for (const p of [
+  it("generator skeleton is created", async () => {
+    await t.runGenerator();
+
+    for (const path of [
+      "lib/generators/awesome",
       "lib/generators/awesome/USAGE",
-      "lib/generators/awesome/templates/.keep",
+      "lib/generators/awesome/templates",
+    ]) {
+      await t.assertFile(path);
+    }
+
+    await t.assertFile(
       "lib/generators/awesome/awesome-generator.ts",
+      /class AwesomeGenerator extends NamedBase/,
+    );
+  });
+
+  it("namespaced generator skeleton", async () => {
+    await t.runGenerator(["rails/awesome"]);
+
+    for (const path of [
+      "lib/generators/rails/awesome",
+      "lib/generators/rails/awesome/USAGE",
+      "lib/generators/rails/awesome/templates",
     ]) {
-      expect(fs.existsSync(path.join(tmpDir, p))).toBe(true);
+      await t.assertFile(path);
     }
-    const src = fs.readFileSync(
-      path.join(tmpDir, "lib/generators/awesome/awesome-generator.ts"),
-      "utf-8",
+
+    await t.assertFile(
+      "lib/generators/rails/awesome/awesome-generator.ts",
+      /class AwesomeGenerator extends NamedBase/,
     );
-    expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
   });
 
-  it("namespaced_generator_skeleton", async () => {
-    const gen = new GeneratorGenerator(["rails/awesome"], {}, { destinationRoot: tmpDir });
-    await gen.createGeneratorFiles();
-    const src = fs.readFileSync(
-      path.join(tmpDir, "lib/generators/rails/awesome/awesome-generator.ts"),
-      "utf-8",
-    );
-    expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
-  });
+  it("generator skeleton is created without file name namespace", async () => {
+    await t.runGenerator(["awesome", "--namespace", "false"]);
 
-  it("generator_skeleton_is_created_without_file_name_namespace", async () => {
-    const gen = new GeneratorGenerator(["awesome"], ["--namespace", "false"], {
-      destinationRoot: tmpDir,
-    });
-    await gen.invokeAll();
-    for (const file of [
-      "lib/generators/USAGE",
-      "lib/generators/templates/.keep",
+    for (const path of ["lib/generators/", "lib/generators/USAGE", "lib/generators/templates"]) {
+      await t.assertFile(path);
+    }
+
+    await t.assertFile(
       "lib/generators/awesome-generator.ts",
-    ]) {
-      expect(fs.existsSync(path.join(tmpDir, file))).toBe(true);
-    }
-    expect(fs.existsSync(path.join(tmpDir, "lib/generators/awesome-generator.ts"))).toBe(true);
+      /class AwesomeGenerator extends NamedBase/,
+    );
   });
 
-  it("namespaced_generator_skeleton_without_file_name_namespace", async () => {
-    await GeneratorGenerator.start(["rails/awesome", "--namespace", "false"], {
-      destinationRoot: tmpDir,
-    });
-    for (const p of ["lib/generators/rails/USAGE", "lib/generators/rails/templates/.keep"]) {
-      expect(fs.existsSync(path.join(tmpDir, p))).toBe(true);
+  it("namespaced generator skeleton without file name namespace", async () => {
+    await t.runGenerator(["rails/awesome", "--namespace", "false"]);
+
+    for (const path of [
+      "lib/generators/rails",
+      "lib/generators/rails/USAGE",
+      "lib/generators/rails/templates",
+    ]) {
+      await t.assertFile(path);
     }
-    const src = fs.readFileSync(
-      path.join(tmpDir, "lib/generators/rails/awesome-generator.ts"),
-      "utf-8",
+
+    await t.assertFile(
+      "lib/generators/rails/awesome-generator.ts",
+      /class AwesomeGenerator extends NamedBase/,
     );
-    expect(src).toMatch(/class AwesomeGenerator extends NamedBase/);
   });
 });

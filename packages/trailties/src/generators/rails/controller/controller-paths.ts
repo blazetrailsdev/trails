@@ -14,10 +14,7 @@ export interface ControllerPaths {
 export function controllerPathHelpers(name: string): ControllerPaths {
   const stripped = name.replace(/[_-]?[Cc]ontroller$/, "");
   const parts = stripped.split("/");
-  const className =
-    parts.length > 1
-      ? parts.map((p) => camelize(underscore(p))).join("") + "Controller"
-      : camelize(underscore(stripped)) + "Controller";
+  const className = camelize(underscore(parts[parts.length - 1])) + "Controller";
   const displayName =
     parts.length > 1
       ? parts.map((p) => camelize(underscore(p))).join("::") + "Controller"

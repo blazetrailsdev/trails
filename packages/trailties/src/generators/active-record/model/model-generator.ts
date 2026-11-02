@@ -57,7 +57,7 @@ export class ModelGenerator extends NamedBase {
 
   async createModelFile(): Promise<void> {
     const regularClassPath = this.regularClassPath();
-    const className = [...regularClassPath, this.fileName].map((part) => camelize(part)).join("");
+    const className = camelize(this.fileName);
     const fileName = dasherize(this.filePath());
     const relativeRoot = "../".repeat(regularClassPath.length);
     const attributes = this.attributes;
@@ -65,7 +65,9 @@ export class ModelGenerator extends NamedBase {
     const parentClassName = this.parentClassName();
     const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
     const parentPath = dasherize(parentClassName.replace(/::/g, "/"));
-    const importPath = `import { ${parentClass} } from "${relativeRoot || "./"}${parentPath}${this.ext()}";`;
+    const parentLeaf = classify(parentClassName.split("::").pop()!);
+    const importName = parentLeaf === parentClass ? parentClass : `${parentLeaf} as ${parentClass}`;
+    const importPath = `import { ${importName} } from "${relativeRoot || "./"}${parentPath}${this.ext()}";`;
 
     const bodyLines: string[] = [];
 
@@ -116,8 +118,8 @@ ${staticBlock}}
     if (this.behavior === "invoke") {
       await this.createFile(
         `app/models/${regularClassPath.map((part) => dasherize(part)).join("/")}${ext}`,
-        `export const ${regularClassPath.map((part) => camelize(part)).join("")} = {
-  tableNamePrefix(): string {
+        `export const ${camelize(regularClassPath.at(-1)!)} = {
+  get tableNamePrefix(): string {
     return "${regularClassPath.join("_")}_";
   },
 };

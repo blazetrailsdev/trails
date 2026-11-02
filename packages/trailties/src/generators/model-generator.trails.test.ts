@@ -93,7 +93,7 @@ describe("ModelGeneratorTest", () => {
       "utf-8",
     );
     expect(unitTest).toContain('import "../../test-helper.js";');
-    expect(unitTest).toContain('describe("AdminAccountTest"');
+    expect(unitTest).toContain('describe("Admin::AccountTest"');
     expect(fs.existsSync(path.join(tmpDir, "test/fixtures/admin/accounts.yml"))).toBe(true);
   });
 });
