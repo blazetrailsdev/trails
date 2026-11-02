@@ -21,6 +21,21 @@ import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 import { Registry } from "./registry.js";
 import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
 
+const raiseOnEveryRead = () => {
+  const raising = new Proxy(getFs(), {
+    get(target, name, receiver) {
+      if (name === "cwd") return Reflect.get(target, name, receiver);
+      return () => {
+        throw new globalThis.Error(`fs touched: ${String(name)}`);
+      };
+    },
+  });
+  const previous = fsAdapterConfig.adapter;
+  registerFsAdapter("raising", raising, getPath());
+  fsAdapterConfig.adapter = "raising";
+  return previous;
+};
+
 const FILES: [string, string?][] = [
   ["x.ts"],
   ["admin/users-controller.ts"],
@@ -91,6 +106,7 @@ describe("autoload artifacts", () => {
         "digest",
         "constants",
         "shadowed",
+        "collapsed",
       ]);
     });
   });
@@ -130,7 +146,7 @@ describe("autoload artifacts", () => {
       await loader.pushDir(".");
       let called = false;
       await loader.onSetup(() => (called = true));
-      loader.manifest = { digest: "stale", constants: {}, shadowed: [] };
+      loader.manifest = { digest: "stale", constants: {}, shadowed: [], collapsed: [] };
       const { constants } = await buildManifest(loader);
       expect(constants).toHaveProperty("M::Y");
       expect(called).toBe(false);
@@ -215,18 +231,7 @@ describe("autoload artifacts", () => {
       const { imports } = await import(`${dir}/imports.generated.js`);
       Registry.unregisterLoader(loader);
 
-      const real = getFs();
-      const raising = new Proxy(real, {
-        get(target, name, receiver) {
-          if (name === "cwd") return Reflect.get(target, name, receiver);
-          return () => {
-            throw new globalThis.Error(`fs touched: ${String(name)}`);
-          };
-        },
-      });
-      const previous = fsAdapterConfig.adapter;
-      registerFsAdapter("raising", raising, getPath());
-      fsAdapterConfig.adapter = "raising";
+      const previous = raiseOnEveryRead();
       try {
         const reader = await newLoader({ setup: false });
         reader.manifest = manifest;
@@ -244,6 +249,68 @@ describe("autoload artifacts", () => {
         expect(seats.M.Y).toBeTypeOf("function");
         expect(seats.Admin.Deep.Thing).toBeTypeOf("function");
         expect(seats.Skipped).toBeUndefined();
+      } finally {
+        fsAdapterConfig.adapter = previous;
+      }
+    });
+  });
+
+  it("answers the eager load variants and expected cpaths from rows on an fs adapter that raises on every read", async () => {
+    const files: [string, string][] = [
+      ["top.js", "export class Top {}\n"],
+      ["app/lib/nested.js", "export class Nested {}\n"],
+      ["app/lib/other.js", "export class Other {}\n"],
+      ["app/flat/flattened.js", "export class Flattened {}\n"],
+      ["app/flat/inner/leaf.js", "export class Leaf {}\n"],
+      ["unloaded/thing.js", "export class Thing {}\n"],
+      ["README.md", "not code\n"],
+    ];
+    const seats = TopLevel as Record<string, Record<string, Record<string, unknown>> | undefined>;
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.collapse("app/flat");
+      const dir = await writeArtifacts(loader);
+      const manifest = JSON.parse(await getFs().readFile(`${dir}/manifest.json`, "utf8"));
+      const { imports } = await import(`${dir}/imports.generated.js`);
+      Registry.unregisterLoader(loader);
+      const expand = (path: string) => File.expandPath(path);
+
+      const previous = raiseOnEveryRead();
+      try {
+        const reader = await newLoader({ setup: false });
+        reader.manifest = manifest;
+        reader.imports = imports;
+        await reader.pushDir(".");
+        await reader.collapse("app/flat");
+        await reader.setup();
+
+        const cpaths = await reader.allExpectedCpaths();
+        expect(cpaths[expand(".")]).toEqual("Object");
+        expect(cpaths[expand("app/lib")]).toEqual("App::Lib");
+        expect(cpaths[expand("app/lib/nested.js")]).toEqual("App::Lib::Nested");
+        expect(cpaths[expand("app/flat")]).toEqual("App");
+        expect(cpaths[expand("app/flat/flattened.js")]).toEqual("App::Flattened");
+
+        expect(await reader.cpathExpectedAt("app/lib")).toEqual("App::Lib");
+        expect(await reader.cpathExpectedAt("app/flat/inner/leaf.js")).toEqual("App::Inner::Leaf");
+        await expect(reader.cpathExpectedAt("README.md")).rejects.toThrow(/does not exist/);
+
+        await expect(reader.eagerLoadDir("top.js")).rejects.toThrow(/is not a directory/);
+        await expect(reader.loadFile("app/lib")).rejects.toThrow(/is not a Ruby file/);
+        await expect(reader.loadFile("README.md")).rejects.toThrow(/does not exist/);
+
+        await reader.loadFile("top.js");
+        expect(seats.Top).toBeTypeOf("function");
+
+        await reader.eagerLoadDir("app/flat/inner");
+        expect(seats.App!.Inner.Leaf).toBeTypeOf("function");
+        expect(seats.App!.Flattened).toBeUndefined();
+
+        await reader.loadFile("app/lib/other.js");
+        expect(seats.App!.Lib.Nested).toBeUndefined();
+        await reader.eagerLoadNamespace(seats.App!.Lib);
+        expect(seats.App!.Lib.Nested).toBeTypeOf("function");
+        expect(seats.Unloaded).toBeUndefined();
       } finally {
         fsAdapterConfig.adapter = previous;
       }
