@@ -19,6 +19,10 @@ export const Registry = {
     deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
+  /**
+   * @inventedArm readFile — PERMANENT
+   * @inventedArm pushDir — PERMANENT
+   */
   async loaderForGem(rootFile: string, { namespace }: { namespace: object }): Promise<Loader> {
     if (Object.hasOwn(this.gemLoadersByRootFile, rootFile)) {
       return this.gemLoadersByRootFile[rootFile];
