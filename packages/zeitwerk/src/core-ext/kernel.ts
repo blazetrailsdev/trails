@@ -34,6 +34,9 @@ export function _installResolveHook(): void {
         for (const [realRoot, rootDir] of Object.entries(loader._realRoots)) {
           if (!path.startsWith(`${realRoot}${getPath().sep}`)) continue;
           if (loader.isIgnores(rootDir + path.slice(realRoot.length))) continue;
+          if (!/\.[jt]s$/.test(path) || path.endsWith(".d.ts")) continue;
+          const segments = path.slice(realRoot.length + 1).split(getPath().sep);
+          if (segments.some((segment) => loader.isHidden(segment))) continue;
           url.searchParams.set("zeitwerk", String(loader._generation));
           return { ...resolved, url: url.href };
         }

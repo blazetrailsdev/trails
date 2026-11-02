@@ -1,5 +1,4 @@
 import { Dir, File, Pathname, TypeError, getFs, rbInspect, stdout } from "@blazetrails/ruby-compat";
-import { _installResolveHook } from "../core-ext/kernel.js";
 import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
@@ -61,7 +60,6 @@ export const Config = {
     }
   },
 
-  /** @inventedArm _installResolveHook — PERMANENT */
   enableReloading(this: Loader): void {
     this.mutex.synchronize(() => {
       if (this._reloadingEnabled) return;
@@ -70,7 +68,6 @@ export const Config = {
         throw new ZeitwerkError("cannot enable reloading after setup");
       } else {
         this._reloadingEnabled = true;
-        _installResolveHook();
       }
     });
   },

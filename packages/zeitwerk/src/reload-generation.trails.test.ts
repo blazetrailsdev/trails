@@ -72,13 +72,9 @@ ${TAIL}`,
 
 const packageDist = (name: string) => new URL(`../../${name}/dist/`, import.meta.url).href;
 
-const STATIC_TAIL = `(globalThis.evaluated ??= []).push(import.meta.url.split("/").pop());`;
-
 const LOADER_MAIN = `
 import { TopLevel, File } from "${packageDist("ruby-compat")}index.js";
 import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
-import { autoloadGet } from "${packageDist("zeitwerk")}core-ext/kernel.js";
-import { Cref } from "${packageDist("zeitwerk")}cref.js";
 
 const once = new Loader();
 await once.pushDir("once");
@@ -92,7 +88,7 @@ await loader.setup();
 const load = () => Promise.all([loader.eagerLoad(), once.eagerLoad()]).then(() => ({ ...TopLevel }));
 
 const first = await load();
-File.write("app/application-record.ts", ${JSON.stringify(`export class ApplicationRecord { static edited = true; }\n${STATIC_TAIL}`)});
+File.write("app/application-record.ts", ${JSON.stringify(`export class ApplicationRecord { static edited = true; }\n${TAIL}`)});
 await loader.reload();
 const second = await load();
 
@@ -108,13 +104,13 @@ console.log(JSON.stringify({
 
 const LOADER_FILES: [string, string][] = [
   ["main.mjs", LOADER_MAIN],
-  ["once/once.ts", `export class Once {}\n${STATIC_TAIL}`],
-  ["app/application-record.ts", `export class ApplicationRecord {}\n${STATIC_TAIL}`],
+  ["once/once.ts", `export class Once {}\n${TAIL}`],
+  ["app/application-record.ts", `export class ApplicationRecord {}\n${TAIL}`],
   [
     "app/comment.ts",
     `import { Post } from "./post.ts";
 export class Comment { static Post = () => Post; }
-${STATIC_TAIL}`,
+${TAIL}`,
   ],
   [
     "app/post.ts",
@@ -125,7 +121,7 @@ export class Post extends ApplicationRecord {
   static Comment = () => Comment;
   static Once = Once;
 }
-${STATIC_TAIL}`,
+${TAIL}`,
   ],
 ];
 
