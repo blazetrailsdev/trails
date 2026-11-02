@@ -302,6 +302,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return super.classOption(name, options);
   }
 
+  /** @inventedArm isRegisteredConstant — CONVERGEABLE delete-register-constant-and-class-path-api */
   protected classCollisions(...classNames: Array<string | string[]>): void {
     if (this.behavior !== "invoke") return;
     const options = this.options as GeneratorOptions & { skipCollisionCheck?: boolean };

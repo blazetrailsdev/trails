@@ -181,6 +181,7 @@ export interface RailsCommandOptions extends RakeOptions {
   inline?: boolean;
 }
 
+/** @inventedArm rbFRequire — PERMANENT */
 export async function railsCommand(
   this: ActionsHost,
   command: string,

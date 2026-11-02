@@ -9,7 +9,13 @@ import {
   setEnv,
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
-import { assertEqual, assertMock, capture, Mock } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertMock,
+  assertNotCalled,
+  capture,
+  Mock,
+} from "@blazetrails/activesupport";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
@@ -208,7 +214,9 @@ describe("ActionsTest", () => {
   });
 
   it("rails_command with inline option", async () => {
-    await makeGen().railsCommand("generate model MyModel", { inline: true });
+    await assertNotCalled(testAdapter, "system", null, async () => {
+      await makeGen().railsCommand("generate model MyModel", { inline: true });
+    });
     await assertFile("app/models/my-model.js", /MyModel/);
   });
 
