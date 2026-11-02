@@ -102,7 +102,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  *
  * `mkdir_p` and `rm_rf` are `FileUtils` statics rather than adapter members:
  * the fs is async, so each one's port is ruby-compat's async spelling
- * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365,1327`).
+ * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365,1328`).
  */
 export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["exist?", ["existsSync", "exists"]],
