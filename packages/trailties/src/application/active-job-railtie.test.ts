@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { include } from "@blazetrails/ruby-compat";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
 
@@ -9,6 +10,7 @@ interface ActiveJobRailtieTest extends Generation {}
 class ActiveJobRailtieTest extends TestCase {}
 include(ActiveJobRailtieTest, Paths);
 include(ActiveJobRailtieTest, Generation);
+include(ActiveJobRailtieTest, Isolation);
 
 describe("ApplicationTests::ActiveJobRailtieTest", () => {
   let t: ActiveJobRailtieTest;

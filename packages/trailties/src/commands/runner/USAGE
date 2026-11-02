@@ -1,0 +1,11 @@
+Description:
+    The Trails `runner` allows running TypeScript code in the context of your application.
+
+Examples:
+    Run `console.log(Trails.env)` after loading the app:
+
+        <%= executable %> 'console.log(Trails.env)'
+
+    Run the TypeScript file located at `path/to/filename.ts` after loading the app:
+
+        <%= executable %> path/to/filename.ts

@@ -1,5 +1,5 @@
 import "../class-paths.runner.generated.js";
-import { File, TopLevel, exit, include, rbFLoad, stdin } from "@blazetrails/ruby-compat";
+import { File, TopLevel, exit, include, rbArgv, rbFLoad, stdin } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
@@ -26,6 +26,7 @@ export class RunnerCommand extends Base {
       desc: "Don't wrap with Rails Executor",
       default: false,
     });
+    klass.noCommands(() => klass.methodAdded("help"));
     klass.desc(
       "runner [<'Some.js(code)'> | <filename.ts> | -]",
       "Run TypeScript code in the context of your application",
@@ -33,15 +34,28 @@ export class RunnerCommand extends Base {
     klass.methodAdded("perform");
   }
 
+  async help(commandName: string | null = null, ..._rest: unknown[]): Promise<void> {
+    await (Base.prototype as unknown as { help(name: string | null): Promise<void> }).help.call(
+      this,
+      commandName,
+    );
+    if (commandName === "runner") {
+      const shell = this as unknown as { say(message: string): void };
+      shell.say("");
+      shell.say((await (this.constructor as typeof Base).classUsage())!);
+    }
+  }
+
   async perform(codeOrFile: string | null = null, ...commandArgv: string[]): Promise<void> {
-    void commandArgv;
     if (codeOrFile == null) {
-      await (this as unknown as { help(): unknown }).help();
+      await this.help();
       exit(1);
     }
 
     await this.bootApplicationBang();
     Trails.application!.loadRunner();
+
+    rbArgv().splice(0, rbArgv().length, ...commandArgv);
 
     const wrapWithExecutor = !this.options.skip_executor;
     if (codeOrFile === "-") {
