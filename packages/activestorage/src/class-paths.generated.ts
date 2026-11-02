@@ -57,9 +57,10 @@ import * as m54 from "./service/registry.js";
 import * as m55 from "./set-blob.js";
 import * as m56 from "./set-current.js";
 import * as m57 from "./transform-job.js";
-import * as m58 from "./variant-with-record.js";
-import * as m59 from "./variant.js";
-import * as m60 from "./variation.js";
+import * as m58 from "./variant-record.js";
+import * as m59 from "./variant-with-record.js";
+import * as m60 from "./variant.js";
+import * as m61 from "./variation.js";
 
 registerClassPaths([
   [() => m0.AnalyzeJob, "ActiveStorage::AnalyzeJob"],
@@ -130,8 +131,9 @@ registerClassPaths([
   [() => m57.TransformJob, "ActiveStorage::TransformJob"],
   [() => m33.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
   [() => m33.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
-  [() => m59.Variant, "ActiveStorage::Variant"],
-  [() => m58.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
-  [() => m60.Variation, "ActiveStorage::Variation"],
+  [() => m60.Variant, "ActiveStorage::Variant"],
+  [() => m58.VariantRecord, "ActiveStorage::VariantRecord"],
+  [() => m59.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
+  [() => m61.Variation, "ActiveStorage::Variation"],
   [() => m37.VERSION, "ActiveStorage::VERSION"],
 ]);

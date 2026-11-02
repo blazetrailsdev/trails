@@ -32,6 +32,7 @@ import { Filename } from "./filename.js";
 import { PurgeJob } from "./purge-job.js";
 import { Record } from "./record.js";
 import type { Service } from "./service.js";
+import "./variant-record.js";
 import type { VariantRecord } from "./variant-record.js";
 import type { One } from "./attached/one.js";
 import type { Registry } from "./service/registry.js";

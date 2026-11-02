@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { onLoad } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
 import { isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "./engine.js";
 import { Model } from "./attached/model.js";
+import { Blob } from "./blob.js";
+import { VariantRecord } from "./variant-record.js";
 import { ActiveRecordExtensions } from "./reflection.js";
 import { app } from "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
@@ -42,5 +45,16 @@ describe("ActiveStorage::Engine", () => {
       ActiveStorage.drawRoutes = true;
     }
     expect(routes.routes.length).toBe(before);
+  });
+
+  it("replays active_storage_reflection for a class loaded after the hook fired", () => {
+    const late = vi.fn();
+    onLoad("active_storage_reflection", late);
+    expect(late).toHaveBeenCalledOnce();
+  });
+
+  it("attaches previewImage and image with no service argument", () => {
+    expect(Blob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
+    expect(VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
   });
 });

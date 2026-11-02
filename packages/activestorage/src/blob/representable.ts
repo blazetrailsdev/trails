@@ -1,7 +1,8 @@
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, onLoad, type Extended } from "@blazetrails/activesupport";
 import { Marcel } from "@blazetrails/marcel";
 import { included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
+import type { ClassMethods } from "../attached/model.js";
 import type { Blob } from "../blob.js";
 import { InvariableError, UnpreviewableError, UnrepresentableError } from "../errors.js";
 import { PreviewImageJob } from "../preview-image-job.js";
@@ -132,6 +133,10 @@ Object.defineProperty(Representable, included, {
     });
     base.beforeDestroy(async (blob: Blob) => {
       if (ActiveStorage.trackVariants) await blob.variantRecords.destroyAll();
+    });
+
+    onLoad("active_storage_reflection", () => {
+      (base as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage");
     });
   },
 });

@@ -1,4 +1,9 @@
-import { onLoad, type Extended } from "@blazetrails/activesupport";
+import {
+  OrderedOptions,
+  InheritableOptions,
+  onLoad,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import { File, include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import "@blazetrails/trailties/trailties/action-controller";
@@ -6,16 +11,8 @@ import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
-import { Model, type ClassMethods } from "./attached/model.js";
-import { Blob } from "./blob.js";
+import { Model } from "./attached/model.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
-
-/** @noRailsEquivalent PERMANENT */
-function attachPreviewImage(this: typeof Blob): void {
-  (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage", {
-    service: () => null as never,
-  });
-}
 
 export class Engine extends TrailsEngine {
   static {
@@ -27,23 +24,24 @@ export class Engine extends TrailsEngine {
       with: File.join(import.meta.dirname, "config", `routes${File.extname(import.meta.filename)}`),
     });
 
+    const activeStorage = new OrderedOptions() as unknown as { [k: string]: unknown };
+    this.config.set("activeStorage", activeStorage);
+    activeStorage.paths = new OrderedOptions();
+    activeStorage.queues = new InheritableOptions();
+    activeStorage.precompileAssets = true;
+
     this.initializer("active_storage.attached", () => {
       onLoad("active_record", function (this: typeof Base) {
         include(this, Model);
       });
     });
 
-    this.initializer("active_storage.reflection", async () => {
+    this.initializer("active_storage.reflection", () => {
       onLoad("active_record", function (this: typeof Base) {
         include(this, ActiveRecordExtensions);
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
+        runLoadHooks("active_storage_reflection", Reflection);
       });
-      if ("hasOneAttached" in Blob) {
-        if (Blob.reflectOnAssociation("previewImageAttachment") == null) {
-          attachPreviewImage.call(Blob);
-        }
-        await import("./variant-record.js");
-      }
     });
   }
 }

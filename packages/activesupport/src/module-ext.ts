@@ -28,7 +28,7 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
 export function delegateMissingTo<T extends object>(
   this: T,
   target: string,
-  options: { allowNil?: boolean; prototypeLayer?: boolean } = {},
+  options: { allowNil?: boolean } = {},
 ): T {
   return Delegation.generateMethodMissing(this, target, options);
 }
