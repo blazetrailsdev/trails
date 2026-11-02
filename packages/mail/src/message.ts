@@ -1,6 +1,5 @@
 import {
   flatten,
-  isAsciiOnly,
   NoMethodError,
   rbObjAsString,
   rbObjId,
@@ -611,10 +610,10 @@ export class Message {
 
   addCharset(): void {
     if (!this.body().isEmpty()) {
-      if (this._defaultedCharset && !isAsciiOnly(this.body().rawSource) && !this.isAttachment()) {
-        warn(
-          "Non US-ASCII detected and no charset defined.\nDefaulting to UTF-8, set your own if this is incorrect.\n",
-        );
+      if (this._defaultedCharset && !this.body().isAsciiOnly() && !this.isAttachment()) {
+        const warning =
+          "Non US-ASCII detected and no charset defined.\nDefaulting to UTF-8, set your own if this is incorrect.\n";
+        warn(warning);
       }
       if (this._charset != null) {
         this.header().get("content_type").parameters().set("charset", this._charset);
