@@ -25,24 +25,24 @@ export class FieldList extends Array<Field> {
 
   addField(field: Field): this {
     if (field.isSingular()) {
-      this.replaceField(field);
+      return this.replaceField(field);
     } else {
-      this.insertField(field);
+      return this.insertField(field);
     }
-    return this;
   }
 
-  replaceField(field: Field): void {
+  replaceField(field: Field): this {
     const firstOffset = this.findIndex((f) => f.isResponsibleFor(field.name));
     if (firstOffset !== -1) {
       this.deleteField(field.name);
       this.splice(firstOffset, 0, field);
+      return this;
     } else {
-      this.insertField(field);
+      return this.insertField(field);
     }
   }
 
-  insertField(field: Field): void {
+  insertField(field: Field): this {
     let [lo, hi] = [0, this.length];
     while (lo < hi) {
       const mid = Math.floor((lo + hi) / 2);
@@ -54,12 +54,14 @@ export class FieldList extends Array<Field> {
     }
 
     this.splice(lo, 0, field);
+    return this;
   }
 
-  deleteField(name: unknown): void {
+  deleteField(name: unknown): this {
     for (let i = this.length - 1; i >= 0; i--) {
       if (this[i].isResponsibleFor(name)) this.splice(i, 1);
     }
+    return this;
   }
 
   summary(): string {

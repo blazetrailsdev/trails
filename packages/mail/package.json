@@ -10,6 +10,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./field": null,
+    "./field-list": null,
+    "./header": null,
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

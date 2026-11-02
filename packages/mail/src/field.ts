@@ -6,17 +6,21 @@ import {
   type Comparable,
   Encoding,
   forceEncoding,
+  PROTOCOL_PROBES,
   Range,
   rbFSend,
   rbInspect,
+  rbModName,
   rbObjAsString,
   rbObjDup,
   rbObjId,
   rbObjInstanceVariables,
+  rbObjIvarGet,
   rbObjRespondTo,
   rstrip,
   StandardError,
   strip,
+  stringSplit,
   warn,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
@@ -148,13 +152,11 @@ export class Field implements Comparable {
     return null;
   }
 
-  /** @internal */
   static split(rawField: string): [string, string] | string | null {
     try {
-      const index = rawField.indexOf(Constants.COLON);
-      if (index !== -1) {
-        const name = rstrip(rawField.slice(0, index));
-        const value = rawField.slice(index + 1);
+      if (rawField.includes(Constants.COLON)) {
+        const [first, value] = stringSplit(rawField, Constants.COLON, 2);
+        const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
           return [rstrip(name), strip(value)];
         } else {
@@ -175,7 +177,6 @@ export class Field implements Comparable {
     }
   }
 
-  /** @internal */
   static fieldClassFor(name: unknown): FieldClass | undefined {
     return Field.FIELDS_MAP[rbObjAsString(name).toLowerCase()];
   }
@@ -239,10 +240,11 @@ export class Field implements Comparable {
   }
 
   inspect(): string {
-    const ivars = rbObjInstanceVariables(this).map(
-      (ivar) => `${ivar}=${rbInspect(this[`_${ivar.slice(1)}` as keyof this])}`,
-    );
-    return `#<Mail::Field 0x${(BigInt(rbObjId(this)) * 2n).toString(16)} ${ivars.join(" ")}>`;
+    const ivars = rbObjInstanceVariables(this)
+      .filter((ivar) => rbObjIvarGet(this, ivar) != null || !/field/.test(ivar))
+      .map((ivar) => `${ivar.replace("@_", "@")}=${rbInspect(rbObjIvarGet(this, ivar))}`);
+    const id = (BigInt(rbObjId(this)) * 2n).toString(16);
+    return `#<${rbModName(this.constructor)} 0x${id} ${ivars.join(" ")}>`;
   }
 
   same(other: unknown): boolean {
@@ -323,7 +325,11 @@ Object.setPrototypeOf(
   Field.prototype,
   new Proxy(Object.create(Object.prototype) as object, {
     get(target, name, receiver: Field) {
-      if (typeof name !== "string" || !Object.hasOwn(receiver, "_field")) {
+      if (
+        typeof name !== "string" ||
+        PROTOCOL_PROBES.has(name) ||
+        !Object.hasOwn(receiver, "_field")
+      ) {
         return Reflect.get(target, name, receiver);
       }
       if (name in target || !receiver.respondToMissing(name, false)) return undefined;

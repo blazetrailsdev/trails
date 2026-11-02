@@ -1,5 +1,11 @@
 import { Hash } from "@blazetrails/ruby-compat";
 
+function isHash(value: unknown): boolean {
+  return (
+    value instanceof Map || (value != null && Object.getPrototypeOf(value) === Object.prototype)
+  );
+}
+
 export class IndifferentHash<V = unknown> extends Hash<string, V> {
   static newFromHashCopyingDefault<V>(hash: Hash<string, V>): IndifferentHash<V> {
     const newHash = new IndifferentHash<V>(hash);
@@ -9,7 +15,7 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
 
   constructor(constructor: unknown = {}) {
     super();
-    if (constructor instanceof Map || Object.getPrototypeOf(constructor) === Object.prototype) {
+    if (isHash(constructor)) {
       this.update(constructor as Map<string, V>);
     } else {
       this.setDefault(constructor as V);
@@ -72,8 +78,18 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
     return this.dup();
   }
 
+  symbolizeKeys(): Hash<string, V> {
+    return this.toHash();
+  }
+
   toOptionsBang(): this {
     return this;
+  }
+
+  override toHash(): Hash<string, V> {
+    const hash = new Hash<string, V>(this.default());
+    for (const [key, value] of this) hash.set(key, value);
+    return hash;
   }
 
   /** @internal */
@@ -87,6 +103,8 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
       return (this.constructor as typeof IndifferentHash).newFromHashCopyingDefault(
         value as Hash<string, unknown>,
       );
+    } else if (value != null && value.constructor === Object) {
+      return new (this.constructor as typeof IndifferentHash)(value);
     } else if (Array.isArray(value)) {
       return value.map((e) => this.convertValue(e));
     } else {

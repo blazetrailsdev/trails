@@ -3,6 +3,7 @@ import {
   Enumerable,
   type Hash,
   include,
+  type Included,
   NoMethodError,
   rbInspect,
   rbObjAsString,
@@ -68,8 +69,8 @@ export class Header {
       unfoldedFields = unfoldedFields.slice(0, (this.constructor as typeof Header).maximumAmount);
     }
 
-    for (const unfolded of unfoldedFields) {
-      const field = Field.parse(unfolded, this.charset);
+    for (let field of unfoldedFields as (string | Field | null)[]) {
+      field = Field.parse(field as string, this.charset);
       if (field != null) {
         this._fields.addField(field);
       }
@@ -105,7 +106,7 @@ export class Header {
           params = null;
         }
         const charset = params?.get("charset");
-        if (params != null && charset != null) this._charset = charset;
+        if (params != null && charset != null && charset !== false) this._charset = charset;
       }
     }
   }
@@ -181,7 +182,7 @@ export class Header {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Header {
+export interface Header extends Included<typeof Enumerable> {
   find(block: (field: Field) => unknown): Field | null;
 }
 include(Header, Enumerable);

@@ -59,22 +59,23 @@ import * as m56 from "./fields/subject-field.js";
 import * as m57 from "./fields/to-field.js";
 import * as m58 from "./fields/unstructured-field.js";
 import * as m59 from "./header.js";
-import * as m60 from "./multibyte.js";
-import * as m61 from "./multibyte/chars.js";
-import * as m62 from "./multibyte/unicode.js";
-import * as m63 from "./parser-tools.js";
-import * as m64 from "./parsers/address-lists-parser.js";
-import * as m65 from "./parsers/content-disposition-parser.js";
-import * as m66 from "./parsers/content-location-parser.js";
-import * as m67 from "./parsers/content-transfer-encoding-parser.js";
-import * as m68 from "./parsers/content-type-parser.js";
-import * as m69 from "./parsers/date-time-parser.js";
-import * as m70 from "./parsers/envelope-from-parser.js";
-import * as m71 from "./parsers/message-ids-parser.js";
-import * as m72 from "./parsers/mime-version-parser.js";
-import * as m73 from "./parsers/phrase-lists-parser.js";
-import * as m74 from "./parsers/received-parser.js";
-import * as m75 from "./utilities.js";
+import * as m60 from "./indifferent-hash.js";
+import * as m61 from "./multibyte.js";
+import * as m62 from "./multibyte/chars.js";
+import * as m63 from "./multibyte/unicode.js";
+import * as m64 from "./parser-tools.js";
+import * as m65 from "./parsers/address-lists-parser.js";
+import * as m66 from "./parsers/content-disposition-parser.js";
+import * as m67 from "./parsers/content-location-parser.js";
+import * as m68 from "./parsers/content-transfer-encoding-parser.js";
+import * as m69 from "./parsers/content-type-parser.js";
+import * as m70 from "./parsers/date-time-parser.js";
+import * as m71 from "./parsers/envelope-from-parser.js";
+import * as m72 from "./parsers/message-ids-parser.js";
+import * as m73 from "./parsers/mime-version-parser.js";
+import * as m74 from "./parsers/phrase-lists-parser.js";
+import * as m75 from "./parsers/received-parser.js";
+import * as m76 from "./utilities.js";
 
 registerClassPaths([
   [() => m2.Address, "Mail::Address"],
@@ -116,31 +117,32 @@ registerClassPaths([
   [() => m22.FieldList, "Mail::FieldList"],
   [() => m35.FromField, "Mail::FromField"],
   [() => m59.Header, "Mail::Header"],
+  [() => m60.IndifferentHash, "Mail::IndifferentHash"],
   [() => m36.InReplyToField, "Mail::InReplyToField"],
   [() => m37.KeywordsField, "Mail::KeywordsField"],
   [() => m38.MessageIdField, "Mail::MessageIdField"],
   [() => m9.MessageIdsElement, "Mail::MessageIdsElement"],
   [() => m10.MimeVersionElement, "Mail::MimeVersionElement"],
   [() => m39.MimeVersionField, "Mail::MimeVersionField"],
-  [() => m60.Multibyte, "Mail::Multibyte"],
-  [() => m61.Chars, "Mail::Multibyte::Chars"],
-  [() => m60.EncodingError, "Mail::Multibyte::EncodingError"],
-  [() => m62.Unicode, "Mail::Multibyte::Unicode"],
+  [() => m61.Multibyte, "Mail::Multibyte"],
+  [() => m62.Chars, "Mail::Multibyte::Chars"],
+  [() => m61.EncodingError, "Mail::Multibyte::EncodingError"],
+  [() => m63.Unicode, "Mail::Multibyte::Unicode"],
   [() => m40.NamedStructuredField, "Mail::NamedStructuredField"],
   [() => m41.NamedUnstructuredField, "Mail::NamedUnstructuredField"],
   [() => m42.OptionalField, "Mail::OptionalField"],
-  [() => m64.AddressListsParser, "Mail::Parsers::AddressListsParser"],
-  [() => m65.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
-  [() => m66.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
-  [() => m67.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
-  [() => m68.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
-  [() => m69.DateTimeParser, "Mail::Parsers::DateTimeParser"],
-  [() => m70.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
-  [() => m71.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
-  [() => m72.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
-  [() => m73.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
-  [() => m74.ReceivedParser, "Mail::Parsers::ReceivedParser"],
-  [() => m63.ParserTools, "Mail::ParserTools"],
+  [() => m65.AddressListsParser, "Mail::Parsers::AddressListsParser"],
+  [() => m66.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
+  [() => m67.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
+  [() => m68.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
+  [() => m69.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
+  [() => m70.DateTimeParser, "Mail::Parsers::DateTimeParser"],
+  [() => m71.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
+  [() => m72.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
+  [() => m73.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
+  [() => m74.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
+  [() => m75.ReceivedParser, "Mail::Parsers::ReceivedParser"],
+  [() => m64.ParserTools, "Mail::ParserTools"],
   [() => m11.PhraseList, "Mail::PhraseList"],
   [() => m12.ReceivedElement, "Mail::ReceivedElement"],
   [() => m43.ReceivedField, "Mail::ReceivedField"],
@@ -160,5 +162,5 @@ registerClassPaths([
   [() => m57.ToField, "Mail::ToField"],
   [() => m13.UnknownEncodingType, "Mail::UnknownEncodingType"],
   [() => m58.UnstructuredField, "Mail::UnstructuredField"],
-  [() => m75.Utilities, "Mail::Utilities"],
+  [() => m76.Utilities, "Mail::Utilities"],
 ]);
