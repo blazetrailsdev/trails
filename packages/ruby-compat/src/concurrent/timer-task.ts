@@ -1,7 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { constSet } from "../include.js";
 import { ScheduledTask } from "../scheduled-task.js";
-import { Thread } from "../thread.js";
 import { globalIoExecutor } from "../thread-pool-executor.js";
 import { Concurrent } from "./map.js";
 
@@ -21,8 +20,9 @@ type Executor = { post(task: () => unknown): unknown };
  * that called {@link execute}. `ScheduledTask`'s wait stands in for the timer
  * thread's `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`).
  * `ScheduledTask` posts a delay of 0.01 or less at once, and a pool hands off
- * through microtasks, which preempt nothing, so each run ends in `Thread.pass`
- * where Ruby's scheduler preempts the thread.
+ * through microtasks, which preempt nothing, so each run ends in an unref'd
+ * macrotask where Ruby's scheduler preempts the thread. Like the wait, it does
+ * not hold the process open.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -116,7 +116,10 @@ export class TimerTask {
       .catch(() => null);
     await this._inFlight;
     this._inFlight = null;
-    await Thread.pass();
+    await new Promise((resolve) => {
+      const timer: unknown = setTimeout(resolve, 0);
+      (timer as { unref?: () => unknown }).unref?.();
+    });
     if (this._running && generation === this._generation) this._scheduleNextTask();
   }
 }
