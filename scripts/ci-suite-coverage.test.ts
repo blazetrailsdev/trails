@@ -1554,6 +1554,12 @@ describe("CI runs every tooling test suite", () => {
             undeclared.push(`${dir} -> ${name}`);
         }
       }
+      const { stdout: relative } = await execFileAsync(
+        "git",
+        ["grep", "-lE", "from [\"'](\\.\\./)+[a-z0-9-]+/src/", "--", ...new Set(dirs)],
+        { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
+      ).catch(() => ({ stdout: "" }));
+      expect(relative).toBe("");
       expect(undeclared).toEqual([]);
     },
   );
