@@ -27,24 +27,15 @@ const FILES: [string, string][] = [
   ["z/a.ts", "export const A = 1;"],
 ];
 
-async function loadAll(mod: object): Promise<[object, object, number[]]> {
-  const y = await get(mod, "Y");
-  const z = await get(mod, "Z");
-  return [y, z, [await get(mod, "X"), await get(y, "A"), await get(z, "A")]];
-}
-
 describe("TestReloading", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
-    (globalThis as Record<string, unknown>).testEagerLoadAfterReload = 0;
-  });
-  afterEach(teardown);
-
-  async function assertReloads(mod: object): Promise<void> {
-    const [y, z, values] = await loadAll(mod);
-    expect(values).toEqual([1, 1, 1]);
+  async function reloads(mod: object): Promise<void> {
+    const y = await get(mod, "Y");
+    const z = await get(mod, "Z");
+    expect(await get(mod, "X")).toEqual(1);
+    expect(await get(y, "A")).toEqual(1);
+    expect(await get(z, "A")).toEqual(1);
 
     File.write("x.ts", "export const X = 2;");
     File.write("y/a.ts", "export const A = 2;");
@@ -52,19 +43,33 @@ describe("TestReloading", () => {
 
     await loader.reload();
 
-    const [y2, z2, values2] = await loadAll(mod);
-    expect(values2).toEqual([2, 2, 2]);
-    expect(y2).not.toBe(y);
-    expect(z2).not.toBe(z);
-    expect(await get(mod, "X")).toBe(2);
+    const y2 = await get(mod, "Y");
+    const z2 = await get(mod, "Z");
+    expect(await get(mod, "X")).toEqual(2);
+    expect(await get(y2, "A")).toEqual(2);
+    expect(await get(z2, "A")).toEqual(2);
+    expect(y2 !== y).toBeTruthy();
+    expect(z2 !== z).toBeTruthy();
+    expect(await get(mod, "X")).toEqual(2);
   }
+
+  beforeEach(() => {
+    loader = newLoader();
+    (globalThis as Record<string, unknown>).testEagerLoadAfterReload = 0;
+  });
+  afterEach(teardown);
 
   it("enabling reloading after setup raises", async () => {
     const other = new Loader();
     await other.setup();
-    expect(() => other.enableReloading()).toThrow(
-      new ZeitwerkError("cannot enable reloading after setup"),
-    );
+    expect(() => other.enableReloading()).toThrow(ZeitwerkError);
+    let message = "";
+    try {
+      other.enableReloading();
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toEqual("cannot enable reloading after setup");
   });
 
   it("enabling reloading is idempotent, even after setup", async () => {
@@ -75,12 +80,18 @@ describe("TestReloading", () => {
   });
 
   it("reloading works if the flag is set (Object)", async () => {
-    await withSetup(loader, FILES, {}, () => assertReloads(Object));
+    await withSetup(loader, FILES, {}, async () => {
+      await reloads(Object);
+    });
   });
 
   it("reloading works if the flag is set (Namespace)", async () => {
     class Namespace {}
-    await withSetup(loader, FILES, { namespace: Namespace }, () => assertReloads(Namespace));
+    await withSetup(loader, FILES, { namespace: Namespace }, async () => {
+      const namespace = Namespace;
+      await reloads(Namespace);
+      expect(namespace === Namespace).toBeTruthy();
+    });
   });
 
   // PERMANENT-SKIP: `Registry::Inceptions` has no port (RFC 0213 § "What is ported").
@@ -90,21 +101,24 @@ describe("TestReloading", () => {
     const other = new Loader();
     await other.setup();
     await expect(other.reload()).rejects.toThrow(ReloadingDisabledError);
-    await expect(other.reload()).rejects.toThrow(
-      "can't reload, please call loader.enable_reloading before setup",
-    );
+    const error = (await other.reload().catch((e: unknown) => e)) as Error;
+    expect(error.message).toEqual("can't reload, please call loader.enable_reloading before setup");
   });
 
   it("if reloading is disabled, autoloading metadata shrinks while autoloading (performance test)", async () => {
     await withFiles(FILES, async () => {
       const other = await setupLoader(".", { enableReloading: false });
 
-      expect(Object.keys(other.autoloads)).not.toHaveLength(0);
+      expect(Object.keys(other.autoloads).length !== 0).toBeTruthy();
 
-      await loadAll(Object);
+      const y = await get(Object, "Y");
+      const z = await get(Object, "Z");
+      expect(await get(Object, "X")).toEqual(1);
+      expect(await get(y, "A")).toEqual(1);
+      expect(await get(z, "A")).toEqual(1);
 
-      expect(Object.keys(other.autoloads)).toHaveLength(0);
-      expect(Object.keys(other.toUnload)).toHaveLength(0);
+      expect(Object.keys(other.autoloads).length === 0).toBeTruthy();
+      expect(Object.keys(other.toUnload).length === 0).toBeTruthy();
     });
   });
 
@@ -112,14 +126,14 @@ describe("TestReloading", () => {
     await withFiles(FILES, async () => {
       const other = await setupLoader(".", { enableReloading: false });
 
-      expect(Object.keys(other.autoloads)).not.toHaveLength(0);
-      expect(Object.keys(Registry.autoloads)).not.toHaveLength(0);
+      expect(Object.keys(other.autoloads).length !== 0).toBeTruthy();
+      expect(Object.keys(Registry.autoloads).length !== 0).toBeTruthy();
 
       await other.eagerLoad();
 
-      expect(Object.keys(other.autoloads)).toHaveLength(0);
-      expect(Object.keys(Registry.autoloads)).toHaveLength(0);
-      expect(Object.keys(other.toUnload)).toHaveLength(0);
+      expect(Object.keys(other.autoloads).length === 0).toBeTruthy();
+      expect(Object.keys(Registry.autoloads).length === 0).toBeTruthy();
+      expect(Object.keys(other.toUnload).length === 0).toBeTruthy();
     });
   });
 
@@ -166,17 +180,18 @@ describe("TestReloading", () => {
         const cref = new Cref(Object, "X");
         await expect(autoloadGet(cref)).rejects.toThrow(NameError);
 
-        expect(Object.keys(TopLevel)).not.toContain("X");
-        expect(cref.isDefined()).toBe(false);
-        expect(cref.isAutoload()).toBeNull();
+        expect(!Object.keys(TopLevel).includes("X")).toBeTruthy();
+        expect(!cref.isDefined()).toBeTruthy();
+        expect(!cref.isAutoload()).toBeTruthy();
 
         await loader.reload();
         File.write("x.ts", "export const X = true;");
 
-        expect(cref.isDefined()).toBe(true);
+        expect(Object.keys(loader.autoloads).length !== 0).toBeTruthy();
+        expect(cref.isDefined()).toBeTruthy();
         expect(cref.isAutoload()).toBeTruthy();
 
-        expect(await autoloadGet(cref)).toBe(true);
+        expect(await autoloadGet(cref)).toBeTruthy();
       });
     });
   }

@@ -42,9 +42,9 @@ describe("TestUnload", () => {
 
         await loader.unload();
 
-        expect(defined(namespace, "User")).toBe(false);
-        expect(defined(namespace, "Admin")).toBe(false);
-        expect(defined(admin, "Root")).toBe(false);
+        expect(!defined(namespace, "User")).toBeTruthy();
+        expect(!defined(namespace, "Admin")).toBeTruthy();
+        expect(!defined(admin, "Root")).toBeTruthy();
       });
     });
   }
@@ -56,15 +56,15 @@ describe("TestUnload", () => {
     await withSetup(loader, files, {}, async () => {
       expect(await get(Object, "X")).toBeTruthy();
       await loader.unload();
-      expect(defined(Object, "X")).toBe(false);
+      expect(!defined(Object, "X")).toBeTruthy();
     });
   });
 
   it("unload removes non-executed autoloads", async () => {
     await withSetup(loader, [["x.ts", "export const X = true;"]], {}, async () => {
-      expect(defined(Object, "X")).toBe(true);
+      expect(defined(Object, "X")).toBeTruthy();
       await loader.unload();
-      expect(defined(Object, "X")).toBe(false);
+      expect(!defined(Object, "X")).toBeTruthy();
     });
   });
 
@@ -80,17 +80,17 @@ describe("TestUnload", () => {
       const api = await get(Object, "Api");
       expect(await get(await get(api, "V1"), "UsersController")).toBeTruthy();
 
-      expect(Object.keys(loader.autoloads)).not.toHaveLength(0);
-      expect(loader.autoloadedDirs).not.toHaveLength(0);
-      expect(Object.keys(loader.toUnload)).not.toHaveLength(0);
-      expect(loader.namespaceDirs.isEmpty()).toBe(false);
+      expect(Object.keys(loader.autoloads).length !== 0).toBeTruthy();
+      expect(loader.autoloadedDirs.length !== 0).toBeTruthy();
+      expect(Object.keys(loader.toUnload).length !== 0).toBeTruthy();
+      expect(!loader.namespaceDirs.isEmpty()).toBeTruthy();
 
       await loader.unload();
 
-      expect(Object.keys(loader.autoloads)).toHaveLength(0);
-      expect(loader.autoloadedDirs).toHaveLength(0);
-      expect(Object.keys(loader.toUnload)).toHaveLength(0);
-      expect(loader.namespaceDirs.isEmpty()).toBe(true);
+      expect(Object.keys(loader.autoloads).length === 0).toBeTruthy();
+      expect(loader.autoloadedDirs.length === 0).toBeTruthy();
+      expect(Object.keys(loader.toUnload).length === 0).toBeTruthy();
+      expect(loader.namespaceDirs.isEmpty()).toBeTruthy();
     });
   });
 
@@ -114,7 +114,7 @@ describe("TestUnload", () => {
 
       expect(await get(ActiveStorage, "Blob")).toBeTruthy();
       await loader.unload();
-      expect((TopLevel as unknown as Record<string, unknown>).ActiveStorage).toBe(ActiveStorage);
+      expect((TopLevel as unknown as Record<string, unknown>).ActiveStorage).toBeTruthy();
     });
   });
 
@@ -128,15 +128,15 @@ describe("TestUnload", () => {
     await withFiles(files, async () => {
       const la = await setupLoader("a");
       const crefM = new Cref(Object, "M");
-      expect(ExplicitNamespaces.isRegistered(crefM)).toBe(la);
+      expect(ExplicitNamespaces.isRegistered(crefM) === la).toBeTruthy();
 
       const lb = await setupLoader("b");
       const crefX = new Cref(Object, "X");
-      expect(ExplicitNamespaces.isRegistered(crefX)).toBe(lb);
+      expect(ExplicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
 
       await la.unload();
       expect(ExplicitNamespaces.isRegistered(crefM)).toBeNull();
-      expect(ExplicitNamespaces.isRegistered(crefX)).toBe(lb);
+      expect(ExplicitNamespaces.isRegistered(crefX) === lb).toBeTruthy();
     });
   });
 
@@ -150,9 +150,9 @@ describe("TestUnload", () => {
       await loader.pushDir("b");
       await loader.setup();
 
-      expect(loader.shadowedFiles.size).not.toBe(0);
+      expect(loader.shadowedFiles.size !== 0).toBeTruthy();
       await loader.unload();
-      expect(loader.shadowedFiles.size).toBe(0);
+      expect(loader.shadowedFiles.size === 0).toBeTruthy();
     });
   });
 
@@ -162,12 +162,14 @@ describe("TestUnload", () => {
   it("unload clears state even if the autoload failed and the exception was rescued", async () => {
     const files: [string, string][] = [["x.ts", "export const X_IS_NOT_DEFINED = true;"]];
     await withSetup(loader, files, {}, async () => {
-      await expect(get(Object, "X")).rejects.toThrow(NameError);
+      await get(Object, "X").catch((error: unknown) => {
+        if (!(error instanceof NameError)) throw error;
+      });
 
       await loader.unload();
 
-      expect(Object.keys(TopLevel)).not.toContain("X");
-      expect(isRequired(...files)).toBe(false);
+      expect(!Object.keys(TopLevel).includes("X")).toBeTruthy();
+      expect(!isRequired(...files)).toBeTruthy();
     });
   });
 

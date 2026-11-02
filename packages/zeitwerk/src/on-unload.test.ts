@@ -54,7 +54,7 @@ describe("TestOnUnload", () => {
       expect(await x()).toBeTruthy();
       await loader.reload();
 
-      expect(onUnloadForY).toBeFalsy();
+      expect(!onUnloadForY).toBeTruthy();
     });
   });
 
@@ -126,7 +126,7 @@ describe("TestOnUnload", () => {
         rbModRemoveConst(Object, "X");
         await loader.reload();
 
-        expect(onUnloadForX).toBeFalsy();
+        expect(!onUnloadForX).toBeTruthy();
       });
     });
 
@@ -138,7 +138,7 @@ describe("TestOnUnload", () => {
         await expect(x()).rejects.toThrow(NameError);
         await loader.reload();
 
-        expect(onUnloadForX).toBeFalsy();
+        expect(!onUnloadForX).toBeTruthy();
       });
     });
 
