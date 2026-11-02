@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Rake } from "@blazetrails/rake";
 import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
 
-describe("ApplicationTests::RakeTests::LogTest", () => {
+describe("LogTest", () => {
   const originalCwd = Dir.pwd();
   let appPath: string;
 

@@ -9,7 +9,7 @@ async function tmpClear(): Promise<void> {
   });
 }
 
-describe("ApplicationTests::RakeTests::TmpTest", () => {
+describe("TmpTest", () => {
   const originalCwd = Dir.pwd();
   let appPath: string;
 
@@ -38,10 +38,10 @@ describe("ApplicationTests::RakeTests::TmpTest", () => {
 
     await tmpClear();
 
-    expect(File.isExist("tmp/cache/cache_file")).toBe(false);
-    expect(File.isExist("tmp/sockets/socket_file")).toBe(false);
-    expect(File.isExist("tmp/screenshots/fail.png")).toBe(false);
-    expect(File.isExist("tmp/storage/6h/np/6hnp81jvgt42pcfqtlpoy8qshfb0")).toBe(false);
+    expect(File.isExist("tmp/cache/cache_file")).toBeFalsy();
+    expect(File.isExist("tmp/sockets/socket_file")).toBeFalsy();
+    expect(File.isExist("tmp/screenshots/fail.png")).toBeFalsy();
+    expect(File.isExist("tmp/storage/6h/np/6hnp81jvgt42pcfqtlpoy8qshfb0")).toBeFalsy();
   });
 
   it("tmp:clear should work if folder missing", async () => {

@@ -3,7 +3,7 @@ import { Rake } from "@blazetrails/rake";
 import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 
-describe("ApplicationTests::RakeTest", () => {
+describe("RakeTest", () => {
   let appPath: string;
 
   beforeEach(() => {
@@ -21,9 +21,9 @@ describe("ApplicationTests::RakeTest", () => {
       await rbFLoad(File.join(import.meta.dirname, "../tasks/framework.ts"));
       await rake.lookup("app:templates:copy")!.invoke();
     });
-    expect(File.isExist(File.join(appPath, "lib", "templates", "tse", "controller"))).toBe(true);
+    expect(File.isExist(File.join(appPath, "lib", "templates", "tse", "controller"))).toBeTruthy();
     for (const dir of ["controller", "helper", "scaffold-controller"]) {
-      expect(File.isExist(File.join(appPath, "lib", "templates", "rails", dir))).toBe(true);
+      expect(File.isExist(File.join(appPath, "lib", "templates", "rails", dir))).toBeTruthy();
     }
   });
 });
