@@ -73,10 +73,7 @@ export class RakeCommand extends Base {
     return result!;
   }
 
-  /**
-   * @internal
-   * @inventedArm findRakefileLocation — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
-   */
+  /** @internal */
   private static async rakeTasks(): Promise<RakeApplication["tasks"]> {
     if ((await Rake.application!.findRakefileLocation()) == null) return [];
     return (this._rakeTasks ??= await this.withRake([], (rake) => rake.tasks));

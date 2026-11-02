@@ -96,6 +96,7 @@ export interface GeneratorBase extends Invocation, GeneratorActionsState {
   sayStatus: ShellHost["sayStatus"];
   template(source: string, ...args: unknown[]): Promise<unknown>;
   removeFile(path: string, ...args: unknown[]): Promise<unknown>;
+  removeDir(path: string, ...args: unknown[]): Promise<unknown>;
 }
 
 export abstract class GeneratorBase extends (Group as unknown as (abstract new (

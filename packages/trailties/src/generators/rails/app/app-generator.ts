@@ -809,7 +809,7 @@ process.exit(status ?? 1);
    * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
    * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
    * @missingRailsCall inside — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsArgs template — PERMANENT
    */
   async config(): Promise<void> {
     const name = File.basename(this.appPath);
@@ -1762,6 +1762,7 @@ export class AppGenerator extends AppBase {
     }
   }
 
+  /** @missingRailsArgs remove_file — PERMANENT */
   async deleteAppViewsIfApiOption(): Promise<void> {
     if (this.options.api) {
       if (this.options.skipActionMailer) {

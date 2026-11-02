@@ -177,11 +177,7 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
   }
 }
 
-/**
- * @internal
- * @inventedArm findRakefileLocation — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
- * @inventedArm parseAsync — CONVERGEABLE port-help-and-version-commands-for-split-namespace
- */
+/** @internal */
 async function invokeRake(
   task: string,
   args: string[],
