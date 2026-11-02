@@ -1,3 +1,4 @@
+import { Loader } from "./loader.js";
 import "./class-paths.generated.js";
 
 export { GemInflector } from "./gem-inflector.js";
@@ -15,3 +16,12 @@ export {
   type Manifest,
   type ManifestRow,
 } from "./loader/manifest.js";
+
+export async function withLoader(block: (loader: Loader) => unknown): Promise<void> {
+  const loader = new Loader();
+  try {
+    await block(loader);
+  } finally {
+    loader.unregister();
+  }
+}

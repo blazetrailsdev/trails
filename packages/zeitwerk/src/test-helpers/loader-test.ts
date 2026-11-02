@@ -1,8 +1,17 @@
 import { expect } from "vitest";
 import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
+import { autoloadGet } from "../core-ext/kernel.js";
+import { Cref } from "../cref.js";
 import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
+
+export const get = (mod: object, cname: string) =>
+  autoloadGet(new Cref(mod, cname)) as Promise<never>;
+
+declare global {
+  var $get: ((cname: string) => Promise<never>) | undefined;
+}
 
 export interface Constants {
   [cname: string]: Constants;
@@ -51,6 +60,7 @@ export async function withFiles(files: [string, string?][], block: () => unknown
   const pwd = Dir.pwd();
   const tmp = Dir.mktmpdir("zeitwerk");
   Dir.chdir(tmp);
+  globalThis.$get = (cname) => get(Object, cname);
   try {
     for (const [fname, contents] of files) {
       FileUtils.mkdirP(File.dirname(fname));
@@ -58,6 +68,7 @@ export async function withFiles(files: [string, string?][], block: () => unknown
     }
     await block();
   } finally {
+    globalThis.$get = undefined;
     Dir.chdir(pwd);
     FileUtils.rmRf(tmp);
   }
