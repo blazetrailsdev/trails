@@ -55,6 +55,12 @@ const GATE_INPUTS: Record<string, string[]> = {
 
 const SKIP_DIRS = new Set(["node_modules", "dist", ".git"]);
 
+/** `git grep` exits 1 for no match; anything else is a real failure. */
+function noGrepMatch(err: { code?: number }): { stdout: string } {
+  if (err.code === 1) return { stdout: "" };
+  throw err;
+}
+
 async function collectTestFiles(dir: string, acc: string[]): Promise<string[]> {
   let entries;
   try {
@@ -1550,7 +1556,7 @@ describe("CI runs every tooling test suite", () => {
           "git",
           ["grep", "-hoE", "(from |import\\(|^import )[\"']@blazetrails/[a-z0-9-]+", "--", dir],
           { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
-        ).catch(() => ({ stdout: "" }));
+        ).catch(noGrepMatch);
         for (const name of new Set(stdout.split("\n").map((l) => l.replace(/^.*["']/, "")))) {
           if (name && name !== pkg.name && !declared.has(name))
             undeclared.push(`${dir} -> ${name}`);
@@ -1558,9 +1564,15 @@ describe("CI runs every tooling test suite", () => {
       }
       const { stdout: relative } = await execFileAsync(
         "git",
-        ["grep", "-lE", "from [\"'](\\.\\./)+[a-z0-9-]+/src/", "--", ...new Set(dirs)],
+        [
+          "grep",
+          "-lE",
+          "(from |import\\(|require\\()[\"'](\\.\\./)+\\.\\./[a-z0-9-]+/(src|dist)/",
+          "--",
+          ...new Set(dirs),
+        ],
         { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
-      ).catch(() => ({ stdout: "" }));
+      ).catch(noGrepMatch);
       expect(relative).toBe("");
       expect(undeclared).toEqual([]);
     },
