@@ -202,7 +202,6 @@ export class Body {
     return this.isAsciiOnly() ? "7bit" : "8bit";
   }
 
-  /** @noRailsEquivalent PERMANENT */
   private _decodedText(): string {
     const decoded = this.decoded();
     return typeof decoded === "string" ? decoded : new TextDecoder().decode(decoded);
