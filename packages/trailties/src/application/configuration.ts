@@ -100,6 +100,8 @@ export class Configuration extends EngineConfiguration {
   eagerLoad: boolean | null = null;
   addAutoloadPathsToLoadPath = true;
   rakeEagerLoad = false;
+  /** @noRailsEquivalent CONVERGEABLE zeitwerk-check-name-error-reaches-task-abort */
+  deferBootEagerLoad = false;
   serverTiming = false;
   domTestingDefaultHtmlVersion = ":html4";
   private _contentSecurityPolicy: ContentSecurityPolicy | null = null;

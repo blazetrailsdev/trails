@@ -1,3 +1,4 @@
+import "../class-paths.rake.generated.js";
 import { Rake, TaskManager, type Application as RakeApplication } from "@blazetrails/rake";
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";

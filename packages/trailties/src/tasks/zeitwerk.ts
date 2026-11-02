@@ -21,9 +21,16 @@ in config/application.rb and run zeitwerk:check again.
 };
 
 DSL.namespace("zeitwerk", () => {
+  DSL.task(
+    "defer_boot_eager_load",
+    block(() => {
+      Trails.application!.config.deferBootEagerLoad = true;
+    }),
+  );
+
   DSL.desc("Check project structure for Zeitwerk compatibility");
   DSL.task(
-    { check: "environment" },
+    { check: ["defer_boot_eager_load", "environment"] },
     block(async () => {
       STDOUT.puts("Hold on, I am eager loading the application.");
 

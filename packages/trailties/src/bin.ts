@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import "@blazetrails/activesupport/node";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
-import { Dir, argv } from "@blazetrails/ruby-compat";
+import { Dir, SystemExit, argv, setExitCode } from "@blazetrails/ruby-compat";
 import { APP_PATH, setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
 import { aliases } from "./commands.js";
@@ -23,4 +23,9 @@ if (APP_PATH == null) {
 }
 
 const [, , command = "", ...args] = argv;
-await invoke(Object.hasOwn(aliases, command) ? aliases[command] : command, args);
+try {
+  await invoke(Object.hasOwn(aliases, command) ? aliases[command] : command, args);
+} catch (error) {
+  if (!(error instanceof SystemExit)) throw error;
+  setExitCode(error.status);
+}
