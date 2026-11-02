@@ -1,0 +1,96 @@
+import { Hash } from "@blazetrails/ruby-compat";
+
+export class IndifferentHash<V = unknown> extends Hash<string, V> {
+  static newFromHashCopyingDefault<V>(hash: Hash<string, V>): IndifferentHash<V> {
+    const newHash = new IndifferentHash<V>(hash);
+    newHash.setDefault(hash.default());
+    return newHash;
+  }
+
+  constructor(constructor: unknown = {}) {
+    super();
+    if (constructor instanceof Map || Object.getPrototypeOf(constructor) === Object.prototype) {
+      this.update(constructor as Map<string, V>);
+    } else {
+      this.setDefault(constructor as V);
+    }
+  }
+
+  override set(key: string, value: V): this {
+    return this.regularWriter(this.convertKey(key), this.convertValue(value) as V);
+  }
+
+  regularWriter(key: string, value: V): this {
+    return super.set(key, value);
+  }
+
+  store(key: string, value: V): this {
+    return this.set(key, value);
+  }
+
+  update(otherHash: Map<string, V> | Record<string, V>): this {
+    const pairs = otherHash instanceof Map ? otherHash : Object.entries(otherHash);
+    for (const [key, value] of pairs) {
+      this.regularWriter(this.convertKey(key), this.convertValue(value) as V);
+    }
+    return this;
+  }
+
+  mergeBang(otherHash: Map<string, V> | Record<string, V>): this {
+    return this.update(otherHash);
+  }
+
+  isKey(key: string): boolean {
+    return super.has(this.convertKey(key));
+  }
+
+  valuesAt(...indices: string[]): (V | undefined)[] {
+    return indices.map((key) => this.get(this.convertKey(key)));
+  }
+
+  dup(): IndifferentHash<V> {
+    return new IndifferentHash<V>(this);
+  }
+
+  override merge(hash: object): IndifferentHash<V> {
+    return this.dup().update(hash as Record<string, V>);
+  }
+
+  reverseMerge(otherHash: Hash<string, V>): IndifferentHash<V> {
+    return IndifferentHash.newFromHashCopyingDefault(otherHash).update(this);
+  }
+
+  reverseMergeBang(otherHash: Hash<string, V>): this {
+    return this.replace(this.reverseMerge(otherHash));
+  }
+
+  stringifyKeysBang(): this {
+    return this;
+  }
+
+  stringifyKeys(): IndifferentHash<V> {
+    return this.dup();
+  }
+
+  toOptionsBang(): this {
+    return this;
+  }
+
+  /** @internal */
+  protected convertKey(key: string): string {
+    return key;
+  }
+
+  /** @internal */
+  protected convertValue(value: unknown): unknown {
+    if (value != null && value.constructor === Hash) {
+      return (this.constructor as typeof IndifferentHash).newFromHashCopyingDefault(
+        value as Hash<string, unknown>,
+      );
+    } else if (Array.isArray(value)) {
+      return value.map((e) => this.convertValue(e));
+    } else {
+      return value;
+    }
+  }
+}

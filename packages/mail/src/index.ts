@@ -12,6 +12,7 @@ export { Utilities } from "./utilities.js";
 export { Field } from "./field.js";
 export { FieldList } from "./field-list.js";
 export { Header } from "./header.js";
+export { IndifferentHash } from "./indifferent-hash.js";
 export { ParserTools } from "./parser-tools.js";
 export { AddressListsParser } from "./parsers/address-lists-parser.js";
 export { ContentDispositionParser } from "./parsers/content-disposition-parser.js";

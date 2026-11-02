@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DateTimeElement, SubjectField } from "./index.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ContentTransferEncodingField, Field, OptionalField, ToField } from "./index.js";
 
@@ -49,6 +50,47 @@ describe("Mail::Field", () => {
 
     it('should say it is not the "same" as nil', () => {
       expect(new Field("To", "mikel").same(null)).toBe(false);
+    });
+  });
+
+  describe("user defined fields", () => {
+    it('should say it is the "same" as another if their field names match', () => {
+      expect(new Field("X-Foo", "mikel").same(new Field("X-Foo", "bob"))).toBe(true);
+    });
+
+    it("should say it is not == to another if their field names do not match", () => {
+      expect(new Field("X-Foo", "mikel").equals(new Field("X-Bar", "bob"))).toBe(false);
+    });
+  });
+
+  describe("passing an encoding", () => {
+    it("should allow you to send in unencoded strings to fields and encode them", () => {
+      const subject = new SubjectField("This is あ string", "utf-8");
+      expect(subject.encoded()).toEqual("Subject: =?UTF-8?Q?This_is_=E3=81=82_string?=\r\n");
+      expect(subject.decoded()).toEqual("This is あ string");
+    });
+
+    it("should allow an encoded value in the Subject field and decode it automatically (issue 44)", () => {
+      expect(new SubjectField("=?ISO-8859-1?Q?2_=FAlt?=", "utf-8").decoded()).toEqual("2 últ");
+    });
+
+    it("should allow you to encoded text in the middle (issue 44)", () => {
+      expect(new SubjectField("ma=?ISO-8859-1?Q?=F1ana?=", "utf-8").decoded()).toEqual("mañana");
+    });
+  });
+
+  describe("Mail::Field::ParseError", () => {
+    it("should be structured", () => {
+      let error: InstanceType<typeof Field.ParseError> | null = null;
+      try {
+        new DateTimeElement("invalid");
+      } catch (e) {
+        error = e as InstanceType<typeof Field.ParseError>;
+      }
+      expect(error).not.toBeNull();
+      expect(error!.element).toBe(DateTimeElement);
+      expect(error!.value).toEqual("invalid");
+      expect(error!.reason).not.toBeNull();
     });
   });
 });

@@ -256,6 +256,7 @@ export class Field implements Comparable {
     return this.same(other) && Utilities.matchToS((other as Field).value, this.value);
   }
 
+  /** @missingRailsArgs casecmp — PERMANENT */
   isResponsibleFor(fieldName: unknown): boolean {
     return casecmp(rbObjAsString(this.name), rbObjAsString(fieldName)) === 0;
   }
