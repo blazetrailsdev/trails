@@ -256,7 +256,7 @@ function validateGlobalServiceConfiguration(modelClass: typeof Base): void {
     | undefined;
   if (
     modelClass.isConnected() &&
-    Blob.connectionPool().schemaCache.getCachedDataSourceExists(Blob.tableName!) !== false &&
+    Blob.connectionPool().schemaCache.getCachedDataSourceExists(Blob.tableName!) === true &&
     trails!.configuration.activeStorage?.service == null
   ) {
     throw new RuntimeError(
