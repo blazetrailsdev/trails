@@ -12,6 +12,7 @@ import { Trailtie as ActionDispatchTrailtie } from "./trailties/action-dispatch.
 import { Trailtie as ActiveSupportTrailtie } from "./trailties/active-support.js";
 
 const baseConfig = (): BootstrapConfig => ({
+  root: null,
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,

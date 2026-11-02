@@ -48,6 +48,7 @@ class TestApp extends Finisher {
     },
   };
   config: FinisherConfig = {
+    root: null,
     allowConcurrency: null,
     toPrepareBlocks: [],
     eagerLoad: null,

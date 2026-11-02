@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
-import { Registry } from "@blazetrails/zeitwerk";
+import { buildManifest, Cref, Registry } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "../autoloaders.js";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Root } from "../paths.js";
@@ -21,7 +21,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
   const run = async (klass: typeof Bootstrap | typeof Finisher, name: string): Promise<void> => {
     const host = {
       autoloaders,
-      config: { isReloadingEnabled: () => false },
+      config: { root, isReloadingEnabled: () => false },
       paths: () => new Root(root),
     };
     const initializer = klass._ownInitializers().find((i) => i.name === name)!;
@@ -74,6 +74,31 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
       expect(autoloaders[loader].isExcludedFromEagerLoad(lazy)).toBe(true);
       expect(autoloaders[loader].isExcludedFromEagerLoad(eager)).toBe(false);
       expect(Object.isFrozen(Dependencies[paths])).toBe(true);
+    });
+
+    it(`${name} reads a built manifest from a directory other than the application root`, async () => {
+      const app = dir("app/lib");
+      FileUtils.touch(File.join(app, "widget.ts"));
+      const builder = new Autoloaders()[loader];
+      builder.manifestRoot = root;
+      await builder.pushDir(app);
+      const manifest = await buildManifest(builder);
+      Registry.unregisterLoader(builder);
+      Dependencies[paths] = [app];
+      autoloaders[loader].manifest = manifest;
+
+      const pwd = Dir.pwd();
+      Dir.chdir(dir("elsewhere"));
+      try {
+        await run(klass, name);
+      } finally {
+        Dir.chdir(pwd);
+      }
+
+      expect(autoloaders[loader].manifestRoot).toEqual(root);
+      const cref = new Cref(Object, "Widget");
+      expect(cref.isAutoload()).toEqual(File.join(app, "widget.ts"));
+      cref.remove();
     });
   }
 });
