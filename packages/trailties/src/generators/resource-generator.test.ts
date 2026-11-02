@@ -2,25 +2,23 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { assertMatch } from "@blazetrails/activesupport";
-import { ModelHelpers } from "../../model-helpers.js";
-import { assertFile, assertInstanceMethod } from "../../testing/assertions.js";
-import { Application } from "../../../application.js";
-import "../../../trailties/active-record.js";
-import "../../../test-unit/trailtie.js";
+import { ModelHelpers } from "./model-helpers.js";
+import { assertFile, assertInstanceMethod, assertMigration } from "./testing/assertions.js";
+import { Application } from "../application.js";
+import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
 
 class ResourceGeneratorApp extends Application {}
-let ResourceGenerator: typeof import("./resource-generator.js").ResourceGenerator;
+let ResourceGenerator: typeof import("./rails/resource/resource-generator.js").ResourceGenerator;
 
 beforeAll(async () => {
   await ResourceGeneratorApp.instance().loadGenerators();
-  ({ ResourceGenerator } = await import("./resource-generator.js"));
+  ({ ResourceGenerator } = await import("./rails/resource/resource-generator.js"));
 });
 
 let tmpDir: string;
 const opts = (extra: object = {}): any => ({ destinationRoot: tmpDir, ...extra });
 const host = () => ({ destinationRoot: tmpDir }) as never;
-const routes = (): string => fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-resource-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
@@ -39,22 +37,31 @@ describe("ResourceGeneratorTest", () => {
 
     for (const path of ["app/models/account.ts", "test/models/account.test.ts"])
       await assertFile.call(host(), path);
+
+    await assertMigration.call(host(), "db/migrate/create_accounts.ts");
   });
 
   it("resource routes are added", async () => {
     await ResourceGenerator.start(["Account"], opts());
-    expect(routes()).toContain('this.resources("accounts");');
+    await assertFile.call(host(), "config/routes.ts", (route) => {
+      expect(route).toMatch(/this\.resources\("accounts"\);$/m);
+    });
   });
 
   it("resource controller with pluralized class name", async () => {
     await ResourceGenerator.start(["account"], opts());
-    await assertFile.call(host(), "app/controllers/accounts-controller.ts", (content) =>
-      assertMatch(/class AccountsController extends ApplicationController/, content),
+    await assertFile.call(
+      host(),
+      "app/controllers/accounts-controller.ts",
+      /class AccountsController extends ApplicationController/,
     );
-    await assertFile.call(host(), "test/controllers/accounts-controller.test.ts");
-    await assertFile.call(host(), "app/helpers/accounts-helper.ts", (content) =>
-      assertMatch(/AccountsHelper/, content),
+    await assertFile.call(
+      host(),
+      "test/controllers/accounts-controller.test.ts",
+      /describe\("AccountsController"/,
     );
+
+    await assertFile.call(host(), "app/helpers/accounts-helper.ts", /AccountsHelper/);
   });
 
   it("resource controller with actions", async () => {

@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { TaskGenerator } from "./task-generator.js";
+import { assertFile } from "./testing/assertions.js";
+import { TaskGenerator } from "./rails/task/task-generator.js";
 
 let tmpDir: string;
 
@@ -19,10 +20,10 @@ describe("TaskGeneratorTest", () => {
   it("task is created", async () => {
     const gen = new TaskGenerator(["feeds", "foo", "bar"], {}, { destinationRoot: tmpDir });
     await gen.createTaskFiles();
-    const taskPath = "lib/tasks/feeds.ts";
-    const content = fs.readFileSync(path.join(tmpDir, taskPath), "utf-8");
-    expect(content).toMatch(/namespace: feeds/);
-    expect(content).toMatch(/export async function foo\(\)/);
-    expect(content).toMatch(/export async function bar\(\)/);
+    await assertFile.call({ destinationRoot: tmpDir } as never, "lib/tasks/feeds.ts", (content) => {
+      expect(content).toMatch(/namespace: feeds/);
+      expect(content).toMatch(/export async function foo\(\)/);
+      expect(content).toMatch(/export async function bar\(\)/);
+    });
   });
 });

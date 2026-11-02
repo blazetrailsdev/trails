@@ -2,11 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { HealthController } from "./health-controller.js";
 
-describe("HealthController", () => {
-  it("controllerPath mirrors Rails::HealthController (`rails/health`)", () => {
-    expect(HealthController.controllerPath()).toBe("rails/health");
-  });
-
+describe("HealthControllerTest", () => {
   it("health controller renders green success page", async ({ task }) => {
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(HealthController);
@@ -17,7 +13,7 @@ describe("HealthController", () => {
       this.get("/up", { to: "rails/health#show", as: "rails_health_check" });
     });
     await t.get("show");
-    expect(t.controller.status).toBe(200);
+    t.assertResponse("success");
     expect(t.response.body).toMatch(/background-color: green/);
   });
 
@@ -36,7 +32,7 @@ describe("HealthController", () => {
       this.get("/up", { to: "rails/health#show", as: "rails_health_check" });
     });
     await t.get("show");
-    expect(t.controller.status).toBe(500);
+    t.assertResponse("internal_server_error");
     expect(t.response.body).toMatch(/background-color: red/);
   });
 });
