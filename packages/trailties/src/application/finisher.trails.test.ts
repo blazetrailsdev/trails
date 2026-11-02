@@ -350,7 +350,8 @@ describe("Finisher", () => {
     class Parent extends Base {}
     class Child extends Parent {}
     await _registerAutoloaded("Child", Child);
-    expect(DescendantsTracker.subclasses(Parent as never)).toContain(Child);
+    await _registerAutoloaded("Child", Child);
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Child]);
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {

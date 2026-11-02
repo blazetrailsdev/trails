@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { Rails } from "./namespaces.js";
+import { constSet } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
 
 export class WelcomeController extends ApplicationController {
@@ -15,4 +16,4 @@ export class WelcomeController extends ApplicationController {
 
 WelcomeController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
-registerConstant("Rails::WelcomeController", WelcomeController);
+constSet(Rails, "WelcomeController", WelcomeController);

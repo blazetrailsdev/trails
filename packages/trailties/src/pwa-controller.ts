@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { Rails } from "./namespaces.js";
+import { constSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 
@@ -20,4 +21,4 @@ export class PwaController extends ApplicationController {
 
 PwaController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
-registerConstant("Rails::PwaController", PwaController);
+constSet(Rails, "PwaController", PwaController);
