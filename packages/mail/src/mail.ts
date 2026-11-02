@@ -8,11 +8,13 @@ import {
   sprintf,
   Thread,
 } from "@blazetrails/ruby-compat";
+import type { Message } from "./message.js";
+import type { Part } from "./part.js";
 import type { CommonField } from "./fields/common-field.js";
 
 interface MailConstants {
-  Message: new (...args: never[]) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  Part: new (...args: never[]) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  Message: typeof Message;
+  Part: typeof Part;
   "new"(...args: unknown[]): any; // eslint-disable-line @typescript-eslint/no-explicit-any
   RANDOM_TAG: string;
   randomTag(): string;
@@ -26,7 +28,7 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   RANDOM_TAG: "%x%x_%x%x%d%x",
 
   new(...args: unknown[]) {
-    return new (Mail.Message as new (...a: unknown[]) => unknown)(args);
+    return new Mail.Message(args);
   },
 
   randomTag(): string {

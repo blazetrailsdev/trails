@@ -26,7 +26,7 @@ export class Body {
   /** @internal */
   private _rawSource: string;
   /** @internal */
-  private _encoding: string;
+  private _encoding: unknown;
   /** @internal */
   private _asciiOnly: boolean | undefined;
 
@@ -56,7 +56,10 @@ export class Body {
   }
 
   initWith(coder: { map: Record<string, unknown>; get(key: string): unknown }): void {
-    for (const [k, v] of Object.entries(coder.map)) rbObjIvarSet(this, `@${k}`, v);
+    for (const [k, v] of Object.entries(coder.map)) {
+      const name = k.replace(/_(\w)/g, (_m, c: string) => c.toUpperCase());
+      rbObjIvarSet(this, `_${name}` in this ? `@_${name}` : `@${name}`, v);
+    }
     this._parts = new PartsList(coder.get("parts"));
   }
 
@@ -104,6 +107,7 @@ export class Body {
     );
   }
 
+  /** @missingRailsCall force_encoding — PERMANENT */
   encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
     if (this.isMultipart()) {
       this.sortPartsBang();
@@ -149,15 +153,15 @@ export class Body {
 
   encoding(val: unknown = null): unknown {
     if (val != null && val !== false) {
-      return this.setEncoding(val);
+      this.setEncoding(val);
+      return val;
     } else {
       return this._encoding;
     }
   }
 
   setEncoding(val: unknown): void {
-    this._encoding =
-      val === "text" || Utilities.isBlank(val) ? this.defaultEncoding() : String(val);
+    this._encoding = val === "text" || Utilities.isBlank(val) ? this.defaultEncoding() : val;
   }
 
   get rawSource(): string {
@@ -182,8 +186,7 @@ export class Body {
 
     this.preamble = strip(parts[0] ?? "");
     this.epilogue = strip(parts.at(-1) ?? "");
-    for (const part of parts.slice(1, -1))
-      this._parts.push(new (Mail.Part as new (s: string) => PartsListPart)(part));
+    for (const part of parts.slice(1, -1)) this._parts.push(new Mail.Part(part));
     return this;
   }
 

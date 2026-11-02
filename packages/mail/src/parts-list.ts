@@ -1,4 +1,4 @@
-import { NoMethodError, sortBy } from "@blazetrails/ruby-compat";
+import { cmp, NoMethodError, sortBy } from "@blazetrails/ruby-compat";
 import { toYaml, type YAML } from "@blazetrails/ruby-compat/yaml";
 import { AttachmentsList } from "./attachments-list.js";
 import { Mail } from "./mail.js";
@@ -14,7 +14,11 @@ export class PartsList extends Array<PartsListPart> {
   /** @missingRailsCall new — CONVERGEABLE mail-message-spec-port */
   constructor(...args: unknown[]) {
     super();
-    if (args[0] != null) this.push(...(args[0] as unknown[]));
+    if (typeof args[0] === "number") {
+      for (let i = 0; i < args[0]; i++) this.push(args[1] ?? null);
+    } else if (args[0] != null) {
+      this.push(...(args[0] as unknown[]));
+    }
   }
 
   get parts(): this {
@@ -76,7 +80,8 @@ export class PartsList extends Array<PartsListPart> {
   }
 
   recursiveEach(block: (part: PartsListPart) => void): void {
-    for (const part of Array.from(this)) {
+    for (let index = 0; index < this.length; index++) {
+      const part = this[index];
       let subList: PartsList;
       if (part.contentType() === "message/rfc822") {
         subList = Mail.new(part.body()).parts;
@@ -97,7 +102,8 @@ export class PartsList extends Array<PartsListPart> {
   }
 
   recursiveDeleteIf(block: (part: PartsListPart) => unknown): void {
-    const kept = Array.from(this).filter((part) => {
+    for (let index = 0; index < this.length; ) {
+      const part = this[index];
       let subList: PartsList;
       if (part.contentType() === "message/rfc822") {
         subList = Mail.new(part.body()).parts;
@@ -106,17 +112,22 @@ export class PartsList extends Array<PartsListPart> {
       }
       const result = block(part);
       if (subList.length > 0) subList.recursiveDeleteIf(block);
-      return result == null || result === false;
-    });
-    this.splice(0, this.length, ...kept);
+      if (result != null && result !== false) {
+        this.splice(index, 1);
+      } else {
+        index += 1;
+      }
+    }
   }
 
   deleteAttachments(): void {
     this.recursiveDeleteIf((part) => part.isAttachment());
   }
 
-  override sort(): this {
-    return new (this.constructor as typeof PartsList)(Array.from(this).sort()) as this;
+  override sort(
+    compareFn: (a: PartsListPart, b: PartsListPart) => number = (a, b) => cmp(a, b) ?? 0,
+  ): this {
+    return new (this.constructor as typeof PartsList)(Array.from(this).sort(compareFn)) as this;
   }
 
   sortBang(order: string[]): PartsListPart[] {
@@ -128,7 +139,7 @@ export class PartsList extends Array<PartsListPart> {
     });
     this.length = 0;
     for (const p of sorted) this.push(p);
-    return this;
+    return sorted;
   }
 
   /** @internal */

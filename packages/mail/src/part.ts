@@ -46,11 +46,11 @@ export class Part extends Message {
   /** @internal */
   protected override addRequiredMessageFields(): void {}
 
-  isDeliveryStatusReportPart(): boolean {
+  isDeliveryStatusReportPart(): number | boolean | null {
     return (
       /message/i.test(this.mainType() ?? "") &&
       /delivery-status/i.test(this.subType() ?? "") &&
-      this.body().matchOperator(/Status:/) != null
+      this.body().matchOperator(/Status:/)
     );
   }
 
@@ -91,9 +91,10 @@ export class Part extends Message {
 
   /** @internal */
   private getReturnValues(key: string): unknown {
-    const value = this.deliveryStatusData().get(key);
+    const deliveryStatusData = this.deliveryStatusData();
+    const value = deliveryStatusData instanceof Header ? deliveryStatusData.get(key) : null;
     if (Array.isArray(value)) {
-      return value.map((a) => a.value);
+      return value.map((a: any) => a.value);
     } else if (value != null) {
       return value.value;
     } else {
@@ -124,4 +125,4 @@ export class Part extends Message {
     ));
   }
 }
-Mail.Part = Part as never;
+Mail.Part = Part;

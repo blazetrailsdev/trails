@@ -746,7 +746,7 @@ export class Message {
 
   htmlPart(block?: MessageBlock): any {
     if (block !== undefined) {
-      return this.setHtmlPart(new (Mail.Part as any)({ contentType: "text/html" }, block));
+      return this.setHtmlPart(new Mail.Part({ contentType: "text/html" }, block));
     } else {
       return this._htmlPart ?? this.findFirstMimeType("text/html");
     }
@@ -754,7 +754,7 @@ export class Message {
 
   textPart(block?: MessageBlock): any {
     if (block !== undefined) {
-      return this.setTextPart(new (Mail.Part as any)({ contentType: "text/plain" }, block));
+      return this.setTextPart(new Mail.Part({ contentType: "text/plain" }, block));
     } else {
       return this._textPart ?? this.findFirstMimeType("text/plain");
     }
@@ -762,7 +762,7 @@ export class Message {
 
   setHtmlPart(msg: any): void {
     if (present(msg)) {
-      if (!(msg instanceof Message)) msg = new (Mail.Part as any)({ body: msg });
+      if (!(msg instanceof Message)) msg = new Mail.Part({ body: msg });
       this._htmlPart = msg;
       if (!this._htmlPart.hasContentType()) this._htmlPart.setContentType("text/html");
       if (present(this.textPart())) this.addMultipartAlternateHeader();
@@ -780,7 +780,7 @@ export class Message {
 
   setTextPart(msg: any): void {
     if (present(msg)) {
-      if (!(msg instanceof Message)) msg = new (Mail.Part as any)({ body: msg });
+      if (!(msg instanceof Message)) msg = new Mail.Part({ body: msg });
       this._textPart = msg;
       if (!this._textPart.hasContentType()) this._textPart.setContentType("text/plain");
       if (present(this.htmlPart())) this.addMultipartAlternateHeader();
@@ -798,7 +798,7 @@ export class Message {
 
   addPart(part: unknown): unknown {
     if (!this.body().isMultipart() && !Utilities.isBlank(this.body().decoded())) {
-      this._textPart = new (Mail.Part as any)("Content-Type: text/plain;");
+      this._textPart = new Mail.Part("Content-Type: text/plain;");
       this._textPart.setBody(this.body().decoded());
       this.body().push(this._textPart);
       this.addMultipartAlternateHeader();
@@ -808,7 +808,7 @@ export class Message {
   }
 
   part(params: Record<string, unknown> = {}, block?: (part: any) => unknown): unknown {
-    const newPart = new (Mail.Part as any)(params);
+    const newPart = new Mail.Part(params);
     if (block !== undefined) block(newPart);
     return this.addPart(newPart);
   }
@@ -831,7 +831,7 @@ export class Message {
   }
 
   convertToMultipart(): void {
-    const textPart = new (Mail.Part as any)({ body: this.body().decoded() });
+    const textPart = new Mail.Part({ body: this.body().decoded() });
     for (const [reader, writer] of MULTIPART_CONVERSION_CONTENT_FIELDS) {
       const value = this[reader]();
       if (present(value)) {
@@ -1154,4 +1154,4 @@ export class Message {
     return Encodings.transcodeCharset(this.decodeBody() as string, this.charset, "UTF-8");
   }
 }
-Mail.Message = Message as never;
+Mail.Message = Message;

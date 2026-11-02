@@ -1,4 +1,4 @@
-import { flatten, RuntimeError, IO } from "@blazetrails/ruby-compat";
+import { flatten, IndexError, isPlainHash, RuntimeError, IO } from "@blazetrails/ruby-compat";
 import { type Info, MiniMime } from "@blazetrails/mini-mime";
 import { Encodings } from "./encodings.js";
 import { Mail } from "./mail.js";
@@ -42,7 +42,13 @@ export class AttachmentsList extends Array<PartsListPart> {
 
   get(indexValue: number | string): PartsListPart {
     if (typeof indexValue === "number") {
-      return this.at(indexValue);
+      const index = indexValue < 0 ? indexValue + this.length : indexValue;
+      if (index < 0 || index >= this.length) {
+        throw new IndexError(
+          `index ${indexValue} outside of array bounds: ${-this.length}...${this.length}`,
+        );
+      }
+      return this[index];
     } else {
       return this.find((a) => a.filename() === indexValue) ?? null;
     }
@@ -57,8 +63,8 @@ export class AttachmentsList extends Array<PartsListPart> {
     };
 
     let hash: Record<string, unknown>;
-    if (typeof value === "object" && value !== null && !(value instanceof Uint8Array)) {
-      const options = value as Record<string, unknown>;
+    if (isPlainHash(value)) {
+      const options = value;
       const path = options.filename;
       delete options.filename;
       if (path != null && path !== false) {
@@ -75,10 +81,12 @@ export class AttachmentsList extends Array<PartsListPart> {
         delete options.data;
       }
 
-      const transferEncoding = options.transferEncoding;
+      let encoding = options.transferEncoding;
       delete options.transferEncoding;
-      const encoding = transferEncoding ?? options.encoding;
-      delete options.encoding;
+      if (encoding == null || encoding === false) {
+        encoding = options.encoding;
+        delete options.encoding;
+      }
       if (encoding != null) {
         if (Encodings.isDefined(encoding as string)) {
           defaultValues.contentTransferEncoding = encoding;
@@ -102,7 +110,7 @@ export class AttachmentsList extends Array<PartsListPart> {
       hash = defaultValues;
     }
 
-    const attachment = new (Mail.Part as new (h: unknown) => PartsListPart)(hash);
+    const attachment = new Mail.Part(hash);
     attachment.addContentId(hash.contentId);
 
     return this._partsList.push(attachment);
