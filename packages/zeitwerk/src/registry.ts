@@ -5,7 +5,6 @@ import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
-  /** @noRailsEquivalent PERMANENT */
   GemLoader: undefined as typeof GemLoader | undefined,
 
   loaders: [] as Loader[],
