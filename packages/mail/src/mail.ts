@@ -11,6 +11,9 @@ import {
 import type { CommonField } from "./fields/common-field.js";
 
 interface MailConstants {
+  Message: new (...args: never[]) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  Part: new (...args: never[]) => any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  "new"(...args: unknown[]): any; // eslint-disable-line @typescript-eslint/no-explicit-any
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -21,6 +24,10 @@ type FieldConstant = new (...args: never[]) => CommonField;
 
 export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   RANDOM_TAG: "%x%x_%x%x%d%x",
+
+  new(...args: unknown[]) {
+    return new (Mail.Message as new (...a: unknown[]) => unknown)(args);
+  },
 
   randomTag(): string {
     const t = Time.now();
@@ -45,6 +52,6 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   uniq(): number | bigint {
     return (_uniq = BigInt(_uniq) + 1n);
   },
-} as MailConstants & Record<`${string}Field`, FieldConstant>;
+} as unknown as MailConstants & Record<`${string}Field`, FieldConstant>;
 
 let _uniq: number | bigint = Mail.somethingRandom();
