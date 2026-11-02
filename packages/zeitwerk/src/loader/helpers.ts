@@ -104,10 +104,7 @@ export const Helpers = {
     return File.isDirectoryAsync(path);
   },
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   _isExist(this: Loader, path: string): Promise<boolean> {
     if (this._manifestChildren != null) {
       return Promise.resolve(Object.hasOwn(this._manifestChildren, path));
