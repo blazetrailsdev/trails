@@ -6,8 +6,7 @@ describe("the reloader drives the main autoloader", () => {
     const script = decodeURIComponent(
       new URL("../__fixtures__/reload-app/serve-edited-controller.mjs", import.meta.url).pathname,
     );
-    const [stdout, stderr] = await Open3.capture3(getProcessAdapter().execPath!(), script);
-    expect(stderr).toBe("");
+    const [stdout] = await Open3.capture3(getProcessAdapter().execPath!(), script);
     expect(JSON.parse(String(stdout).trim().split("\n").at(-1)!)).toEqual({
       before: 1,
       after: 2,

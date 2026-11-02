@@ -147,7 +147,7 @@ RFC 0213 reversed the original ruling: Zeitwerk is vendored and ported, and
 Each setup initializer is followed by an awaited `eagerLoad`.
 For the same reason, `eager_load!`'s `after_class_unload` hook sits outside
 Rails' `config.eager_load` guard (`finisher.rb:83-87`): lookup is synchronous,
-so a reload eager loads whatever that setting says (RFC 0213 § "Loading").
+so a reload eager loads whatever that setting says (RFC 0213 § "Reload").
 
 The eager directory scan in `trailties/src/application/finisher.ts`
 (`loadAppClasses` / `collectAppClasses`) still runs beside the loaders until

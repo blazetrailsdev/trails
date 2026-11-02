@@ -160,6 +160,7 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 /**
  * @missingRailsCall eager_load_all — CONVERGEABLE trailties-app-scan-retires
  * @missingRailsCall eager_load! — CONVERGEABLE trailties-app-scan-retires
+ * @inventedArm if — PERMANENT
  */
 Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {

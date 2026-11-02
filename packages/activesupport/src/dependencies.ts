@@ -26,8 +26,8 @@ export const Dependencies = {
     return this.interlock.unloading(block);
   },
 
-  clear(): Promise<void | undefined> {
-    return this.unloadInterlock(async () => {
+  async clear(): Promise<void> {
+    await this.unloadInterlock(async () => {
       this._autoloadedTrackedClasses.clear();
       await this.autoloader!.reload();
     });
