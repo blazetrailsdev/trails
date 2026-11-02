@@ -135,7 +135,10 @@ export class Files {
     }
   }
 
-  serving(request: Request, path: string): [number, Record<string, any>, any] {
+  serving(
+    request: Pick<Request, "isOptions" | "isHead" | "getHeader">,
+    path: string,
+  ): [number, Record<string, any>, any] {
     if (request.isOptions()) {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
     }

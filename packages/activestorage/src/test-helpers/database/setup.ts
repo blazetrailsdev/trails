@@ -33,14 +33,6 @@ ActiveStorage.previewers = [PopplerPDFPreviewer, MuPDFPreviewer, VideoPreviewer]
 const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
 const routes = new RouteSet();
-routes.draw(function () {
-  this.scope("/rails/active_storage", function () {
-    this.get("/disk/:encoded_key/*filename", {
-      to: "active_storage/disk#show",
-      as: "rails_disk_service",
-    });
-  });
-});
 
 const configuration = new Configuration();
 TopLevel.Trails = {
@@ -53,9 +45,11 @@ TopLevel.Trails = {
   },
 } as unknown as typeof TopLevel.Trails;
 
+await import("../../config/routes.js");
+
 class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
-const app = Dummy.instance();
+export const app = Dummy.instance();
 for (const railtie of [GlobalIDRailtie, Engine]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
