@@ -93,7 +93,7 @@ describe("ControllerGenerator --parent", () => {
       path.join(tmpDir, "app/controllers/admin/dashboard-controller.ts"),
       "utf8",
     );
-    expect(controller).toContain("class AdminDashboardController extends AdminController");
+    expect(controller).toContain("class DashboardController extends AdminController");
   });
 });
 

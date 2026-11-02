@@ -149,7 +149,7 @@ describe("ControllerGeneratorTest", () => {
   it("controller parent param", async () => {
     await t.runGenerator(["admin/dashboard", "--parent", "admin_controller"]);
     await t.assertFile("app/controllers/admin/dashboard-controller.ts", (controller) => {
-      expect(controller).toMatch(/class AdminDashboardController extends AdminController/);
+      expect(controller).toMatch(/class DashboardController extends AdminController/);
     });
   });
 

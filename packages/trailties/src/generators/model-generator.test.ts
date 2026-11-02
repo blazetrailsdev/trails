@@ -139,11 +139,11 @@ describe("ModelGeneratorTest", () => {
   it("model with namespace", async () => {
     await makeGen().run("admin/account", []);
     await assertFile("app/models/admin.ts", /export const Admin = \{/);
-    await assertFile("app/models/admin.ts", /tableNamePrefix\(\)/);
+    await assertFile("app/models/admin.ts", /get tableNamePrefix\(\)/);
     await assertFile("app/models/admin.ts", /"admin_"/);
     await assertFile(
       "app/models/admin/account.ts",
-      /export class AdminAccount extends ApplicationRecord/,
+      /export class Account extends ApplicationRecord/,
     );
   });
 

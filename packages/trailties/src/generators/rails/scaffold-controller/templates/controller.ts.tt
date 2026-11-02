@@ -1,4 +1,4 @@
-<% const modelClassName = this.className().split("::").join(""); -%>
+<% const modelClassName = this.className().split("::").pop(); -%>
 <% const singular = this.singularTableName(); -%>
 <% const plural = this.pluralTableName(); -%>
 <% const params = `this.${ActiveSupport.Inflector.camelize(singular, false)}Params()`; -%>
@@ -6,7 +6,7 @@
 import { <%= modelClassName %> } from "<%= "../".repeat(this.controllerClassPath().length + 1) %>models/<%= this.filePath() %><%= this.ext() %>";
 import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath().length) || "./" %>application-controller<%= this.ext() %>";
 
-export class <%= this.controllerClassName().split("::").join("") %>Controller extends ApplicationController {
+export class <%= this.controllerClassName().split("::").pop() %>Controller extends ApplicationController {
 <% const sig = ts ? ": Promise<void>" : ""; -%>
   static {
     this.beforeAction("set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "edit", "update", "destroy"] });

@@ -1,55 +1,53 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { Dir, File } from "@blazetrails/ruby-compat";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { capture } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it } from "vitest";
 import { HelperGenerator } from "./helper-generator.js";
+import { TestCase } from "../../test-case.js";
 
-let tmpDir: string;
+class HelperGeneratorTest extends TestCase {}
+HelperGeneratorTest.destination(Dir.mktmpdir());
+HelperGeneratorTest.tests(HelperGenerator);
+HelperGeneratorTest.arguments(["admin"]);
+registerSpecType(/^HelperGeneratorTest$/, HelperGeneratorTest);
+let t: TestCase;
 
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-helper-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+beforeEach((context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
 });
 
-afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
-
-function makeGen(name: string, options: object = {}, cwd = tmpDir) {
-  return new HelperGenerator([name], options, { destinationRoot: cwd });
-}
-
 describe("HelperGeneratorTest", () => {
-  it("helper", async () => {
-    await makeGen("Account").createHelperFiles();
-    const c = fs.readFileSync(path.join(tmpDir, "app/helpers/account-helper.ts"), "utf-8");
-    expect(c).toContain("AccountHelper");
+  it("helper skeleton is created", async () => {
+    await t.runGenerator();
+    await t.assertFile("app/helpers/admin-helper.ts", /export const AdminHelper/);
   });
 
-  it("strips a trailing helper suffix", async () => {
-    await makeGen("account_helper").createHelperFiles();
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
-  });
-
-  it("strips a trailing dashed helper suffix", async () => {
-    await makeGen("account-helper").createHelperFiles();
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
-  });
-
-  it("nested namespace", async () => {
-    await makeGen("admin/account").createHelperFiles();
-    const c = fs.readFileSync(path.join(tmpDir, "app/helpers/admin/account-helper.ts"), "utf-8");
-    expect(c).toContain("AdminAccountHelper");
-  });
-
-  it("generates .js helper for JS projects", async () => {
-    const jsDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-helper-js-"));
+  it("check class collision", async () => {
+    const ObjectHelper = class {};
+    registerConstant("ObjectHelper", ObjectHelper);
     try {
-      const gen = makeGen("Posts", {}, jsDir);
-      await gen.createHelperFiles();
-      expect(fs.existsSync(path.join(jsDir, "app/helpers/posts-helper.js"))).toBe(true);
+      const content = await capture("stderr", () => t.runGenerator(["object"]));
+      expect(content).toMatch(
+        /The name 'ObjectHelper' is either already used in your application or reserved/,
+      );
     } finally {
-      fs.rmSync(jsDir, { recursive: true, force: true });
+      unregisterConstant("ObjectHelper", ObjectHelper);
     }
+  });
+
+  it("namespaced and not namespaced helpers", async () => {
+    await t.runGenerator(["products"]);
+
+    await expect(t.runGenerator(["admin::products"])).resolves.not.toThrow();
+  });
+
+  it("helper suffix is not duplicated", async () => {
+    await t.runGenerator(["products_helper"]);
+
+    t.assertNoFile("app/helpers/products-helper-helper.ts");
+    await t.assertFile("app/helpers/products-helper.ts");
   });
 });

@@ -49,8 +49,8 @@ describe("ScaffoldGenerator (namespaced)", () => {
     const controller = read("app/controllers/admin/accounts-controller.ts");
     const model = read("app/models/admin/account.ts");
     expect(model).toContain('import { ApplicationRecord } from "../application-record.ts";');
-    expect(model).toContain("export class AdminAccount extends ApplicationRecord");
-    expect(controller).toContain('import { AdminAccount } from "../../models/admin/account.ts";');
+    expect(model).toContain("export class Account extends ApplicationRecord");
+    expect(controller).toContain('import { Account } from "../../models/admin/account.ts";');
     for (const source of [model, controller, read("app/models/admin.ts")])
       expect(parseTs(source).diagnostics).toEqual([]);
     expect(controller).toContain("this.redirectTo(this.adminAccountsPath(),");
@@ -63,7 +63,7 @@ describe("ScaffoldGenerator (namespaced)", () => {
         'linkTo("Back to accounts", adminAccountsPath())',
       );
     const functionalTest = read("test/controllers/admin/accounts-controller.test.ts");
-    expect(functionalTest).toContain("declare admin_accounts: FixtureSetAccessor<AdminAccount>;");
+    expect(functionalTest).toContain("declare admin_accounts: FixtureSetAccessor<Account>;");
     expect(functionalTest).toContain('this["@admin_account"] = await this.admin_accounts("one");');
     expect(parseTs(functionalTest).diagnostics).toEqual([]);
     const rerun = ScaffoldGenerator.start(["admin/account", "--force"], config);
