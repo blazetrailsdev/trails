@@ -30,3 +30,8 @@ export const COLON = ":";
 export const Q_VALUES = ["Q", "q"];
 export const B_VALUES = ["B", "b"];
 export const ASTERISK = "*";
+export const LAX_CRLF = /\r?\n/;
+export const WSP = /[\t ]/;
+// eslint-disable-next-line no-control-regex
+export const TEXT = /[\x01-\x09\x0b\x0c\x0e-\x7f]/;
+export const HEADER_LINE = /^([\x21-\x39\x3b-\x7e]+:\s*.+)$/m;

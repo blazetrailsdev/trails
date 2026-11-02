@@ -23,7 +23,7 @@ export class AttachmentsList extends Array<PartsListPart> {
     this._contentDispositionType = "attachment";
     const found = Array.from(partsList).map((p) => {
       if (p.mimeType() === "message/rfc822") {
-        return Mail.new(p.body.encoded()).attachments();
+        return Mail.new(p.body().encoded()).attachments();
       } else if (p.parts.length === 0) {
         return p.isAttachment() ? p : null;
       } else {

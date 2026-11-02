@@ -86,8 +86,8 @@ export class Body {
 
   sortPartsBang(): unknown {
     for (const p of this._parts) {
-      p.body.setSortOrder(this._partSortOrder);
-      p.body.sortPartsBang();
+      p.body().setSortOrder(this._partSortOrder);
+      p.body().sortPartsBang();
     }
     return this._parts.sortBang(this._partSortOrder);
   }

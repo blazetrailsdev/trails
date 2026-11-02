@@ -66,7 +66,7 @@ export class PartsList extends Array<PartsListPart> {
         const id = parentId.length === 0 ? `${i}` : `${parentId}.${i}`;
         let subList: PartsList;
         if (part.contentType() === "message/rfc822") {
-          subList = Mail.new(part.body).parts;
+          subList = Mail.new(part.body()).parts;
         } else {
           subList = part.parts;
         }
@@ -79,7 +79,7 @@ export class PartsList extends Array<PartsListPart> {
     for (const part of Array.from(this)) {
       let subList: PartsList;
       if (part.contentType() === "message/rfc822") {
-        subList = Mail.new(part.body).parts;
+        subList = Mail.new(part.body()).parts;
       } else {
         subList = part.parts;
       }
@@ -100,7 +100,7 @@ export class PartsList extends Array<PartsListPart> {
     const kept = Array.from(this).filter((part) => {
       let subList: PartsList;
       if (part.contentType() === "message/rfc822") {
-        subList = Mail.new(part.body).parts;
+        subList = Mail.new(part.body()).parts;
       } else {
         subList = part.parts;
       }
@@ -137,7 +137,7 @@ export class PartsList extends Array<PartsListPart> {
     const hasContentType =
       typeof part?.contentType === "function" && part.get("content_type") != null;
     const index = hasContentType
-      ? order.indexOf(part.get("content_type").string.toLowerCase())
+      ? order.indexOf(part.get("content_type").string().toLowerCase())
       : -1;
 
     return [isAttachment ? 1 : 0, index === -1 ? 10000 : index];

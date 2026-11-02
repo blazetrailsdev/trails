@@ -74,6 +74,23 @@ describe("Mail::Body", () => {
     });
   });
 
+  describe("splitting up a multipart document", () => {
+    const multipartBody =
+      "this is some text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain; charset=ISO-8859-1\r\n\r\nThis is a plain text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/html\r\n\r\n<p>This is HTML</p>\r\n------=_Part_2192_32400445--\r\n";
+
+    it("should keep track of its parts", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.parts.length).toEqual(2);
+    });
+
+    it("should keep the preamble text as its own preamble", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.preamble).toEqual("this is some text");
+    });
+  });
+
   describe("detecting non ascii", () => {
     it("should say an empty string is all ascii", () => {
       expect(new Body().isAsciiOnly()).toBeTruthy();
