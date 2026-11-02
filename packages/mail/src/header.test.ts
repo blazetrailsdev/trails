@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { ArgumentError, rbObjDup } from "@blazetrails/ruby-compat";
-import { Field, Header, Mail } from "./index.js";
+import { describe, expect, it, vi } from "vitest";
+import { ArgumentError, rbObjDup, stderr } from "@blazetrails/ruby-compat";
+import { Field, Header, Mail, Utilities } from "./index.js";
 
 const one = (field: unknown) => field as Field;
 
@@ -33,8 +33,11 @@ describe("Mail::Header", () => {
     it("should collect up any of its fields' errors", () => {
       const header = new Header("Content-Transfer-Encoding: vl@d\r\nReply-To: a b b");
       const errors = header.errors() as unknown[][];
+      expect(Utilities.isBlank(errors)).toBeFalsy();
       expect(errors.length).toEqual(2);
       expect(errors[0][0]).toEqual("Reply-To");
+      expect(errors[0][1]).toEqual("a b b");
+      expect(errors[1][0]).toEqual("Content-Transfer-Encoding");
       expect(errors[1][1]).toEqual("vl@d");
     });
   });
@@ -58,7 +61,8 @@ describe("Mail::Header", () => {
     it("should instantiate with a string passed in", () => {
       const header = new Header("To: Mikel\r\nFrom: bob\r\n");
       const copy = rbObjDup(header);
-      expect(one(copy.get("to")).equals(one(header.get("to")))).toBe(true);
+      expect([...copy.fields]).toEqual([...header.fields]);
+      expect(copy.get("to")).toEqual(header.get("to"));
     });
   });
 
@@ -236,7 +240,9 @@ describe("Mail::Header", () => {
         "To: bob@you.com",
         "Subject: This is a badly formed email",
       ];
-      expect(header.fields.map((f) => f.name)).toEqual(["From", "To", "Subject"]);
+      expect(header.fields[0].name).toEqual("From");
+      expect(header.fields[1].name).toEqual("To");
+      expect(header.fields[2].name).toEqual("Subject");
     });
 
     it("should return nil if no value in the header", () => {
@@ -258,6 +264,7 @@ describe("Mail::Header", () => {
     it("should allow you to delete a field by setting it to nil", () => {
       const header = new Header();
       header.fields = ["To: bob@you.com"];
+      expect(header.fields.length).toEqual(1);
       header.set("To", null);
       expect(header.fields.length).toEqual(0);
     });
@@ -282,12 +289,17 @@ describe("Mail::Header", () => {
       expect(header.fields.length).toEqual(2);
       expect(one(header.get("X-Ms-Has-Attach")).decoded()).toBeNull();
       expect(one(header.get("X-Ms-Has-Attach")).encoded()).toEqual("X-Ms-Has-Attach: \r\n");
+      expect(one(header.get("X-MS-TNEF-Correlator")).decoded()).toBeNull();
+      expect(one(header.get("X-MS-TNEF-Correlator")).encoded()).toEqual(
+        "X-MS-TNEF-Correlator: \r\n",
+      );
     });
 
     it("should allow you to replace a from field", () => {
       const header = new Header();
       expect(header.get("From")).toBeNull();
       header.set("From", "mikel@test.lindsaar.net");
+      expect(one(header.get("From")).decoded()).toEqual("mikel@test.lindsaar.net");
       header.set("From", "bob@test.lindsaar.net");
       expect(one(header.get("From")).decoded()).toEqual("bob@test.lindsaar.net");
     });
@@ -295,6 +307,7 @@ describe("Mail::Header", () => {
     it("should maintain the class of the field", () => {
       const header = new Header();
       header.set("From", "mikel@test.lindsaar.net");
+      expect(one(header.get("From")).field.constructor).toBe(Mail.FromField);
       header.set("From", "bob@test.lindsaar.net");
       expect(one(header.get("From")).field.constructor).toBe(Mail.FromField);
     });
@@ -337,19 +350,19 @@ describe("Mail::Header", () => {
 
   describe("detecting required fields", () => {
     it("should not say it has a message id if it doesn't", () => {
-      expect(new Header().hasMessageId()).toBe(false);
+      expect(new Header().hasMessageId()).toBeFalsy();
     });
 
     it("should say it has a message id if it does", () => {
-      expect(new Header("Message-ID: 1234").hasMessageId()).toBe(true);
+      expect(new Header("Message-ID: 1234").hasMessageId()).toBeTruthy();
     });
 
     it("should not say it has a date if it doesn't", () => {
-      expect(new Header().hasDate()).toBe(false);
+      expect(new Header().hasDate()).toBeFalsy();
     });
 
     it("should not say it has a mime-version if it doesn't", () => {
-      expect(new Header().hasMimeVersion()).toBe(false);
+      expect(new Header().hasMimeVersion()).toBeFalsy();
     });
   });
 
@@ -362,7 +375,10 @@ describe("Mail::Header", () => {
       const old = Header.maximumAmount;
       Header.maximumAmount = 10;
       try {
+        const write = vi.spyOn(stderr, "write").mockImplementation(() => 0);
         expect(new Header("X-SubscriberID: 345\n".repeat(11)).fields.length).toEqual(10);
+        expect(write).toHaveBeenCalledWith(expect.stringMatching(/10 header fields/));
+        write.mockRestore();
       } finally {
         Header.maximumAmount = old;
       }
