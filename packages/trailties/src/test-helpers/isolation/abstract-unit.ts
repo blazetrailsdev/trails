@@ -92,7 +92,7 @@ export class Rack {
       if (this._app == null) {
         setEnv("TRAILS_ENV", env_);
 
-        const environment = `${await this.appPath()}/config/environment.ts`;
+        const environment = await this.appPath("config", "environment.ts");
         await import(environment);
 
         this._app = Trails.application as unknown as RackHost;
@@ -294,7 +294,7 @@ export default { development: env("development"), test: env("test"), production:
   }
 
   async bootTrails(): Promise<void> {
-    const environment = `${await this.appPath()}/config/environment.ts`;
+    const environment = await this.appPath("config", "environment.ts");
     await import(environment);
   }
 

@@ -486,6 +486,10 @@ const aliasEntries = [
 const otherResolve = {
   alias: [
     ...aliasEntries,
+    {
+      find: /^@blazetrails\/trailties$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+    },
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
 };
