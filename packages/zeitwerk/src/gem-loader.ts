@@ -9,8 +9,8 @@ export interface GemLoader extends Included<typeof RealModName> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class GemLoader extends Loader {
-  private _rootFile: string;
-  private _rootDir: string;
+  private rootFile: string;
+  private rootDir: string;
   private _warnOnExtraFiles: boolean;
 
   /** @inventedArm pushDir — PERMANENT */
@@ -19,7 +19,7 @@ export class GemLoader extends Loader {
     { namespace, warnOnExtraFiles }: { namespace: object; warnOnExtraFiles: boolean },
   ): Promise<GemLoader> {
     const loader = new GemLoader(rootFile, { namespace, warnOnExtraFiles });
-    await loader.pushDir(loader._rootDir, { namespace });
+    await loader.pushDir(loader.rootDir, { namespace });
     return loader;
   }
 
@@ -37,8 +37,8 @@ export class GemLoader extends Loader {
     if (namespace !== Object) this._tag = `${this.realModName(namespace)}-${this._tag}`;
 
     this.inflector = new GemInflector(rootFile);
-    this._rootFile = File.expandPath(rootFile);
-    this._rootDir = File.dirname(rootFile);
+    this.rootFile = File.expandPath(rootFile);
+    this.rootDir = File.dirname(rootFile);
     this._warnOnExtraFiles = warnOnExtraFiles;
   }
 
@@ -49,10 +49,10 @@ export class GemLoader extends Loader {
 
   /** @internal */
   private async warnOnExtraFiles(): Promise<void> {
-    const expectedNamespaceDir = this._rootFile.replace(/\.ts$/, "");
+    const expectedNamespaceDir = this.rootFile.replace(/\.ts$/, "");
 
-    await this.ls(this._rootDir, (basename, abspath, ftype) => {
-      if (abspath === this._rootFile) return;
+    await this.ls(this.rootDir, (basename, abspath, ftype) => {
+      if (abspath === this.rootFile) return;
       if (abspath === expectedNamespaceDir) return;
 
       const basenameWithoutExt = basename.replace(/\.ts$/, "");
