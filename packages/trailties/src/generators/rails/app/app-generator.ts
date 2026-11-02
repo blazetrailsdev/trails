@@ -1610,20 +1610,25 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createTestFiles");
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
-    this.methodAdded("applyRailsTemplate");
+    this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
 
-  static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
+  /** @inventedArm perform — CONVERGEABLE actions-generate-runs-in-line */
+  static async applyTrailsTemplate(template: string, destination: string): Promise<AppGenerator> {
     const generator = new this(
       [destination],
       { template: template },
       { destinationRoot: destination },
     );
     generator.setDefaultAccessorsBang();
-    await generator.applyRailsTemplate();
+    await generator.applyTrailsTemplate();
+    const { GenerateCommand } = await import("../../../commands/generate.js");
+    for (const { what, args } of generator.pendingGenerators) {
+      await GenerateCommand.perform("generate", [what, ...args], {});
+    }
     return generator;
   }
 

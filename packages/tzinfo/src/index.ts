@@ -25,6 +25,11 @@ export class InvalidTimezoneIdentifier extends Error {
   override name = "InvalidTimezoneIdentifier";
 }
 
+/** @noRailsEquivalent PERMANENT */
+export class InvalidCountryCode extends Error {
+  override name = "InvalidCountryCode";
+}
+
 function toDate(at: Date | Temporal.Instant | Time): Date {
   if (at instanceof Date) return at;
   if (at instanceof Time) return new Date(at.toI() * 1000 + Math.floor(at.nsec / 1_000_000));

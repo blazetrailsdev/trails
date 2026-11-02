@@ -83,7 +83,7 @@ export abstract class AppBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
     this.noCommands(() => this.methodAdded("railsGemfileEntry"));
     this.noCommands(() => this.methodAdded("railsDevPackages"));
-    this.noCommands(() => this.methodAdded("applyRailsTemplate"));
+    this.noCommands(() => this.methodAdded("applyTrailsTemplate"));
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
     this.noCommands(() => this.methodAdded("createRoot"));
@@ -663,7 +663,7 @@ ${requireStatements.join("\n")}`;
     return out;
   }
 
-  async applyRailsTemplate(): Promise<void> {
+  async applyTrailsTemplate(): Promise<void> {
     try {
       if (this.railsTemplate != null) await this.apply(this.railsTemplate);
     } catch (e) {

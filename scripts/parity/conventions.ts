@@ -138,6 +138,7 @@ const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\
  * `bundle` itself stays free for a JS bundle.
  */
 export const PHRASE_RENAMES: Record<string, string> = {
+  apply_rails_template: "apply_trails_template",
   run_bundle: "run_install",
   bundle_command: "install_command",
   bundle_install: "install",
@@ -182,6 +183,7 @@ export function snakeToCamel(name: string): string {
  * framework that ships a `railtie.rb` or a `railties/` directory).
  */
 export const PATH_SEGMENT_ALIASES: Record<string, string> = {
+  yarn: "pnpm",
   railtie: "trailtie",
   railties: "trailties",
 };
