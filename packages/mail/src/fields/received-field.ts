@@ -3,6 +3,7 @@ import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { ReceivedElement } from "../elements/received-element.js";
 import { Utilities } from "../utilities.js";
 import { NamedStructuredField } from "./named-structured-field.js";
+import { Mail } from "../mail.js";
 
 export class ReceivedField extends NamedStructuredField {
   static readonly NAME = "Received";
@@ -50,3 +51,4 @@ export class ReceivedField extends NamedStructuredField {
     }
   }
 }
+Mail.ReceivedField = ReceivedField;

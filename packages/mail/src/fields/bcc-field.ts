@@ -1,5 +1,6 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { CommonAddressField } from "./common-address-field.js";
+import { Mail } from "../mail.js";
 
 export class BccField extends CommonAddressField {
   static readonly NAME = "Bcc";
@@ -19,3 +20,4 @@ export class BccField extends CommonAddressField {
     }
   }
 }
+Mail.BccField = BccField;

@@ -1,5 +1,6 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { CommonMessageIdField } from "./common-message-id-field.js";
+import { Mail } from "../mail.js";
 
 export class InReplyToField extends CommonMessageIdField {
   static readonly NAME = "In-Reply-To";
@@ -16,3 +17,4 @@ export class InReplyToField extends CommonMessageIdField {
     }
   }
 }
+Mail.InReplyToField = InReplyToField;

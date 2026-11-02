@@ -1,6 +1,7 @@
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 import { ContentLocationElement } from "../elements/content-location-element.js";
 import { NamedStructuredField } from "./named-structured-field.js";
+import { Mail } from "../mail.js";
 
 export class ContentLocationField extends NamedStructuredField {
   static readonly NAME = "Content-Location";
@@ -27,3 +28,4 @@ export class ContentLocationField extends NamedStructuredField {
     return this.location();
   }
 }
+Mail.ContentLocationField = ContentLocationField;

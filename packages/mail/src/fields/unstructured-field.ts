@@ -13,6 +13,7 @@ import * as Constants from "../constants.js";
 import { Encodings } from "../encodings.js";
 import { Utilities } from "../utilities.js";
 import { CommonField } from "./common-field.js";
+import { Mail } from "../mail.js";
 
 export class UnstructuredField extends CommonField {
   constructor(name: unknown, value: unknown, charset: string | Encoding | null = null) {
@@ -143,3 +144,4 @@ export class UnstructuredField extends CommonField {
     return String(this.charset).toUpperCase().replace(/_/g, "-");
   }
 }
+Mail.UnstructuredField = UnstructuredField;

@@ -2,6 +2,7 @@ import { rbStrToI, type Encoding } from "@blazetrails/ruby-compat";
 import { MimeVersionElement } from "../elements/mime-version-element.js";
 import { Utilities } from "../utilities.js";
 import { NamedStructuredField } from "./named-structured-field.js";
+import { Mail } from "../mail.js";
 
 export class MimeVersionField extends NamedStructuredField {
   static readonly NAME = "Mime-Version";
@@ -39,3 +40,4 @@ export class MimeVersionField extends NamedStructuredField {
     return this.version();
   }
 }
+Mail.MimeVersionField = MimeVersionField;
