@@ -1,5 +1,9 @@
 import "./rails.js";
 import { LoadError, rbFRequire } from "@blazetrails/ruby-compat";
+export type {} from "./trailties/active-record.js";
+export type {} from "./trailties/action-controller.js";
+export type {} from "./trailties/action-view.js";
+export type {} from "./trailties/active-job.js";
 
 const activeStorageEngine = "@blazetrails/activestorage/engine";
 const loadPath: Record<string, () => Promise<unknown>> = {
