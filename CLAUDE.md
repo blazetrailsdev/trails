@@ -2328,7 +2328,9 @@ environment, and shipped code has no eval pipeline.** The split is:
 The loader reads a template's module from where `build-views` writes it by
 default: an identifier under `<root>/app/views/` loads
 `<root>/.trails/views/<path>.js`, and any other identifier loads
-`<identifier>.js`, which is where `--in-place` writes. A build with a custom
+`<identifier>.js`, which is where `--in-place` writes outside an `app/views`
+root; inside one it writes `.trails/views/`, so no module sits where an
+autoloader reads code. A build with a custom
 `--out` (`BuildViewsOptions.outDir`) or a views directory not named
 `app/views` and not built in place is for type-checking only, and rendering
 from it raises `LoadError`.

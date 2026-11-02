@@ -45,7 +45,19 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const cwd = opts.cwd ?? process.cwd();
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
-  const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
+  const appViews = `${path.sep}app${path.sep}views${path.sep}`;
+  const viewsRoot = `${viewsDir}${path.sep}`;
+  const appViewsAt = viewsRoot.lastIndexOf(appViews);
+  const besideTemplates = opts.inPlace && appViewsAt === -1;
+  const outViews = besideTemplates
+    ? viewsDir
+    : opts.inPlace
+      ? path.join(
+          viewsRoot.slice(0, appViewsAt),
+          ".trails/views",
+          viewsRoot.slice(appViewsAt + appViews.length),
+        )
+      : path.join(outDir, "views");
   const { Base, PathParser, Template, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
   for (const ext of ["ts", "js"]) {
@@ -74,7 +86,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   }
   const pathParser = new PathParser();
   const { files, skipped } = await walkTemplates(viewsDir, Template.templateHandlerExtensions());
-  if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
+  if (!besideTemplates) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
   const helpers = await allHelpersFromPath(path.join(appDir, "helpers"));
@@ -154,6 +166,10 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     for (const view of [...views, ...handled]) {
       for (const ext of [".ts", ".ts.map", ".d.ts", ".d.ts.map"]) {
         await fs.rm(view.outBase + ext, { force: true });
+      }
+      if (besideTemplates) continue;
+      for (const ext of [".js", ".js.map"]) {
+        await fs.rm(path.join(viewsDir, view.rel) + ext, { force: true });
       }
     }
     return { count: files.length, files, skipped };
