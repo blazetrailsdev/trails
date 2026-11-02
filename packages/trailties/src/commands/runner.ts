@@ -11,6 +11,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
+import { isPresent } from "@blazetrails/activesupport";
+import { environment } from "../command.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { Trails } from "../rails.js";
@@ -28,7 +30,13 @@ function evalToplevel(code: string, file: string): Promise<unknown> {
 }
 
 export class RunnerCommand extends Base {
-  declare options: ThorOptions<Record<string, unknown> & { skipExecutor?: boolean }>;
+  declare options: ThorOptions<Record<string, unknown> & { environment?: string }>;
+  /** @internal */
+  declare _environmentSpecified: boolean;
+  /** @internal */
+  declare availableEnvironments: () => string[];
+  /** @internal */
+  declare expandEnvironmentName: (name: string) => string;
 
   static {
     const klass = this as unknown as ThorClass;
@@ -44,6 +52,21 @@ export class RunnerCommand extends Base {
       "Run TypeScript code in the context of your application",
     );
     klass.methodAdded("perform");
+  }
+
+  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
+  constructor(...args: ConstructorParameters<typeof Base>) {
+    super(...args);
+
+    this._environmentSpecified = isPresent(this.options.environment);
+
+    if (!this._environmentSpecified) {
+      this.options = this.options.merge({ environment: environment() });
+    } else if (!this.availableEnvironments().includes(this.options.environment!)) {
+      this.options = this.options.merge({
+        environment: this.expandEnvironmentName(this.options.environment!),
+      });
+    }
   }
 
   async help(commandName: string | null = null, ..._rest: unknown[]): Promise<void> {
