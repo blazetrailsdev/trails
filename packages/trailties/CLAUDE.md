@@ -165,7 +165,10 @@ constant …". Two classes in one file, or a class under another name, fail at b
 **`on_load` does what `inherited` did.** The loader seats the constant. The
 finisher's `_registerAutoloaded` registers a loaded model with
 `DescendantsTracker` and runs `ActionController::Railties::Helpers.inherited`
-for a controller, superclass first, since JS has no hook at `extends`.
+for a controller, superclass first, since JS has no hook at `extends`. No
+own-property guard can stand in: nothing runs on an empty subclass, and
+`Helpers.inherited` is async where `_helpers` is a sync read. Ruled by the repo
+owner on 2026-11-02.
 
 **`autoload_lib` follows `Application.register`.** It is async (`Loader#ignore`
 is) and a `static {}` block cannot await, so `trails new` emits it as a top-level
