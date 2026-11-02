@@ -10,7 +10,7 @@ on:
     #   run-parity-postgres — Postgres-specific parity (future)
     #   run-parity-mysql    — MySQL/MariaDB-specific parity (future)
     #   run-sqlite-mem      — the ARCONN=sqlite3_mem AR suite (otherwise only
-    #                         main / the weekly sweep / workflow_dispatch).
+    #                         the nightly / the weekly sweep / workflow_dispatch).
     #                         Opting in also gates the merge on it: the job is
     #                         in the `ci` aggregator's `needs:`.
     #   run-mysql-prepared  — the MYSQL_PREPARED_STATEMENTS AR suite (otherwise
@@ -37,6 +37,7 @@ on:
     # Weekly post-merge sweep so slow regressions can't hide between
     # parity-relevant PRs. Monday 06:00 UTC is off-peak on an Ubuntu runner.
     - cron: "0 6 * * 1"
+    - cron: "0 7 * * *"
   workflow_dispatch:
 
 # Cancel superseded runs on PR pushes; keep main/schedule runs intact so
@@ -73,6 +74,9 @@ jobs:
       website_affected: ${{ steps.filter.outputs.website_affected }}
       comparison_affected: ${{ steps.filter.outputs.comparison_affected }}
       thor_only: ${{ steps.filter.outputs.thor_only }}
+      ar_scope: ${{ steps.filter.outputs.ar_scope }}
+      sqlite_only: ${{ steps.filter.outputs.sqlite_only }}
+      unit_packages: ${{ steps.filter.outputs.unit_packages }}
       actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
@@ -92,6 +96,8 @@ jobs:
       sqlite_shards: ${{ steps.self_hosted.outputs.sqlite_shards }}
       unit_runs_on: ${{ steps.self_hosted.outputs.unit_runs_on }}
       unit_shards: ${{ steps.self_hosted.outputs.unit_shards }}
+      postgres_shards: ${{ steps.self_hosted.outputs.postgres_shards }}
+      maria_shards: ${{ steps.self_hosted.outputs.maria_shards }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -115,9 +121,9 @@ jobs:
           ADDITIVE_CANDIDATE_RE='^(pnpm-lock\.yaml|tsconfig[^/]*\.json|vitest[^/]*\.config\.ts)$'
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
-          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activejob|activemodel|activestorage|bcrypt|activesupport|globalid|date|did-you-mean|solid-cable|solid-queue|trails-tsc|vitest-matchers)/'
+          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activejob|activemodel|activestorage|bcrypt|activesupport|globalid|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|solid-cable|solid-queue|trails-tsc|tzinfo|vitest-matchers)/'
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
-          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|vitest-matchers)/'
+          AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|tzinfo|vitest-matchers)/'
           AV_PKGS_RE='^packages/(actionview|activesupport|date|vitest-matchers)/'
           TRAILTIES_PKGS_RE='^packages/(trailties|actioncable|actionpack|actionview|activerecord|arel|activejob|activemodel|bcrypt|activesupport|globalid|rack|date|did-you-mean|thor|trails-tsc|vitest-matchers)/'
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
@@ -306,7 +312,7 @@ jobs:
                   set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
                   set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
-                  bash scripts/ci/scoped-only.sh "$files" >> "$GITHUB_OUTPUT"
+                  bash scripts/ci/scoped-only.sh "$files" "$(grep -E "$INFRA_RE" <<<"$infra_files" || true)" "$AR_PKGS_RE" >> "$GITHUB_OUTPUT"
                 fi
                 ;;
             esac
@@ -345,11 +351,19 @@ jobs:
               echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
+          if [ "${{ github.event.schedule }}" = "0 7 * * *" ]; then
+            echo "docs_only=true" >> "$GITHUB_OUTPUT"
+            echo "parity_sqlite=false" >> "$GITHUB_OUTPUT"
+            echo "parity_postgres=false" >> "$GITHUB_OUTPUT"
+            echo "parity_mysql=false" >> "$GITHUB_OUTPUT"
+          fi
       - id: self_hosted
         env:
           GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
           SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           AR_AFFECTED: ${{ steps.filter.outputs.activerecord_affected }}
+          AR_SCOPE: ${{ steps.filter.outputs.ar_scope }}
+          UNIT_PACKAGES: ${{ steps.filter.outputs.unit_packages }}
         run: |
           hosted='"ubuntu-latest"'
           self_hosted='["self-hosted","debian","ARM64"]'
@@ -357,6 +371,16 @@ jobs:
           sqlite_shards='[1, 2]'
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
+          postgres_shards='[1, 2, 3]'
+          maria_shards='[1, 2]'
+          if [ -n "$AR_SCOPE" ]; then
+            sqlite_shards='[1]'
+            postgres_shards='[1]'
+            maria_shards='[1]'
+          fi
+          if [ -n "$UNIT_PACKAGES" ] && [ "$(wc -w <<<"$UNIT_PACKAGES")" -le 5 ]; then
+            unit_shards='[1]'
+          fi
           if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
             idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
               --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] as $l | all("self-hosted", "debian", "ARM64"; IN($l[]))))] | length' \
@@ -376,6 +400,8 @@ jobs:
             echo "sqlite_shards=$sqlite_shards"
             echo "unit_runs_on=$unit_runs_on"
             echo "unit_shards=$unit_shards"
+            echo "postgres_shards=$postgres_shards"
+            echo "maria_shards=$maria_shards"
           } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
@@ -472,6 +498,7 @@ jobs:
   preflight:
     name: Preflight
     needs: changes
+    if: github.event.schedule != '0 7 * * *'
     # Needs the PR body for the attribution step; the diff-based steps need
     # full history (fetch-depth: 0) to diff against the PR base SHA.
     runs-on: ubuntu-latest
@@ -886,18 +913,14 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm test:types:virtualized
 
-  unit-tests:
-    name: Unit Tests
+  repo-checks:
+    name: Repo Checks
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.unit_shards) }}
     steps:
       - uses: actions/checkout@v5
       # scripts/stale-story-references.test.ts compares story citations in
@@ -911,64 +934,17 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      - name: Install ImageMagick
-        run: |
-          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
-          { magick -version 2>/dev/null || convert -version; } | head -1
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         run: pnpm build
-      # The scripts/* suites added here are the compare tooling's own unit
-      # tests; none needs Ruby or the `pnpm build` above (that step exists for
-      # parity/query/node, which #5264 already wired in — the whole
-      # scripts/parity tree now passes, so one filter covers it).
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 1
-        env:
-          AJ_ADAPTER: test
-        run: pnpm vitest run packages/activejob
-      # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == strategy.job-total
-        env:
-          AJ_ADAPTER: async
-        run: pnpm vitest run packages/activejob
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
-        env:
-          AJ_ADAPTER: inline
         run: >
-          pnpm vitest run --shard=${{matrix.shard}}/${{strategy.job-total}}
-          packages/arel
-          packages/activejob
-          packages/activemodel
-          packages/activesupport
-          packages/bcrypt
-          packages/builder
-          packages/chronic
-          packages/date
-          packages/did-you-mean
-          packages/et-orbi
-          packages/fugit
-          packages/globalid
-          packages/html-sanitizer
-          packages/i18n
-          packages/mail
-          packages/marcel
-          packages/image-processing
-          packages/mini-magick
-          packages/mini-mime
-          packages/msgpack
-          packages/net-smtp
-          packages/nokogiri
-          packages/raabro
-          packages/rake
-          packages/ruby-compat
-          packages/tzinfo
-          packages/vitest-matchers
-          packages/zeitwerk
+          pnpm vitest run
           scripts/guides-typecheck
           scripts/tasks
           scripts/api-compare
@@ -1005,7 +981,7 @@ jobs:
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
-      - if: (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true') && matrix.shard == 1
+      - if: needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest run
           scripts/stale-story-references.test.ts
@@ -1015,6 +991,77 @@ jobs:
           scripts/parity/unported-overmatch.test.ts
           scripts/api-compare/lint-call-mismatches.test.ts
           scripts/api-compare/baseline-json.test.ts
+
+  unit-tests:
+    name: Unit Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.unit_tests_affected == 'true' &&
+      needs.changes.outputs.unit_packages != 'none'
+    runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.unit_shards) }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - name: Install ImageMagick
+        run: |
+          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          { magick -version 2>/dev/null || convert -version; } | head -1
+      - run: pnpm build
+      - if: (needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/activejob')) && matrix.shard == 1
+        env:
+          AJ_ADAPTER: test
+        run: pnpm vitest run packages/activejob
+      # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
+      - if: (needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/activejob')) && matrix.shard == strategy.job-total
+        env:
+          AJ_ADAPTER: async
+        run: pnpm vitest run packages/activejob
+      - if: needs.changes.outputs.unit_packages == ''
+        env:
+          AJ_ADAPTER: inline
+        run: >
+          pnpm vitest run --shard=${{matrix.shard}}/${{strategy.job-total}}
+          packages/arel
+          packages/activejob
+          packages/activemodel
+          packages/activesupport
+          packages/bcrypt
+          packages/builder
+          packages/chronic
+          packages/date
+          packages/did-you-mean
+          packages/et-orbi
+          packages/fugit
+          packages/globalid
+          packages/html-sanitizer
+          packages/i18n
+          packages/mail
+          packages/marcel
+          packages/image-processing
+          packages/mini-magick
+          packages/mini-mime
+          packages/msgpack
+          packages/net-smtp
+          packages/nokogiri
+          packages/raabro
+          packages/rake
+          packages/ruby-compat
+          packages/tzinfo
+          packages/vitest-matchers
+          packages/zeitwerk
+      - if: needs.changes.outputs.unit_packages != ''
+        env:
+          AJ_ADAPTER: inline
+          UNIT_PACKAGES: ${{ needs.changes.outputs.unit_packages }}
+        run: pnpm vitest run --passWithNoTests --shard=${{matrix.shard}}/${{strategy.job-total}} $UNIT_PACKAGES
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
@@ -1035,7 +1082,7 @@ jobs:
       needs.changes.outputs.actioncable_affected == 'true' ||
       needs.changes.outputs.actionview_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true' ||
-      needs.changes.outputs.activerecord_affected == 'true' ||
+      (needs.changes.outputs.activerecord_affected == 'true' && needs.changes.outputs.ar_scope == '') ||
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'))
@@ -1069,7 +1116,7 @@ jobs:
       - name: DX type tests
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' &&
-          (needs.changes.outputs.activerecord_affected == 'true' ||
+          ((needs.changes.outputs.activerecord_affected == 'true' && needs.changes.outputs.ar_scope == '') ||
           (needs.changes.outputs.trailties_affected == 'true' &&
           needs.changes.outputs.thor_only != 'true' &&
           needs.changes.outputs.actioncable_only != 'true')) }}
@@ -1284,31 +1331,38 @@ jobs:
       # (Guard: scripts/ci-suite-coverage.test.ts.)
       # Not sharded — run once, on shard 1 only, to avoid a redundant
       # double-run across the two legs.
-      - if: ${{ matrix.shard == 1 }}
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - if: needs.changes.outputs.ar_scope == ''
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - if: needs.changes.outputs.ar_scope != ''
+        env:
+          AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
+        run: pnpm vitest run $AR_SCOPE
       # CLI E2E is not sharded — run it once, on shard 1 only.
-      - if: ${{ matrix.shard == 1 }}
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
-      - if: ${{ matrix.shard == 1 }}
+      - if: ${{ matrix.shard == 1 && (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli')) }}
         run: pnpm --filter @blazetrails/example-twitter-clone smoke
 
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
   #
-  # A second full pass over the AR suite, so not on every PR: it runs on `main`,
-  # on the Monday sweep (where `changes` forces every gate true), on
+  # A second full pass over the AR suite, so not on every PR or push: it runs on
+  # its own nightly cron (no other job does), on the Monday sweep, on
   # `workflow_dispatch`, and on a PR labelled `run-sqlite-mem`. It is in the `ci`
   # aggregator's `needs:`, so whenever it does run a failure blocks the merge.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
     if: >-
-      needs.changes.outputs.docs_only != 'true' &&
+      github.event.schedule == '0 7 * * *' ||
+      (needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
-      (github.event_name != 'pull_request' ||
-      contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
+      (github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -1509,6 +1563,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
+      needs.changes.outputs.sqlite_only != 'true' &&
       (github.event_name != 'pull_request' ||
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
@@ -1527,7 +1582,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(needs.changes.outputs.postgres_shards) }}
     services:
       # tmpfs: the data dir is mounted in RAM so Postgres' per-DDL fsync
       # traffic (WAL flushes + checkpoints) never hits disk. This suite is
@@ -1607,7 +1662,17 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/3
+      - if: needs.changes.outputs.ar_scope != ''
+        run: pnpm vitest run $AR_SCOPE
+        env:
+          AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: rails
+          PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
+      - if: needs.changes.outputs.ar_scope == ''
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: postgresql
           PGHOST: localhost
@@ -1622,7 +1687,7 @@ jobs:
       # PG_TEST_URL is the activerecord-cli E2E's own input (it drives the CLI's
       # --database-url flag), not the activerecord harness's backend selector.
       # It stays a URL because that is literally what the CLI takes.
-      - if: ${{ matrix.shard == 1 }}
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
@@ -1789,6 +1854,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true' &&
+      needs.changes.outputs.sqlite_only != 'true' &&
       (github.event_name != 'pull_request' ||
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
@@ -1802,7 +1868,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: ${{ fromJSON(needs.changes.outputs.maria_shards) }}
     services:
       mariadb:
         image: mariadb:11
@@ -1835,7 +1901,16 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/2
+      - if: needs.changes.outputs.ar_scope != ''
+        run: pnpm vitest run $AR_SCOPE
+        env:
+          AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
+          ARCONN: mysql2
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+          MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
+      - if: needs.changes.outputs.ar_scope == ''
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1843,7 +1918,7 @@ jobs:
           # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
           # worker count and the slot-DB pool from the runner's vCPU count.
       # CLI E2E is not sharded — run it once, on shard 1 only.
-      - if: ${{ matrix.shard == 1 }}
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
         env:
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
@@ -2633,6 +2708,7 @@ jobs:
       - leaf-tests
       - virtualized-dx-type-tests
       - trails-tsc-tests
+      - repo-checks
       - unit-tests
       - actionpack-tests
       - system-tests
@@ -2658,6 +2734,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      issues: write
     steps:
       - name: Fail if any required job failed, was cancelled, or unexpectedly skipped
         env:
@@ -2681,7 +2758,10 @@ jobs:
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
           PARITY_MYSQL: ${{ needs.changes.outputs.parity_mysql }}
-          SQLITE_MEM_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem') }}
+          SQLITE_ONLY: ${{ needs.changes.outputs.sqlite_only }}
+          UNIT_PACKAGES: ${{ needs.changes.outputs.unit_packages }}
+          AR_SCOPED_DX: ${{ needs.changes.outputs.ar_scope != '' }}
+          SQLITE_MEM_NOT_REQUIRED: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')) }}
           MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
@@ -2741,13 +2821,14 @@ jobs:
                   # two names cover all five legs — do NOT add per-leg names
                   # (they don't exist in the `needs` context).
                   if [ "$AR_AFFECTED" = "false" ] || \
+                     [ "$SQLITE_ONLY" = "true" ] || \
                      [ "$DB_ADAPTERS_DRAFT_DEFERRED" = "true" ]; then
                     continue
                   fi
                   ;;
                 sqlite-mem-tests)
                   if [ "$AR_AFFECTED" = "false" ] || \
-                     [ "$SQLITE_MEM_UNLABELLED" = "true" ]; then
+                     [ "$SQLITE_MEM_NOT_REQUIRED" = "true" ]; then
                     continue
                   fi
                   ;;
@@ -2781,13 +2862,18 @@ jobs:
                      [ "$ACTIONCABLE_AFFECTED" = "false" ] && \
                      [ "$AV_AFFECTED" = "false" ] && \
                      [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
-                     [ "$AR_AFFECTED" = "false" ] && \
+                     { [ "$AR_AFFECTED" = "false" ] || [ "$AR_SCOPED_DX" = "true" ]; } && \
                      { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;
-                unit-tests)
+                repo-checks)
                   if [ "$UNIT_TESTS_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                unit-tests)
+                  if [ "$UNIT_TESTS_AFFECTED" = "false" ] || [ "$UNIT_PACKAGES" = "none" ]; then
                     continue
                   fi
                   ;;
@@ -2850,6 +2936,14 @@ jobs:
       # Informational only — never fails the run. Captures peer-job
       # durations from the same workflow run; CI's own duration is excluded
       # because it isn't final at the time of this query.
+      - name: Open an issue for a red nightly
+        if: ${{ failure() && github.event.schedule == '0 7 * * *' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh issue create -R "$GITHUB_REPOSITORY"
+          --title "Nightly sqlite-mem-tests failed"
+          --body "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
       - name: Job timing report
         if: ${{ always() }}
         continue-on-error: true
