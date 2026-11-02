@@ -39,6 +39,16 @@ DSL.namespace("db", () => DSL.task("migrate"));
     expect(ENGINE_ROOT).toBe("/engine");
   });
 
+  it("raises from update:bin until the updater has a generator", async () => {
+    await Rake.withApplication(async (rake) => {
+      await rbFLoad(File.join(import.meta.dirname, "engine.ts"));
+
+      await expect(rake.lookup("app:update:bin")!.invoke()).rejects.toThrow(
+        "no generator factory installed",
+      );
+    });
+  });
+
   it("falls back to the working directory for ENGINE_ROOT", async () => {
     setEngineRoot(undefined);
     await Rake.withApplication(async () => {

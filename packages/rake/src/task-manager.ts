@@ -246,7 +246,8 @@ export class TaskManager {
   /** @inventedArm if — PERMANENT */
   inNamespace<T>(name: string | null, block: (ns: NameSpace) => T): InNamespaceResult<T> {
     name ??= this.generateName();
-    this._scope = new Scope(name, this._scope);
+    const tail = this._scope;
+    this._scope = new Scope(name, tail);
     let pending = false;
     try {
       const ns = new NameSpace(this, this._scope);
@@ -256,7 +257,7 @@ export class TaskManager {
         return result
           .then(() => ns)
           .finally(() => {
-            this._scope = this._scope.tail;
+            this._scope = tail;
           }) as InNamespaceResult<T>;
       }
       return ns as InNamespaceResult<T>;

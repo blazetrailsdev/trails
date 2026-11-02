@@ -1,6 +1,6 @@
 import { DeprecatedObjectProxy, callerLocations } from "@blazetrails/activesupport";
 import { DSL, Rake } from "@blazetrails/rake";
-import { File, TopLevel, block, stderr, stdout } from "@blazetrails/ruby-compat";
+import { File, STDERR, TopLevel, block, stdout } from "@blazetrails/ruby-compat";
 import { CodeStatistics, DIRECTORIES, type DirectoryPair } from "../code-statistics.js";
 import { deprecator } from "../deprecator.js";
 
@@ -27,11 +27,11 @@ DSL.task(
       ],
     ).filter(([, dir]) => File.isDirectory(dir));
 
-    stderr.write(
-      `${deprecator().warn(
+    STDERR.puts(
+      deprecator().warn(
         "`bin/rake stats` has been deprecated and will be removed in Rails 8.1.\nPlease use `bin/rails stats` as Rails command instead.\n\n",
         callerLocations(0, 2),
-      )}\n`,
+      ) ?? null,
     );
 
     stdout.write(`${(await CodeStatistics.create(...statDirectories)).toString()}\n`);

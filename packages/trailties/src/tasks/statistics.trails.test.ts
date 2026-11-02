@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
-import { File, TopLevel, rbFLoad, stderr, stdout } from "@blazetrails/ruby-compat";
+import { File, STDERR, TopLevel, rbFLoad, stdout } from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
 
 describe("tasks/statistics", () => {
@@ -15,8 +15,8 @@ describe("tasks/statistics", () => {
       out += s;
       return true;
     });
-    vi.spyOn(stderr, "write").mockReturnValue(true);
-    const warn = vi.spyOn(deprecator(), "warn").mockReturnValue(undefined as never);
+    const puts = vi.spyOn(STDERR, "puts").mockReturnValue(null);
+    const warn = vi.spyOn(deprecator(), "warn").mockReturnValue(undefined);
 
     await Rake.withApplication(async (rake) => {
       await rbFLoad(File.join(import.meta.dirname, "statistics.ts"));
@@ -26,6 +26,7 @@ describe("tasks/statistics", () => {
     expect(warn.mock.calls.map(([m]) => m).join()).toContain(
       "`bin/rake stats` has been deprecated",
     );
+    expect(puts).toHaveBeenCalledWith(null);
     expect(out).toContain("Code LOC:");
   });
 });
