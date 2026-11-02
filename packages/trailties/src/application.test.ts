@@ -738,6 +738,19 @@ describe("Application::Configuration", () => {
     expect(c.eagerLoadPaths).toContain("/app/lib");
   });
 
+  it("config.autoload_lib_once adds lib to the once paths and ignores through the once loader", async () => {
+    class AutoloadLibOnceApp extends Application {}
+    const app = AutoloadLibOnceApp.instance();
+    Trails.application = app;
+    const c = new Configuration();
+    c.setRoot("/app");
+    await c.autoloadLibOnce({ ignore: "tasks" });
+
+    expect(c.autoloadOncePaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+    expect(app.autoloaders.once.ignoredGlobPatterns.has("/app/lib/tasks")).toBe(true);
+  });
+
   it("setting priority for engines with config.railties_order", () => {
     class BukkitsEngine extends Engine {}
     class BlogEngine extends Engine {}

@@ -183,10 +183,12 @@ As a consequence:
 
 - The finisher's `eager_load!` initializer runs only its portable arms. The three
   Zeitwerk calls carry `@missingRailsCall … — PERMANENT`.
-- `Configuration#autoloadLib` pushes its paths and has no loader to hand
-  `ignore` to.
-- There is no `Trails.autoloaders`, `autoloadLibOnce`, class-unload
-  re-eager-load, or `autoload_lib` line emitted by `trails new`.
+- `Trails.autoloaders` now runs beside this scan, each setup initializer
+  followed by an awaited `eagerLoad` (RFC 0213), and its `on_load` calls
+  `registerX`; `trailties-app-scan-retires` deletes the scan and rewrites this
+  section.
+- There is no class-unload re-eager-load, or `autoload_lib` line emitted by
+  `trails new`.
 
 This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
 about the application loader only: framework-internal call-time constant
