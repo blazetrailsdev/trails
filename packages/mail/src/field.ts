@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   byteslice,
+  casecmp,
   cmp,
   type Comparable,
   Encoding,
@@ -256,7 +257,7 @@ export class Field implements Comparable {
   }
 
   isResponsibleFor(fieldName: unknown): boolean {
-    return rbObjAsString(this.name).toLowerCase() === rbObjAsString(fieldName).toLowerCase();
+    return casecmp(rbObjAsString(this.name), rbObjAsString(fieldName)) === 0;
   }
 
   compareTo(other: unknown): number | null {

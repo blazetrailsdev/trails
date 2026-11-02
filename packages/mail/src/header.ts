@@ -61,11 +61,11 @@ export class Header {
   set fields(unfoldedFields: string[]) {
     this._fields = new FieldList();
 
-    if (unfoldedFields.length > Header.maximumAmount) {
+    if (unfoldedFields.length > (this.constructor as typeof Header).maximumAmount) {
       warn(
-        `WARNING: More than ${Header.maximumAmount} header fields; only using the first ${Header.maximumAmount} and ignoring the rest`,
+        `WARNING: More than ${(this.constructor as typeof Header).maximumAmount} header fields; only using the first ${(this.constructor as typeof Header).maximumAmount} and ignoring the rest`,
       );
-      unfoldedFields = unfoldedFields.slice(0, Header.maximumAmount);
+      unfoldedFields = unfoldedFields.slice(0, (this.constructor as typeof Header).maximumAmount);
     }
 
     for (const unfolded of unfoldedFields) {
