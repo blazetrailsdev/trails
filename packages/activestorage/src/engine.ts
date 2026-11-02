@@ -10,6 +10,7 @@ import { Model, type ClassMethods } from "./attached/model.js";
 import type { Blob } from "./blob.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
+/** @noRailsEquivalent PERMANENT */
 function attachPreviewImage(this: typeof Blob): void {
   (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage");
 }

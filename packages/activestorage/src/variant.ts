@@ -23,8 +23,7 @@ export class Variant {
     return this.blob.service;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  get content_type(): string | null {
+  get contentType(): string | null {
     return this.variation.contentType;
   }
 
@@ -45,7 +44,7 @@ export class Variant {
       expiresIn: expiresIn,
       disposition: disposition,
       filename: this.filename,
-      contentType: this.content_type,
+      contentType: this.contentType,
     });
   }
 
@@ -76,7 +75,7 @@ export class Variant {
   private async process(): Promise<void> {
     await this.blob.open({}, async (input) => {
       await this.variation.transform(input, async (output: Tempfile) => {
-        await this.service.upload(this.key, output, { contentType: this.content_type });
+        await this.service.upload(this.key, output, { contentType: this.contentType });
       });
     });
   }

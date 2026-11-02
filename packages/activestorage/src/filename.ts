@@ -35,7 +35,6 @@ export class Filename implements Comparable {
     return this.extensionWithoutDelimiter();
   }
 
-  /** @missingRailsCall encode — PERMANENT */
   sanitized(): string {
     return strip(scrub(this.filename, "\uFFFD")).replace(/[\u202E%$|:;/<>?*"\t\r\n\\]/g, "-");
   }

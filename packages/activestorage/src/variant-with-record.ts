@@ -35,8 +35,7 @@ export class VariantWithRecord {
     return this.blob.service;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  get content_type(): string | null {
+  get contentType(): string | null {
     return this.variation.contentType;
   }
 

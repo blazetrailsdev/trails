@@ -126,7 +126,7 @@ Object.defineProperty(Representable, included, {
   value(base: typeof Blob) {
     base.hasMany("variantRecords", {
       className: "ActiveStorage::VariantRecord",
-      dependent: false as never,
+      dependent: false,
     });
     base.beforeDestroy(async (blob: Blob) => {
       if (ActiveStorage.trackVariants) await blob.variantRecords.destroyAll();

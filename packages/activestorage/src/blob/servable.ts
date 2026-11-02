@@ -1,13 +1,13 @@
 import { ActiveStorage } from "../active-storage.js";
 
 interface ServableHost {
-  content_type: string | null;
+  contentType: string | null;
   forciblyServeAsBinary(): boolean;
   isAllowedInline(): boolean;
 }
 
 function contentTypeForServing(this: ServableHost): string | null {
-  return this.forciblyServeAsBinary() ? ActiveStorage.binaryContentType : this.content_type;
+  return this.forciblyServeAsBinary() ? ActiveStorage.binaryContentType : this.contentType;
 }
 
 function forcedDispositionForServing(this: ServableHost): "attachment" | undefined {
@@ -18,12 +18,12 @@ function forcedDispositionForServing(this: ServableHost): "attachment" | undefin
 
 /** @internal */
 function forciblyServeAsBinary(this: ServableHost): boolean {
-  return ActiveStorage.contentTypesToServeAsBinary.includes(this.content_type!);
+  return ActiveStorage.contentTypesToServeAsBinary.includes(this.contentType!);
 }
 
 /** @internal */
 function isAllowedInline(this: ServableHost): boolean {
-  return ActiveStorage.contentTypesAllowedInline.includes(this.content_type!);
+  return ActiveStorage.contentTypesAllowedInline.includes(this.contentType!);
 }
 
 export const Servable = {
