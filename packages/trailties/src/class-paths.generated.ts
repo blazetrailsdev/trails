@@ -27,6 +27,7 @@ import * as m24 from "./source-annotation-extractor.js";
 import * as m25 from "./trailtie.js";
 import * as m26 from "./trailtie/configuration.js";
 import * as m27 from "./welcome-controller.js";
+import * as m28 from "./zeitwerk-checker.js";
 
 registerClassPaths([
   [() => m1.Application, "Rails::Application"],
@@ -68,4 +69,5 @@ registerClassPaths([
   [() => m26.Configuration, "Rails::Trailtie::Configuration"],
   [() => m15.VERSION, "Rails::VERSION"],
   [() => m27.WelcomeController, "Rails::WelcomeController"],
+  [() => m28.ZeitwerkChecker, "Rails::ZeitwerkChecker"],
 ]);
