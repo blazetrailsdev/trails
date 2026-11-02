@@ -490,7 +490,7 @@ export class Blob extends Record {
     await PurgeJob.performLater(this);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activestorage-servable-content-type-spelling */
   get contentType(): string | null {
     return this.content_type;
   }
