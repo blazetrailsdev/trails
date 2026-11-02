@@ -1,3 +1,4 @@
+import { Autoloaders } from "./autoloaders.js";
 import { resetLoadHooks, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
@@ -20,6 +21,7 @@ const baseConfig = (): BootstrapConfig => ({
 
 class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = { ...baseConfig() };
+  autoloaders = new Autoloaders();
 }
 
 const MESSAGE_PACK = "active_support/message_pack";

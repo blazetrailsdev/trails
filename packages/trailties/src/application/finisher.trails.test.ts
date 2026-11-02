@@ -1,3 +1,4 @@
+import { Autoloaders } from "../autoloaders.js";
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import {
   Finisher,
@@ -38,6 +39,7 @@ import { Trailtie as ActiveRecordTrailtie } from "../trailties/active-record.js"
 import { ActiveRecord, AssociationRelation } from "@blazetrails/activerecord";
 
 class TestApp extends Finisher {
+  autoloaders = new Autoloaders();
   sessionStoreArgs: unknown[] | null = null;
   hooks: [unknown, { outer?: boolean } | undefined][] = [];
   executor = {

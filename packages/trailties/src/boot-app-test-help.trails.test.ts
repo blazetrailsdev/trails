@@ -195,9 +195,9 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(constantize("PostsController")).toBe(PostsController);
     expect(constantize("Admin::SessionsController")).toBe(SessionsController);
     expect(rbModName(SessionsController)).toBe("Admin::SessionsController");
-    expect(safeConstantize("Admin::AdminScope")).toBeUndefined();
+    expect(safeConstantize("Admin::Scope")).toBeDefined();
     expect(safeConstantize("Concerns::Authentication")).toBeUndefined();
-    expect(safeConstantize("Authentication")).toBeUndefined();
+    expect(safeConstantize("Authentication")).toBeDefined();
   });
 
   it("registers a controller class over the namespace its same-named directory seats", async () => {
@@ -215,7 +215,7 @@ describe("test_help wires a booted app into the test case classes", () => {
       await import("./__fixtures__/boot-app/app/channels/chat/appearances-channel.js");
     expect(constantize("ChatChannel")).toBe(ChatChannel);
     expect(constantize("Chat::AppearancesChannel")).toBe(AppearancesChannel);
-    expect(safeConstantize("Chat::Helpers")).toBeUndefined();
+    expect(safeConstantize("Chat::Helpers")).toBeDefined();
 
     const connection = new Connection(new TestServer() as never, MockRequest.envFor("/cable"));
     const subscriptions = new Subscriptions(connection as never);

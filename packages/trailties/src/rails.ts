@@ -10,6 +10,7 @@ import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
+import type { Autoloaders } from "./autoloaders.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
@@ -62,6 +63,10 @@ export class Trails {
   }
   static set application(app: Application | null) {
     _application = app;
+  }
+
+  static get autoloaders(): Autoloaders {
+    return Trails.application!.autoloaders;
   }
 
   static get cache(): CacheStore | null {

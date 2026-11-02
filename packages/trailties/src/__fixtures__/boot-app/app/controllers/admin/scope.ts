@@ -1,1 +1,1 @@
-export class AdminScope {}
+export class Scope {}

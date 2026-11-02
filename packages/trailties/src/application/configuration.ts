@@ -24,7 +24,7 @@ import {
   SecureRandom,
 } from "@blazetrails/ruby-compat";
 import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
-import { LogSubscriber } from "@blazetrails/activesupport";
+import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../rails.js";
@@ -424,11 +424,24 @@ export class Configuration extends EngineConfiguration {
     this._loadedConfigVersion = targetVersion;
   }
 
-  autoloadLib({ ignore }: { ignore: string | string[] }): void {
+  async autoloadLib({ ignore }: { ignore: string | string[] }): Promise<void> {
     const lib = File.join(this.root as string, "lib");
 
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);
+
+    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    await Trails.autoloaders.main.ignore(ignoredAbspaths);
+  }
+
+  async autoloadLibOnce({ ignore }: { ignore: string | string[] }): Promise<void> {
+    const lib = File.join(this.root as string, "lib");
+
+    this.autoloadOncePaths.push(lib);
+    this.eagerLoadPaths.push(lib);
+
+    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    await Trails.autoloaders.once.ignore(ignoredAbspaths);
   }
 
   get colorizeLogging(): boolean {

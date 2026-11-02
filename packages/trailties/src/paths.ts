@@ -1,5 +1,4 @@
-import { File, rbInspect } from "@blazetrails/ruby-compat";
-import { glob as fsGlob } from "@blazetrails/activesupport/glob";
+import { Dir, File, rbInspect } from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];
@@ -238,7 +237,7 @@ export class Path {
 
   /** @internal */
   private async filesIn(path: string): Promise<string[]> {
-    let files = await fsGlob(this.glob!, { cwd: path });
+    let files = await Dir.globAsync(this.glob!, 0, { base: path });
     if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
     return files.map((file) => File.join(path, file)).sort();
   }

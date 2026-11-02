@@ -4,6 +4,7 @@ import {
   Notifications,
   onLoad,
   TopLevel,
+  Dependencies,
   underscore,
   type Extended,
   type Included,
@@ -50,8 +51,8 @@ export class Engine extends Trailtie {
   private _app?: RackApp | RackAppObject;
   private _envConfig?: Record<string, unknown>;
 
-  static eagerLoadBang(): void {
-    this.instance().eagerLoadBang();
+  static eagerLoadBang(): void | Promise<void> {
+    return this.instance().eagerLoadBang();
   }
 
   static calledFrom(value?: string): string | undefined {
@@ -220,7 +221,7 @@ export class Engine extends Trailtie {
     return node ? await node.existent() : [];
   }
 
-  eagerLoadBang(): void {}
+  eagerLoadBang(): void | Promise<void> {}
 
   railties(): Trailties {
     if (!this._railties) this._railties = new Trailties();
@@ -396,6 +397,29 @@ Engine.initializer(
     for (const environment of (await this.paths().get("config/environments")?.existent()) ?? []) {
       await import(pathToFileURL!(environment).href);
     }
+  },
+);
+
+Engine.initializer(
+  "set_autoload_paths",
+  { before: "bootstrap_hook" },
+  async function (this: Engine) {
+    Dependencies.autoloadPaths.unshift(...(await this._allAutoloadPaths()));
+    Dependencies.autoloadOncePaths.unshift(...(await this._allAutoloadOncePaths()));
+
+    Object.freeze(this.config.autoloadPaths);
+    Object.freeze(this.config.autoloadOncePaths);
+  },
+);
+
+Engine.initializer(
+  "set_eager_load_paths",
+  { before: "bootstrap_hook" },
+  async function (this: Engine) {
+    for (const path of await this.config.allEagerLoadPaths()) {
+      Dependencies._eagerLoadPaths.add(path);
+    }
+    Object.freeze(this.config.eagerLoadPaths);
   },
 );
 
