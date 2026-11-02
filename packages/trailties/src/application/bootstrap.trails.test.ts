@@ -1,3 +1,4 @@
+import { Autoloaders } from "../autoloaders.js";
 import {
   ActiveSupport,
   Logger,
@@ -24,6 +25,7 @@ const baseConfig = (): BootstrapConfig => ({
 class TestApp extends Bootstrap implements BootstrapHost {
   logger: Logger | null = null;
   config: BootstrapConfig = { ...baseConfig() };
+  autoloaders = new Autoloaders();
 }
 
 describe(":initialize_cache lookup_store arms", () => {

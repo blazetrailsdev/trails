@@ -9,6 +9,7 @@
   "include": ["src"],
   "references": [
     { "path": "../ruby-compat" },
+    { "path": "../zeitwerk" },
     { "path": "../rake" },
     { "path": "../activesupport" },
     { "path": "../activerecord" },

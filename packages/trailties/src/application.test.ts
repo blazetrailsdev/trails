@@ -705,28 +705,34 @@ describe("Application::Configuration", () => {
     expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
   });
 
-  it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
     const c = new Configuration();
     c.setRoot("/app");
-    c.autoloadLib({ ignore: ["tasks", "generators"] });
+    await c.autoloadLib({ ignore: ["tasks", "generators"] });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
   });
 
-  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
     const c = new Configuration();
     c.setRoot("/app");
-    c.autoloadLib({ ignore: [] });
+    await c.autoloadLib({ ignore: [] });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
   });
 
-  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
     const c = new Configuration();
     c.setRoot("/app");
-    c.autoloadLib({ ignore: "tasks" });
+    await c.autoloadLib({ ignore: "tasks" });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");

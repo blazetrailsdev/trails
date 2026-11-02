@@ -3,6 +3,7 @@ import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/repo
 import {
   ActiveSupport,
   BroadcastLogger,
+  Dependencies,
   Logger,
   type LoggerOutput,
   type LogLevel,
@@ -12,13 +13,16 @@ import {
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
 import {
+  File,
   LoadError,
   constGet,
   rbObjRespondTo,
   StandardError,
   STDERR,
 } from "@blazetrails/ruby-compat";
+import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
+import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
   logger?: Logger | null;
@@ -35,10 +39,12 @@ export interface BootstrapConfig {
 
 export interface BootstrapHost {
   config: BootstrapConfig;
+  autoloaders: Autoloaders;
 }
 
 export abstract class Bootstrap extends Initializable implements BootstrapHost {
   abstract config: BootstrapConfig;
+  abstract autoloaders: Autoloaders;
 }
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
@@ -124,6 +130,29 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
     }
   }
 });
+
+Bootstrap.initializer<BootstrapHost>(
+  "setup_once_autoloader",
+  { after: "set_eager_load_paths", before: "bootstrap_hook" },
+  async function () {
+    const autoloader = this.autoloaders.once;
+
+    const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
+
+    Object.freeze(Dependencies.autoloadOncePaths);
+    for (const path of new Set(Dependencies.autoloadOncePaths)) {
+      if (!(await File.isDirectoryAsync(path))) continue;
+      if (alreadyConfiguredDirs.has(path)) continue;
+
+      await autoloader.pushDir(path);
+      if (!Dependencies.isEagerLoad(path)) autoloader.doNotEagerLoad(path);
+    }
+
+    autoloader.onLoad(_registerAutoloaded);
+    await autoloader.setup();
+    await autoloader.eagerLoad();
+  },
+);
 
 Bootstrap.initializer<BootstrapHost>("bootstrap_hook", { group: "all" }, function () {
   runLoadHooks("before_initialize", this);

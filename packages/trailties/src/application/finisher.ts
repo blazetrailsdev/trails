@@ -7,12 +7,14 @@ import {
 } from "@blazetrails/activesupport";
 import { Base as JobBase, registerJob } from "@blazetrails/activejob";
 import {
+  File,
   getFs,
   getPath,
   isRegisteredConstant,
   Monitor,
   registerConstant,
 } from "@blazetrails/ruby-compat";
+import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -67,6 +69,7 @@ export interface FinisherRoutesReloader {
 
 export interface FinisherHost {
   config: FinisherConfig;
+  autoloaders: Autoloaders;
   readonly constructor: { name: string };
   readonly railtieName: string;
   routes(): FinisherRoutes;
@@ -87,6 +90,28 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 });
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
+  const autoloader = this.autoloaders.main;
+
+  const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
+
+  Object.freeze(Dependencies.autoloadPaths);
+  for (const path of new Set(Dependencies.autoloadPaths)) {
+    if (!(await File.isDirectoryAsync(path))) continue;
+    if (alreadyConfiguredDirs.has(path)) continue;
+
+    await autoloader.pushDir(path);
+    if (!Dependencies.isEagerLoad(path)) autoloader.doNotEagerLoad(path);
+  }
+
+  if (this.config.isReloadingEnabled()) {
+    autoloader.enableReloading();
+    Dependencies.autoloader = autoloader;
+  }
+
+  autoloader.onLoad(_registerAutoloaded);
+  await autoloader.setup();
+  await autoloader.eagerLoad();
+
   await loadControllers(this.paths());
   await loadModels(this.paths());
   await loadJobs(this.paths());
@@ -263,6 +288,27 @@ Finisher.initializer(
     }
   },
 );
+
+/** @noRailsEquivalent CONVERGEABLE register-x-retires-from-source */
+export async function _registerAutoloaded(cpath: unknown, value: unknown): Promise<void> {
+  if (typeof value !== "function") return;
+  const cname = cpath as string;
+  if (value.prototype instanceof ActionController.Metal) {
+    registerController(cname, value as typeof ActionController.Metal);
+  } else if (value.prototype instanceof Base) {
+    registerModel(cname, value as typeof Base);
+  } else if (value.prototype instanceof JobBase) {
+    registerJob(cname, value as typeof JobBase);
+  } else if (TopLevel.ActionCable != null) {
+    const { ActionCable, registerChannel, registerConnection } =
+      await import("@blazetrails/actioncable");
+    if (value.prototype instanceof ActionCable.Channel.Base) {
+      registerChannel(cname, value as typeof ActionCable.Channel.Base);
+    } else if (value.prototype instanceof ActionCable.Connection.Base) {
+      registerConnection(cname, value as typeof ActionCable.Connection.Base);
+    }
+  }
+}
 
 /** @noRailsEquivalent PERMANENT */
 async function loadControllers(paths: Root): Promise<void> {

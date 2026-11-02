@@ -1,3 +1,6 @@
+import { Dependencies } from "@blazetrails/activesupport";
+import { Registry } from "@blazetrails/zeitwerk";
+import { Autoloaders } from "./autoloaders.js";
 import {
   dasherize,
   deepMerge,
@@ -55,6 +58,8 @@ const INITIAL_VARIABLES = [
   "appEnvConfig",
 ];
 
+let _bootedAutoloaders: Autoloaders | null = null;
+
 export class Application extends Engine {
   private _initialized = false;
   private _routesReloader?: RoutesReloader;
@@ -68,6 +73,7 @@ export class Application extends Engine {
   private _initialVariableValues: Record<string, unknown>;
   private _block?: (this: this) => void;
   private _reloaders: unknown[] = [];
+  readonly autoloaders = new Autoloaders();
   assets: unknown = undefined;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
@@ -276,9 +282,19 @@ export class Application extends Engine {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root);
+    this._resetAutoloadState();
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  private _resetAutoloadState(): void {
+    _bootedAutoloaders?.each((loader) => Registry.unregisterLoader(loader));
+    _bootedAutoloaders = this.autoloaders;
+    Dependencies.autoloadPaths = [];
+    Dependencies.autoloadOncePaths = [];
+    Dependencies._eagerLoadPaths = new Set();
   }
 
   toApp(): this {

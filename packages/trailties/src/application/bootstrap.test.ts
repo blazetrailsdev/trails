@@ -1,3 +1,4 @@
+import { Autoloaders } from "../autoloaders.js";
 import {
   BroadcastLogger,
   Logger,
@@ -20,6 +21,7 @@ const baseConfig = (): BootstrapConfig => ({
 
 class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = { ...baseConfig() };
+  autoloaders = new Autoloaders();
 }
 
 describe("Bootstrap", () => {
@@ -105,6 +107,7 @@ describe("Bootstrap", () => {
       "load_environment_hook",
       "initialize_logger",
       "initialize_cache",
+      "setup_once_autoloader",
       "bootstrap_hook",
     ];
 
@@ -119,6 +122,7 @@ describe("Bootstrap", () => {
 
     it("places every initializer in the :all group", () => {
       for (const init of Bootstrap._ownInitializers()) {
+        if (init.name === "setup_once_autoloader") continue;
         expect(init.belongsTo("all")).toBe(true);
       }
     });
