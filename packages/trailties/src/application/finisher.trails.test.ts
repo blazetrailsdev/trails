@@ -1,5 +1,5 @@
 import { Autoloaders } from "../autoloaders.js";
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import {
   Finisher,
   InterlockHook,
@@ -12,6 +12,7 @@ import {
 } from "./finisher.js";
 import {
   Dependencies,
+  DescendantsTracker,
   ExecutionWrapper,
   Executor,
   FileUpdateChecker,
@@ -115,8 +116,10 @@ class TestApp extends Finisher {
   }
   toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
   toComplete: Array<(this: FinisherReloaderInstance) => unknown> = [];
+  afterClassUnload: Array<() => unknown> = [];
   reloader: FinisherReloader = {
     check: () => false,
+    afterClassUnload: (block) => this.afterClassUnload.push(block),
     toPrepare: (block) => this.toPrepared.push(block),
     toRun: (block) => this.toRun.push(block),
     toComplete: (block) => this.toComplete.push(block),
@@ -334,6 +337,24 @@ describe("Finisher", () => {
     resetLoadHooks();
   });
 
+  it("eager_load! eager loads the main autoloader after class unload whatever config.eagerLoad says", async () => {
+    const app = new TestApp();
+    app.config.isReloadingEnabled = () => true;
+    app.autoloaders.main.eagerLoad = async () => {
+      app.calls.push("eager_load");
+    };
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toHaveLength(1);
+    await app.afterClassUnload[0]();
+    expect(app.calls).toEqual(["eager_load"]);
+  });
+
+  it("eager_load! registers no after_class_unload when reloading is disabled", async () => {
+    const app = new TestApp();
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toEqual([]);
+  });
+
   it("eager_load! is a no-op when config.eagerLoad is false", async () => {
     const app = new TestApp();
     const seen: string[] = [];
@@ -391,6 +412,12 @@ describe("Finisher", () => {
       klass.toRun(() => void order.push("view"));
       klass.beforeClassUnload(() => void order.push("class_unload"));
       app.reloader = klass as unknown as FinisherReloader;
+      const tracker = vi.spyOn(DescendantsTracker, "clear").mockImplementation(() => {
+        order.push("descendants_clear");
+      });
+      const dependencies = vi.spyOn(Dependencies, "clear").mockImplementation(async () => {
+        order.push("dependencies_clear");
+      });
       await run(app, "set_clear_dependencies_hook");
 
       expect(app.reloaders).toHaveLength(1);
@@ -399,7 +426,9 @@ describe("Finisher", () => {
       expect(klass.check()).toBe(true);
 
       await klass.runBang();
-      expect(order).toEqual(["class_unload", "view"]);
+      tracker.mockRestore();
+      dependencies.mockRestore();
+      expect(order).toEqual(["class_unload", "descendants_clear", "dependencies_clear", "view"]);
       expect(klass.check()).toBe(false);
     });
 
