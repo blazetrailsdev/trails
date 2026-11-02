@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ArgumentError, rbObjDup, stderr } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjDup, stderr, toA } from "@blazetrails/ruby-compat";
 import { Field, Header, Mail, Utilities } from "./index.js";
 
 const one = (field: unknown) => field as Field;
@@ -61,7 +61,7 @@ describe("Mail::Header", () => {
     it("should instantiate with a string passed in", () => {
       const header = new Header("To: Mikel\r\nFrom: bob\r\n");
       const copy = rbObjDup(header);
-      expect([...copy.fields]).toEqual([...header.fields]);
+      expect(toA(copy as never)).toEqual(toA(header as never));
       expect(copy.get("to")).toEqual(header.get("to"));
     });
   });
@@ -374,12 +374,12 @@ describe("Mail::Header", () => {
     it("should limit amount of parsed headers", () => {
       const old = Header.maximumAmount;
       Header.maximumAmount = 10;
+      const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
       try {
-        const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
         expect(new Header("X-SubscriberID: 345\n".repeat(11)).fields.length).toEqual(10);
         expect(write).toHaveBeenCalledWith(expect.stringMatching(/10 header fields/));
-        write.mockRestore();
       } finally {
+        write.mockRestore();
         Header.maximumAmount = old;
       }
     });

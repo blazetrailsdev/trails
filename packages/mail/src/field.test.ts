@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DateTimeElement, SubjectField } from "./index.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, stderr } from "@blazetrails/ruby-compat";
 import { Field, OptionalField, ToField } from "./index.js";
 
 describe("Mail::Field", () => {
   describe("parsing", () => {
     it("parses full header fields", () => {
+      const write = vi.spyOn(stderr, "write");
       const field = Field.parse("To: Mikel")!;
+      expect(write).not.toHaveBeenCalled();
+      write.mockRestore();
       expect(field.name).toEqual("To");
       expect(field.value).toEqual("Mikel");
       expect(field.field).toBeInstanceOf(ToField);

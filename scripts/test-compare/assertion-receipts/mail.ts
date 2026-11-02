@@ -9,13 +9,6 @@ export const mail: Record<string, AssertionReceipt[]> = {
       reason:
         'field_spec.rb:16 asserts `field.value.encoding`; a JS string has no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
-    {
-      kind: "expect_not_to_output",
-      value: null,
-      as: null,
-      reason:
-        "field_spec.rb:11 asserts nothing reaches stderr; `Field.parse` of a valid header has no warn arm to observe, so the port asserts the parsed field.",
-    },
   ],
   "mail:mail/header_spec.rb › encoding › should output a parsed version of itself to US-ASCII on encoded and tidy up and sort correctly":
     [
