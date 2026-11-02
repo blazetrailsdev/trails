@@ -78,7 +78,9 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   const baseNames = new Set(opts.baseNames ?? ["Base"]);
   const out: ClassInfo[] = [];
 
-  const isModel = opts.isModelClass ?? ((cls: ts.ClassDeclaration) => extendsOneOf(cls, baseNames));
+  const foreignNames = foreignBaseImports(sourceFile);
+  const isModel =
+    opts.isModelClass ?? ((cls: ts.ClassDeclaration) => extendsOneOf(cls, baseNames, foreignNames));
   const visit = (node: ts.Node): void => {
     if (ts.isClassDeclaration(node) && node.name && isModel(node)) {
       out.push(buildClassInfo(node, sourceFile));
@@ -191,13 +193,45 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
   return info;
 }
 
-function extendsOneOf(cls: ts.ClassDeclaration, names: Set<string>): boolean {
+/**
+ * The framework packages whose `Base` is not a model: `ActiveJob::Base`,
+ * `ActionMailer::Base`, `ActionController::Base`. `Base` alone says nothing, so
+ * a class is told from a model by where its `Base` came from.
+ */
+const NON_MODEL_PACKAGE = String.raw`(?:action[a-z]*|activejob)`;
+const NON_MODEL_SPECIFIER = new RegExp(String.raw`^@blazetrails/${NON_MODEL_PACKAGE}(?:/|$)`);
+const NON_MODEL_PATH = new RegExp(String.raw`(?:@blazetrails|/packages)/${NON_MODEL_PACKAGE}/`);
+
+/** Whether a class declared in `fileName` belongs to a non-model framework package. */
+export function isNonModelFrameworkFile(fileName: string): boolean {
+  return NON_MODEL_PATH.test(fileName);
+}
+
+function foreignBaseImports(sourceFile: ts.SourceFile): Set<string> {
+  const out = new Set<string>();
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteralLikeNode(stmt.moduleSpecifier)) {
+      continue;
+    }
+    if (!NON_MODEL_SPECIFIER.test(stmt.moduleSpecifier.text)) continue;
+    const bindings = stmt.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const el of bindings.elements) out.add(el.name.text);
+  }
+  return out;
+}
+
+function extendsOneOf(
+  cls: ts.ClassDeclaration,
+  names: Set<string>,
+  excluded: ReadonlySet<string> = new Set(),
+): boolean {
   for (const hc of cls.heritageClauses ?? []) {
     if (hc.token !== ts.SyntaxKind.ExtendsKeyword) continue;
     for (const t of hc.types) {
       if (!ts.isExpressionWithTypeArguments(t)) continue;
       const expr = t.expression;
-      if (ts.isIdentifier(expr) && names.has(expr.text)) return true;
+      if (ts.isIdentifier(expr) && names.has(expr.text) && !excluded.has(expr.text)) return true;
     }
   }
   return false;

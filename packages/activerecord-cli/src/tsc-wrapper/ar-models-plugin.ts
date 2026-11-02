@@ -1,5 +1,9 @@
 import type { TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
-import { virtualize, type ModelTable } from "../type-virtualization/virtualize.js";
+import {
+  virtualize,
+  type ModelTable,
+  type SchemaScopes,
+} from "../type-virtualization/virtualize.js";
 import { resolveAutoImports } from "../type-virtualization/auto-import.js";
 import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 
@@ -12,14 +16,26 @@ export interface ArModelsPluginOptions {
   baseNames: readonly string[];
   modelRegistry: ReadonlyMap<string, string>;
   schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
+  schemaScopes?: SchemaScopes;
+  modelSuperNames?: ReadonlyMap<string, string>;
   onModel?: (missing: ModelTable) => void;
   timeZoneAwareAttributes?: boolean;
 }
 
 export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
-  const { baseNames, modelRegistry, schemaColumnsByTable, onModel, timeZoneAwareAttributes } = opts;
+  const {
+    baseNames,
+    modelRegistry,
+    schemaColumnsByTable,
+    schemaScopes,
+    modelSuperNames,
+    onModel,
+    timeZoneAwareAttributes,
+  } = opts;
   const baseNameSet = new Set(baseNames);
-  const hasSchemaColumns = schemaColumnsByTable && Object.keys(schemaColumnsByTable).length > 0;
+  const hasSchemaColumns =
+    (schemaColumnsByTable && Object.keys(schemaColumnsByTable).length > 0) ||
+    (schemaScopes?.size ?? 0) > 0;
   const EXTENDS_IDENT = /\bextends\s+([\w$]+)/g;
 
   function shouldVirtualize(text: string): boolean {
@@ -45,6 +61,8 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
         baseNames,
         prependImports,
         schemaColumnsByTable,
+        schemaScopes,
+        modelSuperNames,
         onModel,
         timeZoneAwareAttributes,
       });

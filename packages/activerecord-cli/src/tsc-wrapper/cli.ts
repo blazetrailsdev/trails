@@ -11,7 +11,12 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as ts from "typescript/unstable/ast";
 import { tsApi } from "../type-virtualization/ts-api.js";
-import { virtualize, missingTables, type ModelTable } from "../type-virtualization/virtualize.js";
+import {
+  virtualize,
+  missingTables,
+  type ModelTable,
+  type SchemaScopes,
+} from "../type-virtualization/virtualize.js";
 import {
   createArTrailsProgram,
   createArSolutionBuilder,
@@ -29,8 +34,14 @@ type RichColumnValue = Extract<SchemaColumnValue, object>;
 
 type SchemaColumns = Record<string, Record<string, SchemaColumnValue>>;
 
-export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
-  const schemaPaths: string[] = [];
+interface SchemaFlag {
+  file: string;
+  /** The `<path>=<Base>` form: the schema applies only under that class. */
+  base?: string;
+}
+
+function schemaFlags(args: string[]): SchemaFlag[] {
+  const flags: SchemaFlag[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--schema" || a.startsWith("--schema=")) {
@@ -39,9 +50,32 @@ export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
         process.stderr.write("trails-tsc: --schema expects a file path.\n");
         process.exit(1);
       }
-      schemaPaths.push(path.resolve(value));
+      const eq = value.lastIndexOf("=");
+      flags.push(
+        eq === -1
+          ? { file: path.resolve(value) }
+          : { file: path.resolve(value.slice(0, eq)), base: value.slice(eq + 1) },
+      );
     }
   }
+  return flags;
+}
+
+/** The `--schema <path>=<Base>` files, keyed by base class. */
+export function loadSchemaScopes(args: string[]): SchemaScopes | undefined {
+  const scopes = new Map<string, SchemaColumns>();
+  for (const { file, base } of schemaFlags(args)) {
+    if (!base) continue;
+    const tables = loadSchemaFile(file);
+    if (tables) scopes.set(base, tables);
+  }
+  return scopes.size > 0 ? scopes : undefined;
+}
+
+export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
+  const schemaPaths = schemaFlags(args)
+    .filter((flag) => !flag.base)
+    .map((flag) => flag.file);
   let merged: SchemaColumns | undefined;
   const sourceOf = new Map<string, string>();
   for (const resolved of schemaPaths) {
@@ -222,17 +256,20 @@ export interface MissingTableReporter {
 
 export function missingTableReporter(
   schema: Readonly<Record<string, unknown>> | undefined,
+  scopes?: SchemaScopes,
 ): MissingTableReporter {
   const models = new Map<string, ModelTable>();
   return {
     onModel: (m) => {
-      if (schema) models.set(`${m.fileName}#${m.className}`, m);
+      if (schema || scopes) models.set(`${m.fileName}#${m.className}`, m);
     },
     flush: () => {
-      if (!schema) return;
+      if (!schema && !scopes) return;
       for (const { className, tableName, fileName } of missingTables(
         [...models.values()],
-        schema,
+        schema ?? {},
+        undefined,
+        scopes,
       )) {
         process.stderr.write(
           `trails-tsc: warning: ${className} (${fileName}) reads table "${tableName}", ` +
@@ -251,7 +288,10 @@ export function handleHelp(args: string[]): void {
       "  --schema <path>  Schema source: db/schema.ts (TypeScript) or a legacy .json\n" +
       "                   column-dump. Drives attribute virtualization. Repeat it\n" +
       "                   for a multi-database app (--schema db/schema.ts\n" +
-      "                   --schema db/hub_schema.ts); a table in two files is an error.\n\n" +
+      "                   --schema db/hub_schema.ts); a table in two files is an error.\n" +
+      "  --schema <path>=<Base>  That schema applies only to descendants of <Base>, the\n" +
+      "                   abstract class that connects to its database. Such a file\n" +
+      "                   may repeat another's table name.\n\n" +
       "  All other options are passed through to tsc. Run tsc --help for the full list.\n",
   );
   process.exit(0);
@@ -272,9 +312,11 @@ function handlePrintVirtualized(args: string[]): void {
   }
   const text = fs.readFileSync(resolved, "utf8");
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const reporter = missingTableReporter(schemaColumnsByTable);
+  const schemaScopes = loadSchemaScopes(args);
+  const reporter = missingTableReporter(schemaColumnsByTable, schemaScopes);
   const { text: virtualized } = virtualize(text, resolved, {
     schemaColumnsByTable,
+    schemaScopes,
     onModel: reporter.onModel,
   });
   reporter.flush();
@@ -364,7 +406,8 @@ async function handleBuildMode(args: string[]): Promise<void> {
   const fh = formatHost();
   const pretty = parsePretty(args, {});
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const reporter = missingTableReporter(schemaColumnsByTable);
+  const schemaScopes = loadSchemaScopes(args);
+  const reporter = missingTableReporter(schemaColumnsByTable, schemaScopes);
   for (const root of rootConfigs) {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
     await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
@@ -378,6 +421,7 @@ async function handleBuildMode(args: string[]): Promise<void> {
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
+    schemaScopes,
     timeZoneAwareAttributes,
     onModel: reporter.onModel,
     onDiagnostic: (d) => {
@@ -470,10 +514,12 @@ export async function main(): Promise<void> {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
-  const reporter = missingTableReporter(schemaColumnsByTable);
+  const schemaScopes = loadSchemaScopes(args);
+  const reporter = missingTableReporter(schemaColumnsByTable, schemaScopes);
   await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
+    schemaScopes,
     timeZoneAwareAttributes: await loadTimeZoneAwareAttributes(path.dirname(configPath)),
     onModel: reporter.onModel,
   });
