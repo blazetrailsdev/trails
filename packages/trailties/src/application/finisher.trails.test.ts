@@ -11,13 +11,14 @@ import {
 } from "./finisher.js";
 import {
   Dependencies,
+  ExecutionWrapper,
   Executor,
   FileUpdateChecker,
   onLoad,
   Reloader,
   resetLoadHooks,
 } from "@blazetrails/activesupport";
-import { Dir, FileUtils, Monitor, Thread } from "@blazetrails/ruby-compat";
+import { Dir, FileUtils, Monitor, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -486,5 +487,61 @@ describe("MonitorHook", () => {
     expect(monitor.isMonOwned()).toBe(true);
     hook.complete(null);
     expect(monitor.isMonOwned()).toBe(false);
+  });
+});
+
+describe("executor.wrap on pool threads outside a request", () => {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+  function pool(): ThreadPoolExecutor {
+    return new ThreadPoolExecutor({ minThreads: 0, maxThreads: 2, maxQueue: 0 });
+  }
+
+  it("excludes concurrent flows under allow_concurrency = false", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(new MonitorHook(), { outer: true });
+    const events: string[] = [];
+    const threads = new Set<Thread>();
+    const executor = pool();
+    for (const name of ["a", "b"]) {
+      executor.post(() =>
+        PoolExecutor.wrap(async () => {
+          threads.add(Thread.current());
+          events.push(`enter ${name}`);
+          await pause();
+          events.push(`leave ${name}`);
+        }),
+      );
+    }
+
+    executor.shutdown();
+    await executor.waitForTermination();
+
+    expect(events).toEqual(["enter a", "leave a", "enter b", "leave b"]);
+    expect(threads.size).toBe(2);
+  });
+
+  it("blocks a reload through InterlockHook while a flow runs", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(InterlockHook, { outer: true });
+    const events: string[] = [];
+    const executor = pool();
+    executor.post(() =>
+      PoolExecutor.wrap(async () => {
+        events.push("running");
+        await pause();
+        await pause();
+        events.push("done");
+      }),
+    );
+    await pause();
+
+    await Dependencies.interlock.unloading(() => {
+      events.push("unloading");
+    });
+    executor.shutdown();
+    await executor.waitForTermination();
+
+    expect(events).toEqual(["running", "done", "unloading"]);
   });
 });
