@@ -156,7 +156,7 @@ export class PluginBuilder {
     opts.force = force;
     opts.skipThruster = true;
     opts.skipBrakeman = true;
-    opts.skipBundle = true;
+    opts.skipInstall = true;
     opts.skipCi = true;
     opts.skipKamal = true;
     opts.skipSolid = true;

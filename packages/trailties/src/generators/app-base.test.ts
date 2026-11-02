@@ -1,8 +1,13 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, it, expect } from "vitest";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { describe, it, expect, vi } from "vitest";
+import {
+  childProcessAdapterConfig,
+  env,
+  registerChildProcessAdapter,
+  setEnv,
+} from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { AppGenerator } from "./rails/app/app-generator.js";
 import { packageManagerAdapterConfig, registerPackageManagerAdapter } from "../package-manager.js";
@@ -168,9 +173,36 @@ describe("AppBase run tasks", () => {
     ]);
   });
 
-  it("run tasks do nothing without bundle_install?", async () => {
-    expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
+  it("run tasks do nothing without isInstall", async () => {
+    expect(await commandsFor({ skipInstall: true }, "runHotwire")).toEqual([]);
     expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
+  });
+
+  it("runInstall installs through the package manager unless isInstall is false", async () => {
+    const previous = childProcessAdapterConfig.adapter;
+    const spawnSync = vi.fn(() => ({ status: 0, signal: null, stdout: "", stderr: "" }));
+    registerChildProcessAdapter("run-install-test", { spawnSync });
+    childProcessAdapterConfig.adapter = "run-install-test";
+    try {
+      const generator = (options: Record<string, unknown>) =>
+        new T(["app"], { quiet: true, ...options }, { destinationRoot: "/tmp" }) as unknown as {
+          runInstall(): Promise<void>;
+        };
+      await generator({ skipInstall: true }).runInstall();
+      await generator({ pretend: true }).runInstall();
+      expect(spawnSync).not.toHaveBeenCalled();
+      const installing = generator({}) as unknown as {
+        runInstall(): Promise<void>;
+        sayStatus: unknown;
+      };
+      const sayStatus = vi.fn();
+      installing.sayStatus = sayStatus;
+      await installing.runInstall();
+      expect(spawnSync).toHaveBeenCalledOnce();
+      expect(sayStatus).toHaveBeenCalledWith("run", expect.stringMatching(/ install$/));
+    } finally {
+      childProcessAdapterConfig.adapter = previous;
+    }
   });
 
   it("dockerfile_binfile_fixups writes a literal backslash-r", () => {

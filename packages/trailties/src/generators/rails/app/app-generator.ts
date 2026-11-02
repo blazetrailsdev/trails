@@ -1547,11 +1547,11 @@ export class AppGenerator extends AppBase {
       enum: CSS_OPTIONS,
       desc: "Choose CSS processor. Check https://github.com/rails/cssbundling-rails for more options",
     });
-    this.classOption("skipBundle", {
+    this.classOption("skipInstall", {
       type: "boolean",
       aliases: "-B",
       default: null,
-      desc: "Don't run bundle install",
+      desc: "Don't install dependencies",
     });
     this.classOption("packageManager", {
       type: "string",
@@ -1591,6 +1591,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
     this.methodAdded("applyRailsTemplate");
+    this.publicCommand("runInstall");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
