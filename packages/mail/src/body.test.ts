@@ -17,6 +17,9 @@ describe("Mail::Body", () => {
       expect(new Body().toString()).toEqual("");
     });
     it("should accept an array as the body and join it", () => {
+      expect(() => new Body(["line one\n", "line two\n"])).not.toThrow();
+    });
+    it("should accept an array as the body and join it", () => {
       expect(new Body(["line one\n", "line two\n"]).encoded()).toEqual("line one\r\nline two\r\n");
     });
   });
@@ -60,6 +63,11 @@ describe("Mail::Body", () => {
       expect(body.decoded()).toEqual("The=3Dbody");
     });
     it("should change a body on decode if given an encoding type to decode", () => {
+      const body = new Body("The=3Dbody");
+      body.setEncoding("quoted-printable");
+      expect(body.toString()).toEqual("The=body");
+    });
+    it("should change a body on decode if given an encoding type to decode", () => {
       const body = new Body("VGhlIGJvZHk=\n");
       body.setEncoding("base64");
       expect(body.toString()).toEqual("The body");
@@ -68,20 +76,20 @@ describe("Mail::Body", () => {
 
   describe("detecting non ascii", () => {
     it("should say an empty string is all ascii", () => {
-      expect(new Body().isAsciiOnly()).toBe(true);
+      expect(new Body().isAsciiOnly()).toBeTruthy();
     });
     it("should say if a body is ascii", () => {
-      expect(new Body("This is ASCII").isAsciiOnly()).toBe(true);
+      expect(new Body("This is ASCII").isAsciiOnly()).toBeTruthy();
     });
     it("should say if a body is not ascii", () => {
-      expect(new Body("This is NOT plain text ASCII　− かきくけこ").isAsciiOnly()).toBe(false);
+      expect(new Body("This is NOT plain text ASCII　− かきくけこ").isAsciiOnly()).toBeFalsy();
     });
   });
 
   describe("matching", () => {
     it("should still equal itself", () => {
       const body = new Body("The body");
-      expect(body.equals(body)).toBe(true);
+      expect(body).toEqual(body);
     });
     it("should match on the body part decoded if given a string to ==", () => {
       expect(new Body("The body").equals("The body")).toBeTruthy();
@@ -93,7 +101,7 @@ describe("Mail::Body", () => {
       expect(new Body("The body").match(/The/)![0]).toEqual("The");
     });
     it("should match on the body part decoded if given a string to include?", () => {
-      expect(new Body("The Body").isInclude("The")).toBe(true);
+      expect(new Body("The Body").decoded()).toContain("The");
     });
   });
 
