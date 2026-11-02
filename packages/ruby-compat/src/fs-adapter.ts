@@ -157,6 +157,7 @@ export interface PathAdapter {
   isAbsolute?(p: string): boolean;
   relative?(from: string, to: string): string;
   pathToFileURL?(p: string): URL;
+  fileURLToPath?(url: string): string;
   sep: string;
 }
 
@@ -441,8 +442,13 @@ function tryAutoRegisterNode(): boolean {
       readlink: (p: string) => fsPromises.readlink(p),
       ...withFlock(nodeFs as unknown as FlockableFs),
     }) as FsAdapter;
-    const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;
-    const nodeUrl = req("node:url") as { pathToFileURL(p: string): URL };
+    const nodePath = req("node:path") as Required<
+      Omit<PathAdapter, "pathToFileURL" | "fileURLToPath">
+    >;
+    const nodeUrl = req("node:url") as {
+      pathToFileURL(p: string): URL;
+      fileURLToPath(url: string): string;
+    };
     const path: PathAdapter = {
       join: (...parts) => nodePath.join(...parts),
       dirname: (p) => nodePath.dirname(p),
@@ -452,6 +458,7 @@ function tryAutoRegisterNode(): boolean {
       isAbsolute: (p) => nodePath.isAbsolute(p),
       relative: (from, to) => nodePath.relative(from, to),
       pathToFileURL: (p) => nodeUrl.pathToFileURL(p),
+      fileURLToPath: (url) => nodeUrl.fileURLToPath(url),
       sep: nodePath.sep,
     };
     registry.set("node", { fs, path });
