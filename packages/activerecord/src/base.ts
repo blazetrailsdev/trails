@@ -1,3 +1,4 @@
+import type { Duration } from "@blazetrails/activesupport";
 import {
   type Hash,
   block as rbBlock,
@@ -1669,7 +1670,7 @@ export class Base extends Model {
 
   signedId(options?: {
     purpose?: string;
-    expiresIn?: number;
+    expiresIn?: number | Duration;
     expiresAt?: Temporal.Instant;
   }): string {
     return _signedId(this, options);

@@ -13,6 +13,9 @@ const _requiring = new Map<string, Promise<void>>();
 /** @noRailsEquivalent PERMANENT */
 let _resolveHookInstalled = false;
 
+/** @noRailsEquivalent PERMANENT */
+export const _generations = new Map<string, number>();
+
 export function _installResolveHook(): void {
   if (_resolveHookInstalled) return;
 

@@ -1,23 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DelegationError } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import { registerModel } from "@blazetrails/activerecord";
+import { ArgumentError, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
 import { createBlob, User } from "./test-helpers/test-helper.js";
-
-// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-Object.assign(Blob.prototype, {
-  isAnalyzed: () => false,
-  analyzeLater: async () => {},
-  isPreviewImageNeededBeforeProcessingVariants: () => false,
-});
-Object.defineProperty(User.prototype, "attachmentReflections", {
-  value: {},
-  configurable: true,
-});
 
 describe("Attachment", () => {
   let attachment: Attachment;
@@ -29,6 +19,13 @@ describe("Attachment", () => {
       record: await User.createBang({ name: "Josh" }),
       blob: await createBlob({ filename: "hello.txt" }),
     });
+  });
+
+  it("keeps its qualified name through registerModel", () => {
+    registerModel(Attachment);
+
+    expect(rbModName(Attachment)).toBe("ActiveStorage::Attachment");
+    expect(User.computeType("ActiveStorage::Attachment")).toBe(Attachment);
   });
 
   it("delegates missing names to a loaded blob", async () => {

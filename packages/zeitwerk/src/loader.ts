@@ -1,4 +1,4 @@
-import { _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
+import { _generations, _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
 import {
   File,
   LOADED_FEATURES,
@@ -196,6 +196,9 @@ export class Loader {
       this._setup = false;
       this._eagerLoaded = false;
       this._generation += 1;
+      for (const realRoot of Object.keys(this._realRoots)) {
+        _generations.set(realRoot, this._generation);
+      }
       _installResolveHook();
     });
   }

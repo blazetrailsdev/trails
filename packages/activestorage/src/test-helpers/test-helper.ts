@@ -17,11 +17,11 @@ import type { AssociationProxy } from "@blazetrails/activerecord/associations/co
 
 export class User extends Base {
   declare name: string | null;
-  declare recordCallbacks: boolean | undefined;
+  declare private _recordCallbacks: boolean | undefined;
   declare callbackCounter: number | undefined;
   notificationSent: boolean | undefined;
 
-  declare avatar: One;
+  declare avatar: One & Pick<Attachment, "signedId">;
   declare coverPhoto: One;
   declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
   declare avatarBlob: Blob | null | Promise<Blob | null>;
@@ -37,7 +37,7 @@ export class User extends Base {
   declare highlightsWithConditionalPreprocessed: Many;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
-  declare highlights: Many;
+  declare highlights: Many & Pick<AssociationProxy<Attachment>, "findBy">;
   declare vlogs: Many;
   declare highlightsAttachments: Attachment[] | Promise<Attachment[]>;
   declare highlightsBlobs: { count(): Promise<number> };
@@ -99,6 +99,14 @@ export class User extends Base {
     this.afterUpdateCommit((user: User) => user.notify());
 
     this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
+  }
+
+  get recordCallbacks(): boolean | undefined {
+    return this._recordCallbacks;
+  }
+
+  set recordCallbacks(value: boolean | undefined) {
+    this._recordCallbacks = value;
   }
 
   isShouldPreprocessed(): boolean {
