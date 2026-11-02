@@ -1,4 +1,5 @@
 import { afterAll } from "vitest";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { EnvironmentInquirer, getEnv, NullLogger, TopLevel } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
@@ -25,6 +26,7 @@ import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
 ActiveStorage.logger = new NullLogger();
+ActiveJobBase.setQueueAdapter("test");
 ActiveStorage.analyzers = [Vips, ImageMagick, VideoAnalyzer, AudioAnalyzer];
 ActiveStorage.previewers = [PopplerPDFPreviewer, MuPDFPreviewer, VideoPreviewer];
 
