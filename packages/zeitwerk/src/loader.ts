@@ -147,18 +147,6 @@ export class Loader {
     await this.mutex.synchronize(async () => {
       if (!this._setup) throw new SetupRequired();
 
-      if (this.manifest != null && this.isReloadingEnabled()) {
-        const fs = getFs();
-        if (fs.realpath === undefined) {
-          throw new ZeitwerkError(
-            `loader ${this.tag} cannot reload from a manifest without a file system`,
-          );
-        }
-        for (const rootDir of Object.keys(this.roots)) {
-          if (await this.isDir(rootDir)) this._realRoots[await fs.realpath(rootDir)] = rootDir;
-        }
-      }
-
       const unloadedFiles = new Set<string>();
 
       for (const [abspath, cref] of Object.entries(this.autoloads)) {
@@ -378,6 +366,12 @@ export class Loader {
     }
 
     this._manifestConstants = manifest.constants;
+
+    if (this.isReloadingEnabled()) {
+      for (const rootDir of Object.keys(this.roots)) {
+        this._realRoots[await getFs().realpath!(rootDir)] = rootDir;
+      }
+    }
 
     const namespaces: Record<string, object> = {};
     for (const rootNamespace of Object.values(this.roots)) {

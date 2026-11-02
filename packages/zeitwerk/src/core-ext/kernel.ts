@@ -5,16 +5,12 @@ import {
   getPath,
   getProcessAdapter,
   type AsyncContext,
-  type AsyncContextAdapter,
 } from "@blazetrails/ruby-compat";
 import type { Cref } from "../cref.js";
 import { Registry } from "../registry.js";
 
 /** @noRailsEquivalent PERMANENT */
 const _requiring = new Map<string, { cpath: string; load: Promise<void> }>();
-
-/** @noRailsEquivalent PERMANENT */
-let _adapter: AsyncContextAdapter | null = null;
 
 /** @noRailsEquivalent PERMANENT */
 let _heldConstants: AsyncContext<string[]> | null = null;
@@ -60,12 +56,7 @@ export function _installResolveHook(): void {
 
 /** @noRailsEquivalent PERMANENT */
 function _held(): AsyncContext<string[]> {
-  const adapter = getAsyncContext();
-  if (_heldConstants === null || _adapter !== adapter) {
-    _heldConstants = adapter.create<string[]>();
-    _adapter = adapter;
-  }
-  return _heldConstants;
+  return (_heldConstants ??= getAsyncContext().create<string[]>());
 }
 
 /** @noRailsEquivalent PERMANENT */

@@ -27,6 +27,7 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
   const application = trails?.application;
   if (application != null) {
     const once = application.autoloaders?.once;
+    const own = once && Object.getOwnPropertyDescriptors(once);
     if (once != null) once.setup = once.eagerLoad = async () => {};
     try {
       for (const initializer of application.initializers.tsort()) {
@@ -36,6 +37,11 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     } finally {
       delete once?.setup;
       delete once?.eagerLoad;
+      if (once != null) {
+        for (const name of ["setup", "eagerLoad"] as const) {
+          if (own?.[name] !== undefined) Object.defineProperty(once, name, own[name]);
+        }
+      }
     }
   }
 
