@@ -168,7 +168,10 @@ export const EagerLoad = {
 
     if (this._manifestConstants != null) {
       const root = manifestRoot(this);
-      for (const row of Object.values(this._manifestConstants)) {
+      const rows = Object.entries(this._manifestConstants).sort(
+        ([a], [b]) => a.split("::").length - b.split("::").length,
+      );
+      for (const [, row] of rows) {
         const abspaths = [row.path, ...(row.dirs ?? [])].map((p) => File.expandPath(p, root));
         if (!abspaths.some((p) => p.startsWith(`${dir}/`))) continue;
         if (honourExclusions && abspaths.every((p) => this.isExcludedFromEagerLoad(p))) continue;

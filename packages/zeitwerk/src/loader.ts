@@ -328,7 +328,10 @@ export class Loader {
   /** @internal */
   async defineAutoloadsForDir(dir: string, parent: object): Promise<void> {
     if (this._manifestConstants != null) {
-      return this._defineAutoloadsForNamespace(this.realModName(parent)!, parent);
+      return this._defineAutoloadsForNamespace(
+        parent === Object ? "" : this.realModName(parent)!,
+        parent,
+      );
     }
 
     await this.ls(dir, async (basename, abspath, ftype) => {
