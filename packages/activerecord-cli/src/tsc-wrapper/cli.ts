@@ -49,11 +49,13 @@ function schemaFlags(args: string[]): SchemaFlag[] {
         process.stderr.write("trails-tsc: --schema expects a file path.\n");
         process.exit(1);
       }
-      const eq = value.lastIndexOf("=");
+      if (value.endsWith("=")) {
+        process.stderr.write("trails-tsc: --schema expects <path>=<Base>.\n");
+        process.exit(1);
+      }
+      const scoped = /^(.+)=([A-Za-z_$][\w$]*)$/.exec(value);
       flags.push(
-        eq === -1
-          ? { file: path.resolve(value) }
-          : { file: path.resolve(value.slice(0, eq)), base: value.slice(eq + 1) },
+        scoped ? { file: path.resolve(scoped[1]), base: scoped[2] } : { file: path.resolve(value) },
       );
     }
   }
@@ -65,7 +67,12 @@ export function loadSchemaScopes(args: string[]): SchemaScopes | undefined {
   for (const { file, base } of schemaFlags(args)) {
     if (!base) continue;
     const tables = loadSchemaFile(file);
-    if (tables) scopes.set(base, tables);
+    if (!tables) continue;
+    if (scopes.has(base)) {
+      process.stderr.write(`trails-tsc: two --schema files name the base ${base}.\n`);
+      process.exit(1);
+    }
+    scopes.set(base, tables);
   }
   return scopes.size > 0 ? scopes : undefined;
 }

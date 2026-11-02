@@ -193,7 +193,7 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
   return info;
 }
 
-const NON_MODEL_PACKAGE = String.raw`(?:action[a-z]*|activejob)`;
+const NON_MODEL_PACKAGE = String.raw`(?:actioncable|actionmailbox|actionmailer|actionpack|actiontext|actionview|activejob)`;
 const NON_MODEL_SPECIFIER = new RegExp(String.raw`^@blazetrails/${NON_MODEL_PACKAGE}(?:/|$)`);
 const NON_MODEL_PATH = new RegExp(String.raw`(?:@blazetrails|/packages)/${NON_MODEL_PACKAGE}/`);
 

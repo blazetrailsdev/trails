@@ -71,7 +71,9 @@ export function missingTables(
     if (base !== m && base.optedOut) continue;
     if (m.dynamicTableName || base.dynamicTableName) continue;
     const tableName = m.tableName ?? base.tableName ?? pluralize(underscore(base.className));
-    const scope = scopeFor(m.className, scopes, (name) => byName.get(name)?.superName);
+    const scope = scopeFor(m.className, scopes, (name) =>
+      name === m.className ? m.superName : byName.get(name)?.superName,
+    );
     if (Object.hasOwn(scope ?? schema, tableName)) continue;
     out.push({ className: m.className, tableName, fileName: m.fileName });
   }

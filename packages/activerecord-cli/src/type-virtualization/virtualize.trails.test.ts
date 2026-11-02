@@ -1298,3 +1298,19 @@ describe("schema scopes and non-model bases", () => {
     ).toEqual(["WorkflowRun"]);
   });
 });
+
+test("scopes each of two same-named models by its own superclass", () => {
+  const model = (superName: string, fileName: string) => ({
+    className: "PullRequest",
+    superName,
+    dynamicTableName: false,
+    abstract: false,
+    optedOut: false,
+    fileName,
+  });
+  const models = [model("Stats", "a.ts"), model("StatsSyncRecord", "b.ts")];
+  const scopes = new Map([["StatsSyncRecord", { pull_requests: {} }]]);
+  expect(
+    missingTables(models, {}, new Set(["Base", "Stats"]), scopes).map((m) => m.fileName),
+  ).toEqual(["a.ts"]);
+});
