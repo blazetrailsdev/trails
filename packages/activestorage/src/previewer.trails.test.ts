@@ -44,4 +44,19 @@ describe("ActiveStorage::Previewer", () => {
       new PreviewError("sh failed (status 3): boom"),
     );
   });
+
+  it("reads each command's own status when previews run concurrently", async () => {
+    const blob = await createFileBlob();
+    const previewer = new ShellPreviewer(blob);
+
+    const results = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, i) =>
+        previewer.run("sh", "-c", `sleep 0.0${i % 3}; exit ${i % 2}`),
+      ),
+    );
+
+    expect(results.map((result) => result.status)).toEqual(
+      Array.from({ length: 12 }, (_, i) => (i % 2 === 0 ? "fulfilled" : "rejected")),
+    );
+  });
 });

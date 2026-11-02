@@ -18,7 +18,7 @@ interface Presented {
   filename: Filename;
   contentType: string | null;
   key: string | null | Promise<string | null>;
-  url(options?: never): unknown;
+  url(options?: Parameters<Blob["url"]>[0]): unknown;
   download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null>;
 }
 
@@ -63,7 +63,7 @@ export class Preview {
 
   async url(options: Parameters<Blob["url"]>[0] = {}): Promise<unknown> {
     if (await this.isProcessed()) {
-      return await (await this.presentation()).url(options as never);
+      return await (await this.presentation()).url(options);
     } else {
       throw new UnprocessedError();
     }
@@ -110,9 +110,7 @@ export class Preview {
 
   /** @internal */
   private async variant(): Promise<Variant | VariantWithRecord> {
-    return (await (this.image as One & Pick<Attachment, "variant">).variant(
-      this.variation as never,
-    )) as Variant | VariantWithRecord;
+    return await (this.image as One & Attachment).variant(this.variation);
   }
 
   /** @internal */
@@ -120,15 +118,11 @@ export class Preview {
     return isPresent(this.variation.transformations);
   }
 
-  /**
-   * @internal
-   * @inventedArm isProcessed — PERMANENT
-   */
+  /** @internal */
   private async presentation(): Promise<Presented> {
-    await this.isProcessed();
-    return (this.isVariant()
+    return this.isVariant()
       ? await (await this.variant()).processed()
-      : this.image) as unknown as Presented;
+      : (this.image as One & Presented);
   }
 
   /** @internal */

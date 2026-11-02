@@ -1,3 +1,5 @@
+import type { VariantWithRecord } from "./variant-with-record.js";
+import type { Variant } from "./variant.js";
 import type { Variation } from "./variation.js";
 import { type Base } from "@blazetrails/activerecord";
 import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
@@ -80,7 +82,7 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  async variant(transformations: Transformations): Promise<unknown> {
+  async variant(transformations: Transformations): Promise<Variant | VariantWithRecord> {
     transformations = await this.transformationsByName(transformations);
     return (await this.blob)!.variant(transformations);
   }
