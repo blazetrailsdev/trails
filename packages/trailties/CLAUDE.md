@@ -150,6 +150,12 @@ The eager directory scan in `trailties/src/application/finisher.ts`
 (`loadAppClasses` / `collectAppClasses`) still runs beside the loaders until
 `trailties-app-scan-retires` deletes it and rewrites this section.
 
+**`app/views` is not an autoload root.** Rails' `app` glob
+(`railties/lib/rails/engine/configuration.rb:76-78`) reaches it because `.erb` is
+not `.rb`; a template built `--in-place` leaves a `.js` module that Zeitwerk's
+`ruby?` would read as code. So the `app` path excludes `views` and
+`views/concerns`, as it excludes `assets`. Ruled in review on trails#9603.
+
 **A scanned app class registers through its package's `registerX`.** Every
 framework base an app subclasses has one, beside the base class:
 `registerModel` (`activerecord/src/associations.ts`), `registerController`

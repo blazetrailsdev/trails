@@ -89,7 +89,6 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
   await this.ensureGeneratorTemplatesAdded();
 });
 
-/** @inventedArm if — PERMANENT */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
 
@@ -99,7 +98,6 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   for (const path of new Set(Dependencies.autoloadPaths)) {
     if (!(await File.isDirectoryAsync(path))) continue;
     if (alreadyConfiguredDirs.has(path)) continue;
-    if (/\/app\/views\/?$/.test(path)) continue;
 
     await autoloader.pushDir(path);
     if (!Dependencies.isEagerLoad(path)) autoloader.doNotEagerLoad(path);

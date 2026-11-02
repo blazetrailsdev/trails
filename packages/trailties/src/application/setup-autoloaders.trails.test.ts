@@ -3,6 +3,7 @@ import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { Registry } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "../autoloaders.js";
+import { EngineConfiguration } from "../engine/configuration.js";
 import { Root } from "../paths.js";
 import { Bootstrap } from "./bootstrap.js";
 import { Finisher } from "./finisher.js";
@@ -43,14 +44,16 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     FileUtils.rmRf(root);
   });
 
-  it("setup_main_autoloader does not push app/views, whose built templates are not constants", async () => {
-    const views = dir("app/views");
-    File.write(File.join(views, "feed.xml.builder.js"), "");
-    Dependencies.autoloadPaths = [views];
+  it("the app glob leaves app/views and app/views/concerns out of the eager load paths", async () => {
+    dir("app/models");
+    dir("app/views/concerns");
 
-    await run(Finisher, "setup_main_autoloader");
+    const config = new EngineConfiguration(root);
+    const eagerLoad = await config.paths().eagerLoad();
 
-    expect(autoloaders.main.dirs()).toEqual([]);
+    expect(eagerLoad).toContain(File.join(root, "app/models"));
+    expect(eagerLoad).not.toContain(File.join(root, "app/views"));
+    expect(eagerLoad).not.toContain(File.join(root, "app/views/concerns"));
   });
 
   for (const [paths, loader, klass, name] of [
