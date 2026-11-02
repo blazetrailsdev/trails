@@ -8,9 +8,14 @@ import {
   sprintf,
   Thread,
 } from "@blazetrails/ruby-compat";
+import type { Message } from "./message.js";
+import type { Part } from "./part.js";
 import type { CommonField } from "./fields/common-field.js";
 
 interface MailConstants {
+  Message: typeof Message;
+  Part: typeof Part;
+  "new"(...args: unknown[]): Message;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -21,6 +26,10 @@ type FieldConstant = new (...args: never[]) => CommonField;
 
 export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   RANDOM_TAG: "%x%x_%x%x%d%x",
+
+  new(...args: unknown[]) {
+    return new Mail.Message(args);
+  },
 
   randomTag(): string {
     const t = Time.now();
@@ -45,6 +54,6 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   uniq(): number | bigint {
     return (_uniq = BigInt(_uniq) + 1n);
   },
-} as MailConstants & Record<`${string}Field`, FieldConstant>;
+} as unknown as MailConstants & Record<`${string}Field`, FieldConstant>;
 
 let _uniq: number | bigint = Mail.somethingRandom();

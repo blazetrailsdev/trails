@@ -667,6 +667,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/mini-mime':
+        specifier: workspace:*
+        version: link:../mini-mime
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

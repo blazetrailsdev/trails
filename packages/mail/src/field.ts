@@ -80,6 +80,9 @@ export class Field implements Comparable {
       received: Mail.ReceivedField,
       "mime-version": Mail.MimeVersionField,
       "content-transfer-encoding": Mail.ContentTransferEncodingField,
+      "content-type": Mail.ContentTypeField,
+      "content-disposition": Mail.ContentDispositionField,
+      "content-id": Mail.ContentIdField,
       "content-description": Mail.ContentDescriptionField,
       "content-location": Mail.ContentLocationField,
     } as unknown as Record<string, FieldClass>);

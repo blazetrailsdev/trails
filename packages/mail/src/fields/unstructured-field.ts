@@ -63,7 +63,10 @@ export class UnstructuredField extends CommonField {
     return result.join("\r\n ");
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall map — CONVERGEABLE mail-message-spec-port
+   */
   protected fold(prepend = 0): string[] {
     const encoding = this.normalizedEncoding();
     const decodedString = rbObjAsString(this.decoded());
