@@ -40,20 +40,26 @@ import * as m37 from "./gem-version.js";
 import * as m38 from "./log-subscriber.js";
 import * as m39 from "./mirror-job.js";
 import * as m40 from "./named-variant.js";
-import * as m41 from "./purge-job.js";
-import * as m42 from "./record.js";
-import * as m43 from "./reflection.js";
-import * as m44 from "./service.js";
-import * as m45 from "./service/configurator.js";
-import * as m46 from "./service/disk-service.js";
-import * as m47 from "./service/mirror-service.js";
-import * as m48 from "./service/registry.js";
-import * as m49 from "./set-blob.js";
-import * as m50 from "./set-current.js";
-import * as m51 from "./transform-job.js";
-import * as m52 from "./variant-with-record.js";
-import * as m53 from "./variant.js";
-import * as m54 from "./variation.js";
+import * as m41 from "./preview-image-job.js";
+import * as m42 from "./preview.js";
+import * as m43 from "./previewer.js";
+import * as m44 from "./previewer/mupdf-previewer.js";
+import * as m45 from "./previewer/poppler-pdf-previewer.js";
+import * as m46 from "./previewer/video-previewer.js";
+import * as m47 from "./purge-job.js";
+import * as m48 from "./record.js";
+import * as m49 from "./reflection.js";
+import * as m50 from "./service.js";
+import * as m51 from "./service/configurator.js";
+import * as m52 from "./service/disk-service.js";
+import * as m53 from "./service/mirror-service.js";
+import * as m54 from "./service/registry.js";
+import * as m55 from "./set-blob.js";
+import * as m56 from "./set-current.js";
+import * as m57 from "./transform-job.js";
+import * as m58 from "./variant-with-record.js";
+import * as m59 from "./variant.js";
+import * as m60 from "./variation.js";
 
 registerClassPaths([
   [() => m0.AnalyzeJob, "ActiveStorage::AnalyzeJob"],
@@ -99,27 +105,33 @@ registerClassPaths([
   [() => m38.LogSubscriber, "ActiveStorage::LogSubscriber"],
   [() => m39.MirrorJob, "ActiveStorage::MirrorJob"],
   [() => m40.NamedVariant, "ActiveStorage::NamedVariant"],
+  [() => m42.Preview, "ActiveStorage::Preview"],
+  [() => m43.Previewer, "ActiveStorage::Previewer"],
+  [() => m44.MuPDFPreviewer, "ActiveStorage::Previewer::MuPDFPreviewer"],
+  [() => m45.PopplerPDFPreviewer, "ActiveStorage::Previewer::PopplerPDFPreviewer"],
+  [() => m46.VideoPreviewer, "ActiveStorage::Previewer::VideoPreviewer"],
   [() => m33.PreviewError, "ActiveStorage::PreviewError"],
-  [() => m41.PurgeJob, "ActiveStorage::PurgeJob"],
-  [() => m42.Record, "ActiveStorage::Record"],
-  [() => m43.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
-  [() => m43.ClassMethods, "ActiveStorage::Reflection::ActiveRecordExtensions::ClassMethods"],
-  [() => m43.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
-  [() => m43.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
-  [() => m43.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
-  [() => m43.ReflectionExtension, "ActiveStorage::Reflection::ReflectionExtension"],
-  [() => m44.Service, "ActiveStorage::Service"],
-  [() => m45.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m46.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m47.MirrorService, "ActiveStorage::Service::MirrorService"],
-  [() => m48.Registry, "ActiveStorage::Service::Registry"],
-  [() => m49.SetBlob, "ActiveStorage::SetBlob"],
-  [() => m50.SetCurrent, "ActiveStorage::SetCurrent"],
-  [() => m51.TransformJob, "ActiveStorage::TransformJob"],
+  [() => m41.PreviewImageJob, "ActiveStorage::PreviewImageJob"],
+  [() => m47.PurgeJob, "ActiveStorage::PurgeJob"],
+  [() => m48.Record, "ActiveStorage::Record"],
+  [() => m49.ActiveRecordExtensions, "ActiveStorage::Reflection::ActiveRecordExtensions"],
+  [() => m49.ClassMethods, "ActiveStorage::Reflection::ActiveRecordExtensions::ClassMethods"],
+  [() => m49.HasAttachedReflection, "ActiveStorage::Reflection::HasAttachedReflection"],
+  [() => m49.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
+  [() => m49.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
+  [() => m49.ReflectionExtension, "ActiveStorage::Reflection::ReflectionExtension"],
+  [() => m50.Service, "ActiveStorage::Service"],
+  [() => m51.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m52.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m53.MirrorService, "ActiveStorage::Service::MirrorService"],
+  [() => m54.Registry, "ActiveStorage::Service::Registry"],
+  [() => m55.SetBlob, "ActiveStorage::SetBlob"],
+  [() => m56.SetCurrent, "ActiveStorage::SetCurrent"],
+  [() => m57.TransformJob, "ActiveStorage::TransformJob"],
   [() => m33.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
   [() => m33.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
-  [() => m53.Variant, "ActiveStorage::Variant"],
-  [() => m52.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
-  [() => m54.Variation, "ActiveStorage::Variation"],
+  [() => m59.Variant, "ActiveStorage::Variant"],
+  [() => m58.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
+  [() => m60.Variation, "ActiveStorage::Variation"],
   [() => m37.VERSION, "ActiveStorage::VERSION"],
 ]);
