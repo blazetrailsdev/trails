@@ -53,6 +53,22 @@
       "types": "./dist/autoloaders/inflector.d.ts",
       "default": "./dist/autoloaders/inflector.js"
     },
+    "./engine/commands": {
+      "types": "./dist/engine/commands.d.ts",
+      "default": "./dist/engine/commands.js"
+    },
+    "./plugin/test": {
+      "types": "./dist/plugin/test.d.ts",
+      "default": "./dist/plugin/test.js"
+    },
+    "./tasks/engine": {
+      "types": "./dist/tasks/engine.d.ts",
+      "default": "./dist/tasks/engine.js"
+    },
+    "./tasks/statistics": {
+      "types": "./dist/tasks/statistics.d.ts",
+      "default": "./dist/tasks/statistics.js"
+    },
     "./engine": {
       "types": "./dist/engine.d.ts",
       "default": "./dist/engine.js"
