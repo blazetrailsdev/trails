@@ -37,14 +37,12 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  /** @inventedArm isProcessed — PERMANENT */
   get filename(): Promise<Filename> {
     return this.isProcessed()
       .then(() => this.presentation())
       .then((presentation) => presentation.filename);
   }
 
-  /** @inventedArm isProcessed — PERMANENT */
   get contentType(): Promise<string | null> {
     return this.isProcessed()
       .then(() => this.presentation())
