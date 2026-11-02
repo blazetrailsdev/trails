@@ -140,15 +140,24 @@ the direct call in `commands/server.ts` goes, or blocks run twice.
 This is a genuine language shortcoming, ratified here: JS has no synchronous
 await. A server-block runner returning a promise is the designed shape.
 
-## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
+## The application loader is Zeitwerk (`Rails.autoloaders`)
 
-RFC 0213 reversed the original ruling: Zeitwerk is vendored and ported, and
-`Trails.autoloaders` holds `main` and `once` (`railties/lib/rails/autoloaders.rb`).
-Each setup initializer is followed by an awaited `eagerLoad`.
+RFC 0213 reversed the "no autoloader" ruling: Zeitwerk is vendored and ported,
+and `Trails.autoloaders` holds `main` and `once`
+(`railties/lib/rails/autoloaders.rb`). The directory scan is gone.
 
-The eager directory scan in `trailties/src/application/finisher.ts`
-(`loadAppClasses` / `collectAppClasses`) still runs beside the loaders until
-`trailties-app-scan-retires` deletes it and rewrites this section.
+**Boot order.** Lookup is synchronous and a load is not, so `setup_main_autoloader`
+and `setup_once_autoloader` each end with an awaited `eagerLoad`, whatever
+`config.eager_load` says. `config.eager_load` keeps its Rails meaning for the
+`eager_load!` initializer (`railties/lib/rails/application/finisher.rb:76-90`).
+Reading a constant under a `do_not_eager_load` path raises `NameError` until
+`await loader.loadFile(path)` runs.
+
+**File layout is a contract.** A file's path names its constant, and the file
+exports that constant by name: `app/models/admin/user.ts` exports `User`, seated
+as `Admin::User`. A default export has no constant name to check, and a file that
+does not define its constant raises Zeitwerk's "expected file … to define
+constant …". Two classes in one file, or a class under another name, fail at boot.
 
 **`app/views` is not an autoload root.** Rails' `app` glob
 (`railties/lib/rails/engine/configuration.rb:76-78`) reaches it because `.erb` is
@@ -157,37 +166,14 @@ not `.rb`; a template built `--in-place` leaves a `.js` module that Zeitwerk's
 `views/concerns`, as it excludes `assets`. Decided in review on trails#9603, not a repo-owner ruling; it converges under
 `app-glob-matches-rails-exclude`.
 
-**A scanned app class registers through its package's `registerX`.** Every
-framework base an app subclasses has one, beside the base class:
-`registerModel` (`activerecord/src/associations.ts`), `registerController`
-(`actionpack/src/action-controller/base.ts`), `registerJob`
-(`activejob/src/base.ts`), `registerChannel`
-(`actioncable/src/channel/base.ts`) and `registerConnection`
-(`actioncable/src/connection/base.ts`). Each takes `(klass)`, `(name, klass)`
-or `(klasses[])`, checks the base with `rbClassInheritedP` and raises
-`ArgumentError` on a mismatch, and seats the class under `klass.name` plus
-`rbModName`. A directory prefix goes through `(name, klass)`. A new scanned
-directory (mailers, an engine's `app/` dirs) adds a `registerX` in the package
-that owns the base, tagged `@noRailsEquivalent PERMANENT` citing this section,
-and never a bare `registerConstant` or a `mod[camelize(filename)]` lookup in the
-finisher. Ruled by the repo owner on 2026-10-26 (trails#9319). The last
-exception, `loadControllers`' file-name selection and its `controllerConstants`
-map, converged under `load-controllers-shares-collect-constants`. A reader
-reaches a registered class by asking its `registerX` registry, not through
-`constantize`; route dispatch's `controller_class_for` `constantize` is debt
-under root CLAUDE.md § "Constant lookup is an import or a registry"
-(2026-10-28).
+**`on_load` does what `inherited` and the `registerX` calls did.** The finisher's
+`_registerAutoloaded` hands each loaded class to its `registerX` until RFC 0213
+retires them, and runs `ActionController::Railties::Helpers.inherited` for a
+controller, superclass first, since JS has no hook at `extends`.
 
-As a consequence:
-
-- The finisher's `eager_load!` initializer runs only its portable arms. The three
-  Zeitwerk calls carry `@missingRailsCall … — CONVERGEABLE` receipts.
-- `Trails.autoloaders` now runs beside this scan, each setup initializer
-  followed by an awaited `eagerLoad` (RFC 0213), and its `on_load` calls
-  `registerX`; `trailties-app-scan-retires` deletes the scan and rewrites this
-  section.
-- There is no class-unload re-eager-load, or `autoload_lib` line emitted by
-  `trails new`.
+**`autoload_lib` follows `Application.register`.** It is async (`Loader#ignore`
+is) and a `static {}` block cannot await, so `trails new` emits it as a top-level
+`await` in `config/application.ts`.
 
 It is about the application loader only: framework-internal call-time constant
 resolution is root § "Call-time constant resolution".

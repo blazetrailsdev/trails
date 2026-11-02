@@ -27,7 +27,6 @@ import {
   ThreadPoolExecutor,
   TimerTask,
 } from "@blazetrails/ruby-compat";
-import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
@@ -105,13 +104,10 @@ class TestApp extends Finisher {
   routesReloader(): FinisherRoutesReloader {
     return this._routesReloader;
   }
-  paths(): Root {
-    return new Root(null);
-  }
-
   routes(): FinisherRoutes {
     return this._routes;
   }
+  afterClassUnload: Array<() => unknown> = [];
   toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
   toComplete: Array<(this: FinisherReloaderInstance) => unknown> = [];
   reloader: FinisherReloader = {
@@ -120,6 +116,7 @@ class TestApp extends Finisher {
     toRun: (block) => this.toRun.push(block),
     toComplete: (block) => this.toComplete.push(block),
     prepareBang: () => this.calls.push("prepare!"),
+    afterClassUnload: (block) => this.afterClassUnload.push(block),
   };
   watchableArgs(): [string[], Record<string, string[]>] {
     return [this.watchableFiles, {}];
@@ -284,6 +281,13 @@ describe("Finisher", () => {
     expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded", "execute"]);
     expect(seen).toEqual([instance]);
     resetLoadHooks();
+  });
+
+  it("eager_load! registers no after_class_unload block when reloading is disabled", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toEqual([]);
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
