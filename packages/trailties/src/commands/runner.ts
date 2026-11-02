@@ -78,7 +78,7 @@ export class RunnerCommand extends Base {
       );
     } else if (await File.isExistAsync(codeOrFile)) {
       const expandedFilePath = File.expandPath(codeOrFile);
-      argv[1] = expandedFilePath;
+      (argv as string[])[1] = expandedFilePath;
       await this.conditionalExecutor(
         wrapWithExecutor,
         { source: "application.runner.railties" },
