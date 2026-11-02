@@ -17,10 +17,10 @@ export async function require(path: string): Promise<boolean> {
     }
     if (!Object.hasOwn(loader.autoloads, path)) return false;
     const load = (async () => {
-      const exports = (await import(getPath().pathToFileURL!(path).href)) as Record<
-        string,
-        unknown
-      >;
+      const thunk = loader.imports?.[loader.autoloads[path].path()];
+      const exports = (await (thunk !== undefined
+        ? thunk()
+        : import(getPath().pathToFileURL!(path).href))) as Record<string, unknown>;
       LOADED_FEATURES.push(path);
       await loader.onFileAutoloaded(path, exports);
     })();

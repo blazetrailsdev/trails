@@ -1,9 +1,22 @@
-import { Dir, File, TopLevel, getFs } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  TopLevel,
+  fsAdapterConfig,
+  getFs,
+  getPath,
+  registerFsAdapter,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import { Error as ZeitwerkError } from "./error.js";
 import type { Loader } from "./loader.js";
-import { buildManifest, writeArtifacts, type Manifest } from "./loader/manifest.js";
+import {
+  buildManifest,
+  configurationDigest,
+  writeArtifacts,
+  type Manifest,
+} from "./loader/manifest.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 import { Registry } from "./registry.js";
 import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
@@ -183,6 +196,56 @@ describe("autoload artifacts", () => {
       } finally {
         delete seats.X;
         delete seats.Admin;
+      }
+    });
+  });
+
+  it("boots a built manifest on an fs adapter that raises on every read", async () => {
+    const files: [string, string][] = [
+      ["x.js", "export class X {}\n"],
+      ["admin/deep/thing.js", "export class Thing {}\n"],
+      ["m.js", "export class M {}\n"],
+      ["m/y.js", "export class Y {}\n"],
+      ["skipped/z.js", "export class Z {}\n"],
+    ];
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      const dir = await writeArtifacts(loader);
+      const manifest = JSON.parse(await getFs().readFile(`${dir}/manifest.json`, "utf8"));
+      const { imports } = await import(`${dir}/imports.generated.js`);
+      Registry.unregisterLoader(loader);
+
+      const real = getFs();
+      const raising = new Proxy(real, {
+        get(target, name, receiver) {
+          if (name === "cwd") return Reflect.get(target, name, receiver);
+          return () => {
+            throw new globalThis.Error(`fs touched: ${String(name)}`);
+          };
+        },
+      });
+      const previous = fsAdapterConfig.adapter;
+      registerFsAdapter("raising", raising, getPath());
+      fsAdapterConfig.adapter = "raising";
+      try {
+        const reader = newLoader();
+        reader.manifest = manifest;
+        reader.imports = imports;
+        await reader.pushDir(".");
+        await reader.collapse("nothing");
+        reader.manifest = { ...manifest, digest: configurationDigest(reader) };
+        await reader.setup();
+        reader.doNotEagerLoad("skipped");
+
+        await reader.eagerLoad();
+
+        const seats = TopLevel as Record<string, Record<string, Record<string, unknown>>>;
+        expect(seats.X).toBeTypeOf("function");
+        expect(seats.M.Y).toBeTypeOf("function");
+        expect(seats.Admin.Deep.Thing).toBeTypeOf("function");
+        expect(seats.Skipped).toBeUndefined();
+      } finally {
+        fsAdapterConfig.adapter = previous;
       }
     });
   });

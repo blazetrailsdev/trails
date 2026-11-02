@@ -4,6 +4,7 @@ import { _isModule } from "../core-ext/module.js";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";
 import type { Loader } from "../loader.js";
+import { manifestRoot } from "./manifest.js";
 import { Registry } from "../registry.js";
 
 export const EagerLoad = {
@@ -164,6 +165,22 @@ export const EagerLoad = {
     if (honourExclusions && this.isExcludedFromEagerLoad(dir)) return;
 
     if (this.logger != null) this.log(`eager load directory ${dir} start`);
+
+    if (this._manifestConstants != null) {
+      const root = manifestRoot(this);
+      const rows = Object.entries(this._manifestConstants).sort(
+        ([a], [b]) => a.split("::").length - b.split("::").length,
+      );
+      for (const [, row] of rows) {
+        const abspaths = [row.path, ...(row.dirs ?? [])].map((p) => File.expandPath(p, root));
+        if (!abspaths.some((p) => p.startsWith(`${dir}/`))) continue;
+        if (honourExclusions && abspaths.every((p) => this.isExcludedFromEagerLoad(p))) continue;
+        const cref = this.autoloads[abspaths[0]];
+        if (cref != null) await autoloadGet(cref);
+      }
+      if (this.logger != null) this.log(`eager load directory ${dir} end`);
+      return;
+    }
 
     const queue: [string, object][] = [[dir, namespace]];
     let next: [string, object] | undefined;

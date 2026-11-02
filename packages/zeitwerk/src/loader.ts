@@ -19,7 +19,12 @@ import { Callbacks } from "./loader/callbacks.js";
 import { Config } from "./loader/config.js";
 import { EagerLoad } from "./loader/eager-load.js";
 import { Helpers } from "./loader/helpers.js";
-import { configurationDigest, manifestRoot, type Manifest } from "./loader/manifest.js";
+import {
+  configurationDigest,
+  manifestRoot,
+  type Manifest,
+  type ManifestRow,
+} from "./loader/manifest.js";
 import { RealModName } from "./real-mod-name.js";
 import { Registry } from "./registry.js";
 
@@ -48,6 +53,10 @@ export class Loader {
   manifest: Manifest | string | null;
   /** @noRailsEquivalent PERMANENT */
   manifestRoot: string | null;
+  /** @noRailsEquivalent PERMANENT */
+  imports: Record<string, () => Promise<unknown>> | null;
+  /** @internal */ _manifestConstants: Record<string, ManifestRow> | null;
+  /** @internal */ _manifestRows: Record<string, [string, ManifestRow][]>;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
   /** @internal */ roots: Record<string, object>;
@@ -77,6 +86,9 @@ export class Loader {
     this.logger = (this.constructor as typeof Loader).defaultLogger;
     this.manifest = null;
     this.manifestRoot = null;
+    this.imports = null;
+    this._manifestConstants = null;
+    this._manifestRows = {};
     this._tag = SecureRandom.hex(3);
     this._initializedAt = new Date();
     this.roots = {};
@@ -259,6 +271,8 @@ export class Loader {
       );
     }
 
+    this._manifestConstants = manifest.constants;
+
     const namespaces: Record<string, object> = {};
     for (const rootNamespace of Object.values(this.roots)) {
       namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;
@@ -266,14 +280,28 @@ export class Loader {
 
     for (const file of manifest.shadowed) this.shadowedFiles.add(File.expandPath(file, root));
 
+    this._manifestRows = {};
     for (const [cpath, row] of Object.entries(manifest.constants)) {
       const index = cpath.lastIndexOf("::");
-      const parentPath = index < 0 ? "" : cpath.slice(0, index);
+      (this._manifestRows[index < 0 ? "" : cpath.slice(0, index)] ??= []).push([cpath, row]);
+    }
+
+    for (const parentPath of Object.keys(this._manifestRows)) {
       if (!Object.hasOwn(namespaces, parentPath) && Object.hasOwn(manifest.constants, parentPath)) {
         continue;
       }
       const parent = namespaces[parentPath] ?? (constGet(Object, parentPath) as object);
+      await this._defineAutoloadsForNamespace(parentPath, parent);
+    }
+  }
 
+  /** @internal */
+  async _defineAutoloadsForNamespace(parentPath: string, parent: object): Promise<void> {
+    const root = manifestRoot(this);
+    const rows = this._manifestRows[parentPath] ?? [];
+    delete this._manifestRows[parentPath];
+    for (const [cpath, row] of rows) {
+      const index = cpath.lastIndexOf("::");
       const cref = new Cref(parent, index < 0 ? cpath : cpath.slice(index + 2));
       const abspath = File.expandPath(row.path, root);
       if (cref.isDefined()) {
@@ -283,7 +311,7 @@ export class Loader {
             this.log(`file ${abspath} is ignored because ${cref} is already defined`);
           }
         }
-        if (row.dirs != null) namespaces[cpath] = cref.get() as object;
+        if (row.dirs != null) await this._defineAutoloadsForNamespace(cpath, cref.get() as object);
         continue;
       }
 
@@ -299,6 +327,13 @@ export class Loader {
 
   /** @internal */
   async defineAutoloadsForDir(dir: string, parent: object): Promise<void> {
+    if (this._manifestConstants != null) {
+      return this._defineAutoloadsForNamespace(
+        parent === Object ? "" : this.realModName(parent)!,
+        parent,
+      );
+    }
+
     await this.ls(dir, async (basename, abspath, ftype) => {
       if (ftype === "file") {
         basename = basename.replace(/\.[jt]s$/, "");
