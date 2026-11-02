@@ -288,7 +288,6 @@ export class Application extends Engine {
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   private _resetAutoloadState(): void {
     _bootedAutoloaders?.each((loader) => Registry.unregisterLoader(loader));
     _bootedAutoloaders = this.autoloaders;

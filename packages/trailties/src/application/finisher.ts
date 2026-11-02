@@ -289,7 +289,6 @@ Finisher.initializer(
   },
 );
 
-/** @noRailsEquivalent CONVERGEABLE register-x-retires-from-source */
 export async function _registerAutoloaded(cpath: unknown, value: unknown): Promise<void> {
   if (typeof value !== "function") return;
   const cname = cpath as string;
