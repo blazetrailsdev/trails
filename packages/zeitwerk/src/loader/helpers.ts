@@ -89,6 +89,7 @@ export const Helpers = {
   async isRuby(this: Loader, path: string): Promise<boolean> {
     if (path.endsWith(".d.ts") || /\.test\.[jt]s$/.test(path)) return false;
     if (path.endsWith(".ts")) return true;
+    if (this._manifestConstants != null) return path.endsWith(".js");
     return path.endsWith(".js") && !(await File.isExistAsync(`${path.slice(0, -3)}.ts`));
   },
 

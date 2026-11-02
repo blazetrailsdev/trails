@@ -24,9 +24,9 @@ export const Config = {
 
     path = path.toString();
     const abspath = File.expandPath(path);
-    if (await this.isDir(abspath)) {
+    if (this.manifest != null || (await this.isDir(abspath))) {
       this.raiseIfConflictingDirectory(abspath);
-      this._realRoots[await getFs().realpath!(abspath)] = abspath;
+      if (this.manifest == null) this._realRoots[await getFs().realpath!(abspath)] = abspath;
       return (this.roots[abspath] = namespace);
     } else {
       throw new ZeitwerkError(`the root directory ${abspath} does not exist`);
@@ -150,7 +150,8 @@ export const Config = {
   async actualRoots(this: Loader): Promise<Record<string, object>> {
     const roots: Record<string, object> = {};
     for (const [rootDir, rootNamespace] of Object.entries(this.roots)) {
-      if (!(await this.isDir(rootDir)) || this.isIgnoredPath(rootDir)) continue;
+      if (this._manifestConstants == null && !(await this.isDir(rootDir))) continue;
+      if (this.isIgnoredPath(rootDir)) continue;
       roots[rootDir] = rootNamespace;
     }
     return roots;
@@ -186,6 +187,7 @@ export const Config = {
   /** @internal */
   async expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): Promise<string[]> {
     const found: string[] = [];
+    if (this.manifest != null) return found;
     for (const globPattern of globPatterns) found.push(...(await Dir.globAsync(globPattern)));
     return found;
   },
