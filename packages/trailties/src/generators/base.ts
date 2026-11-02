@@ -15,6 +15,7 @@ import {
   include,
   hashDelete,
   isRegisteredConstant,
+  constDefined,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -318,7 +319,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       if (
         last &&
         (isRegisteredConstant([...nesting, camelize(lastName)].join("::")) ||
-          (last !== Object && Object.hasOwn(last, camelize(lastName))))
+          constDefined(last, camelize(lastName), false))
       ) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +

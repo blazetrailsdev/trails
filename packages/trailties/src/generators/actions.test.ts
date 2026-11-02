@@ -10,10 +10,15 @@ import {
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { assertEqual, assertMock, capture, Mock } from "@blazetrails/activesupport";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
 import { GeneratorBase } from "./base.js";
 import * as Assertions from "./testing/assertions.js";
 
 class TestGenerator extends GeneratorBase {}
+class ActionsTestApp extends Application {}
 
 let mock: Mock | null;
 let previousAdapter: string | null;
@@ -43,6 +48,7 @@ const draw = "Trails.application.routes().draw(function () {\n";
 
 beforeEach(() => {
   mock = null;
+  Trails.application = ActionsTestApp.instance();
   registerChildProcessAdapter("trailties-actions-test", testAdapter);
   previousAdapter = childProcessAdapterConfig.adapter;
   childProcessAdapterConfig.adapter = "trailties-actions-test";
@@ -60,6 +66,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Trails.application = null;
   childProcessAdapterConfig.adapter = previousAdapter;
   FileUtils.rmRf(root);
 });
@@ -198,6 +205,17 @@ describe("ActionsTest", () => {
         setEnv("TRAILS_ENV", previous);
       }
     });
+  });
+
+  it("rails_command with inline option", async () => {
+    await makeGen().railsCommand("generate model MyModel", { inline: true });
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("rails_command with inline option should raise on failure", async () => {
+    await expect(
+      makeGen().railsCommand("generate model 1234567890", { inline: true }),
+    ).rejects.toThrow(/1234567890/);
   });
 
   it("rake with env option should run rake with the env environment", async () => {

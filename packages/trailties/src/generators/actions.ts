@@ -1,4 +1,11 @@
-import { env as ENV, File, Gem, regexpEscape, Shellwords } from "@blazetrails/ruby-compat";
+import {
+  env as ENV,
+  File,
+  Gem,
+  rbFRequire,
+  regexpEscape,
+  Shellwords,
+} from "@blazetrails/ruby-compat";
 import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import { Trails } from "../rails.js";
@@ -165,6 +172,11 @@ export function rake(
   return executeCommand.call(this, "rake", command, options);
 }
 
+const commandModule = "../command.js";
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "rails/command": () => import(commandModule),
+};
+
 export interface RailsCommandOptions extends RakeOptions {
   inline?: boolean;
 }
@@ -178,6 +190,7 @@ export async function railsCommand(
     log.call(this, "rails", command);
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
+    await rbFRequire(loadPath, "rails/command");
     return await this.inRoot(() =>
       silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
     );
