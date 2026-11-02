@@ -3,6 +3,10 @@
 import eslint from "@eslint/js";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+import {
+  prefilterNoFloatingPromises,
+  prefilterNoMisusedPromises,
+} from "./eslint/promise-rule-prefilters.mjs";
 import unusedImports from "eslint-plugin-unused-imports";
 import vitest from "@vitest/eslint-plugin";
 import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
@@ -126,6 +130,14 @@ const canonicalTables = canonicalTableNames();
 // heap now that `scripts/**` is in scope — 500 extra files, several of them
 // thousands of lines. package.json's `lint` script raises it to 10240 MB; a
 // bare `eslint .` OOMs.
+const typescriptEslintRules = tseslint.plugin.rules;
+typescriptEslintRules["no-floating-promises"] = prefilterNoFloatingPromises(
+  typescriptEslintRules["no-floating-promises"],
+);
+typescriptEslintRules["no-misused-promises"] = prefilterNoMisusedPromises(
+  typescriptEslintRules["no-misused-promises"],
+);
+
 export default defineConfig(
   {
     ignores: [
@@ -1202,6 +1214,9 @@ export default defineConfig(
   //    a Promise spread into an object.
   //  - no-floating-promises: catches a dropped Promise statement — a bare
   //    `record.save()` whose result nobody awaits.
+  //
+  // Both stay under their upstream names, behind the prefilters applied at the
+  // top of this file.
   {
     files: [
       "packages/activemodel/src/**/*.ts",
