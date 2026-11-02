@@ -208,6 +208,8 @@ a genuine gap:
 
 - Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, "`Module#autoload` is a build step"). PERMANENT.
   - `require`, `const_added` (only in: `core_ext/kernel.rb`, `core_ext/module.rb`)
+- `Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no JS counterpart (RFC 0213). PERMANENT.
+  - `unregister_inceptions` (only in: `loader.rb`)
 - `Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess arm's `runInIsolation` exists. PERMANENT.
   - `run_in_isolation` (only in: `isolation.rb`; ported in TS as `runInIsolation`)
 - tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. PERMANENT.
