@@ -157,6 +157,34 @@ describe("Runner", () => {
     ]);
   });
 
+  it("testLocations matches a rendered it.each title", async () => {
+    await app();
+    const file = "test/models/rendered.test.ts";
+    await getFs().writeFile!(
+      file,
+      'it.each([1, 2])("saves %s", () => {});\nit.each([1])("100%% %d", () => {});\nit("other", () => {});\n',
+    );
+    await Runner.loadTests([`${file}:3`]);
+    expect(await internals.testLocations([file], /saves 1/)).toEqual([`${file}:1`, `${file}:3`]);
+    expect(await internals.testLocations([file], /^100% 1$/)).toEqual([`${file}:2`, `${file}:3`]);
+    expect(await internals.testLocations([file], /saves 3/)).toEqual([`${file}:3`]);
+  });
+
+  it("testLocations selects a test under a non-literal describe title", async () => {
+    await app();
+    const file = "test/models/computed.test.ts";
+    await getFs().writeFile!(
+      file,
+      'describe(Post.name, () => {\n  it("saves", () => {});\n});\nit("other", () => {});\n',
+    );
+    await Runner.loadTests([`${file}:4`]);
+    expect(await internals.testLocations([file], /^Post saves$/)).toEqual([
+      `${file}:2`,
+      `${file}:4`,
+    ]);
+    expect(await internals.testLocations([file], null)).toEqual([`${file}:4`]);
+  });
+
   it("relativePathFor strips the application root", () => {
     TestUnitReporter.appRoot = "/app";
     try {
