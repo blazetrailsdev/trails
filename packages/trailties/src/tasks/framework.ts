@@ -15,7 +15,7 @@ DSL.namespace("app", () => {
         );
       }
       const { AppGenerator } = await import("../generators/rails/app/app-generator.js");
-      await AppGenerator.applyRailsTemplate(template!, Trails.root()!.toString());
+      await AppGenerator.applyTrailsTemplate(template!, Trails.root()!.toString());
     }),
   );
 
@@ -26,7 +26,6 @@ DSL.namespace("app", () => {
         const generatorsLib = File.expandPath("../generators", import.meta.dirname);
         const projectTemplates = `${Trails.root()}/lib/templates`;
 
-        /** @missingRailsArgs cp_r — CONVERGEABLE app-templates-copy-tse-mailer-and-scaffold */
         const defaultTemplates = {
           tse: ["controller"],
           rails: ["controller", "helper", "scaffold-controller"],

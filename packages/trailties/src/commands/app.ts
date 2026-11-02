@@ -7,6 +7,6 @@ export function appTemplateCommand(): Command {
     .description("Apply the template supplied by <location>")
     .argument("<location>", "Template file (.mjs/.js/.ts)")
     .action(async (location: string) => {
-      await AppGenerator.applyRailsTemplate(location, Dir.pwd());
+      await AppGenerator.applyTrailsTemplate(location, Dir.pwd());
     });
 }

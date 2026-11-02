@@ -167,6 +167,7 @@ applied first (trails railties are not `Rails::Railtie` subclasses):
 
 | Ruby segment | trails segment |
 | ------------ | -------------- |
+| `yarn`       | `pnpm`         |
 | `railtie`    | `trailtie`     |
 | `railties`   | `trailties`    |
 
