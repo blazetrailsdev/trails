@@ -9,7 +9,7 @@ describe("TestRealModName", () => {
     for (const mod of [class {}, {}]) expect(realModName(mod)).toBeNull();
   });
 
-  // PERMANENT-SKIP: a JS class's `name` is the one fact an unseated class has, so an override cannot be told from it (RFC 0213).
+  // PERMANENT-SKIP: `rbModName` reads a JS function's `name` for an unseated class (`packages/ruby-compat/src/object.ts`), the only name it has, so an override cannot be told from it.
   it.skip("returns nil for anonymous classes and modules that override #name", () => {});
 
   class TestRealModName {}

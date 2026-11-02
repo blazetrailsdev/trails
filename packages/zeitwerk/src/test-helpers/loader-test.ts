@@ -9,6 +9,10 @@ import { Registry } from "../registry.js";
 export const get = (mod: object, cname: string) =>
   autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
+declare global {
+  var $get: ((cname: string) => Promise<never>) | undefined;
+}
+
 export interface Constants {
   [cname: string]: Constants;
 }
@@ -56,6 +60,7 @@ export async function withFiles(files: [string, string?][], block: () => unknown
   const pwd = Dir.pwd();
   const tmp = Dir.mktmpdir("zeitwerk");
   Dir.chdir(tmp);
+  globalThis.$get = (cname) => get(Object, cname);
   try {
     for (const [fname, contents] of files) {
       FileUtils.mkdirP(File.dirname(fname));
@@ -63,6 +68,7 @@ export async function withFiles(files: [string, string?][], block: () => unknown
     }
     await block();
   } finally {
+    globalThis.$get = undefined;
     Dir.chdir(pwd);
     FileUtils.rmRf(tmp);
   }
@@ -91,5 +97,3 @@ export async function withSetup(
     await block();
   });
 }
-
-(globalThis as Record<string, unknown>).$get = (cname: string) => get(Object, cname);
