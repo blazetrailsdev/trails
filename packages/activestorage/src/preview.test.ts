@@ -108,7 +108,9 @@ describe("ActiveStorage::PreviewTest", () => {
     await preview.processed();
 
     const variant = await (delegated(preview) as unknown as Attachment).variant(resizeToLimit);
-    expect(await (variant as { isProcessed(): Promise<boolean> }).isProcessed()).toBe(true);
+    expect(await (variant as unknown as { isProcessed(): Promise<boolean> }).isProcessed()).toBe(
+      true,
+    );
   });
 
   it("image-related methods raise UnprocessedError when preview is not processed", async () => {
