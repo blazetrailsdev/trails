@@ -1,4 +1,5 @@
 import { Dir, File, Pathname, TypeError, rbInspect, stdout } from "@blazetrails/ruby-compat";
+import { _installResolveHook } from "../core-ext/kernel.js";
 import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
@@ -66,6 +67,7 @@ export const Config = {
         throw new ZeitwerkError("cannot enable reloading after setup");
       } else {
         this._reloadingEnabled = true;
+        _installResolveHook();
       }
     });
   },

@@ -24,7 +24,17 @@ export interface ReadStream {
 
 export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT";
 
+/** @noRailsEquivalent PERMANENT */
+export interface ModuleHooks {
+  resolve(
+    specifier: string,
+    context: { parentURL?: string },
+    nextResolve: (specifier: string, context: { parentURL?: string }) => { url: string },
+  ): { url: string };
+}
+
 export interface ProcessAdapter {
+  registerHooks?(hooks: ModuleHooks): void;
   envSnapshot(): Record<string, string | undefined>;
   argvSnapshot(): readonly string[];
   cwd(): string;
@@ -646,6 +656,12 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
         | { setSourceMapsSupport?(enabled: boolean): void }
         | undefined;
       nodeModule?.setSourceMapsSupport?.(enabled);
+    },
+    registerHooks: (hooks) => {
+      const nodeModule = proc.getBuiltinModule?.("node:module") as
+        | { registerHooks?(hooks: ModuleHooks): unknown }
+        | undefined;
+      nodeModule?.registerHooks?.(hooks);
     },
     onSignal: (name, handler) => {
       proc.on(name, handler);

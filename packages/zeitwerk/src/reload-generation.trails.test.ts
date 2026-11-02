@@ -70,6 +70,101 @@ ${TAIL}`,
   ],
 ];
 
+const packageDist = (name: string) => new URL(`../../${name}/dist/`, import.meta.url).href;
+
+const STATIC_TAIL = `(globalThis.evaluated ??= []).push(import.meta.url.split("/").pop());`;
+
+const LOADER_MAIN = `
+import { TopLevel, File } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+import { autoloadGet } from "${packageDist("zeitwerk")}core-ext/kernel.js";
+import { Cref } from "${packageDist("zeitwerk")}cref.js";
+
+const once = new Loader();
+await once.pushDir("once");
+await once.setup();
+
+const loader = new Loader();
+loader.enableReloading();
+await loader.pushDir("app");
+await loader.setup();
+
+const load = async () => {
+  await loader.eagerLoad();
+  await once.eagerLoad();
+  return { ...TopLevel };
+};
+
+const first = await load();
+File.write("app/application-record.ts", ${JSON.stringify(`export class ApplicationRecord { static edited = true; }\n${STATIC_TAIL}`)});
+await loader.reload();
+const second = await load();
+
+console.log(JSON.stringify({
+  newPost: first.Post !== second.Post,
+  newParent: Object.getPrototypeOf(second.Post) === second.ApplicationRecord,
+  noOldParent: Object.getPrototypeOf(second.Post) !== first.ApplicationRecord,
+  cycle: second.Comment.Post() === second.Post,
+  edited: second.Post.edited === true,
+  once: first.Once === second.Once && second.Post.Once === second.Once,
+  unchangedFile: first.Comment !== second.Comment,
+  evaluated: globalThis.evaluated,
+}));
+`;
+
+const LOADER_FILES: [string, string][] = [
+  ["main.mjs", LOADER_MAIN],
+  ["once/once.ts", `export class Once {}\n${STATIC_TAIL}`],
+  ["app/application-record.ts", `export class ApplicationRecord {}\n${STATIC_TAIL}`],
+  [
+    "app/comment.ts",
+    `import { Post } from "./post.ts";
+export class Comment { static Post = () => Post; }
+${STATIC_TAIL}`,
+  ],
+  [
+    "app/post.ts",
+    `import { ApplicationRecord } from "./application-record.ts";
+import { Comment } from "./comment.ts";
+import { Once } from "../once/once.ts";
+export class Post extends ApplicationRecord {
+  static Comment = () => Comment;
+  static Once = Once;
+}
+${STATIC_TAIL}`,
+  ],
+];
+
+describe("Loader#reload under real Node", () => {
+  it("leaves no class from the previous generation", async () => {
+    await withFiles(LOADER_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({
+        newPost: true,
+        newParent: true,
+        noOldParent: true,
+        cycle: true,
+        edited: true,
+        once: true,
+        unchangedFile: true,
+        evaluated: [
+          "application-record.ts",
+          "once.ts",
+          "post.ts",
+          "comment.ts",
+          "application-record.ts?zeitwerk=2",
+          "post.ts?zeitwerk=2",
+          "comment.ts?zeitwerk=2",
+        ],
+      });
+    });
+  }, 30_000);
+});
+
 describe("reload generations through module.registerHooks", () => {
   it("re-evaluates both ends of an import edge in generation 2", async () => {
     await withFiles(FILES, async () => {
