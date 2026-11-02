@@ -398,36 +398,58 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
   lint:
-    name: Lint
+    name: Lint (${{ matrix.shard }})
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: activerecord
+            paths: packages/activerecord
+          - shard: rails-and-scripts
+            paths: packages/activemodel packages/actionpack packages/trailties scripts
+          - shard: rest
+            paths: >-
+              . --ignore-pattern packages/activerecord/**
+              --ignore-pattern packages/activemodel/**
+              --ignore-pattern packages/actionpack/**
+              --ignore-pattern packages/trailties/**
+              --ignore-pattern scripts/**
+    env:
+      LINT_FILES: ${{ needs.changes.outputs.lint_files }}
+      ACTIVE: ${{ matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
     steps:
       - uses: actions/checkout@v5
+        if: env.ACTIVE == 'true'
         with:
           fetch-depth: 2
       - uses: ./.github/actions/setup-pnpm
+        if: env.ACTIVE == 'true'
       - run: pnpm install --frozen-lockfile --prefer-offline
-      # Lints only the changed files. `__ALL__` is the fallback sentinel from
-      # the `changes` job — set whenever the diff couldn't be computed, on
-      # push/schedule/dispatch, or when a changed file is an INPUT to a rule
-      # rather than a file the rule reports on (LINT_ALL_RE there). Empty means
-      # nothing ESLint is configured for changed.
+        if: env.ACTIVE == 'true'
+      # `__ALL__` is the fallback sentinel from the `changes` job: each shard
+      # lints its paths. Otherwise the `rest` shard alone lints the changed
+      # files, whichever package they are in, and the others stop here. Empty
+      # means nothing ESLint is configured for changed.
       - name: ESLint
+        if: env.ACTIVE == 'true'
         env:
-          LINT_FILES: ${{ needs.changes.outputs.lint_files }}
+          SHARD_PATHS: ${{ matrix.paths }}
         run: |
           set -euo pipefail
           if [ "$LINT_FILES" = "__ALL__" ]; then
-            pnpm lint
+            read -r -a shard_paths <<<"$SHARD_PATHS"
+            pnpm run lint:shard "${shard_paths[@]}"
           elif [ -z "$LINT_FILES" ]; then
             echo "No changed files to lint."
           else
             printf '%s\n' "$LINT_FILES" | xargs -r -d '\n' pnpm run lint:files
           fi
       - name: ESLint violation counts
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && matrix.shard == 'rest' }}
         run: pnpm parity:lint:counts:ci
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
