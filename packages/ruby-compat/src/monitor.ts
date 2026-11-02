@@ -109,8 +109,8 @@ export function isMonOwned(this: object): boolean {
  * `monitor_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`). Answers a
  * promise only when it has to wait for the monitor. The entry is owned by the
  * `Thread`, not the fiber MRI records: `enter` has no block for
- * `AsyncContext#run` to scope, so flows sharing a `Thread` re-enter until
- * `executor-wrap-flows-own-a-thread` gives each its own.
+ * `AsyncContext#run` to scope. `ThreadPoolExecutor` workers and Rack requests
+ * each run on their own `Thread`; flows sharing a `Thread` re-enter.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#enter`
  * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`).
