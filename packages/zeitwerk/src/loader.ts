@@ -361,7 +361,11 @@ export class Loader {
       const cname = cpath.slice(cpath.lastIndexOf("::") + (cpath.includes("::") ? 2 : 1));
       return this.inflector.camelize(basename, File.expandPath(row.path, root)) !== cname;
     });
-    if (stale || manifest.digest !== configurationDigest(this)) {
+    if (
+      stale ||
+      !Array.isArray(manifest.collapsed) ||
+      manifest.digest !== configurationDigest(this)
+    ) {
       throw new ZeitwerkError(
         `the autoload manifest of loader ${this.tag} does not match its configuration, run trails build`,
       );

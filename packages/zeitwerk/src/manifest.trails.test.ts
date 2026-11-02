@@ -153,6 +153,15 @@ describe("autoload artifacts", () => {
     });
   });
 
+  it("raises on a manifest built before it recorded collapsed directories", async () => {
+    await withFiles(FILES, async () => {
+      await loader.pushDir(".");
+      const { collapsed: _collapsed, ...manifest } = await buildManifest(loader);
+      loader.manifest = manifest as Manifest;
+      await expect(loader.setup()).rejects.toThrow(/run trails build/);
+    });
+  });
+
   it("digests the inflector's overrides", async () => {
     await withFiles(FILES, async () => {
       await loader.pushDir(".");
