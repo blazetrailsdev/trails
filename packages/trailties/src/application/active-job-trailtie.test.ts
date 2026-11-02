@@ -5,18 +5,18 @@ import { include } from "@blazetrails/ruby-compat";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface ActiveJobRailtieTest extends Generation {}
+interface ActiveJobTrailtieTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-class ActiveJobRailtieTest extends TestCase {}
-include(ActiveJobRailtieTest, Paths);
-include(ActiveJobRailtieTest, Generation);
-include(ActiveJobRailtieTest, Isolation);
+class ActiveJobTrailtieTest extends TestCase {}
+include(ActiveJobTrailtieTest, Paths);
+include(ActiveJobTrailtieTest, Generation);
+include(ActiveJobTrailtieTest, Isolation);
 
-describe("ApplicationTests::ActiveJobRailtieTest", () => {
-  let t: ActiveJobRailtieTest;
+describe("ApplicationTests::ActiveJobTrailtieTest", () => {
+  let t: ActiveJobTrailtieTest;
 
   beforeEach(async () => {
-    t = new ActiveJobRailtieTest("test");
+    t = new ActiveJobTrailtieTest("test");
     await t.buildApp();
   });
 
