@@ -295,6 +295,13 @@ export class Application extends Engine {
     Dependencies.autoloadPaths = [];
     Dependencies.autoloadOncePaths = [];
     Dependencies._eagerLoadPaths = new Set();
+    Dependencies._autoloadedTrackedClasses = new Set();
+    Dependencies.autoloader = null;
+  }
+
+  override async eagerLoadBang(): Promise<void> {
+    await this.autoloaders.main.eagerLoad();
+    await this.autoloaders.once.eagerLoad();
   }
 
   toApp(): this {
@@ -359,6 +366,10 @@ export class Application extends Engine {
 
   watchableArgs(): [string[], Record<string, string[]>] {
     const [files, dirs] = [[...this.config.watchableFiles], { ...this.config.watchableDirs }];
+
+    for (const path of this.autoloaders.main.dirs() as readonly string[]) {
+      dirs[path] = ["ts", "js"];
+    }
 
     return [files, dirs];
   }

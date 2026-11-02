@@ -51,8 +51,8 @@ export class Engine extends Trailtie {
   private _app?: RackApp | RackAppObject;
   private _envConfig?: Record<string, unknown>;
 
-  static eagerLoadBang(): void {
-    this.instance().eagerLoadBang();
+  static eagerLoadBang(): void | Promise<void> {
+    return this.instance().eagerLoadBang();
   }
 
   static calledFrom(value?: string): string | undefined {
@@ -221,7 +221,7 @@ export class Engine extends Trailtie {
     return node ? await node.existent() : [];
   }
 
-  eagerLoadBang(): void {}
+  eagerLoadBang(): void | Promise<void> {}
 
   railties(): Trailties {
     if (!this._railties) this._railties = new Trailties();

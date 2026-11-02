@@ -237,8 +237,7 @@ export class Path {
 
   /** @internal */
   private async filesIn(path: string): Promise<string[]> {
-    const base = `${path}/`;
-    let files = (await Dir.globAsync(`${base}${this.glob!}`)).map((f) => f.slice(base.length));
+    let files = await Dir.globAsync(this.glob!, 0, { base: path });
     if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
     return files.map((file) => File.join(path, file)).sort();
   }

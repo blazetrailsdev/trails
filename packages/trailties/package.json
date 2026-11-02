@@ -41,6 +41,14 @@
       "default": "./dist/bin.js"
     },
     "./generators": "./dist/generators/index.js",
+    "./autoloaders": {
+      "types": "./dist/autoloaders.d.ts",
+      "default": "./dist/autoloaders.js"
+    },
+    "./zeitwerk-checker": {
+      "types": "./dist/zeitwerk-checker.d.ts",
+      "default": "./dist/zeitwerk-checker.js"
+    },
     "./autoloaders/inflector": {
       "types": "./dist/autoloaders/inflector.d.ts",
       "default": "./dist/autoloaders/inflector.js"

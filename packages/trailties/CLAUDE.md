@@ -142,21 +142,13 @@ await. A server-block runner returning a promise is the designed shape.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
-`Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of
-`Zeitwerk::Loader` instances whose entire mechanism is Ruby constant resolution
-at reference time. ESM resolves nothing from a constant name and offers no hook
-for an unresolved identifier, so there is no loader graph for a
-`Trails.autoloaders` to hold, and **Zeitwerk is not vendored under `vendor/`**,
-so a port would be invented surface with no Ruby source to mirror.
+RFC 0213 reversed the original ruling: Zeitwerk is vendored and ported, and
+`Trails.autoloaders` holds `main` and `once` (`railties/lib/rails/autoloaders.rb`).
+Each setup initializer is followed by an awaited `eagerLoad`.
 
-**Trails has no autoloader.** Application constants come from explicit imports
-and trails' eager directory scan in `trailties/src/application/finisher.ts`:
-`loadAppClasses` / `collectAppClasses` walk every existent `app/<root>`
-directory, dynamically `import()` every `.ts`/`.js` file whatever it is named,
-and keep each exported subclass of the framework base. A subdirectory is a
-namespace: it is seated as a plain-object module when nothing holds the name
-(Zeitwerk's implicit namespace), and its classes are prefixed `Admin::`. That
-scan is the port.
+The eager directory scan in `trailties/src/application/finisher.ts`
+(`loadAppClasses` / `collectAppClasses`) still runs beside the loaders until
+`trailties-app-scan-retires` deletes it and rewrites this section.
 
 **A scanned app class registers through its package's `registerX`.** Every
 framework base an app subclasses has one, beside the base class:
@@ -182,7 +174,7 @@ under root CLAUDE.md § "Constant lookup is an import or a registry"
 As a consequence:
 
 - The finisher's `eager_load!` initializer runs only its portable arms. The three
-  Zeitwerk calls carry `@missingRailsCall … — PERMANENT`.
+  Zeitwerk calls carry `@missingRailsCall … — CONVERGEABLE` receipts.
 - `Trails.autoloaders` now runs beside this scan, each setup initializer
   followed by an awaited `eagerLoad` (RFC 0213), and its `on_load` calls
   `registerX`; `trailties-app-scan-retires` deletes the scan and rewrites this
@@ -190,8 +182,7 @@ As a consequence:
 - There is no class-unload re-eager-load, or `autoload_lib` line emitted by
   `trails new`.
 
-This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
-about the application loader only: framework-internal call-time constant
+It is about the application loader only: framework-internal call-time constant
 resolution is root § "Call-time constant resolution".
 
 ## A package-shipped engine's root is its package root (`Engine.find_root`)

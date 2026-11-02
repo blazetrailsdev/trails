@@ -708,6 +708,9 @@ describe("Application::Configuration", () => {
   it("config.autoload_lib adds lib to the expected paths (array ignore)", async () => {
     class AutoloadLibApp extends Application {}
     Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration();
     c.setRoot("/app");
     await c.autoloadLib({ ignore: ["tasks", "generators"] });
@@ -719,6 +722,9 @@ describe("Application::Configuration", () => {
   it("config.autoload_lib adds lib to the expected paths (empty array ignore)", async () => {
     class AutoloadLibApp extends Application {}
     Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration();
     c.setRoot("/app");
     await c.autoloadLib({ ignore: [] });
@@ -730,6 +736,9 @@ describe("Application::Configuration", () => {
   it("config.autoload_lib adds lib to the expected paths (scalar ignore)", async () => {
     class AutoloadLibApp extends Application {}
     Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration();
     c.setRoot("/app");
     await c.autoloadLib({ ignore: "tasks" });
@@ -742,6 +751,9 @@ describe("Application::Configuration", () => {
     class AutoloadLibOnceApp extends Application {}
     const app = AutoloadLibOnceApp.instance();
     Trails.application = app;
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration();
     c.setRoot("/app");
     await c.autoloadLibOnce({ ignore: "tasks" });

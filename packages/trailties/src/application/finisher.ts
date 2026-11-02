@@ -148,9 +148,9 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 });
 
 /**
- * @missingRailsCall eager_load_all — PERMANENT
- * @missingRailsCall eager_load! — PERMANENT
- * @missingRailsCall after_class_unload — PERMANENT
+ * @missingRailsCall eager_load_all — CONVERGEABLE trailties-app-scan-retires
+ * @missingRailsCall eager_load! — CONVERGEABLE trailties-app-scan-retires
+ * @missingRailsCall after_class_unload — CONVERGEABLE trailties-reload-drives-zeitwerk
  */
 Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
@@ -237,8 +237,8 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
 });
 
 /**
- * @missingRailsCall _autoloaded_tracked_classes — PERMANENT
- * @missingRailsCall clear — PERMANENT
+ * @missingRailsCall _autoloaded_tracked_classes — CONVERGEABLE trailties-reload-drives-zeitwerk
+ * @missingRailsCall clear — CONVERGEABLE trailties-reload-drives-zeitwerk
  */
 Finisher.initializer(
   "set_clear_dependencies_hook",

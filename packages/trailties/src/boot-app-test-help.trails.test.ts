@@ -195,7 +195,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(constantize("PostsController")).toBe(PostsController);
     expect(constantize("Admin::SessionsController")).toBe(SessionsController);
     expect(rbModName(SessionsController)).toBe("Admin::SessionsController");
-    expect(safeConstantize("Admin::AdminScope")).toBeUndefined();
+    expect(safeConstantize("Admin::Scope")).toBeDefined();
     expect(safeConstantize("Concerns::Authentication")).toBeUndefined();
     expect(safeConstantize("Authentication")).toBeDefined();
   });
