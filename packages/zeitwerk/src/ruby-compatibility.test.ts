@@ -11,6 +11,9 @@ import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
 import { get, newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader-test.js";
 
+const g = globalThis as Record<string, unknown>;
+const GLOBALS = ["$isDefinedX", "$constDefinedForX", "$ensureMIsAutoloaded"];
+
 describe("TestRubyCompatibility", () => {
   let loader: Loader;
 
@@ -18,10 +21,7 @@ describe("TestRubyCompatibility", () => {
     loader = newLoader();
   });
   afterEach(() => {
-    const g = globalThis as Record<string, unknown>;
-    delete g.$isDefinedX;
-    delete g.$constDefinedForX;
-    delete g.$ensureMIsAutoloaded;
+    for (const name of GLOBALS) delete g[name];
     teardown();
   });
 
@@ -30,7 +30,6 @@ describe("TestRubyCompatibility", () => {
 
   it("within a file triggered by an autoload, the constant being autoloaded is not defined", async () => {
     const cref = new Cref(Object, "X");
-    const g = globalThis as Record<string, unknown>;
     g.$isDefinedX = () => "X" in TopLevel;
     const files: [string, string][] = [
       ["x.ts", "globalThis.$constDefinedForX = globalThis.$isDefinedX(); export const X = 1"],
@@ -120,7 +119,6 @@ describe("TestRubyCompatibility", () => {
   it.skip("required pathnames end up as strings in $LOADED_FEATURES", () => {});
 
   it("autoloads and constant references are synchronized", async () => {
-    const g = globalThis as Record<string, unknown>;
     const started = new Promise((resolve) => (g.$ensureMIsAutoloaded = resolve));
     const files: [string, string][] = [
       [
