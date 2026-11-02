@@ -26,11 +26,14 @@ import {
 import { ActiveStorage } from "./active-storage.js";
 import { Analyzable } from "./blob/analyzable.js";
 import { Identifiable } from "./blob/identifiable.js";
+import { Representable } from "./blob/representable.js";
 import { Servable } from "./blob/servable.js";
 import { Filename } from "./filename.js";
 import { PurgeJob } from "./purge-job.js";
 import { Record } from "./record.js";
 import type { Service } from "./service.js";
+import type { VariantRecord } from "./variant-record.js";
+import type { One } from "./attached/one.js";
 import type { Registry } from "./service/registry.js";
 
 interface Io {
@@ -54,7 +57,11 @@ const MINIMUM_TOKEN_LENGTH = 28;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Blob
-  extends Included<typeof Analyzable>, Included<typeof Identifiable>, Included<typeof Servable> {}
+  extends
+    Included<typeof Analyzable>,
+    Included<typeof Identifiable>,
+    Included<typeof Representable>,
+    Included<typeof Servable> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Blob extends Record {
@@ -75,6 +82,8 @@ export class Blob extends Record {
   declare identified: unknown;
   declare composed: unknown;
   declare attachments: Relation<Base>;
+  declare variantRecords: Relation<VariantRecord>;
+  declare previewImage: One;
   declare content_typePreviouslyChanged: () => boolean;
   declare metadataPreviouslyChanged: () => boolean;
   declare service_nameChanged: () => boolean;
@@ -481,6 +490,11 @@ export class Blob extends Record {
     await PurgeJob.performLater(this);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE activestorage-servable-content-type-spelling */
+  get contentType(): string | null {
+    return this.content_type;
+  }
+
   get service(): Service {
     return this.services.fetch(this.service_name!);
   }
@@ -508,7 +522,7 @@ export class Blob extends Record {
   }
 
   /** @internal */
-  private isWebImage(): boolean {
+  isWebImage(): boolean {
     return ActiveStorage.webImageContentTypes.includes(this.content_type!);
   }
 
@@ -554,6 +568,7 @@ export class Blob extends Record {
 
 include(Blob, Analyzable);
 include(Blob, Identifiable);
+include(Blob, Representable);
 include(Blob, Servable);
 
 ActiveStorage.Blob = Blob;
