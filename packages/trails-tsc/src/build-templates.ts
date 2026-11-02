@@ -29,7 +29,8 @@ async function templatesIn(path: string): Promise<string[]> {
   return found;
 }
 
-function compileTemplate(source: string): string {
+function compileTemplate(template: string): string {
+  const source = template.replaceAll("<%%", '<%= "<%" %>');
   const options = {
     trim: true,
     bufvar: "this.outputBuffer",

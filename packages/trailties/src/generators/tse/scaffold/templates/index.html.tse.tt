@@ -1,0 +1,16 @@
+<p style="color: green"><%%= notice %></p>
+
+<%% contentFor("title", "<%= ActiveSupport.Inflector.pluralize(this.humanName()) %>") %>
+
+<h1><%= ActiveSupport.Inflector.pluralize(this.humanName()) %></h1>
+
+<div id="<%= this.pluralTableName() %>">
+  <%% for (const <%= this.singularTableName() %> of this.<%= this.pluralTableName() %>) { %>
+    <%%= render(<%= this.singularTableName() %>) %>
+    <p>
+      <%%= linkTo("Show this <%= this.humanName().toLowerCase() %>", <%= this.modelResourceName(this.singularTableName()) %>) %>
+    </p>
+  <%% } %>
+</div>
+
+<%%= linkTo("New <%= this.humanName().toLowerCase() %>", <%= this.newHelper({ type: "path" }) %>()) %>

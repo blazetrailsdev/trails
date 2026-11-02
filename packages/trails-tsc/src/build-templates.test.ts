@@ -19,6 +19,10 @@ describe("buildTemplates", () => {
     return mod.default.call(binding);
   };
 
+  it("keeps scanning after a <%% literal, as ERB does", async () => {
+    expect(await render('<%%= a(<%= "b" %>) %>', {})).toBe("<%= a(b) %>");
+  });
+
   it("resolves a free name when its line runs, not at render start", async () => {
     expect(await render("<% if (false) { %><%= missing %><% } %>ok", {})).toBe("ok");
   });

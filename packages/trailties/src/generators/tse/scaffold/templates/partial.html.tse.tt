@@ -1,0 +1,18 @@
+<div id="<%%= domId(<%= this.singularName() %>) %>">
+<% for (const attribute of this.attributes.filter((attribute) => !attribute.passwordDigest())) { -%>
+  <p>
+    <strong><%= attribute.humanName() %>:</strong>
+<% if (attribute.attachment()) { -%>
+    <%% await (await <%= this.singularName() %>.<%= attribute.columnName() %>.attachment)?.blob; %>
+    <%%= <%= this.singularName() %>.<%= attribute.columnName() %>.isAttached() ? linkTo(<%= this.singularName() %>.<%= attribute.columnName() %>.filename, <%= this.singularName() %>.<%= attribute.columnName() %>) : null %>
+<% } else if (attribute.attachments()) { -%>
+    <%% for (const <%= attribute.singularName() %> of <%= this.singularName() %>.<%= attribute.columnName() %>) { %>
+      <div><%%= linkTo(<%= attribute.singularName() %>.filename, <%= attribute.singularName() %>) %></div>
+    <%% } %>
+<% } else { -%>
+    <%%= <%= this.singularName() %>.<%= attribute.columnName() %> %>
+<% } -%>
+  </p>
+
+<% } -%>
+</div>

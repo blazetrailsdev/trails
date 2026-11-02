@@ -27,7 +27,7 @@ DSL.namespace("app", () => {
         const projectTemplates = `${Trails.root()}/lib/templates`;
 
         const defaultTemplates = {
-          tse: ["controller"],
+          tse: ["controller", "mailer", "scaffold"],
           rails: ["controller", "helper", "scaffold-controller"],
         };
 

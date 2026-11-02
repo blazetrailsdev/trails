@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Address } from "../elements/address.js";
 import { CcField } from "./cc-field.js";
 import { ToField } from "./to-field.js";
 
@@ -23,6 +24,13 @@ describe("Mail::CommonAddressField", () => {
       const field = new ToField("Mikel <test1@lindsaar.net>, Bob <test2@lindsaar.net>");
       expect([...field.displayNames()]).toEqual(["Mikel", "Bob"]);
     });
+    it("should give the actual address objects", () => {
+      const field = new ToField("Mikel <test1@lindsaar.net>, Bob <test2@lindsaar.net>");
+      for (const addr of field.addrs()) {
+        expect(addr.constructor).toBe(Address);
+      }
+    });
+
     it("should handle groups as well", () => {
       const field = new ToField("test1@lindsaar.net, group: test2@lindsaar.net, me@lindsaar.net;");
       expect([...field.addresses()]).toEqual([
@@ -246,5 +254,13 @@ describe("Mail::CommonAddressField", () => {
         '"みける" <raasdnil@text.lindsaar.net>, "みける" <mikel@text.lindsaar.net>',
       );
     });
+  });
+  it("should yield each address object in turn", () => {
+    const field = new ToField("test1@lindsaar.net, test2@lindsaar.net, me@lindsaar.net");
+    const addresses: unknown[] = [];
+    field.each((address) => {
+      addresses.push(address.address());
+    });
+    expect(addresses).toEqual(["test1@lindsaar.net", "test2@lindsaar.net", "me@lindsaar.net"]);
   });
 });

@@ -28,4 +28,17 @@ describe("tasks/framework", () => {
       }),
     ).rejects.toBeInstanceOf(RuntimeError);
   });
+
+  it("copies the default templates", async () => {
+    await Rake.withApplication(async (rake) => {
+      await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
+      await rake.lookup("app:templates:copy")!.invoke();
+    });
+    for (const name of ["controller/view.html.tse.tt", "mailer/layout.text.tse.tt"]) {
+      expect(File.isExist(File.join(root, "lib/templates/tse", name))).toBe(true);
+    }
+    expect(File.isExist(File.join(root, "lib/templates/tse/scaffold/_form.html.tse.tt"))).toBe(
+      true,
+    );
+  });
 });

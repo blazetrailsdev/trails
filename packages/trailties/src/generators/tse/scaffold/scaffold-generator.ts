@@ -13,13 +13,15 @@ import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
 import { format, File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
-import { TEMPLATES } from "./templates.js";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export interface ScaffoldGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldGenerator extends Base {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
 
     this.methodAdded("createRootFolder");
@@ -74,21 +76,19 @@ export class ScaffoldGenerator extends Base {
     await this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async copyViewFiles(): Promise<void> {
     const viewDirectory = dasherize(this.controllerFilePath());
     for (const view of this.availableViews()) {
       for (const format of this.formats()) {
         const filename = this.filenameWithExtensions(view, format);
-        await this.createFile(
-          File.join("app/views", viewDirectory, filename),
-          TEMPLATES[filename].call(this),
-        );
+        await this.template(filename, File.join("app/views", viewDirectory, filename));
       }
     }
 
-    await this.createFile(
+    await this.template(
+      "partial.html.tse",
       File.join("app/views", viewDirectory, `_${this.singularName()}.html.tse`),
-      TEMPLATES["partial.html.tse"].call(this),
     );
   }
 
