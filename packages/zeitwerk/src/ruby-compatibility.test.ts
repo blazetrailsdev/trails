@@ -1,4 +1,11 @@
-import { Dir, File, LOADED_FEATURES, TopLevel, constDefined } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  LOADED_FEATURES,
+  NameError,
+  TopLevel,
+  constDefined,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 import type { Loader } from "./loader.js";
@@ -69,11 +76,18 @@ describe("TestRubyCompatibility", () => {
     });
   });
 
-  // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
-  it.skip("const_defined? is true for autoloads and does not load the file, if the file exists", () => {});
+  it("const_defined? is true for autoloads and does not load the file, if the file exists", () => {
+    const cref = new Cref(Object, "X");
+    cref.autoload("/x.ts");
+    expect(cref.isDefined()).toBeTruthy();
+    expect(LOADED_FEATURES.includes("/x.ts")).toBe(false);
+    cref.remove();
+  });
 
   it("const_defined? raises NameError for invalid cnames", () => {
-    expect(() => constDefined(class {}, "Foo-Bar", false)).toThrow("wrong constant name Foo-Bar");
+    const invalid = () => constDefined(class {}, "Foo-Bar", false);
+    expect(invalid).toThrow(NameError);
+    expect(invalid).toThrow("wrong constant name Foo-Bar");
   });
 
   // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
@@ -82,8 +96,13 @@ describe("TestRubyCompatibility", () => {
   // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
   it.skip("autoloading removes the autoload configuration in the parent", () => {});
 
-  // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
-  it.skip("autoload configuration can be deleted with remove_const", () => {});
+  it("autoload configuration can be deleted with remove_const", () => {
+    const cref = new Cref(Object, "X");
+    cref.autoload("/x.ts");
+    expect(cref.isAutoload()).toBeTruthy();
+    cref.remove();
+    expect(cref.isAutoload()).toBeFalsy();
+  });
 
   // PERMANENT-SKIP: this edge case is what `Registry::Inceptions` exists for, and it has no port (`scripts/parity/conventions.ts`, `unregister_inceptions`).
   it.skip("an autoload on yourself is ignored", () => {});
