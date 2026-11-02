@@ -1616,6 +1616,7 @@ export class AppGenerator extends AppBase {
 
   declare options: AppGeneratorOptions & AppBaseOptions;
 
+  /** @inventedArm perform — CONVERGEABLE actions-generate-runs-in-line */
   static async applyRailsTemplate(template: string, destination: string): Promise<AppGenerator> {
     const generator = new this(
       [destination],
