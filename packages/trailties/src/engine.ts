@@ -9,7 +9,14 @@ import {
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, getFs, getPath, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import {
+  File,
+  getFs,
+  getPath,
+  rbFLoad,
+  rbObjRespondTo,
+  rbProcCall,
+} from "@blazetrails/ruby-compat";
 import {
   AbstractController,
   MiddlewareStack,
@@ -263,6 +270,17 @@ export class Engine extends Trailtie {
     this.runGeneratorsBlocks(app);
     Generators.configureBang(app.config.generators());
     return this;
+  }
+
+  async loadTasks(app: unknown = this): Promise<this> {
+    await this.runTasksBlocks(app);
+    return this;
+  }
+
+  /** @internal */
+  override async runTasksBlocks(app: unknown): Promise<void> {
+    await super.runTasksBlocks(app);
+    for (const ext of (await this.paths().get("lib/tasks")!.existent()).sort()) await rbFLoad(ext);
   }
 
   async loadServer(app: unknown = this): Promise<this> {

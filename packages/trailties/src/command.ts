@@ -13,6 +13,7 @@ import {
   stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
+import { Rake } from "@blazetrails/rake";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -177,7 +178,7 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
 async function invokeRake(
   task: string,
   args: string[],
-  _config: Record<string, unknown>,
+  config: Record<string, unknown>,
 ): Promise<void> {
   await lookupBang();
   const program = createProgram();
@@ -192,6 +193,11 @@ async function invokeRake(
     }
   }
   if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
+    if ((await new Rake.Application!().findRakefileLocation()) != null) {
+      const { RakeCommand } = await import("./commands/rake.js");
+      await RakeCommand.perform(task, args, config);
+      return;
+    }
     throw new UnrecognizedCommandError(
       task,
       (await printingCommands()).map(([name]) => name),

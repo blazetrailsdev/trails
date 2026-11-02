@@ -383,6 +383,21 @@ built module raises \`LoadError\`.
   }
 
   /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async rakefile(): Promise<void> {
+    await this.createFile(
+      "Rakefile.ts",
+      `// Add your own tasks in files placed in lib/tasks ending in .ts, and they will
+// automatically be available to Rake.
+import { Trails } from "@blazetrails/trailties";
+
+import "./config/application.ts";
+
+await Trails.application.loadTasks();
+`,
+    );
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async configru(): Promise<void> {
     await this.createFile(
       "config.ts",
