@@ -384,6 +384,14 @@ export class Loader {
       this._indexManifestPath(File.expandPath(file, root), null);
     }
 
+    if (this.isReloadingEnabled()) {
+      for (const rootDir of Object.keys(this.roots)) {
+        const realRoot = await getFs().realpath!(rootDir);
+        this._realRoots[realRoot] = rootDir;
+        this._generation = Math.max(this._generation, _generations.get(realRoot) ?? 1);
+      }
+    }
+
     const namespaces: Record<string, object> = {};
     for (const rootNamespace of Object.values(this.roots)) {
       namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;

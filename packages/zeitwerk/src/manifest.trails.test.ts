@@ -242,7 +242,7 @@ describe("autoload artifacts", () => {
 
       const previous = raiseOnEveryRead();
       try {
-        const reader = await newLoader({ setup: false });
+        const reader = await newLoader({ setup: false, enableReloading: false });
         reader.manifest = manifest;
         reader.imports = imports;
         await reader.pushDir(".");

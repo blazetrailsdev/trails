@@ -1,14 +1,19 @@
 import {
   LOADED_FEATURES,
   NotImplementedError,
+  getAsyncContext,
   getPath,
   getProcessAdapter,
+  type AsyncContext,
 } from "@blazetrails/ruby-compat";
 import type { Cref } from "../cref.js";
 import { Registry } from "../registry.js";
 
 /** @noRailsEquivalent PERMANENT */
-const _requiring = new Map<string, Promise<void>>();
+const _requiring = new Map<string, { cpath: string; load: Promise<void> }>();
+
+/** @noRailsEquivalent PERMANENT */
+let _heldConstants: AsyncContext<string[]> | null = null;
 
 /** @noRailsEquivalent PERMANENT */
 let _resolveHookInstalled = false;
@@ -49,18 +54,36 @@ export function _installResolveHook(): void {
   });
 }
 
+/** @noRailsEquivalent PERMANENT */
+function _held(): AsyncContext<string[]> {
+  return (_heldConstants ??= getAsyncContext().create<string[]>());
+}
+
+/** @noRailsEquivalent PERMANENT */
+function _loadingConstant(cpath: string): Promise<void> | undefined {
+  if (_held().getStore()?.includes(cpath)) return undefined;
+  for (const requiring of _requiring.values()) {
+    if (requiring.cpath === cpath) return requiring.load;
+  }
+  return undefined;
+}
+
 export async function require(path: string): Promise<boolean> {
   const loader = Registry.loaderFor(path);
   if (loader == null) return false;
 
-  if (await loader.isRuby(path)) {
-    const loading = _requiring.get(path);
-    if (loading !== undefined) {
-      await loading;
-      return false;
-    }
-    if (!Object.hasOwn(loader.autoloads, path)) return false;
-    const load = (async () => {
+  const ruby = await loader.isRuby(path);
+  if (_requiring.has(path)) return !ruby;
+  if (!Object.hasOwn(loader.autoloads, path)) {
+    if (ruby) return false;
+    await loader.onDirAutoloaded(path);
+    return true;
+  }
+
+  const cpath = loader.autoloads[path].path();
+  const held = _held();
+  const load = held.run([...(held.getStore() ?? []), cpath], async () => {
+    if (ruby) {
       const thunk =
         loader._generation === 1 ? loader.imports?.[loader.autoloads[path].path()] : undefined;
       const url = getPath().pathToFileURL!(path);
@@ -71,23 +94,31 @@ export async function require(path: string): Promise<boolean> {
       >;
       LOADED_FEATURES.push(path);
       await loader.onFileAutoloaded(path, exports);
-    })();
-    _requiring.set(path, load);
-    try {
-      await load;
-    } finally {
-      _requiring.delete(path);
+    } else {
+      await loader.onDirAutoloaded(path);
     }
-    return true;
-  } else {
-    await loader.onDirAutoloaded(path);
-    return true;
+  });
+  _requiring.set(path, { cpath, load });
+  try {
+    await load;
+  } finally {
+    _requiring.delete(path);
   }
+  return true;
 }
 
 /** @noRailsEquivalent PERMANENT */
 export async function autoloadGet(cref: Cref): Promise<unknown> {
-  const autoloadPath = cref.isAutoload();
-  if (autoloadPath != null) await require(autoloadPath);
+  for (;;) {
+    const loading = _loadingConstant(cref.path());
+    if (loading !== undefined) {
+      await loading.catch(() => undefined);
+      continue;
+    }
+    const autoloadPath = cref.isAutoload();
+    if (autoloadPath == null) break;
+    await require(autoloadPath);
+    if (_loadingConstant(cref.path()) === undefined) break;
+  }
   return cref.get();
 }

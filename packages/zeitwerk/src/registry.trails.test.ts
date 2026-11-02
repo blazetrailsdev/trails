@@ -20,4 +20,21 @@ describe("Zeitwerk::Registry.loaderForPackage", () => {
       expect(await Registry.loaderForPackage("my_package/package.json", options)).toBe(loader);
     });
   });
+
+  it("answers concurrent first calls with one Loader", async () => {
+    const files: [string, string][] = [
+      ["my_package/package.json", '{ "name": "my_package" }'],
+      ["my_package/src/foo.ts", "export class Foo {}"],
+    ];
+    await withFiles(files, async () => {
+      const options = { namespace: Object };
+      const [first, second] = await Promise.all([
+        Registry.loaderForPackage("my_package/package.json", options),
+        Registry.loaderForPackage("my_package/package.json", options),
+      ]);
+
+      expect(first).toBe(second);
+      expect(Registry.loaders).toEqual([first]);
+    });
+  });
 });

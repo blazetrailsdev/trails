@@ -209,7 +209,53 @@ const UNREGISTER_FILES: [string, string][] = [
   ...UNLOAD_FILES.slice(1),
 ];
 
+const MANIFEST_MAIN = `
+import { TopLevel, File } from "${packageDist("ruby-compat")}index.js";
+import { Loader, writeArtifacts } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const builder = new Loader();
+builder.tag = "main";
+await builder.pushDir("app");
+await writeArtifacts(builder);
+builder.unregister();
+
+const loader = new Loader();
+loader.tag = "main";
+loader.enableReloading();
+loader.manifest = ".trails/autoload/main/manifest.json";
+await loader.pushDir("app");
+await loader.setup();
+
+await loader.eagerLoad();
+const first = { ...TopLevel };
+await loader.reload();
+await loader.eagerLoad();
+const second = { ...TopLevel };
+
+console.log(JSON.stringify({
+  required: first.B !== second.B,
+  imported: first.A !== second.A && Object.getPrototypeOf(second.B) === second.A,
+}));
+`;
+
+const MANIFEST_FILES: [string, string][] = [
+  ["main.mjs", MANIFEST_MAIN],
+  ["app/a.ts", "export class A {}"],
+  ["app/b.ts", 'import { A } from "./a.ts";\nexport class B extends A {}'],
+];
+
 describe("Loader#reload under real Node", () => {
+  it("gets new classes through require and a static import after a manifest boot", async () => {
+    await withFiles(MANIFEST_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({ required: true, imported: true });
+    });
+  }, 30_000);
+
   it("re-evaluates a file for a new loader after unload and unregister", async () => {
     await withFiles(UNREGISTER_FILES, async () => {
       const [output, status] = await Open3.capture2e(
