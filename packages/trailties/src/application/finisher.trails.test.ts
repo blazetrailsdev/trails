@@ -1,6 +1,7 @@
 import { Autoloaders } from "../autoloaders.js";
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, onTestFinished, vi } from "vitest";
 import {
+  _registerAutoloaded,
   Finisher,
   InterlockHook,
   MonitorHook,
@@ -27,6 +28,8 @@ import {
   ThreadPoolExecutor,
   TimerTask,
 } from "@blazetrails/ruby-compat";
+import { Loader } from "@blazetrails/zeitwerk";
+import { ActionController } from "@blazetrails/actionpack";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
@@ -288,6 +291,56 @@ describe("Finisher", () => {
     app.config.eagerLoad = true;
     await run(app, "eager_load!");
     expect(app.afterClassUnload).toEqual([]);
+  });
+
+  it("eager_load! loads every Zeitwerk loader and Trails before the namespaces", async () => {
+    const app = new TestApp();
+    const seen: string[] = [];
+    const all = vi.spyOn(Loader, "eagerLoadAll").mockImplementation(async () => {
+      seen.push("eager_load_all");
+    });
+    const trails = vi.spyOn(Trails, "eagerLoadBang").mockImplementation(async () => {
+      seen.push("rails");
+    });
+    onTestFinished(() => {
+      all.mockRestore();
+      trails.mockRestore();
+    });
+    app.config.eagerLoad = true;
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
+    await run(app, "eager_load!");
+    expect(seen).toEqual(["eager_load_all", "rails", "namespace"]);
+  });
+
+  it("eager_load! reloads the main autoloader after class unload when reloading is enabled", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    app.config.isReloadingEnabled = () => true;
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toHaveLength(1);
+
+    const eagerLoad = vi.spyOn(app.autoloaders.main, "eagerLoad").mockResolvedValue(undefined);
+    await app.afterClassUnload[0]();
+    expect(eagerLoad).toHaveBeenCalledOnce();
+  });
+
+  it("on_load runs Helpers.inherited for an autoloaded controller", async () => {
+    const base = ActionController.Base as unknown as { includeAllHelpers: boolean };
+    const include = base.includeAllHelpers;
+    base.includeAllHelpers = false;
+    onTestFinished(() => {
+      base.includeAllHelpers = include;
+    });
+    class OnLoadedController extends ActionController.Base {}
+    let assigned: unknown = null;
+    Object.defineProperty(OnLoadedController, "helpersPath", {
+      get: () => assigned,
+      set: (paths) => {
+        assigned = paths;
+      },
+    });
+    await _registerAutoloaded("OnLoadedController", OnLoadedController);
+    expect(assigned).toBeInstanceOf(Array);
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
