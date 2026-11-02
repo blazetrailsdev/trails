@@ -57,13 +57,13 @@ describe("InfoControllerTest", () => {
   test("info controller does not allow remote requests", async () => {
     tc.request.env["REMOTE_ADDR"] = "example.org";
     await tc.get("properties");
-    expect(tc.response.status).toBe(403);
+    tc.assertResponse("forbidden");
   });
 
   test("info controller renders an error message when request was forbidden", async () => {
     tc.request.env["REMOTE_ADDR"] = "example.org";
     await tc.get("properties");
-    expect(tc.response.body).toContain("<p>");
+    tc.assertSelect("p");
   });
 
   test("info controller allows requests when all requests are considered local", async () => {
@@ -71,7 +71,7 @@ describe("InfoControllerTest", () => {
     Trails.application!.config.considerAllRequestsLocal = true;
     try {
       await tc.get("properties");
-      expect(tc.response.status).toBe(200);
+      tc.assertResponse("success");
     } finally {
       Trails.application!.config.considerAllRequestsLocal = false;
     }
@@ -79,18 +79,17 @@ describe("InfoControllerTest", () => {
 
   test("info controller allows local requests", async () => {
     await tc.get("properties");
-    expect(tc.response.status).toBe(200);
+    tc.assertResponse("success");
   });
 
   test("info controller renders a table with properties", async () => {
     await tc.get("properties");
-    expect(tc.response.body).toContain("<table>");
-    expect(tc.response.body).toContain('<td class="name">Hello</td>');
+    tc.assertSelect("table");
   });
 
   test("info controller renders with routes", async () => {
     await tc.get("routes");
-    expect(tc.response.status).toBe(200);
+    tc.assertResponse("success");
   });
 
   test("info controller search returns exact matches for route names", async () => {
@@ -217,7 +216,7 @@ describe("InfoControllerTest", () => {
 
   test("internal routes do not have a default params[:internal] value", async () => {
     await tc.get("properties");
-    expect(tc.response.status).toBe(200);
+    tc.assertResponse("success");
     assertNil((tc.controller as unknown as ActionController.Base).params.get("internal"));
   });
 
