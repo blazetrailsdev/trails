@@ -17,4 +17,10 @@ Trails.HealthController = HealthController;
 Trails.InfoController = InfoController;
 Trails.PwaController = PwaController;
 Trails.WelcomeController = WelcomeController;
-(TopLevel as Record<string, unknown>).Rails = Trails;
+TopLevel.Rails = Trails;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Rails?: typeof Trails;
+  }
+}
