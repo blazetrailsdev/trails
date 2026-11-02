@@ -691,19 +691,22 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  protected bundleCommand(command: string): void {
+    const pm = getPackageManager(this.destinationRoot, {
+      fallback: (this as unknown as { packageManager?: string }).packageManager,
+    });
+    this.sayStatus("run", `${pm.name} ${command}`);
+    packageManagerInstall(this.destinationRoot, pm);
+  }
+
+  /** @internal */
   protected isBundleInstall(): boolean {
     return !(this.options.skipBundle || this.options.pretend);
   }
 
   /** @internal */
   protected async runBundle(): Promise<void> {
-    if (this.isBundleInstall()) {
-      const pm = getPackageManager(this.destinationRoot, {
-        fallback: (this.options as { packageManager?: string }).packageManager,
-      });
-      this.sayStatus("run", `${pm.name} install`);
-      packageManagerInstall(this.destinationRoot, pm);
-    }
+    if (this.isBundleInstall()) this.bundleCommand("install");
   }
 
   /** @internal */
