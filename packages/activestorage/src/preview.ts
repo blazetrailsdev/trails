@@ -14,10 +14,13 @@ import { Variation } from "./variation.js";
 
 class UnprocessedError extends StandardError {}
 
-type Presented = { filename: Filename; contentType: string | null } & Pick<
-  Blob,
-  "url" | "key" | "download"
->;
+interface Presented {
+  filename: Filename;
+  contentType: string | null;
+  key: string | null | Promise<string | null>;
+  url(options?: never): unknown;
+  download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null>;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Preview extends Included<typeof Servable> {}
@@ -34,12 +37,18 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
+  /** @inventedArm isProcessed — PERMANENT */
   get filename(): Promise<Filename> {
-    return this.presentation().then((presentation) => presentation.filename);
+    return this.isProcessed()
+      .then(() => this.presentation())
+      .then((presentation) => presentation.filename);
   }
 
+  /** @inventedArm isProcessed — PERMANENT */
   get contentType(): Promise<string | null> {
-    return this.presentation().then((presentation) => presentation.contentType);
+    return this.isProcessed()
+      .then(() => this.presentation())
+      .then((presentation) => presentation.contentType);
   }
 
   async processed(): Promise<this> {
@@ -52,15 +61,15 @@ export class Preview {
     return this.blob.previewImage;
   }
 
-  async url(options: Parameters<Blob["url"]>[0] = {}): Promise<string> {
+  async url(options: Parameters<Blob["url"]>[0] = {}): Promise<unknown> {
     if (await this.isProcessed()) {
-      return await (await this.presentation()).url(options);
+      return await (await this.presentation()).url(options as never);
     } else {
       throw new UnprocessedError();
     }
   }
 
-  async key(): Promise<string> {
+  async key(): Promise<string | null> {
     if (await this.isProcessed()) {
       return await (
         await this.presentation()
@@ -70,9 +79,9 @@ export class Preview {
     }
   }
 
-  async download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void> {
+  async download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null> {
     if (await this.isProcessed()) {
-      return await (await this.presentation()).download(block as never);
+      return await (await this.presentation()).download(block);
     } else {
       throw new UnprocessedError();
     }
