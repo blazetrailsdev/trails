@@ -94,7 +94,9 @@ describe("ActiveStorage::Analyzer::VideoAnalyzerTest", () => {
 
     expect([...metadata.keys()]).not.toContainEqual("width");
     expect([...metadata.keys()]).not.toContainEqual("height");
-    expect([true]).toContainEqual(new Range(1.0, 1.022).cover(metadata.get("duration") as number));
+    expect([true]).toContainEqual(
+      new Range(1.0, 1.022).isInclude(metadata.get("duration") as number),
+    );
     expect(metadata.get("video")).toBeFalsy();
     expect(metadata.get("audio")).toBeTruthy();
   });
