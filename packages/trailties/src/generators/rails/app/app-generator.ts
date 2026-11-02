@@ -1624,6 +1624,10 @@ export class AppGenerator extends AppBase {
     );
     generator.setDefaultAccessorsBang();
     await generator.applyRailsTemplate();
+    const { GenerateCommand } = await import("../../../commands/generate.js");
+    for (const { what, args } of generator.pendingGenerators) {
+      await GenerateCommand.perform("generate", [what, ...args], {});
+    }
     return generator;
   }
 

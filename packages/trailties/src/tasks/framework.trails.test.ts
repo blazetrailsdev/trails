@@ -13,6 +13,7 @@ describe("tasks/framework", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     FileUtils.rmRf(root);
   });
 
@@ -26,6 +27,5 @@ describe("tasks/framework", () => {
         await task.invoke();
       }),
     ).rejects.toBeInstanceOf(RuntimeError);
-    vi.unstubAllEnvs();
   });
 });
