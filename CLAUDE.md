@@ -1805,6 +1805,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_storage/attachment.rb`                        | Proxy (proto chain)   |
 | `active_storage/attached/one.rb`                      | Proxy (proto chain)   |
 | `active_storage/attached/many.rb`                     | Proxy (proto chain)   |
+| `mail/field.rb`                                       | Proxy (proto chain)   |
 
 Rules that apply across the table:
 

@@ -1,4 +1,5 @@
 import { NamedUnstructuredField } from "./named-unstructured-field.js";
+import { Mail } from "../mail.js";
 
 export class ContentDescriptionField extends NamedUnstructuredField {
   static readonly NAME = "Content-Description";
@@ -7,3 +8,4 @@ export class ContentDescriptionField extends NamedUnstructuredField {
     return true;
   }
 }
+Mail.ContentDescriptionField = ContentDescriptionField;

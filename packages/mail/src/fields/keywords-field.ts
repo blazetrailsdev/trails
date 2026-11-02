@@ -1,5 +1,6 @@
 import { PhraseList } from "../elements/phrase-list.js";
 import { NamedStructuredField } from "./named-structured-field.js";
+import { Mail } from "../mail.js";
 
 export class KeywordsField extends NamedStructuredField {
   static readonly NAME = "Keywords";
@@ -26,3 +27,4 @@ export class KeywordsField extends NamedStructuredField {
     return `${this.name}: ${this.keywords().join(",\r\n ")}\r\n`;
   }
 }
+Mail.KeywordsField = KeywordsField;

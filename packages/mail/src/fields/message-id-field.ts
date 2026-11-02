@@ -1,6 +1,7 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { Utilities } from "../utilities.js";
 import { CommonMessageIdField } from "./common-message-id-field.js";
+import { Mail } from "../mail.js";
 
 export class MessageIdField extends CommonMessageIdField {
   static readonly NAME = "Message-ID";
@@ -18,3 +19,4 @@ export class MessageIdField extends CommonMessageIdField {
     return [this.messageId()];
   }
 }
+Mail.MessageIdField = MessageIdField;

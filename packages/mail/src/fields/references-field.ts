@@ -1,5 +1,6 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { CommonMessageIdField } from "./common-message-id-field.js";
+import { Mail } from "../mail.js";
 
 export class ReferencesField extends CommonMessageIdField {
   static readonly NAME = "References";
@@ -13,3 +14,4 @@ export class ReferencesField extends CommonMessageIdField {
     super(value, charset);
   }
 }
+Mail.ReferencesField = ReferencesField;

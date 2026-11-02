@@ -1,6 +1,7 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { ContentTransferEncodingElement } from "../elements/content-transfer-encoding-element.js";
 import { NamedStructuredField } from "./named-structured-field.js";
+import { Mail } from "../mail.js";
 
 export class ContentTransferEncodingField extends NamedStructuredField {
   static readonly NAME = "Content-Transfer-Encoding";
@@ -43,3 +44,4 @@ export class ContentTransferEncodingField extends NamedStructuredField {
     return this.encoding();
   }
 }
+Mail.ContentTransferEncodingField = ContentTransferEncodingField;
