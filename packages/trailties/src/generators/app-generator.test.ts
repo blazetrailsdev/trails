@@ -13,6 +13,7 @@ let lines: string[];
 const destination = { destinationRoot: "" };
 const assertFile = Assertions.assertFile.bind(destination);
 const assertNoFile = Assertions.assertNoFile.bind(destination);
+const assertDirectory = Assertions.assertDirectory.bind(destination);
 const assertNoDirectory = Assertions.assertNoDirectory.bind(destination);
 
 function assertGem(name: string): Promise<void> {
@@ -53,6 +54,20 @@ function makeGen(
 ) {
   return new AppGenerator(["my-app"], { database, ...opts }, { destinationRoot: tmpDir });
 }
+
+describe("AppGeneratorTest", () => {
+  it("version control initializes git repo", async () => {
+    await makeGen().invokeAll();
+    await assertDirectory("my-app/.git");
+  });
+
+  it("skip git", async () => {
+    await makeGen("sqlite", { skipGit: true }).invokeAll();
+    assertNoFile("my-app/.gitignore");
+    assertNoFile("my-app/.gitattributes");
+    assertNoDirectory("my-app/.git");
+  });
+});
 
 function appPath(...segments: string[]) {
   return path.join(tmpDir, "my-app", ...segments);

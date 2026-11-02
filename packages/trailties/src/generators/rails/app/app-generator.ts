@@ -159,6 +159,10 @@ export class AppBuilder extends ActionMethods {
   /** @internal */
   declare private readonly skipSolid: () => boolean | undefined;
   /** @internal */
+  declare private readonly gitInitCommand: () => Promise<string>;
+  /** @internal */
+  declare private readonly run: (command: unknown, config?: object) => Promise<unknown>;
+  /** @internal */
   private _configTargetVersion: string | null = null;
 
   /** @internal */
@@ -551,6 +555,15 @@ dist
   /** @missingRailsArgs template — PERMANENT */
   async eslint(): Promise<void> {
     await this.template("eslint.config.mjs");
+  }
+
+  async versionControl(): Promise<void> {
+    if (!this.options.skipGit && !this.options.pretend) {
+      await this.run(await this.gitInitCommand(), {
+        capture: this.options.quiet,
+        abortOnFailure: false,
+      });
+    }
   }
 
   /**
