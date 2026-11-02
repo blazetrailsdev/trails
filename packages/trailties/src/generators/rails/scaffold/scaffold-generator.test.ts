@@ -44,10 +44,7 @@ describe("ScaffoldGeneratorTest", () => {
     await t.runGenerator();
 
     await t.assertFile("app/models/product-line.ts", /class ProductLine extends ApplicationRecord/);
-    await t.assertFile(
-      "test/models/product-line.test.ts",
-      /class ProductLineTest extends TestCase|describe\("ProductLineTest"/,
-    );
+    await t.assertFile("test/models/product-line.test.ts", /describe\("ProductLineTest"/);
     await t.assertFile("test/fixtures/product_lines.yml");
     await t.assertMigration("db/migrate/create_product_lines.ts", /belongsTo\("product"/);
     await t.assertMigration("db/migrate/create_product_lines.ts", /boolean\("approved"/);
@@ -136,7 +133,7 @@ describe("ScaffoldGeneratorTest", () => {
     ]);
 
     await t.assertFile("app/models/product-line.ts", /class ProductLine extends ApplicationRecord/);
-    await t.assertFile("test/models/product-line.test.ts");
+    await t.assertFile("test/models/product-line.test.ts", /describe\("ProductLineTest"/);
     await t.assertFile("test/fixtures/product_lines.yml");
     await t.assertMigration("db/migrate/create_product_lines.ts", /belongsTo\("product"/);
     await t.assertMigration("db/migrate/create_product_lines.ts", /references\("user"/);
@@ -182,6 +179,9 @@ describe("ScaffoldGeneratorTest", () => {
       expect(test).toMatch(/class ProductLinesControllerTest extends IntegrationTest/);
       expect(test).toMatch(
         /t\.post\(t\.productLinesUrl\(\), \{ params: \{ product_line: \{ product_id: t\["@product_line"\]\.product_id, title: t\["@product_line"\]\.title, user_id: t\["@product_line"\]\.user_id \} \}/,
+      );
+      expect(test).toMatch(
+        /t\.patch\(t\.productLineUrl\(t\["@product_line"\]\), \{ params: \{ product_line: \{ product_id: t\["@product_line"\]\.product_id, title: t\["@product_line"\]\.title, user_id: t\["@product_line"\]\.user_id \} \}/,
       );
       expect(test).not.toMatch(/assertRedirectedTo/);
     });
@@ -243,7 +243,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     await t.assertFile("app/models/admin.ts", /export const Admin/);
     await t.assertFile("app/models/admin/role.ts", /class AdminRole extends ApplicationRecord/);
-    await t.assertFile("test/models/admin/role.test.ts");
+    await t.assertFile("test/models/admin/role.test.ts", /describe\("AdminRoleTest"/);
     await t.assertFile("test/fixtures/admin/roles.yml");
     await t.assertMigration("db/migrate/create_admin_roles.ts");
 
