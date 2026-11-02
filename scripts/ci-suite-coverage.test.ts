@@ -106,7 +106,7 @@ function ciVitestFilters(yml: string): string[] {
       tokens.push(trimmed);
     }
     for (const token of tokens) {
-      if (token === "" || token.startsWith("-")) continue;
+      if (token === "" || token.startsWith("-") || token.startsWith("$")) continue;
       filters.push(token);
     }
   }
@@ -127,11 +127,11 @@ function ciPackageFilterDirs(yml: string): string[] {
   return dirs;
 }
 
-/** The `unit-tests:` job block, sliced out at the next job at the same indent. */
-function unitTestsJob(yml: string): string {
+/** A job's block, sliced out at the next job at the same indent. */
+function jobBlock(yml: string, job: string): string {
   const lines = yml.split("\n");
-  const start = lines.findIndex((l) => l === "  unit-tests:");
-  if (start === -1) throw new Error("no unit-tests job in ci.yml");
+  const start = lines.findIndex((l) => l === `  ${job}:`);
+  if (start === -1) throw new Error(`no ${job} job in ci.yml`);
   const end = lines.findIndex((l, i) => i > start && /^ {2}[\w-]+:/.test(l));
   return lines.slice(start, end === -1 ? undefined : end).join("\n");
 }
@@ -177,6 +177,8 @@ function gateRegex(yml: string, name: string): RegExp {
  *  nothing; scripts/ci-suite-coverage.test.ts enforces that pairing.
  *
  *  AR_PKGS_RE
+ *  ruby-compat, i18n, msgpack, tzinfo and nokogiri are runtime or peer deps of
+ *  activerecord; a diff confined to them runs SQLite only (sqlite_only below).
  *  AR workspace deps: arel/activemodel/activesupport/globalid/
  *  did-you-mean (per packages/activerecord/package.json).
  *  activerecord-cli consumes @blazetrails/trails-tsc at runtime via its
@@ -466,6 +468,35 @@ function gateRegex(yml: string, name: string): RegExp {
  *    fetch is never saved under the key rails-comparison shares. The ci
  *    aggregate accepts each job's skip only on the other's side of thor_only.
  *
+ *  ar_scope (scripts/ci/scoped-only.sh)
+ *  Set when every AR_PKGS_RE path in a non-infra diff is in activestorage,
+ *  solid-queue, solid-cable, activerecord-cli or trails-tsc. It lists the
+ *  packages to run, and each database lane runs only those, on one shard,
+ *  with no DX type step (virtualized-dx still runs for activerecord-cli, which
+ *  it builds). Nothing depends on those satellites but trailties, whose own
+ *  gate is unchanged. trails-tsc expands to activerecord-cli, solid-cable and
+ *  solid-queue, the packages that declare it: core activerecord has no
+ *  dependency on it, and the one AR suite that reads it, virtualized-dx, is
+ *  gated by trails_tsc_affected. Empty means the full suite; the push arm never
+ *  runs the script, so main, the sweeps and workflow_dispatch are full.
+ *
+ *  sqlite_only (scripts/ci/scoped-only.sh)
+ *  True when every AR_PKGS_RE path is in ruby-compat, i18n, msgpack, tzinfo or
+ *  nokogiri. postgres-tests and maria-tests skip; main runs them.
+ *
+ *  unit_packages (scripts/ci/scoped-only.sh, scripts/ci/unit-packages.mjs)
+ *  The changed packages plus their reverse closure over package.json
+ *  @blazetrails dependencies, peerDependencies and devDependencies, intersected
+ *  with the unit-tests list. `none` skips the job, empty runs the whole list.
+ *  An INFRA_RE match leaves it empty. The closure trusts package.json, so
+ *  a test below requires every unit-tests package to declare what it imports.
+ *
+ *  github.event.schedule (nightly)
+ *  The nightly cron exists for sqlite-mem-tests alone. `changes` reports
+ *  docs_only=true for it, the switch every other gated job already honours,
+ *  so it runs neither Query/Schema Parity nor the rest of the sweep. Preflight
+ *  has its own `if:` for the same cron.
+ *
  *  actioncable_only (scripts/ci/scoped-only.sh)
  *  The same script answers it, over its own set: packages/actioncable/ and
  *  scripts/parity/unported-files/actioncable.ts. vendor/ is not in it, being
@@ -596,7 +627,7 @@ function filterCoversDir(filter: string, dir: string): boolean {
  */
 function gateNames(ifText: unknown): string[] {
   if (typeof ifText !== "string") return [];
-  return [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)\s*==/g)].map((m) => m[1]);
+  return [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)\s*==\s*'true'/g)].map((m) => m[1]);
 }
 
 /**
@@ -685,7 +716,7 @@ async function testedPackageDirs(): Promise<string[]> {
   return dirs;
 }
 
-describe("CI runs every tooling test suite", () => {
+describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const filters = ciVitestFilters(yml);
@@ -870,7 +901,9 @@ describe("CI runs every tooling test suite", () => {
     const yml = await readFile(CI_YML, "utf8");
     const gate = gateRegex(yml, "UNIT_TESTS_PKGS_RE");
 
-    const filters = ciVitestFilters(unitTestsJob(yml));
+    const filters = ciVitestFilters(
+      jobBlock(yml, "unit-tests") + "\n" + jobBlock(yml, "repo-checks"),
+    );
     expect(filters.length).toBeGreaterThan(5);
 
     // A filter is a path prefix, so probe it with a file that lives under it.
@@ -963,27 +996,8 @@ describe("CI runs every tooling test suite", () => {
     expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
   });
 
-  // packages/i18n is a leaf: package.json declares no workspace dependencies
-  // and nothing imports @blazetrails/i18n yet, so an i18n-only PR must run the
-  // unit-tests job and nothing else. The intended dependency direction, for
-  // whoever edits these gates next:
-  //
-  // - Downstream (i18n -> its consumers) is allowed, and REQUIRED once real.
-  //   When i18n-consolidate-activesupport-shim and
-  //   i18n-consolidate-activemodel-activerecord-shims point activesupport /
-  //   activemodel / activerecord at @blazetrails/i18n at runtime, `i18n` must
-  //   be added to every gate that then consumes it (AR_PKGS_RE, AP_PKGS_RE,
-  //   AV_PKGS_RE, TRAILTIES_PKGS_RE, RACK_PKGS_RE — the same membership
-  //   activesupport already has). Those stories own that edit and own relaxing
-  //   this test: landing the consumption without widening the gates has to
-  //   fail here rather than ship an untested edge.
-  // - Upstream (consumers -> i18n) is never automatic. An activesupport /
-  //   activemodel / activerecord change must not be SPECIFIED as running the
-  //   i18n suite. activesupport PRs do run it today only because they share
-  //   UNIT_TESTS_PKGS_RE and one vitest invocation with i18n — an incidental
-  //   consequence of the leaf bundle, not a dependency claim, and deliberately
-  //   not asserted here so a later split of i18n into its own gate is free to
-  //   drop it.
+  // activerecord and actionpack consume i18n at runtime, so an i18n-only PR runs
+  // the SQLite lane and Action Pack on top of unit-tests, and no adapter lane.
   it("fires only unit_tests_affected for i18n-only changes", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const runGate = await gateRunner(yml);
@@ -995,8 +1009,6 @@ describe("CI runs every tooling test suite", () => {
       "packages/i18n/src/interpolate/ruby.ts",
     ];
     const dependentGates = [
-      "activerecord_affected",
-      "actionpack_affected",
       "actionview_affected",
       "trailties_affected",
       "rack_affected",
@@ -1017,13 +1029,8 @@ describe("CI runs every tooling test suite", () => {
 
     // Structural form of the same claim, so a failure names the gate that grew
     // the membership rather than only the path that fanned out.
-    const dependentRegexes = [
-      "AR_PKGS_RE",
-      "AP_PKGS_RE",
-      "AV_PKGS_RE",
-      "TRAILTIES_PKGS_RE",
-      "RACK_PKGS_RE",
-    ];
+    expect(fired.every((f) => f.sqlite_only === "true")).toBe(true);
+    const dependentRegexes = ["AV_PKGS_RE", "TRAILTIES_PKGS_RE", "RACK_PKGS_RE"];
     expect(
       dependentRegexes.filter((name) => gateRegex(yml, name).test("packages/i18n/src/config.ts")),
     ).toEqual([]);
@@ -1432,8 +1439,98 @@ describe("CI runs every tooling test suite", () => {
       '[ "$TRAILS_TSC_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
     );
     expect(aggregate).toContain(
-      '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
+      '{ [ "$AR_AFFECTED" = "false" ] || [ "$AR_SCOPED_DX" = "true" ]; } && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
     );
+  });
+
+  it("narrows the database lanes to the satellite packages a diff is confined to", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    const storage = await runGate("packages/activestorage/src/blob.ts");
+    expect(storage.activerecord_affected).toBe("true");
+    expect(storage.ar_scope).toBe("packages/activestorage");
+    expect(storage.sqlite_only).toBe("false");
+    expect((await runGate("packages/trails-tsc/src/index.ts")).ar_scope).toBe(
+      "packages/activerecord-cli packages/solid-cable packages/solid-queue",
+    );
+    expect(
+      (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
+    ).toBe("");
+    expect(
+      (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts")).sqlite_only,
+    ).toBe("false");
+    // An unrelated carved-out path does not widen the scope.
+    expect(
+      (await runGate("packages/activestorage/src/blob.ts\nscripts/api-compare/config.ts")).ar_scope,
+    ).toBe("packages/activestorage");
+  });
+
+  it("runs the foundation packages on SQLite and leaves the adapter lanes to main", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    for (const pkg of ["ruby-compat", "i18n", "msgpack", "tzinfo", "nokogiri"]) {
+      const fired = await runGate(`packages/${pkg}/src/a.ts`);
+      expect(fired.activerecord_affected).toBe("true");
+      expect(fired.actionpack_affected).toBe("true");
+      expect(fired.sqlite_only).toBe("true");
+    }
+    for (const job of ["postgres-tests", "maria-tests"]) {
+      expect(wf.jobs[job].if).toContain("needs.changes.outputs.sqlite_only != 'true'");
+    }
+  });
+
+  it("selects unit packages by reverse closure and runs everything on infra", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    expect((await runGate("packages/zeitwerk/src/a.ts")).unit_packages).toBe("packages/zeitwerk");
+    expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
+    expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
+    expect((await runGate("packages/activemodel/src/a.ts")).unit_packages.split(" ")).toEqual(
+      expect.arrayContaining(["packages/activemodel", "packages/arel", "packages/globalid"]),
+    );
+    expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");
+  });
+
+  // unit-packages.mjs reads package.json only, so an undeclared import between
+  // packages in this list would drop a dependent from the selection.
+  it("keeps every unit-tests package's imports declared in its package.json", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const dirs = ciVitestFilters(jobBlock(yml, "unit-tests")).filter((f) =>
+      f.startsWith("packages/"),
+    );
+    const undeclared: string[] = [];
+    for (const dir of new Set(dirs)) {
+      const pkg = JSON.parse(await readFile(path.join(REPO_ROOT, dir, "package.json"), "utf8"));
+      const declared = new Set(
+        ["dependencies", "peerDependencies", "devDependencies"].flatMap((f) =>
+          Object.keys(pkg[f] ?? {}),
+        ),
+      );
+      const { stdout } = await execFileAsync(
+        "git",
+        ["grep", "-hoE", "(from |import\\(|^import )[\"']@blazetrails/[a-z0-9-]+", "--", dir],
+        { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
+      ).catch(() => ({ stdout: "" }));
+      for (const name of new Set(stdout.split("\n").map((l) => l.replace(/^.*["']/, "")))) {
+        if (name && name !== pkg.name && !declared.has(name)) undeclared.push(`${dir} -> ${name}`);
+      }
+    }
+    expect(undeclared).toEqual([]);
+  });
+
+  it("gives sqlite-mem-tests a nightly of its own", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const crons = wf.on.schedule.map((s: { cron: string }) => s.cron);
+    const nightly = crons.find((c: string) => c !== "0 6 * * 1");
+    expect(crons).toHaveLength(2);
+    const mem = wf.jobs["sqlite-mem-tests"].if;
+    expect(mem).toContain(`github.event.schedule == '${nightly}'`);
+    expect(mem).toContain("run-sqlite-mem");
+    expect(mem).not.toContain("github.event_name != 'pull_request'");
+    expect(wf.jobs.preflight.if).toBe(`github.event.schedule != '${nightly}'`);
+    expect(wf.jobs.ci.steps[0].env.SQLITE_MEM_NOT_REQUIRED).toContain(
+      "github.event_name == 'push'",
+    );
+    const filter = wf.jobs.changes.steps.find((s: { id?: string }) => s.id === "filter").run;
+    expect(filter).toContain(`if [ "\${{ github.event.schedule }}" = "${nightly}" ]`);
   });
 
   it("runs exactly one comparison job on either side of thor_only", async () => {
