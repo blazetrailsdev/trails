@@ -20,6 +20,7 @@ const tester = new RuleTester({
     parserOptions: {
       project: "./tsconfig.json",
       tsconfigRootDir: fixture,
+      disallowAutomaticSingleRunInference: true,
     },
   },
 });
