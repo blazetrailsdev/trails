@@ -15,7 +15,7 @@ import type { CommonField } from "./fields/common-field.js";
 interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
-  "new"(...args: unknown[]): any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  "new"(...args: unknown[]): Message;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
