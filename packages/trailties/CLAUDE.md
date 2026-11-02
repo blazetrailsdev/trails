@@ -232,3 +232,9 @@ superclass here, and its `super` calls have nothing to reach.
 `test-unit/vitest-reporter.ts` is the sole reporter of a `trails test` run. Its
 `VitestReporter` stands in for Minitest's reporter calls, and carries the
 `@noRailsEquivalent PERMANENT` receipt against this section.
+
+Vitest reports no assertion count or Minitest timing, so the adapter's closing
+`N runs, N failures, N errors, N skips` line is `Minitest::SummaryReporter`'s
+summary as far as Vitest allows, built from the results it recorded. The
+`executable` default is `bin/trails test`, where `reporter.rb:9` says
+`bin/rails test`, because generated applications ship `bin/trails`.

@@ -91,7 +91,7 @@ export class Parser {
       if (end !== undefined) scanner.resetTokenState(end);
       else if (kind === SingleLineCommentTrivia || kind === MultiLineCommentTrivia) {
         this.lineno = sourceFile.getLineAndCharacterOfPosition(start).line + 1;
-        for (const line of scanner.getTokenText().split("\n")) {
+        for (const line of scanner.getTokenText().split(/\r?\n/)) {
           this.onComment(line);
           this.lineno += 1;
         }
@@ -174,7 +174,7 @@ function registerDefaults(): void {
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", (tag) =>
     tokenizer
-      ? new ParserExtractor(new RegExp(`(?://|/\\*|\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`))
+      ? new ParserExtractor(new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`))
       : slash(tag),
   );
   Annotation.registerExtensions("css", "scss", "sass", "less", slash);

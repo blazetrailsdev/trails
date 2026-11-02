@@ -36,7 +36,7 @@ describe("BacktraceCleaner", () => {
 });
 
 describe("Parser", () => {
-  const pattern = /(?:\/\/|\/\*|\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
+  const pattern = /(?:\/\/|\/\*|^\s*\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
 
   it("skips a // in a multi-line template and a regexp", () => {
     const parser = new Parser("const x = `a\n// TODO: no`;\nconst y = /\\/\\/ TODO: no/;\n", {
@@ -65,6 +65,15 @@ describe("Parser", () => {
       new Annotation(1, "TODO", "one"),
       new Annotation(3, "TODO", "two"),
     ]);
+  });
+
+  it("reads CRLF block comments and ignores a * inside a line comment", () => {
+    const parser = new Parser("/*\r\n * TODO: one\r\n */\r\n// 2 * TODO no\r\n", {
+      pattern,
+      file: "a.ts",
+    });
+    parser.parse();
+    expect(parser.comments).toEqual([new Annotation(2, "TODO", "one")]);
   });
 
   it("reports an error on an unterminated string", () => {

@@ -53,6 +53,8 @@ export default class VitestReporter implements Reporter {
     color: true,
   });
 
+  results: VitestResult[] = [];
+
   onInit(vitest: Vitest): void {
     vitest.config.includeTaskLocation = true;
     TestUnitReporter.appRoot ??= vitest.config.root;
@@ -60,6 +62,7 @@ export default class VitestReporter implements Reporter {
 
   onTestCaseResult(testCase: TestCase): void {
     const result = new VitestResult(testCase);
+    this.results.push(result);
     this.reporter.prerecord({ name: result.klass }, result.name);
     this.reporter.record(result);
   }
@@ -70,9 +73,7 @@ export default class VitestReporter implements Reporter {
   ): void {
     this.reporter.report();
     const errors = [...testModules.flatMap((mod) => mod.errors()), ...unhandledErrors];
-    const codes = [...testModules.flatMap((mod) => [...mod.children.allTests()])].map(
-      (testCase) => new VitestResult(testCase).resultCode,
-    );
+    const codes = this.results.map((result) => result.resultCode);
     const count = (code: string) => codes.filter((resultCode) => resultCode === code).length;
     STDOUT.puts();
     for (const error of errors) STDOUT.puts(error.message);

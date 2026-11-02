@@ -38,7 +38,7 @@ describe("TestCommand", () => {
       const [env, ...args] = vi.mocked(rbFSystem).mock.lastCall!;
       expect(env).toEqual({ TRAILS_TEST_VERBOSE: "1" });
       expect(args.slice(0, 3)).toEqual(["vitest", "run", "test/a.test.ts"]);
-      expect(args.at(-1)).toMatch(/test-unit\/vitest-reporter\.js$/);
+      expect(args.at(-1)).toMatch(/test-unit\/vitest-reporter\.[jt]s$/);
     } finally {
       load.mockRestore();
     }

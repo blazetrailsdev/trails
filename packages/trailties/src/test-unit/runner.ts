@@ -100,7 +100,10 @@ export class Runner {
       ...(name != null && !lineFiltered ? ["-t", name.source] : []),
       ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
       "--reporter",
-      decodeURIComponent(new URL("./vitest-reporter.js", import.meta.url).pathname),
+      decodeURIComponent(
+        new URL(`./vitest-reporter${/\.[jt]s$/.exec(import.meta.url)![0]}`, import.meta.url)
+          .pathname,
+      ),
     );
     if (success == null) throw new LoadError("cannot load such file -- vitest");
     if (!success) exit(false);
