@@ -25,6 +25,25 @@ describe("TimerTask", () => {
     expect(runs).toBe(after);
   });
 
+  it("posts each run to the given executor", async () => {
+    let posts = 0;
+    let runs = 0;
+    const executor = {
+      post(task: () => unknown): boolean {
+        posts += 1;
+        task();
+        return true;
+      },
+    };
+    const task = new TimerTask({ executionInterval: 0.02, runNow: true, executor }, () => {
+      runs += 1;
+    }).execute();
+    await sleep(30);
+    task.shutdown();
+    expect(posts).toBeGreaterThanOrEqual(1);
+    expect(runs).toBe(posts);
+  });
+
   it("keeps running after the block raises", async () => {
     let runs = 0;
     const task = new TimerTask({ executionInterval: 0.02 }, () => {

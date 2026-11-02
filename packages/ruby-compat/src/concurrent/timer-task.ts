@@ -1,24 +1,24 @@
 import { ArgumentError } from "../argument-error.js";
 import { constSet } from "../include.js";
-import { globalIoExecutor, type ThreadPoolExecutor } from "../thread-pool-executor.js";
+import { ScheduledTask } from "../scheduled-task.js";
+import { globalIoExecutor } from "../thread-pool-executor.js";
 import { Concurrent } from "./map.js";
 
-const MAX_TIMEOUT = 2 ** 31 - 1;
+type Executor = { post(task: () => unknown): unknown };
 
 /**
  * concurrent-ruby's `Concurrent::TimerTask` (not vendored,
- * `concurrent/timer_task.rb:148-358`, concurrent-ruby 1.3.6), with its default
+ * `concurrent/timer_task.rb:166-365`, concurrent-ruby 1.3.8), with its default
  * `run_now: false` and `interval_type: :fixed_delay`: the first run is one
  * `execution_interval` (seconds) after {@link execute}, and each later one is
  * scheduled when the previous run has settled, so an async block never
  * overlaps itself. A raising block does not stop the timer, and each run's
  * `(time, result, error)` goes to the observers {@link addObserver} registered
- * (`timer_task.rb:330-345` `execute_task`). The wait is an unref'd
- * `setTimeout`, so a pending run does not hold the process open, where
- * concurrent-ruby's timer thread waits through `rb_mutex_sleep`
- * (`vendor/ruby/v3.3.11/thread_sync.c:626`). Each run is posted to `executor`,
- * by default {@link globalIoExecutor} (`timer_task.rb:312`, `:334`), so it owns
- * a pool `Thread` rather than the one that called {@link execute}.
+ * (`timer_task.rb:339-354` `execute_task`). Each run is a {@link ScheduledTask}
+ * posted to `executor`, by default {@link globalIoExecutor}
+ * (`timer_task.rb:312`, `:334`), so it owns a pool `Thread` rather than the one
+ * that called {@link execute}. `ScheduledTask`'s wait stands in for the timer
+ * thread's `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -26,10 +26,10 @@ export class TimerTask {
   /** @noRailsEquivalent PERMANENT */
   readonly executionInterval: number;
   private readonly _runNow: boolean;
-  private readonly _executor: Pick<ThreadPoolExecutor, "post">;
+  private readonly _executor: Executor;
   private readonly _task: (task: TimerTask) => unknown;
   private _running = false;
-  private _timer: ReturnType<typeof setTimeout> | undefined;
+  private _scheduled: ScheduledTask<[number]> | undefined;
   private _generation = 0;
   private _inFlight: Promise<unknown> | null = null;
   private readonly _observers: ((time: Date, result: unknown, error: unknown) => unknown)[] = [];
@@ -43,7 +43,7 @@ export class TimerTask {
     }: {
       executionInterval: number;
       runNow?: boolean;
-      executor?: Pick<ThreadPoolExecutor, "post">;
+      executor?: Executor;
     },
     task: (task: TimerTask) => unknown,
   ) {
@@ -83,19 +83,17 @@ export class TimerTask {
   shutdown(): true {
     this._running = false;
     this._generation += 1;
-    clearTimeout(this._timer);
-    this._timer = undefined;
+    this._scheduled?.cancel();
+    this._scheduled = undefined;
     return true;
   }
 
   private _scheduleNextTask(interval = this.executionInterval): void {
-    const generation = this._generation;
-    const timer: unknown = setTimeout(
-      () => this._executor.post(() => this._executeTask(generation)),
-      Math.min(interval * 1000, MAX_TIMEOUT),
+    this._scheduled = ScheduledTask.execute(
+      interval,
+      { executor: this._executor, args: [this._generation] },
+      (generation) => this._executeTask(generation),
     );
-    this._timer = timer as ReturnType<typeof setTimeout>;
-    (timer as { unref?: () => unknown }).unref?.();
   }
 
   private _notifyObservers(result: unknown, error: unknown): void {
