@@ -18,7 +18,7 @@ async function generatedLayout(): Promise<string> {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-layout-"));
   await new AppGenerator(
     ["blog"],
-    { database: "sqlite", skipDocker: true },
+    { skipBundle: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
   return fs.readFileSync(

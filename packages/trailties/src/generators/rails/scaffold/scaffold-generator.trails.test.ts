@@ -115,7 +115,7 @@ describe("ScaffoldGenerator (type-check)", () => {
     try {
       await new AppGenerator(
         ["blog"],
-        { database: "sqlite" },
+        { skipBundle: true, database: "sqlite" },
         { destinationRoot: tmpApps },
       ).invokeAll();
       const appDir = path.join(tmpApps, "blog");

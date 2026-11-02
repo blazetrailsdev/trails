@@ -28,7 +28,7 @@ async function generateApp(): Promise<string> {
   );
   await new AppGenerator(
     ["my-app"],
-    { database: "sqlite", skipDocker: true },
+    { skipBundle: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
   return path.join(tmpDir, "my-app");

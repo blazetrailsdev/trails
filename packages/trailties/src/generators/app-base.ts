@@ -23,7 +23,7 @@ import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./ba
 import { DATABASES, Database, type DatabaseName } from "./database.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { AppName } from "./app-name.js";
-import { getPackageManager } from "../package-manager.js";
+import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
@@ -693,6 +693,17 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected isBundleInstall(): boolean {
     return !(this.options.skipBundle || this.options.pretend);
+  }
+
+  /** @internal */
+  protected async runBundle(): Promise<void> {
+    if (this.isBundleInstall()) {
+      const pm = getPackageManager(this.destinationRoot, {
+        fallback: (this.options as { packageManager?: string }).packageManager,
+      });
+      this.sayStatus("run", `${pm.name} install`);
+      packageManagerInstall(this.destinationRoot, pm);
+    }
   }
 
   /** @internal */

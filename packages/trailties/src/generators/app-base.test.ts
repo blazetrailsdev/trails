@@ -1,8 +1,13 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, it, expect } from "vitest";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { describe, it, expect, vi } from "vitest";
+import {
+  childProcessAdapterConfig,
+  env,
+  registerChildProcessAdapter,
+  setEnv,
+} from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { AppGenerator } from "./rails/app/app-generator.js";
 import { packageManagerAdapterConfig, registerPackageManagerAdapter } from "../package-manager.js";
@@ -171,6 +176,26 @@ describe("AppBase run tasks", () => {
   it("run tasks do nothing without bundle_install?", async () => {
     expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
     expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
+  });
+
+  it("run_bundle installs through the package manager unless bundle_install? is false", async () => {
+    const previous = childProcessAdapterConfig.adapter;
+    const spawnSync = vi.fn(() => ({ status: 0, signal: null, stdout: "", stderr: "" }));
+    registerChildProcessAdapter("run-bundle-test", { spawnSync });
+    childProcessAdapterConfig.adapter = "run-bundle-test";
+    try {
+      const generator = (options: Record<string, unknown>) =>
+        new T(["app"], { quiet: true, ...options }, { destinationRoot: "/tmp" }) as unknown as {
+          runBundle(): Promise<void>;
+        };
+      await generator({ skipBundle: true }).runBundle();
+      await generator({ pretend: true }).runBundle();
+      expect(spawnSync).not.toHaveBeenCalled();
+      await generator({}).runBundle();
+      expect(spawnSync).toHaveBeenCalledOnce();
+    } finally {
+      childProcessAdapterConfig.adapter = previous;
+    }
   });
 
   it("dockerfile_binfile_fixups writes a literal backslash-r", () => {

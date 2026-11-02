@@ -1591,6 +1591,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
     this.methodAdded("applyRailsTemplate");
+    this.publicCommand("runBundle");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
