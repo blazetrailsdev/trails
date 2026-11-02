@@ -1,3 +1,4 @@
+import type { AnyClass } from "./descendants-tracker.js";
 import { Interlock } from "./dependencies/interlock.js";
 
 export const Dependencies = {
@@ -9,9 +10,9 @@ export const Dependencies = {
 
   _eagerLoadPaths: new Set<string>(),
 
-  _autoloadedTrackedClasses: new Set<unknown>(),
+  _autoloadedTrackedClasses: new Set<AnyClass>(),
 
-  autoloader: null as unknown,
+  autoloader: null as { reload(): Promise<void> } | null,
 
   runInterlock<T>(block: () => T | Promise<T>): Promise<T> {
     return this.interlock.running(block);
@@ -23,6 +24,13 @@ export const Dependencies = {
 
   unloadInterlock<T>(block: () => T | Promise<T>): Promise<T | undefined> {
     return this.interlock.unloading(block);
+  },
+
+  async clear(): Promise<void> {
+    await this.unloadInterlock(async () => {
+      this._autoloadedTrackedClasses.clear();
+      await this.autoloader!.reload();
+    });
   },
 
   isEagerLoad(path: string): boolean {

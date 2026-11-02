@@ -31,8 +31,12 @@ describe("a generated app reloads its views in development", () => {
     const view = `${tmp}/posts/show.html.tse`;
     File.write(view, "<h1>Before edit</h1>");
     FileUtils.touch(view, { mtime: new Date(Date.now() - 10_000) });
-    const posts = constantize("PostsController");
-    (posts as { prependViewPath(path: string): void }).prependViewPath(tmp);
+    const prependViewPath = (): void => {
+      const posts = constantize("PostsController");
+      (posts as { prependViewPath(path: string): void }).prependViewPath(tmp);
+    };
+    prependViewPath();
+    app.reloader.toPrepare(prependViewPath);
 
     const show = async (): Promise<string> => {
       const [, , body] = await (rbFSend(app.app(), "call", {

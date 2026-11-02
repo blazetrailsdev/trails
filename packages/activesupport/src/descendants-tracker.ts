@@ -88,7 +88,7 @@ export function disableClearBang(): void {
   }
 }
 
-export function clear(classes: AnyClass[]): void {
+export function clear(classes: Iterable<AnyClass>): void {
   if (_clearDisabled) {
     throw new Error(
       "DescendantsTracker.clear was disabled because config.enable_reloading is false",

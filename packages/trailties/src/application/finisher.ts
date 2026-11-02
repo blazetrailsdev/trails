@@ -12,6 +12,7 @@ import {
   getPath,
   isRegisteredConstant,
   Monitor,
+  rbObjIsKindOf,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import type { Autoloaders } from "../autoloaders.js";
@@ -39,6 +40,7 @@ export interface FinisherReloaderInstance {
 export interface FinisherReloader {
   check: () => boolean;
   toPrepare(block: ConfigurationBlock): void;
+  afterClassUnload(block: () => unknown): void;
   toRun(block: (this: FinisherReloaderInstance) => unknown, options?: { prepend?: boolean }): void;
   toComplete(block: (this: FinisherReloaderInstance) => unknown): void;
   prepareBang(): void;
@@ -109,6 +111,12 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   if (this.config.isReloadingEnabled()) {
     autoloader.enableReloading();
     Dependencies.autoloader = autoloader;
+
+    autoloader.onLoad((_cpath: unknown, value: unknown) => {
+      if (typeof value === "function" && rbObjIsKindOf(value, DescendantsTracker)) {
+        Dependencies._autoloadedTrackedClasses.add(value as never);
+      }
+    });
   }
 
   autoloader.onLoad(_registerAutoloaded);
@@ -153,7 +161,7 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 /**
  * @missingRailsCall eager_load_all — CONVERGEABLE trailties-app-scan-retires
  * @missingRailsCall eager_load! — CONVERGEABLE trailties-app-scan-retires
- * @missingRailsCall after_class_unload — CONVERGEABLE trailties-reload-drives-zeitwerk
+ * @inventedArm if — PERMANENT
  */
 Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
@@ -161,6 +169,12 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
     for (const namespace of this.config.eagerLoadNamespaces) {
       await (namespace as { eagerLoadBang(): Promise<void> }).eagerLoadBang();
     }
+  }
+
+  if (this.config.isReloadingEnabled()) {
+    this.reloader.afterClassUnload(() => {
+      return this.autoloaders.main.eagerLoad();
+    });
   }
 });
 
@@ -239,15 +253,14 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
   }
 });
 
-/**
- * @missingRailsCall _autoloaded_tracked_classes — CONVERGEABLE trailties-reload-drives-zeitwerk
- * @missingRailsCall clear — CONVERGEABLE trailties-reload-drives-zeitwerk
- */
 Finisher.initializer(
   "set_clear_dependencies_hook",
   { group: "all" },
   function (this: FinisherHost) {
-    const callback = (): void => {};
+    const callback = async (): Promise<void> => {
+      DescendantsTracker.clear(Dependencies._autoloadedTrackedClasses);
+      await Dependencies.clear();
+    };
 
     if (this.config.isReloadingEnabled()) {
       if (this.config.reloadClassesOnlyOnChange) {
@@ -268,7 +281,7 @@ Finisher.initializer(
         const FileWatcher = this.config.fileWatcher as new (
           files: string[],
           dirs: Record<string, string[]>,
-          block: () => void,
+          block: () => Promise<void>,
         ) => { execute(): Promise<void> };
         const reloader = new FileWatcher(...this.watchableArgs(), callback);
         this.reloaders.push(reloader);
@@ -297,6 +310,7 @@ export async function _registerAutoloaded(cpath: unknown, value: unknown): Promi
   const cname = cpath as string;
   if (value.prototype instanceof ActionController.Metal) {
     registerController(cname, value as typeof ActionController.Metal);
+    await defineController(value);
   } else if (value.prototype instanceof Base) {
     registerModel(cname, value as typeof Base);
   } else if (value.prototype instanceof JobBase) {
