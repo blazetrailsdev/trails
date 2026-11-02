@@ -21,6 +21,19 @@ describe("tasks/misc", () => {
     return out;
   }
 
+  it("lists the zones at the local standard offset", async () => {
+    const out: string[] = [];
+    vi.spyOn(STDOUT, "puts").mockImplementation((...lines: unknown[]) => {
+      out.push(lines.join("\n"));
+      return null;
+    });
+    await Rake.withApplication(async (rake) => {
+      await rbFLoad(File.join(import.meta.dirname, "misc.ts"));
+      await rake.lookup("time:zones:local")!.invoke();
+    });
+    expect(out.at(-1)).toBe("\n");
+  });
+
   it("lists a country's zones", async () => {
     const out = await zones("US");
     expect(out).toContain("Pacific Time (US & Canada)");

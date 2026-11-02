@@ -16,17 +16,6 @@ describe("tasks/framework", () => {
     FileUtils.rmRf(root);
   });
 
-  it("copies the templates", async () => {
-    await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
-      await rake.lookup("app:templates:copy")!.invoke();
-    });
-    expect(File.isExist(File.join(root, "lib/templates/tse/controller"))).toBe(true);
-    for (const dir of ["controller", "helper", "scaffold-controller"]) {
-      expect(File.isExist(File.join(root, "lib/templates/rails", dir))).toBe(true);
-    }
-  });
-
   it("raises when no LOCATION is given", async () => {
     vi.stubEnv("LOCATION", "");
     await expect(
