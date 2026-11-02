@@ -287,7 +287,6 @@ Finisher.initializer(
   },
 );
 
-/** @noRailsEquivalent PERMANENT */
 export async function _registerAutoloaded(_cpath: unknown, value: unknown): Promise<void> {
   if (typeof value !== "function") return;
   if (value.prototype instanceof ActionController.Metal) {
