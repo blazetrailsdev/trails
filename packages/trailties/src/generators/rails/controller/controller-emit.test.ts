@@ -58,7 +58,7 @@ describe("controllerPathHelpers", () => {
     });
   });
 
-  it("exports the leaf class and preserves :: for display", async () => {
+  it("flattens namespace for the TS class name but preserves :: for display", async () => {
     expect(controllerPathHelpers("admin/dashboard")).toMatchObject({
       className: "DashboardController",
       displayName: "Admin::DashboardController",

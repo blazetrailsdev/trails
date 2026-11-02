@@ -11,7 +11,7 @@ export const get = (mod: object, cname: string) =>
   autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
 declare global {
-  var $get: ((cname: string) => Promise<never>) | undefined;
+  var $get: ((cname: string, mod?: object) => Promise<never>) | undefined;
 }
 
 export interface Constants {
@@ -79,7 +79,7 @@ export async function withFiles(files: [string, string?][], block: () => unknown
   const pwd = Dir.pwd();
   const tmp = Dir.mktmpdir("zeitwerk");
   Dir.chdir(tmp);
-  globalThis.$get = (cname) => get(Object, cname);
+  globalThis.$get = (cname, mod = Object) => get(mod, cname);
   try {
     for (const [fname, contents] of files) {
       FileUtils.mkdirP(File.dirname(fname));

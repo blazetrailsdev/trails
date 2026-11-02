@@ -26,12 +26,12 @@ describe("TestMultipleLoaders", () => {
       ["lib0/app0.ts", 'await globalThis.$get("App1"); export const App0 = class {}'],
       [
         "lib0/app0/foo.ts",
-        'const App1 = await globalThis.$get("App1"); App1.Foo; export class Foo {}',
+        'await globalThis.$get("Foo", await globalThis.$get("App1")); export class Foo {}',
       ],
       ["lib1/app1/foo.ts", 'await globalThis.$get("App0"); export class Foo {}'],
       [
         "lib1/app1/foo/bar/baz.ts",
-        'const App0 = await globalThis.$get("App0"); App0.Foo; export class Baz {}',
+        'await globalThis.$get("Foo", await globalThis.$get("App0")); export class Baz {}',
       ],
     ];
     await withFiles(files, async () => {

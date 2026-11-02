@@ -301,7 +301,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(parseTs(t).diagnostics).toEqual([]);
   });
 
-  it("namespaced scaffold controller emits the leaf class name and nested paths", async () => {
+  it("namespaced scaffold controller emits flattened class name and nested paths", async () => {
     await runGenerator("admin/account", ["name:string"]);
     const c = read("app/controllers/admin/accounts-controller.ts");
     expect(c).toContain("class AccountsController");
