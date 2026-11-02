@@ -13,5 +13,6 @@ describe("kernelHash", () => {
   it("raises TypeError for anything else", () => {
     expect(() => kernelHash("")).toThrow(TypeError);
     expect(() => kernelHash([1])).toThrow(TypeError);
+    expect(() => kernelHash({ toHash: () => 1 })).toThrow(TypeError);
   });
 });

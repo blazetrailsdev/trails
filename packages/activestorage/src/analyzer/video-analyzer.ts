@@ -73,10 +73,11 @@ export class VideoAnalyzer extends Analyzer {
     const tags = await this.tags();
     if (tags["rotate"] != null) {
       return kernelInteger(tags["rotate"]);
-    }
-    const displayMatrix = await this.displayMatrix();
-    if (displayMatrix != null && displayMatrix["rotation"] != null) {
-      return kernelInteger(displayMatrix["rotation"]);
+    } else if (
+      (await this.displayMatrix()) != null &&
+      (await this.displayMatrix())!["rotation"] != null
+    ) {
+      return kernelInteger((await this.displayMatrix())!["rotation"]);
     }
     return null;
   }
@@ -122,10 +123,8 @@ export class VideoAnalyzer extends Analyzer {
 
   /** @internal */
   protected async computedHeight(): Promise<number | null> {
-    const encodedWidth = await this.encodedWidth();
-    const displayHeightScale = await this.displayHeightScale();
-    if (encodedWidth != null && displayHeightScale != null) {
-      return encodedWidth * displayHeightScale;
+    if ((await this.encodedWidth()) != null && (await this.displayHeightScale()) != null) {
+      return (await this.encodedWidth())! * (await this.displayHeightScale())!;
     }
     return null;
   }
