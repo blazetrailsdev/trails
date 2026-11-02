@@ -19,9 +19,9 @@ import { mail } from "./assertion-receipts/mail.js";
 import { msgpack } from "./assertion-receipts/msgpack.js";
 import { rack } from "./assertion-receipts/rack.js";
 import { rake } from "./assertion-receipts/rake.js";
-import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { trailties } from "./assertion-receipts/trailties.js";
+import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
 /** One Rails assertion the port cannot make. */
 export interface AssertionReceipt {
@@ -57,9 +57,9 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   msgpack,
   rack,
   rake,
-  zeitwerk,
   "ruby-compat": rubyCompat,
   trailties,
+  zeitwerk,
 };
 
 /**
