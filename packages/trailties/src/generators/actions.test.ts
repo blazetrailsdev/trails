@@ -7,11 +7,14 @@ import {
   FileUtils,
   registerChildProcessAdapter,
   setEnv,
+  StandardError,
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import {
   assertEqual,
+  assertMatch,
   assertMock,
+  assertRaises,
   assertNotCalled,
   capture,
   Mock,
@@ -221,9 +224,10 @@ describe("ActionsTest", () => {
   });
 
   it("rails_command with inline option should raise on failure", async () => {
-    await expect(
+    const error = await assertRaises([StandardError], {}, () =>
       makeGen().railsCommand("generate model 1234567890", { inline: true }),
-    ).rejects.toThrow(/1234567890/);
+    );
+    assertMatch(/1234567890/, error.message);
   });
 
   it("rake with env option should run rake with the env environment", async () => {
