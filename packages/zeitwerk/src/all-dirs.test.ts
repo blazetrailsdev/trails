@@ -3,19 +3,19 @@ import "@blazetrails/vitest-matchers";
 import { Dir } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Loader } from "./loader.js";
-import { newLoader, setupLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
+import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
 
 describe("TestAllDirs", () => {
   afterEach(teardown);
 
-  it("returns an empty array if no loaders are instantiated", () => {
-    teardown();
+  it("returns an empty array if no loaders are instantiated", async () => {
+    await teardown();
     expect(Loader.allDirs()).toBeEmpty();
   });
 
-  it("returns an empty array if there are loaders but they have no root dirs", () => {
-    newLoader();
-    newLoader();
+  it("returns an empty array if there are loaders but they have no root dirs", async () => {
+    await newLoader({ setup: false });
+    await newLoader({ setup: false });
     expect(Loader.allDirs()).toBeEmpty();
   });
 
@@ -25,8 +25,8 @@ describe("TestAllDirs", () => {
       ["loaderB/b.ts", "export const B = true"],
     ];
     await withFiles(files, async () => {
-      await setupLoader("loaderA");
-      await setupLoader("loaderB");
+      await newLoader({ dirs: "loaderA" });
+      await newLoader({ dirs: "loaderB" });
       expect(Loader.allDirs()).toEqual([`${Dir.pwd()}/loaderA`, `${Dir.pwd()}/loaderB`]);
     });
   });

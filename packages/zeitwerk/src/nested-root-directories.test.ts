@@ -10,8 +10,8 @@ const g = globalThis as Record<string, unknown>;
 describe("TestNestedRootDirectories", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 

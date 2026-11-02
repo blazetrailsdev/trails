@@ -61,7 +61,7 @@ export async function resetConstants(): Promise<void> {
 
 function resetRegistry(): void {
   Registry.loaders.length = 0;
-  Registry.gemLoadersByRootFile = {};
+  Registry.loadersByPackageFile = {};
   Registry.autoloads = {};
 }
 

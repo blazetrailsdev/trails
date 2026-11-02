@@ -7,7 +7,8 @@ export const Registry = {
   Loader: undefined as typeof Loader | undefined,
 
   loaders: [] as Loader[],
-  gemLoadersByRootFile: {} as Record<string, Loader>,
+  /** @noRailsEquivalent PERMANENT */
+  loadersByPackageFile: {} as Record<string, Loader>,
   autoloads: {} as Record<string, Loader>,
 
   registerLoader(loader: Loader): void {
@@ -16,26 +17,27 @@ export const Registry = {
 
   unregisterLoader(loader: Loader): void {
     aryDelete(this.loaders, loader);
-    deleteIf(this.gemLoadersByRootFile, (_k, l) => l === loader);
+    for (const [packageFile, l] of Object.entries(this.loadersByPackageFile)) {
+      if (l === loader) delete this.loadersByPackageFile[packageFile];
+    }
     deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
-  /**
-   * @inventedArm readFile — PERMANENT
-   * @inventedArm pushDir — PERMANENT
-   * @inventedArm if — CONVERGEABLE loader-for-gem-memoizes-across-await
-   */
-  async loaderForGem(rootFile: string, { namespace }: { namespace: object }): Promise<Loader> {
-    if (Object.hasOwn(this.gemLoadersByRootFile, rootFile)) {
-      return this.gemLoadersByRootFile[rootFile];
+  /** @noRailsEquivalent CONVERGEABLE loader-for-package-memoizes-across-await */
+  async loaderForPackage(
+    packageFile: string,
+    { namespace }: { namespace: object },
+  ): Promise<Loader> {
+    if (Object.hasOwn(this.loadersByPackageFile, packageFile)) {
+      return this.loadersByPackageFile[packageFile];
     }
 
-    const { name } = JSON.parse(await getFs().readFile(rootFile, "utf8")) as { name: string };
+    const { name } = JSON.parse(await getFs().readFile(packageFile, "utf8")) as { name: string };
     const loader = new this.Loader!();
     loader.tag = name.slice(name.lastIndexOf("/") + 1);
     if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
-    await loader.pushDir(File.join(File.dirname(rootFile), "src"), { namespace });
-    return (this.gemLoadersByRootFile[rootFile] = loader);
+    await loader.pushDir(File.join(File.dirname(packageFile), "src"), { namespace });
+    return (this.loadersByPackageFile[packageFile] = loader);
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {

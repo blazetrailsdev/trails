@@ -7,7 +7,6 @@ import {
   type Constants,
   get,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -18,8 +17,8 @@ const top = TopLevel as unknown as Constants;
 describe("TestUnloadableCpath", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -60,7 +59,7 @@ describe("TestUnloadableCpath", () => {
 
   it("a loader that loaded some stuff has nothing to unload if reloading is disabled", async () => {
     await withFiles(files, async () => {
-      const loader = await setupLoader(".", { enableReloading: false });
+      const loader = await newLoader({ dirs: ".", enableReloading: false });
       expect(await get(await get(Object, "M"), "X")).toBeTruthy();
       expect(await get(top.M, "Y")).toBeTruthy();
       expect(await get(Object, "Z")).toBeTruthy();
