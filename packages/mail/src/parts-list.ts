@@ -11,7 +11,7 @@ export class PartsList extends Array<PartsListPart> {
     return Array;
   }
 
-  /** @missingRailsCall new — CONVERGEABLE mail-part-and-message-dependent-specs */
+  /** @missingRailsCall new — CONVERGEABLE mail-message-spec-port */
   constructor(...args: unknown[]) {
     super();
     if (args[0] != null) this.push(...(args[0] as unknown[]));
