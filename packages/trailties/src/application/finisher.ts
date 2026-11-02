@@ -35,7 +35,6 @@ export interface FinisherReloader {
   toRun(block: (this: FinisherReloaderInstance) => unknown, options?: { prepend?: boolean }): void;
   toComplete(block: (this: FinisherReloaderInstance) => unknown): void;
   prepareBang(): void;
-  afterClassUnload(block: () => unknown): void;
 }
 
 export interface FinisherExecutor {

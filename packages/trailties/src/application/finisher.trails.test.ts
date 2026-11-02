@@ -115,7 +115,6 @@ class TestApp extends Finisher {
   afterClassUnload: Array<() => unknown> = [];
   toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
   toComplete: Array<(this: FinisherReloaderInstance) => unknown> = [];
-  afterClassUnload: Array<() => unknown> = [];
   reloader: FinisherReloader = {
     check: () => false,
     afterClassUnload: (block) => this.afterClassUnload.push(block),
@@ -123,7 +122,6 @@ class TestApp extends Finisher {
     toRun: (block) => this.toRun.push(block),
     toComplete: (block) => this.toComplete.push(block),
     prepareBang: () => this.calls.push("prepare!"),
-    afterClassUnload: (block) => this.afterClassUnload.push(block),
   };
   watchableArgs(): [string[], Record<string, string[]>] {
     return [this.watchableFiles, {}];
