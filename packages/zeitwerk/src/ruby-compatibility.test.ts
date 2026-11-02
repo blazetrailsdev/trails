@@ -17,7 +17,13 @@ describe("TestRubyCompatibility", () => {
   beforeEach(() => {
     loader = newLoader();
   });
-  afterEach(teardown);
+  afterEach(() => {
+    const g = globalThis as Record<string, unknown>;
+    delete g.$isDefinedX;
+    delete g.$constDefinedForX;
+    delete g.$ensureMIsAutoloaded;
+    teardown();
+  });
 
   // PERMANENT-SKIP: names the `Kernel#require` decoration, a scoped skip on `core_ext/kernel.rb` in `scripts/parity/conventions.ts`; an ES `import` does not pass through it (CLAUDE.md, "`Module#autoload` is a build step").
   it.skip("autoload calls Kernel#require", () => {});
