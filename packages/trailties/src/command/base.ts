@@ -117,7 +117,7 @@ export class Base extends Thor {
     await (this as unknown as ThorClass).dispatch(command, [...args], null, config);
   }
 
-  static printingCommands(): [string, string | null][] {
+  static printingCommands(): [string, string | null][] | Promise<[string, string | null][]> {
     return Object.entries((this as unknown as ThorClass).commands())
       .filter(([, command]) => !command.isHidden())
       .map(([name, command]) => [this.namespacedName(name), command.description]);

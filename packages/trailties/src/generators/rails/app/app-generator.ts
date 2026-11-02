@@ -490,9 +490,7 @@ ${
 
 /storage/*
 !/storage/.gitkeep
-
-/public/assets
-
+${this.options.api ? "" : "\n/public/assets\n"}
 *.tsbuildinfo
 `,
     );
@@ -595,7 +593,7 @@ dist
         declarations: [
           tsClass({
             name: "ApplicationController",
-            extends: ref("ActionController.Base"),
+            extends: ref(`ActionController.${this.options.api ? "API" : "Base"}`),
             body: [],
           }),
         ],
@@ -827,7 +825,16 @@ export class ${this.appConstBase()} extends Application {
   static {
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("${this.configTargetVersion()}");
-  }
+${
+  this.options.api
+    ? `
+    // Only loads a smaller set of middleware suitable for API only apps.
+    // Middleware like session, flash, cookies can be added back manually.
+    // Skip views, helpers and assets when generating a new resource.
+    this.config.apiOnly = true;
+`
+    : ""
+}  }
 
   // Configuration for the application, engines, and trailties goes here.
   //
@@ -865,24 +872,7 @@ export default await Trails.initialize();
 `,
     );
 
-    await this.createFile(
-      "config/routes.ts",
-      `import { Trails } from "@blazetrails/trailties";
-
-Trails.application.routes().draw(function () {
-  // Define your application routes here.
-  // Example:
-  //   this.get("/posts", { to: "posts#index" });
-
-  // Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
-  // Can be used by load balancers and uptime monitors to verify that the app is live.
-  this.get("up", { to: "rails/health#show", as: "rails_health_check" });
-
-  // Defines the root path route ("/")
-  // this.root("posts#index");
-});
-`,
-    );
+    await this.template("config/routes.ts");
 
     if (!this.skipActionCable()) {
       await this.createFile(
@@ -1610,6 +1600,10 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createTestFiles");
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
+    this.methodAdded("deleteAppAssetsIfApiOption");
+    this.methodAdded("deleteAppHelpersIfApiOption");
+    this.methodAdded("deleteAppViewsIfApiOption");
+    this.methodAdded("deletePublicFilesIfApiOption");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
   }
@@ -1753,6 +1747,42 @@ export class AppGenerator extends AppBase {
 
   async createStorageFiles(): Promise<void> {
     if (!this.skipStorage()) await this.build("storage");
+  }
+
+  async deleteAppAssetsIfApiOption(): Promise<void> {
+    if (this.options.api) {
+      await this.removeDir("app/assets");
+    }
+  }
+
+  async deleteAppHelpersIfApiOption(): Promise<void> {
+    if (this.options.api) {
+      await this.removeDir("app/helpers");
+      await this.removeDir("test/helpers");
+    }
+  }
+
+  async deleteAppViewsIfApiOption(): Promise<void> {
+    if (this.options.api) {
+      if (this.options.skipActionMailer) {
+        await this.removeDir("app/views");
+      } else {
+        await this.removeFile("app/views/layouts/application.html.tse");
+        await this.removeDir("app/views/pwa");
+      }
+    }
+  }
+
+  async deletePublicFilesIfApiOption(): Promise<void> {
+    if (this.options.api) {
+      await this.removeFile("public/400.html");
+      await this.removeFile("public/404.html");
+      await this.removeFile("public/406-unsupported-browser.html");
+      await this.removeFile("public/422.html");
+      await this.removeFile("public/500.html");
+      await this.removeFile("public/icon.png");
+      await this.removeFile("public/icon.svg");
+    }
   }
 
   /** @internal */

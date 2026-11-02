@@ -148,9 +148,12 @@ export async function findByNamespace(
 
 export async function printingCommands(): Promise<[string, string | null][]> {
   await lookupBang();
-  return subclasses()
-    .filter((klass) => !hiddenCommands().includes(klass))
-    .flatMap((klass) => klass.printingCommands());
+  const commands = await Promise.all(
+    subclasses()
+      .filter((klass) => !hiddenCommands().includes(klass))
+      .map((klass) => klass.printingCommands()),
+  );
+  return commands.flat();
 }
 
 /** @internal */
@@ -174,37 +177,41 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm findRakefileLocation — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
+ * @inventedArm parseAsync — CONVERGEABLE port-help-and-version-commands-for-split-namespace
+ */
 async function invokeRake(
   task: string,
   args: string[],
   config: Record<string, unknown>,
 ): Promise<void> {
-  await lookupBang();
-  const program = createProgram();
-  const taskName = /[^[]+/.exec(task)?.[0] ?? "";
-  const colon = taskName.indexOf(":");
-  if (colon > 0) {
-    const command = program.commands.find((c) => c.name() === taskName.slice(0, colon));
-    const subcommand = taskName.slice(colon + 1);
-    if (command?.commands.some((c) => c.name() === subcommand)) {
-      await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
-      return;
+  if (task === "" || task === "help" || HELP_MAPPINGS.has(task) || VERSION_MAPPINGS.has(task)) {
+    const rake = (await findByNamespace("rake")) as typeof Base;
+    await lookupBang();
+    const program = createProgram();
+    if (task !== "" && !VERSION_MAPPINGS.has(task)) {
+      const tasks = await rake.printingCommands();
+      const width = Math.max(0, ...tasks.map(([name]) => name.length));
+      program.addHelpText(
+        "after",
+        ["", "In addition to those commands, there are:", ""]
+          .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
+          .join("\n"),
+      );
     }
+    await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
+    return;
   }
-  if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
-    if ((await Rake.application!.findRakefileLocation()) != null) {
-      if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
-      const { RakeCommand } = await import("./commands/rake.js");
-      await RakeCommand.perform(task, args, config);
-      return;
-    }
+  if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
+  if ((await Rake.application!.findRakefileLocation()) == null) {
     throw new UnrecognizedCommandError(
       task,
       (await printingCommands()).map(([name]) => name),
     );
   }
-  await program.parseAsync(taskName === "" ? args : [taskName, ...args], { from: "user" });
+  await ((await findByNamespace("rake")) as typeof Base).perform(task, args, config);
 }
 
 Trails.Command = { invoke };

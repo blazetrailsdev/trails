@@ -3,12 +3,25 @@ import { Rake, TaskManager, type Application as RakeApplication } from "@blazetr
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
+import { subclasses } from "../command/behavior.js";
 import { UnrecognizedCommandError, root } from "../command.js";
 
 export class RakeCommand extends Base {
   static {
     extend(this, Actions);
     this.namespace("rake");
+    subclasses().push(this);
+  }
+
+  static override async printingCommands(): Promise<[string, string | null][]> {
+    const nonAppFilePattern = this.nonAppFilePattern();
+    return (await this.rakeTasks())
+      .filter(
+        (task) =>
+          task.comment != null &&
+          task.locations.some((location) => nonAppFilePattern.test(location)),
+      )
+      .map((task) => [task.nameWithArgs(), task.comment]);
   }
 
   static override async perform(
@@ -41,7 +54,7 @@ export class RakeCommand extends Base {
 
   /** @internal */
   private static nonAppFilePattern(): RegExp {
-    return new RegExp(`^(?!${regexpEscape(root()!.toString())})`);
+    return new RegExp(`^(?!${regexpEscape(root()?.toString() ?? "")})`);
   }
 
   /** @internal */
@@ -58,5 +71,14 @@ export class RakeCommand extends Base {
       result = await block(rake);
     });
     return result!;
+  }
+
+  /**
+   * @internal
+   * @inventedArm findRakefileLocation — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
+   */
+  private static async rakeTasks(): Promise<RakeApplication["tasks"]> {
+    if ((await Rake.application!.findRakefileLocation()) == null) return [];
+    return (this._rakeTasks ??= await this.withRake([], (rake) => rake.tasks));
   }
 }

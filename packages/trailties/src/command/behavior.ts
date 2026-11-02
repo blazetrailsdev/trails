@@ -24,6 +24,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   dev: async () => (await import("../commands/dev.js"), null),
   test: async () => (await import("../commands/test.js"), null),
   build: async () => (await import("../commands/build.js"), null),
+  rake: async () => (await import("../commands/rake.js"), null),
 };
 
 export function noColorBang(): void {

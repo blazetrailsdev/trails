@@ -27,12 +27,12 @@ beforeAll(async () => {
   ScaffoldGeneratorTest.tests(ScaffoldGenerator);
 });
 
-beforeEach((context) => {
+beforeEach(async (context) => {
   t = context.testCase as TestCase;
   t.prepareDestination();
   Trails.application = ScaffoldGeneratorApp.instance();
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
-  copyRoutes.call(t);
+  await copyRoutes.call(t);
 });
 
 afterEach(() => {

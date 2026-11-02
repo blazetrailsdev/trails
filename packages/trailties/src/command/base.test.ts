@@ -9,16 +9,16 @@ import { GenerateCommand } from "../commands/generate.js";
 import { NotesCommand } from "../commands/notes.js";
 
 describe("Rails::Command::BaseTest", () => {
-  it("printing commands returns command and description if present", () => {
-    expect(GenerateCommand.printingCommands()[0]).toEqual(["generate", ""]);
-    expect(NotesCommand.printingCommands()[0]).toEqual([
+  it("printing commands returns command and description if present", async () => {
+    expect((await GenerateCommand.printingCommands())[0]).toEqual(["generate", ""]);
+    expect((await NotesCommand.printingCommands())[0]).toEqual([
       "notes",
       "Show comments in your code annotated with FIXME, OPTIMIZE, and TODO",
     ]);
   });
 
-  it("printing commands returns namespaced commands", () => {
-    expect(CredentialsCommand.printingCommands().map(([name]) => name)).toEqual([
+  it("printing commands returns namespaced commands", async () => {
+    expect((await CredentialsCommand.printingCommands()).map(([name]) => name)).toEqual([
       "credentials:edit",
       "credentials:show",
       "credentials:diff",
@@ -31,10 +31,12 @@ describe("Rails::Command::BaseTest", () => {
         (this as unknown as ThorClass).methodAdded("perform");
       }
     }
-    expect(ChangeCommand.printingCommands().map(([name]) => name)).toEqual(["db:system:change"]);
+    expect((await ChangeCommand.printingCommands()).map(([name]) => name)).toEqual([
+      "db:system:change",
+    ]);
   });
 
-  it("printing commands hides hidden commands", () => {
+  it("printing commands hides hidden commands", async () => {
     class HiddenCommand extends Base {
       command(): void {}
 
@@ -45,7 +47,7 @@ describe("Rails::Command::BaseTest", () => {
         klass.methodAdded("command");
       }
     }
-    expect(HiddenCommand.printingCommands()).toEqual([]);
+    expect(await HiddenCommand.printingCommands()).toEqual([]);
   });
 
   it("help shows usage and description", async () => {

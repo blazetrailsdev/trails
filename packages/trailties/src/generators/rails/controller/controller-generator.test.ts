@@ -20,11 +20,11 @@ beforeAll(async () => {
   ControllerGeneratorTest.tests(ControllerGenerator);
 });
 
-beforeEach((context) => {
+beforeEach(async (context) => {
   t = context.testCase as TestCase;
   t.prepareDestination();
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
-  copyRoutes.call(t);
+  await copyRoutes.call(t);
 });
 
 describe("ControllerGeneratorTest", () => {
