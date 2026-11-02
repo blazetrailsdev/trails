@@ -1,9 +1,10 @@
 import { File, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
-import { Loader } from "./loader.js";
+import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
+  Loader: undefined as typeof Loader | undefined,
 
   loaders: [] as Loader[],
   gemLoadersByRootFile: {} as Record<string, Loader>,
@@ -30,7 +31,7 @@ export const Registry = {
     }
 
     const { name } = JSON.parse(await getFs().readFile(rootFile, "utf8")) as { name: string };
-    const loader = new Loader();
+    const loader = new this.Loader!();
     loader.tag = name.slice(name.lastIndexOf("/") + 1);
     if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
     await loader.pushDir(File.join(File.dirname(rootFile), "src"), { namespace });
