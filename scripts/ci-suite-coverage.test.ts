@@ -1567,7 +1567,7 @@ describe("CI runs every tooling test suite", () => {
         [
           "grep",
           "-lE",
-          "(from |import\\(|require\\()[\"'](\\.\\./)+\\.\\./[a-z0-9-]+/(src|dist)/",
+          "(from |import\\(|require\\()[\"'](\\.\\./)+[a-z0-9-]+/(src|dist)/",
           "--",
           ...new Set(dirs),
         ],
