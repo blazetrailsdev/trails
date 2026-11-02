@@ -6,8 +6,9 @@ import {
   RuntimeError,
   Shellwords,
   classModule,
-  env,
+  env as ENV,
   getFs,
+  rbFArray,
   rbFBackquote,
   rbInspect,
   setEnv,
@@ -86,11 +87,11 @@ export class Rack {
   static readonly [classModule] = true;
   declare _app: RackHost | undefined;
 
-  async app(env_ = "production"): Promise<RackHost> {
-    const oldEnv = env["TRAILS_ENV"];
+  async app(env = "production"): Promise<RackHost> {
+    const oldEnv = ENV["TRAILS_ENV"];
     try {
       if (this._app == null) {
-        setEnv("TRAILS_ENV", env_);
+        setEnv("TRAILS_ENV", env);
 
         const environment = await this.appPath("config", "environment.ts");
         await import(environment);
@@ -114,6 +115,8 @@ export class Rack {
   }
 
   async assertWelcome(resp: RackResponse): Promise<void> {
+    resp = rbFArray(resp) as RackResponse;
+
     this.assertEqual(200, resp[0]);
     this.assertMatch("text/html", resp[1]["Content-Type"]);
     this.assertMatch("charset=utf-8", resp[1]["Content-Type"]);
@@ -156,7 +159,7 @@ export class Generation {
     Application.appClass = null;
     Trails.application = null;
 
-    this._prevTrailsEnv = env["TRAILS_ENV"];
+    this._prevTrailsEnv = ENV["TRAILS_ENV"];
     setEnv("TRAILS_ENV", "development");
 
     const appPath = await this.appPath();
@@ -298,19 +301,26 @@ export default { development: env("development"), test: env("test"), production:
     await import(environment);
   }
 
-  /**
-   * @missingRailsCall fork — PERMANENT
-   * @missingRailsCall BOOTSNAP_CACHE_DIR — PERMANENT
-   */
+  /** @missingRailsCall fork — PERMANENT */
   async trails(
-    args: (string | string[])[] | string,
-    { allowFailure = false, stderr = false }: { allowFailure?: boolean; stderr?: boolean } = {},
+    ...args: (string | unknown[] | { allowFailure?: boolean; stderr?: boolean })[]
   ): Promise<string> {
-    const argv = [args].flat(2);
+    const last = args.at(-1);
+    const { allowFailure = false, stderr = false } =
+      last != null && typeof last === "object" && !Array.isArray(last)
+        ? (args.pop() as { allowFailure?: boolean; stderr?: boolean })
+        : {};
+    const argv = args.flat(Infinity);
 
-    const command = `bin/trails ${argv.map((arg) => Shellwords.escape(arg)).join(" ")}${stderr ? "" : " 2>&1"}`;
+    const command = `bin/trails ${Shellwords.join(argv)}${stderr ? "" : " 2>&1"}`;
 
-    const output = await rbFBackquote(`cd ${await this.appPath()}; ${command}`);
+    let output: string;
+    setEnv("BOOTSNAP_CACHE_DIR", this.bootsnapCachePath());
+    try {
+      output = await rbFBackquote(`cd ${await this.appPath()}; ${command}`);
+    } finally {
+      setEnv("BOOTSNAP_CACHE_DIR", undefined);
+    }
 
     if (!allowFailure && !Process.lastStatus!.isSuccess()) {
       throw new RuntimeError(
@@ -505,7 +515,7 @@ export class Reload {
 export const TestHelpers = { Paths, Rack, Generation, Reload };
 
 export default async function setup(): Promise<void> {
-  if (env["ISOLATION_TEST"] != null) return;
+  if (ENV["ISOLATION_TEST"] != null) return;
 
   const appTemplatePath = Paths.prototype.appTemplatePath();
 

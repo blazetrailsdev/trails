@@ -9,6 +9,15 @@ import { rbInspect } from "./object.js";
  */
 export const Shellwords = {
   /**
+   * `vendor/ruby/v3.3.11/lib/shellwords.rb:191` — `Shellwords.shelljoin`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Shellwords.join`.
+   */
+  join(array: readonly unknown[]): string {
+    return array.map((arg) => Shellwords.escape(arg)).join(" ");
+  },
+
+  /**
    * `vendor/ruby/v3.3.11/lib/shellwords.rb:90` — `Shellwords.shellsplit`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Shellwords.shellwords`.

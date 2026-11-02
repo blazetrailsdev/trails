@@ -1,5 +1,14 @@
 import "../class-paths.runner.generated.js";
-import { File, TopLevel, exit, include, rbArgv, rbFLoad, stdin } from "@blazetrails/ruby-compat";
+import {
+  File,
+  TopLevel,
+  exit,
+  argv,
+  include,
+  rbArgv,
+  rbFLoad,
+  stdin,
+} from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
@@ -10,9 +19,12 @@ const AsyncFunction = (async () => {}).constructor as new (
   ...args: string[]
 ) => (scope: unknown) => Promise<unknown>;
 
-/** @noRailsEquivalent PERMANENT */
-function evalToplevel(code: string): Promise<unknown> {
-  return new AsyncFunction("__toplevel__", `with (__toplevel__) {\n${code}\n}`)(TopLevel);
+/** @noRailsEquivalent CONVERGEABLE runner-code-arm-eval-needs-owner-ruling */
+function evalToplevel(code: string, file: string): Promise<unknown> {
+  return new AsyncFunction(
+    "__toplevel__",
+    `with (__toplevel__) {\n${code}\n}\n//# sourceURL=${file}`,
+  )(TopLevel);
 }
 
 export class RunnerCommand extends Base {
@@ -62,10 +74,11 @@ export class RunnerCommand extends Base {
       await this.conditionalExecutor(
         wrapWithExecutor,
         { source: "application.runner.railties" },
-        async () => evalToplevel((await stdin.read()) as string),
+        async () => evalToplevel((await stdin.read()) as string, "stdin"),
       );
     } else if (await File.isExistAsync(codeOrFile)) {
       const expandedFilePath = File.expandPath(codeOrFile);
+      argv[1] = expandedFilePath;
       await this.conditionalExecutor(
         wrapWithExecutor,
         { source: "application.runner.railties" },
@@ -76,7 +89,7 @@ export class RunnerCommand extends Base {
         await this.conditionalExecutor(
           wrapWithExecutor,
           { source: "application.runner.railties" },
-          () => evalToplevel(codeOrFile),
+          () => evalToplevel(codeOrFile, import.meta.filename),
         );
       } catch (e) {
         if (!(e instanceof SyntaxError || e instanceof ReferenceError)) throw e;

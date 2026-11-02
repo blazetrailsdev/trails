@@ -486,6 +486,8 @@ const aliasEntries = [
 const otherResolve = {
   alias: [
     ...aliasEntries,
+    // A generated app under tmp/ must share the suite's source Trails, not dist's.
+    // `./commands` is excluded because its export maps to bin.ts, not commands.ts.
     {
       find: /^@blazetrails\/trailties\/((?!commands$).+)$/,
       replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",

@@ -41,7 +41,7 @@ describe("ApplicationTests::ActiveJobRailtieTest", () => {
       );
 
       expect(
-        (await t.trails(["runner", "console.log(FooJob.enqueueAfterTransactionCommit)"])).trim(),
+        (await t.trails("runner", "console.log(FooJob.enqueueAfterTransactionCommit)")).trim(),
       ).toBe("never");
     },
   );
