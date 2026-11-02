@@ -7,12 +7,14 @@ import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
 import { Model, type ClassMethods } from "./attached/model.js";
-import type { Blob } from "./blob.js";
+import { Blob } from "./blob.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
 /** @noRailsEquivalent PERMANENT */
 function attachPreviewImage(this: typeof Blob): void {
-  (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage");
+  (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage", {
+    service: () => null as never,
+  });
 }
 
 export class Engine extends TrailsEngine {
@@ -32,8 +34,12 @@ export class Engine extends TrailsEngine {
         include(this, ActiveRecordExtensions);
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
       });
-      onLoad("active_storage_blob", { runOnce: true }, attachPreviewImage);
-      await import("./variant-record.js");
+      if ("hasOneAttached" in Blob) {
+        if (Blob.reflectOnAssociation("previewImageAttachment") == null) {
+          attachPreviewImage.call(Blob);
+        }
+        await import("./variant-record.js");
+      }
     });
   }
 }

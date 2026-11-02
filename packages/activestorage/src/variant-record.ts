@@ -12,7 +12,9 @@ export class VariantRecord extends Record {
 
   static {
     this.belongsTo("blob");
-    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("image");
+    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("image", {
+      service: () => null as never,
+    });
   }
 }
 
