@@ -1,5 +1,5 @@
 import { ActionController } from "@blazetrails/actionpack";
-import { Files, type Request as RackRequest } from "@blazetrails/rack";
+import { Files } from "@blazetrails/rack";
 
 type Host = InstanceType<typeof ActionController.Base>;
 
@@ -10,7 +10,7 @@ export const FileServer = {
     path: string,
     { contentType, disposition }: { contentType: string | null; disposition: string | null },
   ): ReturnType<Files["serving"]> {
-    const result = new Files(null).serving(this.request as unknown as RackRequest, path);
+    const result = new Files(null).serving(this.request, path);
     const [status, headers, body] = result;
     this.status = status;
     this.responseBody = body;
