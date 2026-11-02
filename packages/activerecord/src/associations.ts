@@ -42,7 +42,8 @@ export interface AssociationOptions {
     | "delete"
     | "deleteAll"
     | "restrictWithException"
-    | "restrictWithError";
+    | "restrictWithError"
+    | false;
   ensuringOwnerWas?: string;
   inverseOf?: string | false;
   through?: string;

@@ -348,7 +348,7 @@ export abstract class CollectionAssociation extends Association {
   delete(
     ...records: Array<Base | number | string | bigint>
   ): Promise<Base[] | undefined> | Base[] | undefined {
-    return this.deleteOrDestroy(records, this.options.dependent);
+    return this.deleteOrDestroy(records, this.options.dependent || undefined);
   }
 
   async destroy(

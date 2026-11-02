@@ -1,24 +1,29 @@
 import { ActiveStorage } from "../active-storage.js";
-import type { Blob } from "../blob.js";
 
-function contentTypeForServing(this: Blob): string | null {
-  return this.forciblyServeAsBinary() ? ActiveStorage.binaryContentType : this.content_type;
+interface ServableHost {
+  contentType: string | null;
+  forciblyServeAsBinary(): boolean;
+  isAllowedInline(): boolean;
 }
 
-function forcedDispositionForServing(this: Blob): "attachment" | undefined {
+function contentTypeForServing(this: ServableHost): string | null {
+  return this.forciblyServeAsBinary() ? ActiveStorage.binaryContentType : this.contentType;
+}
+
+function forcedDispositionForServing(this: ServableHost): "attachment" | undefined {
   if (this.forciblyServeAsBinary() || !this.isAllowedInline()) {
     return "attachment";
   }
 }
 
 /** @internal */
-function forciblyServeAsBinary(this: Blob): boolean {
-  return ActiveStorage.contentTypesToServeAsBinary.includes(this.content_type!);
+function forciblyServeAsBinary(this: ServableHost): boolean {
+  return ActiveStorage.contentTypesToServeAsBinary.includes(this.contentType!);
 }
 
 /** @internal */
-function isAllowedInline(this: Blob): boolean {
-  return ActiveStorage.contentTypesAllowedInline.includes(this.content_type!);
+function isAllowedInline(this: ServableHost): boolean {
+  return ActiveStorage.contentTypesAllowedInline.includes(this.contentType!);
 }
 
 export const Servable = {

@@ -1,4 +1,4 @@
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, type Extended } from "@blazetrails/activesupport";
 import { include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import "@blazetrails/trailties/trailties/action-controller";
@@ -6,8 +6,16 @@ import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
-import { Model } from "./attached/model.js";
+import { Model, type ClassMethods } from "./attached/model.js";
+import { Blob } from "./blob.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
+
+/** @noRailsEquivalent PERMANENT */
+function attachPreviewImage(this: typeof Blob): void {
+  (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage", {
+    service: () => null as never,
+  });
+}
 
 export class Engine extends TrailsEngine {
   static {
@@ -21,11 +29,17 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    this.initializer("active_storage.reflection", () => {
+    this.initializer("active_storage.reflection", async () => {
       onLoad("active_record", function (this: typeof Base) {
         include(this, ActiveRecordExtensions);
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
       });
+      if ("hasOneAttached" in Blob) {
+        if (Blob.reflectOnAssociation("previewImageAttachment") == null) {
+          attachPreviewImage.call(Blob);
+        }
+        await import("./variant-record.js");
+      }
     });
   }
 }

@@ -28,6 +28,9 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Previewer: unknown;
   Analyzer: typeof Analyzer;
   Blob?: typeof Blob;
+  Preview?: new (blob: Blob, transformations: unknown) => { processed(): Promise<unknown> };
+  PreviewImageJob?: { performLater(...args: unknown[]): Promise<unknown> };
+  VariantRecord?: unknown;
   Transformers: typeof Transformers;
   Error: typeof Errors.Error;
   InvariableError: typeof Errors.InvariableError;
@@ -42,7 +45,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   verifier: MessageVerifier;
   variantProcessor: string;
   queues: Record<string, unknown>;
-  previewers: unknown[];
+  previewers: { isAccept(blob: Blob): boolean }[];
   analyzers: (typeof Analyzer)[];
   paths: Record<string, unknown>;
   variableContentTypes: string[];
