@@ -7915,7 +7915,8 @@ function assignSourceProven(target: ts.Expression): boolean {
 /**
  * Whether the checker proves a read cannot answer `undefined`, so an
  * `Object.hasOwn(h, "k") ? h.k : d` agrees with ruby-compat's `fetch`, whose
- * `hasKey` reads an own `undefined` as a missing key.
+ * `hasKey` reads an own `undefined` as a missing key. An `as T` on the read is
+ * the author's claim and is taken at its asserted type.
  */
 function readCannotBeUndefined(expr: ts.Expression): boolean {
   const checker = currentChecker;

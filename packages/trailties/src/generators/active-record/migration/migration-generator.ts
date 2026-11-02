@@ -60,7 +60,8 @@ export class MigrationGenerator extends NamedBase {
 
   async createMigrationFile(): Promise<void> {
     const name = this.name;
-    if (!/^\w+$/.test(name)) throw new IllegalMigrationNameError(name);
+    if (!/^[_a-z0-9]+$/.test(underscore(name)))
+      throw new IllegalMigrationNameError(underscore(name));
 
     this.setLocalAssignsBang(underscore(name));
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
