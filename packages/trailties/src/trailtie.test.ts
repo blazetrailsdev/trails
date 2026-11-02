@@ -60,7 +60,7 @@ describe("Trailtie", () => {
     expect(calls).toEqual(["one"]);
   });
 
-  it("rake_tasks block is executed when MyApp.load_tasks is called", () => {
+  it("rake_tasks block is executed when MyApp.load_tasks is called", async () => {
     let ran = false;
     class TaskTie extends Trailtie {}
     Trailtie.register(TaskTie);
@@ -68,11 +68,11 @@ describe("Trailtie", () => {
       ran = true;
     });
     expect(ran).toBe(false);
-    TaskTie.instance().runTasksBlocks({});
+    await TaskTie.instance().runTasksBlocks({});
     expect(ran).toBe(true);
   });
 
-  it("rake_tasks block defined in superclass of railtie is also executed", () => {
+  it("rake_tasks block defined in superclass of railtie is also executed", async () => {
     const ran: string[] = [];
     class ParentTie extends Trailtie {}
     Trailtie.register(ParentTie);
@@ -82,7 +82,7 @@ describe("Trailtie", () => {
     class ChildTie extends ParentTie {}
     Trailtie.register(ChildTie);
     ChildTie.railtieName("child_tie");
-    ChildTie.instance().runTasksBlocks({});
+    await ChildTie.instance().runTasksBlocks({});
     expect(ran).toContain("child_tie");
   });
 

@@ -1,4 +1,5 @@
-import { Dependencies } from "@blazetrails/activesupport";
+import { Dependencies, onLoad } from "@blazetrails/activesupport";
+import { DSL } from "@blazetrails/rake";
 import { Registry } from "@blazetrails/zeitwerk";
 import { Autoloaders } from "./autoloaders.js";
 import {
@@ -14,6 +15,8 @@ import {
 } from "@blazetrails/activesupport";
 import {
   File,
+  block,
+  rbFLoad,
   getFs,
   getPath,
   LOAD_PATH,
@@ -196,6 +199,22 @@ export class Application extends Engine {
   override runConsoleBlocks(app: unknown): void {
     for (const r of this.railties()) r.runConsoleBlocks(app);
     super.runConsoleBlocks(app);
+  }
+
+  /** @internal */
+  override async runTasksBlocks(app: unknown): Promise<void> {
+    for (const r of this.railties()) await r.runTasksBlocks(app);
+    await super.runTasksBlocks(app);
+    await rbFLoad(File.join(import.meta.dirname, `tasks${File.extname(import.meta.filename)}`));
+    DSL.task(
+      "environment",
+      block(async () => {
+        onLoad("before_initialize", () => {
+          this.config.eagerLoad = this.config.rakeEagerLoad;
+        });
+        await this.requireEnvironmentBang();
+      }),
+    );
   }
 
   /** @internal */

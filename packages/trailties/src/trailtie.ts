@@ -1,5 +1,12 @@
 import { underscore } from "@blazetrails/activesupport";
-import { NoMethodError, RuntimeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { DSL } from "@blazetrails/rake";
+import {
+  NoMethodError,
+  RuntimeError,
+  extend,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
@@ -141,8 +148,11 @@ export class Trailtie extends Initializable {
   runRunnerBlocks(app: unknown): void {
     eachRegisteredBlock(this, "runner", (b) => b.call(this, app));
   }
-  runTasksBlocks(app: unknown): void {
-    eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
+  async runTasksBlocks(app: unknown): Promise<void> {
+    extend(this, DSL);
+    const blocks: TrailtieBlock[] = [];
+    eachRegisteredBlock(this, "rakeTasks", (b) => blocks.push(b));
+    for (const b of blocks) await b.call(this, app);
   }
   async runServerBlocks(app: unknown): Promise<void> {
     const blocks: TrailtieBlock[] = [];
