@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { include, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
+import { BaseController } from "./base-controller.js";
+import { Current } from "./current.js";
+import { DisableSession } from "./disable-session.js";
 import { FileServer } from "./file-server.js";
 import { SetBlob } from "./set-blob.js";
+import { SetCurrent } from "./set-current.js";
 import { createBlob } from "./test-helpers/test-helper.js";
 
 describe("ActiveStorage::SetBlob", () => {
@@ -42,5 +47,53 @@ describe("ActiveStorage::FileServer", () => {
     });
     expect(headers.get("Content-Type")).toBe("application/octet-stream");
     expect(headers.get("Content-Disposition")).toBe("inline");
+  });
+
+  it("drops the cascade headers from a 416 response", () => {
+    const headers = new Map([["x-cascade", "pass"]]);
+    const host = {
+      request: {
+        isOptions: () => false,
+        isHead: () => false,
+        getHeader: (name: string) => (name === "HTTP_RANGE" ? "bytes=999999999-" : null),
+      },
+      response: { headers },
+    };
+    FileServer.serveFile.call(host as never, import.meta.filename, {
+      contentType: "text/plain",
+      disposition: null,
+    });
+    expect((host as unknown as { status: number }).status).toBe(416);
+    expect(headers.has("x-cascade")).toBe(false);
+    expect(headers.get("Content-Disposition")).toBe("attachment");
+  });
+});
+
+function beforeActionBlock(klass: object): (this: unknown) => void {
+  let block!: (this: unknown) => void;
+  include(
+    Object.assign(class {}, {
+      beforeAction(fn: (this: unknown) => void) {
+        block = fn;
+      },
+    }),
+    klass as never,
+  );
+  return block;
+}
+
+describe("ActiveStorage concerns", () => {
+  it("BaseController includes SetCurrent, which sets Current.urlOptions", () => {
+    expect(isModuleIncluded(BaseController, SetCurrent)).toBe(true);
+    beforeActionBlock(SetCurrent).call({
+      request: { protocol: "https://", host: "example.com", port: 443 },
+    });
+    expect(Current.urlOptions).toEqual({ protocol: "https://", host: "example.com", port: 443 });
+  });
+
+  it("DisableSession skips the session", () => {
+    const sessionOptions: Record<string, unknown> = {};
+    beforeActionBlock(DisableSession).call({ request: { sessionOptions } });
+    expect(sessionOptions["skip"]).toBe(true);
   });
 });

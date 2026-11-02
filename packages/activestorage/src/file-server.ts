@@ -1,5 +1,5 @@
 import { ActionController } from "@blazetrails/actionpack";
-import { Files } from "@blazetrails/rack";
+import { Files, type Request as RackRequest } from "@blazetrails/rack";
 
 type Host = InstanceType<typeof ActionController.Base>;
 
@@ -10,10 +10,10 @@ export const FileServer = {
     path: string,
     { contentType, disposition }: { contentType: string | null; disposition: string | null },
   ): ReturnType<Files["serving"]> {
-    const result = new Files(null as never).serving(this.request as never, path);
+    const result = new Files(null).serving(this.request as unknown as RackRequest, path);
     const [status, headers, body] = result;
     this.status = status;
-    this.responseBody = body as string;
+    this.responseBody = body;
 
     for (const [name, value] of Object.entries(headers)) {
       this.response.headers.set(name, value);
@@ -24,11 +24,11 @@ export const FileServer = {
     }
     this.response.headers.set(
       "Content-Type",
-      contentType ?? ActionController.DEFAULT_SEND_FILE_TYPE,
+      contentType ?? ActionController.DataStreaming.DEFAULT_SEND_FILE_TYPE,
     );
     this.response.headers.set(
       "Content-Disposition",
-      disposition ?? ActionController.DEFAULT_SEND_FILE_DISPOSITION,
+      disposition ?? ActionController.DataStreaming.DEFAULT_SEND_FILE_DISPOSITION,
     );
     return result;
   },

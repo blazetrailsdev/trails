@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
 import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "./engine.js";
 import { Model } from "./attached/model.js";
 import { ActiveRecordExtensions } from "./reflection.js";
-import "./test-helpers/database/setup.js";
+import { app } from "./test-helpers/database/setup.js";
+import { ActiveStorage } from "./active-storage.js";
+import { TopLevel } from "@blazetrails/activesupport";
+import type { RouteSet } from "@blazetrails/actionpack";
 
 describe("ActiveStorage::Engine", () => {
   it("includes the attachment modules and GlobalID::Identification into Base", () => {
@@ -17,5 +21,26 @@ describe("ActiveStorage::Engine", () => {
   it("finds its routes file through the config/routes.ts path", async () => {
     const routes = await Engine.config.paths().get("config/routes.ts")!.existent();
     expect(routes).toEqual([`${import.meta.dirname}/config/routes.ts`]);
+  });
+
+  it("hands its routes file to the application's routes reloader", async () => {
+    const initializer = TrailsEngine.initializers.find((i) => i.name === "add_routing_paths")!;
+    await initializer.bind(Engine.instance()).run(app);
+    expect(
+      (app as unknown as { routesReloader(): { paths: string[] } }).routesReloader().paths,
+    ).toContain(`${import.meta.dirname}/config/routes.ts`);
+  });
+
+  it("draws nothing when draw_routes is false", async () => {
+    const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
+    const before = routes.routes.length;
+    ActiveStorage.drawRoutes = false;
+    try {
+      // @ts-expect-error a query string forces a fresh evaluation
+      await import("./config/routes.js?draw_routes=false");
+    } finally {
+      ActiveStorage.drawRoutes = true;
+    }
+    expect(routes.routes.length).toBe(before);
   });
 });

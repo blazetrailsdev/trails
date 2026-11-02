@@ -49,7 +49,7 @@ await import("../../config/routes.js");
 
 class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
-const app = Dummy.instance();
+export const app = Dummy.instance();
 for (const railtie of [GlobalIDRailtie, Engine]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);

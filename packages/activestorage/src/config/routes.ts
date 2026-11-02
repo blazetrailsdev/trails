@@ -8,6 +8,7 @@ import type { Variant } from "../variant.js";
 
 type Host = { routeFor(name: string, ...args: unknown[]): string };
 type Options = Record<string, unknown>;
+type SignedIdOptions = NonNullable<Parameters<Blob["signedId"]>[0]>;
 type Representation = Pick<Variant, "blob" | "variation">;
 
 if (ActiveStorage.drawRoutes) {
@@ -99,13 +100,13 @@ if (ActiveStorage.drawRoutes) {
         options as Options,
         "expiresIn",
         () => ActiveStorage.urlsExpireIn,
-      );
-      const expiresAt = hashDelete(options as Options, "expiresAt");
+      ) as SignedIdOptions["expiresIn"];
+      const expiresAt = hashDelete(options as Options, "expiresAt") as SignedIdOptions["expiresAt"];
 
       if (rbObjRespondTo(model, "signedId")) {
         return (this as unknown as Host).routeFor(
           "rails_service_blob_proxy",
-          (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt } as never),
+          (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt }),
           (model as Blob).filename,
           options,
         );
@@ -113,7 +114,7 @@ if (ActiveStorage.drawRoutes) {
         const signedBlobId = (model as Representation).blob.signedId({
           expiresIn: expiresIn,
           expiresAt: expiresAt,
-        } as never);
+        });
         const variationKey = (model as Representation).variation.key;
         const filename = (model as Representation).blob.filename;
 
@@ -132,13 +133,13 @@ if (ActiveStorage.drawRoutes) {
         options as Options,
         "expiresIn",
         () => ActiveStorage.urlsExpireIn,
-      );
-      const expiresAt = hashDelete(options as Options, "expiresAt");
+      ) as SignedIdOptions["expiresIn"];
+      const expiresAt = hashDelete(options as Options, "expiresAt") as SignedIdOptions["expiresAt"];
 
       if (rbObjRespondTo(model, "signedId")) {
         return (this as unknown as Host).routeFor(
           "rails_service_blob",
-          (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt } as never),
+          (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt }),
           (model as Blob).filename,
           options,
         );
@@ -146,7 +147,7 @@ if (ActiveStorage.drawRoutes) {
         const signedBlobId = (model as Representation).blob.signedId({
           expiresIn: expiresIn,
           expiresAt: expiresAt,
-        } as never);
+        });
         const variationKey = (model as Representation).variation.key;
         const filename = (model as Representation).blob.filename;
 
