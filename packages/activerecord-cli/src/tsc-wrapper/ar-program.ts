@@ -13,6 +13,7 @@ import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-pl
 
 export interface CreateArTrailsProgramOptions {
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
+  schemaScopes?: ArModelsPluginOptions["schemaScopes"];
   onModel?: ArModelsPluginOptions["onModel"];
   timeZoneAwareAttributes?: boolean;
 }
@@ -47,11 +48,13 @@ export function createArTrailsProgram(
   if (configDiagnostics.length > 0) {
     return { program: undefined!, host: undefined!, configDiagnostics };
   }
-  const { baseNames, modelRegistry } = collectBaseDescendants(configPath);
+  const { baseNames, modelRegistry, superNames } = collectBaseDescendants(configPath);
   const plugin = createArModelsPlugin({
     baseNames: [...baseNames],
     modelRegistry,
     schemaColumnsByTable: opts.schemaColumnsByTable,
+    schemaScopes: opts.schemaScopes,
+    modelSuperNames: superNames,
     onModel: opts.onModel,
     timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
   });
@@ -253,6 +256,7 @@ export interface CreateArSolutionBuilderOptions {
   onDiagnostic?: (d: Diagnostic) => void;
   onStatus?: (d: Diagnostic) => void;
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
+  schemaScopes?: ArModelsPluginOptions["schemaScopes"];
   onModel?: ArModelsPluginOptions["onModel"];
   timeZoneAwareAttributes?: boolean;
 }
@@ -270,12 +274,16 @@ export function createArSolutionBuilder(
     onDiagnostic: opts.onDiagnostic && ((d) => opts.onDiagnostic!(fromTs5Diagnostic(d))),
     onStatus: opts.onStatus && ((d) => opts.onStatus!(fromTs5Diagnostic(d))),
     pluginFactory: (_plainProgram, options) => {
-      const { baseNames, modelRegistry } = collectBaseDescendants(options.configFilePath as string);
+      const { baseNames, modelRegistry, superNames } = collectBaseDescendants(
+        options.configFilePath as string,
+      );
       return [
         createArModelsPlugin({
           baseNames: [...baseNames],
           modelRegistry,
           schemaColumnsByTable: opts.schemaColumnsByTable,
+          schemaScopes: opts.schemaScopes,
+          modelSuperNames: superNames,
           onModel: opts.onModel,
           timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
         }),

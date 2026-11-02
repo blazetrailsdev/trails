@@ -7,6 +7,11 @@ import { tsApi } from "./ts-api.js";
 const INCLUDED_ALIAS = "__TrailsIncluded";
 const INCLUDED_IMPORT_LINE = `import type { Included as ${INCLUDED_ALIAS} } from "@blazetrails/activesupport";`;
 
+export type SchemaScopes = ReadonlyMap<
+  string,
+  Readonly<Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>>
+>;
+
 export interface LineDelta {
   insertedAtLine: number;
   lineCount: number;
@@ -22,6 +27,8 @@ export interface VirtualizeOptions extends WalkOptions {
   schemaColumnsByTable?: Readonly<
     Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>
   >;
+  schemaScopes?: SchemaScopes;
+  modelSuperNames?: ReadonlyMap<string, string>;
   classNameAliases?: ReadonlyMap<string, string>;
   attributesNullable?: boolean;
   associationTargets?: ReadonlyMap<string, string>;
@@ -52,6 +59,7 @@ export function missingTables(
   models: readonly ModelTable[],
   schema: Readonly<Record<string, unknown>>,
   rootNames: ReadonlySet<string> = new Set(["Base"]),
+  scopes?: SchemaScopes,
 ): MissingTable[] {
   const byName = new Map<string, ModelTable>();
   for (const m of models) if (!byName.has(m.className)) byName.set(m.className, m);
@@ -63,10 +71,29 @@ export function missingTables(
     if (base !== m && base.optedOut) continue;
     if (m.dynamicTableName || base.dynamicTableName) continue;
     const tableName = m.tableName ?? base.tableName ?? pluralize(underscore(base.className));
-    if (Object.hasOwn(schema, tableName)) continue;
+    const scope = scopeFor(m.className, scopes, (name) =>
+      name === m.className ? m.superName : byName.get(name)?.superName,
+    );
+    if (Object.hasOwn(scope ?? schema, tableName)) continue;
     out.push({ className: m.className, tableName, fileName: m.fileName });
   }
   return out;
+}
+
+function scopeFor<T>(
+  className: string,
+  scopes: ReadonlyMap<string, T> | undefined,
+  superNameOf: (name: string) => string | undefined,
+): T | undefined {
+  if (!scopes?.size) return undefined;
+  const seen = new Set<string>();
+  for (let name: string | undefined = className; name; name = superNameOf(name)) {
+    if (seen.has(name)) return undefined;
+    seen.add(name);
+    const scope = scopes.get(name);
+    if (scope) return scope;
+  }
+  return undefined;
 }
 
 function baseClassOf(m: ModelTable, byName: ReadonlyMap<string, ModelTable>): ModelTable {
@@ -139,7 +166,12 @@ export function virtualize(
     const mergeAttributeInterface = canMergeInterface(info.classDecl);
     const synthesized = synthesizeDeclares(info, {
       mergeAttributeInterface,
-      schemaColumnsByTable: options.schemaColumnsByTable,
+      schemaColumnsByTable:
+        scopeFor(
+          info.name,
+          options.schemaScopes,
+          (name) => inFileSuperNameOf.get(name) ?? options.modelSuperNames?.get(name),
+        ) ?? options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
       timeZoneAwareAttributes: options.timeZoneAwareAttributes,

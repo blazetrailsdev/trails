@@ -1244,3 +1244,73 @@ describe("virtualize — aliasAttribute", () => {
     expect(text).not.toMatch(/get prNumber/);
   });
 });
+
+describe("schema scopes and non-model bases", () => {
+  const scoped = new Map([["StatsSyncRecord", { pull_requests: { title: "string" } }]]);
+
+  test("does not treat a class extending ActiveJob's Base as a model", () => {
+    const source = `import { Base } from "@blazetrails/activejob";\nexport class ApplicationJob extends Base {}\n`;
+    const seen: string[] = [];
+    virtualize(source, "app/jobs/application-job.ts", {
+      schemaColumnsByTable: { users: { name: "string" } },
+      onModel: (m) => seen.push(m.className),
+    });
+    expect(seen).toEqual([]);
+  });
+
+  test("applies a scoped schema to a descendant of its base, across files", () => {
+    const source = `export class PullRequest extends StatsSyncRecord {}\n`;
+    const { text } = virtualize(source, "app/models/stats-sync/pull-request.ts", {
+      baseNames: ["Base", "StatsSyncRecord"],
+      schemaColumnsByTable: { pull_requests: { other: "string" } },
+      schemaScopes: scoped,
+      modelSuperNames: new Map([["StatsSyncRecord", "ApplicationRecord"]]),
+    });
+    expect(text).toContain("title");
+    expect(text).not.toContain("other");
+  });
+
+  test("keeps a scoped schema from a model outside its base", () => {
+    const source = `export class PullRequest extends Stats {}\n`;
+    const { text } = virtualize(source, "app/models/pull-request.ts", {
+      baseNames: ["Base", "Stats"],
+      schemaScopes: scoped,
+    });
+    expect(text).not.toContain("title");
+  });
+
+  test("reports a missing table against the model's scoped schema only", () => {
+    const model = (className: string, superName: string, abstract = false) => ({
+      className,
+      superName,
+      dynamicTableName: false,
+      abstract,
+      optedOut: false,
+      fileName: `${className}.ts`,
+    });
+    const models = [
+      model("StatsSyncRecord", "Base", true),
+      model("PullRequest", "StatsSyncRecord"),
+      model("WorkflowRun", "StatsSyncRecord"),
+    ];
+    expect(
+      missingTables(models, { workflow_runs: {} }, undefined, scoped).map((m) => m.className),
+    ).toEqual(["WorkflowRun"]);
+  });
+});
+
+test("scopes each of two same-named models by its own superclass", () => {
+  const model = (superName: string, fileName: string) => ({
+    className: "PullRequest",
+    superName,
+    dynamicTableName: false,
+    abstract: false,
+    optedOut: false,
+    fileName,
+  });
+  const models = [model("Stats", "a.ts"), model("StatsSyncRecord", "b.ts")];
+  const scopes = new Map([["StatsSyncRecord", { pull_requests: {} }]]);
+  expect(
+    missingTables(models, {}, new Set(["Base", "Stats"]), scopes).map((m) => m.fileName),
+  ).toEqual(["a.ts"]);
+});
