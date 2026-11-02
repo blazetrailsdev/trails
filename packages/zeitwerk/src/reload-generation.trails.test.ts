@@ -15,10 +15,13 @@ registerHooks({
     const generation = context.parentURL && new URL(context.parentURL).searchParams.get("zeitwerk");
     const managed = resolved.url.startsWith(root) && resolved.url !== once;
     if (!generation || !managed) return resolved;
-    return { ...resolved, url: resolved.url + "?zeitwerk=" + generation };
+    const url = new URL(resolved.url);
+    url.searchParams.set("zeitwerk", generation);
+    return { ...resolved, url: url.href };
   },
 });
 
+async function run() {
 const first = await import(root + "post.ts");
 writeFileSync(new URL(root + "application-record.ts"), "export class ApplicationRecord { static edited = true; }\\n" + globalThis.tail);
 const second = await import(root + "post.ts?zeitwerk=2");
@@ -34,13 +37,13 @@ console.log(JSON.stringify({
   once: first.Post.Once === second.Post.Once,
   lazy,
 }));
+}
 `;
 
 const TAIL = `(globalThis.evaluated ??= []).push(import.meta.url.split("/").pop());`;
 
 const FILES: [string, string][] = [
-  ["main.mjs", `globalThis.tail = ${JSON.stringify(TAIL)};\n${TAIL}\nawait import("./run.mjs");`],
-  ["run.mjs", MAIN],
+  ["main.mjs", `${MAIN}\nglobalThis.tail = ${JSON.stringify(TAIL)};\n${TAIL}\nawait run();`],
   ["framework.mjs", `export const framework = {};\n${TAIL}`],
   ["app/application-record.ts", `export class ApplicationRecord {}\n${TAIL}`],
   ["app/once.ts", `export class Once {}\n${TAIL}`],
@@ -70,7 +73,9 @@ ${TAIL}`,
 describe("reload generations through module.registerHooks", () => {
   it("re-evaluates both ends of an import edge in generation 2", async () => {
     await withFiles(FILES, async () => {
-      const [output, status] = await Open3.capture2e(`${getProcessAdapter().execPath!()} main.mjs`);
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
 
       expect(status.isSuccess(), output).toBe(true);
       expect(JSON.parse(output)).toEqual({
