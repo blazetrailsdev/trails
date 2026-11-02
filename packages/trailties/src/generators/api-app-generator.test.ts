@@ -73,9 +73,16 @@ describe("ApiAppGeneratorTest", () => {
     });
     await t.assertFile("config/application.ts", /config\.apiOnly = true/);
     await t.assertFile("app/controllers/application-controller.ts", /ActionController\.API/);
+    for (const env of ["development", "production"]) {
+      await t.assertFile(`config/environments/${env}.ts`, (content: string) => {
+        assertNoMatch(/actionController\.performCaching = true/, content);
+      });
+    }
     await t.assertFile(".github/workflows/ci.yml", (content: string) => {
       assertNoMatch(/test:system/, content);
       assertNoMatch(/screenshots/, content);
+      assertNoMatch(/scan_js/, content);
+      assertNoMatch(/google-chrome-stable/, content);
     });
   });
 
@@ -90,6 +97,9 @@ describe("ApiAppGeneratorTest", () => {
   it("generator if skip action cable is given", async () => {
     await t.runGenerator([t.destinationRoot, "--api", "--skip-install", "--skip-action-cable"]);
     t.assertNoFile("config/cable.ts");
+    await t.assertFile("package.json", (content: string) => {
+      assertNoMatch(/"redis"/, content);
+    });
   });
 
   it("generator if skip action mailer is given", async () => {
