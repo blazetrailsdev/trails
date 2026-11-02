@@ -885,9 +885,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "reference, and `eager_load!` forces the whole set in production. ESM has " +
       "no autoload — every converter module is a static `import` at the top of " +
       "number-helper.ts, resolved before the module body runs — so there is " +
-      "nothing to register and nothing to force. Same reason as the " +
-      "dependencies.rb group below; scoped to number_helper.rb so the names stay " +
-      "expected wherever a real autoload surface is ported.",
+      "nothing to register and nothing to force. Scoped to number_helper.rb so " +
+      "the names stay expected on the ported surface, " +
+      "dependencies/autoload.rb.",
     names: ["autoload", "autoload_under", "autoload_at", "eager_autoload", "eager_load!"],
     rubyFiles: ["number_helper.rb"],
   },
@@ -1072,54 +1072,15 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveSupport::Dependencies (dependencies.rb), " +
-      "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
-      "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
-      "autoload/reload machinery: an interlock guarding concurrent constant " +
-      "loads, the autoload/eager-load path registries it walks, and the " +
-      "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
-      "file. ESM has neither half — a module graph is resolved and evaluated " +
-      "eagerly at import, and there is no reloading — so trails has " +
-      "no constant table to guard and nothing to reload. Where Ruby leans on " +
-      "call-time constant resolution to break a load-order cycle, the port uses " +
-      "a plain ES import, whose binding is live and is read when the expression " +
-      'runs (CLAUDE.md, "Call-time constant ' +
-      'resolution"); the two require_dependency suites in trails ' +
-      "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
-      "reason. That includes every `eager_load!` a module inherits from " +
-      "`extend ActiveSupport::Autoload` with no `def` of its own — the `super` " +
-      "and the Locking / Scoping / AttributeMethods / ConnectionAdapters calls " +
-      "in `ActiveRecord.eager_load!` (active_record.rb:499-507) — so " +
-      "`eagerLoadBang` makes only the calls that reach a Rails `def`: " +
-      "Associations (associations.rb:44) then Encryption (encryption.rb:50). " +
-      "Scoped to these three files so `clear`, `autoload`, `autoloader`, " +
-      "`initialize`, `running` and the `*_paths` readers stay expected everywhere " +
-      "else.",
-    names: [
-      "interlock",
-      "interlock=",
-      "run_interlock",
-      "load_interlock",
-      "unload_interlock",
-      "clear",
-      "search_for_file",
-      "autoload",
-      "autoload_under",
-      "autoload_at",
-      "eager_autoload",
-      "eager_load!",
-      "initialize",
-      "loading",
-      "unloading",
-      "start_unloading",
-      "done_unloading",
-      "start_running",
-      "done_running",
-      "running",
-      "permit_concurrent_loads",
-      "raw_state",
-    ],
-    rubyFiles: ["dependencies.rb", "dependencies/autoload.rb", "dependencies/interlock.rb"],
+      "`Dependencies.search_for_file` (dependencies.rb:83-90) has one caller, " +
+      "`require_dependency` (dependencies/require_dependency.rb:18), which " +
+      "appends `.rb` and searches `autoload_paths` to hand `Kernel#require` an " +
+      "absolute path. `require_dependency` is obsolete in Rails and is not " +
+      "ported: ESM has no synchronous `require`, and a constant is reached by a " +
+      'plain ES import (CLAUDE.md, "Call-time constant resolution"). Scoped to ' +
+      "dependencies.rb.",
+    names: ["search_for_file"],
+    rubyFiles: ["dependencies.rb"],
   },
   {
     reason:
