@@ -1,6 +1,6 @@
 import { Notifications, reverseMerge } from "@blazetrails/activesupport";
 import { Marcel } from "@blazetrails/marcel";
-import { ArgumentError, fetch, Marshal, OpenSSL, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Marshal, OpenSSL, rbInspect } from "@blazetrails/ruby-compat";
 import type { Tempfile } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Transformers } from "./active-storage.js";
 import type { ImageProcessingTransformer } from "./transformers/image-processing-transformer.js";
@@ -46,8 +46,11 @@ export class Variation {
     });
   }
 
+  /** @missingRailsCall fetch — PERMANENT */
   get format(): string {
-    const format = fetch(this.transformations, "format", "png") as string;
+    const format = Object.hasOwn(this.transformations, "format")
+      ? (this.transformations.format as string)
+      : "png";
     if (Marcel.Magic.byExtension(format) == null) {
       throw new ArgumentError(`Invalid variant format (${rbInspect(format)})`);
     }
