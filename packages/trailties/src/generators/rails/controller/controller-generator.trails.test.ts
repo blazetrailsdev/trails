@@ -97,6 +97,18 @@ describe("ControllerGenerator --parent", () => {
   });
 });
 
+describe("ControllerGenerator namespaced parent", () => {
+  it("aliases a namespaced parent and imports it from its nested file", async () => {
+    await makeGen().run("sync", ["index", "--parent=Admin::Base"]);
+    const controller = fs.readFileSync(
+      path.join(tmpDir, "app/controllers/sync-controller.ts"),
+      "utf8",
+    );
+    expect(controller).toContain('import { Base as AdminBase } from "./admin/base.ts";');
+    expect(controller).toContain("class SyncController extends AdminBase");
+  });
+});
+
 describe("ControllerGenerator nested namespaces", () => {
   it("deeply nested namespace routes are created in routes", async () => {
     const gen = makeGen();
