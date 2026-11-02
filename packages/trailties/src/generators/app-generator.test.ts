@@ -54,7 +54,7 @@ function makeGen(
 ) {
   return new AppGenerator(
     ["my-app"],
-    { database, skipBundle: true, ...opts },
+    { database, skipInstall: true, ...opts },
     { destinationRoot: tmpDir },
   );
 }
@@ -227,7 +227,7 @@ describe("AppGenerator", () => {
   it("--api implies its options and a default run reports nothing", async () => {
     const api = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, api: true },
+      { skipInstall: true, api: true },
       { destinationRoot: tmpDir },
     );
     expect(api.options.skipAssetPipeline).toBe(true);
@@ -236,7 +236,7 @@ describe("AppGenerator", () => {
     expect(lines.join("\n")).not.toMatch(/will also be activated/);
     const minimal = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, minimal: true, skipActionText: false },
+      { skipInstall: true, minimal: true, skipActionText: false },
       { destinationRoot: tmpDir },
     );
     expect(() => minimal.reportImpliedOptions()).not.toThrow();
@@ -365,7 +365,7 @@ describe("AppGenerator", () => {
   it("--package-manager npm uses npm install in bin/setup", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, packageManager: "npm" },
+      { skipInstall: true, packageManager: "npm" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -377,7 +377,7 @@ describe("AppGenerator", () => {
   it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, packageManager: "yarn" },
+      { skipInstall: true, packageManager: "yarn" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -391,7 +391,7 @@ describe("AppGenerator", () => {
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, sqliteDriver: "node-sqlite" },
+      { skipInstall: true, sqliteDriver: "node-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -407,7 +407,7 @@ describe("AppGenerator", () => {
       () =>
         new AppGenerator(
           ["my-app"],
-          { skipBundle: true, sqliteDriver: "bogus-driver" as never },
+          { skipInstall: true, sqliteDriver: "bogus-driver" as never },
           { destinationRoot: tmpDir },
         ),
     ).toThrow(/Unknown SQLite driver/);
@@ -416,7 +416,7 @@ describe("AppGenerator", () => {
   it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { skipBundle: true, database: "sqlite", sqliteDriver: "expo-sqlite" },
+      { skipInstall: true, database: "sqlite", sqliteDriver: "expo-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -502,7 +502,7 @@ describe("AppGenerator", () => {
     await expect(
       new AppGenerator(
         ["string"],
-        { skipBundle: true },
+        { skipInstall: true },
         { destinationRoot: "/tmp/string" },
       ).createRoot(),
     ).rejects.toThrow(
@@ -531,7 +531,7 @@ describe("AppGenerator", () => {
   it("invalid application name raises an error", async () => {
     const gen = new AppGenerator(
       ["43-things"],
-      { skipBundle: true, database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await expect(gen.invokeAll()).rejects.toThrow(
@@ -542,7 +542,7 @@ describe("AppGenerator", () => {
   it("invalid application name is fixed", async () => {
     const gen = new AppGenerator(
       ["things-43"],
-      { skipBundle: true, database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -553,7 +553,7 @@ describe("AppGenerator", () => {
   it("name option", async () => {
     const gen = new AppGenerator(
       ["app-dir"],
-      { skipBundle: true, name: "my-app", database: "sqlite" },
+      { skipInstall: true, name: "my-app", database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();

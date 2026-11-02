@@ -173,31 +173,31 @@ describe("AppBase run tasks", () => {
     ]);
   });
 
-  it("run tasks do nothing without bundle_install?", async () => {
-    expect(await commandsFor({ skipBundle: true }, "runHotwire")).toEqual([]);
+  it("run tasks do nothing without isInstall", async () => {
+    expect(await commandsFor({ skipInstall: true }, "runHotwire")).toEqual([]);
     expect(await commandsFor({ pretend: true }, "runHotwire")).toEqual([]);
   });
 
-  it("run_bundle installs through the package manager unless bundle_install? is false", async () => {
+  it("runInstall installs through the package manager unless isInstall is false", async () => {
     const previous = childProcessAdapterConfig.adapter;
     const spawnSync = vi.fn(() => ({ status: 0, signal: null, stdout: "", stderr: "" }));
-    registerChildProcessAdapter("run-bundle-test", { spawnSync });
-    childProcessAdapterConfig.adapter = "run-bundle-test";
+    registerChildProcessAdapter("run-install-test", { spawnSync });
+    childProcessAdapterConfig.adapter = "run-install-test";
     try {
       const generator = (options: Record<string, unknown>) =>
         new T(["app"], { quiet: true, ...options }, { destinationRoot: "/tmp" }) as unknown as {
-          runBundle(): Promise<void>;
+          runInstall(): Promise<void>;
         };
-      await generator({ skipBundle: true }).runBundle();
-      await generator({ pretend: true }).runBundle();
+      await generator({ skipInstall: true }).runInstall();
+      await generator({ pretend: true }).runInstall();
       expect(spawnSync).not.toHaveBeenCalled();
       const installing = generator({}) as unknown as {
-        runBundle(): Promise<void>;
+        runInstall(): Promise<void>;
         sayStatus: unknown;
       };
       const sayStatus = vi.fn();
       installing.sayStatus = sayStatus;
-      await installing.runBundle();
+      await installing.runInstall();
       expect(spawnSync).toHaveBeenCalledOnce();
       expect(sayStatus).toHaveBeenCalledWith("run", expect.stringMatching(/ install$/));
     } finally {

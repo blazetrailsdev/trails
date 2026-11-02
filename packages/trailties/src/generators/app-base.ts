@@ -691,7 +691,7 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected bundleCommand(command: string): void {
+  protected installCommand(command: string): void {
     const pm = getPackageManager(this.destinationRoot, {
       fallback: (this as unknown as { packageManager?: string }).packageManager,
     });
@@ -700,18 +700,18 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected isBundleInstall(): boolean {
-    return !(this.options.skipBundle || this.options.pretend);
+  protected isInstall(): boolean {
+    return !(this.options.skipInstall || this.options.pretend);
   }
 
   /** @internal */
-  protected async runBundle(): Promise<void> {
-    if (this.isBundleInstall()) this.bundleCommand("install");
+  protected async runInstall(): Promise<void> {
+    if (this.isInstall()) this.installCommand("install");
   }
 
   /** @internal */
   protected async runJavascript(): Promise<void> {
-    if (this.options.skipJavascript || !this.isBundleInstall()) return;
+    if (this.options.skipJavascript || !this.isInstall()) return;
 
     switch (this.options.javascript) {
       case "importmap":
@@ -728,14 +728,14 @@ ${requireStatements.join("\n")}`;
 
   /** @internal */
   protected async runHotwire(): Promise<void> {
-    if (this.options.skipHotwire || !this.isBundleInstall()) return;
+    if (this.options.skipHotwire || !this.isInstall()) return;
 
     await this.railsCommand("turbo:install stimulus:install");
   }
 
   /** @internal */
   protected async runCss(): Promise<void> {
-    if (!this.options.css || !this.isBundleInstall()) return;
+    if (!this.options.css || !this.isInstall()) return;
 
     if (!this.usingJsRuntime() && this.options.css === "tailwind") {
       await this.railsCommand("tailwindcss:install");
@@ -748,7 +748,7 @@ ${requireStatements.join("\n")}`;
 
   /** @internal */
   protected async runSolid(): Promise<void> {
-    if (this.skipSolid() || !this.isBundleInstall()) return;
+    if (this.skipSolid() || !this.isInstall()) return;
 
     let commands = "solid_cache:install solid_queue:install";
     if (!this.skipActionCable()) commands += " solid_cable:install";

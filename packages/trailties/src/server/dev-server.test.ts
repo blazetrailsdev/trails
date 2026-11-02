@@ -59,7 +59,7 @@ async function generateApp(): Promise<string> {
   );
   await new AppGenerator(
     ["my-app"],
-    { skipBundle: true, database: "sqlite", skipDocker: true },
+    { skipInstall: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
   process.chdir(startDir);
