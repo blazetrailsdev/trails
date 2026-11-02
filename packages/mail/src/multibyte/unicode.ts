@@ -146,6 +146,7 @@ export const Unicode = {
     return ActiveSupportUnicode.compose(codepoints);
   },
 
+  /** @missingRailsCall map — CONVERGEABLE mail-part-and-message-dependent-specs */
   tidyBytes(string: string, force: boolean = false): string {
     return ActiveSupportUnicode.tidyBytes(string, force);
   },

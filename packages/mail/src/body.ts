@@ -107,7 +107,7 @@ export class Body {
   encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
     if (this.isMultipart()) {
       this.sortPartsBang();
-      const encodedParts = Array.from(this.parts, (p: PartsListPart) => p.encoded());
+      const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());
       return (
         [this.preamble, ...encodedParts].join(this.crlfBoundary()) +
         this.endBoundary() +

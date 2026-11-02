@@ -78,7 +78,7 @@ export class Header {
   }
 
   errors(): unknown[] {
-    return this._fields!.flatMap((field) => field.errors);
+    return this._fields!.map((field) => field.errors).flat();
   }
 
   get(name: unknown): Field | Field[] | null {
