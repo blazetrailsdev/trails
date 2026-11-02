@@ -2,6 +2,7 @@ import { expect } from "vitest";
 import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
 import { autoloadGet } from "../core-ext/kernel.js";
 import { Cref } from "../cref.js";
+import { SetupRequired } from "../error.js";
 import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
@@ -17,20 +18,21 @@ export interface Constants {
   [cname: string]: Constants;
 }
 
-export function newLoader(): Loader {
+export async function newLoader({
+  dirs = [],
+  namespace = Object,
+  enableReloading = true,
+  setup = true,
+}: {
+  dirs?: string | string[];
+  namespace?: object;
+  enableReloading?: boolean;
+  setup?: boolean;
+} = {}): Promise<Loader> {
   const loader = new Loader();
-  loader.enableReloading();
-  return loader;
-}
-
-export async function setupLoader(
-  dirs: string | string[],
-  { enableReloading = true }: { enableReloading?: boolean } = {},
-): Promise<Loader> {
-  const loader = new Loader();
+  for (const dir of [dirs].flat()) await loader.pushDir(dir, { namespace });
   if (enableReloading) loader.enableReloading();
-  for (const dir of [dirs].flat()) await loader.pushDir(dir);
-  await loader.setup();
+  if (setup) await loader.setup();
   return loader;
 }
 
@@ -44,16 +46,33 @@ export function isRequired(...files: [string, string?][]): boolean {
 
 const topLevelConstants = new Set(Object.keys(TopLevel));
 
-export function teardown(): void {
+export async function resetConstants(): Promise<void> {
   for (const loader of Registry.loaders) {
-    for (const cref of Object.values(loader.autoloads)) cref.remove();
+    try {
+      await loader.unload();
+    } catch (error) {
+      if (!(error instanceof SetupRequired)) throw error;
+    }
   }
-  Registry.loaders.length = 0;
-  Registry.autoloads = {};
-  ExplicitNamespaces.clear();
   for (const cname of Object.keys(TopLevel)) {
     if (!topLevelConstants.has(cname)) delete (TopLevel as Record<string, unknown>)[cname];
   }
+}
+
+function resetRegistry(): void {
+  Registry.loaders.length = 0;
+  Registry.gemLoadersByRootFile = {};
+  Registry.autoloads = {};
+}
+
+function resetExplicitNamespace(): void {
+  ExplicitNamespaces.clear();
+}
+
+export async function teardown(): Promise<void> {
+  await resetConstants();
+  resetRegistry();
+  resetExplicitNamespace();
 }
 
 export async function withFiles(files: [string, string?][], block: () => unknown): Promise<void> {

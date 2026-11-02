@@ -7,7 +7,6 @@ import {
   assertAbspath,
   type Constants,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -18,8 +17,8 @@ const top = TopLevel as unknown as Constants;
 describe("TestOnLoad", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -207,7 +206,7 @@ describe("TestOnLoad", () => {
 
   it("if reloading is disabled, we deplete the hash (performance test)", async () => {
     await withFiles([["a.ts", "export class A {}"]], async () => {
-      const l = await setupLoader(".", { enableReloading: false });
+      const l = await newLoader({ dirs: ".", enableReloading: false });
       let x = 0;
       l.onLoad("A", () => (x = 1));
 

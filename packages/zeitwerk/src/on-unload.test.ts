@@ -21,8 +21,8 @@ describe("TestOnUnload", () => {
   const withSetup = (files: [string, string?][], block: () => unknown) =>
     withLoaderSetup(loader, files, {}, block);
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
     (globalThis as Record<string, unknown>).failedAutoloads = 0;
   });
   afterEach(teardown);

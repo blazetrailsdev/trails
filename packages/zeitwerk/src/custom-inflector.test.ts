@@ -8,8 +8,8 @@ import { newLoader, teardown, withFiles } from "./test-helpers/loader-test.js";
 describe("TestCustomInflector", () => {
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 

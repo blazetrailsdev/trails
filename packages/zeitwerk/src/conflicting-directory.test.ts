@@ -16,9 +16,9 @@ describe("TestConflictingDirectory", () => {
   let existingLoader: Loader;
   let loader: Loader;
 
-  beforeEach(() => {
-    existingLoader = newLoader();
-    loader = newLoader();
+  beforeEach(async () => {
+    existingLoader = await newLoader({ setup: false });
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
@@ -65,7 +65,7 @@ describe("TestConflictingDirectory", () => {
   });
 
   it("does not raise if a second existing loader ignores the directory (dir)", async () => {
-    const secondExistingLoader = newLoader();
+    const secondExistingLoader = await newLoader({ setup: false });
     await secondExistingLoader.pushDir(parent);
     await secondExistingLoader.ignore(dir);
 

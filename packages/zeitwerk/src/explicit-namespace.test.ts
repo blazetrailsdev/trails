@@ -6,7 +6,6 @@ import { Registry } from "./registry.js";
 import {
   type Constants,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -19,8 +18,8 @@ describe("TestExplicitNamespace", () => {
   const ns = Namespace as unknown as Constants;
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
     delete ns.Hotel;
   });
   afterEach(teardown);
@@ -112,8 +111,8 @@ describe("TestExplicitNamespace", () => {
       ["b/x/y.ts", "export const Y = true"],
     ];
     await withFiles(files, async () => {
-      const la = await setupLoader("a");
-      const lb = await setupLoader("b");
+      const la = await newLoader({ dirs: "a" });
+      const lb = await newLoader({ dirs: "b" });
       await la.eagerLoad();
       await lb.eagerLoad();
 

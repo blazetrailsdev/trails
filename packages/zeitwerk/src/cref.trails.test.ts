@@ -26,11 +26,11 @@ describe("Zeitwerk::Cref on Object", () => {
   });
 
   it("push_dir accepts a plain-object module", async () => {
-    const loader = newLoader();
+    const loader = await newLoader({ setup: false });
     const mod = {};
     constSet(TopLevel, "ZeitwerkPlainNamespace", mod);
     await loader.pushDir(".", { namespace: mod });
     expect(loader.roots[File.expandPath(".")]).toBe(mod);
-    teardown();
+    await teardown();
   });
 });

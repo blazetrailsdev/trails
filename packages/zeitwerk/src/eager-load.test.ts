@@ -7,7 +7,6 @@ import {
   type Constants,
   isRequired,
   newLoader,
-  setupLoader,
   teardown,
   withFiles,
   withSetup,
@@ -20,13 +19,13 @@ describe("TestEagerLoad", () => {
   class Namespace {}
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
   });
   afterEach(teardown);
 
   it("eager loads independent files (Object)", async () => {
-    const second = newLoader();
+    const second = await newLoader({ setup: false });
     const files: Files = [
       ["lib0/app0.ts", "export class App0 {}"],
       ["lib0/app0/foo.ts", "export class Foo {}"],
@@ -46,7 +45,7 @@ describe("TestEagerLoad", () => {
   });
 
   it("eager loads independent files (Namespace)", async () => {
-    const second = newLoader();
+    const second = await newLoader({ setup: false });
     const files: Files = [
       ["lib0/app0.ts", "export class App0 {}"],
       ["lib0/app0/foo.ts", "export class Foo {}"],
@@ -66,7 +65,7 @@ describe("TestEagerLoad", () => {
   });
 
   it("eager loads dependent loaders", async () => {
-    const second = newLoader();
+    const second = await newLoader({ setup: false });
     const files: Files = [
       ["lib0/app0.ts", "export class App0 {}"],
       ["lib0/app0/foo.ts", "export class Foo {}"],
@@ -88,7 +87,7 @@ describe("TestEagerLoad", () => {
   it("skips loaders that are not ready", async () => {
     const files: Files = [["x.ts", "export const X = 1"]];
     await withSetup(loader, files, {}, async () => {
-      newLoader();
+      await newLoader({ setup: false });
       await Loader.eagerLoadAll();
       expect(isRequired(...files)).toBeTruthy();
     });
@@ -99,7 +98,7 @@ describe("TestEagerLoad", () => {
     it(`we can opt-out of entire root directories, and still autoload (enable_autoloading ${enableReloading})`, async () => {
       const files: Files = [["foo.ts", "export const Foo = true"]];
       await withFiles(files, async () => {
-        const l = await setupLoader(".", { enableReloading });
+        const l = await newLoader({ dirs: ".", enableReloading });
         l.doNotEagerLoad(".");
         await l.eagerLoad();
 
@@ -114,7 +113,7 @@ describe("TestEagerLoad", () => {
         ["foo.ts", "export const Foo = true"],
       ];
       await withFiles(files, async () => {
-        const l = await setupLoader(".", { enableReloading });
+        const l = await newLoader({ dirs: ".", enableReloading });
         l.doNotEagerLoad("db_adapters");
         await l.eagerLoad();
 
@@ -130,7 +129,7 @@ describe("TestEagerLoad", () => {
         ["bar.ts", "export const Bar = true"],
       ];
       await withFiles(files, async () => {
-        const l = await setupLoader(".", { enableReloading });
+        const l = await newLoader({ dirs: ".", enableReloading });
         l.doNotEagerLoad("bar.ts");
         await l.eagerLoad();
 
@@ -146,7 +145,7 @@ describe("TestEagerLoad", () => {
         ["eagerlib/ns/bar.ts", "export class Bar {}"],
       ];
       await withFiles(files, async () => {
-        const l = await setupLoader(["lazylib", "eagerlib"], { enableReloading });
+        const l = await newLoader({ dirs: ["lazylib", "eagerlib"], enableReloading });
         l.doNotEagerLoad("lazylib");
         await l.eagerLoad();
 
@@ -162,7 +161,7 @@ describe("TestEagerLoad", () => {
         ["eagerlib/ns/bar.ts", "export class Bar {}"],
       ];
       await withFiles(files, async () => {
-        const l = await setupLoader(["lazylib", "eagerlib"], { enableReloading });
+        const l = await newLoader({ dirs: ["lazylib", "eagerlib"], enableReloading });
         l.doNotEagerLoad("lazylib/ns");
         await l.eagerLoad();
 
@@ -179,8 +178,8 @@ describe("TestEagerLoad", () => {
       ["b/foo.ts", "export const Foo = 1"],
     ];
     await withFiles(files, async () => {
-      const la = await setupLoader("a");
-      const lb = await setupLoader("b");
+      const la = await newLoader({ dirs: "a" });
+      const lb = await newLoader({ dirs: "b" });
 
       await la.eagerLoad();
       await lb.eagerLoad();

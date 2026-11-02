@@ -20,8 +20,8 @@ describe("TestAutovivification", () => {
   const ns = Namespace as unknown as Constants;
   let loader: Loader;
 
-  beforeEach(() => {
-    loader = newLoader();
+  beforeEach(async () => {
+    loader = await newLoader({ setup: false });
     delete ns.Admin;
     delete ns.Foo;
   });

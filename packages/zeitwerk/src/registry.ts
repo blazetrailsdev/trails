@@ -1,9 +1,12 @@
 import { aryDelete, deleteIf } from "@blazetrails/ruby-compat";
+import type { GemLoader } from "./gem-loader.js";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
+  /** @noRailsEquivalent PERMANENT */
+  GemLoader: undefined as typeof GemLoader | undefined,
 
   loaders: [] as Loader[],
   gemLoadersByRootFile: {} as Record<string, Loader>,
@@ -17,6 +20,16 @@ export const Registry = {
     aryDelete(this.loaders, loader);
     deleteIf(this.gemLoadersByRootFile, (_k, l) => l === loader);
     deleteIf(this.autoloads, (_k, l) => l === loader);
+  },
+
+  async loaderForGem(
+    rootFile: string,
+    { namespace, warnOnExtraFiles }: { namespace: object; warnOnExtraFiles: boolean },
+  ): Promise<Loader> {
+    return (this.gemLoadersByRootFile[rootFile] ??= await this.GemLoader!.__new(rootFile, {
+      namespace,
+      warnOnExtraFiles,
+    }));
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {
