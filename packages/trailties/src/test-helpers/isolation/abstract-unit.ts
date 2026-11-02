@@ -3,12 +3,18 @@ import {
   File,
   FileUtils,
   Process,
+  RuntimeError,
+  Shellwords,
   classModule,
-  env,
+  env as ENV,
   getFs,
+  rbFArray,
+  rbFBackquote,
   rbInspect,
   setEnv,
 } from "@blazetrails/ruby-compat";
+import { Dependencies } from "@blazetrails/activesupport";
+import { MockRequest } from "@blazetrails/rack";
 import { Application } from "../../application.js";
 import { AppGenerator } from "../../generators/rails/app/app-generator.js";
 import { Trails } from "../../rails.js";
@@ -16,6 +22,11 @@ import { Trails } from "../../rails.js";
 export const TRAILS_FRAMEWORK_ROOT = File.expandPath(
   decodeURIComponent(new URL("../../../../..", import.meta.url).pathname),
 );
+
+type RackResponse = [number, Record<string, string>, AsyncIterable<string> | Iterable<string>];
+interface RackHost {
+  call(env: Record<string, unknown>): Promise<RackResponse>;
+}
 
 async function puts(file: string, string: string, mode: "w" | "a" = "w"): Promise<void> {
   const fs = getFs();
@@ -65,6 +76,54 @@ export class Paths {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Rack extends Paths {
+  assert(test: unknown): void;
+  assertEqual(expected: unknown, actual: unknown): void;
+  assertMatch(matcher: string | RegExp, obj: string): void;
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Rack {
+  static readonly [classModule] = true;
+  declare _app: RackHost | undefined;
+
+  async app(env = "production"): Promise<RackHost> {
+    const oldEnv = ENV["TRAILS_ENV"];
+    try {
+      if (this._app == null) {
+        setEnv("TRAILS_ENV", env);
+
+        const environment = await this.appPath("config", "environment.ts");
+        await import(environment);
+
+        this._app = Trails.application as unknown as RackHost;
+      }
+      return this._app;
+    } finally {
+      setEnv("TRAILS_ENV", oldEnv);
+    }
+  }
+
+  async extractBody(response: RackResponse): Promise<string> {
+    let body = "";
+    for await (const chunk of response[2]) body += chunk;
+    return body;
+  }
+
+  get(path: string): Promise<RackResponse> {
+    return this._app!.call(MockRequest.envFor(path));
+  }
+
+  async assertWelcome(resp: RackResponse): Promise<void> {
+    resp = rbFArray(resp) as RackResponse;
+
+    this.assertEqual(200, resp[0]);
+    this.assertMatch("text/html", resp[1]["Content-Type"]);
+    this.assertMatch("charset=utf-8", resp[1]["Content-Type"]);
+    this.assert(/Trails version:/.test(await this.extractBody(resp)));
+  }
+}
+
 export class Bukkit {
   path: string;
 
@@ -100,7 +159,7 @@ export class Generation {
     Application.appClass = null;
     Trails.application = null;
 
-    this._prevTrailsEnv = env["TRAILS_ENV"];
+    this._prevTrailsEnv = ENV["TRAILS_ENV"];
     setEnv("TRAILS_ENV", "development");
 
     const appPath = await this.appPath();
@@ -235,6 +294,41 @@ export default { development: env("development"), test: env("test"), production:
     const bukkit = new Bukkit(dir);
     if (block != null) await block(bukkit);
     return bukkit;
+  }
+
+  async bootTrails(): Promise<void> {
+    const environment = await this.appPath("config", "environment.ts");
+    await import(environment);
+  }
+
+  /** @missingRailsCall fork — PERMANENT */
+  async trails(
+    ...args: (string | unknown[] | { allowFailure?: boolean; stderr?: boolean })[]
+  ): Promise<string> {
+    const last = args.at(-1);
+    const { allowFailure = false, stderr = false } =
+      last != null && typeof last === "object" && !Array.isArray(last)
+        ? (args.pop() as { allowFailure?: boolean; stderr?: boolean })
+        : {};
+    const argv = args.flat(Infinity);
+
+    const command = `bin/trails ${Shellwords.join(argv)}${stderr ? "" : " 2>&1"}`;
+
+    let output: string;
+    setEnv("BOOTSNAP_CACHE_DIR", this.bootsnapCachePath());
+    try {
+      output = await rbFBackquote(`cd ${await this.appPath()}; ${command}`);
+    } finally {
+      setEnv("BOOTSNAP_CACHE_DIR", undefined);
+    }
+
+    if (!allowFailure && !Process.lastStatus!.isSuccess()) {
+      throw new RuntimeError(
+        `rails command failed (${Process.lastStatus!.exitstatus()}): ${command}\n${output}`,
+      );
+    }
+
+    return output;
   }
 
   async addToTopOfConfig(str: string): Promise<void> {
@@ -410,10 +504,18 @@ export default {
   }
 }
 
-export const TestHelpers = { Paths, Generation };
+export class Reload {
+  static readonly [classModule] = true;
+
+  reload(): Promise<void> {
+    return Dependencies.clear();
+  }
+}
+
+export const TestHelpers = { Paths, Rack, Generation, Reload };
 
 export default async function setup(): Promise<void> {
-  if (env["ISOLATION_TEST"] != null) return;
+  if (ENV["ISOLATION_TEST"] != null) return;
 
   const appTemplatePath = Paths.prototype.appTemplatePath();
 
@@ -434,4 +536,9 @@ export default async function setup(): Promise<void> {
 
   await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
   await getFs().writeFile!(File.join(appTemplatePath, "app/javascript/application.js"), "\n");
+
+  await FileUtils.lnSfAsync(
+    File.join(TRAILS_FRAMEWORK_ROOT, "packages/trailties/node_modules"),
+    File.join(TRAILS_FRAMEWORK_ROOT, "tmp/node_modules"),
+  );
 }

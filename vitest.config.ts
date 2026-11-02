@@ -486,6 +486,15 @@ const aliasEntries = [
 const otherResolve = {
   alias: [
     ...aliasEntries,
+    // A generated app under tmp/ must share the suite's source Trails, not dist's.
+    {
+      find: /^@blazetrails\/trailties\/(rails|test-unit\/trailtie)$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",
+    },
+    {
+      find: /^@blazetrails\/trailties$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+    },
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
 };
