@@ -93,10 +93,7 @@ export const Helpers = {
     return path.endsWith(".js") && !(await File.isExistAsync(`${path.slice(0, -3)}.ts`));
   },
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   isDir(this: Loader, path: string): Promise<boolean> {
     if (this._manifestChildren != null) {
       return Promise.resolve(this._manifestChildren[path] instanceof Set);
