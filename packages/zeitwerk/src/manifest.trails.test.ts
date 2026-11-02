@@ -30,6 +30,26 @@ const FILES: [string, string?][] = [
 ];
 
 describe("autoload artifacts", () => {
+  it("raises from reload when no file system can stamp a manifest loader's roots", async () => {
+    const loader = await newLoader({ setup: false });
+    loader.tag = "main";
+    loader.enableReloading();
+    loader.manifest = { digest: "", constants: {}, shadowed: [] };
+    loader.manifest.digest = configurationDigest(loader);
+    await loader.setup();
+    const fs = getFs();
+    const realpath = fs.realpath;
+    fs.realpath = undefined;
+    try {
+      await expect(loader.reload()).rejects.toThrow(
+        "loader main cannot reload from a manifest without a file system",
+      );
+    } finally {
+      fs.realpath = realpath;
+      await teardown();
+    }
+  });
+
   let loader: Loader;
 
   beforeEach(async () => {

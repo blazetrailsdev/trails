@@ -1,6 +1,9 @@
-import { File, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
+import { File, Mutex, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
+
+/** @noRailsEquivalent PERMANENT */
+const PACKAGE_MUTEX = new Mutex();
 
 export const Registry = {
   ExplicitNamespaces,
@@ -23,21 +26,23 @@ export const Registry = {
     deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
-  /** @noRailsEquivalent CONVERGEABLE loader-for-package-memoizes-across-await */
+  /** @noRailsEquivalent PERMANENT */
   async loaderForPackage(
     packageFile: string,
     { namespace }: { namespace: object },
   ): Promise<Loader> {
-    if (Object.hasOwn(this.loadersByPackageFile, packageFile)) {
-      return this.loadersByPackageFile[packageFile];
-    }
+    return PACKAGE_MUTEX.synchronize(async () => {
+      if (Object.hasOwn(this.loadersByPackageFile, packageFile)) {
+        return this.loadersByPackageFile[packageFile];
+      }
 
-    const { name } = JSON.parse(await getFs().readFile(packageFile, "utf8")) as { name: string };
-    const loader = new this.Loader!();
-    loader.tag = name.slice(name.lastIndexOf("/") + 1);
-    if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
-    await loader.pushDir(File.join(File.dirname(packageFile), "src"), { namespace });
-    return (this.loadersByPackageFile[packageFile] = loader);
+      const { name } = JSON.parse(await getFs().readFile(packageFile, "utf8")) as { name: string };
+      const loader = new this.Loader!();
+      loader.tag = name.slice(name.lastIndexOf("/") + 1);
+      if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
+      await loader.pushDir(File.join(File.dirname(packageFile), "src"), { namespace });
+      return (this.loadersByPackageFile[packageFile] = loader);
+    });
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {

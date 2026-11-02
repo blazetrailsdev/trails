@@ -292,9 +292,10 @@ it makes `Foo` a subclass of its parent as Ruby sees it: `inherited`
 
 A JS `class Foo extends Base {}` does neither. It binds a module-scope
 identifier, seats nothing a `rbConstGet` / `computeType` lookup can find, and
-fires no hook. trails has no autoloader to seat it either (root CLAUDE.md
-§ "Trails has no autoloader"), and no `inherited` (§ "`inherited` is deferred
-to own-property memo guards" above).
+fires no hook. Zeitwerk seats only a file its loader manages (root CLAUDE.md
+§ "The application loader is Zeitwerk"), which a model defined by hand or in a
+framework package is not, and there is no `inherited` (§ "`inherited` is
+deferred to own-property memo guards" above).
 
 **`registerModel` (`associations.ts`) is the port of that pair.** One call
 seats the constant and registers the subclass:

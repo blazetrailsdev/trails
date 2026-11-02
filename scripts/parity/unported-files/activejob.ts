@@ -58,6 +58,6 @@ export const ACTIVEJOB_UNPORTED_FILES: UnportedFile[] = [
     testFile: "cases/test_helper_test.rb",
     tests: ["queue adapter is is inline adapter because it is set on the job class"],
     reason:
-      'drives Zeitwerk.with_loader to autoload QueueAdapterJob from test/jobs (CLAUDE.md § "Trails has no autoloader").',
+      'drives Zeitwerk.with_loader to autoload QueueAdapterJob on a synchronous constant read, which cannot run an awaited load (CLAUDE.md § "`Module#autoload` is a build step").',
   },
 ];

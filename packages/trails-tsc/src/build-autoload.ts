@@ -10,6 +10,7 @@ interface BootInitializer {
 interface BootApplication {
   config: { root: string | null };
   initializers: { tsort(): BootInitializer[] };
+  autoloaders?: { once: { setup?(): Promise<void>; eagerLoad?(): Promise<void> } };
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -25,9 +26,16 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
   const trails = (TopLevel as { Trails?: { application?: BootApplication | null } }).Trails;
   const application = trails?.application;
   if (application != null) {
-    for (const initializer of application.initializers.tsort()) {
-      if (initializer.name === "setup_main_autoloader") break;
-      if (initializer.belongsTo("default")) await initializer.run(application);
+    const once = application.autoloaders?.once;
+    if (once != null) once.setup = once.eagerLoad = async () => {};
+    try {
+      for (const initializer of application.initializers.tsort()) {
+        if (initializer.name === "setup_main_autoloader") break;
+        if (initializer.belongsTo("default")) await initializer.run(application);
+      }
+    } finally {
+      delete once?.setup;
+      delete once?.eagerLoad;
     }
   }
 

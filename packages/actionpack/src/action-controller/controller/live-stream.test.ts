@@ -515,7 +515,7 @@ describe("LiveStreamTest", () => {
   });
 
   it.skip("delayed autoload after write within interlock hook", () => {
-    // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; trails has no autoloader (packages/trailties/CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)") and so no load interlock to deadlock against.
+    // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; a JS constant read cannot run a load (CLAUDE.md, "`Module#autoload` is a build step"), so no load runs inside the action to deadlock against.
   });
 
   it("async stream", async () => {

@@ -192,7 +192,7 @@ export const Config = {
   /** @internal */
   async expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): Promise<string[]> {
     const found: string[] = [];
-    if (this.manifest != null) return found;
+    if (this.manifest != null && Object.keys(this._realRoots).length === 0) return found;
     for (const globPattern of globPatterns) found.push(...(await Dir.globAsync(globPattern)));
     return found;
   },

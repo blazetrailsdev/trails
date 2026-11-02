@@ -2102,8 +2102,7 @@ synchronously and raises while it is pending.
 ## The application loader is Zeitwerk (`Rails.autoloaders`)
 
 Moved to [packages/trailties/CLAUDE.md](packages/trailties/CLAUDE.md#the-application-loader-is-zeitwerk-railsautoloaders).
-RFC 0213 reversed the old "Trails has no autoloader" ruling; a citation of that
-heading means this section until `autoloader-receipts-recheck-after-scan-retires` sweeps them. It is about the application loader only; framework-internal
+It is about the application loader only; framework-internal
 call-time constant resolution is § "Call-time constant resolution" above.
 
 ## `Module#autoload` is a build step (`Zeitwerk::Loader#define_autoload`)

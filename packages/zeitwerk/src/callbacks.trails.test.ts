@@ -1,4 +1,4 @@
-import { autoloadGet } from "./core-ext/kernel.js";
+import { autoloadGet, require } from "./core-ext/kernel.js";
 import { File, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cref } from "./cref.js";
@@ -9,6 +9,7 @@ import {
   isRequired,
   newLoader,
   teardown,
+  withFiles,
   withSetup,
 } from "./test-helpers/loader-test.js";
 
@@ -108,6 +109,101 @@ describe("Zeitwerk::Loader::Callbacks and EagerLoad", () => {
       await Promise.all([first, autoloadGet(cref)]);
       isRuby.mockRestore();
       expect(LOADED_FEATURES.filter((f) => f === File.expandPath("x.js")).length).toEqual(1);
+    });
+  });
+});
+
+describe("autoloadGet with a load in flight", () => {
+  afterEach(teardown);
+
+  const member = (cname: string) => (top.M as unknown as Record<string, unknown>)[cname];
+
+  const release = () => {
+    let open!: () => void;
+    const opened = new Promise<void>((resolve) => (open = resolve));
+    return { open, opened };
+  };
+
+  it("waits for the explicit namespace's children before a concurrent loadFile", async () => {
+    const files: [string, string][] = [
+      ["m.ts", "export class M {}"],
+      ["m/a.ts", "export class A {}"],
+      ["m/x.ts", "export class X {}"],
+    ];
+    const loader = await newLoader({ setup: false });
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.setup();
+      const { open, opened } = release();
+      const define = loader.defineAutoloadsForDir.bind(loader);
+      vi.spyOn(loader, "defineAutoloadsForDir").mockImplementation(async (dir, parent) => {
+        open();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return define(dir, parent);
+      });
+
+      const a = loader.loadFile("m/a.ts");
+      await opened;
+      const x = loader.loadFile("m/x.ts");
+
+      expect(await Promise.all([a, x])).toEqual([member("A"), member("X")]);
+    });
+  });
+
+  it("does not wait for itself from the load's own on_load", async () => {
+    const files: [string, string][] = [
+      ["m.ts", "export class M {}"],
+      ["m/x.ts", "export class X {}"],
+    ];
+    const loader = await newLoader({ setup: false });
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.setup();
+      let loaded: unknown;
+      loader.onLoad("M", async () => {
+        loaded = await loader.loadFile("m/x.ts");
+      });
+
+      await loader.loadFile("m.ts");
+
+      expect(loaded).toBe(member("X"));
+    });
+  });
+
+  it("retries in the waiter after a failed load", async () => {
+    const files: [string, string][] = [
+      ["m.ts", "export class M {}"],
+      ["m/x.ts", "export class X {}"],
+    ];
+    const loader = await newLoader({ setup: false });
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.setup();
+      const cref = new Cref(Object, "M");
+      const { open, opened } = release();
+      const seen: unknown[] = [];
+      const importing = vi.fn();
+      const path = cref.isAutoload()!;
+      loader.imports = {
+        M: async () => {
+          importing();
+          if (importing.mock.calls.length === 1) {
+            await opened;
+            throw new Error("boom");
+          }
+          return { M: class {} };
+        },
+      };
+
+      const first = autoloadGet(cref).catch((error: Error) => seen.push(error.message));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const second = require(path);
+      open();
+      await first;
+
+      expect(await second).toBe(true);
+      expect(seen).toEqual(["boom"]);
+      expect(importing).toHaveBeenCalledTimes(2);
     });
   });
 });
