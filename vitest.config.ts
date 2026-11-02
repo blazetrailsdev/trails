@@ -487,8 +487,8 @@ const otherResolve = {
   alias: [
     ...aliasEntries,
     {
-      find: /^@blazetrails\/trailties\/test-unit\/(.*)$/,
-      replacement: path.resolve(__dirname, "packages/trailties/src/test-unit") + "/$1.ts",
+      find: /^@blazetrails\/trailties\/((?!commands$).+)$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",
     },
     {
       find: /^@blazetrails\/trailties$/,
