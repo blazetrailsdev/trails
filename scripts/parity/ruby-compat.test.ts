@@ -110,6 +110,11 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatAliases("new")).toEqual([]);
   });
 
+  it("credits the async FileUtils spellings as mkdir_p and rm_rf", () => {
+    expect(jsEnumerableAliases("mkdir_p")).toContain("mkdirPAsync");
+    expect(jsEnumerableAliases("rm_rf")).toContain("rmRfAsync");
+  });
+
   it("forwards the receiver through jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("merge", ["hash"])).toEqual(["merge"]);
     expect(jsEnumerableAliases("merge")).toEqual([]);
