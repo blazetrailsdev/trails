@@ -36,7 +36,6 @@ type SchemaColumns = Record<string, Record<string, SchemaColumnValue>>;
 
 interface SchemaFlag {
   file: string;
-  /** The `<path>=<Base>` form: the schema applies only under that class. */
   base?: string;
 }
 

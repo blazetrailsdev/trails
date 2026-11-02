@@ -193,11 +193,6 @@ function buildClassInfo(cls: ts.ClassDeclaration, sourceFile: ts.SourceFile): Cl
   return info;
 }
 
-/**
- * The framework packages whose `Base` is not a model: `ActiveJob::Base`,
- * `ActionMailer::Base`, `ActionController::Base`. `Base` alone says nothing, so
- * a class is told from a model by where its `Base` came from.
- */
 const NON_MODEL_PACKAGE = String.raw`(?:action[a-z]*|activejob)`;
 const NON_MODEL_SPECIFIER = new RegExp(String.raw`^@blazetrails/${NON_MODEL_PACKAGE}(?:/|$)`);
 const NON_MODEL_PATH = new RegExp(String.raw`(?:@blazetrails|/packages)/${NON_MODEL_PACKAGE}/`);

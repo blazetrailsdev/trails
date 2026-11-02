@@ -27,9 +27,7 @@ export interface VirtualizeOptions extends WalkOptions {
   schemaColumnsByTable?: Readonly<
     Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>
   >;
-  /** Abstract base class name to its schema: its descendants read only that. */
   schemaScopes?: SchemaScopes;
-  /** Each model's superclass across files, so a scope reaches another file's base. */
   modelSuperNames?: ReadonlyMap<string, string>;
   classNameAliases?: ReadonlyMap<string, string>;
   attributesNullable?: boolean;
@@ -80,7 +78,6 @@ export function missingTables(
   return out;
 }
 
-/** The schema of the nearest scoped ancestor of `className`, itself included. */
 function scopeFor<T>(
   className: string,
   scopes: ReadonlyMap<string, T> | undefined,

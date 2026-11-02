@@ -6,7 +6,6 @@ import { isNonModelFrameworkFile } from "./walker.js";
 export interface WalkerResult {
   baseNames: Set<string>;
   modelRegistry: Map<string, string>;
-  /** Each model's direct superclass, across files: a schema scope is found by walking it. */
   superNames: Map<string, string>;
 }
 
