@@ -6,7 +6,7 @@ import {
   regexpEscape,
   Shellwords,
 } from "@blazetrails/ruby-compat";
-import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
+import { chomp, extractOptionsBang, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import { Trails } from "../rails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
@@ -24,7 +24,6 @@ export interface ActionsHost {
 }
 
 export interface GeneratorActionsState {
-  pendingGenerators: Array<{ what: string; args: string[] }>;
   afterInstallCallbacks: Array<() => void | Promise<void>>;
 }
 
@@ -140,14 +139,17 @@ export async function initializer(
   );
 }
 
-/** @missingRailsCall rails_command — CONVERGEABLE converge-generators-actions-generate-onto-rails-command */
 export function generate(
-  this: ActionsHost & GeneratorActionsState,
+  this: ActionsHost,
   what: string,
-  ...args: string[]
-): void {
+  ...args: Array<string | RailsCommandOptions>
+): Promise<unknown> {
   log.call(this, "generate", what);
-  this.pendingGenerators.push({ what, args });
+
+  const options = extractOptionsBang(args) as RailsCommandOptions;
+  options.abortOnFailure = !options.inline;
+
+  return railsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
 }
 
 export function afterInstall(
@@ -196,7 +198,7 @@ export async function railsCommand(
       silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
     );
   } else {
-    return await executeCommand.call(this, "rails", command, options);
+    return await executeCommand.call(this, "trails", command, options);
   }
 }
 

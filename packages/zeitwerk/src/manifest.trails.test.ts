@@ -107,6 +107,7 @@ describe("autoload artifacts", () => {
         "constants",
         "shadowed",
         "collapsed",
+        "ignored",
       ]);
     });
   });
@@ -146,7 +147,13 @@ describe("autoload artifacts", () => {
       await loader.pushDir(".");
       let called = false;
       await loader.onSetup(() => (called = true));
-      loader.manifest = { digest: "stale", constants: {}, shadowed: [], collapsed: [] };
+      loader.manifest = {
+        digest: "stale",
+        constants: {},
+        shadowed: [],
+        collapsed: [],
+        ignored: [],
+      };
       const { constants } = await buildManifest(loader);
       expect(constants).toHaveProperty("M::Y");
       expect(called).toBe(false);
@@ -320,6 +327,37 @@ describe("autoload artifacts", () => {
         await reader.eagerLoadNamespace(seats.App!.Lib);
         expect(seats.App!.Lib.Nested).toBeTypeOf("function");
         expect(seats.Unloaded).toBeUndefined();
+      } finally {
+        fsAdapterConfig.adapter = previous;
+      }
+    });
+  });
+
+  it("answers an ignored path from the manifest on an fs adapter that raises on every read", async () => {
+    const files: [string, string][] = [
+      ["x.js", "export class X {}\n"],
+      ["skip.js", "export class Skip {}\n"],
+    ];
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.ignore("skip.js");
+      const manifest = await buildManifest(loader);
+      expect(manifest.ignored).toEqual(["skip.js"]);
+      Registry.unregisterLoader(loader);
+
+      const previous = raiseOnEveryRead();
+      try {
+        const reader = await newLoader({ setup: false, enableReloading: false });
+        reader.manifest = manifest;
+        await reader.pushDir(".");
+        await reader.ignore("skip.js");
+        await reader.setup();
+
+        await expect(reader.loadFile("skip.js")).rejects.toThrow(/is ignored/);
+        expect(await reader.cpathExpectedAt("skip.js")).toBeNull();
+        expect(Object.keys(await reader.allExpectedCpaths())).not.toContain(
+          File.expandPath("skip.js"),
+        );
       } finally {
         fsAdapterConfig.adapter = previous;
       }

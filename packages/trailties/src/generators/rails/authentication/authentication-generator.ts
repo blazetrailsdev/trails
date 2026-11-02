@@ -2,7 +2,6 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
-import { MigrationGenerator } from "../../active-record/migration/migration-generator.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
@@ -117,25 +116,12 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   async addMigrations(): Promise<void> {
-    this.generate(
+    await this.generate(
       "migration CreateUsers email_address:string!:uniq password_digest:string! --force",
     );
-    this.generate(
+    await this.generate(
       "migration CreateSessions user:references ip_address:string user_agent:string --force",
     );
-    await this.runPendingGenerators();
-  }
-
-  private async runPendingGenerators(): Promise<void> {
-    for (const { what, args } of this.pendingGenerators.splice(0)) {
-      const [namespace, ...words] = [...what.split(/\s+/), ...args].filter(Boolean);
-      if (namespace !== "migration") continue;
-      await MigrationGenerator.start(words, {
-        destinationRoot: this.destinationRoot,
-        shell: this.shell,
-        behavior: this.behavior,
-      });
-    }
   }
 }
 

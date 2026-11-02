@@ -97,3 +97,50 @@ describe("ModelGeneratorTest", () => {
     expect(fs.existsSync(path.join(tmpDir, "test/fixtures/admin/accounts.yml"))).toBe(true);
   });
 });
+
+describe("ModelGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  function makeJsGen() {
+    return {
+      run: async (name: string, args: string[]) => {
+        await ModelGenerator.start([name, ...args], {
+          destinationRoot: jsTmpDir,
+        });
+        return (fs.readdirSync(jsTmpDir, { recursive: true }) as string[]).filter((f) =>
+          fs.statSync(path.join(jsTmpDir, f)).isFile(),
+        );
+      },
+    };
+  }
+
+  it("generates .js model and test files", async () => {
+    const gen = makeJsGen();
+    const files = await gen.run("User", ["name:string"]);
+    expect(files).toContain("app/models/user.js");
+    expect(files).toContain("test/models/user.test.js");
+  });
+
+  it("generates .js migration file", async () => {
+    const gen = makeJsGen();
+    const files = await gen.run("User", ["name:string"]);
+    const migFile = files.find((f) => f.startsWith("db/migrate/"));
+    expect(migFile).toMatch(/\.js$/);
+  });
+
+  it("uses ESM imports and exports in model", async () => {
+    const gen = makeJsGen();
+    await gen.run("User", ["name:string"]);
+    const content = fs.readFileSync(path.join(jsTmpDir, "app/models/user.js"), "utf-8");
+    expect(content).toContain('import { ApplicationRecord } from "./application-record.js"');
+    expect(content).toContain("export class User");
+  });
+});

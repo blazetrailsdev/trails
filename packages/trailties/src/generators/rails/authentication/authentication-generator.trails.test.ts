@@ -70,39 +70,6 @@ describe("AuthenticationGenerator", () => {
   });
 });
 
-describe("AuthenticationGenerator pending generators", () => {
-  it("re-running replaces create_users and create_sessions without a conflict", async () => {
-    registerChildProcessAdapter("trailties-auth-rerun-test", {
-      spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
-      system: async () => ({ pid: 1, status: 0, signal: null }),
-    });
-    childProcessAdapterConfig.adapter = "trailties-auth-rerun-test";
-    const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-rerun-"));
-    try {
-      for (const [rel, content] of Object.entries(APP_FILES)) {
-        fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
-        fs.writeFileSync(path.join(appDir, rel), content);
-      }
-      const generate = () =>
-        new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
-      await generate();
-      await expect(generate()).resolves.toBeDefined();
-
-      const migrations = fs.readdirSync(path.join(appDir, "db/migrate"));
-      expect(migrations.filter((f) => f.endsWith("_create_users.ts"))).toHaveLength(1);
-      expect(migrations.filter((f) => f.endsWith("_create_sessions.ts"))).toHaveLength(1);
-      const createUsers = fs.readFileSync(
-        path.join(appDir, "db/migrate", migrations.find((f) => f.endsWith("_create_users.ts"))!),
-        "utf-8",
-      );
-      expect(createUsers).toContain('t.string("email_address", { null: false });');
-      expect(createUsers).toContain('this.addIndex("users", "email_address", { unique: true });');
-    } finally {
-      fs.rmSync(appDir, { recursive: true, force: true });
-    }
-  });
-});
-
 describe("AuthenticationGenerator enable_bcrypt", () => {
   it("adds the bcrypt gem port and requires it from config/application.ts", async () => {
     registerChildProcessAdapter("trailties-auth-bcrypt-test", {

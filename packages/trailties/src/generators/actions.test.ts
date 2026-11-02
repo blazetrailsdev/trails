@@ -296,10 +296,24 @@ describe("ActionsTest", () => {
     );
   });
 
-  it("generate should queue a sub-generator invocation", () => {
-    const gen = makeGen();
-    gen.generate("scaffold", "Post", "title:string");
-    expect(gen.pendingGenerators).toEqual([{ what: "scaffold", args: ["Post", "title:string"] }]);
+  it("generate", async () => {
+    await assertRuns("bin/trails generate model MyModel", null, () =>
+      makeGen().generate("model", "MyModel"),
+    );
+  });
+
+  it("generate with inline option", async () => {
+    await assertNotCalled(testAdapter, "system", null, async () => {
+      await makeGen().generate("model", "MyModel", { inline: true });
+    });
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("generate with inline option should raise on failure", async () => {
+    const error = await assertRaises([StandardError], {}, () =>
+      makeGen().generate("model", "1234567890", { inline: true }),
+    );
+    assertMatch(/1234567890/, error.message);
   });
 
   function action(quiet: boolean, ...args: unknown[]): Promise<string> {

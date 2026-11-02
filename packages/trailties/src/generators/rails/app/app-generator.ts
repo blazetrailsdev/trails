@@ -1610,7 +1610,6 @@ export class AppGenerator extends AppBase {
 
   declare options: AppGeneratorOptions & AppBaseOptions;
 
-  /** @inventedArm perform — CONVERGEABLE actions-generate-runs-in-line */
   static async applyTrailsTemplate(template: string, destination: string): Promise<AppGenerator> {
     const generator = new this(
       [destination],
@@ -1619,10 +1618,6 @@ export class AppGenerator extends AppBase {
     );
     generator.setDefaultAccessorsBang();
     await generator.applyTrailsTemplate();
-    const { GenerateCommand } = await import("../../../commands/generate.js");
-    for (const { what, args } of generator.pendingGenerators) {
-      await GenerateCommand.perform("generate", [what, ...args], {});
-    }
     return generator;
   }
 
