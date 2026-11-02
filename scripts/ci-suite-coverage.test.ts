@@ -1522,6 +1522,8 @@ describe("CI runs every tooling test suite", () => {
       );
       expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");
       expect((await runGate("scripts/ci/unit-packages.mjs")).unit_packages).toBe("");
+      expect((await runGate("eslint/no-raw-sql.mjs")).unit_packages).toBe("");
+      expect((await runGate("vendor/sources.ts")).unit_packages).toBe("");
       expect(
         (await runGate("packages/solid-queue/src/a.ts\nscripts/ci/scoped-only.sh")).ar_scope,
       ).toBe("");

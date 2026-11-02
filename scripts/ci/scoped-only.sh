@@ -20,7 +20,7 @@ UNIT_RE='^packages/(arel|activejob|activemodel|activesupport|bcrypt|builder|chro
 ar_scope=""
 sqlite_only=false
 unit_packages=""
-if [ -z "$infra" ] && ! grep -qE '^scripts/ci/(scoped-only\.sh|unit-packages\.mjs)$' <<<"$files"; then
+if [ -z "$infra" ] && ! grep -qE '^(scripts/ci/(scoped-only\.sh|unit-packages\.mjs)$|eslint/|eslint\.config\.mjs$|vendor/)' <<<"$files"; then
   unit_packages=$(node "$(dirname "${BASH_SOURCE[0]}")/unit-packages.mjs" "$files" | { grep -E "$UNIT_RE" || true; } | tr '\n' ' ' | sed 's/ $//')
   [ -n "$unit_packages" ] || unit_packages=none
   if [ -n "$ar_re" ]; then
