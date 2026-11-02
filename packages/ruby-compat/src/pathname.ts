@@ -170,6 +170,11 @@ export class Pathname {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:218` `root?` */
+  isRoot(): boolean {
+    return this.chopBasename(this._path) == null && this._path.includes(File.SEPARATOR);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:233` */
   isAbsolute(): boolean {
     return ABSOLUTE_PATH.test(this._path);

@@ -30,6 +30,9 @@ import { Task, type TaskAction } from "./task.js";
 type Rule = [RegExp | null, string[], unknown[], unknown, TaskAction | undefined];
 type ResolvedArgs = [unknown, string[], unknown[], unknown];
 
+/** @noRailsEquivalent PERMANENT */
+export type InNamespaceResult<T> = T extends Promise<unknown> ? Promise<NameSpace> : NameSpace;
+
 export class TaskManager {
   static readonly [classModule] = true;
   static recordTaskMetadata = false;
@@ -240,15 +243,26 @@ export class TaskManager {
     return this._scope;
   }
 
-  inNamespace(name: string | null, block: (ns: NameSpace) => unknown): NameSpace {
+  /** @inventedArm if — PERMANENT */
+  inNamespace<T>(name: string | null, block: (ns: NameSpace) => T): InNamespaceResult<T> {
     name ??= this.generateName();
-    this._scope = new Scope(name, this._scope);
+    const tail = this._scope;
+    this._scope = new Scope(name, tail);
+    let pending = false;
     try {
       const ns = new NameSpace(this, this._scope);
-      block(ns);
-      return ns;
+      const result = block(ns);
+      if (result instanceof Promise) {
+        pending = true;
+        return result
+          .then(() => ns)
+          .finally(() => {
+            this._scope = tail;
+          }) as InNamespaceResult<T>;
+      }
+      return ns as InNamespaceResult<T>;
     } finally {
-      this._scope = this._scope.tail;
+      if (!pending) this._scope = this._scope.tail;
     }
   }
 
