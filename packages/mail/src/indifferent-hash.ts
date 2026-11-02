@@ -7,9 +7,11 @@ function isHash(value: unknown): boolean {
 }
 
 export class IndifferentHash<V = unknown> extends Hash<string, V> {
-  static newFromHashCopyingDefault<V>(hash: Hash<string, V>): IndifferentHash<V> {
+  static newFromHashCopyingDefault<V>(
+    hash: Hash<string, V> | Record<string, V>,
+  ): IndifferentHash<V> {
     const newHash = new IndifferentHash<V>(hash);
-    newHash.setDefault(hash.default());
+    if (hash instanceof Hash) newHash.setDefault(hash.default());
     return newHash;
   }
 
@@ -28,6 +30,12 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
 
   regularWriter(key: string, value: V): this {
     return super.set(key, value);
+  }
+
+  regularUpdate(otherHash: Map<string, V> | Record<string, V>): this {
+    const pairs = otherHash instanceof Map ? otherHash : Object.entries(otherHash);
+    for (const [key, value] of pairs) super.set(key, value);
+    return this;
   }
 
   store(key: string, value: V): this {
@@ -50,8 +58,8 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
     return super.has(this.convertKey(key));
   }
 
-  valuesAt(...indices: string[]): (V | undefined)[] {
-    return indices.map((key) => this.get(this.convertKey(key)));
+  valuesAt(...indices: string[]): (V | null)[] {
+    return indices.map((key) => this.get(this.convertKey(key)) ?? null);
   }
 
   dup(): IndifferentHash<V> {
@@ -62,11 +70,11 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
     return this.dup().update(hash as Record<string, V>);
   }
 
-  reverseMerge(otherHash: Hash<string, V>): IndifferentHash<V> {
-    return IndifferentHash.newFromHashCopyingDefault(otherHash).update(this);
+  reverseMerge(otherHash: Hash<string, V> | Record<string, V>): IndifferentHash<V> {
+    return IndifferentHash.newFromHashCopyingDefault(otherHash).merge(this);
   }
 
-  reverseMergeBang(otherHash: Hash<string, V>): this {
+  reverseMergeBang(otherHash: Hash<string, V> | Record<string, V>): this {
     return this.replace(this.reverseMerge(otherHash));
   }
 

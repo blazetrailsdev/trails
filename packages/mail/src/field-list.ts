@@ -1,4 +1,4 @@
-import { lessThan, type Comparable } from "@blazetrails/ruby-compat";
+import { lessThan, rbObjAsString, type Comparable } from "@blazetrails/ruby-compat";
 import { Field } from "./field.js";
 
 export class FieldList extends Array<Field> {
@@ -65,7 +65,7 @@ export class FieldList extends Array<Field> {
   }
 
   summary(): string {
-    return this.map((f) => `<${f.name}: ${String(f.value)}>`).join(", ");
+    return this.map((f) => `<${f.name}: ${rbObjAsString(f.value)}>`).join(", ");
   }
 
   /** @internal */

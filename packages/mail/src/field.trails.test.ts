@@ -9,6 +9,10 @@ describe("Mail::Field", () => {
     );
   });
 
+  it("still answers Object.prototype members", () => {
+    expect(new Field("X-A", "1").valueOf()).toBeInstanceOf(Field);
+  });
+
   it("does not parse on a then probe", () => {
     const field = new Field("To", "a@b.c");
     void (field as unknown as { then: unknown }).then;
@@ -23,5 +27,8 @@ describe("Mail::IndifferentHash", () => {
     const hash = new IndifferentHash({ a: 1 }).toHash();
     expect(hash).not.toBeInstanceOf(IndifferentHash);
     expect(hash.get("a")).toEqual(1);
+    expect(
+      new IndifferentHash({ a: 1 }).reverseMerge({ a: 2, b: 3 }).valuesAt("a", "b", "c"),
+    ).toEqual([1, 3, null]);
   });
 });

@@ -332,7 +332,8 @@ Object.setPrototypeOf(
       ) {
         return Reflect.get(target, name, receiver);
       }
-      if (name in target || !receiver.respondToMissing(name, false)) return undefined;
+      if (name in target) return Reflect.get(target, name, receiver);
+      if (!receiver.respondToMissing(name, false)) return undefined;
       const value = Reflect.get(receiver.field, name, receiver.field) as unknown;
       if (typeof value !== "function") return value;
       return (...args: unknown[]) => receiver.methodMissing(name, ...args);
