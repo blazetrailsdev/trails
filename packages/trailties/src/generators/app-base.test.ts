@@ -191,8 +191,15 @@ describe("AppBase run tasks", () => {
       await generator({ skipBundle: true }).runBundle();
       await generator({ pretend: true }).runBundle();
       expect(spawnSync).not.toHaveBeenCalled();
-      await generator({}).runBundle();
+      const installing = generator({}) as unknown as {
+        runBundle(): Promise<void>;
+        sayStatus: unknown;
+      };
+      const sayStatus = vi.fn();
+      installing.sayStatus = sayStatus;
+      await installing.runBundle();
       expect(spawnSync).toHaveBeenCalledOnce();
+      expect(sayStatus).toHaveBeenCalledWith("run", expect.stringMatching(/ install$/));
     } finally {
       childProcessAdapterConfig.adapter = previous;
     }
