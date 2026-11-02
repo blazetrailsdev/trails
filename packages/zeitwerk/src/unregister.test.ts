@@ -32,7 +32,6 @@ describe("TestUnregister", () => {
     expect(!Object.values(registry.gemLoadersByRootFile).includes(loader1)).toBeTruthy();
     expect(!Object.values(registry.autoloads).includes(loader1)).toBeTruthy();
     expect(!Registry.ExplicitNamespaces.isRegistered(cref1)).toBeTruthy();
-
     expect(registry.loaders.includes(loader2)).toBeTruthy();
     expect(Object.values(registry.gemLoadersByRootFile).includes(loader2)).toBeTruthy();
     expect(Object.values(registry.autoloads).includes(loader2)).toBeTruthy();
