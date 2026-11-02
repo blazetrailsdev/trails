@@ -37,7 +37,7 @@ export class User extends Base {
   declare highlightsWithConditionalPreprocessed: Many;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
-  declare highlights: Many;
+  declare highlights: Many & Pick<AssociationProxy<Attachment>, "findBy">;
   declare vlogs: Many;
   declare highlightsAttachments: Attachment[] | Promise<Attachment[]>;
   declare highlightsBlobs: { count(): Promise<number> };

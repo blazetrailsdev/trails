@@ -244,11 +244,7 @@ describe("ActiveStorage::AttachmentTest", () => {
   it("can destroy attachment without existing relation", async () => {
     const blob = await createBlob();
     await user.highlights.attach(blob);
-    const attachment = await (
-      user.highlights as unknown as {
-        findBy(conditions: object): Promise<Attachment>;
-      }
-    ).findBy({ blob_id: blob.id });
+    const attachment = (await user.highlights.findBy({ blob_id: blob.id }))!;
     await attachment.updateAttribute("name", "old_highlights");
     await attachment.destroy();
   });
