@@ -1,5 +1,5 @@
 import { onLoad, type Extended } from "@blazetrails/activesupport";
-import { include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { File, include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-job";
@@ -22,6 +22,10 @@ export class Engine extends TrailsEngine {
     TrailsEngine.register(this, import.meta.dirname);
 
     this.isolateNamespace(ActiveStorage);
+
+    this.config.paths().add("config/routes.ts", {
+      with: File.join(import.meta.dirname, "config", `routes${File.extname(import.meta.filename)}`),
+    });
 
     this.initializer("active_storage.attached", () => {
       onLoad("active_record", function (this: typeof Base) {

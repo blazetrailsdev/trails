@@ -437,6 +437,9 @@ importers:
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../marcel
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test

@@ -71,3 +71,4 @@ import * as RailtiesHelpers from "./trailties/helpers.js";
 export const Railties = { Helpers: RailtiesHelpers };
 export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";
+export { DEFAULT_SEND_FILE_DISPOSITION, DEFAULT_SEND_FILE_TYPE } from "./metal/data-streaming.js";
