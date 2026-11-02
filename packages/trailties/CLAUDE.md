@@ -154,7 +154,8 @@ The eager directory scan in `trailties/src/application/finisher.ts`
 (`railties/lib/rails/engine/configuration.rb:76-78`) reaches it because `.erb` is
 not `.rb`; a template built `--in-place` leaves a `.js` module that Zeitwerk's
 `ruby?` would read as code. So the `app` path excludes `views` and
-`views/concerns`, as it excludes `assets`. Decided in review on trails#9603, not a repo-owner ruling.
+`views/concerns`, as it excludes `assets`. Decided in review on trails#9603, not a repo-owner ruling; it converges under
+`app-glob-matches-rails-exclude`.
 
 **A scanned app class registers through its package's `registerX`.** Every
 framework base an app subclasses has one, beside the base class:
