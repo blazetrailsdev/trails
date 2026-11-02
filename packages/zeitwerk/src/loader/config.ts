@@ -59,6 +59,7 @@ export const Config = {
     }
   },
 
+  /** @inventedArm _installResolveHook — PERMANENT */
   enableReloading(this: Loader): void {
     this.mutex.synchronize(() => {
       if (this._reloadingEnabled) return;

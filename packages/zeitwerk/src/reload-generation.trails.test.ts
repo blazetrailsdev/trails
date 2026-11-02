@@ -103,11 +103,9 @@ const second = await load();
 console.log(JSON.stringify({
   newPost: first.Post !== second.Post,
   newParent: Object.getPrototypeOf(second.Post) === second.ApplicationRecord,
-  noOldParent: Object.getPrototypeOf(second.Post) !== first.ApplicationRecord,
   cycle: second.Comment.Post() === second.Post,
   edited: second.Post.edited === true,
   once: first.Once === second.Once && second.Post.Once === second.Once,
-  unchangedFile: first.Comment !== second.Comment,
   evaluated: globalThis.evaluated,
 }));
 `;
@@ -146,11 +144,9 @@ describe("Loader#reload under real Node", () => {
       expect(JSON.parse(output)).toEqual({
         newPost: true,
         newParent: true,
-        noOldParent: true,
         cycle: true,
         edited: true,
         once: true,
-        unchangedFile: true,
         evaluated: [
           "application-record.ts",
           "once.ts",

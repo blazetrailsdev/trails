@@ -32,19 +32,6 @@ describe("TestOnUnload", () => {
     expect(() => loader.onUnload(Object as never, () => {})).toThrow(TypeError);
   });
 
-  it("multiple on_unload on cpaths are called in order of definition", async () => {
-    await withSetup(X_FILES, async () => {
-      const calls: number[] = [];
-      loader.onUnload("X", () => calls.push(1));
-      loader.onUnload("X", () => calls.push(2));
-
-      expect(await x()).toBeTruthy();
-      await loader.reload();
-
-      expect(calls).toEqual([1, 2]);
-    });
-  });
-
   it("on_unload blocks for cpaths get the expected arguments passed", async () => {
     await withSetup(X_FILES, async () => {
       let args: unknown[] = [];
@@ -55,18 +42,6 @@ describe("TestOnUnload", () => {
 
       expect(args[0]).toBe(1);
       assertAbspath("x.ts", args[1]);
-    });
-  });
-
-  it("on_unload for cpaths is called before the constant is removed", async () => {
-    await withSetup(X_FILES, async () => {
-      let definedX = false;
-      loader.onUnload("X", () => (definedX = isX()));
-
-      expect(await x()).toBeTruthy();
-      await loader.reload();
-
-      expect(definedX).toBeTruthy();
     });
   });
 
@@ -81,45 +56,6 @@ describe("TestOnUnload", () => {
 
       expect(onUnloadForY).toBeFalsy();
     });
-  });
-
-  it("on_unload on cpaths is resilient to manually removed constants", async () => {
-    await withSetup(X_FILES, async () => {
-      let onUnloadForX = false;
-      loader.onUnload("X", () => (onUnloadForX = true));
-
-      expect(await x()).toBeTruthy();
-      rbModRemoveConst(Object, "X");
-      await loader.reload();
-
-      expect(onUnloadForX).toBeFalsy();
-    });
-  });
-
-  it("on_unload on cpaths is resilient to failed autoloads", async () => {
-    await withSetup(TYPO_FILES, async () => {
-      let onUnloadForX = false;
-      loader.onUnload("X", () => (onUnloadForX = true));
-
-      await expect(x()).rejects.toThrow(NameError);
-      await loader.reload();
-
-      expect(onUnloadForX).toBeFalsy();
-    });
-  });
-
-  it("on_unload on cpaths does not trigger a failed autoload twice", async () => {
-    await withSetup(
-      [["x.ts", "globalThis.failedAutoloads += 1; export const Y = 1;"]],
-      async () => {
-        loader.onUnload("X", () => {});
-
-        await expect(x()).rejects.toThrow(NameError);
-        await loader.reload();
-
-        expect((globalThis as Record<string, unknown>).failedAutoloads).toBe(1);
-      },
-    );
   });
 
   it("on_unload for :ANY is called with the expected arguments", async () => {
@@ -137,31 +73,6 @@ describe("TestOnUnload", () => {
     });
   });
 
-  it("on_unload for :ANY is called before the constant is removed", async () => {
-    await withSetup(X_FILES, async () => {
-      let definedX = false;
-      loader.onUnload(() => (definedX = isX()));
-
-      expect(await x()).toBeTruthy();
-      await loader.reload();
-
-      expect(definedX).toBeTruthy();
-    });
-  });
-
-  it("multiple on_unload for :ANY are called in order of definition", async () => {
-    await withSetup(X_FILES, async () => {
-      const calls: number[] = [];
-      loader.onUnload(() => calls.push(1));
-      loader.onUnload(() => calls.push(2));
-
-      expect(await x()).toBeTruthy();
-      await loader.reload();
-
-      expect(calls).toEqual([1, 2]);
-    });
-  });
-
   it("if there are specific and :ANY on_unloads, the specific one runs first", async () => {
     await withSetup(X_FILES, async () => {
       const calls: number[] = [];
@@ -175,42 +86,74 @@ describe("TestOnUnload", () => {
     });
   });
 
-  it("on_unload for :ANY is is resilient to manually removed constants", async () => {
-    await withSetup(X_FILES, async () => {
-      let onUnloadForX = false;
-      loader.onUnload(() => (onUnloadForX = true));
+  for (const [order, before, resilient, twice, cpath] of [
+    ["on cpaths", "for cpaths", "on cpaths is", "on cpaths", "X"],
+    ["for :ANY", "for :ANY", "for :ANY is is", "on :ANY", ":ANY"],
+  ] as const) {
+    const onUnload = (block: () => unknown) => loader.onUnload(cpath, block as never);
 
-      expect(await x()).toBeTruthy();
-      rbModRemoveConst(Object, "X");
-      await loader.reload();
+    it(`multiple on_unload ${order} are called in order of definition`, async () => {
+      await withSetup(X_FILES, async () => {
+        const calls: number[] = [];
+        onUnload(() => calls.push(1));
+        onUnload(() => calls.push(2));
 
-      expect(onUnloadForX).toBeFalsy();
+        expect(await x()).toBeTruthy();
+        await loader.reload();
+
+        expect(calls).toEqual([1, 2]);
+      });
     });
-  });
 
-  it("on_unload for :ANY is is resilient to failed autoloads", async () => {
-    await withSetup(TYPO_FILES, async () => {
-      let onUnloadForX = false;
-      loader.onUnload(() => (onUnloadForX = true));
+    it(`on_unload ${before} is called before the constant is removed`, async () => {
+      await withSetup(X_FILES, async () => {
+        let definedX = false;
+        onUnload(() => (definedX = isX()));
 
-      await expect(x()).rejects.toThrow(NameError);
-      await loader.reload();
+        expect(await x()).toBeTruthy();
+        await loader.reload();
 
-      expect(onUnloadForX).toBeFalsy();
+        expect(definedX).toBeTruthy();
+      });
     });
-  });
 
-  it("on_unload on :ANY does not trigger a failed autoload twice", async () => {
-    await withSetup(
-      [["x.ts", "globalThis.failedAutoloads += 1; export const Y = 1;"]],
-      async () => {
-        loader.onUnload(() => {});
+    it(`on_unload ${resilient} resilient to manually removed constants`, async () => {
+      await withSetup(X_FILES, async () => {
+        let onUnloadForX = false;
+        onUnload(() => (onUnloadForX = true));
+
+        expect(await x()).toBeTruthy();
+        rbModRemoveConst(Object, "X");
+        await loader.reload();
+
+        expect(onUnloadForX).toBeFalsy();
+      });
+    });
+
+    it(`on_unload ${resilient} resilient to failed autoloads`, async () => {
+      await withSetup(TYPO_FILES, async () => {
+        let onUnloadForX = false;
+        onUnload(() => (onUnloadForX = true));
+
+        await expect(x()).rejects.toThrow(NameError);
+        await loader.reload();
+
+        expect(onUnloadForX).toBeFalsy();
+      });
+    });
+
+    it(`on_unload ${twice} does not trigger a failed autoload twice`, async () => {
+      const files: [string, string][] = [
+        ["x.ts", "globalThis.failedAutoloads += 1; export const Y = 1;"],
+      ];
+      await withSetup(files, async () => {
+        onUnload(() => {});
 
         await expect(x()).rejects.toThrow(NameError);
         await loader.reload();
 
         expect((globalThis as Record<string, unknown>).failedAutoloads).toBe(1);
-      },
-    );
-  });
+      });
+    });
+  }
 });

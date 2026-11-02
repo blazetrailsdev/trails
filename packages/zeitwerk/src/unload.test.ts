@@ -17,6 +17,11 @@ import {
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<object>;
 const defined = (mod: object, cname: string) => new Cref(mod, cname).isDefined();
 
+const USERS: [string, string][] = [
+  ["user.ts", "export class User {}"],
+  ["admin/root.ts", "export class Root {}"],
+];
+
 describe("TestUnload", () => {
   let loader: Loader;
 
@@ -25,43 +30,24 @@ describe("TestUnload", () => {
   });
   afterEach(teardown);
 
-  it("unload removes all autoloaded constants (Object)", async () => {
-    const files: [string, string][] = [
-      ["user.ts", "export class User {}"],
-      ["admin/root.ts", "export class Root {}"],
-    ];
-    await withSetup(loader, files, {}, async () => {
-      expect(await get(Object, "User")).toBeTruthy();
-      const admin = await get(Object, "Admin");
-      expect(await get(admin, "Root")).toBeTruthy();
+  for (const [name, namespace] of [
+    ["Object", Object],
+    ["Namespace", class Namespace {}],
+  ] as const) {
+    it(`unload removes all autoloaded constants (${name})`, async () => {
+      await withSetup(loader, USERS, { namespace }, async () => {
+        expect(await get(namespace, "User")).toBeTruthy();
+        const admin = await get(namespace, "Admin");
+        expect(await get(admin, "Root")).toBeTruthy();
 
-      await loader.unload();
+        await loader.unload();
 
-      expect(defined(Object, "User")).toBe(false);
-      expect(defined(Object, "Admin")).toBe(false);
-      expect(defined(admin, "Root")).toBe(false);
+        expect(defined(namespace, "User")).toBe(false);
+        expect(defined(namespace, "Admin")).toBe(false);
+        expect(defined(admin, "Root")).toBe(false);
+      });
     });
-  });
-
-  it("unload removes all autoloaded constants (Namespace)", async () => {
-    class Namespace {}
-    const namespace = Namespace;
-    const files: [string, string][] = [
-      ["user.ts", "export class User {}"],
-      ["admin/root.ts", "export class Root {}"],
-    ];
-    await withSetup(loader, files, { namespace }, async () => {
-      expect(await get(namespace, "User")).toBeTruthy();
-      const admin = await get(namespace, "Admin");
-      expect(await get(admin, "Root")).toBeTruthy();
-
-      await loader.unload();
-
-      expect(defined(namespace, "User")).toBe(false);
-      expect(defined(namespace, "Admin")).toBe(false);
-      expect(defined(admin, "Root")).toBe(false);
-    });
-  });
+  }
 
   it("unload removes autoloaded constants, even if #name is overridden", async () => {
     const files: [string, string][] = [

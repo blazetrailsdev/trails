@@ -723,6 +723,14 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no " +
+      "JS counterpart (RFC 0213). PERMANENT.",
+    names: ["unregister_inceptions"],
+    rubyFiles: ["loader.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
       "`Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node " +
       'counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess ' +
       "arm's `runInIsolation` exists. PERMANENT.",
