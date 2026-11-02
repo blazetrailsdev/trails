@@ -302,6 +302,16 @@ describe("ActionsTest", () => {
     );
   });
 
+  it("generate should raise on failure", async () => {
+    const { system } = testAdapter;
+    testAdapter.system = async () => ({ pid: 1, status: 1, signal: null });
+    try {
+      await expect(makeGen().generate("model", "1234567890")).rejects.toThrow();
+    } finally {
+      testAdapter.system = system;
+    }
+  });
+
   it("generate with inline option", async () => {
     await assertNotCalled(testAdapter, "system", null, async () => {
       await makeGen().generate("model", "MyModel", { inline: true });

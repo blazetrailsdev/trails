@@ -1,5 +1,5 @@
 import { File, Dir } from "@blazetrails/ruby-compat";
-import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
@@ -123,7 +123,13 @@ describe("ModelGeneratorTest", () => {
     );
   });
 
-  it.skip("impossible inflection rules raises an error", () => {});
+  it("impossible inflection rules raises an error", async () => {
+    const content = await capture("stderr", () => t.runGenerator(["BFF"]));
+    assertMatch(
+      /Rails cannot recover the underscored form from its camelcase form 'BFF'\./,
+      content,
+    );
+  });
 
   it("model with underscored parent option", async () => {
     await t.runGenerator(["account", "--parent", "admin/account"]);
@@ -172,11 +178,53 @@ describe("ModelGeneratorTest", () => {
     );
   });
 
-  it.skip("migration with nested namespace without pluralization", () => {});
+  it("migration with nested namespace without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator(["Admin::Gallery::Image"]);
+      t.assertNoMigration("db/migrate/create_images.ts");
+      t.assertNoMigration("db/migrate/create_gallery_images.ts");
+      t.assertNoMigration("db/migrate/create_admin_gallery_images.ts");
+      await t.assertMigration(
+        "db/migrate/create_admin_gallery_image.ts",
+        /class CreateAdminGalleryImage extends Migration\.get\([0-9.]+\)/,
+      );
+      await t.assertMigration(
+        "db/migrate/create_admin_gallery_image.ts",
+        /createTable\("admin_gallery_image"/,
+      );
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
-  it.skip("migration with namespaces in model name without pluralization", () => {});
+  it("migration with namespaces in model name without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator(["Gallery::Image"]);
+      await t.assertMigration(
+        "db/migrate/create_gallery_image.ts",
+        /class CreateGalleryImage extends Migration\.get\([0-9.]+\)/,
+      );
+      t.assertNoMigration("db/migrate/create_gallery_images.ts");
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
-  it.skip("migration without pluralization", () => {});
+  it("migration without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator();
+      await t.assertMigration(
+        "db/migrate/create_account.ts",
+        /class CreateAccount extends Migration\.get\([0-9.]+\)/,
+      );
+      t.assertNoMigration("db/migrate/create_accounts.ts");
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
   it("migration is skipped", async () => {
     await t.runGenerator(["account", "--no-migration"]);
@@ -386,7 +434,13 @@ describe("ModelGeneratorTest", () => {
     }
   });
 
-  it.skip("check class collision", () => {});
+  it("check class collision", async () => {
+    const content = await capture("stderr", () => t.runGenerator(["object"]));
+    assertMatch(
+      /The name 'Object' is either already used in your application or reserved/,
+      content,
+    );
+  });
 
   it("index is skipped for belongs to association", async () => {
     await t.runGenerator(["account", "supplier:belongs_to", "--no-indexes"]);
