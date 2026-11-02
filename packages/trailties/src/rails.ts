@@ -91,7 +91,7 @@ export class Trails {
 
   static VERSION = VERSION;
   static gemVersion = gemVersion;
-  static Command?: {
+  declare static Command?: {
     invoke(fullNamespace: string, args?: string[], config?: Record<string, unknown>): Promise<void>;
   };
   static version = version;
