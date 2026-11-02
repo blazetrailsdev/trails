@@ -1,8 +1,10 @@
-import { autoloadGet } from "./core-ext/kernel.js";
+import { _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
 import {
   File,
+  LOADED_FEATURES,
   Monitor,
   Mutex,
+  NameError as RubyNameError,
   SecureRandom,
   constGet,
   getFs,
@@ -13,7 +15,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Cref } from "./cref.js";
 import { Map } from "./cref/map.js";
-import { Error as ZeitwerkError, SetupRequired } from "./error.js";
+import { ReloadingDisabledError, Error as ZeitwerkError, SetupRequired } from "./error.js";
 import { Inflector } from "./inflector.js";
 import { Callbacks } from "./loader/callbacks.js";
 import { Config } from "./loader/config.js";
@@ -70,6 +72,8 @@ export class Loader {
   /** @internal */ _eagerLoaded: boolean;
   /** @internal */ mutex: Mutex;
   /** @internal */ dirsAutoloadMonitor: Monitor;
+  /** @internal */ _generation: number;
+  /** @internal */ _realRoots: Record<string, string>;
 
   /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.2/lib/zeitwerk/loader/config.rb:86-101 */
   constructor() {
@@ -100,6 +104,8 @@ export class Loader {
 
     this.mutex = new Mutex();
     this.dirsAutoloadMonitor = new Monitor();
+    this._generation = 1;
+    this._realRoots = {};
 
     Registry.registerLoader(this);
   }
@@ -122,6 +128,74 @@ export class Loader {
 
       this._setup = true;
     });
+  }
+
+  /** @inventedArm _installResolveHook — PERMANENT */
+  async unload(): Promise<void> {
+    await this.mutex.synchronize(async () => {
+      if (!this._setup) throw new SetupRequired();
+
+      const unloadedFiles = new Set<string>();
+
+      for (const [abspath, cref] of Object.entries(this.autoloads)) {
+        if (cref.isAutoload() != null) {
+          this.unloadAutoload(cref);
+        } else {
+          this.unloadCref(cref);
+          if (await this.isRuby(abspath)) unloadedFiles.add(abspath);
+        }
+      }
+
+      for (const [abspath, cref] of Object.entries(this.toUnload)) {
+        if (Object.keys(this.onUnloadCallbacks).length !== 0) {
+          let value: unknown;
+          let defined = true;
+          try {
+            value = cref.get();
+          } catch (error) {
+            if (!(error instanceof RubyNameError)) throw error;
+            defined = false;
+          }
+          if (defined) await this.runOnUnloadCallbacks(cref, value, abspath);
+        }
+
+        this.unloadCref(cref);
+        if (await this.isRuby(abspath)) unloadedFiles.add(abspath);
+      }
+
+      if (unloadedFiles.size !== 0) {
+        LOADED_FEATURES.splice(
+          0,
+          LOADED_FEATURES.length,
+          ...LOADED_FEATURES.filter((file) => !unloadedFiles.has(file)),
+        );
+      }
+
+      this.autoloads = {};
+      this.autoloadedDirs.length = 0;
+      this.toUnload = {};
+      this.namespaceDirs.clear();
+      this.shadowedFiles.clear();
+
+      this.unregisterExplicitNamespaces();
+
+      Registry.onUnload(this);
+
+      this._setup = false;
+      this._eagerLoaded = false;
+      this._generation += 1;
+      _installResolveHook();
+    });
+  }
+
+  async reload(): Promise<void> {
+    if (!this.isReloadingEnabled()) throw new ReloadingDisabledError();
+    if (!this._setup) throw new SetupRequired();
+
+    await this.unload();
+    await this.recomputeIgnoredPaths();
+    await this.recomputeCollapseDirs();
+    await this.setup();
   }
 
   async allExpectedCpaths(): Promise<Record<string, string>> {
@@ -211,6 +285,19 @@ export class Loader {
         return `${this.realModName(rootNamespace)}::${cnames.join("::")}`;
       }
     }
+  }
+
+  isUnloadableCpath(cpath: string): boolean {
+    return this.unloadableCpaths().includes(cpath);
+  }
+
+  unloadableCpaths(): string[] {
+    return Object.values(this.toUnload).map((cref) => cref.path());
+  }
+
+  unregister(): void {
+    this.unregisterExplicitNamespaces();
+    Registry.unregisterLoader(this);
   }
 
   /** @internal */
@@ -408,6 +495,11 @@ export class Loader {
   }
 
   /** @internal */
+  private unregisterExplicitNamespaces(): void {
+    Registry.ExplicitNamespaces.unregisterLoader(this);
+  }
+
+  /** @internal */
   raiseIfConflictingDirectory(dir: string): void {
     MUTEX.synchronize(() => {
       const dirSlash = `${dir}/`;
@@ -429,6 +521,30 @@ export class Loader {
         }
       }
     });
+  }
+
+  /** @internal */
+  private async runOnUnloadCallbacks(cref: Cref, value: unknown, abspath: string): Promise<void> {
+    const callbacks = this.onUnloadCallbacks as Record<string, ((...args: unknown[]) => unknown)[]>;
+    for (const c of callbacks[cref.path()] ?? []) await c(value, abspath);
+    for (const c of callbacks[":ANY"] ?? []) await c(cref.path(), value, abspath);
+  }
+
+  /** @internal */
+  private unloadAutoload(cref: Cref): void {
+    cref.remove();
+    if (this.logger != null) this.log(`autoload for ${cref} removed`);
+  }
+
+  /** @internal */
+  private unloadCref(cref: Cref): void {
+    try {
+      cref.remove();
+    } catch (error) {
+      if (!(error instanceof RubyNameError)) throw error;
+      return;
+    }
+    if (this.logger != null) this.log(`${cref} unloaded`);
   }
 }
 

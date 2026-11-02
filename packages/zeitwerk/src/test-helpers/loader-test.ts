@@ -40,6 +40,7 @@ export function teardown(): void {
     for (const cref of Object.values(loader.autoloads)) cref.remove();
   }
   Registry.loaders.length = 0;
+  Registry.autoloads = {};
   ExplicitNamespaces.clear();
   for (const cname of Object.keys(TopLevel)) {
     if (!topLevelConstants.has(cname)) delete (TopLevel as Record<string, unknown>)[cname];

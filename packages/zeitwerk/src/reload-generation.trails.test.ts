@@ -70,6 +70,162 @@ ${TAIL}`,
   ],
 ];
 
+const packageDist = (name: string) => new URL(`../../${name}/dist/`, import.meta.url).href;
+
+const LOADER_MAIN = `
+import { TopLevel, File } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const once = new Loader();
+await once.pushDir("once");
+await once.setup();
+
+const loader = new Loader();
+loader.enableReloading();
+await loader.pushDir("app");
+await loader.setup();
+
+const load = () => Promise.all([loader.eagerLoad(), once.eagerLoad()]).then(() => ({ ...TopLevel }));
+
+const first = await load();
+File.write("app/application-record.ts", ${JSON.stringify(`export class ApplicationRecord { static edited = true; }\n${TAIL}`)});
+await loader.reload();
+const second = await load();
+
+console.log(JSON.stringify({
+  newPost: first.Post !== second.Post,
+  newParent: Object.getPrototypeOf(second.Post) === second.ApplicationRecord,
+  cycle: second.Comment.Post() === second.Post,
+  edited: second.Post.edited === true,
+  once: first.Once === second.Once && second.Post.Once === second.Once,
+  evaluated: globalThis.evaluated,
+}));
+`;
+
+const LOADER_FILES: [string, string][] = [
+  ["main.mjs", LOADER_MAIN],
+  ["once/once.ts", `export class Once {}\n${TAIL}`],
+  ["app/application-record.ts", `export class ApplicationRecord {}\n${TAIL}`],
+  [
+    "app/comment.ts",
+    `import { Post } from "./post.ts";
+export class Comment { static Post = () => Post; }
+${TAIL}`,
+  ],
+  [
+    "app/post.ts",
+    `import { ApplicationRecord } from "./application-record.ts";
+import { Comment } from "./comment.ts";
+import { Once } from "../once/once.ts";
+export class Post extends ApplicationRecord {
+  static Comment = () => Comment;
+  static Once = Once;
+}
+${TAIL}`,
+  ],
+];
+
+const REPAIR_MAIN = `
+import { File, TopLevel } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const once = new Loader();
+await once.pushDir("once");
+await once.setup();
+const loader = new Loader();
+loader.enableReloading();
+await loader.pushDir("app");
+await loader.setup();
+
+const message = await loader.eagerLoad().catch((error) => error.message);
+File.write("app/broken.ts", 'export { Late as Broken } from "../once/late.ts";');
+await loader.reload();
+await loader.eagerLoad();
+console.log(JSON.stringify({
+  message,
+  current: TopLevel.Broken.parent === TopLevel.Base,
+}));
+`;
+
+const REPAIR_FILES: [string, string][] = [
+  ["main.mjs", REPAIR_MAIN],
+  ["app/base.ts", "export class Base {}"],
+  ["app/broken.ts", 'throw new globalThis.Error("boom");'],
+  [
+    "once/late.ts",
+    'import { Base } from "../app/base.ts";\nexport class Late { static parent = Base; }',
+  ],
+];
+
+const UNLOAD_MAIN = `
+import { TopLevel } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const loader = new Loader();
+await loader.pushDir("app");
+await loader.setup();
+await loader.unload();
+await loader.setup();
+await loader.eagerLoad();
+console.log(JSON.stringify(Object.getPrototypeOf(TopLevel.B) === TopLevel.A));
+`;
+
+const UNLOAD_FILES: [string, string][] = [
+  ["main.mjs", UNLOAD_MAIN],
+  ["app/a.ts", "export class A {}"],
+  ["app/b.ts", 'import { A } from "./a.ts";\nexport class B extends A {}'],
+];
+
+describe("Loader#reload under real Node", () => {
+  it("keeps one class across unload and setup with reloading disabled", async () => {
+    await withFiles(UNLOAD_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toBe(true);
+    });
+  }, 30_000);
+
+  it("retries a raising file and hands an unmanaged importer the current generation", async () => {
+    await withFiles(REPAIR_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({ message: "boom", current: true });
+    });
+  }, 30_000);
+
+  it("leaves no class from the previous generation", async () => {
+    await withFiles(LOADER_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({
+        newPost: true,
+        newParent: true,
+        cycle: true,
+        edited: true,
+        once: true,
+        evaluated: [
+          "application-record.ts",
+          "once.ts",
+          "post.ts",
+          "comment.ts",
+          "application-record.ts?zeitwerk=2",
+          "post.ts?zeitwerk=2",
+          "comment.ts?zeitwerk=2",
+        ],
+      });
+    });
+  }, 30_000);
+});
+
 describe("reload generations through module.registerHooks", () => {
   it("re-evaluates both ends of an import edge in generation 2", async () => {
     await withFiles(FILES, async () => {
