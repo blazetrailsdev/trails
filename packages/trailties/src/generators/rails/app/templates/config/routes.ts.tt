@@ -9,6 +9,12 @@ Trails.application.routes().draw(function () {
   // Can be used by load balancers and uptime monitors to verify that the app is live.
   this.get("up", { to: "rails/health#show", as: "rails_health_check" });
 
+  <%- if (!this.options.api) { -%>
+  // Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.tse)
+  // this.get("manifest", { to: "rails/pwa#manifest", as: "pwa_manifest" });
+  // this.get("service-worker", { to: "rails/pwa#service_worker", as: "pwa_service_worker" });
+
+  <%- } -%>
   // Defines the root path route ("/")
   // this.root("posts#index");
 });

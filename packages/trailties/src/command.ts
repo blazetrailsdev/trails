@@ -13,7 +13,6 @@ import {
   stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
-import { Rake } from "@blazetrails/rake";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
@@ -83,7 +82,10 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/** @inventedArm replaceAll — PERMANENT */
+/**
+ * @inventedArm replaceAll — PERMANENT
+ * @inventedArm if — CONVERGEABLE port-help-and-version-commands-for-split-namespace
+ */
 export async function invoke(
   fullNamespace: string,
   args: string[] = [],
@@ -95,6 +97,30 @@ export async function invoke(
 
   try {
     await withArgv(args, async () => {
+      if (
+        fullNamespace === "" ||
+        fullNamespace === "help" ||
+        HELP_MAPPINGS.has(fullNamespace) ||
+        VERSION_MAPPINGS.has(fullNamespace)
+      ) {
+        const rake = (await findByNamespace("rake")) as typeof Base;
+        await lookupBang();
+        const program = createProgram();
+        if (fullNamespace !== "" && !VERSION_MAPPINGS.has(fullNamespace)) {
+          const tasks = await rake.printingCommands();
+          const width = Math.max(0, ...tasks.map(([name]) => name.length));
+          program.addHelpText(
+            "after",
+            ["", "In addition to those commands, there are:", ""]
+              .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
+              .join("\n"),
+          );
+        }
+        await program.parseAsync(fullNamespace === "" ? args : [fullNamespace, ...args], {
+          from: "user",
+        });
+        return;
+      }
       if (command && "perform" in command) {
         if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
           await command.perform(name, args, config);
@@ -183,30 +209,7 @@ async function invokeRake(
   args: string[],
   config: Record<string, unknown>,
 ): Promise<void> {
-  if (task === "" || task === "help" || HELP_MAPPINGS.has(task) || VERSION_MAPPINGS.has(task)) {
-    const rake = (await findByNamespace("rake")) as typeof Base;
-    await lookupBang();
-    const program = createProgram();
-    if (task !== "" && !VERSION_MAPPINGS.has(task)) {
-      const tasks = await rake.printingCommands();
-      const width = Math.max(0, ...tasks.map(([name]) => name.length));
-      program.addHelpText(
-        "after",
-        ["", "In addition to those commands, there are:", ""]
-          .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
-          .join("\n"),
-      );
-    }
-    await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
-    return;
-  }
   if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
-  if ((await Rake.application!.findRakefileLocation()) == null) {
-    throw new UnrecognizedCommandError(
-      task,
-      (await printingCommands()).map(([name]) => name),
-    );
-  }
   await ((await findByNamespace("rake")) as typeof Base).perform(task, args, config);
 }
 

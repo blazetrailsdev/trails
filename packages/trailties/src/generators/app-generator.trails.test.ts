@@ -28,6 +28,17 @@ describe("AppGenerator (trails-only)", () => {
     expect(await File.isDirectory(root)).toBe(true);
   });
 
+  it("ignores public/assets unless the app is API only", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(await File.readAsync(File.join(tmpDir, "my-app/.gitignore"))).toContain(
+      "!/storage/.gitkeep\n\n/public/assets\n\n*.tsbuildinfo\n",
+    );
+  });
+
   it("generates action cable files by default", async () => {
     await new AppGenerator(
       ["my-app"],
