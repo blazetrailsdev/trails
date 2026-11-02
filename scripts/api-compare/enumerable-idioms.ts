@@ -99,6 +99,10 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  * Both spellings are listed per name because the adapter exposes the sync
  * member (`existsSync`) while a promise-shaped seam spells it bare (`exists`).
  * Each is the WHOLE call's analogue, never a building block.
+ *
+ * `mkdir_p` and `rm_rf` are `FileUtils` statics rather than adapter members:
+ * the fs is async, so each one's port is ruby-compat's async spelling
+ * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365,1328`).
  */
 export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["exist?", ["existsSync", "exists"]],
@@ -106,6 +110,8 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["rename", ["renameSync"]],
   ["unlink", ["unlinkSync"]],
   ["realpath", ["realpathSync"]],
+  ["mkdir_p", ["mkdirPAsync"]],
+  ["rm_rf", ["rmRfAsync"]],
 ]);
 
 /** JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail
