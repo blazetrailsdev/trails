@@ -197,7 +197,6 @@ const NON_MODEL_PACKAGE = String.raw`(?:action[a-z]*|activejob)`;
 const NON_MODEL_SPECIFIER = new RegExp(String.raw`^@blazetrails/${NON_MODEL_PACKAGE}(?:/|$)`);
 const NON_MODEL_PATH = new RegExp(String.raw`(?:@blazetrails|/packages)/${NON_MODEL_PACKAGE}/`);
 
-/** Whether a class declared in `fileName` belongs to a non-model framework package. */
 export function isNonModelFrameworkFile(fileName: string): boolean {
   return NON_MODEL_PATH.test(fileName);
 }

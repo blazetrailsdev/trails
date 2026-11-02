@@ -60,7 +60,6 @@ function schemaFlags(args: string[]): SchemaFlag[] {
   return flags;
 }
 
-/** The `--schema <path>=<Base>` files, keyed by base class. */
 export function loadSchemaScopes(args: string[]): SchemaScopes | undefined {
   const scopes = new Map<string, SchemaColumns>();
   for (const { file, base } of schemaFlags(args)) {
