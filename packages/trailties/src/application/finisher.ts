@@ -84,6 +84,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
   await this.ensureGeneratorTemplatesAdded();
 });
 
+/** @inventedArm eagerLoad — PERMANENT */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
   autoloader.manifestRoot ??= this.config.root;
