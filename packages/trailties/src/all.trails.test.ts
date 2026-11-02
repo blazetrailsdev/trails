@@ -49,7 +49,12 @@ export function read(config: InstanceType<typeof Application>["config"]) {
         try {
           execFileSync("pnpm", ["exec", "tsc", "-p", dir], { cwd: root, encoding: "utf8" });
         } catch (e) {
-          output = (e as { stdout: string }).stdout;
+          const { status, stdout, stderr } = e as {
+            status: number;
+            stdout: string;
+            stderr: string;
+          };
+          output = `exit ${status}\n${stdout}${stderr}`;
         }
         expect(output).toBe("");
       } finally {
