@@ -65,10 +65,3 @@ describe("Zeitwerk::Loader::Config", () => {
     expect(lines).toEqual(["Zeitwerk@main: hi"]);
   });
 });
-
-describe("Zeitwerk::Loader::Helpers#ruby?", () => {
-  it("does not read a template module built in place as code", async () => {
-    const loader = newLoader();
-    expect(await loader.isRuby("/app/views/posts/index.html.tse.js")).toBe(false);
-  });
-});

@@ -43,6 +43,16 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     FileUtils.rmRf(root);
   });
 
+  it("setup_main_autoloader does not push app/views, whose built templates are not constants", async () => {
+    const views = dir("app/views");
+    File.write(File.join(views, "feed.xml.builder.js"), "");
+    Dependencies.autoloadPaths = [views];
+
+    await run(Finisher, "setup_main_autoloader");
+
+    expect(autoloaders.main.dirs()).toEqual([]);
+  });
+
   for (const [paths, loader, klass, name] of [
     ["autoloadOncePaths", "once", Bootstrap, "setup_once_autoloader"],
     ["autoloadPaths", "main", Finisher, "setup_main_autoloader"],
