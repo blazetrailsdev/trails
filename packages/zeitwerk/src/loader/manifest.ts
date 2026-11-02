@@ -52,6 +52,12 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
   const seen = new Set<string>();
 
   try {
+    const { manifest } = loader;
+    loader.manifest = null;
+    await loader.recomputeIgnoredPaths();
+    await loader.recomputeCollapseDirs();
+    loader.manifest = manifest;
+
     const roots = await loader.actualRoots();
     for (const [rootDir, rootNamespace] of Object.entries(roots)) {
       await loader["defineAutoloadsForDir"](rootDir, rootNamespace);
