@@ -22,19 +22,22 @@ export class NotesCommand extends Base {
   async perform(..._args: string[]): Promise<void> {
     await this.bootApplicationBang();
 
-    this.displayAnnotations();
+    await this.displayAnnotations();
   }
 
   /**
    * @internal
    * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
    */
-  private displayAnnotations(): void {
+  private async displayAnnotations(): Promise<void> {
     const annotations = this.options.annotations ?? Annotation.tags;
     const tag = annotations.length > 1;
 
     stdout.write(
-      SourceAnnotationExtractor.enumerate(annotations.join("|"), { tag, dirs: this.directories() }),
+      await SourceAnnotationExtractor.enumerate(annotations.join("|"), {
+        tag,
+        dirs: this.directories(),
+      }),
     );
   }
 

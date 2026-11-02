@@ -11,7 +11,7 @@ import { Trails } from "../rails.js";
 
 type Io = Pick<StringIO, "print" | "puts" | "write"> & { isTty?(): boolean };
 
-interface Result {
+export interface Result {
   name: string;
   klass: string;
   time: number;
@@ -32,7 +32,7 @@ export class TestUnitReporter {
 
   static {
     classAttribute.call(this, "appRoot", { instanceAccessor: false });
-    classAttribute.call(this, "executable", { default: "bin/rails test" });
+    classAttribute.call(this, "executable", { default: "bin/trails test" });
   }
 
   io: Io;

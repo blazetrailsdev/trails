@@ -26,7 +26,7 @@ class FakeResult {
 
 const location = `${FILE}:9`;
 const heading = "TestUnitReporterTest::ExampleTest#woot";
-const snippet = `bin/rails test ${location}\n\n`;
+const snippet = `bin/trails test ${location}\n\n`;
 const failedTest = () => new FakeResult("F", `Failure:\n${heading} [${location}]:\nboo\n`);
 const erroredTest = () =>
   new FakeResult("E", `Error:\n${heading}:\nArgumentError: wups\n    some_test.rb:4\n`);
@@ -52,7 +52,7 @@ describe("TestUnitReporterTest", () => {
     reporter.report();
   };
   const assertRerunSnippetCount = (snippetCount: number) =>
-    expect(output.string().match(/^(bin\/rails test|bin\/test) /gm)?.length ?? 0).toBe(
+    expect(output.string().match(/^(bin\/trails test|bin\/test) /gm)?.length ?? 0).toBe(
       snippetCount,
     );
 
@@ -68,7 +68,7 @@ describe("TestUnitReporterTest", () => {
 
   it("prints rerun snippet to run a single failed test", () => {
     run(failedTest());
-    expect(output.string()).toMatch(/^bin\/rails test .*test\/test_unit\/reporter_test\.rb:\d+$/m);
+    expect(output.string()).toMatch(/^bin\/trails test .*test\/test_unit\/reporter_test\.rb:\d+$/m);
     assertRerunSnippetCount(1);
   });
 

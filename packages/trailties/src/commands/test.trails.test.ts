@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, getFs, rbFSystem } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
@@ -28,6 +28,19 @@ describe("TestCommand", () => {
     } finally {
       run.mockRestore();
       parse.mockRestore();
+    }
+  });
+
+  it("runs Vitest with the TestUnitReporter adapter", async () => {
+    const load = vi.spyOn(Runner, "loadTests").mockResolvedValue(["test/a.test.ts"]);
+    try {
+      await Runner.run(["-v"]);
+      const [env, ...args] = vi.mocked(rbFSystem).mock.lastCall!;
+      expect(env).toEqual({ TRAILS_TEST_VERBOSE: "1" });
+      expect(args.slice(0, 3)).toEqual(["vitest", "run", "test/a.test.ts"]);
+      expect(args.at(-1)).toMatch(/test-unit\/vitest-reporter\.[jt]s$/);
+    } finally {
+      load.mockRestore();
     }
   });
 

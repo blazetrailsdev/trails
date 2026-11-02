@@ -1,10 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { include, registerConstant } from "@blazetrails/ruby-compat";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Application } from "./application.js";
 import { Engine } from "./engine.js";
 import { Root } from "./paths.js";
-import { Annotation, Parser } from "./source-annotation-extractor.js";
+import {
+  Annotation,
+  Parser,
+  ParserExtractor,
+  SourceAnnotationExtractor,
+} from "./source-annotation-extractor.js";
 
 describe("Paths remaining surface", () => {
   it("edits a path's list and reads Root's hash surface", async () => {
@@ -36,21 +41,78 @@ describe("BacktraceCleaner", () => {
 });
 
 describe("Parser", () => {
-  it("skips a # in a multi-line string and stops at __END__", () => {
-    const parser = new Parser('x = "a\n# TODO: no"\n__END__\n# TODO: data\n', {
-      pattern: /#\s*(TODO):?\s*(.*)$/,
+  beforeAll(() => SourceAnnotationExtractor.enumerate(null, { dirs: [] }));
+
+  const pattern = /(?:\/\/|\/\*|^\s*\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
+
+  it("skips a // in a multi-line template and a regexp", () => {
+    const parser = new Parser("const x = `a\n// TODO: no`;\nconst y = /\\/\\/ TODO: no/;\n", {
+      pattern,
+      file: "a.ts",
     });
     parser.parse();
     expect(parser.comments).toEqual([]);
     expect(parser.isError()).toBe(false);
   });
 
-  it("reads comments and skips a # inside a string", () => {
-    const parser = new Parser('x = "# TODO: no"\ny # TODO: yes\n', {
-      pattern: /#\s*(TODO):?\s*(.*)$/,
+  it("reads comments and skips a // inside a string", () => {
+    const parser = new Parser('const url = "http://x // TODO: no";\ny(); // TODO: yes\n', {
+      pattern,
+      file: "a.ts",
     });
     parser.parse();
     expect(parser.comments).toEqual([new Annotation(2, "TODO", "yes")]);
+  });
+
+  it("reads block comments and skips JSX text", () => {
+    const source = "/* TODO: one */\n/**\n * TODO: two\n */\nconst a = <p>// TODO: no</p>;\n";
+    const parser = new Parser(source, { pattern, file: "a.tsx" });
+    parser.parse();
+    expect(parser.comments).toEqual([
+      new Annotation(1, "TODO", "one"),
+      new Annotation(3, "TODO", "two"),
+    ]);
+  });
+
+  it("reads CRLF block comments and ignores a * inside a line comment", () => {
+    const parser = new Parser("/*\r\n * TODO: one\r\n */\r\n// 2 * TODO no\r\n", {
+      pattern,
+      file: "a.ts",
+    });
+    parser.parse();
+    expect(parser.comments).toEqual([new Annotation(2, "TODO", "one")]);
+  });
+
+  it("reports an error on an unterminated string", () => {
+    const parser = new Parser('// TODO: x\nconst a = "b\n', { pattern, file: "a.ts" });
+    parser.parse();
+    expect(parser.isError()).toBe(true);
+  });
+});
+
+describe("Annotation", () => {
+  it("falls back to the regexp without typescript", async () => {
+    const missing = () => {
+      throw new Error("missing");
+    };
+    vi.resetModules();
+    vi.doMock("typescript/unstable/sync", missing);
+    try {
+      const { Annotation: Fallback, SourceAnnotationExtractor: Extractor } =
+        await import("./source-annotation-extractor.js");
+      await Extractor.enumerate(null, { dirs: [] });
+      const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
+      expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
+    } finally {
+      vi.doUnmock("typescript/unstable/sync");
+      vi.resetModules();
+    }
+  });
+
+  it("registers a ParserExtractor for ts files", async () => {
+    await SourceAnnotationExtractor.enumerate(null, { dirs: [] });
+    const extension = Annotation.extensions.find((e) => e.test.test("a.tsx"))!;
+    expect(extension.builder("TODO")).toBeInstanceOf(ParserExtractor);
   });
 });
 

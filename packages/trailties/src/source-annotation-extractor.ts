@@ -1,4 +1,33 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
+import type { Node } from "typescript/unstable/ast";
+import type { API } from "typescript/unstable/sync";
+
+/** @noRailsEquivalent PERMANENT */
+async function requireTokenizer() {
+  try {
+    const [ast, scanner, sync] = await Promise.all([
+      import("typescript/unstable/ast"),
+      import("typescript/unstable/ast/scanner"),
+      import("typescript/unstable/sync"),
+    ]);
+    return {
+      API: sync.API,
+      SyntaxKind: ast.SyntaxKind,
+      isLiteralLike: (node: Node) =>
+        ast.isStringLiteralLikeNode(node) ||
+        ast.isTemplateHead(node) ||
+        ast.isTemplateMiddle(node) ||
+        ast.isTemplateTail(node) ||
+        ast.isRegularExpressionLiteral(node),
+      createScanner: scanner.createScanner,
+    };
+  } catch {
+    return null;
+  }
+}
+
+let tokenizer: Awaited<ReturnType<typeof requireTokenizer>> | undefined;
+let api: API | undefined;
 
 export interface AnnotationOptions {
   tag?: boolean;
@@ -16,12 +45,14 @@ export class Parser {
   comments: Annotation[] = [];
   pattern: RegExp;
   private source: string;
+  private file: string;
   private lineno = 0;
-  private _quote: string | null = null;
+  private _error = false;
 
-  constructor(source: string, { pattern }: { pattern: RegExp }) {
+  constructor(source: string, { pattern, file }: { pattern: RegExp; file: string }) {
     this.source = source;
     this.pattern = pattern;
+    this.file = file;
   }
 
   onComment(value: string): void {
@@ -29,28 +60,43 @@ export class Parser {
     if (m) this.comments.push(new Annotation(this.lineno, m[1], m[2]));
   }
 
-  /** @noRailsEquivalent CONVERGEABLE source-annotation-extractor-reads-ts-comments */
+  /** @noRailsEquivalent PERMANENT */
   isError(): boolean {
-    return this._quote !== null;
+    return this._error;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE source-annotation-extractor-reads-ts-comments */
+  /** @noRailsEquivalent PERMANENT */
   parse(): void {
-    for (const line of this.source.split("\n")) {
-      this.lineno += 1;
-      if (this._quote === null && line === "__END__") break;
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (this._quote !== null) {
-          if (char === "\\") i += 1;
-          else if (char === this._quote) this._quote = null;
-        } else if (char === '"' || char === "'") {
-          this._quote = char;
-        } else if (char === "#") {
-          this.onComment(line.slice(i));
-          break;
+    api ??= new tokenizer!.API();
+    const sourceFile = api.createSourceFile(this.file, this.source);
+    const literals = new Map<number, number>();
+    const queue: Node[] = [sourceFile];
+    let node: Node | undefined;
+    while ((node = queue.pop())) {
+      if (node.kind === tokenizer!.SyntaxKind.JsxText) literals.set(node.pos, node.end);
+      else if (tokenizer!.isLiteralLike(node)) literals.set(node.getStart(sourceFile), node.end);
+      node.forEachChild((child) => {
+        queue.push(child);
+      });
+    }
+
+    const { SingleLineCommentTrivia, MultiLineCommentTrivia, EndOfFile } = tokenizer!.SyntaxKind;
+    const scanner = tokenizer!.createScanner(false);
+    scanner.setText(this.source);
+    let kind = scanner.scan();
+    while (kind !== EndOfFile) {
+      if (scanner.isUnterminated()) this._error = true;
+      const start = scanner.getTokenStart();
+      const end = literals.get(start);
+      if (end !== undefined) scanner.resetTokenState(end);
+      else if (kind === SingleLineCommentTrivia || kind === MultiLineCommentTrivia) {
+        this.lineno = sourceFile.getLineAndCharacterOfPosition(start).line + 1;
+        for (const line of scanner.getTokenText().split(/\r?\n/)) {
+          this.onComment(line);
+          this.lineno += 1;
         }
       }
+      kind = scanner.scan();
     }
   }
 }
@@ -60,7 +106,7 @@ export class ParserExtractor {
 
   annotations(file: string): Annotation[] {
     const contents = File.read(file);
-    const parser = new Parser(contents, { pattern: this.pattern });
+    const parser = new Parser(contents, { pattern: this.pattern, file });
     parser.parse();
     return parser.isError() ? [] : parser.comments;
   }
@@ -125,15 +171,12 @@ export function resetAnnotationRegistry(): void {
 }
 
 function registerDefaults(): void {
-  Annotation.registerExtensions(
-    "builder",
-    "rb",
-    "rake",
-    "ruby",
-    (tag) => new ParserExtractor(new RegExp(`#\\s*(${tag}):?\\s*(.*)$`)),
-  );
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
-  Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", slash);
+  Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", (tag) =>
+    tokenizer
+      ? new ParserExtractor(new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`))
+      : slash(tag),
+  );
   Annotation.registerExtensions("css", "scss", "sass", "less", slash);
   Annotation.registerExtensions("yml", "yaml", (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
   Annotation.registerExtensions(
@@ -146,10 +189,12 @@ function registerDefaults(): void {
 registerDefaults();
 
 export class SourceAnnotationExtractor {
-  static enumerate(
+  /** @inventedArm requireTokenizer — PERMANENT */
+  static async enumerate(
     tag: string | null = null,
     options: AnnotationOptions & { dirs?: readonly string[] } = {},
-  ): string {
+  ): Promise<string> {
+    tokenizer ??= await requireTokenizer();
     tag ??= Annotation.tags.join("|");
     const extractor = new SourceAnnotationExtractor(tag);
     const dirs = options.dirs ?? Annotation.directories;
