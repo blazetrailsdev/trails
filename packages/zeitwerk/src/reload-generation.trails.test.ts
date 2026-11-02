@@ -85,7 +85,11 @@ loader.enableReloading();
 await loader.pushDir("app");
 await loader.setup();
 
-const load = () => Promise.all([loader.eagerLoad(), once.eagerLoad()]).then(() => ({ ...TopLevel }));
+const load = async () => {
+  await loader.eagerLoad();
+  await once.eagerLoad();
+  return { ...TopLevel };
+};
 
 const first = await load();
 File.write("app/application-record.ts", ${JSON.stringify(`export class ApplicationRecord { static edited = true; }\n${TAIL}`)});
