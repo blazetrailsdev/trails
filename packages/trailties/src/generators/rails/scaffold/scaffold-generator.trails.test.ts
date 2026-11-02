@@ -206,3 +206,43 @@ describe("ScaffoldGenerator (type-check)", () => {
     }
   }, 30_000);
 });
+
+describe("ScaffoldGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
+    fs.mkdirSync(path.join(jsTmpDir, "config"));
+    fs.writeFileSync(
+      path.join(jsTmpDir, "config/routes.ts"),
+      "Trails.application!.routes().draw(function () {\n});\n",
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  it("generates .js controller and model files", async () => {
+    await ScaffoldGenerator.start(["Post", "title:string"], {
+      destinationRoot: jsTmpDir,
+    });
+    const files = fs.readdirSync(jsTmpDir, { recursive: true }) as string[];
+    expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
+    expect(files).toContain("app/models/post.js");
+    const migFile = files.find((f) => f.startsWith("db/migrate/"));
+    expect(migFile).toMatch(/\.js$/);
+  });
+
+  it("omits TypeScript annotations in controller", async () => {
+    await ScaffoldGenerator.start(["Post", "title:string"], {
+      destinationRoot: jsTmpDir,
+    });
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).not.toContain("Promise<void>");
+    expect(content).toContain("export class PostsController");
+  });
+});

@@ -96,3 +96,74 @@ describe("ControllerGenerator --parent", () => {
     expect(controller).toContain("class AdminDashboardController extends AdminController");
   });
 });
+
+describe("ControllerGenerator nested namespaces", () => {
+  it("deeply nested namespace routes are created in routes", async () => {
+    const gen = makeGen();
+    await gen.run("admin/api/dashboard", ["index"]);
+    const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.namespace("api"');
+    expect(routes).toMatch(/this\.namespace\("admin"[\s\S]*this\.namespace\("api"/);
+    expect(routes).toContain('this.get("dashboard/index")');
+  });
+});
+
+describe("ControllerGenerator (JavaScript project)", () => {
+  let jsTmpDir: string;
+
+  beforeEach(() => {
+    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
+    fs.mkdirSync(path.join(jsTmpDir, "config"));
+    fs.writeFileSync(
+      path.join(jsTmpDir, "config/routes.ts"),
+      "Trails.application!.routes().draw(function () {\n});\n",
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(jsTmpDir, { recursive: true, force: true });
+  });
+
+  function makeJsGen() {
+    return {
+      run: async (name: string, args: string[]) => {
+        await ControllerGenerator.start([name, ...args], { destinationRoot: jsTmpDir });
+        return (fs.readdirSync(jsTmpDir, { recursive: true }) as string[]).filter((f) =>
+          fs.statSync(path.join(jsTmpDir, f)).isFile(),
+        );
+      },
+    };
+  }
+
+  it("generates .js controller and test files", async () => {
+    const gen = makeJsGen();
+    const files = await gen.run("Posts", ["index"]);
+    expect(files).toContain("app/controllers/posts-controller.js");
+    expect(files).toContain("test/controllers/posts-controller.test.js");
+  });
+
+  it("omits TypeScript return type annotations", async () => {
+    const gen = makeJsGen();
+    await gen.run("Posts", ["index"]);
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).not.toContain("Promise<void>");
+    expect(content).toContain("async index()");
+  });
+
+  it("uses ESM imports and exports", async () => {
+    const gen = makeJsGen();
+    await gen.run("Posts", ["index"]);
+    const content = fs.readFileSync(
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
+      "utf-8",
+    );
+    expect(content).toContain(
+      'import { ApplicationController } from "./application-controller.js"',
+    );
+    expect(content).toContain("export class PostsController");
+  });
+});

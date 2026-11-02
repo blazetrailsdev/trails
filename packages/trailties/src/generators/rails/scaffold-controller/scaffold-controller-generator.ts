@@ -96,7 +96,8 @@ export class ScaffoldControllerGenerator extends NamedBase {
       this.isAttachments(name),
     );
     const params = others.map((name) => `"${name}"`);
-    params.push(...attachments.map((name) => `{ ${name}: [] }`));
+    if (attachments.length > 0)
+      params.push(`{ ${attachments.map((name) => `${name}: []`).join(", ")} }`);
     return params.join(", ");
   }
 
