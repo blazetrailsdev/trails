@@ -1,3 +1,4 @@
+import { Base } from "@blazetrails/activerecord";
 import { Autoloaders } from "../autoloaders.js";
 import { afterEach, beforeEach, describe, it, expect, onTestFinished, vi } from "vitest";
 import {
@@ -343,6 +344,13 @@ describe("Finisher", () => {
     });
     await _registerAutoloaded("OnLoadedController", OnLoadedController);
     expect(assigned).toBeInstanceOf(Array);
+  });
+
+  it("registers an autoloaded model with its superclass, as a class definition does", async () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    await _registerAutoloaded("Child", Child);
+    expect(DescendantsTracker.subclasses(Parent as never)).toContain(Child);
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {

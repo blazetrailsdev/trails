@@ -58,7 +58,7 @@ describe("ArCliTest", () => {
 
     expect(await run(["generate:manifest"], dir)).toBe(0);
     expect(out.join("\n")).toContain("write");
-    expect(await readFile(join(models, "index.ts"), "utf8")).toContain("registerModel");
+    expect(await readFile(join(models, "index.ts"), "utf8")).toContain("constSet");
 
     out.length = 0;
     expect(await run(["generate:manifest"], dir)).toBe(0);

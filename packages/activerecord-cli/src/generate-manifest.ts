@@ -213,13 +213,17 @@ export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
   );
 }
 
+const IMPORTS =
+  `import { DescendantsTracker } from "@blazetrails/activesupport";\n` +
+  `import { constSet, TopLevel } from "@blazetrails/ruby-compat";\n`;
+
 export function renderManifest(entries: ModelEntry[]): string {
   const names = entries.map((e) => e.className);
   let out = HEADER;
   out +=
     names.length > 0
-      ? `import { registerModel } from "@blazetrails/activerecord";\n`
-      : `import { registerModel, type Base } from "@blazetrails/activerecord";\n`;
+      ? IMPORTS
+      : `import type { Base } from "@blazetrails/activerecord";\n${IMPORTS}`;
   for (const e of entries) {
     const binding = e.isDefault ? e.className : `{ ${e.className} }`;
     out += `import ${binding} from "${e.importPath}";\n`;
@@ -228,7 +232,10 @@ export function renderManifest(entries: ModelEntry[]): string {
     names.length > 0
       ? `\nexport const models = [${names.join(", ")}] as const;\n`
       : `\nexport const models: ReadonlyArray<typeof Base> = [];\n`;
-  out += `for (const m of models) registerModel(m);\n`;
+  out += `for (const m of models) {\n`;
+  out += `  constSet(TopLevel, m.name, m);\n`;
+  out += `  DescendantsTracker.registerSubclass(Object.getPrototypeOf(m), m);\n`;
+  out += `}\n`;
   if (names.length > 0) out += `\nexport { ${names.join(", ")} };\n`;
   return out;
 }
