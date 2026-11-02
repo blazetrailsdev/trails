@@ -49,7 +49,7 @@ export interface FinisherExecutor {
 }
 
 export interface FinisherConfig {
-  root?: string | null;
+  root: string | null;
   allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
@@ -92,7 +92,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
-  autoloader.manifestRoot ??= this.config.root ?? null;
+  autoloader.manifestRoot ??= this.config.root;
 
   const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 

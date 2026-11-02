@@ -27,7 +27,7 @@ describe("buildAutoload", () => {
       });
       seats.Trails = {
         application: {
-          config: { root: Dir.pwd() },
+          config: { root: File.dirname(Dir.pwd()) },
           initializers: {
             tsort: () => [initializer("first"), initializer("setup_main_autoloader")],
           },
@@ -40,7 +40,7 @@ describe("buildAutoload", () => {
       const [dir] = await buildAutoload();
 
       expect(ran).toEqual(["first"]);
-      expect(loader.manifestRoot).toEqual(Dir.pwd());
+      expect(loader.manifestRoot).toEqual(File.dirname(Dir.pwd()));
       expect(File.isExist(File.join(dir, "manifest.json"))).toBe(true);
     } finally {
       Dir.chdir(pwd);
