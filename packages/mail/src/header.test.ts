@@ -375,7 +375,7 @@ describe("Mail::Header", () => {
       const old = Header.maximumAmount;
       Header.maximumAmount = 10;
       try {
-        const write = vi.spyOn(stderr, "write").mockImplementation(() => 0);
+        const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
         expect(new Header("X-SubscriberID: 345\n".repeat(11)).fields.length).toEqual(10);
         expect(write).toHaveBeenCalledWith(expect.stringMatching(/10 header fields/));
         write.mockRestore();
