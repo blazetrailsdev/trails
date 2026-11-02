@@ -90,7 +90,10 @@ export class ScaffoldControllerGenerator extends NamedBase {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private permittedParams(): string {
     const [attachments, others] = partition(this.attributesNames(), (name) =>
       this.isAttachments(name),
