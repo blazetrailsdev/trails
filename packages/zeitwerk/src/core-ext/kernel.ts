@@ -12,25 +12,23 @@ export function _installResolveHook(): void {
   if (_resolveHookInstalled) return;
   _resolveHookInstalled = true;
 
-  getProcessAdapter().registerHooks?.({
+  getProcessAdapter().registerHooks!({
     resolve(specifier, context, nextResolve) {
       const resolved = nextResolve(specifier, context);
-      if (context.parentURL === undefined || !resolved.url.startsWith("file:")) return resolved;
-      const generation = new URL(context.parentURL).searchParams.get("zeitwerk");
-      if (generation === null) return resolved;
+      if (!resolved.url.startsWith("file:")) return resolved;
 
       const url = new URL(resolved.url);
-      const path = decodeURIComponent(url.pathname);
-      const reloadable = Registry.loaders.some(
-        (loader) =>
-          loader.isReloadingEnabled() &&
-          !loader.isIgnores(path) &&
-          Object.keys(loader.roots).some((rootDir) => path.startsWith(`${rootDir}/`)),
-      );
-      if (!reloadable) return resolved;
-
-      url.searchParams.set("zeitwerk", generation);
-      return { ...resolved, url: url.href };
+      const path = getPath().fileURLToPath!(resolved.url);
+      for (const loader of Registry.loaders) {
+        if (!loader.isReloadingEnabled() || loader._generation === 1) continue;
+        for (const [realRoot, rootDir] of Object.entries(loader._realRoots)) {
+          if (!path.startsWith(`${realRoot}/`)) continue;
+          if (loader.isIgnores(rootDir + path.slice(realRoot.length))) continue;
+          url.searchParams.set("zeitwerk", String(loader._generation));
+          return { ...resolved, url: url.href };
+        }
+      }
+      return resolved;
     },
   });
 }

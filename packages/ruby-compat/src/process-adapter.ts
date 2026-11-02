@@ -661,7 +661,10 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       const nodeModule = proc.getBuiltinModule?.("node:module") as
         | { registerHooks?(hooks: ModuleHooks): unknown }
         | undefined;
-      nodeModule?.registerHooks?.(hooks);
+      if (nodeModule?.registerHooks === undefined) {
+        throw new NotImplementedError("registerHooks() function is unimplemented on this machine");
+      }
+      nodeModule.registerHooks(hooks);
     },
     onSignal: (name, handler) => {
       proc.on(name, handler);

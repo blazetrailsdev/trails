@@ -73,6 +73,7 @@ export class Loader {
   /** @internal */ mutex: Mutex;
   /** @internal */ dirsAutoloadMonitor: Monitor;
   /** @internal */ _generation: number;
+  /** @internal */ _realRoots: Record<string, string>;
 
   /** @inlinedFrom Zeitwerk::Loader::Config#initialize zeitwerk/v2.7.2/lib/zeitwerk/loader/config.rb:86-101 */
   constructor() {
@@ -104,6 +105,7 @@ export class Loader {
     this.mutex = new Mutex();
     this.dirsAutoloadMonitor = new Monitor();
     this._generation = 1;
+    this._realRoots = {};
 
     Registry.registerLoader(this);
   }
@@ -166,7 +168,6 @@ export class Loader {
           LOADED_FEATURES.length,
           ...LOADED_FEATURES.filter((file) => !unloadedFiles.has(file)),
         );
-        this._generation += 1;
       }
 
       this.autoloads = {};
@@ -181,6 +182,7 @@ export class Loader {
 
       this._setup = false;
       this._eagerLoaded = false;
+      this._generation += 1;
     });
   }
 

@@ -129,7 +129,50 @@ ${STATIC_TAIL}`,
   ],
 ];
 
+const REPAIR_MAIN = `
+import { File, TopLevel } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const once = new Loader();
+await once.pushDir("once");
+await once.setup();
+const loader = new Loader();
+loader.enableReloading();
+await loader.pushDir("app");
+await loader.setup();
+
+const message = await loader.eagerLoad().catch((error) => error.message);
+File.write("app/broken.ts", 'export { Late as Broken } from "../once/late.ts";');
+await loader.reload();
+await loader.eagerLoad();
+console.log(JSON.stringify({
+  message,
+  current: TopLevel.Broken.parent === TopLevel.Base,
+}));
+`;
+
+const REPAIR_FILES: [string, string][] = [
+  ["main.mjs", REPAIR_MAIN],
+  ["app/base.ts", "export class Base {}"],
+  ["app/broken.ts", 'throw new globalThis.Error("boom");'],
+  [
+    "once/late.ts",
+    'import { Base } from "../app/base.ts";\nexport class Late { static parent = Base; }',
+  ],
+];
+
 describe("Loader#reload under real Node", () => {
+  it("retries a raising file and hands an unmanaged importer the current generation", async () => {
+    await withFiles(REPAIR_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({ message: "boom", current: true });
+    });
+  }, 30_000);
+
   it("leaves no class from the previous generation", async () => {
     await withFiles(LOADER_FILES, async () => {
       const [output, status] = await Open3.capture2e(
