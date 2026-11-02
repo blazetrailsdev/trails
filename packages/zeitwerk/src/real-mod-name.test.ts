@@ -17,8 +17,7 @@ describe("TestRealModName", () => {
   it("returns the name of regular classes an modules", () => {
     const C = class {};
     const M = {};
-    constSet(TestRealModName, "C", C);
-    constSet(TestRealModName, "M", M);
+    for (const [name, mod] of Object.entries({ C, M })) constSet(TestRealModName, name, mod);
     for (const [mod, name] of [
       [C, "C"],
       [M, "M"],
@@ -34,12 +33,13 @@ describe("TestRealModName", () => {
       }
     };
     const M = { name: "X" };
-    constSet(TestRealModName, "C2", C);
-    constSet(TestRealModName, "M2", M);
+    for (const [name, mod] of Object.entries({ C2: C, M2: M }))
+      constSet(TestRealModName, name, mod);
     for (const [mod, name] of [
       [C, "C2"],
       [M, "M2"],
     ] as const) {
+      expect((mod as { name: string }).name).toEqual("X");
       expect(realModName(mod)).toEqual(`TestRealModName::${name}`);
     }
   });
