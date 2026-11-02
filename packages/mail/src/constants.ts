@@ -29,3 +29,4 @@ export const COLON = ":";
 
 export const Q_VALUES = ["Q", "q"];
 export const B_VALUES = ["B", "b"];
+export const ASTERISK = "*";
