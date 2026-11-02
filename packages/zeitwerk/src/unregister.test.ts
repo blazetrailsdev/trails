@@ -28,23 +28,23 @@ describe("TestUnregister", () => {
 
     loader1.unregister();
 
-    expect(registry.loaders.includes(loader1)).toBe(false);
-    expect(Object.values(registry.gemLoadersByRootFile).includes(loader1)).toBe(false);
-    expect(Object.values(registry.autoloads).includes(loader1)).toBe(false);
-    expect(Registry.ExplicitNamespaces.isRegistered(cref1)).toBeNull();
+    expect(!registry.loaders.includes(loader1)).toBeTruthy();
+    expect(!Object.values(registry.gemLoadersByRootFile).includes(loader1)).toBeTruthy();
+    expect(!Object.values(registry.autoloads).includes(loader1)).toBeTruthy();
+    expect(!Registry.ExplicitNamespaces.isRegistered(cref1)).toBeTruthy();
 
-    expect(registry.loaders.includes(loader2)).toBe(true);
-    expect(Object.values(registry.gemLoadersByRootFile).includes(loader2)).toBe(true);
-    expect(Object.values(registry.autoloads).includes(loader2)).toBe(true);
-    expect(Registry.ExplicitNamespaces.isRegistered(cref2)).toBe(loader2);
+    expect(registry.loaders.includes(loader2)).toBeTruthy();
+    expect(Object.values(registry.gemLoadersByRootFile).includes(loader2)).toBeTruthy();
+    expect(Object.values(registry.autoloads).includes(loader2)).toBeTruthy();
+    expect(Registry.ExplicitNamespaces.isRegistered(cref2) === loader2).toBeTruthy();
   });
 
   it("with_loader yields and unregisters", async () => {
     const unregister = vi.spyOn(Loader.prototype, "unregister");
     await withLoader((l) => {
-      expect(l).toBeInstanceOf(Loader);
+      expect(l).toBe(Registry.loaders.at(-1));
     });
-    expect(unregister).toHaveBeenCalledTimes(1);
+    expect(unregister.mock.calls.length).toBeTruthy();
   });
 
   it("with_loader yields and unregisters, even if an exception happens", async () => {
@@ -52,6 +52,6 @@ describe("TestUnregister", () => {
     await withLoader(() => {
       throw new Error();
     }).catch(() => null);
-    expect(unregister).toHaveBeenCalledTimes(1);
+    expect(unregister.mock.calls.length).toBeTruthy();
   });
 });

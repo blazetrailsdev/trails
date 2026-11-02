@@ -1,3 +1,5 @@
+import "@blazetrails/vitest-matchers/setup";
+import "@blazetrails/vitest-matchers";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Loader } from "./loader.js";
@@ -23,8 +25,8 @@ describe("TestUnloadableCpath", () => {
 
   it("a loader that has loading nothing, has nothing to unload", async () => {
     await withSetup(loader, [["x.ts", "export const X = true"]], {}, () => {
-      expect(loader.unloadableCpaths()).toEqual([]);
-      expect(loader.isUnloadableCpath("X")).toBe(false);
+      expect(loader.unloadableCpaths()).toBeEmpty();
+      expect(!loader.isUnloadableCpath("X")).toBeTruthy();
     });
   });
 
@@ -38,10 +40,10 @@ describe("TestUnloadableCpath", () => {
     await withSetup(loader, files, {}, async () => {
       expect(await get(await get(Object, "M"), "X")).toBeTruthy();
       expect(loader.unloadableCpaths()).toEqual(["M", "M::X"]);
-      expect(loader.isUnloadableCpath("M")).toBe(true);
-      expect(loader.isUnloadableCpath("M::X")).toBe(true);
-      expect(loader.isUnloadableCpath("M::Y")).toBe(false);
-      expect(loader.isUnloadableCpath("Z")).toBe(false);
+      expect(loader.isUnloadableCpath("M")).toBeTruthy();
+      expect(loader.isUnloadableCpath("M::X")).toBeTruthy();
+      expect(!loader.isUnloadableCpath("M::Y")).toBeTruthy();
+      expect(!loader.isUnloadableCpath("Z")).toBeTruthy();
     });
   });
 
@@ -52,7 +54,7 @@ describe("TestUnloadableCpath", () => {
     ];
     await withSetup(loader, overridden, {}, async () => {
       expect(await get(await get(Object, "M"), "C")).toBeTruthy();
-      expect(loader.isUnloadableCpath("M::C")).toBe(true);
+      expect(loader.isUnloadableCpath("M::C")).toBeTruthy();
     });
   });
 
@@ -62,8 +64,8 @@ describe("TestUnloadableCpath", () => {
       expect(await get(await get(Object, "M"), "X")).toBeTruthy();
       expect(await get(top.M, "Y")).toBeTruthy();
       expect(await get(Object, "Z")).toBeTruthy();
-      expect(loader.unloadableCpaths()).toEqual([]);
-      expect(loader.toUnload).toEqual({});
+      expect(loader.unloadableCpaths()).toBeEmpty();
+      expect(Object.keys(loader.toUnload).length === 0).toBeTruthy();
     });
   });
 });

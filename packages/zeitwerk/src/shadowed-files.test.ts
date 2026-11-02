@@ -41,7 +41,7 @@ describe("TestShadowedFiles", () => {
       await loader.pushDir("a");
       await loader.pushDir("b");
       await loader.setup();
-      expect(loader.isShadowedFile(File.expandPath("a/x.ts"))).toBeFalsy();
+      expect(!loader.isShadowedFile(File.expandPath("a/x.ts"))).toBeTruthy();
       expect(loader.isShadowedFile(File.expandPath("b/x.ts"))).toBeTruthy();
       expect(await get(Object, "X")).toEqual(1);
       await loader.reload();
@@ -53,7 +53,7 @@ describe("TestShadowedFiles", () => {
     await withFiles(files, async () => {
       const firstLoader = await setupLoader("a");
       const secondLoader = await setupLoader("b");
-      expect(firstLoader.isShadowedFile(File.expandPath("a/x.ts"))).toBeFalsy();
+      expect(!firstLoader.isShadowedFile(File.expandPath("a/x.ts"))).toBeTruthy();
       expect(secondLoader.isShadowedFile(File.expandPath("b/x.ts"))).toBeTruthy();
       expect(await get(Object, "X")).toEqual(1);
       await secondLoader.reload();

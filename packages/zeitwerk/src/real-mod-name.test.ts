@@ -19,8 +19,12 @@ describe("TestRealModName", () => {
     const M = {};
     constSet(TestRealModName, "C", C);
     constSet(TestRealModName, "M", M);
-    expect(realModName(C)).toEqual("TestRealModName::C");
-    expect(realModName(M)).toEqual("TestRealModName::M");
+    for (const [mod, name] of [
+      [C, "C"],
+      [M, "M"],
+    ] as const) {
+      expect(realModName(mod)).toEqual(`TestRealModName::${name}`);
+    }
   });
 
   it("returns the real name of class and modules that override #name", () => {
@@ -32,7 +36,11 @@ describe("TestRealModName", () => {
     const M = { name: "X" };
     constSet(TestRealModName, "C2", C);
     constSet(TestRealModName, "M2", M);
-    expect(realModName(C)).toEqual("TestRealModName::C2");
-    expect(realModName(M)).toEqual("TestRealModName::M2");
+    for (const [mod, name] of [
+      [C, "C2"],
+      [M, "M2"],
+    ] as const) {
+      expect(realModName(mod)).toEqual(`TestRealModName::${name}`);
+    }
   });
 });

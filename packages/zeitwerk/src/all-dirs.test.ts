@@ -1,3 +1,5 @@
+import "@blazetrails/vitest-matchers/setup";
+import "@blazetrails/vitest-matchers";
 import { Dir } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Loader } from "./loader.js";
@@ -8,13 +10,13 @@ describe("TestAllDirs", () => {
 
   it("returns an empty array if no loaders are instantiated", () => {
     teardown();
-    expect(Loader.allDirs()).toEqual([]);
+    expect(Loader.allDirs()).toBeEmpty();
   });
 
   it("returns an empty array if there are loaders but they have no root dirs", () => {
     newLoader();
     newLoader();
-    expect(Loader.allDirs()).toEqual([]);
+    expect(Loader.allDirs()).toBeEmpty();
   });
 
   it("returns the root directories of the registered loaders", async () => {

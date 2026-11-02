@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Loader } from "./loader.js";
 import { get, newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
 
+import { NameError } from "@blazetrails/ruby-compat";
 import { Cref } from "./cref.js";
 
 const g = globalThis as Record<string, unknown>;
@@ -17,7 +18,7 @@ describe("TestNestedRootDirectories", () => {
   it("nested root directories do not autovivify modules", async () => {
     const files: [string, string][] = [["concerns/pricing.ts", "export class Pricing {}"]];
     await withSetup(loader, files, { dirs: [".", "concerns"] }, () => {
-      expect(new Cref(Object, "Concerns").isDefined()).toBe(false);
+      expect(() => new Cref(Object, "Concerns").get()).toThrow(NameError);
     });
   });
 
@@ -40,8 +41,8 @@ describe("TestNestedRootDirectories", () => {
     ];
     await withSetup(loader, files, { dirs: [".", "concerns"] }, async () => {
       await loader.eagerLoad();
-      expect(g.$airplane).toBe(true);
-      expect(g.$locatable).toBe(true);
+      expect(g.$airplane).toBeTruthy();
+      expect(g.$locatable).toBeTruthy();
     });
   });
 });

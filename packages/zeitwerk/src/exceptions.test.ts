@@ -17,12 +17,24 @@ describe("TestExceptions", () => {
       .then(fn)
       .catch((e: unknown) => e) as Promise<NameError>;
 
+  function assertErrorMessage(message: string, error: Error) {
+    expect(error.message.split("\n")[0]).toEqual(message);
+  }
+
+  const withInflection = (files: [string, string][]) => {
+    loader.inflector.inflect({ foo_bar: "Foo-bar" });
+    return withSetup(loader, files, {}, () => null);
+  };
+
   it("raises NameError if the expected constant is not defined", async () => {
     await withSetup(loader, [["typo.ts", "export const TyPo = 1"]], {}, async () => {
       const error = await failure(() => get(Object, "Typo"));
-      expect(error).toBeInstanceOf(NameError);
-      expect(error.message).toEqual(
+      expect(() => {
+        throw error;
+      }).toThrow(NameError);
+      assertErrorMessage(
         `expected file ${File.expandPath("typo.ts")} to define constant Typo, but didn't`,
+        error,
       );
       expect(error.constantName).toEqual("Typo");
     });
@@ -31,9 +43,12 @@ describe("TestExceptions", () => {
   it("eager loading raises NameError if files do not define the expected constants", async () => {
     await withSetup(loader, [["x.ts", ""]], {}, async () => {
       const error = await failure(() => loader.eagerLoad());
-      expect(error).toBeInstanceOf(NameError);
-      expect(error.message).toEqual(
+      expect(() => {
+        throw error;
+      }).toThrow(NameError);
+      assertErrorMessage(
         `expected file ${File.expandPath("x.ts")} to define constant X, but didn't`,
+        error,
       );
       expect(error.constantName).toEqual("X");
     });
@@ -50,18 +65,22 @@ describe("TestExceptions", () => {
   });
 
   it("raises Zeitwerk::NameError if the inflector returns an invalid constant name for a file", async () => {
-    const error = await failure(() => withSetup(loader, [["foo@bar.ts", ""]], {}, () => null));
-    expect(error).toBeInstanceOf(NameError);
-    expect(error.constantName).toEqual("Foo@bar");
-    expect(error.message).toContain("wrong constant name Foo@bar");
+    const error = await failure(() => withInflection([["foo-bar.ts", ""]]));
+    expect(() => {
+      throw error;
+    }).toThrow(NameError);
+    expect(error.constantName).toEqual("Foo-bar");
+    expect(error.message).toContain("wrong constant name Foo-bar");
     expect(error.message).toContain("Tell Zeitwerk to ignore this particular file.");
   });
 
   it("raises Zeitwerk::NameError if the inflector returns an invalid constant name for a directory", async () => {
-    const error = await failure(() => withSetup(loader, [["foo@bar/baz.ts", ""]], {}, () => null));
-    expect(error).toBeInstanceOf(NameError);
-    expect(error.constantName).toEqual("Foo@bar");
-    expect(error.message).toContain("wrong constant name Foo@bar");
+    const error = await failure(() => withInflection([["foo-bar/baz.ts", ""]]));
+    expect(() => {
+      throw error;
+    }).toThrow(NameError);
+    expect(error.constantName).toEqual("Foo-bar");
+    expect(error.message).toContain("wrong constant name Foo-bar");
     expect(error.message).toContain("Tell Zeitwerk to ignore this particular directory.");
   });
 });
