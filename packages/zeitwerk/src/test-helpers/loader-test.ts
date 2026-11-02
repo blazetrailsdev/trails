@@ -1,8 +1,13 @@
 import { expect } from "vitest";
 import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
+import { autoloadGet } from "../core-ext/kernel.js";
+import { Cref } from "../cref.js";
 import { Loader } from "../loader.js";
 import { ExplicitNamespaces } from "../registry/explicit-namespaces.js";
 import { Registry } from "../registry.js";
+
+export const get = (mod: object, cname: string) =>
+  autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
 export interface Constants {
   [cname: string]: Constants;
@@ -86,3 +91,5 @@ export async function withSetup(
     await block();
   });
 }
+
+(globalThis as Record<string, unknown>).$get = (cname: string) => get(Object, cname);

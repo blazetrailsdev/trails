@@ -1,0 +1,47 @@
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Loader } from "./loader.js";
+import { get, newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
+
+import { Cref } from "./cref.js";
+
+const g = globalThis as Record<string, unknown>;
+
+describe("TestNestedRootDirectories", () => {
+  let loader: Loader;
+
+  beforeEach(() => {
+    loader = newLoader();
+  });
+  afterEach(teardown);
+
+  it("nested root directories do not autovivify modules", async () => {
+    const files: [string, string][] = [["concerns/pricing.ts", "export class Pricing {}"]];
+    await withSetup(loader, files, { dirs: [".", "concerns"] }, () => {
+      expect(new Cref(Object, "Concerns").isDefined()).toBe(false);
+    });
+  });
+
+  it("nested root directories are ignored even if there is a matching file", async () => {
+    const files: [string, string][] = [
+      ["hotel.ts", "export class Hotel {}"],
+      ["concerns/geo-loc.ts", "export class GeoLoc {}"],
+      ["concerns.ts", "export class Concerns {}"],
+    ];
+    await withSetup(loader, files, { dirs: [".", "concerns"] }, async () => {
+      expect(await get(Object, "Concerns")).toBeTruthy();
+      expect(await get(Object, "Hotel")).toBeTruthy();
+    });
+  });
+
+  it("eager loading handles nested root directories correctly", async () => {
+    const files: [string, string][] = [
+      ["airplane.ts", "globalThis.$airplane = true; export class Airplane {}"],
+      ["concerns/locatable.ts", "globalThis.$locatable = true; export class Locatable {}"],
+    ];
+    await withSetup(loader, files, { dirs: [".", "concerns"] }, async () => {
+      await loader.eagerLoad();
+      expect(g.$airplane).toBe(true);
+      expect(g.$locatable).toBe(true);
+    });
+  });
+});

@@ -337,6 +337,10 @@ export class Loader {
     }
   }
 
+  static allDirs(): readonly string[] {
+    return Object.freeze(Registry.loaders.flatMap((loader) => loader.dirs() as readonly string[]));
+  }
+
   private async _defineAutoloadsFromManifest(source: Manifest | string): Promise<void> {
     const manifest =
       typeof source === "string"
