@@ -1,8 +1,9 @@
-import { Base as JobBase, DeserializationError, registerJob } from "@blazetrails/activejob";
-import { rbFSend, StandardError } from "@blazetrails/ruby-compat";
+import { Base as JobBase, DeserializationError } from "@blazetrails/activejob";
+import { constSet, rbFSend, StandardError } from "@blazetrails/ruby-compat";
 import { queues } from "./active-record.js";
 import { Base } from "./base.js";
 import { computeType } from "./inheritance.js";
+import { ActiveRecord } from "./namespaces.js";
 
 export class DestroyAssociationAsyncError extends StandardError {}
 
@@ -62,4 +63,4 @@ export class DestroyAssociationAsyncJob extends JobBase {
   }
 }
 
-registerJob("ActiveRecord::DestroyAssociationAsyncJob", DestroyAssociationAsyncJob);
+constSet(ActiveRecord, "DestroyAssociationAsyncJob", DestroyAssociationAsyncJob);

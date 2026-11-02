@@ -92,6 +92,7 @@ import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import type { Default } from "./scoping/default.js";
 import type * as Named from "./scoping/named.js";
+import type { DestroyAssociationAsyncJob } from "./destroy-association-async-job.js";
 import type { DatabaseTasks } from "./tasks/database-tasks.js";
 import type { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
 import type { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
@@ -236,6 +237,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Result: typeof Result;
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
+  DestroyAssociationAsyncJob: typeof DestroyAssociationAsyncJob;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;

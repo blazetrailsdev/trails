@@ -2,11 +2,9 @@ import {
   Dependencies,
   DescendantsTracker,
   runLoadHooks,
-  TopLevel,
   type ExecutionHook,
 } from "@blazetrails/activesupport";
-import { Base as JobBase, registerJob } from "@blazetrails/activejob";
-import { File, Monitor, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { File, Monitor, rbClassSuperclass, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
@@ -14,8 +12,8 @@ import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import { ActionController, registerController } from "@blazetrails/actionpack";
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { ActionController } from "@blazetrails/actionpack";
+import { Base } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
@@ -289,24 +287,12 @@ Finisher.initializer(
   },
 );
 
-export async function _registerAutoloaded(cpath: unknown, value: unknown): Promise<void> {
+export async function _registerAutoloaded(_cpath: unknown, value: unknown): Promise<void> {
   if (typeof value !== "function") return;
-  const cname = cpath as string;
   if (value.prototype instanceof ActionController.Metal) {
-    registerController(cname, value as typeof ActionController.Metal);
     await defineController(value);
   } else if (value.prototype instanceof Base) {
-    registerModel(cname, value as typeof Base);
-  } else if (value.prototype instanceof JobBase) {
-    registerJob(cname, value as typeof JobBase);
-  } else if (TopLevel.ActionCable != null) {
-    const { ActionCable, registerChannel, registerConnection } =
-      await import("@blazetrails/actioncable");
-    if (value.prototype instanceof ActionCable.Channel.Base) {
-      registerChannel(cname, value as typeof ActionCable.Channel.Base);
-    } else if (value.prototype instanceof ActionCable.Connection.Base) {
-      registerConnection(cname, value as typeof ActionCable.Connection.Base);
-    }
+    DescendantsTracker.registerSubclass(rbClassSuperclass(value as never) as never, value as never);
   }
 }
 

@@ -1,4 +1,4 @@
-import { registerModel, type Base, type Relation } from "@blazetrails/activerecord";
+import { type Base, type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
 import { StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
@@ -118,8 +118,6 @@ export class Execution extends Record {
     );
   }
 }
-
-registerModel("SolidQueue::Execution", Execution);
 registerConstant("SolidQueue::Execution::UndiscardableError", UndiscardableError);
 
 declare module "@blazetrails/activerecord" {

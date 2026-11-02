@@ -162,10 +162,10 @@ as `Admin::User`. A default export has no constant name to check, and a file tha
 does not define its constant raises Zeitwerk's "expected file … to define
 constant …". Two classes in one file, or a class under another name, fail at boot.
 
-**`on_load` does what `inherited` and the `registerX` calls did.** The finisher's
-`_registerAutoloaded` hands each loaded class to its `registerX` until RFC 0213
-retires them, and runs `ActionController::Railties::Helpers.inherited` for a
-controller, superclass first, since JS has no hook at `extends`.
+**`on_load` does what `inherited` did.** The loader seats the constant. The
+finisher's `_registerAutoloaded` registers a loaded model with
+`DescendantsTracker` and runs `ActionController::Railties::Helpers.inherited`
+for a controller, superclass first, since JS has no hook at `extends`.
 
 **`autoload_lib` follows `Application.register`.** It is async (`Loader#ignore`
 is) and a `static {}` block cannot await, so `trails new` emits it as a top-level

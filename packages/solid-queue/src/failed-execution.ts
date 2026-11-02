@@ -1,4 +1,3 @@
-import { registerModel } from "@blazetrails/activerecord";
 import { include, isPresent } from "@blazetrails/activesupport";
 import { excBacktrace, rbModName } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
@@ -17,7 +16,6 @@ export class FailedExecution extends Execution {
   declare private _exception: Error | null | undefined;
 
   static {
-    registerModel("SolidQueue::FailedExecution", this);
     include(this, Dispatching);
 
     this.serialize("error", { coder: JSON });

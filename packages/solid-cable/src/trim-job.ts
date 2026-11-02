@@ -1,4 +1,4 @@
-import { Base, registerJob } from "@blazetrails/activejob";
+import { Base } from "@blazetrails/activejob";
 import { Message } from "./message.js";
 import { SolidCable } from "./solid-cable.js";
 
@@ -27,4 +27,3 @@ export class TrimJob extends Base {
     return Math.random() < expiresPerWrite - Math.floor(expiresPerWrite);
   }
 }
-registerJob("SolidCable::TrimJob", TrimJob);

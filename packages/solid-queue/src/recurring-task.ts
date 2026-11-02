@@ -1,4 +1,4 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { type Relation } from "@blazetrails/activerecord";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Arguments as ActiveJobArguments } from "@blazetrails/activejob";
 import {
@@ -45,8 +45,6 @@ export class RecurringTask extends Record {
   static Arguments = Arguments;
 
   static {
-    registerModel("SolidQueue::RecurringTask", this);
-
     this.serialize("arguments", { coder: Arguments, default: [] });
 
     this.validate(":supportedSchedule");

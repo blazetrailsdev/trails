@@ -1,4 +1,4 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { type Relation } from "@blazetrails/activerecord";
 import { slice } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { Range, rbFArray } from "@blazetrails/ruby-compat";
@@ -14,8 +14,6 @@ export class BlockedExecution extends Execution {
   declare semaphore: Promise<Semaphore | null>;
 
   static {
-    registerModel("SolidQueue::BlockedExecution", this);
-
     this.assumesAttributesFromJob("concurrency_key");
     this.beforeCreate(function (this: BlockedExecution) {
       return this.setExpiresAt();

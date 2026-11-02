@@ -1,4 +1,4 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat";
@@ -16,7 +16,6 @@ export class ScheduledExecution extends Execution {
   declare scheduled_at: Time | null;
 
   static {
-    registerModel("SolidQueue::ScheduledExecution", this);
     include(this, Dispatching);
 
     this.scope("due", function () {
