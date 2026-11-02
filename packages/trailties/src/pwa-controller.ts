@@ -1,5 +1,3 @@
-import { Rails } from "./namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 
@@ -20,5 +18,3 @@ export class PwaController extends ApplicationController {
 }
 
 PwaController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
-
-constSet(Rails, "PwaController", PwaController);

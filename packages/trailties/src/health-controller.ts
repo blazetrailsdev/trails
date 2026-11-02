@@ -1,5 +1,3 @@
-import { Rails } from "./namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
 
@@ -33,5 +31,3 @@ HealthController.rescueFrom(Error, {
     return this.renderDown();
   },
 });
-
-constSet(Rails, "HealthController", HealthController);
