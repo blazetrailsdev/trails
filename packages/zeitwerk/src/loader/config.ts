@@ -9,6 +9,7 @@ type GlobArg = PathArg | PathArg[];
 type LoadBlock = (...args: never[]) => unknown;
 
 export const Config = {
+  /** @inventedArm realpath — PERMANENT */
   async pushDir(
     this: Loader,
     path: PathArg,

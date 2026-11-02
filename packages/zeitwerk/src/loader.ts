@@ -1,4 +1,4 @@
-import { autoloadGet } from "./core-ext/kernel.js";
+import { _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
 import {
   File,
   LOADED_FEATURES,
@@ -130,6 +130,7 @@ export class Loader {
     });
   }
 
+  /** @inventedArm _installResolveHook — PERMANENT */
   async unload(): Promise<void> {
     await this.mutex.synchronize(async () => {
       if (!this._setup) throw new SetupRequired();
@@ -183,6 +184,7 @@ export class Loader {
       this._setup = false;
       this._eagerLoaded = false;
       this._generation += 1;
+      _installResolveHook();
     });
   }
 

@@ -1,4 +1,9 @@
-import { LOADED_FEATURES, getPath, getProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  LOADED_FEATURES,
+  NotImplementedError,
+  getPath,
+  getProcessAdapter,
+} from "@blazetrails/ruby-compat";
 import type { Cref } from "../cref.js";
 import { Registry } from "../registry.js";
 
@@ -10,9 +15,14 @@ let _resolveHookInstalled = false;
 
 export function _installResolveHook(): void {
   if (_resolveHookInstalled) return;
+
+  const adapter = getProcessAdapter();
+  if (adapter.registerHooks === undefined) {
+    throw new NotImplementedError("registerHooks() function is unimplemented on this machine");
+  }
   _resolveHookInstalled = true;
 
-  getProcessAdapter().registerHooks!({
+  adapter.registerHooks({
     resolve(specifier, context, nextResolve) {
       const resolved = nextResolve(specifier, context);
       if (!resolved.url.startsWith("file:")) return resolved;
@@ -20,9 +30,9 @@ export function _installResolveHook(): void {
       const url = new URL(resolved.url);
       const path = getPath().fileURLToPath!(resolved.url);
       for (const loader of Registry.loaders) {
-        if (!loader.isReloadingEnabled() || loader._generation === 1) continue;
+        if (loader._generation === 1) continue;
         for (const [realRoot, rootDir] of Object.entries(loader._realRoots)) {
-          if (!path.startsWith(`${realRoot}/`)) continue;
+          if (!path.startsWith(`${realRoot}${getPath().sep}`)) continue;
           if (loader.isIgnores(rootDir + path.slice(realRoot.length))) continue;
           url.searchParams.set("zeitwerk", String(loader._generation));
           return { ...resolved, url: url.href };

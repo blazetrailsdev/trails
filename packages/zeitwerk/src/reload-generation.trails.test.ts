@@ -161,7 +161,37 @@ const REPAIR_FILES: [string, string][] = [
   ],
 ];
 
+const UNLOAD_MAIN = `
+import { TopLevel } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const loader = new Loader();
+await loader.pushDir("app");
+await loader.setup();
+await loader.unload();
+await loader.setup();
+await loader.eagerLoad();
+console.log(JSON.stringify(Object.getPrototypeOf(TopLevel.B) === TopLevel.A));
+`;
+
+const UNLOAD_FILES: [string, string][] = [
+  ["main.mjs", UNLOAD_MAIN],
+  ["app/a.ts", "export class A {}"],
+  ["app/b.ts", 'import { A } from "./a.ts";\nexport class B extends A {}'],
+];
+
 describe("Loader#reload under real Node", () => {
+  it("keeps one class across unload and setup with reloading disabled", async () => {
+    await withFiles(UNLOAD_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toBe(true);
+    });
+  }, 30_000);
+
   it("retries a raising file and hands an unmanaged importer the current generation", async () => {
     await withFiles(REPAIR_FILES, async () => {
       const [output, status] = await Open3.capture2e(
