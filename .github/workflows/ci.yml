@@ -37,8 +37,6 @@ on:
     # Weekly post-merge sweep so slow regressions can't hide between
     # parity-relevant PRs. Monday 06:00 UTC is off-peak on an Ubuntu runner.
     - cron: "0 6 * * 1"
-    # Nightly: sqlite-mem-tests alone. `changes` reports docs_only for this
-    # cron, which skips every other gated job.
     - cron: "0 7 * * *"
   workflow_dispatch:
 
@@ -917,8 +915,6 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm test:types:virtualized
 
-  # Whole-tree guards and the tooling suites: everything Unit Tests ran that is
-  # not a package's own tests. Runs whichever packages changed.
   repo-checks:
     name: Repo Checks
     needs: changes
@@ -998,9 +994,6 @@ jobs:
           scripts/api-compare/lint-call-mismatches.test.ts
           scripts/api-compare/baseline-json.test.ts
 
-  # Package tests. unit_packages is the reverse closure of the changed packages
-  # (scripts/ci/unit-packages.mjs), `none` when it holds no package listed here,
-  # and empty when everything runs: main, the sweeps, and any infra change.
   unit-tests:
     name: Unit Tests
     needs: changes

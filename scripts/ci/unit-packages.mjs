@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Prints the `packages/<name>` dirs a change set must retest: each changed
-// package plus its reverse closure over package.json @blazetrails edges
-// (dependencies, peer and dev), one per line. Rationale: "unit_packages" in
-// the gate reference, scripts/ci-suite-coverage.test.ts.
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

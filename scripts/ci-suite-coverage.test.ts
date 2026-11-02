@@ -996,8 +996,6 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
     expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
   });
 
-  // activerecord and actionpack consume i18n at runtime, so an i18n-only PR runs
-  // the SQLite lane and Action Pack on top of unit-tests, and no adapter lane.
   it("fires only unit_tests_affected for i18n-only changes", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const runGate = await gateRunner(yml);
@@ -1458,7 +1456,6 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
     expect(
       (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts")).sqlite_only,
     ).toBe("false");
-    // An unrelated carved-out path does not widen the scope.
     expect(
       (await runGate("packages/activestorage/src/blob.ts\nscripts/api-compare/config.ts")).ar_scope,
     ).toBe("packages/activestorage");
@@ -1489,8 +1486,6 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
     expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");
   });
 
-  // unit-packages.mjs reads package.json only, so an undeclared import between
-  // packages in this list would drop a dependent from the selection.
   it("keeps every unit-tests package's imports declared in its package.json", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const dirs = ciVitestFilters(jobBlock(yml, "unit-tests")).filter((f) =>
