@@ -825,6 +825,11 @@ export class ${this.appConstBase()} extends Application {
 
 Application.register(${this.appConstBase()}, import.meta.dirname);
 
+// Please, add to the \`ignore\` list any other \`lib\` subdirectories that do
+// not contain \`.ts\` files, or that should not be reloaded or eager loaded.
+// Common ones are \`templates\`, \`generators\`, or \`middleware\`, for example.
+await ${this.appConstBase()}.config.autoloadLib({ ignore: ["assets", "tasks"] });
+
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {
     application: ${this.appConstBase()};
