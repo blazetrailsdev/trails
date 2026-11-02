@@ -85,10 +85,7 @@ export const Helpers = {
     return false;
   },
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   async isRuby(this: Loader, path: string): Promise<boolean> {
     if (path.endsWith(".d.ts") || /\.test\.[jt]s$/.test(path)) return false;
     if (path.endsWith(".ts")) return true;

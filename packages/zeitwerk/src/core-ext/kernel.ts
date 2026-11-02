@@ -5,7 +5,6 @@ import { Registry } from "../registry.js";
 /** @noRailsEquivalent PERMANENT */
 const _requiring = new Map<string, Promise<void>>();
 
-/** @inventedArm thunk — PERMANENT */
 export async function require(path: string): Promise<boolean> {
   const loader = Registry.loaderFor(path);
   if (loader == null) return false;

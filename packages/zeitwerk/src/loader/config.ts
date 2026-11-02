@@ -8,7 +8,6 @@ type GlobArg = PathArg | PathArg[];
 type LoadBlock = (...args: never[]) => unknown;
 
 export const Config = {
-  /** @inventedArm if — PERMANENT */
   async pushDir(
     this: Loader,
     path: PathArg,
@@ -182,10 +181,7 @@ export const Config = {
     return (paths.flat(Infinity) as PathArg[]).map((path) => File.expandPath(path.toString()));
   },
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   async expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): Promise<string[]> {
     const found: string[] = [];
     if (this.manifest != null) return found;
