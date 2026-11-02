@@ -173,7 +173,7 @@ describe("UnusedRoutesCommand", () => {
     );
     await Trails.initialize();
 
-    const output = await capture(":stdout", () => invoke("routes", ["-u"]));
+    const output = await capture(":stdout", () => invoke("routes", ["-u", "-c", "legacy"]));
     expect(output).toMatch(/^Found 1 unused route:$/m);
     expect(output).toMatch(/legacy GET\s+\/legacy\(\.:format\)\s+legacy#index/);
     expect(exit).toHaveBeenCalledWith(1);
