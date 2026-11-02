@@ -5,14 +5,21 @@ import {
   prefilterNoMisusedPromises,
 } from "./promise-rule-prefilters.mjs";
 
+const fixture = `${import.meta.dirname}/promise-rule-prefilters-fixture`;
+
+const inFixture = ({ valid, invalid }) => ({
+  valid: valid.map((code) => ({ code, filename: `${fixture}/file.ts` })),
+  invalid: invalid.map((test) => ({ ...test, filename: `${fixture}/file.ts` })),
+});
+
 const tester = new RuleTester({
   languageOptions: {
     parser: tseslint.parser,
     ecmaVersion: 2022,
     sourceType: "module",
     parserOptions: {
-      projectService: { allowDefaultProject: ["*.ts"] },
-      tsconfigRootDir: import.meta.dirname,
+      project: "./tsconfig.json",
+      tsconfigRootDir: fixture,
     },
   },
 });
@@ -46,7 +53,7 @@ const floatingVoid = (statement) => ({
 tester.run(
   "no-floating-promises",
   prefilterNoFloatingPromises(tseslint.plugin.rules["no-floating-promises"]),
-  {
+  inFixture({
     valid: [
       `${declarations} nothing();`,
       `${declarations} maybe();`,
@@ -68,13 +75,13 @@ tester.run(
         errors: [{ messageId: "floatingPromiseArrayVoid" }],
       },
     ],
-  },
+  }),
 );
 
 tester.run(
   "no-misused-promises",
   prefilterNoMisusedPromises(tseslint.plugin.rules["no-misused-promises"]),
-  {
+  inFixture({
     valid: [
       `${declarations} run(() => {});`,
       `${declarations} run(nothing);`,
@@ -96,5 +103,5 @@ tester.run(
       { code: `${declarations} run(either);`, errors: [{ messageId: "voidReturnArgument" }] },
       { code: `${declarations} if (later()) {}`, errors: [{ messageId: "conditional" }] },
     ],
-  },
+  }),
 );
