@@ -60,10 +60,8 @@ export class MigrationGenerator extends NamedBase {
 
   async createMigrationFile(): Promise<void> {
     const name = this.name;
-    if (!/^[_a-z0-9]+$/.test(underscore(name)))
-      throw new IllegalMigrationNameError(underscore(name));
-
     this.setLocalAssignsBang(underscore(name));
+    this.validateFileName();
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
 
     await migrationTemplate.call(
@@ -189,6 +187,11 @@ export class MigrationGenerator extends NamedBase {
   private foreignKeyType(): string | undefined {
     const keyType = this.options.primaryKeyType;
     if (keyType) return `, type: "${keyType}"`;
+  }
+
+  /** @internal */
+  private validateFileName(): void {
+    if (!/^[_a-z0-9]+$/.test(this.fileName)) throw new IllegalMigrationNameError(this.fileName);
   }
 
   private setLocalAssignsBang(fileName: string): void {

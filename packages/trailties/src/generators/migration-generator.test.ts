@@ -331,9 +331,23 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("database puts migrations in configured folder", () => {});
+  it.skip("database puts migrations in configured folder", async () => {
+    await t.runGenerator(["create_books", "--database=secondary"]);
+    await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
+      t.assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("books"/, change);
+      }),
+    );
+  });
 
-  it.skip("database puts migrations in configured folder with aliases", () => {});
+  it.skip("database puts migrations in configured folder with aliases", async () => {
+    await t.runGenerator(["create_books", "--db=secondary"]);
+    await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
+      t.assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("books"/, change);
+      }),
+    );
+  });
 
   it("should create empty migrations if name not start with add or remove or create", async () => {
     const migration = "delete_books";
@@ -346,7 +360,11 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("properly identifies usage file", () => {});
+  it.skip("properly identifies usage file", async () => {
+    expect(
+      await (t.generatorClass as unknown as { usagePath(): unknown }).usagePath(),
+    ).toBeTruthy();
+  });
 
   it("migration with singular table name", async () => {
     await withSingularTableName(async () => {
@@ -412,7 +430,11 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("add migration to configured path", () => {});
+  it.skip("add migration to configured path", async () => {
+    const migration = "migration_in_custom_path";
+    await t.runGenerator([migration]);
+    await t.assertMigration(`db2/migrate/${migration}.ts`, /.*/);
+  });
 
   it("add migration ignores virtual attributes", async () => {
     const migration = "add_rich_text_content_to_messages";
