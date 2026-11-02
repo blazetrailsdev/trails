@@ -44,7 +44,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     FileUtils.rmRf(root);
   });
 
-  it("the app glob leaves app/views and app/views/concerns out of the eager load paths", async () => {
+  it("the app glob reaches app/views/concerns, and app/views is not eager", async () => {
     dir("app/models");
     dir("app/views/concerns");
 
@@ -53,7 +53,7 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
 
     expect(eagerLoad).toContain(File.join(root, "app/models"));
     expect(eagerLoad).not.toContain(File.join(root, "app/views"));
-    expect(eagerLoad).not.toContain(File.join(root, "app/views/concerns"));
+    expect(eagerLoad).toContain(File.join(root, "app/views/concerns"));
   });
 
   for (const [paths, loader, klass, name] of [
