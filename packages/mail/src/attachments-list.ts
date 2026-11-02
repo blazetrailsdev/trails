@@ -31,7 +31,7 @@ export class AttachmentsList extends Array<PartsListPart> {
       }
     });
     for (const a of flatten(found)) {
-      if (a != null) this.push(a);
+      if (a != null) this.push(a as PartsListPart);
     }
   }
 
@@ -40,7 +40,7 @@ export class AttachmentsList extends Array<PartsListPart> {
     return this;
   }
 
-  get(indexValue: number | string): PartsListPart {
+  get(indexValue: number | string): PartsListPart | null {
     if (typeof indexValue === "number") {
       const index = indexValue < 0 ? indexValue + this.length : indexValue;
       if (index < 0 || index >= this.length) {

@@ -1,9 +1,11 @@
+import type { ContentTypeField } from "./fields/content-type-field.js";
+import type { Part } from "./part.js";
 import { cmp, NoMethodError, sortBy } from "@blazetrails/ruby-compat";
 import { toYaml, type YAML } from "@blazetrails/ruby-compat/yaml";
 import { AttachmentsList } from "./attachments-list.js";
 import { Mail } from "./mail.js";
 
-export type PartsListPart = any; // eslint-disable-line @typescript-eslint/no-explicit-any
+export type PartsListPart = Part;
 
 export class PartsList extends Array<PartsListPart> {
   /** @noRailsEquivalent PERMANENT */
@@ -15,9 +17,9 @@ export class PartsList extends Array<PartsListPart> {
   constructor(...args: unknown[]) {
     super();
     if (typeof args[0] === "number") {
-      for (let i = 0; i < args[0]; i++) this.push(args[1] ?? null);
+      for (let i = 0; i < args[0]; i++) this.push((args[1] ?? null) as PartsListPart);
     } else if (args[0] != null) {
-      this.push(...(args[0] as unknown[]));
+      this.push(...(args[0] as PartsListPart[]));
     }
   }
 
@@ -40,7 +42,7 @@ export class PartsList extends Array<PartsListPart> {
   collect(block?: (o: PartsListPart) => unknown): unknown {
     if (block !== undefined) {
       const ary = new PartsList();
-      for (const o of this) ary.push(block(o));
+      for (const o of this) ary.push(block(o) as PartsListPart);
       return ary;
     } else {
       return Array.from(this);
@@ -124,10 +126,11 @@ export class PartsList extends Array<PartsListPart> {
     this.recursiveDeleteIf((part) => part.isAttachment());
   }
 
-  override sort(
-    compareFn: (a: PartsListPart, b: PartsListPart) => number = (a, b) => cmp(a, b) ?? 0,
-  ): this {
-    return new (this.constructor as typeof PartsList)(Array.from(this).sort(compareFn)) as this;
+  /** @missingRailsArgs sort — PERMANENT */
+  override sort(compareFn?: (a: PartsListPart, b: PartsListPart) => number): this {
+    return new (this.constructor as typeof PartsList)(
+      Array.from(this).sort(compareFn ?? ((a, b) => cmp(a, b) ?? 0)),
+    ) as this;
   }
 
   sortBang(order: string[]): PartsListPart[] {
@@ -144,11 +147,14 @@ export class PartsList extends Array<PartsListPart> {
 
   /** @internal */
   private getOrderValue(part: PartsListPart, order: string[]): number[] {
-    const isAttachment = typeof part?.isAttachment === "function" && part.isAttachment();
+    const isAttachment =
+      typeof (part as Part | null)?.isAttachment === "function" && part.isAttachment();
     const hasContentType =
-      typeof part?.contentType === "function" && part.get("content_type") != null;
+      typeof (part as Part | null)?.contentType === "function" && part.get("content_type") != null;
     const index = hasContentType
-      ? order.indexOf(part.get("content_type").string().toLowerCase())
+      ? order.indexOf(
+          (part.get("content_type") as unknown as ContentTypeField).string().toLowerCase(),
+        )
       : -1;
 
     return [isAttachment ? 1 : 0, index === -1 ? 10000 : index];

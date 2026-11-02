@@ -1,4 +1,5 @@
 import {
+  cmp,
   flatten,
   NoMethodError,
   rbObjAsString,
@@ -13,7 +14,12 @@ import { Body } from "./body.js";
 import * as Constants from "./constants.js";
 import type { AttachmentsList } from "./attachments-list.js";
 import { Encodings } from "./encodings.js";
+import type { TransferEncoding } from "./encodings/transfer-encoding.js";
+import type { ContentDispositionField } from "./fields/content-disposition-field.js";
+import type { ContentLocationField } from "./fields/content-location-field.js";
+import type { ParameterHash } from "./fields/parameter-hash.js";
 import { ContentTypeField } from "./fields/content-type-field.js";
+import type { Part } from "./part.js";
 import { Envelope } from "./envelope.js";
 import { Field } from "./field.js";
 import { Header } from "./header.js";
@@ -22,8 +28,7 @@ import { Mail } from "./mail.js";
 import type { PartsList } from "./parts-list.js";
 import { Utilities } from "./utilities.js";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-type MessageBlock = ((message: any) => unknown) | undefined;
+type MessageBlock = ((this: Message, message: Message) => unknown) | undefined;
 
 const MULTIPART_CONVERSION_CONTENT_FIELDS = [
   ["contentDescription", "setContentDescription"],
@@ -40,8 +45,8 @@ export class Message {
   protected _body: Body | null = null;
   protected _bodyRaw: string | null = null;
   protected _separateParts = false;
-  protected _textPart: any = null;
-  protected _htmlPart: any = null;
+  protected _textPart: Message | null = null;
+  protected _htmlPart: Message | null = null;
   protected _header: Header | null = null;
   protected _charset: string | null;
   protected _defaultedCharset = true;
@@ -52,10 +57,10 @@ export class Message {
   protected _rawSource = "";
   protected _rawEnvelope: unknown = null;
   protected _envelope: Envelope | null = null;
-  protected _deliveryStatusPart: any;
+  protected _deliveryStatusPart: Part | null | undefined;
   protected _attachment: unknown = undefined;
 
-  deliveryHandler: any = null;
+  deliveryHandler: unknown = null;
   performDeliveries = true;
   raiseDeliveryErrors = true;
 
@@ -83,7 +88,7 @@ export class Message {
       if (block.length === 0) {
         block.call(this, this);
       } else {
-        block(this);
+        block.call(this, this);
       }
     }
   }
@@ -105,13 +110,15 @@ export class Message {
     }
     if (present(this.subject())) {
       const subject = this.subject();
-      reply.setSubject(/^Re:/im.test(subject) ? subject : `Re: ${subject}`);
+      reply.setSubject(/^Re:/im.test(subject as string) ? subject : `Re: ${subject}`);
     }
     if (present(this.replyTo()) || present(this.from())) {
       reply.setTo(rbObjAsString(this.get(present(this.replyTo()) ? "reply_to" : "from")));
     }
     if (present(this.to())) {
-      reply.setFrom(rbObjAsString(this.get("to").formatted()[0]));
+      reply.setFrom(
+        rbObjAsString((this.get("to") as unknown as { formatted(): unknown[] }).formatted()[0]),
+      );
     }
     if (args.length > 0) {
       const first = flatten(args)[0];
@@ -130,18 +137,18 @@ export class Message {
       return 1;
     } else {
       const [a, b] = [this.date(), other.date()];
-      return a < b ? -1 : a > b ? 1 : 0;
+      return cmp(a, b);
     }
   }
 
-  equals(other: any): boolean {
+  equals(other: Message | null | undefined): boolean {
     if (typeof other?.encoded !== "function") return false;
     if (present(this.messageId()) && present(other.messageId())) {
       return this.encoded() === other.encoded();
     } else {
       const m = new (this.constructor as typeof Message)(this.encoded());
       m.setMessageId("<temp@test>");
-      const o = new other.constructor(other.encoded());
+      const o = new (other.constructor as typeof Message)(other.encoded());
       o.setMessageId("<temp@test>");
       return m.encoded() === o.encoded();
     }
@@ -159,7 +166,7 @@ export class Message {
   setEnvelope(val: unknown): void {
     this._rawEnvelope = val;
     try {
-      this._envelope = (Envelope as any).parse(val);
+      this._envelope = Envelope.parse(val);
     } catch {
       this._envelope = null;
     }
@@ -181,8 +188,9 @@ export class Message {
     this._header = new Header(value as string | null, this.charset);
   }
 
-  header(value: unknown = null): any {
-    return present(value) ? this.setHeader(value) : this._header;
+  header(value: unknown = null): Header {
+    if (present(value)) this.setHeader(value);
+    return this._header!;
   }
 
   headers(hash: Record<string, unknown> = {}): void {
@@ -193,7 +201,7 @@ export class Message {
     return this.header().errors();
   }
 
-  bcc(val: unknown = null): any {
+  bcc(val: unknown = null): unknown {
     return this.default("bcc", val);
   }
 
@@ -201,7 +209,7 @@ export class Message {
     this.header().set("bcc", val);
   }
 
-  cc(val: unknown = null): any {
+  cc(val: unknown = null): unknown {
     return this.default("cc", val);
   }
 
@@ -209,7 +217,7 @@ export class Message {
     this.header().set("cc", val);
   }
 
-  comments(val: unknown = null): any {
+  comments(val: unknown = null): unknown {
     return this.default("comments", val);
   }
 
@@ -217,7 +225,7 @@ export class Message {
     this.header().set("comments", val);
   }
 
-  contentDescription(val: unknown = null): any {
+  contentDescription(val: unknown = null): unknown {
     return this.default("content_description", val);
   }
 
@@ -225,7 +233,7 @@ export class Message {
     this.header().set("content_description", val);
   }
 
-  contentDisposition(val: unknown = null): any {
+  contentDisposition(val: unknown = null): unknown {
     return this.default("content_disposition", val);
   }
 
@@ -233,7 +241,7 @@ export class Message {
     this.header().set("content_disposition", val);
   }
 
-  contentId(val: unknown = null): any {
+  contentId(val: unknown = null): unknown {
     return this.default("content_id", val);
   }
 
@@ -241,7 +249,7 @@ export class Message {
     this.header().set("content_id", val);
   }
 
-  contentLocation(val: unknown = null): any {
+  contentLocation(val: unknown = null): unknown {
     return this.default("content_location", val);
   }
 
@@ -249,7 +257,7 @@ export class Message {
     this.header().set("content_location", val);
   }
 
-  contentTransferEncoding(val: unknown = null): any {
+  contentTransferEncoding(val: unknown = null): unknown {
     return this.default("content_transfer_encoding", val);
   }
 
@@ -257,7 +265,7 @@ export class Message {
     this.header().set("content_transfer_encoding", val);
   }
 
-  contentType(val: unknown = null): any {
+  contentType(val: unknown = null): unknown {
     return this.default("content_type", val);
   }
 
@@ -265,7 +273,7 @@ export class Message {
     this.header().set("content_type", val);
   }
 
-  date(val: unknown = null): any {
+  date(val: unknown = null): unknown {
     return this.default("date", val);
   }
 
@@ -273,7 +281,7 @@ export class Message {
     this.header().set("date", val);
   }
 
-  from(val: unknown = null): any {
+  from(val: unknown = null): unknown {
     return this.default("from", val);
   }
 
@@ -281,7 +289,7 @@ export class Message {
     this.header().set("from", val);
   }
 
-  inReplyTo(val: unknown = null): any {
+  inReplyTo(val: unknown = null): unknown {
     return this.default("in_reply_to", val);
   }
 
@@ -289,7 +297,7 @@ export class Message {
     this.header().set("in_reply_to", val);
   }
 
-  keywords(val: unknown = null): any {
+  keywords(val: unknown = null): unknown {
     return this.default("keywords", val);
   }
 
@@ -297,7 +305,7 @@ export class Message {
     this.header().set("keywords", val);
   }
 
-  messageId(val: unknown = null): any {
+  messageId(val: unknown = null): unknown {
     return this.default("message_id", val);
   }
 
@@ -305,7 +313,7 @@ export class Message {
     this.header().set("message_id", val);
   }
 
-  mimeVersion(val: unknown = null): any {
+  mimeVersion(val: unknown = null): unknown {
     return this.default("mime_version", val);
   }
 
@@ -313,7 +321,7 @@ export class Message {
     this.header().set("mime_version", val);
   }
 
-  references(val: unknown = null): any {
+  references(val: unknown = null): unknown {
     return this.default("references", val);
   }
 
@@ -321,7 +329,7 @@ export class Message {
     this.header().set("references", val);
   }
 
-  replyTo(val: unknown = null): any {
+  replyTo(val: unknown = null): unknown {
     return this.default("reply_to", val);
   }
 
@@ -329,7 +337,7 @@ export class Message {
     this.header().set("reply_to", val);
   }
 
-  resentBcc(val: unknown = null): any {
+  resentBcc(val: unknown = null): unknown {
     return this.default("resent_bcc", val);
   }
 
@@ -337,7 +345,7 @@ export class Message {
     this.header().set("resent_bcc", val);
   }
 
-  resentCc(val: unknown = null): any {
+  resentCc(val: unknown = null): unknown {
     return this.default("resent_cc", val);
   }
 
@@ -345,7 +353,7 @@ export class Message {
     this.header().set("resent_cc", val);
   }
 
-  resentDate(val: unknown = null): any {
+  resentDate(val: unknown = null): unknown {
     return this.default("resent_date", val);
   }
 
@@ -353,7 +361,7 @@ export class Message {
     this.header().set("resent_date", val);
   }
 
-  resentFrom(val: unknown = null): any {
+  resentFrom(val: unknown = null): unknown {
     return this.default("resent_from", val);
   }
 
@@ -361,7 +369,7 @@ export class Message {
     this.header().set("resent_from", val);
   }
 
-  resentMessageId(val: unknown = null): any {
+  resentMessageId(val: unknown = null): unknown {
     return this.default("resent_message_id", val);
   }
 
@@ -369,7 +377,7 @@ export class Message {
     this.header().set("resent_message_id", val);
   }
 
-  resentSender(val: unknown = null): any {
+  resentSender(val: unknown = null): unknown {
     return this.default("resent_sender", val);
   }
 
@@ -377,7 +385,7 @@ export class Message {
     this.header().set("resent_sender", val);
   }
 
-  resentTo(val: unknown = null): any {
+  resentTo(val: unknown = null): unknown {
     return this.default("resent_to", val);
   }
 
@@ -385,7 +393,7 @@ export class Message {
     this.header().set("resent_to", val);
   }
 
-  returnPath(val: unknown = null): any {
+  returnPath(val: unknown = null): unknown {
     return this.default("return_path", val);
   }
 
@@ -393,7 +401,7 @@ export class Message {
     this.header().set("return_path", val);
   }
 
-  sender(val: unknown = null): any {
+  sender(val: unknown = null): unknown {
     return this.default("sender", val);
   }
 
@@ -401,7 +409,7 @@ export class Message {
     this.header().set("sender", val);
   }
 
-  subject(val: unknown = null): any {
+  subject(val: unknown = null): unknown {
     return this.default("subject", val);
   }
 
@@ -409,7 +417,7 @@ export class Message {
     this.header().set("subject", val);
   }
 
-  to(val: unknown = null): any {
+  to(val: unknown = null): unknown {
     return this.default("to", val);
   }
 
@@ -475,21 +483,23 @@ export class Message {
       return this.header().set(sym, val);
     }
     const field = this.header().get(sym);
-    if (field != null) return Array.isArray(field) ? field[0].default() : field.default();
+    if (field != null) {
+      return (field as unknown as { default(): unknown }).default();
+    }
     return null;
   }
 
   setBody(value: unknown): void {
-    this.bodyLazy(value);
+    this.bodyLazy(value as string | null);
   }
 
-  body(value: unknown = null): any {
+  body(value: unknown = null): Body {
     if (present(value)) {
-      return this.setBody(value);
-    } else {
-      if (this._bodyRaw != null) this.processBodyRaw();
-      return this._body;
+      this.setBody(value);
+    } else if (this._bodyRaw != null) {
+      this.processBodyRaw();
     }
+    return this._body!;
   }
 
   bodyEncoding(value: unknown = null): unknown {
@@ -536,7 +546,7 @@ export class Message {
     }
   }
 
-  get(name: unknown): any {
+  get(name: unknown): Field | Field[] | null {
     return this.header().get(Utilities.underscoreize(name));
   }
 
@@ -571,25 +581,25 @@ export class Message {
 
   hasContentType(): boolean {
     try {
-      return present(this.header().get("content_type").mainType());
+      return present((this.header().get("content_type") as unknown as ContentTypeField).mainType());
     } catch {
       return false;
     }
   }
 
   hasCharset(): boolean {
-    let tmp: any;
+    let tmp: ParameterHash | null;
     try {
-      tmp = this.header().get("content_type").parameters();
+      tmp = (this.header().get("content_type") as unknown as ContentTypeField).parameters();
     } catch {
       tmp = null;
     }
-    return this.hasContentType() && present(tmp) && present(tmp.get("charset"));
+    return this.hasContentType() && tmp != null && present(tmp.get("charset"));
   }
 
   hasContentTransferEncoding(): boolean {
     const field = this.header().get("content_transfer_encoding");
-    return present(field) && Utilities.isBlank(field.errors);
+    return present(field) && Utilities.isBlank((field as Field).errors);
   }
 
   addMessageId(msgIdVal: unknown = ""): void {
@@ -616,7 +626,9 @@ export class Message {
         warn(warning);
       }
       if (this._charset != null) {
-        this.header().get("content_type").parameters().set("charset", this._charset);
+        (this.header().get("content_type") as unknown as ContentTypeField)
+          .parameters()
+          .set("charset", this._charset);
       }
     }
   }
@@ -629,7 +641,9 @@ export class Message {
 
   mimeType(): string | null {
     try {
-      return this.hasContentType() ? this.header().get("content_type").string() : null;
+      return this.hasContentType()
+        ? (this.header().get("content_type") as unknown as ContentTypeField).string()
+        : null;
     } catch {
       return null;
     }
@@ -638,7 +652,7 @@ export class Message {
   get charset(): string | null {
     if (this._header != null) {
       return this.hasContentType() && !this.isMultipart()
-        ? (this.contentTypeParameters().get("charset") as string | null)
+        ? (this.contentTypeParameters()!.get("charset") as string | null)
         : this._charset;
     } else {
       return this._charset;
@@ -653,7 +667,9 @@ export class Message {
 
   mainType(): string | null {
     try {
-      return this.hasContentType() ? this.header().get("content_type").mainType() : null;
+      return this.hasContentType()
+        ? (this.header().get("content_type") as unknown as ContentTypeField).mainType()
+        : null;
     } catch {
       return null;
     }
@@ -661,15 +677,19 @@ export class Message {
 
   subType(): string | null {
     try {
-      return this.hasContentType() ? this.header().get("content_type").subType() : null;
+      return this.hasContentType()
+        ? (this.header().get("content_type") as unknown as ContentTypeField).subType()
+        : null;
     } catch {
       return null;
     }
   }
 
-  contentTypeParameters(): any {
+  contentTypeParameters(): ParameterHash | null {
     try {
-      return this.hasContentType() ? this.header().get("content_type").parameters() : null;
+      return this.hasContentType()
+        ? (this.header().get("content_type") as unknown as ContentTypeField).parameters()
+        : null;
     } catch {
       return null;
     }
@@ -686,45 +706,45 @@ export class Message {
   isDeliveryStatusReport(): boolean {
     return (
       this.isMultipartReport() &&
-      /^delivery-status$/im.test((this.contentTypeParameters().get("report-type") as string) ?? "")
+      /^delivery-status$/im.test((this.contentTypeParameters()!.get("report-type") as string) ?? "")
     );
   }
 
-  deliveryStatusPart(): any {
+  deliveryStatusPart(): Part | null {
     if (this._deliveryStatusPart === undefined) {
       this._deliveryStatusPart = this.isDeliveryStatusReport()
-        ? (this.parts.find((p: any) => p.isDeliveryStatusReportPart()) ?? null)
+        ? (this.parts.find((p) => p.isDeliveryStatusReportPart()) ?? null)
         : null;
     }
     return this._deliveryStatusPart;
   }
 
   isBounced(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().isBounced();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.isBounced();
   }
 
   action(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().action();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.action();
   }
 
   finalRecipient(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().finalRecipient();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.finalRecipient();
   }
 
   errorStatus(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().errorStatus();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.errorStatus();
   }
 
   diagnosticCode(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().diagnosticCode();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.diagnosticCode();
   }
 
   remoteMta(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().remoteMta();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.remoteMta();
   }
 
   isRetryable(): unknown {
-    return this.deliveryStatusPart() && this.deliveryStatusPart().isRetryable();
+    return this.deliveryStatusPart() && this.deliveryStatusPart()!.isRetryable();
   }
 
   boundary(): string | null {
@@ -744,7 +764,7 @@ export class Message {
     return this.attachments().length !== 0;
   }
 
-  htmlPart(block?: MessageBlock): any {
+  htmlPart(block?: MessageBlock): Message | null | void {
     if (block !== undefined) {
       return this.setHtmlPart(new Mail.Part({ contentType: "text/html" }, block));
     } else {
@@ -752,7 +772,7 @@ export class Message {
     }
   }
 
-  textPart(block?: MessageBlock): any {
+  textPart(block?: MessageBlock): Message | null | void {
     if (block !== undefined) {
       return this.setTextPart(new Mail.Part({ contentType: "text/plain" }, block));
     } else {
@@ -760,15 +780,15 @@ export class Message {
     }
   }
 
-  setHtmlPart(msg: any): void {
+  setHtmlPart(msg: unknown): void {
     if (present(msg)) {
       if (!(msg instanceof Message)) msg = new Mail.Part({ body: msg });
-      this._htmlPart = msg;
+      this._htmlPart = msg as Message;
       if (!this._htmlPart.hasContentType()) this._htmlPart.setContentType("text/html");
       if (present(this.textPart())) this.addMultipartAlternateHeader();
-      this.addPart(this._htmlPart);
+      this.addPart(this._htmlPart as Part);
     } else if (this._htmlPart != null) {
-      const index = this.parts.indexOf(this._htmlPart);
+      const index = this.parts.indexOf(this._htmlPart as Part);
       if (index !== -1) this.parts.splice(index, 1);
       this._htmlPart = null;
       if (present(this.textPart())) {
@@ -778,15 +798,15 @@ export class Message {
     }
   }
 
-  setTextPart(msg: any): void {
+  setTextPart(msg: unknown): void {
     if (present(msg)) {
       if (!(msg instanceof Message)) msg = new Mail.Part({ body: msg });
-      this._textPart = msg;
+      this._textPart = msg as Message;
       if (!this._textPart.hasContentType()) this._textPart.setContentType("text/plain");
       if (present(this.htmlPart())) this.addMultipartAlternateHeader();
-      this.addPart(this._textPart);
+      this.addPart(this._textPart as Part);
     } else if (this._textPart != null) {
-      const index = this.parts.indexOf(this._textPart);
+      const index = this.parts.indexOf(this._textPart as Part);
       if (index !== -1) this.parts.splice(index, 1);
       this._textPart = null;
       if (present(this.htmlPart())) {
@@ -796,24 +816,24 @@ export class Message {
     }
   }
 
-  addPart(part: unknown): unknown {
+  addPart(part: Part): unknown {
     if (!this.body().isMultipart() && !Utilities.isBlank(this.body().decoded())) {
       this._textPart = new Mail.Part("Content-Type: text/plain;");
       this._textPart.setBody(this.body().decoded());
-      this.body().push(this._textPart);
+      this.body().push(this._textPart as Part);
       this.addMultipartAlternateHeader();
     }
     this.addBoundary();
     return this.body().push(part);
   }
 
-  part(params: Record<string, unknown> = {}, block?: (part: any) => unknown): unknown {
+  part(params: Record<string, unknown> = {}, block?: (part: Part) => unknown): unknown {
     const newPart = new Mail.Part(params);
     if (block !== undefined) block(newPart);
     return this.addPart(newPart);
   }
 
-  async addFile(values: any): Promise<unknown> {
+  async addFile(values: string | { filename: string }): Promise<unknown> {
     if (!(this.isMultipart() || Utilities.isBlank(this.body().decoded()))) {
       this.convertToMultipart();
     }
@@ -855,9 +875,9 @@ export class Message {
 
   encoded(): string {
     this.readyToSendBang();
-    let buffer = this.header().encoded() as string;
+    let buffer = this.header().encoded();
     buffer += "\r\n";
-    const body = this.body().encoded(this.contentTransferEncoding());
+    const body = this.body().encoded(this.contentTransferEncoding() as string | null);
     buffer += typeof body === "string" ? body : new TextDecoder("latin1").decode(body);
     return buffer;
   }
@@ -866,7 +886,9 @@ export class Message {
     if (this.hasAttachments()) {
       this.parts.deleteAttachments();
       const reencoded =
-        this.parts.length === 0 ? "" : this.body().encoded(this.contentTransferEncoding());
+        this.parts.length === 0
+          ? ""
+          : this.body().encoded(this.contentTransferEncoding() as string | null);
       this._body = null;
       this.setBody(reencoded);
     }
@@ -927,11 +949,11 @@ export class Message {
     return this.findAttachment();
   }
 
-  allParts(): any[] {
-    return flatten(this.parts.map((p: any) => [p, p.allParts()]));
+  allParts(): Part[] {
+    return flatten(this.parts.map((p) => [p, p.allParts()])) as Part[];
   }
 
-  findFirstMimeType(mt: string): any {
+  findFirstMimeType(mt: string): Part | null {
     return this.allParts().find((p) => p.mimeType() === mt && !p.isAttachment()) ?? null;
   }
 
@@ -963,7 +985,7 @@ export class Message {
   }
 
   /** @internal */
-  private bodyLazy(value: any): void {
+  private bodyLazy(value: string | null): void {
     if (this._bodyRaw != null && value != null) this.processBodyRaw();
     if (value == null || value.length <= 0) {
       this._body = new Body("");
@@ -1002,12 +1024,12 @@ export class Message {
   }
 
   /** @internal */
-  private allowedEncodings(): any {
+  private allowedEncodings(): (typeof TransferEncoding)[] | null {
     if (this.mimeType() === "message/rfc822") {
       return [
-        Encodings.getEncoding("7bit"),
-        Encodings.getEncoding("8bit"),
-        Encodings.getEncoding("binary"),
+        Encodings.getEncoding("7bit")!,
+        Encodings.getEncoding("8bit")!,
+        Encodings.getEncoding("binary")!,
       ];
     }
     return null;
@@ -1026,7 +1048,10 @@ export class Message {
       } else {
         this.setContentTransferEncoding(
           rbObjAsString(
-            this.body().negotiateBestEncoding(this._transportEncoding, this.allowedEncodings()),
+            this.body().negotiateBestEncoding(
+              this._transportEncoding as typeof TransferEncoding | null,
+              this.allowedEncodings(),
+            ),
           ),
         );
       }
@@ -1058,13 +1083,14 @@ export class Message {
   /** @internal */
   private addBoundary(): void {
     if (!(present(this.body().boundary) && present(this.boundary()))) {
-      if (!present(this.header().get("content-type"))) {
+      if (!present(this.header().get("content-type") as unknown as ContentTypeField)) {
         const charset = this.charset;
         this.header().set("content-type", "multipart/mixed");
-        this.header().get("content-type").parameters().set("charset", charset);
+        (this.header().get("content-type") as unknown as ContentTypeField)
+          .parameters()
+          .set("charset", charset);
       }
-      this.header()
-        .get("content-type")
+      (this.header().get("content-type") as unknown as ContentTypeField)
         .parameters()
         .set("boundary", ContentTypeField.generateBoundary());
       this.body().boundary = this.boundary();
@@ -1073,7 +1099,7 @@ export class Message {
 
   /** @internal */
   private addMultipartMixedHeader(): void {
-    if (!present(this.header().get("content-type"))) {
+    if (!present(this.header().get("content-type") as unknown as ContentTypeField)) {
       this.header().set("content-type", ContentTypeField.withBoundary("multipart/mixed").value);
       this.body().boundary = this.boundary();
     }
@@ -1126,9 +1152,15 @@ export class Message {
         return null;
       }
     };
-    const contentTypeName = rescue(() => this.header().get("content_type").filename());
-    const contentDispName = rescue(() => this.header().get("content_disposition").filename());
-    const contentLocName = rescue(() => this.header().get("content_location").location());
+    const contentTypeName = rescue(() =>
+      (this.header().get("content_type") as unknown as ContentTypeField).filename(),
+    );
+    const contentDispName = rescue(() =>
+      (this.header().get("content_disposition") as unknown as ContentDispositionField).filename(),
+    );
+    const contentLocName = rescue(() =>
+      (this.header().get("content_location") as unknown as ContentLocationField).location(),
+    );
     let filename: unknown;
     if (present(this.contentDisposition()) && present(contentDispName)) {
       filename = contentDispName;

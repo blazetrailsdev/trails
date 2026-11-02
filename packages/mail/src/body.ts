@@ -107,7 +107,6 @@ export class Body {
     );
   }
 
-  /** @missingRailsCall force_encoding — PERMANENT */
   encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
     if (this.isMultipart()) {
       this.sortPartsBang();

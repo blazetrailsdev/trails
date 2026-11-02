@@ -1,20 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { AttachmentsList } from "./attachments-list.js";
 import "./index.js";
+import type { Part } from "./part.js";
 
-const part = (filename: string, attachment = true) => ({
-  mimeType: () => "text/plain",
-  parts: [],
-  isAttachment: () => attachment,
-  filename: () => filename,
-});
+const part = (filename: string, attachment = true) =>
+  ({
+    mimeType: () => "text/plain",
+    parts: [],
+    isAttachment: () => attachment,
+    filename: () => filename,
+  }) as unknown as Part;
 
 describe("AttachmentsList", () => {
   it("keeps only attachment parts and reads by index or filename", () => {
     const list = new AttachmentsList([part("a.txt"), part("b.txt", false), part("c.txt")]);
     expect(list.length).toBe(2);
-    expect(list.get(1).filename()).toBe("c.txt");
-    expect(list.get("a.txt").filename()).toBe("a.txt");
+    expect(list.get(1)!.filename()).toBe("c.txt");
+    expect(list.get("a.txt")!.filename()).toBe("a.txt");
     expect(list.get("nope.txt")).toBeNull();
   });
 

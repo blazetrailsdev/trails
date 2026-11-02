@@ -1,5 +1,7 @@
 import { rbObjAsString, stringSplit } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
+import type { ContentDispositionField } from "./fields/content-disposition-field.js";
+import type { Field } from "./field.js";
 import { Header } from "./header.js";
 import { Mail } from "./mail.js";
 import { Message } from "./message.js";
@@ -8,7 +10,6 @@ import { Utilities } from "./utilities.js";
 const LAX = Constants.LAX_CRLF.source;
 const WSP = Constants.WSP.source;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export class Part extends Message {
   /** @internal */
   declare private _deliveryStatusData: Header | undefined;
@@ -23,7 +24,7 @@ export class Part extends Message {
 
   cid(): string {
     if (!this.hasContentId()) this.addContentId();
-    return Utilities.uriEscape(Utilities.unbracket(this.contentId()));
+    return Utilities.uriEscape(Utilities.unbracket(this.contentId() as string));
   }
 
   url(): string {
@@ -31,7 +32,9 @@ export class Part extends Message {
   }
 
   isInline(): boolean | null {
-    const field = this.header().get("content_disposition");
+    const field = this.header().get(
+      "content_disposition",
+    ) as unknown as ContentDispositionField | null;
     return typeof field?.dispositionType === "function"
       ? field.dispositionType() === "inline"
       : null;
@@ -54,12 +57,12 @@ export class Part extends Message {
     );
   }
 
-  deliveryStatusData(): any {
+  deliveryStatusData(): Header | Record<string, never> {
     return this.isDeliveryStatusReportPart() ? this.parseDeliveryStatusReport() : {};
   }
 
   override isBounced(): boolean {
-    const action = this.action() as any;
+    const action = this.action() as string | string[] | null;
     return /failed/i.test(
       rbObjAsString(Array.isArray(action) ? (action[0] ?? "") : (action ?? "")),
     );
@@ -94,7 +97,7 @@ export class Part extends Message {
     const deliveryStatusData = this.deliveryStatusData();
     const value = deliveryStatusData instanceof Header ? deliveryStatusData.get(key) : null;
     if (Array.isArray(value)) {
-      return value.map((a: any) => a.value);
+      return value.map((a: Field) => a.value);
     } else if (value != null) {
       return value.value;
     } else {

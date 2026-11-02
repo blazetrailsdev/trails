@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ContentTypeField } from "./fields/content-type-field.js";
 import "./index.js";
 import { Part } from "./part.js";
 
@@ -29,7 +30,9 @@ describe("Mail::Part", () => {
 
   it("should correctly parse plain text raw source and not truncate after newlines - issue 208", () => {
     const part = new Part("First Line\n\nSecond Line\n\nThird Line\n\n");
-    expect(part.get("content_type").contentType()).toEqual("text/plain");
+    expect((part.get("content_type") as unknown as ContentTypeField).contentType()).toEqual(
+      "text/plain",
+    );
     expect(part.toString()).toMatch(/^First Line\r\n\r\nSecond Line\r\n\r\nThird Line/m);
   });
 });

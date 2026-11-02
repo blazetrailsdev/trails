@@ -4,16 +4,16 @@ import { PartsList } from "./parts-list.js";
 describe("PartsList", () => {
   it("should return itself on sort", () => {
     const p = new PartsList();
-    p.push(2);
-    p.push(1);
+    p.push(2 as never);
+    p.push(1 as never);
     expect(p.sort().constructor).toBe(PartsList);
   });
 
   it("should not fail if we do not have a content_type", () => {
     const p = new PartsList();
     const order = ["text/plain"];
-    p.push("text/plain");
-    p.push("text/html");
+    p.push("text/plain" as never);
+    p.push("text/html" as never);
     p.sortBang(order);
   });
 
@@ -40,8 +40,8 @@ describe("PartsList", () => {
 
   it("is equal to its parts array", () => {
     const p = new PartsList();
-    p.push("foo");
-    p.push("bar");
+    p.push("foo" as never);
+    p.push("bar" as never);
     expect(Array.from(p)).toEqual(["foo", "bar"]);
   });
 
