@@ -10,6 +10,8 @@ import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../class-paths.generated.js";
 import { ImageMagick } from "../../analyzer/image-analyzer/image-magick.js";
 import { Vips } from "../../analyzer/image-analyzer/vips.js";
+import { VideoAnalyzer } from "../../analyzer/video-analyzer.js";
+import { AudioAnalyzer } from "../../analyzer/audio-analyzer.js";
 import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
@@ -20,7 +22,7 @@ import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
 ActiveStorage.logger = new NullLogger();
-ActiveStorage.analyzers = [Vips, ImageMagick];
+ActiveStorage.analyzers = [Vips, ImageMagick, VideoAnalyzer, AudioAnalyzer];
 
 const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 

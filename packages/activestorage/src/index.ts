@@ -30,3 +30,5 @@ export { NullAnalyzer } from "./analyzer/null-analyzer.js";
 export { ImageAnalyzer } from "./analyzer/image-analyzer.js";
 export { ImageMagick } from "./analyzer/image-analyzer/image-magick.js";
 export { Vips } from "./analyzer/image-analyzer/vips.js";
+export { VideoAnalyzer } from "./analyzer/video-analyzer.js";
+export { AudioAnalyzer } from "./analyzer/audio-analyzer.js";
