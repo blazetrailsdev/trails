@@ -25,6 +25,7 @@ import { Initializable } from "../initializable.js";
 import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
+  root?: string | null;
   logger?: Logger | null;
   logLevel: LogLevel | number | string;
   logFormatter: Logger["formatter"];
@@ -136,6 +137,7 @@ Bootstrap.initializer<BootstrapHost>(
   { after: "set_eager_load_paths", before: "bootstrap_hook" },
   async function () {
     const autoloader = this.autoloaders.once;
+    autoloader.manifestRoot ??= this.config.root ?? null;
 
     const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 
