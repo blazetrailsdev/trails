@@ -15,6 +15,7 @@ import type { MiddlewareStackProxy } from "../configuration.js";
 import { Trails } from "../rails.js";
 
 const baseConfig = (): BootstrapConfig => ({
+  root: null,
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,

@@ -8,6 +8,7 @@ interface BootInitializer {
 }
 
 interface BootApplication {
+  config: { root: string | null };
   initializers: { tsort(): BootInitializer[] };
 }
 
@@ -32,7 +33,7 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
 
   const dirs: string[] = [];
   for (const loader of [...Registry.loaders]) {
-    loader.manifestRoot ??= cwd;
+    loader.manifestRoot ??= application?.config.root ?? cwd;
     dirs.push(await writeArtifacts(loader));
   }
   return dirs;

@@ -12,6 +12,7 @@ import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap
 import { Trails } from "../rails.js";
 
 const baseConfig = (): BootstrapConfig => ({
+  root: null,
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,
