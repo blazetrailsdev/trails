@@ -1,9 +1,10 @@
 import { autoloadGet } from "../core-ext/kernel.js";
-import { Dir, File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
+import { File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
 import { _isModule } from "../core-ext/module.js";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";
 import type { Loader } from "../loader.js";
+import { manifestRoot } from "./manifest.js";
 import { Registry } from "../registry.js";
 
 export const EagerLoad = {
@@ -16,7 +17,7 @@ export const EagerLoad = {
       if (this.logger != null) this.log("eager load start");
 
       if (this._manifestConstants != null) {
-        const root = this.manifestRoot ?? Dir.pwd();
+        const root = manifestRoot(this);
         for (const row of Object.values(this._manifestConstants)) {
           const abspaths = [row.path, ...(row.dirs ?? [])].map((p) => File.expandPath(p, root));
           if (!force && abspaths.every((p) => this.isExcludedFromEagerLoad(p))) continue;
