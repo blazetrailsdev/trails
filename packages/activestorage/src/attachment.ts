@@ -1,3 +1,6 @@
+import type { VariantWithRecord } from "./variant-with-record.js";
+import type { Variant } from "./variant.js";
+import type { Variation } from "./variation.js";
 import { type Base } from "@blazetrails/activerecord";
 import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
@@ -6,7 +9,7 @@ import type { Blob } from "./blob.js";
 import type { NamedVariant } from "./named-variant.js";
 import { Record } from "./record.js";
 
-type Transformations = string | { [k: string]: unknown };
+type Transformations = string | Variation | { [k: string]: unknown };
 
 interface AttachmentReflection {
   options?: { dependent?: unknown };
@@ -79,7 +82,7 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  async variant(transformations: Transformations): Promise<unknown> {
+  async variant(transformations: Transformations): Promise<Variant | VariantWithRecord> {
     transformations = await this.transformationsByName(transformations);
     return (await this.blob)!.variant(transformations);
   }

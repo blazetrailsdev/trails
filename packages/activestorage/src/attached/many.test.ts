@@ -917,7 +917,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   // BLOCKED: activestorage-variation-and-variants
   it.skip("creating variation by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate variant", () => {});
-  // BLOCKED: activestorage-previewers-and-preview
+  // BLOCKED: activestorage-attached-preview-tests
   it.skip("creating preview by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate preview", () => {});
   // BLOCKED: activestorage-variation-and-variants

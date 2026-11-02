@@ -1,4 +1,5 @@
 import { afterAll } from "vitest";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { EnvironmentInquirer, getEnv, NullLogger, TopLevel } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
@@ -12,6 +13,9 @@ import { ImageMagick } from "../../analyzer/image-analyzer/image-magick.js";
 import { Vips } from "../../analyzer/image-analyzer/vips.js";
 import { VideoAnalyzer } from "../../analyzer/video-analyzer.js";
 import { AudioAnalyzer } from "../../analyzer/audio-analyzer.js";
+import { MuPDFPreviewer } from "../../previewer/mupdf-previewer.js";
+import { PopplerPDFPreviewer } from "../../previewer/poppler-pdf-previewer.js";
+import { VideoPreviewer } from "../../previewer/video-previewer.js";
 import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
@@ -22,7 +26,9 @@ import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
 ActiveStorage.logger = new NullLogger();
+ActiveJobBase.setQueueAdapter("test");
 ActiveStorage.analyzers = [Vips, ImageMagick, VideoAnalyzer, AudioAnalyzer];
+ActiveStorage.previewers = [PopplerPDFPreviewer, MuPDFPreviewer, VideoPreviewer];
 
 const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
 
@@ -85,6 +91,11 @@ GlobalID.setApp("ActiveStorageExampleApp");
 
 Blob.services = new Registry({
   local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
+  local_public: {
+    service: "Disk",
+    root: File.join(Dir.tmpdir(), "active_storage_public_blobs"),
+    public: true,
+  },
   disk_mirror_1: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_1") },
   disk_mirror_2: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_2") },
   disk_mirror_3: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_3") },

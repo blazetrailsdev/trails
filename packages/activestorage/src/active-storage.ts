@@ -15,6 +15,7 @@ import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
+import type { Previewer } from "./previewer.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -25,11 +26,9 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Attachment?: typeof Attachment;
   FixtureSet: unknown;
   Service: unknown;
-  Previewer: unknown;
+  Previewer: typeof Previewer;
   Analyzer: typeof Analyzer;
   Blob?: typeof Blob;
-  Preview?: new (blob: Blob, transformations: unknown) => { processed(): Promise<unknown> };
-  PreviewImageJob?: { performLater(...args: unknown[]): Promise<unknown> };
   VariantRecord?: unknown;
   Transformers: typeof Transformers;
   Error: typeof Errors.Error;
@@ -45,7 +44,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   verifier: MessageVerifier;
   variantProcessor: string;
   queues: Record<string, unknown>;
-  previewers: { isAccept(blob: Blob): boolean }[];
+  previewers: (typeof Previewer)[];
   analyzers: (typeof Analyzer)[];
   paths: Record<string, unknown>;
   variableContentTypes: string[];

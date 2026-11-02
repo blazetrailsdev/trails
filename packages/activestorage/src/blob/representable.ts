@@ -4,6 +4,8 @@ import { included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import type { Blob } from "../blob.js";
 import { InvariableError, UnpreviewableError, UnrepresentableError } from "../errors.js";
+import { PreviewImageJob } from "../preview-image-job.js";
+import { Preview } from "../preview.js";
 import { TransformJob } from "../transform-job.js";
 import { VariantWithRecord } from "../variant-with-record.js";
 import { Variant } from "../variant.js";
@@ -30,7 +32,7 @@ function isVariable(this: Blob): boolean {
 
 function preview(this: Blob, transformations: Transformations) {
   if (this.isPreviewable()) {
-    return new ActiveStorage.Preview!(this, transformations);
+    return new Preview(this, transformations);
   } else {
     throw new UnpreviewableError(
       `No previewer found for blob with ID=${this.id} and content_type=${this.content_type}`,
@@ -67,7 +69,7 @@ async function isPreviewImageNeededBeforeProcessingVariants(this: Blob): Promise
 
 /** @internal */
 async function createPreviewImageLater(this: Blob, variations: unknown[]): Promise<void> {
-  if (this.isRepresentable()) await ActiveStorage.PreviewImageJob!.performLater(this, variations);
+  if (this.isRepresentable()) await PreviewImageJob.performLater(this, variations);
 }
 
 /** @internal */
