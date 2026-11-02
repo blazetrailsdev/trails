@@ -7,7 +7,6 @@ export { NullInflector } from "./null-inflector.js";
 export { Error, NameError, ReloadingDisabledError, SetupRequired } from "./error.js";
 export { Cref } from "./cref.js";
 export { Loader } from "./loader.js";
-export { GemLoader } from "./gem-loader.js";
 export { Registry } from "./registry.js";
 export {
   buildManifest,

@@ -1,11 +1,9 @@
-import { aryDelete, deleteIf } from "@blazetrails/ruby-compat";
-import type { GemLoader } from "./gem-loader.js";
-import type { Loader } from "./loader.js";
+import { File, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
+import { Loader } from "./loader.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
 
 export const Registry = {
   ExplicitNamespaces,
-  GemLoader: undefined as typeof GemLoader | undefined,
 
   loaders: [] as Loader[],
   gemLoadersByRootFile: {} as Record<string, Loader>,
@@ -21,14 +19,17 @@ export const Registry = {
     deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
-  async loaderForGem(
-    rootFile: string,
-    { namespace, warnOnExtraFiles }: { namespace: object; warnOnExtraFiles: boolean },
-  ): Promise<Loader> {
-    return (this.gemLoadersByRootFile[rootFile] ??= await this.GemLoader!.__new(rootFile, {
-      namespace,
-      warnOnExtraFiles,
-    }));
+  async loaderForGem(rootFile: string, { namespace }: { namespace: object }): Promise<Loader> {
+    if (Object.hasOwn(this.gemLoadersByRootFile, rootFile)) {
+      return this.gemLoadersByRootFile[rootFile];
+    }
+
+    const { name } = JSON.parse(await getFs().readFile(rootFile, "utf8")) as { name: string };
+    const loader = new Loader();
+    loader.tag = name.slice(name.lastIndexOf("/") + 1);
+    if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
+    await loader.pushDir(File.join(File.dirname(rootFile), "src"), { namespace });
+    return (this.gemLoadersByRootFile[rootFile] = loader);
   },
 
   registerAutoload(loader: Loader, abspath: string): Loader {

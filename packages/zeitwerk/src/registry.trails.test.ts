@@ -1,19 +1,23 @@
+import { File } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
-import { GemLoader } from "./gem-loader.js";
 import { Registry } from "./registry.js";
 import { teardown, withFiles } from "./test-helpers/loader-test.js";
 
 describe("Zeitwerk::Registry.loader_for_gem", () => {
   afterEach(teardown);
 
-  it("returns the same GemLoader for the same root file", async () => {
-    await withFiles([["lib/my_gem.ts", "export class MyGem {}"]], async () => {
-      const options = { namespace: Object, warnOnExtraFiles: false };
-      const loader = await Registry.loaderForGem("lib/my_gem.ts", options);
+  it("builds one Loader per package.json, tagged and rooted from it", async () => {
+    const files: [string, string][] = [
+      ["my_gem/package.json", '{ "name": "@scope/my_gem" }'],
+      ["my_gem/src/foo.ts", "export class Foo {}"],
+    ];
+    await withFiles(files, async () => {
+      const options = { namespace: Object };
+      const loader = await Registry.loaderForGem("my_gem/package.json", options);
 
-      expect(loader).toBeInstanceOf(GemLoader);
       expect(loader.tag).toEqual("my_gem");
-      expect(await Registry.loaderForGem("lib/my_gem.ts", options)).toBe(loader);
+      expect(loader.dirs()).toEqual([File.expandPath("my_gem/src")]);
+      expect(await Registry.loaderForGem("my_gem/package.json", options)).toBe(loader);
     });
   });
 });
