@@ -1,3 +1,4 @@
+import { _generations } from "../core-ext/kernel.js";
 import { Dir, File, Pathname, TypeError, getFs, rbInspect, stdout } from "@blazetrails/ruby-compat";
 import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
@@ -26,7 +27,11 @@ export const Config = {
     const abspath = File.expandPath(path);
     if (this.manifest != null || (await this.isDir(abspath))) {
       this.raiseIfConflictingDirectory(abspath);
-      if (this.manifest == null) this._realRoots[await getFs().realpath!(abspath)] = abspath;
+      if (this.manifest == null) {
+        const realRoot = await getFs().realpath!(abspath);
+        this._realRoots[realRoot] = abspath;
+        this._generation = Math.max(this._generation, _generations.get(realRoot) ?? 1);
+      }
       return (this.roots[abspath] = namespace);
     } else {
       throw new ZeitwerkError(`the root directory ${abspath} does not exist`);

@@ -114,9 +114,9 @@ export function registerModel(
   } else {
     model = nameOrModel;
     assertActiveRecordBase(model);
-    registerConstant(model.name, model);
-    const qualified = rbModName(model)!;
-    if (qualified !== model.name) registerConstant(qualified, model);
+    const qualified = rbModName(model) ?? model.name;
+    registerConstant(qualified, model);
+    if (qualified !== model.name) registerConstant(model.name, model);
   }
   if (model === ActiveRecord.Base) return;
   DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);

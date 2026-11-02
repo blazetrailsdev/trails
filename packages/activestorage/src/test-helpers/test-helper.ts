@@ -17,7 +17,7 @@ import type { AssociationProxy } from "@blazetrails/activerecord/associations/co
 
 export class User extends Base {
   declare name: string | null;
-  declare recordCallbacks: boolean | undefined;
+  declare private _recordCallbacks: boolean | undefined;
   declare callbackCounter: number | undefined;
   notificationSent: boolean | undefined;
 
@@ -99,6 +99,14 @@ export class User extends Base {
     this.afterUpdateCommit((user: User) => user.notify());
 
     this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
+  }
+
+  get recordCallbacks(): boolean | undefined {
+    return this._recordCallbacks;
+  }
+
+  set recordCallbacks(value: boolean | undefined) {
+    this._recordCallbacks = value;
   }
 
   isShouldPreprocessed(): boolean {

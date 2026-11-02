@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fixtures } from "../../activerecord/src/test-helpers/use-fixtures.js";
-import { IO } from "@blazetrails/ruby-compat";
+import { isPresent } from "@blazetrails/activesupport";
+import { FileUtils } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
@@ -19,27 +20,42 @@ describe("ActiveStorage::FixtureSetTest", () => {
     active_storage_attachments: [Attachment, attachments],
   }) as never as { users: (name: string) => Promise<User> };
 
-  // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
   it("test_active_storage_blob", async () => {
     const user = await users("first");
 
-    const avatar = (await Attachment.findBy({ name: "avatar", record_id: user.id })) as Attachment;
-    const blob = (await avatar.blob)!;
+    const avatar = user.avatar;
+    await avatar.load();
+    const blob = (await (await avatar.attachment)!.blob)!;
 
     expect(blob.content_type).toBe("image/jpeg+override");
     expect(blob.filename.toString()).toBe("racecar.jpg");
     expect(blob.service.name).toBe("local");
     await blob.open({}, async (file) => {
       const fixture = new FixtureSet().fileFixture("racecar.jpg");
-      expect(await IO.binreadAsync(file.path()!)).toEqual(await IO.binreadAsync(fixture.toPath()));
+      expect(await FileUtils.isIdenticalAsync(file.path()!, fixture.toPath())).toBe(true);
     });
   }, 30_000);
 
-  it.skip("test_active_storage_attachment", () => {
-    // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
+  it("test_active_storage_attachment", async () => {
+    const user = await users("first");
+
+    const avatar = user.avatar;
+    await avatar.load();
+
+    expect(avatar.isBlank()).toBe(false);
+    expect(avatar.isAttached()).toBe(true);
+    expect(isPresent(await avatar.attachment)).toBe(true);
   });
 
-  it.skip("test_active_storage_metadata", () => {
-    // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-  });
+  it("test_active_storage_metadata", async () => {
+    const user = await users("first");
+
+    const avatar = user.avatar;
+    await avatar.load();
+    const blob = (await (await avatar.attachment)!.blob)!;
+    await blob.analyze();
+
+    expect(blob.metadata.get("identified")).toBeTruthy();
+    expect(blob.metadata.get("analyzed")).toBeTruthy();
+  }, 30_000);
 });

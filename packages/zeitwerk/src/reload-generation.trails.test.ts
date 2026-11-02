@@ -176,7 +176,47 @@ const UNLOAD_FILES: [string, string][] = [
   ["app/b.ts", 'import { A } from "./a.ts";\nexport class B extends A {}'],
 ];
 
+const UNREGISTER_MAIN = `
+import { TopLevel } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+
+const load = async () => {
+  const loader = new Loader();
+  loader.enableReloading();
+  await loader.pushDir("app");
+  await loader.setup();
+  await loader.eagerLoad();
+  return [loader, { ...TopLevel }];
+};
+
+const [loader, first] = await load();
+await loader.unload();
+loader.unregister();
+const [, second] = await load();
+
+console.log(JSON.stringify({
+  required: first.B !== second.B,
+  imported: first.A !== second.A && Object.getPrototypeOf(second.B) === second.A,
+}));
+`;
+
+const UNREGISTER_FILES: [string, string][] = [
+  ["main.mjs", UNREGISTER_MAIN],
+  ...UNLOAD_FILES.slice(1),
+];
+
 describe("Loader#reload under real Node", () => {
+  it("re-evaluates a file for a new loader after unload and unregister", async () => {
+    await withFiles(UNREGISTER_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({ required: true, imported: true });
+    });
+  }, 30_000);
+
   it("keeps one class across unload and setup with reloading disabled", async () => {
     await withFiles(UNLOAD_FILES, async () => {
       const [output, status] = await Open3.capture2e(
