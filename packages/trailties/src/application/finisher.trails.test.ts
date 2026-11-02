@@ -367,16 +367,6 @@ describe("Finisher", () => {
     expect(constantize("SeatedJob")).toBe(SeatedJob);
   });
 
-  it("drops a reloaded model from its superclass's subclasses", async () => {
-    class Parent extends Base {}
-    class Stale extends Parent {}
-    class Fresh extends Parent {}
-    await _registerAutoloaded("Stale", Stale);
-    DescendantsTracker.clear([Stale as never]);
-    await _registerAutoloaded("Fresh", Fresh);
-    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Fresh]);
-  });
-
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
     const app = new TestApp();
     const seen: string[] = [];

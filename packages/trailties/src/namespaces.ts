@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export const Rails = { name: "Rails" };
-registerConstant("Rails", Rails);
+constSet(TopLevel, "Rails", Rails);
