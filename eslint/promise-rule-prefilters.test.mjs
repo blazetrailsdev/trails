@@ -43,8 +43,6 @@ const floatingVoid = (statement) => ({
     },
   ],
 });
-
-// Each case sits behind a prefilter's early return, or just past it.
 tester.run(
   "no-floating-promises",
   prefilterNoFloatingPromises(tseslint.plugin.rules["no-floating-promises"]),

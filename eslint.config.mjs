@@ -1214,9 +1214,6 @@ export default defineConfig(
   //    a Promise spread into an object.
   //  - no-floating-promises: catches a dropped Promise statement — a bare
   //    `record.save()` whose result nobody awaits.
-  //
-  // Both stay under their upstream names, behind the prefilters applied at the
-  // top of this file.
   {
     files: [
       "packages/activemodel/src/**/*.ts",

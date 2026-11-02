@@ -25,16 +25,10 @@ const NON_FUNCTION_ARGUMENT = new Set([
   "ObjectExpression",
   "TemplateLiteral",
 ]);
-
-// A union's own flags say nothing about its members, so it is read through
-// them. `boolean` is a union too, and BooleanLike answers it at the first test.
 function isNeverThenable(type) {
   if (type.flags & NEVER_THENABLE) return true;
   return type.isUnion() && type.types.every(isNeverThenable);
 }
-
-// No signature answers "unknown", as for `any`: the caller keeps the upstream
-// check. Otherwise the call's result is one of these return types.
 function everySignatureReturns(signatures, predicate) {
   return signatures.length > 0 && signatures.every((sig) => predicate(sig.getReturnType()));
 }
