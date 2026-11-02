@@ -23,6 +23,7 @@ export class Variant {
     return this.blob.service;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get content_type(): string | null {
     return this.variation.contentType;
   }
