@@ -19,7 +19,12 @@ import { Callbacks } from "./loader/callbacks.js";
 import { Config } from "./loader/config.js";
 import { EagerLoad } from "./loader/eager-load.js";
 import { Helpers } from "./loader/helpers.js";
-import { configurationDigest, manifestRoot, type Manifest } from "./loader/manifest.js";
+import {
+  configurationDigest,
+  manifestRoot,
+  type Manifest,
+  type ManifestRow,
+} from "./loader/manifest.js";
 import { RealModName } from "./real-mod-name.js";
 import { Registry } from "./registry.js";
 
@@ -48,6 +53,9 @@ export class Loader {
   manifest: Manifest | string | null;
   /** @noRailsEquivalent PERMANENT */
   manifestRoot: string | null;
+  /** @noRailsEquivalent PERMANENT */
+  imports: Record<string, () => Promise<unknown>> | null;
+  /** @internal */ _manifestConstants: Record<string, ManifestRow> | null;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
   /** @internal */ roots: Record<string, object>;
@@ -77,6 +85,8 @@ export class Loader {
     this.logger = (this.constructor as typeof Loader).defaultLogger;
     this.manifest = null;
     this.manifestRoot = null;
+    this.imports = null;
+    this._manifestConstants = null;
     this._tag = SecureRandom.hex(3);
     this._initializedAt = new Date();
     this.roots = {};
@@ -259,6 +269,8 @@ export class Loader {
       );
     }
 
+    this._manifestConstants = manifest.constants;
+
     const namespaces: Record<string, object> = {};
     for (const rootNamespace of Object.values(this.roots)) {
       namespaces[rootNamespace === Object ? "" : this.realModName(rootNamespace)!] = rootNamespace;
@@ -266,10 +278,29 @@ export class Loader {
 
     for (const file of manifest.shadowed) this.shadowedFiles.add(File.expandPath(file, root));
 
-    for (const [cpath, row] of Object.entries(manifest.constants)) {
+    await this._defineAutoloadsFromRows(Object.entries(manifest.constants), namespaces);
+  }
+
+  /** @internal */
+  async _defineAutoloadsForNamespace(cpath: string, namespace: object): Promise<void> {
+    const rows = Object.entries(this._manifestConstants!).filter(([path]) =>
+      path.startsWith(`${cpath}::`),
+    );
+    await this._defineAutoloadsFromRows(rows, { [cpath]: namespace });
+  }
+
+  private async _defineAutoloadsFromRows(
+    rows: [string, ManifestRow][],
+    namespaces: Record<string, object>,
+  ): Promise<void> {
+    const root = manifestRoot(this);
+    for (const [cpath, row] of rows) {
       const index = cpath.lastIndexOf("::");
       const parentPath = index < 0 ? "" : cpath.slice(0, index);
-      if (!Object.hasOwn(namespaces, parentPath) && Object.hasOwn(manifest.constants, parentPath)) {
+      if (
+        !Object.hasOwn(namespaces, parentPath) &&
+        Object.hasOwn(this._manifestConstants!, parentPath)
+      ) {
         continue;
       }
       const parent = namespaces[parentPath] ?? (constGet(Object, parentPath) as object);

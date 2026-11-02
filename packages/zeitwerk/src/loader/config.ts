@@ -8,6 +8,7 @@ type GlobArg = PathArg | PathArg[];
 type LoadBlock = (...args: never[]) => unknown;
 
 export const Config = {
+  /** @inventedArm if — PERMANENT */
   async pushDir(
     this: Loader,
     path: PathArg,
@@ -23,7 +24,7 @@ export const Config = {
 
     path = path.toString();
     const abspath = File.expandPath(path);
-    if (await this.isDir(abspath)) {
+    if (this.manifest != null || (await this.isDir(abspath))) {
       this.raiseIfConflictingDirectory(abspath);
       return (this.roots[abspath] = namespace);
     } else {
@@ -181,9 +182,13 @@ export const Config = {
     return (paths.flat(Infinity) as PathArg[]).map((path) => File.expandPath(path.toString()));
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   async expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): Promise<string[]> {
     const found: string[] = [];
+    if (this.manifest != null) return found;
     for (const globPattern of globPatterns) found.push(...(await Dir.globAsync(globPattern)));
     return found;
   },

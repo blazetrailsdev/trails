@@ -1,5 +1,5 @@
 import { autoloadGet } from "../core-ext/kernel.js";
-import { File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
+import { Dir, File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
 import { _isModule } from "../core-ext/module.js";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";
@@ -7,6 +7,7 @@ import type { Loader } from "../loader.js";
 import { Registry } from "../registry.js";
 
 export const EagerLoad = {
+  /** @inventedArm if — PERMANENT */
   async eagerLoad(this: Loader, { force = false }: { force?: boolean } = {}): Promise<void> {
     await this.mutex.synchronize(async () => {
       if (this._eagerLoaded) return;
@@ -14,9 +15,19 @@ export const EagerLoad = {
 
       if (this.logger != null) this.log("eager load start");
 
-      const roots = await this.actualRoots();
-      for (const [rootDir, rootNamespace] of Object.entries(roots)) {
-        await this.actualEagerLoadDir(rootDir, rootNamespace, { force });
+      if (this._manifestConstants != null) {
+        const root = this.manifestRoot ?? Dir.pwd();
+        for (const row of Object.values(this._manifestConstants)) {
+          const abspaths = [row.path, ...(row.dirs ?? [])].map((p) => File.expandPath(p, root));
+          if (!force && abspaths.every((p) => this.isExcludedFromEagerLoad(p))) continue;
+          const cref = this.autoloads[abspaths[0]];
+          if (cref != null) await autoloadGet(cref);
+        }
+      } else {
+        const roots = await this.actualRoots();
+        for (const [rootDir, rootNamespace] of Object.entries(roots)) {
+          await this.actualEagerLoadDir(rootDir, rootNamespace, { force });
+        }
       }
 
       for (const autoloadedDir of this.autoloadedDirs) {
