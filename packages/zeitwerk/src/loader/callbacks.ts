@@ -58,17 +58,10 @@ export const Callbacks = {
     });
   },
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   async onNamespaceLoaded(this: Loader, cref: Cref, namespace: object): Promise<void> {
     const dirs = this.namespaceDirs.delete(cref);
     if (dirs != null) {
-      if (this._manifestConstants != null) {
-        await this._defineAutoloadsForNamespace(cref.path(), namespace);
-        return;
-      }
       for (const dir of dirs) await this.defineAutoloadsForDir(dir, namespace);
     }
   },

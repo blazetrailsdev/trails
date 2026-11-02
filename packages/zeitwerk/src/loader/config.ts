@@ -148,7 +148,8 @@ export const Config = {
   async actualRoots(this: Loader): Promise<Record<string, object>> {
     const roots: Record<string, object> = {};
     for (const [rootDir, rootNamespace] of Object.entries(this.roots)) {
-      if (!(await this.isDir(rootDir)) || this.isIgnoredPath(rootDir)) continue;
+      if (this._manifestConstants == null && !(await this.isDir(rootDir))) continue;
+      if (this.isIgnoredPath(rootDir)) continue;
       roots[rootDir] = rootNamespace;
     }
     return roots;
