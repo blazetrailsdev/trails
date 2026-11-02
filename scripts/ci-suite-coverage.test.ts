@@ -716,7 +716,7 @@ async function testedPackageDirs(): Promise<string[]> {
   return dirs;
 }
 
-describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
+describe("CI runs every tooling test suite", () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const filters = ciVitestFilters(yml);
@@ -739,57 +739,69 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
   // The package half of the same defect: packages/date held 13 files and 362
   // tests that no ci.yml job ran — the change filters named the package, so a
   // date change woke the Unit Tests job, which then ran no date test.
-  it("covers each package test suite with a ci.yml vitest filter", async () => {
-    const yml = await readFile(CI_YML, "utf8");
-    const { uncovered } = await packageCoverage(yml, await testedPackageDirs());
-    expect(uncovered).toEqual([]);
-  });
+  it(
+    "covers each package test suite with a ci.yml vitest filter",
+    { timeout: 60_000 },
+    async () => {
+      const yml = await readFile(CI_YML, "utf8");
+      const { uncovered } = await packageCoverage(yml, await testedPackageDirs());
+      expect(uncovered).toEqual([]);
+    },
+  );
 
   // The companion the package half was missing, mirroring the unit-tests one
   // below: a filter only runs when the gate of the job holding it fires, so a
   // package filtered by a job its own paths cannot wake is not covered at all.
   // packages/rack-session was exactly that — RACK_PKGS_RE never matched it, so
   // leaf-tests was skipped on a rack-session-only PR.
-  it("matches each package filter against the gate of the job that runs it", async () => {
-    const yml = await readFile(CI_YML, "utf8");
-    const { ungated } = await packageCoverage(yml, await testedPackageDirs());
-    expect(ungated).toEqual([]);
-  });
+  it(
+    "matches each package filter against the gate of the job that runs it",
+    { timeout: 60_000 },
+    async () => {
+      const yml = await readFile(CI_YML, "utf8");
+      const { ungated } = await packageCoverage(yml, await testedPackageDirs());
+      expect(ungated).toEqual([]);
+    },
+  );
 
   // Regression proof for both halves at once, over a synthetic ci.yml: with
   // packages/rack-session unregistered (the state this story was filed from),
   // the guard must report it. The string-prefix bug hid the gate bug — the
   // packages/rack filter "covered" packages/rack-session for free — so assert
   // the uncovered arm here and the gated arm against the repaired workflow.
-  it("reports a package a prefix-named sibling's filter appears to cover", async () => {
-    const yml = await readFile(CI_YML, "utf8");
-    const dirs = ["packages/rack", "packages/rack-session"];
+  it(
+    "reports a package a prefix-named sibling's filter appears to cover",
+    { timeout: 60_000 },
+    async () => {
+      const yml = await readFile(CI_YML, "utf8");
+      const dirs = ["packages/rack", "packages/rack-session"];
 
-    const broken = yml
-      .replace(
-        "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test\n",
+      const broken = yml
+        .replace(
+          "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test\n",
+          "run: pnpm vitest run packages/rack\n",
+        )
+        .replace("RACK_PKGS_RE='^packages/(rack|rack-session|", "RACK_PKGS_RE='^packages/(rack|");
+      expect(broken).not.toEqual(yml);
+      expect((await packageCoverage(broken, dirs)).uncovered).toEqual(["packages/rack-session"]);
+
+      const filterOnly = broken.replace(
         "run: pnpm vitest run packages/rack\n",
-      )
-      .replace("RACK_PKGS_RE='^packages/(rack|rack-session|", "RACK_PKGS_RE='^packages/(rack|");
-    expect(broken).not.toEqual(yml);
-    expect((await packageCoverage(broken, dirs)).uncovered).toEqual(["packages/rack-session"]);
+        "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test\n",
+      );
+      expect(filterOnly).not.toEqual(broken);
+      const halfFixed = await packageCoverage(filterOnly, dirs);
+      expect(halfFixed.uncovered).toEqual([]);
+      expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
 
-    const filterOnly = broken.replace(
-      "run: pnpm vitest run packages/rack\n",
-      "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test\n",
-    );
-    expect(filterOnly).not.toEqual(broken);
-    const halfFixed = await packageCoverage(filterOnly, dirs);
-    expect(halfFixed.uncovered).toEqual([]);
-    expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
-
-    const fixed = filterOnly.replace(
-      "RACK_PKGS_RE='^packages/(rack|",
-      "RACK_PKGS_RE='^packages/(rack|rack-session|",
-    );
-    expect(fixed).not.toEqual(filterOnly);
-    expect(await packageCoverage(fixed, dirs)).toEqual({ uncovered: [], ungated: [] });
-  });
+      const fixed = filterOnly.replace(
+        "RACK_PKGS_RE='^packages/(rack|",
+        "RACK_PKGS_RE='^packages/(rack|rack-session|",
+      );
+      expect(fixed).not.toEqual(filterOnly);
+      expect(await packageCoverage(fixed, dirs)).toEqual({ uncovered: [], ungated: [] });
+    },
+  );
 
   // The infra sweep fires on `pnpm-lock.yaml`, the root `tsconfig.json` and
   // `vitest*.config.ts` because a change to any of them CAN affect everything.
@@ -955,48 +967,52 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
   // Under-firing only delays the PG/MySQL signal to the ready-for-review run,
   // but over-firing hands back the saving the deferral exists to capture, so
   // both directions are pinned.
-  it("fires db_adapter_affected for PG/MySQL adapter paths and not for backend-neutral ones", async () => {
-    const yml = await readFile(CI_YML, "utf8");
-    const runGate = await gateRunner(yml);
+  it(
+    "fires db_adapter_affected for PG/MySQL adapter paths and not for backend-neutral ones",
+    { timeout: 60_000 },
+    async () => {
+      const yml = await readFile(CI_YML, "utf8");
+      const runGate = await gateRunner(yml);
 
-    const runs = [
-      "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
-      "packages/activerecord/src/connection-adapters/postgresql/column.ts",
-      "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
-      "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
-      "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts",
-      "packages/activerecord/src/adapters/postgresql/range.test.ts",
-      // Shared substrate: breaks one backend without naming it.
-      "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
-      "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
-      "packages/activerecord/src/connection-adapters/sql-classification.ts",
-      "packages/arel/src/visitors/postgresql.ts",
-      "packages/arel/src/visitors/mysql.ts",
-      "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
-    ];
-    const skips = [
-      "packages/activerecord/src/relation.ts",
-      "packages/activerecord/src/associations.ts",
-      "packages/activerecord/src/base.test.ts",
-      "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
-      "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
-      "packages/arel/src/visitors/to-sql.ts",
-    ];
-    const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
-    const outcome = Object.fromEntries(
-      [...runs, ...skips].map((f, i) => [f, fired[i].db_adapter_affected]),
-    );
-    expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
-    expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
+      const runs = [
+        "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
+        "packages/activerecord/src/connection-adapters/postgresql/column.ts",
+        "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
+        "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
+        "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts",
+        "packages/activerecord/src/adapters/postgresql/range.test.ts",
+        // Shared substrate: breaks one backend without naming it.
+        "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
+        "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
+        "packages/activerecord/src/connection-adapters/sql-classification.ts",
+        "packages/arel/src/visitors/postgresql.ts",
+        "packages/arel/src/visitors/mysql.ts",
+        "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+      ];
+      const skips = [
+        "packages/activerecord/src/relation.ts",
+        "packages/activerecord/src/associations.ts",
+        "packages/activerecord/src/base.test.ts",
+        "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
+        "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
+        "packages/arel/src/visitors/to-sql.ts",
+      ];
+      const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
+      const outcome = Object.fromEntries(
+        [...runs, ...skips].map((f, i) => [f, fired[i].db_adapter_affected]),
+      );
+      expect(runs.filter((f) => outcome[f] !== "true")).toEqual([]);
+      expect(skips.filter((f) => outcome[f] !== "false")).toEqual([]);
 
-    // Anchor probe. Every path above starts at position 0, so none of them can
-    // catch an alternation whose `^` covers only its first branch — the shape
-    // a later edit to this regex is most likely to introduce.
-    const gate = gateRegex(yml, "DB_ADAPTER_RE");
-    expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
-  });
+      // Anchor probe. Every path above starts at position 0, so none of them can
+      // catch an alternation whose `^` covers only its first branch — the shape
+      // a later edit to this regex is most likely to introduce.
+      const gate = gateRegex(yml, "DB_ADAPTER_RE");
+      expect(runs.filter((f) => gate.test(`vendor/${f}`))).toEqual([]);
+    },
+  );
 
-  it("fires only unit_tests_affected for i18n-only changes", async () => {
+  it("fires only unit_tests_affected for i18n-only changes", { timeout: 60_000 }, async () => {
     const yml = await readFile(CI_YML, "utf8");
     const runGate = await gateRunner(yml);
 
@@ -1313,88 +1329,96 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
     expect(discriminator.test("HTTP 404: Not Found")).toBe(false);
   });
 
-  it("sets thor_only only when every changed path is in the thor-only set", async () => {
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+  it(
+    "sets thor_only only when every changed path is in the thor-only set",
+    { timeout: 60_000 },
+    async () => {
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
 
-    const thorOnly = await runGate(
-      [
-        "packages/thor/src/actions.ts",
-        "packages/thor/src/actions.test.ts",
-        "scripts/parity/unported-files/thor.ts",
-        "scripts/api-compare/call-mismatches-exclude/thor/actions.json",
-        "scripts/api-compare/call-mismatches-unreviewed/thor/actions.json",
-      ].join("\n"),
-    );
-    expect(thorOnly.thor_only).toBe("true");
-    expect(thorOnly.trailties_affected).toBe("true");
-    expect(thorOnly.unit_tests_affected).toBe("true");
-    expect(thorOnly.activerecord_affected).toBe("false");
+      const thorOnly = await runGate(
+        [
+          "packages/thor/src/actions.ts",
+          "packages/thor/src/actions.test.ts",
+          "scripts/parity/unported-files/thor.ts",
+          "scripts/api-compare/call-mismatches-exclude/thor/actions.json",
+          "scripts/api-compare/call-mismatches-unreviewed/thor/actions.json",
+        ].join("\n"),
+      );
+      expect(thorOnly.thor_only).toBe("true");
+      expect(thorOnly.trailties_affected).toBe("true");
+      expect(thorOnly.unit_tests_affected).toBe("true");
+      expect(thorOnly.activerecord_affected).toBe("false");
 
-    const withTrailties = await runGate(
-      "packages/thor/src/actions.ts\npackages/trailties/src/generators/base.ts",
-    );
-    expect(withTrailties.thor_only).toBe("false");
-    expect(withTrailties.trailties_affected).toBe("true");
+      const withTrailties = await runGate(
+        "packages/thor/src/actions.ts\npackages/trailties/src/generators/base.ts",
+      );
+      expect(withTrailties.thor_only).toBe("false");
+      expect(withTrailties.trailties_affected).toBe("true");
 
-    const withLockfile = await runGate(
-      "packages/thor/src/actions.ts\npnpm-lock.yaml",
-      await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
-    );
-    expect(withLockfile.thor_only).toBe("false");
-    expect(withLockfile.activerecord_affected).toBe("true");
-    expect(withLockfile.actionpack_affected).toBe("true");
+      const withLockfile = await runGate(
+        "packages/thor/src/actions.ts\npnpm-lock.yaml",
+        await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
+      );
+      expect(withLockfile.thor_only).toBe("false");
+      expect(withLockfile.activerecord_affected).toBe("true");
+      expect(withLockfile.actionpack_affected).toBe("true");
 
-    expect((await runGate("packages/thorough/src/x.ts")).thor_only).toBe("false");
-  });
+      expect((await runGate("packages/thorough/src/x.ts")).thor_only).toBe("false");
+    },
+  );
 
-  it("sets actioncable_only only when every changed path is in the actioncable-only set", async () => {
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-    const cable = "packages/actioncable/src/server/base.ts";
+  it(
+    "sets actioncable_only only when every changed path is in the actioncable-only set",
+    { timeout: 60_000 },
+    async () => {
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+      const cable = "packages/actioncable/src/server/base.ts";
 
-    const cableOnly = await runGate(
-      [
-        cable,
-        "packages/actioncable/src/server/base.test.ts",
-        "scripts/parity/unported-files/actioncable.ts",
-      ].join("\n"),
-    );
-    expect(cableOnly.actioncable_only).toBe("true");
-    expect(cableOnly.thor_only).toBe("false");
-    expect(cableOnly.actioncable_affected).toBe("true");
-    expect(
-      (await runGate("scripts/parity/unported-files/actioncable.ts")).actioncable_affected,
-    ).toBe("true");
-    expect(cableOnly.unit_tests_affected).toBe("true");
-    expect(cableOnly.activerecord_affected).toBe("false");
-    expect(cableOnly.actionpack_affected).toBe("false");
+      const cableOnly = await runGate(
+        [
+          cable,
+          "packages/actioncable/src/server/base.test.ts",
+          "scripts/parity/unported-files/actioncable.ts",
+        ].join("\n"),
+      );
+      expect(cableOnly.actioncable_only).toBe("true");
+      expect(cableOnly.thor_only).toBe("false");
+      expect(cableOnly.actioncable_affected).toBe("true");
+      expect(
+        (await runGate("scripts/parity/unported-files/actioncable.ts")).actioncable_affected,
+      ).toBe("true");
+      expect(cableOnly.unit_tests_affected).toBe("true");
+      expect(cableOnly.activerecord_affected).toBe("false");
+      expect(cableOnly.actionpack_affected).toBe("false");
 
-    const withTrailties = await runGate(`${cable}\npackages/trailties/src/generators/base.ts`);
-    expect(withTrailties.actioncable_only).toBe("false");
-    expect(withTrailties.trailties_affected).toBe("true");
+      const withTrailties = await runGate(`${cable}\npackages/trailties/src/generators/base.ts`);
+      expect(withTrailties.actioncable_only).toBe("false");
+      expect(withTrailties.trailties_affected).toBe("true");
 
-    const withLockfile = await runGate(
-      `${cable}\npnpm-lock.yaml`,
-      await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
-    );
-    expect(withLockfile.actioncable_only).toBe("false");
-    expect(withLockfile.activerecord_affected).toBe("true");
+      const withLockfile = await runGate(
+        `${cable}\npnpm-lock.yaml`,
+        await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
+      );
+      expect(withLockfile.actioncable_only).toBe("false");
+      expect(withLockfile.activerecord_affected).toBe("true");
 
-    const withThor = await runGate(`${cable}\npackages/thor/src/actions.ts`);
-    expect(withThor.actioncable_only).toBe("false");
-    expect(withThor.thor_only).toBe("false");
+      const withThor = await runGate(`${cable}\npackages/thor/src/actions.ts`);
+      expect(withThor.actioncable_only).toBe("false");
+      expect(withThor.thor_only).toBe("false");
 
-    expect(
-      (await runGate("vendor/rails/v8.0.2/actioncable/lib/action_cable.rb")).actioncable_only,
-    ).toBe("false");
-    expect((await runGate("packages/activesupport/src/index.ts")).actioncable_affected).toBe(
-      "true",
-    );
-    for (const dep of ["i18n", "nokogiri", "rack-session", "rack-test", "html-sanitizer"]) {
-      expect((await runGate(`packages/${dep}/src/index.ts`)).actioncable_affected).toBe("true");
-    }
-    expect((await runGate("packages/trailties/src/index.ts")).actioncable_affected).toBe("false");
-    expect((await runGate(cable)).actionpack_affected).toBe("false");
-  });
+      expect(
+        (await runGate("vendor/rails/v8.0.2/actioncable/lib/action_cable.rb")).actioncable_only,
+      ).toBe("false");
+      expect((await runGate("packages/activesupport/src/index.ts")).actioncable_affected).toBe(
+        "true",
+      );
+      for (const dep of ["i18n", "nokogiri", "rack-session", "rack-test", "html-sanitizer"]) {
+        expect((await runGate(`packages/${dep}/src/index.ts`)).actioncable_affected).toBe("true");
+      }
+      expect((await runGate("packages/trailties/src/index.ts")).actioncable_affected).toBe("false");
+      expect((await runGate(cable)).actionpack_affected).toBe("false");
+    },
+  );
 
   it("never sets thor_only outside the pull_request gate arm", async () => {
     const yml = await readFile(CI_YML, "utf8");
@@ -1441,75 +1465,98 @@ describe("CI runs every tooling test suite", { timeout: 60_000 }, () => {
     );
   });
 
-  it("narrows the database lanes to the satellite packages a diff is confined to", async () => {
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-    const storage = await runGate("packages/activestorage/src/blob.ts");
-    expect(storage.activerecord_affected).toBe("true");
-    expect(storage.ar_scope).toBe("packages/activestorage");
-    expect(storage.sqlite_only).toBe("false");
-    expect((await runGate("packages/trails-tsc/src/index.ts")).ar_scope).toBe(
-      "packages/activerecord-cli packages/solid-cable packages/solid-queue",
-    );
-    expect(
-      (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
-    ).toBe("");
-    expect(
-      (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts")).sqlite_only,
-    ).toBe("false");
-    expect(
-      (await runGate("packages/activestorage/src/blob.ts\nscripts/api-compare/config.ts")).ar_scope,
-    ).toBe("packages/activestorage");
-  });
-
-  it("runs the foundation packages on SQLite and leaves the adapter lanes to main", async () => {
-    const wf = parseYaml(await readFile(CI_YML, "utf8"));
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-    for (const pkg of ["ruby-compat", "i18n", "msgpack", "tzinfo", "nokogiri"]) {
-      const fired = await runGate(`packages/${pkg}/src/a.ts`);
-      expect(fired.activerecord_affected).toBe("true");
-      expect(fired.actionpack_affected).toBe("true");
-      expect(fired.sqlite_only).toBe("true");
-    }
-    for (const job of ["postgres-tests", "maria-tests"]) {
-      expect(wf.jobs[job].if).toContain("needs.changes.outputs.sqlite_only != 'true'");
-    }
-  });
-
-  it("selects unit packages by reverse closure and runs everything on infra", async () => {
-    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-    expect((await runGate("packages/zeitwerk/src/a.ts")).unit_packages).toBe("packages/zeitwerk");
-    expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
-    expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
-    expect((await runGate("packages/activemodel/src/a.ts")).unit_packages.split(" ")).toEqual(
-      expect.arrayContaining(["packages/activemodel", "packages/arel", "packages/globalid"]),
-    );
-    expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");
-  });
-
-  it("keeps every unit-tests package's imports declared in its package.json", async () => {
-    const yml = await readFile(CI_YML, "utf8");
-    const dirs = ciVitestFilters(jobBlock(yml, "unit-tests")).filter((f) =>
-      f.startsWith("packages/"),
-    );
-    const undeclared: string[] = [];
-    for (const dir of new Set(dirs)) {
-      const pkg = JSON.parse(await readFile(path.join(REPO_ROOT, dir, "package.json"), "utf8"));
-      const declared = new Set(
-        ["dependencies", "peerDependencies", "devDependencies"].flatMap((f) =>
-          Object.keys(pkg[f] ?? {}),
-        ),
+  it(
+    "narrows the database lanes to the satellite packages a diff is confined to",
+    { timeout: 60_000 },
+    async () => {
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+      const storage = await runGate("packages/activestorage/src/blob.ts");
+      expect(storage.activerecord_affected).toBe("true");
+      expect(storage.ar_scope).toBe("packages/activestorage");
+      expect(storage.sqlite_only).toBe("false");
+      expect((await runGate("packages/trails-tsc/src/index.ts")).ar_scope).toBe(
+        "packages/activerecord-cli packages/solid-cable packages/solid-queue",
       );
-      const { stdout } = await execFileAsync(
-        "git",
-        ["grep", "-hoE", "(from |import\\(|^import )[\"']@blazetrails/[a-z0-9-]+", "--", dir],
-        { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
-      ).catch(() => ({ stdout: "" }));
-      for (const name of new Set(stdout.split("\n").map((l) => l.replace(/^.*["']/, "")))) {
-        if (name && name !== pkg.name && !declared.has(name)) undeclared.push(`${dir} -> ${name}`);
+      expect(
+        (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
+      ).toBe("");
+      expect(
+        (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts"))
+          .sqlite_only,
+      ).toBe("false");
+      expect(
+        (await runGate("packages/activestorage/src/blob.ts\nscripts/api-compare/config.ts"))
+          .ar_scope,
+      ).toBe("packages/activestorage");
+    },
+  );
+
+  it(
+    "runs the foundation packages on SQLite and leaves the adapter lanes to main",
+    { timeout: 60_000 },
+    async () => {
+      const wf = parseYaml(await readFile(CI_YML, "utf8"));
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+      for (const pkg of ["ruby-compat", "i18n", "msgpack", "tzinfo", "nokogiri"]) {
+        const fired = await runGate(`packages/${pkg}/src/a.ts`);
+        expect(fired.activerecord_affected).toBe("true");
+        expect(fired.actionpack_affected).toBe("true");
+        expect(fired.sqlite_only).toBe("true");
       }
-    }
-    expect(undeclared).toEqual([]);
-  });
+      for (const job of ["postgres-tests", "maria-tests"]) {
+        expect(wf.jobs[job].if).toContain("needs.changes.outputs.sqlite_only != 'true'");
+      }
+    },
+  );
+
+  it(
+    "selects unit packages by reverse closure and runs everything on infra",
+    { timeout: 60_000 },
+    async () => {
+      const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+      expect((await runGate("packages/zeitwerk/src/a.ts")).unit_packages).toBe("packages/zeitwerk");
+      expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
+      expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
+      expect((await runGate("packages/activemodel/src/a.ts")).unit_packages.split(" ")).toEqual(
+        expect.arrayContaining(["packages/activemodel", "packages/arel", "packages/globalid"]),
+      );
+      expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");
+      expect((await runGate("scripts/ci/unit-packages.mjs")).unit_packages).toBe("");
+      expect(
+        (await runGate("packages/solid-queue/src/a.ts\nscripts/ci/scoped-only.sh")).ar_scope,
+      ).toBe("");
+    },
+  );
+
+  it(
+    "keeps every unit-tests package's imports declared in its package.json",
+    { timeout: 60_000 },
+    async () => {
+      const yml = await readFile(CI_YML, "utf8");
+      const dirs = ciVitestFilters(jobBlock(yml, "unit-tests")).filter((f) =>
+        f.startsWith("packages/"),
+      );
+      const undeclared: string[] = [];
+      for (const dir of new Set(dirs)) {
+        const pkg = JSON.parse(await readFile(path.join(REPO_ROOT, dir, "package.json"), "utf8"));
+        const declared = new Set(
+          ["dependencies", "peerDependencies", "devDependencies"].flatMap((f) =>
+            Object.keys(pkg[f] ?? {}),
+          ),
+        );
+        const { stdout } = await execFileAsync(
+          "git",
+          ["grep", "-hoE", "(from |import\\(|^import )[\"']@blazetrails/[a-z0-9-]+", "--", dir],
+          { cwd: REPO_ROOT, maxBuffer: 1 << 28 },
+        ).catch(() => ({ stdout: "" }));
+        for (const name of new Set(stdout.split("\n").map((l) => l.replace(/^.*["']/, "")))) {
+          if (name && name !== pkg.name && !declared.has(name))
+            undeclared.push(`${dir} -> ${name}`);
+        }
+      }
+      expect(undeclared).toEqual([]);
+    },
+  );
 
   it("gives sqlite-mem-tests a nightly of its own", async () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));

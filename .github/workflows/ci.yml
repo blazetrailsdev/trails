@@ -900,9 +900,7 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      ((needs.changes.outputs.activerecord_affected == 'true' &&
-      (needs.changes.outputs.ar_scope == '' ||
-      contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli'))) ||
+      (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
@@ -2736,6 +2734,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      issues: write
     steps:
       - name: Fail if any required job failed, was cancelled, or unexpectedly skipped
         env:
@@ -2762,7 +2761,6 @@ jobs:
           SQLITE_ONLY: ${{ needs.changes.outputs.sqlite_only }}
           UNIT_PACKAGES: ${{ needs.changes.outputs.unit_packages }}
           AR_SCOPED_DX: ${{ needs.changes.outputs.ar_scope != '' }}
-          AR_SCOPED_VIRTUALIZED: ${{ needs.changes.outputs.ar_scope != '' && !contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli') }}
           SQLITE_MEM_NOT_REQUIRED: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')) }}
           MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
@@ -2915,7 +2913,7 @@ jobs:
                   fi
                   ;;
                 virtualized-dx-type-tests)
-                  if { [ "$AR_AFFECTED" = "false" ] || [ "$AR_SCOPED_VIRTUALIZED" = "true" ]; } && [ "$TRAILS_TSC_AFFECTED" = "false" ] && \
+                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ] && \
                      { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
@@ -2938,6 +2936,14 @@ jobs:
       # Informational only — never fails the run. Captures peer-job
       # durations from the same workflow run; CI's own duration is excluded
       # because it isn't final at the time of this query.
+      - name: Open an issue for a red nightly
+        if: ${{ failure() && github.event.schedule == '0 7 * * *' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh issue create -R "$GITHUB_REPOSITORY"
+          --title "Nightly sqlite-mem-tests failed"
+          --body "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
       - name: Job timing report
         if: ${{ always() }}
         continue-on-error: true
