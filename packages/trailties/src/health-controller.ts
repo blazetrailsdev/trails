@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
 
@@ -31,3 +32,5 @@ HealthController.rescueFrom(Error, {
     return this.renderDown();
   },
 });
+
+registerConstant("Rails::HealthController", HealthController);

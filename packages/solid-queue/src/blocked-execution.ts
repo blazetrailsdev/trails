@@ -1,7 +1,7 @@
 import { type Relation } from "@blazetrails/activerecord";
 import { slice } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Range, rbFArray } from "@blazetrails/ruby-compat";
+import { constSet, Range, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Semaphore } from "./semaphore.js";
@@ -14,6 +14,8 @@ export class BlockedExecution extends Execution {
   declare semaphore: Promise<Semaphore | null>;
 
   static {
+    constSet(SolidQueue, "BlockedExecution", this);
+
     this.assumesAttributesFromJob("concurrency_key");
     this.beforeCreate(function (this: BlockedExecution) {
       return this.setExpiresAt();

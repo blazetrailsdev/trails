@@ -220,6 +220,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
+  DestroyAssociationAsyncJob: typeof DestroyAssociationAsyncJob;
   Encryption: typeof Encryption;
   Fixture: typeof Fixture;
   FixtureSet: typeof FixtureSet;
@@ -237,7 +238,6 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Result: typeof Result;
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
-  DestroyAssociationAsyncJob: typeof DestroyAssociationAsyncJob;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;

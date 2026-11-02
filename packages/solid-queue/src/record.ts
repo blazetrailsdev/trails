@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { Base, type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
@@ -17,6 +18,8 @@ export class Record extends Base {
     }
   }
 }
+
+constSet(SolidQueue, "Record", Record);
 
 runLoadHooks("solid_queue_record", Record);
 

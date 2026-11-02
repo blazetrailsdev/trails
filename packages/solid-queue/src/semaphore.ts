@@ -1,6 +1,7 @@
+import { SolidQueue } from "./solid-queue.js";
 import { RecordNotUnique, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { Range, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, Range, registerConstant } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import type { Job } from "./job.js";
 
@@ -12,6 +13,8 @@ export class Semaphore extends Record {
   declare expires_at: Time;
 
   static {
+    constSet(SolidQueue, "Semaphore", this);
+
     this.scope("available", function () {
       return this.where("value > 0");
     });

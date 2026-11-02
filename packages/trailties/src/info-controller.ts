@@ -1,6 +1,6 @@
 import { htmlSafe, isBlank } from "@blazetrails/activesupport";
 import { DebugView, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
-import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import { registerConstant, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
 import { Info } from "./info.js";
 
@@ -75,3 +75,5 @@ export class InfoController extends ApplicationController {
 
 InfoController.prependViewPath(DebugView.RESCUES_TEMPLATE_PATHS);
 InfoController.beforeAction("requireLocalBang");
+
+registerConstant("Rails::InfoController", InfoController);

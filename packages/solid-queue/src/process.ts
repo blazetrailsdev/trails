@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { type Relation } from "@blazetrails/activerecord";
 import { include, isPresent, type HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
@@ -22,6 +23,8 @@ export class Process extends Record {
   declare static prune: typeof PrunableClassMethods.prune;
 
   static {
+    constSet(SolidQueue, "Process", this);
+
     include(this, Executor);
     include(this, Prunable);
 

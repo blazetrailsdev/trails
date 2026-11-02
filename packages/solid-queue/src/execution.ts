@@ -1,6 +1,6 @@
 import { type Base, type Relation } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
-import { StandardError, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidQueue } from "./solid-queue.js";
 import {
@@ -118,6 +118,8 @@ export class Execution extends Record {
     );
   }
 }
+
+constSet(SolidQueue, "Execution", Execution);
 registerConstant("SolidQueue::Execution::UndiscardableError", UndiscardableError);
 
 declare module "@blazetrails/activerecord" {

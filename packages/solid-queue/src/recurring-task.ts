@@ -11,6 +11,7 @@ import {
 import { Time } from "@blazetrails/date";
 import { Cron, Fugit } from "@blazetrails/fugit";
 import {
+  constSet,
   rbHashSRuby2KeywordsHash,
   rbInspect,
   rbObjClass,
@@ -45,6 +46,8 @@ export class RecurringTask extends Record {
   static Arguments = Arguments;
 
   static {
+    constSet(SolidQueue, "RecurringTask", this);
+
     this.serialize("arguments", { coder: Arguments, default: [] });
 
     this.validate(":supportedSchedule");

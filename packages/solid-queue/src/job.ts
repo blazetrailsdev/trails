@@ -1,8 +1,10 @@
+import { SolidQueue } from "./solid-queue.js";
 import { ActiveRecordError, type Base, type Relation } from "@blazetrails/activerecord";
 import { include, indexBy } from "@blazetrails/activesupport";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
 import {
+  constSet,
   StandardError,
   excBacktrace,
   excSetBacktrace,
@@ -72,6 +74,8 @@ export class Job extends Record {
   declare resetExecutionCounters: typeof Retryable.prototype.resetExecutionCounters;
 
   static {
+    constSet(SolidQueue, "Job", this);
+
     include(this, Recurrable);
     include(this, Clearable);
     include(this, Executable);
