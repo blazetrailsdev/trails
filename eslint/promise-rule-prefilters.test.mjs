@@ -83,6 +83,11 @@ tester.run(
       `${declarations} either("a");`,
     ],
     invalid: [
+      {
+        code: `${declarations} if (later()) {}`,
+        options: [{ checksVoidReturn: { arguments: false } }],
+        errors: [{ messageId: "conditional" }],
+      },
       { code: `${declarations} run(later);`, errors: [{ messageId: "voidReturnArgument" }] },
       {
         code: `${declarations} run(async () => {});`,

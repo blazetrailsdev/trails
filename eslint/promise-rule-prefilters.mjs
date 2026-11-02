@@ -45,13 +45,18 @@ function callCannotFloat(node, services, checker) {
   });
 }
 
+const prefiltered = new WeakSet();
+
 function withListeners(rule, wrap) {
-  return {
+  if (prefiltered.has(rule)) return rule;
+  const wrappedRule = {
     ...rule,
     create(context) {
       return wrap(rule.create(context), context);
     },
   };
+  prefiltered.add(wrappedRule);
+  return wrappedRule;
 }
 
 /** `ExpressionStatement` reports a Promise or an array of them, so an assignment or a call answering neither is skipped. */
@@ -94,6 +99,7 @@ export function prefilterNoMisusedPromises(rule) {
     const wrapped = { ...listeners };
     for (const key of ["CallExpression", "NewExpression"]) {
       const upstream = listeners[key];
+      if (upstream === undefined) continue;
       wrapped[key] = (node) => {
         if (node.arguments.some((arg) => argumentMayReturnThenable(arg, services, checker))) {
           upstream(node);
