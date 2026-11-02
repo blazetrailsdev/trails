@@ -36,21 +36,41 @@ describe("BacktraceCleaner", () => {
 });
 
 describe("Parser", () => {
-  it("skips a # in a multi-line string and stops at __END__", () => {
-    const parser = new Parser('x = "a\n# TODO: no"\n__END__\n# TODO: data\n', {
-      pattern: /#\s*(TODO):?\s*(.*)$/,
+  const pattern = /(?:\/\/|\/\*|\*)\s*(TODO):?\s*(.*?)\s*(?:\*\/)?$/;
+
+  it("skips a // in a multi-line template and a regexp", () => {
+    const parser = new Parser("const x = `a\n// TODO: no`;\nconst y = /\\/\\/ TODO: no/;\n", {
+      pattern,
+      file: "a.ts",
     });
     parser.parse();
     expect(parser.comments).toEqual([]);
     expect(parser.isError()).toBe(false);
   });
 
-  it("reads comments and skips a # inside a string", () => {
-    const parser = new Parser('x = "# TODO: no"\ny # TODO: yes\n', {
-      pattern: /#\s*(TODO):?\s*(.*)$/,
+  it("reads comments and skips a // inside a string", () => {
+    const parser = new Parser('const url = "http://x // TODO: no";\ny(); // TODO: yes\n', {
+      pattern,
+      file: "a.ts",
     });
     parser.parse();
     expect(parser.comments).toEqual([new Annotation(2, "TODO", "yes")]);
+  });
+
+  it("reads block comments and skips JSX text", () => {
+    const source = "/* TODO: one */\n/**\n * TODO: two\n */\nconst a = <p>// TODO: no</p>;\n";
+    const parser = new Parser(source, { pattern, file: "a.tsx" });
+    parser.parse();
+    expect(parser.comments).toEqual([
+      new Annotation(1, "TODO", "one"),
+      new Annotation(3, "TODO", "two"),
+    ]);
+  });
+
+  it("reports an error on an unterminated string", () => {
+    const parser = new Parser('// TODO: x\nconst a = "b\n', { pattern, file: "a.ts" });
+    parser.parse();
+    expect(parser.isError()).toBe(true);
   });
 });
 

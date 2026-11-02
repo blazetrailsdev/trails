@@ -91,13 +91,16 @@ export class Runner {
     if (locations.length === 0) return;
 
     const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
+    const verbose = argv.includes("-v") || argv.includes("--verbose");
     const success = await rbFSystem(
+      verbose ? { TRAILS_TEST_VERBOSE: "1" } : {},
       "vitest",
       "run",
       ...locations,
       ...(name != null && !lineFiltered ? ["-t", name.source] : []),
       ...(argv.includes("-f") || argv.includes("--fail-fast") ? ["--bail", "1"] : []),
-      ...(argv.includes("-v") || argv.includes("--verbose") ? ["--reporter", "verbose"] : []),
+      "--reporter",
+      decodeURIComponent(new URL("./vitest-reporter.js", import.meta.url).pathname),
     );
     if (success == null) throw new LoadError("cannot load such file -- vitest");
     if (!success) exit(false);

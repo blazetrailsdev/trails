@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   fsAdapterConfig,
   registerFsAdapter,
@@ -21,6 +21,7 @@ const posix: PathAdapter = {
 };
 
 const files = new Map<string, string>();
+const openFiles: Uint8Array[] = [];
 const norm = (p: string): string => p.replace(/^\.\//, "").replace(/\/+$/, "");
 const dirs = (): Set<string> => {
   const out = new Set<string>();
@@ -44,6 +45,16 @@ const memoryFs = {
     if (contents === undefined) throw new Error(`ENOENT: ${p}`);
     return contents;
   },
+  openSync: (p: string) => {
+    openFiles.push(new TextEncoder().encode(files.get(norm(p))));
+    return openFiles.length + 2;
+  },
+  readSync: (fd: number, buf: Uint8Array, off: number, len: number, pos: number) => {
+    const chunk = openFiles[fd - 3].subarray(pos, pos + len);
+    buf.set(chunk, off);
+    return chunk.length;
+  },
+  closeSync: () => {},
   readdirSync: (dir: string): string[] => {
     const pre = norm(dir) === "" ? "" : `${norm(dir)}/`;
     const seen = new Set<string>();
@@ -111,6 +122,29 @@ describe("SourceAnnotationExtractor", () => {
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `app/a.scss:\n  * [1] [TODO] styled\n\n`,
     );
+  });
+
+  test("ts files skip a marker in a string and read a block comment", async () => {
+    w("app/a.ts", 'const url = "http://x // TODO: no";\n/* TODO: x */\n');
+    expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
+      `app/a.ts:\n  * [2] [TODO] x\n\n`,
+    );
+  });
+
+  test("falls back to the regexp without typescript", async () => {
+    const missing = () => {
+      throw new Error("missing");
+    };
+    vi.resetModules();
+    vi.doMock("typescript/unstable/sync", missing);
+    try {
+      const { Annotation: Fallback } = await import("./source-annotation-extractor.js");
+      const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
+      expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
+    } finally {
+      vi.doUnmock("typescript/unstable/sync");
+      vi.resetModules();
+    }
   });
 
   test("registerTags adds new tags; unregistered tags are ignored", async () => {

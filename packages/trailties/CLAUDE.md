@@ -222,3 +222,13 @@ at `extends` (CLAUDE.md § "`inherited` is deferred to own-property memo guards"
 so `Base.methodAdded` seats the class the first time it adds a command, with
 `inherited`'s guard. A subclass with no command is never seated, which loses
 nothing: `find_by_namespace` needs a command to dispatch.
+
+## `TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)
+
+`trails test` hands off to Vitest (RFC 0212 open question 1, trails#9567), so
+`Rails::TestUnitReporter < Minitest::StatisticsReporter`
+(`vendor/rails/v8.0.2/railties/lib/rails/test_unit/reporter.rb:7`) has no
+superclass here, and its `super` calls have nothing to reach.
+`test-unit/vitest-reporter.ts` is the sole reporter of a `trails test` run. Its
+`VitestReporter` stands in for Minitest's reporter calls, and carries the
+`@noRailsEquivalent PERMANENT` receipt against this section.
