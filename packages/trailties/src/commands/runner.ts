@@ -45,9 +45,10 @@ export class RunnerCommand extends Base {
 
     const wrapWithExecutor = !this.options.skip_executor;
     if (codeOrFile === "-") {
-      const source = "application.runner.railties";
-      await this.conditionalExecutor(wrapWithExecutor, { source }, async () =>
-        evalToplevel((await stdin.read()) as string),
+      await this.conditionalExecutor(
+        wrapWithExecutor,
+        { source: "application.runner.railties" },
+        async () => evalToplevel((await stdin.read()) as string),
       );
     } else if (await File.isExistAsync(codeOrFile)) {
       const expandedFilePath = File.expandPath(codeOrFile);
@@ -65,13 +66,12 @@ export class RunnerCommand extends Base {
         );
       } catch (e) {
         if (!(e instanceof SyntaxError || e instanceof ReferenceError)) throw e;
-        const executable = (this.constructor as typeof Base).executable();
         if (this.isLooksLikeAFilePath(codeOrFile)) {
           this.error(`The file ${codeOrFile} could not be found, please check and try again.`);
-          this.error(`Run '${executable} -h' for help.`);
+          this.error(`Run '${(this.constructor as typeof Base).executable()} -h' for help.`);
         } else {
           this.error("Please specify a valid ruby command or the path of a script to run.");
-          this.error(`Run '${executable} -h' for help.`);
+          this.error(`Run '${(this.constructor as typeof Base).executable()} -h' for help.`);
           this.error("");
           this.error(String(e));
         }
