@@ -22,6 +22,7 @@ export const Registry = {
   /**
    * @inventedArm readFile — PERMANENT
    * @inventedArm pushDir — PERMANENT
+   * @inventedArm if — CONVERGEABLE loader-for-gem-memoizes-across-await
    */
   async loaderForGem(rootFile: string, { namespace }: { namespace: object }): Promise<Loader> {
     if (Object.hasOwn(this.gemLoadersByRootFile, rootFile)) {
