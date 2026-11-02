@@ -19,11 +19,15 @@ export class RakeCommand extends Base {
     await this.withRake([task, ...args], async (rake) => {
       const unrecognizedTask = rake.topLevelTasks
         .filter((t) => t !== "default")
-        .find((t) => !rake.lookup(/[^[]+/.exec(t)![0]));
+        .find((t) => {
+          const name = /[^[]+/.exec(t)?.[0];
+          return name === undefined || !rake.lookup(name);
+        });
       if (unrecognizedTask !== undefined) {
+        this._rakeTasks = rake.tasks;
         throw new UnrecognizedCommandError(
           unrecognizedTask,
-          rake.tasks.map((t) => t.name),
+          this._rakeTasks.map((t) => t.name),
         );
       }
 
@@ -31,6 +35,9 @@ export class RakeCommand extends Base {
       await rake.standardExceptionHandling(() => rake.topLevel());
     });
   }
+
+  /** @internal */
+  private static _rakeTasks: RakeApplication["tasks"] | undefined;
 
   /** @internal */
   private static nonAppFilePattern(): RegExp {

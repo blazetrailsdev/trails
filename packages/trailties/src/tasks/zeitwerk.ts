@@ -21,6 +21,7 @@ in config/application.rb and run zeitwerk:check again.
 };
 
 DSL.namespace("zeitwerk", () => {
+  /** @noRailsEquivalent CONVERGEABLE zeitwerk-check-name-error-reaches-task-abort */
   DSL.task(
     "defer_boot_eager_load",
     block(() => {

@@ -50,10 +50,10 @@ export interface FinisherExecutor {
 
 export interface FinisherConfig {
   root: string | null;
-  deferBootEagerLoad?: boolean;
   allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
+  deferBootEagerLoad?: boolean;
   eagerLoadNamespaces: unknown[];
   reloadClassesOnlyOnChange: boolean;
   fileWatcher: unknown;
@@ -113,9 +113,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
 
   autoloader.onLoad(_registerAutoloaded);
   await autoloader.setup();
-  if (this.config.deferBootEagerLoad) return;
-
-  await autoloader.eagerLoad();
+  if (!this.config.deferBootEagerLoad) await autoloader.eagerLoad();
 
   await loadControllers(this.paths());
   await loadModels(this.paths());

@@ -193,7 +193,8 @@ async function invokeRake(
     }
   }
   if (taskName !== "" && !program.commands.some((c) => c.name() === taskName)) {
-    if ((await new Rake.Application!().findRakefileLocation()) != null) {
+    if ((await Rake.application!.findRakefileLocation()) != null) {
+      if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
       const { RakeCommand } = await import("./commands/rake.js");
       await RakeCommand.perform(task, args, config);
       return;
