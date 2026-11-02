@@ -73,17 +73,7 @@ export async function require(path: string): Promise<boolean> {
   if (loader == null) return false;
 
   const ruby = await loader.isRuby(path);
-  for (;;) {
-    const requiring = _requiring.get(path);
-    if (requiring === undefined) break;
-    if (_held().getStore()?.includes(requiring.cpath)) return !ruby;
-    try {
-      await requiring.load;
-      return !ruby;
-    } catch {
-      continue;
-    }
-  }
+  if (_requiring.has(path)) return !ruby;
   if (!Object.hasOwn(loader.autoloads, path)) {
     if (ruby) return false;
     await loader.onDirAutoloaded(path);
@@ -121,10 +111,14 @@ export async function require(path: string): Promise<boolean> {
 export async function autoloadGet(cref: Cref): Promise<unknown> {
   for (;;) {
     const loading = _loadingConstant(cref.path());
-    if (loading === undefined) break;
-    await loading.catch(() => undefined);
+    if (loading !== undefined) {
+      await loading.catch(() => undefined);
+      continue;
+    }
+    const autoloadPath = cref.isAutoload();
+    if (autoloadPath == null) break;
+    await require(autoloadPath);
+    if (_loadingConstant(cref.path()) === undefined) break;
   }
-  const autoloadPath = cref.isAutoload();
-  if (autoloadPath != null) await require(autoloadPath);
   return cref.get();
 }

@@ -369,7 +369,9 @@ export class Loader {
 
     if (this.isReloadingEnabled()) {
       for (const rootDir of Object.keys(this.roots)) {
-        this._realRoots[await getFs().realpath!(rootDir)] = rootDir;
+        const realRoot = await getFs().realpath!(rootDir);
+        this._realRoots[realRoot] = rootDir;
+        this._generation = Math.max(this._generation, _generations.get(realRoot) ?? 1);
       }
     }
 

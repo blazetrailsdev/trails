@@ -1,4 +1,4 @@
-import { autoloadGet, require } from "./core-ext/kernel.js";
+import { autoloadGet } from "./core-ext/kernel.js";
 import { File, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Cref } from "./cref.js";
@@ -183,7 +183,6 @@ describe("autoloadGet with a load in flight", () => {
       const { open, opened } = release();
       const seen: unknown[] = [];
       const importing = vi.fn();
-      const path = cref.isAutoload()!;
       loader.imports = {
         M: async () => {
           importing();
@@ -197,11 +196,11 @@ describe("autoloadGet with a load in flight", () => {
 
       const first = autoloadGet(cref).catch((error: Error) => seen.push(error.message));
       await new Promise((resolve) => setTimeout(resolve, 0));
-      const second = require(path);
+      const second = autoloadGet(cref);
       open();
       await first;
 
-      expect(await second).toBe(true);
+      expect(await second).toBe(top.M);
       expect(seen).toEqual(["boom"]);
       expect(importing).toHaveBeenCalledTimes(2);
     });
