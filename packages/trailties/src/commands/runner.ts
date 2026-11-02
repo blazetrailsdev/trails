@@ -21,7 +21,7 @@ const AsyncFunction = (async () => {}).constructor as new (
   ...args: string[]
 ) => (scope: unknown) => Promise<unknown>;
 
-/** @noRailsEquivalent CONVERGEABLE runner-code-arm-eval-needs-owner-ruling */
+/** @noRailsEquivalent PERMANENT */
 function evalToplevel(code: string, file: string): Promise<unknown> {
   return new AsyncFunction(
     "__toplevel__",

@@ -232,3 +232,13 @@ top-level `await` is barred from a package's root import graph
 (`scripts/test-deps/yaml-optional-dependency.test.ts`), so `enumerate` awaits
 the `typescript` import, the shape of § "An adapter file is loaded by an awaited
 step" in the root `CLAUDE.md`.
+
+## `runner` evaluates its code argument (`RunnerCommand#perform`'s `eval`)
+
+`RunnerCommand#perform` evals a code string or stdin at `TOPLEVEL_BINDING`
+(`vendor/rails/v8.0.2/railties/lib/rails/commands/runner/runner_command.rb:37,48`).
+JS has no such binding, so `evalToplevel` in `commands/runner.ts` builds a
+sloppy-mode async function with `with (TopLevel)`, where constants resolve.
+Root § "Templates are precompiled" keeps eval out of what serves production; a
+CLI command evaluating the string its own operator passed is not that. Ruled by
+the repo owner on 2026-11-02 (trails#9630).
