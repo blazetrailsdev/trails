@@ -7,9 +7,13 @@ describe("Mail::Field", () => {
   describe("parsing", () => {
     it("parses full header fields", () => {
       const write = vi.spyOn(stderr, "write");
-      const field = Field.parse("To: Mikel")!;
-      expect(write).not.toHaveBeenCalled();
-      write.mockRestore();
+      let field: Field;
+      try {
+        field = Field.parse("To: Mikel")!;
+        expect(write).not.toHaveBeenCalled();
+      } finally {
+        write.mockRestore();
+      }
       expect(field.name).toEqual("To");
       expect(field.value).toEqual("Mikel");
       expect(field.field).toBeInstanceOf(ToField);
