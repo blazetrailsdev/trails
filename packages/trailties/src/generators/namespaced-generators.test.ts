@@ -337,15 +337,147 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     t.assertNoFile("app/helpers/test_app/product-lines-helper.ts");
   });
 
-  it.skip("scaffold with namespace on invoke", () => {});
+  it.skip("scaffold with namespace on invoke", async () => {
+    await t.runGenerator(["admin/role", "name:string", "description:string"]);
 
-  it.skip("scaffold with namespace on revoke", () => {});
+    await t.assertFile("app/models/test_app/admin.ts", /namespace TestApp \{\n {2}namespace Admin/);
+    await t.assertFile(
+      "app/models/test_app/admin/role.ts",
+      /namespace TestApp \{\n {2}class Admin::Role extends ApplicationRecord/,
+    );
+    await t.assertFile(
+      "test/models/test_app/admin/role.test.ts",
+      /namespace TestApp \{\n {2}class Admin::RoleTest extends TestCase/,
+    );
+    await t.assertFile("test/fixtures/test_app/admin/roles.yml");
+    await t.assertMigration("db/migrate/create_test_app_admin_roles.ts");
+    await t.assertFile("config/routes.ts", (route: string) => {
+      expect(route).toMatch(
+        /^ {2}this\.namespace\("admin", \(\) => \{\n {4}this\.resources\("roles"\);\n {2}\}\);$/m,
+      );
+    });
+    await t.assertFile("app/controllers/test_app/admin/roles-controller.ts", (content: string) => {
+      expect(content).toMatch(
+        /namespace TestApp \{\n {2}class Admin::RolesController extends ApplicationController/,
+      );
+    });
+    await t.assertFile(
+      "test/controllers/test_app/admin/roles-controller.test.ts",
+      /namespace TestApp \{\n {2}class Admin::RolesControllerTest extends IntegrationTest/,
+    );
+    for (const view of ["index", "edit", "new", "show", "_form"]) {
+      await t.assertFile(`app/views/test_app/admin/roles/${view}.html.tse`);
+    }
+    t.assertNoFile("app/views/layouts/admin/roles.html.tse");
+    await t.assertFile("app/helpers/test_app/admin/roles-helper.ts");
+  });
 
-  it.skip("scaffold with nested namespace on invoke", () => {});
+  it.skip("scaffold with namespace on revoke", async () => {
+    await t.runGenerator(["admin/role", "name:string", "description:string"]);
+    await t.runGenerator(["admin/role"], { behavior: "revoke" });
 
-  it.skip("scaffold with nested namespace on revoke", () => {});
+    await t.assertFile("app/models/test_app/admin.ts");
+    t.assertNoFile("app/models/test_app/admin/role.ts");
+    t.assertNoFile("test/models/test_app/admin/role.test.ts");
+    t.assertNoFile("test/fixtures/test_app/admin/roles.yml");
+    t.assertNoMigration("db/migrate/create_test_app_admin_roles.ts");
+    await t.assertFile("config/routes.ts", (route: string) => {
+      expect(route).not.toMatch(/this\.namespace\("admin"/);
+    });
+    t.assertNoFile("app/controllers/test_app/admin/roles-controller.ts");
+    t.assertNoFile("test/controllers/test_app/admin/roles-controller.test.ts");
+    t.assertNoFile("app/views/test_app/admin/roles");
+    t.assertNoFile("app/helpers/test_app/admin/roles-helper.ts");
+  });
 
-  it.skip("api scaffold with namespace on invoke", () => {});
+  it.skip("scaffold with nested namespace on invoke", async () => {
+    await t.runGenerator(["admin/user/special/role", "name:string", "description:string"]);
+
+    await t.assertFile(
+      "app/models/test_app/admin/user/special.ts",
+      /namespace TestApp \{\n {2}namespace Admin/,
+    );
+    await t.assertFile(
+      "app/models/test_app/admin/user/special/role.ts",
+      /namespace TestApp \{\n {2}class Admin::User::Special::Role extends ApplicationRecord/,
+    );
+    await t.assertFile(
+      "test/models/test_app/admin/user/special/role.test.ts",
+      /namespace TestApp \{\n {2}class Admin::User::Special::RoleTest extends TestCase/,
+    );
+    await t.assertFile("test/fixtures/test_app/admin/user/special/roles.yml");
+    await t.assertMigration("db/migrate/create_test_app_admin_user_special_roles.ts");
+    await t.assertFile("config/routes.ts", (route: string) => {
+      expect(route).toMatch(
+        /this\.namespace\("special", \(\) => \{\n\s+this\.resources\("roles"\)/,
+      );
+    });
+    await t.assertFile(
+      "app/controllers/test_app/admin/user/special/roles-controller.ts",
+      (content: string) => {
+        expect(content).toMatch(
+          /namespace TestApp \{\n {2}class Admin::User::Special::RolesController extends ApplicationController/,
+        );
+      },
+    );
+    await t.assertFile(
+      "test/controllers/test_app/admin/user/special/roles-controller.test.ts",
+      /namespace TestApp \{\n {2}class Admin::User::Special::RolesControllerTest extends IntegrationTest/,
+    );
+    for (const view of ["index", "edit", "new", "show", "_form"]) {
+      await t.assertFile(`app/views/test_app/admin/user/special/roles/${view}.html.tse`);
+    }
+    t.assertNoFile("app/views/layouts/admin/user/special/roles.html.tse");
+    await t.assertFile("app/helpers/test_app/admin/user/special/roles-helper.ts");
+  });
+
+  it.skip("scaffold with nested namespace on revoke", async () => {
+    await t.runGenerator(["admin/user/special/role", "name:string", "description:string"]);
+    await t.runGenerator(["admin/user/special/role"], { behavior: "revoke" });
+
+    await t.assertFile("app/models/test_app/admin/user/special.ts");
+    t.assertNoFile("app/models/test_app/admin/user/special/role.ts");
+    t.assertNoFile("test/models/test_app/admin/user/special/role.test.ts");
+    t.assertNoFile("test/fixtures/test_app/admin/user/special/roles.yml");
+    t.assertNoMigration("db/migrate/create_test_app_admin_user_special_roles.ts");
+    await t.assertFile("config/routes.ts", (route: string) => {
+      expect(route).not.toMatch(/this\.namespace\("special"/);
+    });
+    t.assertNoFile("app/controllers/test_app/admin/user/special/roles-controller.ts");
+    t.assertNoFile("test/controllers/test_app/admin/user/special/roles-controller.test.ts");
+    t.assertNoFile("app/views/test_app/admin/user/special/roles");
+    t.assertNoFile("app/helpers/test_app/admin/user/special/roles-helper.ts");
+  });
+
+  it.skip("api scaffold with namespace on invoke", async () => {
+    await t.runGenerator(["admin/role", "name:string", "description:string", "--api"]);
+
+    await t.assertFile("app/models/test_app/admin.ts", /namespace TestApp \{\n {2}namespace Admin/);
+    await t.assertFile(
+      "app/models/test_app/admin/role.ts",
+      /namespace TestApp \{\n {2}class Admin::Role extends ApplicationRecord/,
+    );
+    await t.assertFile(
+      "test/models/test_app/admin/role.test.ts",
+      /namespace TestApp \{\n {2}class Admin::RoleTest extends TestCase/,
+    );
+    await t.assertFile("test/fixtures/test_app/admin/roles.yml");
+    await t.assertMigration("db/migrate/create_test_app_admin_roles.ts");
+    await t.assertFile("config/routes.ts", (route: string) => {
+      expect(route).toMatch(
+        /^ {2}this\.namespace\("admin", \(\) => \{\n {4}this\.resources\("roles"\);\n {2}\}\);$/m,
+      );
+    });
+    await t.assertFile("app/controllers/test_app/admin/roles-controller.ts", (content: string) => {
+      expect(content).toMatch(
+        /namespace TestApp \{\n {2}class Admin::RolesController extends ApplicationController/,
+      );
+    });
+    await t.assertFile(
+      "test/controllers/test_app/admin/roles-controller.test.ts",
+      /namespace TestApp \{\n {2}class Admin::RolesControllerTest extends IntegrationTest/,
+    );
+  });
 });
 
 describe("NamespacedApplicationRecordGeneratorTest", () => {

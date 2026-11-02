@@ -23,6 +23,10 @@ describe("buildTemplates", () => {
     expect(await render('<%%= a(<%= "b" %>) %>', {})).toBe("<%= a(b) %>");
   });
 
+  it("leaves a <%% inside a code tag alone", async () => {
+    expect(await render('<%= "<%%" %>', {})).toBe("<%%");
+  });
+
   it("resolves a free name when its line runs, not at render start", async () => {
     expect(await render("<% if (false) { %><%= missing %><% } %>ok", {})).toBe("ok");
   });
