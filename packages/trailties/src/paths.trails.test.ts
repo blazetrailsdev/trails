@@ -4,7 +4,7 @@ import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Application } from "./application.js";
 import { Engine } from "./engine.js";
 import { Root } from "./paths.js";
-import { Annotation, Parser } from "./source-annotation-extractor.js";
+import { Annotation, Parser, ParserExtractor } from "./source-annotation-extractor.js";
 
 describe("Paths remaining surface", () => {
   it("edits a path's list and reads Root's hash surface", async () => {
@@ -71,6 +71,29 @@ describe("Parser", () => {
     const parser = new Parser('// TODO: x\nconst a = "b\n', { pattern, file: "a.ts" });
     parser.parse();
     expect(parser.isError()).toBe(true);
+  });
+});
+
+describe("Annotation", () => {
+  it("falls back to the regexp without typescript", async () => {
+    const missing = () => {
+      throw new Error("missing");
+    };
+    vi.resetModules();
+    vi.doMock("typescript/unstable/sync", missing);
+    try {
+      const { Annotation: Fallback } = await import("./source-annotation-extractor.js");
+      const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
+      expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
+    } finally {
+      vi.doUnmock("typescript/unstable/sync");
+      vi.resetModules();
+    }
+  });
+
+  it("registers a ParserExtractor for ts files", () => {
+    const extension = Annotation.extensions.find((e) => e.test.test("a.tsx"))!;
+    expect(extension.builder("TODO")).toBeInstanceOf(ParserExtractor);
   });
 });
 

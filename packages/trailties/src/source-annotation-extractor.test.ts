@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   fsAdapterConfig,
   registerFsAdapter,
@@ -122,29 +122,6 @@ describe("SourceAnnotationExtractor", () => {
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `app/a.scss:\n  * [1] [TODO] styled\n\n`,
     );
-  });
-
-  test("ts files skip a marker in a string and read a block comment", async () => {
-    w("app/a.ts", 'const url = "http://x // TODO: no";\n/* TODO: x */\n');
-    expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
-      `app/a.ts:\n  * [2] [TODO] x\n\n`,
-    );
-  });
-
-  test("falls back to the regexp without typescript", async () => {
-    const missing = () => {
-      throw new Error("missing");
-    };
-    vi.resetModules();
-    vi.doMock("typescript/unstable/sync", missing);
-    try {
-      const { Annotation: Fallback } = await import("./source-annotation-extractor.js");
-      const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
-      expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
-    } finally {
-      vi.doUnmock("typescript/unstable/sync");
-      vi.resetModules();
-    }
   });
 
   test("registerTags adds new tags; unregistered tags are ignored", async () => {
