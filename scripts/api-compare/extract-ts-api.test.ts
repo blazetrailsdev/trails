@@ -6682,6 +6682,12 @@ describe("typed fetch credit", () => {
     expect(forms(`return Object.hasOwn(h, "b") ? h.b : 0;`).has("fetch@typed")).toBe(false);
     expect(forms(`return Object.hasOwn(u, "a") ? u.a : 0;`).has("fetch@typed")).toBe(false);
   });
+
+  it("credits a read asserted to a defined type", () => {
+    expect(forms(`return Object.hasOwn(h, "b") ? (h.b as string) : "";`).has("fetch@typed")).toBe(
+      true,
+    );
+  });
 });
 
 describe("a native hash form credits the Hash call it ports", () => {

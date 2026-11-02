@@ -258,7 +258,7 @@ export namespace Delegation {
   export function generateMethodMissing<T extends object>(
     owner: T,
     target: string,
-    { allowNil, prototypeLayer }: { allowNil?: boolean; prototypeLayer?: boolean } = {},
+    { allowNil }: { allowNil?: boolean } = {},
   ): T {
     if (RESERVED_METHOD_NAMES.has(target) || target === "__target") target = `self.${target}`;
 
@@ -268,7 +268,7 @@ export namespace Delegation {
       has(obj, prop) {
         if (prop === "marshal_dump" || prop === "_dump") return false;
         if (Reflect.has(obj, prop)) return true;
-        if (prototypeLayer) return false;
+        if (Object.hasOwn(obj, "constructor")) return false;
         const __target = (obj as Record<string, unknown>)[targetName];
         return __target != null && prop in Object(__target);
       },

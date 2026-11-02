@@ -1,6 +1,5 @@
 import "./class-paths.variant-record.generated.js";
-import type { Extended } from "@blazetrails/activesupport";
-import { runLoadHooks } from "@blazetrails/activesupport";
+import { onLoad, runLoadHooks, type Extended } from "@blazetrails/activesupport";
 import type { ClassMethods } from "./attached/model.js";
 import { ActiveStorage } from "./active-storage.js";
 import type { One } from "./attached/one.js";
@@ -12,11 +11,12 @@ export class VariantRecord extends Record {
 
   static {
     this.belongsTo("blob");
-    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("image", {
-      service: () => null as never,
-    });
   }
 }
+
+onLoad("active_storage_reflection", () => {
+  (VariantRecord as unknown as Extended<typeof ClassMethods>).hasOneAttached("image");
+});
 
 ActiveStorage.VariantRecord = VariantRecord;
 

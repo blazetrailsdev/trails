@@ -46,7 +46,6 @@ export class Variation {
     });
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   get format(): string {
     const format = Object.hasOwn(this.transformations, "format")
       ? (this.transformations.format as string)

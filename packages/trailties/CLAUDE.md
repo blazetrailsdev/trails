@@ -154,7 +154,10 @@ Reading a constant under a `do_not_eager_load` path raises `NameError` until
 `await loader.loadFile(path)` runs. For the same reason, `eager_load!`'s
 `after_class_unload` hook sits outside Rails' `config.eager_load` guard
 (`finisher.rb:83-87`), so a reload eager loads whatever that setting says
-(RFC 0213 § "Reload").
+(RFC 0213 § "Reload"). So `zeitwerk:check` runs `defer_boot_eager_load` before
+`environment`: `config.deferBootEagerLoad` holds the boot's `eagerLoad` back, so
+a `Zeitwerk::NameError` raises inside `ZeitwerkChecker.check`, where
+`zeitwerk.rake` rescues it, and every other task still boots loaded.
 
 **File layout is a contract.** A file's path names its constant, and the file
 exports that constant by name: `app/models/admin/user.ts` exports `User`, seated

@@ -7545,7 +7545,7 @@ function collectCalls(
       nativeHashForms(n).some(
         ([form, receiver]) => form === "fetch" && checkerProvenKind(receiver!) === "object",
       ) &&
-      readCannotBeUndefined(unwrapped(n.whenTrue))
+      readCannotBeUndefined(n.whenTrue)
     ) {
       hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.fetch}`);
     }

@@ -179,12 +179,12 @@ describe("Delegation.generateMethodMissing", () => {
   it("does not read the target off a prototype layer", () => {
     const layer = Delegation.generateMethodMissing(
       {
+        constructor: Object,
         get delegate(): never {
           throw new TypeError("no receiver");
         },
       },
       "delegate",
-      { prototypeLayer: true },
     );
     expect("greet" in layer).toBe(false);
   });

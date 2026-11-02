@@ -248,13 +248,17 @@ function validateServiceConfiguration(
 
 /**
  * @internal
- * @missingRailsCall table_exists — CONVERGEABLE activestorage-engine
+ * @missingRailsCall table_exists — PERMANENT
  */
 function validateGlobalServiceConfiguration(modelClass: typeof Base): void {
   const trails = TopLevel.Trails as unknown as
     | { configuration: { activeStorage?: { service?: unknown } }; env: unknown }
     | undefined;
-  if (modelClass.isConnected() && trails!.configuration.activeStorage?.service == null) {
+  if (
+    modelClass.isConnected() &&
+    Blob.connectionPool().schemaCache.getCachedDataSourceExists(Blob.tableName!) !== false &&
+    trails!.configuration.activeStorage?.service == null
+  ) {
     throw new RuntimeError(
       `Missing Active Storage service name. Specify Active Storage service name for config.active_storage.service in config/environments/${String(trails!.env)}.rb`,
     );

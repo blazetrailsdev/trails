@@ -1,4 +1,5 @@
 import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
+import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { createMigration, migrationTemplate, type MigrationTemplateHost } from "../../migration.js";
@@ -59,11 +60,7 @@ export class MigrationGenerator extends NamedBase {
 
   async createMigrationFile(): Promise<void> {
     const name = this.name;
-    if (!/^\w+$/.test(name)) {
-      throw new Error(
-        `Illegal migration name: ${name} (only letters, numbers, and underscores allowed)`,
-      );
-    }
+    if (!/^\w+$/.test(name)) throw new IllegalMigrationNameError(name);
 
     this.setLocalAssignsBang(underscore(name));
     const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
