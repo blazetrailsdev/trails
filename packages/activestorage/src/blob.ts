@@ -490,11 +490,6 @@ export class Blob extends Record {
     await PurgeJob.performLater(this);
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  get contentType(): string | null {
-    return this.content_type;
-  }
-
   get service(): Service {
     return this.services.fetch(this.service_name!);
   }
