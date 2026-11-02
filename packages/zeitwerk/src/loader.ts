@@ -58,6 +58,7 @@ export class Loader {
   /** @noRailsEquivalent PERMANENT */
   imports: Record<string, () => Promise<unknown>> | null;
   /** @internal */ _manifestConstants: Record<string, ManifestRow> | null;
+  /** @internal */ _manifestChildren: Record<string, Set<string> | null> | null;
   /** @internal */ _manifestRows: Record<string, [string, ManifestRow][]>;
   /** @internal */ _tag: string;
   /** @internal */ _initializedAt: Date;
@@ -92,6 +93,7 @@ export class Loader {
     this.manifestRoot = null;
     this.imports = null;
     this._manifestConstants = null;
+    this._manifestChildren = null;
     this._manifestRows = {};
     this._tag = SecureRandom.hex(3);
     this._initializedAt = new Date();
@@ -253,7 +255,7 @@ export class Loader {
     path = path.toString();
     const abspath = File.expandPath(path);
 
-    if (!(await File.isExistAsync(abspath))) {
+    if (!(await this._isExist(abspath))) {
       throw new ZeitwerkError(`${abspath} does not exist`);
     }
 
@@ -359,13 +361,28 @@ export class Loader {
       const cname = cpath.slice(cpath.lastIndexOf("::") + (cpath.includes("::") ? 2 : 1));
       return this.inflector.camelize(basename, File.expandPath(row.path, root)) !== cname;
     });
-    if (stale || manifest.digest !== configurationDigest(this)) {
+    if (
+      stale ||
+      !Array.isArray(manifest.collapsed) ||
+      manifest.digest !== configurationDigest(this)
+    ) {
       throw new ZeitwerkError(
         `the autoload manifest of loader ${this.tag} does not match its configuration, run trails build`,
       );
     }
 
     this._manifestConstants = manifest.constants;
+    this._manifestChildren = Object.fromEntries(Object.keys(this.roots).map((d) => [d, new Set()]));
+    for (const dir of manifest.collapsed) this.collapseDirs.add(File.expandPath(dir, root));
+    for (const row of Object.values(manifest.constants)) {
+      if (row.export != null) this._indexManifestPath(File.expandPath(row.path, root), null);
+      for (const dir of row.dirs ?? []) {
+        this._indexManifestPath(File.expandPath(dir, root), new Set());
+      }
+    }
+    for (const file of manifest.shadowed) {
+      this._indexManifestPath(File.expandPath(file, root), null);
+    }
 
     const namespaces: Record<string, object> = {};
     for (const rootNamespace of Object.values(this.roots)) {
@@ -386,6 +403,15 @@ export class Loader {
       }
       const parent = namespaces[parentPath] ?? (constGet(Object, parentPath) as object);
       await this._defineAutoloadsForNamespace(parentPath, parent);
+    }
+  }
+
+  private _indexManifestPath(abspath: string, children: Set<string> | null): void {
+    const index = this._manifestChildren!;
+    index[abspath] ??= children;
+    for (const path of this.walkUp(abspath)) {
+      if (Object.hasOwn(this.roots, path)) break;
+      (index[File.dirname(path)] ??= new Set()).add(File.basename(path));
     }
   }
 

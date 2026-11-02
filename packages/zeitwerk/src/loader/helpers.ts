@@ -31,7 +31,7 @@ export const Helpers = {
     dir: string,
     block: (basename: string, abspath: string, ftype: string) => unknown,
   ): Promise<void> {
-    const children = await Dir.childrenAsync(dir);
+    const children = [...(this._manifestChildren?.[dir] ?? (await Dir.childrenAsync(dir)))];
     children.sort();
 
     for (const basename of children) {
@@ -68,7 +68,7 @@ export const Helpers = {
     let next: string | undefined;
     while ((next = toVisit.shift()) !== undefined) {
       dir = next;
-      for (const basename of await Dir.childrenAsync(dir)) {
+      for (const basename of this._manifestChildren?.[dir] ?? (await Dir.childrenAsync(dir))) {
         if (this.isHidden(basename)) continue;
 
         const abspath = File.join(dir, basename);
@@ -95,7 +95,18 @@ export const Helpers = {
 
   /** @internal */
   isDir(this: Loader, path: string): Promise<boolean> {
+    if (this._manifestChildren != null) {
+      return Promise.resolve(this._manifestChildren[path] instanceof Set);
+    }
     return File.isDirectoryAsync(path);
+  },
+
+  /** @internal */
+  _isExist(this: Loader, path: string): Promise<boolean> {
+    if (this._manifestChildren != null) {
+      return Promise.resolve(Object.hasOwn(this._manifestChildren, path));
+    }
+    return File.isExistAsync(path);
   },
 
   /** @internal */

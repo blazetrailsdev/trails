@@ -2124,7 +2124,12 @@ when it is named by path. A namespace's load is what reveals the constants below
 Ruby, so the step seats an empty module for each namespace and descends.
 `Loader#manifest`, a parsed manifest or a path to one, makes `setup` fill
 `autoloads`, `namespace_dirs` and `shadowed_files` from its rows, and a digest that differs from
-the running configuration raises. New names the step needs carry
+the running configuration raises. With a manifest set up, `ls`, `dir?` and
+`File.exist?` answer from its rows, so the eager load variants, `load_file`,
+`cpath_expected_at` and `all_expected_cpaths` read no directory; a path the walk
+left out (ignored, hidden, not code) is unknown there, so `load_file` and
+`cpath_expected_at` raise "does not exist" for it and `eager_load_dir` raises
+"is not a directory". New names the step needs carry
 `@noRailsEquivalent PERMANENT` against this section. This is a genuine language
 shortcoming, ratified repo-wide by RFC 0213.
 
