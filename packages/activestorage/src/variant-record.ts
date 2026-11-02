@@ -1,4 +1,3 @@
-import "./class-paths.variant-record.generated.js";
 import { onLoad, runLoadHooks, type Extended } from "@blazetrails/activesupport";
 import type { ClassMethods } from "./attached/model.js";
 import { ActiveStorage } from "./active-storage.js";
