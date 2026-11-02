@@ -6,25 +6,16 @@ import {
   type ExecutionHook,
 } from "@blazetrails/activesupport";
 import { Base as JobBase, registerJob } from "@blazetrails/activejob";
-import {
-  File,
-  getFs,
-  getPath,
-  isRegisteredConstant,
-  Monitor,
-  rbObjIsKindOf,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { File, Monitor, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
-import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
 import { ActionController, registerController } from "@blazetrails/actionpack";
 import { Base, registerModel } from "@blazetrails/activerecord";
-import { Inflector } from "../autoloaders/inflector.js";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
@@ -82,7 +73,6 @@ export interface FinisherHost {
   readonly reloaders: unknown[];
   routesReloader(): FinisherRoutesReloader;
   watchableArgs(): [string[], Record<string, string[]>];
-  paths(): Root;
   ensureGeneratorTemplatesAdded(): Promise<void>;
   buildMiddlewareStack(): void;
 }
@@ -93,6 +83,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
   await this.ensureGeneratorTemplatesAdded();
 });
 
+/** @inventedArm eagerLoad — PERMANENT */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
   autoloader.manifestRoot ??= this.config.root;
@@ -122,11 +113,6 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   autoloader.onLoad(_registerAutoloaded);
   await autoloader.setup();
   if (!this.config.deferBootEagerLoad) await autoloader.eagerLoad();
-
-  await loadControllers(this.paths());
-  await loadModels(this.paths());
-  await loadJobs(this.paths());
-  await loadChannels(this.paths());
 });
 
 Finisher.initializer(
@@ -158,14 +144,12 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
   this.reloader.prepareBang();
 });
 
-/**
- * @missingRailsCall eager_load_all — CONVERGEABLE trailties-app-scan-retires
- * @missingRailsCall eager_load! — CONVERGEABLE trailties-app-scan-retires
- * @inventedArm if — PERMANENT
- */
+/** @inventedArm if — PERMANENT */
 Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
     runLoadHooks("before_eager_load", this);
+    await Loader.eagerLoadAll();
+    await Trails.eagerLoadBang();
     for (const namespace of this.config.eagerLoadNamespaces) {
       await (namespace as { eagerLoadBang(): Promise<void> }).eagerLoadBang();
     }
@@ -326,19 +310,6 @@ export async function _registerAutoloaded(cpath: unknown, value: unknown): Promi
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-async function loadControllers(paths: Root): Promise<void> {
-  for (const [prefix, klass] of await loadAppClasses(
-    paths,
-    "controllers",
-    ActionController.Metal,
-  )) {
-    if (prefix) registerController(`${prefix}${klass.name}`, klass);
-    else registerController(klass);
-    await defineController(klass);
-  }
-}
-
 const definedControllers = new WeakSet<object>();
 
 /** @noRailsEquivalent PERMANENT */
@@ -354,128 +325,4 @@ async function defineController(klass: object): Promise<void> {
   await ActionController.Railties.Helpers.inherited(
     klass as ActionController.HelpersPathControllerClass,
   );
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function loadJobs(paths: Root): Promise<void> {
-  for (const [prefix, klass] of await loadAppClasses(paths, "jobs", JobBase)) {
-    if (prefix) registerJob(`${prefix}${klass.name}`, klass);
-    else registerJob(klass);
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function loadChannels(paths: Root): Promise<void> {
-  if (TopLevel.ActionCable == null) return;
-
-  const { ActionCable, registerChannel, registerConnection } =
-    await import("@blazetrails/actioncable");
-  for (const [prefix, klass] of await loadAppClasses(paths, "channels", ActionCable.Channel.Base)) {
-    if (prefix) registerChannel(`${prefix}${klass.name}`, klass);
-    else registerChannel(klass);
-  }
-  for (const [prefix, klass] of await loadAppClasses(
-    paths,
-    "channels",
-    ActionCable.Connection.Base,
-  )) {
-    if (prefix) registerConnection(`${prefix}${klass.name}`, klass);
-    else registerConnection(klass);
-  }
-}
-
-/** @internal */
-async function loadAppClasses<T extends abstract new (...args: never[]) => unknown>(
-  paths: Root,
-  root: string,
-  base: T,
-): Promise<[string, T][]> {
-  const out: [string, T][] = [];
-  const node = paths.get("app");
-  if (!node) return out;
-
-  const p = getPath();
-  for (const dir of await node.existentDirectories()) {
-    if (p.basename(dir) === root) await collectAppClasses(dir, "", base, out);
-  }
-  return out;
-}
-
-/** @internal */
-async function collectAppClasses<T extends abstract new (...args: never[]) => unknown>(
-  dir: string,
-  prefix: string,
-  base: T,
-  out: [string, T][],
-): Promise<void> {
-  const fs = getFs();
-  const p = getPath();
-  for (const entry of await fs.readdir!(dir)) {
-    const full = p.join(dir, entry);
-    if ((await fs.stat!(full)).isDirectory()) {
-      const namespace = `${prefix}${Inflector.camelize(entry.replace(/-/g, "_"), full)}`;
-      if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
-      await collectAppClasses(full, `${namespace}::`, base, out);
-      continue;
-    }
-    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
-    const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (
-        typeof value === "function" &&
-        value.prototype instanceof base &&
-        !out.some(([, klass]) => klass === value)
-      ) {
-        out.push([prefix, value as T]);
-      }
-    }
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function loadModels(paths: Root): Promise<void> {
-  const node = paths.get("app/models");
-  if (!node) return;
-
-  const out: [string, typeof Base][] = [];
-  for (const dir of await node.existentDirectories()) {
-    await collectModels(dir, "", out);
-  }
-  for (const [prefix, model] of out) {
-    if (prefix) registerModel(`${prefix}${model.name}`, model);
-    else registerModel(model);
-  }
-}
-
-/** @internal */
-async function collectModels(
-  dir: string,
-  prefix: string,
-  out: [string, typeof Base][],
-): Promise<void> {
-  const fs = getFs();
-  const p = getPath();
-  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
-
-  for (const entry of await fs.readdir(dir)) {
-    const full = p.join(dir, entry);
-    if ((await fs.stat(full)).isDirectory()) {
-      if (prefix === "" && entry === "concerns") continue;
-      const namespace = `${prefix}${Inflector.camelize(entry.replace(/-/g, "_"), full)}`;
-      if (!isRegisteredConstant(namespace)) registerConstant(namespace, {});
-      await collectModels(full, `${namespace}::`, out);
-      continue;
-    }
-    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
-    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (
-        typeof value === "function" &&
-        value.prototype instanceof Base &&
-        !out.some(([, model]) => model === value)
-      ) {
-        out.push([prefix, value as typeof Base]);
-      }
-    }
-  }
 }
