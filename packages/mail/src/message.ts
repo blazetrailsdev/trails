@@ -929,7 +929,7 @@ export class Message {
   }
 
   allParts(): any[] {
-    return flatten(Array.from(this.parts, (p: any) => [p, p.allParts()]));
+    return flatten(this.parts.map((p: any) => [p, p.allParts()]));
   }
 
   findFirstMimeType(mt: string): any {

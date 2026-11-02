@@ -32,19 +32,22 @@ export class ContentTypeField extends NamedStructuredField {
   }
 
   constructor(value: unknown = null, charset: string | Encoding | null = null) {
-    const isArray = Array.isArray(value);
-    if (!isArray) value = rbObjAsString(value);
-    super(ContentTypeField.prototype.ensureFilenameQuoted(value), charset);
-    if (isArray) {
-      const array = value as unknown[];
-      this._mainType = array[0] as string;
-      this._subType = array[1] as string;
-      this._parameters = new ParameterHash();
-      this._parameters.update(array.at(-1) as Record<string, unknown>);
+    let mainType: string | null = null;
+    let subType: string | null = null;
+    let parameters: ParameterHash | undefined;
+    if (Array.isArray(value)) {
+      mainType = value[0] as string;
+      subType = value[1] as string;
+      parameters = new ParameterHash();
+      parameters.mergeBang(value.at(-1) as Record<string, unknown>);
     } else {
-      this._mainType = null;
-      this._subType = null;
+      value = rbObjAsString(value);
     }
+
+    super(ContentTypeField.prototype.ensureFilenameQuoted(value), charset);
+    this._mainType = mainType;
+    this._subType = subType;
+    this._parameters = parameters;
   }
 
   override element(): ContentTypeElement {
@@ -91,7 +94,7 @@ export class ContentTypeField extends NamedStructuredField {
   parameters(): ParameterHash {
     if (this._parameters === undefined) {
       this._parameters = new ParameterHash();
-      for (const p of this.element().parameters) this._parameters.update(p);
+      for (const p of this.element().parameters) this._parameters.mergeBang(p);
     }
     return this._parameters;
   }

@@ -30,7 +30,7 @@ export class ContentDispositionField extends NamedStructuredField {
 
   parameters(): ParameterHash {
     const parameters = new ParameterHash();
-    for (const p of this.element().parameters ?? []) parameters.update(p);
+    for (const p of this.element().parameters ?? []) parameters.mergeBang(p);
     return parameters;
   }
 
