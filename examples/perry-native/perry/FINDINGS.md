@@ -1580,6 +1580,71 @@ Note what it also proves: `simple.ts` initialized at 205 while activerecord was
 still uninitialized, without throwing. That is the measurement that rules
 `simple.ts:120` out as wall 16's cause.
 
+## Wall 16, SOLVED: a top-level `new` through a constructor-type cast (2026-11-02)
+
+Three patched call sites take the eager init chain from 249 modules to 494 and
+make the `_allocation` TDZ `ReferenceError` disappear entirely. The trigger is
+this idiom, at **module top level**:
+
+```ts
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
+```
+
+The boot graph has exactly three of them — `i18n/src/backend/simple.ts:120`,
+`chain.ts:142` and `key-value.ts:181` — and they fail in chain order, one at a
+time. The measurements, each a full 1937-module build:
+
+| change | `INIT:` lines | stderr |
+| --- | --- | --- |
+| none | 249 | `Cannot access '_allocation' before initialization` at `new Base` |
+| `simple.ts` → concrete subclass | 251 | same error, now at `chain.ts` |
+| `chain.ts` + `key-value.ts` too | **494** | wall 17's `reading 'path'` instead |
+
+Replacing the cast with `class _Probe extends Base {}` and `new _Probe()` is
+what fixes each site. **i18n's `Base` has no abstract members**, so that
+subclass runs the byte-identical constructor — which is the whole argument: the
+same constructor body throws when reached through the cast and succeeds through
+a direct class reference, so the constructor's contents are not the defect. A
+probe confirmed the binding resolves sanely at the site
+(`Base.name=Base probe.name=_KeyValueProbe proto=true`), so this is not a
+mis-resolved class either; it is how the `new` is lowered when its callee is a
+cast to an anonymous constructor type.
+
+The other `as unknown as new () =>` sites in the repo
+(`activerecord/src/migration.ts:340`, `activesupport/src/current-attributes.ts:123`,
+`trailties/src/trailtie.ts:69`) sit inside methods, never run during init, and
+never appeared. Top-level position is part of the trigger.
+
+**Caveat, stated because it is not yet excluded:** adding a class declaration
+also perturbs codegen. "The cast is the trigger" is strongly supported by the
+three-for-three chain-order behaviour, but it has not been isolated from that
+perturbation. A minimal repro built from the shape is the next step, and it is
+what an upstream filing needs.
+
+### Corrections to the two sections above
+
+- **`simple.ts:120` was never ruled out.** The entry above says the 202-module
+  and 1107-module probes rule it out, because `simple.ts` initializes there
+  without throwing. Patching that exact line in the full graph moved the
+  frontier, so the probes' negative result was **graph-size dependent, not a
+  refutation**. A site that is harmless in a 1107-module graph and fatal in a
+  1937-module one is evidence about position, not about innocence.
+- **The microtask/async-continuation hypothesis is superseded.** The reasoning
+  was that the throw ran "between two module initializers" and so had to come
+  from a drained continuation. It did not: it ran inside the dispatch of the
+  module whose `INIT:` line was printed last, from a top-level `new` in that
+  module. `INIT:` is printed before dispatch, which is what made the throw look
+  like it came from between frames.
+- **"The name is not the mechanism" stands**, but the rename experiment that
+  appeared to prove it was not a clean test: it renamed the declaration while
+  keeping `export { I18nBackendBase as Base }`, so the binding at the
+  construction site was still spelled `Base`. The claim survives on the probe
+  evidence above, not on that experiment.
+
+Wall 16 took six experiments, five of which were wrong, and every wrong one
+reasoned from the shape of the code instead of changing one variable and
+measuring. The one that worked changed a single call site.
+
 ## A bare import that cannot be resolved compiles anyway
 
 Found by accident while building the probes above, and filable on its own.
@@ -1591,3 +1656,21 @@ binary, and that binary prints `typeof I18n` as `"boolean"`.
 An unresolvable bare specifier should be a compile error, not a silent bogus
 value — and silently compiling one module instead of several hundred is exactly
 the failure that looks like a passing rung.
+
+**Filed and narrowed (2026-11-02).** Most of this is already #11576, which
+hard-errors a *value-used* named or default import of an uninstalled bare
+package and *deliberately* keeps `typeof`-only and type-only uses compiling —
+which is exactly what the headline probe above does, so that probe is not a new
+defect. The one real gap was `new`: constructing such an import compiled
+silently, because `Expr::New`/`JsNew` fed only the generic reference set and
+never the called-or-constructed set that #11576's preflight checks. Fixed in
+PerryTS/perry#13667 (`bootstrap/named_exports.rs`, 4 tests).
+
+Its CI is red and that red is **inherited, not caused**: main's own CI run at
+the PR's merge-base `1cb8838a0` fails the same job set, the `perry --bin perry`
+suite gives an identical `1350 passed; 12 failed` with the PR's code absent,
+and `cargo fmt --check` under the pinned `nightly-2026-10-04` rustfmt reports
+231 diff hunks at that commit. Of those 12 failures only one is a root —
+`gc_diagnostic_knobs_set_while_compiling_install_the_gc_diagnostics` panics
+while holding the process-environment lock, and the other 11 are `PoisonError`
+cascades from `test_env_lock.rs:29`.
