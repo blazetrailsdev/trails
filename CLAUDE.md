@@ -2124,10 +2124,12 @@ Ruby, so the step seats an empty module for each namespace and descends.
 the running configuration raises. With a manifest set up, `ls`, `dir?` and
 `File.exist?` answer from its rows, so the eager load variants, `load_file`,
 `cpath_expected_at` and `all_expected_cpaths` read no directory; a path the walk
-left out (ignored, hidden, not code) is unknown there, so `load_file` and
-`cpath_expected_at` raise "does not exist" for it and `eager_load_dir` raises
-"is not a directory". New names the step needs carry
-`@noRailsEquivalent PERMANENT` against this section. This is a genuine language
+left out (hidden, not code, under an ignored directory) is unknown there, so
+`load_file` and `cpath_expected_at` raise "does not exist" for it and
+`eager_load_dir` raises "is not a directory". An ignored path the walk expanded
+is recorded, so those answer as Ruby does for it. A reload walks the file
+system, as `setup` does, so it sees what changed since the build. New names
+the step needs carry `@noRailsEquivalent PERMANENT` against this section. This is a genuine language
 shortcoming, ratified repo-wide by RFC 0213.
 
 ## An action's name is its method's name (`AbstractController::Base#action_methods`)

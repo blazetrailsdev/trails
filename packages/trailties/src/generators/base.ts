@@ -199,7 +199,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare options: GeneratorOptions;
   declare args: unknown[];
   declare behavior: "invoke" | "revoke";
-  pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
   _sourcePaths?: string[];

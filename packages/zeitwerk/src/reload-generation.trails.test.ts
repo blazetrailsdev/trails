@@ -106,6 +106,44 @@ console.log(JSON.stringify({
 }));
 `;
 
+const MANIFEST_RELOAD_MAIN = `
+import { TopLevel, File } from "${packageDist("ruby-compat")}index.js";
+import { Loader } from "${packageDist("zeitwerk")}zeitwerk.js";
+import { buildManifest } from "${packageDist("zeitwerk")}loader/manifest.js";
+
+const newLoader = async () => {
+  const loader = new Loader();
+  loader.enableReloading();
+  await loader.pushDir("app");
+  return loader;
+};
+
+const builder = await newLoader();
+const manifest = await buildManifest(builder);
+builder.unregister();
+
+const loader = await newLoader();
+loader.manifest = manifest;
+await loader.setup();
+
+File.write("app/added.ts", "export class Added {}\\n");
+File.delete("app/removed.ts");
+await loader.reload();
+await loader.eagerLoad();
+
+console.log(JSON.stringify({
+  added: typeof TopLevel.Added,
+  removed: typeof TopLevel.Removed,
+  kept: typeof TopLevel.Kept,
+}));
+`;
+
+const MANIFEST_RELOAD_FILES: [string, string][] = [
+  ["main.mjs", MANIFEST_RELOAD_MAIN],
+  ["app/kept.ts", "export class Kept {}\n"],
+  ["app/removed.ts", "export class Removed {}\n"],
+];
+
 const LOADER_FILES: [string, string][] = [
   ["main.mjs", LOADER_MAIN],
   ["once/once.ts", `export class Once {}\n${TAIL}`],
@@ -253,6 +291,21 @@ describe("Loader#reload under real Node", () => {
 
       expect(status.isSuccess(), output).toBe(true);
       expect(JSON.parse(output)).toEqual({ required: true, imported: true });
+    });
+  }, 30_000);
+
+  it("sees files added and removed since the build after a manifest loader's reload", async () => {
+    await withFiles(MANIFEST_RELOAD_FILES, async () => {
+      const [output, status] = await Open3.capture2e(
+        `"${getProcessAdapter().execPath!()}" main.mjs`,
+      );
+
+      expect(status.isSuccess(), output).toBe(true);
+      expect(JSON.parse(output)).toEqual({
+        added: "function",
+        removed: "undefined",
+        kept: "function",
+      });
     });
   }, 30_000);
 
