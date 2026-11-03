@@ -1,16 +1,18 @@
 import {
   File,
   getFs,
+  extend,
   include,
   rbFBinding,
   strNew,
   TSE,
+  type Extended,
   type Included,
 } from "@blazetrails/ruby-compat";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { Migration } from "../../migration.js";
+import { ClassMethods, Migration } from "../../migration.js";
 import {
   configuredMigratePath,
   dbMigratePath,
@@ -74,6 +76,9 @@ export class MigrationGenerator extends NamedBase {
   migrationFileName = "";
   migrationClassName = "";
 
+  declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
+  declare static migrationExists: Extended<typeof ClassMethods>["migrationExists"];
+  declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
   static nextMigrationNumber = nextMigrationNumber;
 
   private _migrationTemplate = "migration.ts";
@@ -258,6 +263,7 @@ export class MigrationGenerator extends NamedBase {
 }
 
 include(MigrationGenerator, Migration);
+extend(MigrationGenerator, ClassMethods);
 
 Object.defineProperty(MigrationGenerator, "name", {
   value: "ActiveRecord::Generators::MigrationGenerator",

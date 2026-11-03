@@ -1,12 +1,12 @@
 import { CreateFile } from "@blazetrails/thor/actions/create-file";
 import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
 import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
-import { migrationExists } from "../migration-lookup.js";
 import { GeneratorError } from "../generated-attribute.js";
 
 export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";
   migrationFileName: string;
+  constructor: { migrationExists(dirname: string, fileName: string): string | undefined };
 }
 
 export type CreateMigrationConfig = {
@@ -62,7 +62,7 @@ export class CreateMigration extends CreateFile {
 
   existingMigration(): string | false {
     return (this._existingMigration ||=
-      migrationExists(this.migrationDir, this.migrationFileName) ||
+      this.base.constructor.migrationExists(this.migrationDir, this.migrationFileName) ||
       (File.isExist(this.destination) && this.destination));
   }
 

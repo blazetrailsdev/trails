@@ -80,9 +80,7 @@ export class Pathname {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1288` `path_unlink` */
   async delete(): Promise<number> {
     try {
-      const fs = getFs();
-      if (fs.rmdir) await fs.rmdir(this._path);
-      else fs.rmdirSync(this._path);
+      await getFs().rmdir!(this._path);
       return 0;
     } catch (e) {
       if (!(e instanceof Errno.ENOTDIR)) throw e;

@@ -87,7 +87,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   it("opens the session through the built default middleware stack", async () => {
     const paths = new Root("/app");
     paths.add("public");
-    const config = new Configuration();
+    const config = new Configuration("/app");
     config.publicFileServer.enabled = false;
     const stack = new DefaultMiddlewareStack(
       { config, executor: app.executor, reloader: app.reloader },

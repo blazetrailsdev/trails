@@ -582,7 +582,7 @@ export class Configuration extends EngineConfiguration {
 
   /** @internal */
   private credentialsDefaults(): { contentPath: string; keyPath: string } {
-    const root = this.root ?? "";
+    const root = this.root as string;
     let contentPath = getPath().join(root, `config/credentials/${Trails.env}.yml.enc`);
     if (!File.isExist(contentPath))
       contentPath = getPath().join(root, "config/credentials.yml.enc");

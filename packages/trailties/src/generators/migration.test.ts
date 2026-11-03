@@ -4,14 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import * as os from "node:os";
-import {
-  currentMigrationNumber,
-  migrationExists,
-  migrationLookupAt,
-  Migration,
-  nextMigrationNumber,
-  NotImplementedError,
-} from "./migration.js";
+import { ClassMethods, Migration, NotImplementedError } from "./migration.js";
 
 let tmpDir: string;
 
@@ -30,18 +23,20 @@ describe("migration", () => {
     for (const name of ["20260101000000_create_posts.ts", "20260103000000_other.ts", "skip.md"]) {
       fs.writeFileSync(nodePath.join(d, name), "");
     }
-    expect(migrationLookupAt(d)).toEqual([
+    expect(ClassMethods.migrationLookupAt(d)).toEqual([
       `${d}/20260101000000_create_posts.ts`,
       `${d}/20260103000000_other.ts`,
     ]);
-    expect(migrationLookupAt(nodePath.join(tmpDir, "missing"))).toEqual([]);
-    expect(migrationExists(d, "create_posts")).toBe(`${d}/20260101000000_create_posts.ts`);
-    expect(migrationExists(d, "missing")).toBeUndefined();
-    expect(currentMigrationNumber(d)).toBe(20260103000000);
+    expect(ClassMethods.migrationLookupAt(nodePath.join(tmpDir, "missing"))).toEqual([]);
+    expect(ClassMethods.migrationExists(d, "create_posts")).toBe(
+      `${d}/20260101000000_create_posts.ts`,
+    );
+    expect(ClassMethods.migrationExists(d, "missing")).toBeUndefined();
+    expect(ClassMethods.currentMigrationNumber(d)).toBe(20260103000000);
   });
 
   it("nextMigrationNumber raises NotImplementedError", () => {
-    expect(() => nextMigrationNumber()).toThrow(NotImplementedError);
+    expect(() => ClassMethods.nextMigrationNumber("db/migrate")).toThrow(NotImplementedError);
   });
 
   it("migrationTemplate prepends migration_number, sets assigns, and renders", async () => {
@@ -53,7 +48,7 @@ describe("migration", () => {
       migrationClassName: "",
       destinationRoot: tmpDir,
       relativeToOriginalDestinationRoot: (p: string) => p,
-      constructor: { nextMigrationNumber: () => "20260101000000" },
+      constructor: { ...ClassMethods, nextMigrationNumber: () => "20260101000000" },
       action,
       ...Migration,
     };
@@ -61,9 +56,9 @@ describe("migration", () => {
       () => `class ${host.migrationClassName} {}`,
       "db/migrate/create_articles.rb",
     );
-    expect(dest).toBe(`${tmpDir}/db/migrate/20260101000000_create_articles.rb`);
+    expect(dest).toBe("db/migrate/20260101000000_create_articles.rb");
     expect(host.migrationFileName).toBe("create_articles");
     expect(host.migrationClassName).toBe("CreateArticles");
-    expect(fs.readFileSync(dest!, "utf-8")).toBe("class CreateArticles {}");
+    expect(fs.readFileSync(`${tmpDir}/${dest}`, "utf-8")).toBe("class CreateArticles {}");
   });
 });

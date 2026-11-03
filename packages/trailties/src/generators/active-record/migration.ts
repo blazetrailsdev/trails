@@ -1,6 +1,5 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
-import { currentMigrationNumber } from "../migration.js";
 
 interface MigrationHost {
   options: { database?: string };
@@ -8,8 +7,11 @@ interface MigrationHost {
   configuredMigratePath(): string | undefined;
 }
 
-export function nextMigrationNumber(dirname: string): string {
-  const nextMigrationNumber = currentMigrationNumber(dirname) + 1;
+export function nextMigrationNumber(
+  this: { currentMigrationNumber(dirname: string): number },
+  dirname: string,
+): string {
+  const nextMigrationNumber = this.currentMigrationNumber(dirname) + 1;
   return Migration.nextMigrationNumber(nextMigrationNumber);
 }
 

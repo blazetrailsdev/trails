@@ -1,34 +1,54 @@
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { Dir, File, regexpEscape } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
   type CreateMigrationHost,
   type MigrationRenderer,
 } from "./actions/create-migration.js";
-import { migrationLookupAt } from "./migration-lookup.js";
 import { Generators } from "../generators.js";
 
 export { NotImplementedError };
-export { migrationLookupAt, migrationExists } from "./migration-lookup.js";
 
-export function currentMigrationNumber(dirname: string): number {
-  let max = 0;
-  for (const file of migrationLookupAt(dirname)) {
-    const n = parseInt(File.basename(file).split("_")[0], 10);
-    if (!Number.isNaN(n) && n > max) max = n;
-  }
-  return max;
-}
-export function nextMigrationNumber(): never {
-  throw new NotImplementedError("nextMigrationNumber must be implemented");
-}
+export const ClassMethods = {
+  migrationLookupAt(dirname: string): string[] {
+    return Dir.glob(`${dirname}/[0-9]*_*.{ts,js,rb}`);
+  },
+
+  migrationExists(
+    this: { migrationLookupAt(dirname: string): string[] },
+    dirname: string,
+    fileName: string,
+  ): string | undefined {
+    const re = new RegExp(`\\d+_${regexpEscape(fileName)}\\.(ts|js|rb)$`);
+    return this.migrationLookupAt(dirname).find((f) => re.test(f));
+  },
+
+  currentMigrationNumber(
+    this: { migrationLookupAt(dirname: string): string[] },
+    dirname: string,
+  ): number {
+    return Math.max(
+      0,
+      ...this.migrationLookupAt(dirname).map(
+        (file) => parseInt(File.basename(file).split("_")[0], 10) || 0,
+      ),
+    );
+  },
+
+  nextMigrationNumber(_dirname: string): never {
+    throw new NotImplementedError();
+  },
+};
 
 export interface MigrationTemplateHost extends CreateMigrationHost {
   action(instance: CreateMigration): unknown;
   destinationRoot: string;
-  constructor: { nextMigrationNumber(dirname: string): string };
+  constructor: {
+    nextMigrationNumber(dirname: string): string;
+    migrationExists(dirname: string, fileName: string): string | undefined;
+  };
   migrationNumber: string;
   migrationClassName: string;
   createMigration(
@@ -72,9 +92,8 @@ export const Migration = {
   ): Promise<string | undefined> {
     this.setMigrationAssignsBang(destination);
 
-    const resolved = File.expandPath(destination, this.destinationRoot);
-    const [dir, base] = [File.dirname(resolved), File.basename(resolved)];
-    const numberedDestination = File.join(dir, [this.migrationNumber, base].join("_"));
+    const [dir, base] = File.split(destination);
+    const numberedDestination = File.join(dir, ["%migration_number%", base].join("_"));
 
     const file = await this.createMigration(numberedDestination, null, config, source);
     return Generators.addGeneratedFile(file!);
