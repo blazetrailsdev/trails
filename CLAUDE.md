@@ -1170,9 +1170,13 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
 - **A known name is still an ES import.** A name that is a literal at the call
   site, and that a plain import can reach, is an import (§ "Call-time constant
   resolution"), or a module-private map or `switch` beside the reader.
-- **`registerModel`, `registerController`, `registerJob`, `registerChannel` and
+- **`registerController`, `registerJob`, `registerChannel` and
   `registerConnection` retire** under RFC 0213. Until then they seat through
-  `registerConstant`, and the walk finds what they seated.
+  `registerConstant`, and the walk finds what they seated. **`registerModel`
+  stays** as the one call the generated model manifest makes
+  (`packages/activerecord-cli/src/generate-manifest.ts`), by repo-owner ruling
+  on trails#9644. The manifest is a build artifact, so hand-written source and
+  tests never call it: a test class is seated with `rbModConstSet`.
 - **Full-path seats and class-path tables are transitional.** `registerConstant`
   seats `"A::B"` whole and `generatedClass` holds a class no namespace does, so
   the walk reads both where it reaches them, until
