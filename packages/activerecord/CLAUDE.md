@@ -303,9 +303,11 @@ A JS `class Foo extends Base {}` does neither, so each half has its own port
   model the loader seats, and a test that needs it calls
   `DescendantsTracker.registerSubclass`.
 
-`registerModel` (`associations.ts`) retires. activerecord's own tests and models
-no longer call it; it stays defined for the other packages' tests until
-`register-x-retires-from-other-tests` deletes it. Do not add a caller.
+`registerModel` (`associations.ts`) stays, as the one call the generated model
+manifest makes (`packages/activerecord-cli/src/generate-manifest.ts`), by
+repo-owner ruling on trails#9644. activerecord's own tests and models no longer
+call it, and the other packages' tests stop calling it under
+`register-x-retires-from-other-tests`. Do not add a caller outside the manifest.
 
 ## A create path awaits its block before saving (`create`'s `&block`)
 
