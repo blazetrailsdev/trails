@@ -2,9 +2,9 @@
  * The framework constant table (RFC 0213 § "Framework constants"): one
  * checked-in module per package, `src/constants.generated.ts`, mapping each
  * exported TS class or module that `parity:api` pairs with a Ruby class or
- * module to its `fqn` in `output/rails-api.json`. ruby-compat's `rbModName` reads it after the
- * `classpaths` a `const_set` or a module-eval seat wrote, and before
- * `klass.name`.
+ * module to its `fqn` in `output/rails-api.json`. ruby-compat's `rbModName`
+ * reads it after the `classpaths` a `const_set` or a module-eval seat wrote,
+ * and before `klass.name`.
  *
  *   pnpm parity:class-paths           # rewrite the tables
  *   pnpm parity:class-paths --check   # red on a stale table, or on a generated
