@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# Run a generated application's own vitest suite against packed packages.
-#
-# trails' vitest config aliases every @blazetrails/* package to its source, so
-# in trails' suite every package runs inside vite's module graph. An
-# application installs the packed packages, which vitest externalizes, so
-# their own `import()` is Node's. A defect on that path (a second module
-# instance of each class the loader seats, trails#9683) cannot fail a trails
-# test. This packs the packages as trailmap's vendor-trails.sh does, generates
-# an app with `trails new` against the tarballs, adds two associated models,
-# and runs the app's suite.
-#
 # Usage: scripts/generated-app-smoke.sh [work-dir]   (after `pnpm build`)
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -62,8 +51,8 @@ import { Book } from "../../app/models/book.ts";
 
 describe("generated app", () => {
   it("seats the class the test imported", () => {
-    expect((TopLevel as Record<string, unknown>).Author).toBe(Author);
-    expect((TopLevel as Record<string, unknown>).Book).toBe(Book);
+    expect(TopLevel.Author).toBe(Author);
+    expect(TopLevel.Book).toBe(Book);
   });
 
   it("queries an association", async () => {

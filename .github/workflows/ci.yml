@@ -1199,11 +1199,6 @@ jobs:
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/thor/src/*.ts')
 
-  # A generated application's own vitest suite, against packed packages.
-  # trails' vitest config aliases every package to its source, so a defect
-  # that exists only where vitest externalizes the installed packages (a
-  # second module instance of each class the loader seats, trails#9683)
-  # cannot fail any other job.
   generated-app-tests:
     name: Generated App Tests
     needs: changes
