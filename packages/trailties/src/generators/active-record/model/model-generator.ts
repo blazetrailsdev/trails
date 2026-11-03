@@ -145,6 +145,7 @@ ${staticBlock}}
     }
   }
 
+  /** @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing */
   private async generateAbstractClass(): Promise<void> {
     const path = File.join(
       "app/models",
