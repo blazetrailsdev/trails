@@ -570,10 +570,11 @@ async function baseRecord(): Promise<Record<string, ConstantResidue>> {
 /**
  * A class excluded by its receipt: the JSDoc directly above its declaration
  * carries `@noRailsEquivalent PERMANENT` or `@noRailsEquivalent CONVERGEABLE <story-id>`.
+ * An `excluded` key is a walked top-level class, so `tsName` is never dotted.
  */
 export function isReceipted(source: string, tsName: string): boolean {
   const decl = new RegExp(
-    `^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${tsName.replace(/[$]/g, "\\$")}\\b`,
+    `^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${tsName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
     "m",
   ).exec(source);
   if (decl === null) return false;
