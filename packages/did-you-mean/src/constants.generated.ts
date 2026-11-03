@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./index.js";
 import * as m0 from "./did-you-mean.js";
 import * as m1 from "./formatter.js";
 import * as m2 from "./jaro-winkler.js";

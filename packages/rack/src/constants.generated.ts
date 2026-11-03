@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./index.js";
 import * as m0 from "./bad-request.js";
 import * as m1 from "./body-proxy.js";
 import * as m2 from "./builder.js";

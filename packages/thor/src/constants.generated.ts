@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./thor.js";
 import * as m0 from "./actions.js";
 import * as m1 from "./actions/create-file.js";
 import * as m2 from "./actions/create-link.js";

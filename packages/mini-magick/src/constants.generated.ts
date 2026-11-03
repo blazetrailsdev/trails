@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./mini-magick.js";
 import * as m0 from "./configuration.js";
 import * as m1 from "./image.js";
 import * as m2 from "./image/info.js";

@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./index.js";
 import * as m0 from "./alias-predication.js";
 import * as m1 from "./attributes/attribute.js";
 import * as m2 from "./collectors/bind.js";

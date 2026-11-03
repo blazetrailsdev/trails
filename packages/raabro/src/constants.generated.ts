@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./raabro.js";
 import * as m0 from "./raabro.js";
 
 defineConstants([

@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./index.js";
 import * as m0 from "./analyze-job.js";
 import * as m1 from "./analyzer.js";
 import * as m2 from "./analyzer/audio-analyzer.js";

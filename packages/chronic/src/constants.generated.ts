@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./chronic.js";
 import * as m0 from "./date.js";
 import * as m1 from "./grabber.js";
 import * as m2 from "./handler.js";

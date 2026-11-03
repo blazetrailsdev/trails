@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./index.js";
 import * as m0 from "./cookie-jar.js";
 import * as m1 from "./methods.js";
 import * as m2 from "./test.js";

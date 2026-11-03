@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./mini-mime.js";
 import * as m0 from "./mini-mime.js";
 
 defineConstants([

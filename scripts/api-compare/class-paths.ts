@@ -286,9 +286,12 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
   return byDir;
 }
 
+/** A table imported by a module besides the entry (thor's `command.ts`) must not load the entry itself. */
+const ENTRY_FIRST = new Set(["i18n", "solid-queue"]);
+
 /**
- * `entry` is the package entry a main table imports first: entered at the table,
- * the entry's own order still runs, so no `extends` meets a class in TDZ.
+ * `entry` is the package entry an `ENTRY_FIRST` table imports first: entered at
+ * the table, the entry's own order still runs, so no `extends` meets a class in TDZ.
  */
 export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: string): string {
   const sorted = [...entries].sort((a, b) => a.fqn.localeCompare(b.fqn));
@@ -555,7 +558,7 @@ async function main(): Promise<void> {
       continue;
     }
     const entry =
-      table === GENERATED
+      table === GENERATED && ENTRY_FIRST.has(dir)
         ? (await entryFile(path.join(ROOT_DIR, "packages", dir))).replace(/^\.\/dist\//, "")
         : undefined;
     const next = await prettier.format(renderClassPaths(entries, entry), {

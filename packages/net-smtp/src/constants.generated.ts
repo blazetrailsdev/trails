@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./smtp.js";
 import * as m0 from "./auth-cram-md5.js";
 import * as m1 from "./auth-login.js";
 import * as m2 from "./auth-plain.js";

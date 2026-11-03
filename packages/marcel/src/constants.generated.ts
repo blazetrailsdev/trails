@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./marcel.js";
 import * as m0 from "./magic.js";
 import * as m1 from "./mime-type.js";
 

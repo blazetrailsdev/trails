@@ -1,5 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import "./fugit.js";
 import * as m0 from "./at.js";
 import * as m1 from "./cron.js";
 import * as m2 from "./duration.js";
