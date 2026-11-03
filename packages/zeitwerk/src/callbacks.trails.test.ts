@@ -205,4 +205,54 @@ describe("autoloadGet with a load in flight", () => {
       expect(importing).toHaveBeenCalledTimes(2);
     });
   });
+
+  it("imports a file through Loader#importer when one is set", async () => {
+    const loader = await newLoader({ setup: false });
+    await withSetup(loader, [["x.ts", 'throw new Error("imported natively");']], {}, async () => {
+      class X {}
+      const urls: string[] = [];
+      loader.importer = async (url) => {
+        urls.push(url);
+        return { X };
+      };
+
+      await loader.eagerLoad();
+
+      expect(urls).toEqual([new URL(`file://${File.expandPath("x.ts")}`).href]);
+      expect(top.X).toBe(X);
+    });
+  });
+
+  it("imports a reloaded file through Loader#importer with the reload generation", async () => {
+    const loader = await newLoader({ setup: false });
+    await withSetup(loader, [["x.ts", "export class X {}"]], {}, async () => {
+      const urls: string[] = [];
+      loader.importer = async (url) => {
+        urls.push(url);
+        return { X: class X {} };
+      };
+
+      await loader.eagerLoad();
+      await loader.reload();
+      await loader.eagerLoad();
+
+      const href = new URL(`file://${File.expandPath("x.ts")}`).href;
+      expect(urls).toEqual([href, `${href}?zeitwerk=2`]);
+    });
+  });
+
+  it("prefers an imports thunk over Loader#importer", async () => {
+    const loader = await newLoader({ setup: false });
+    await withSetup(loader, [["x.ts", "export class X {}"]], {}, async () => {
+      class X {}
+      const importer = vi.fn();
+      loader.importer = importer;
+      loader.imports = { X: async () => ({ X }) };
+
+      await loader.eagerLoad();
+
+      expect(importer).not.toHaveBeenCalled();
+      expect(top.X).toBe(X);
+    });
+  });
 });

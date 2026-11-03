@@ -2135,6 +2135,21 @@ system, as `setup` does, so it sees what changed since the build. New names
 the step needs carry `@noRailsEquivalent PERMANENT` against this section. This is a genuine language
 shortcoming, ratified repo-wide by RFC 0213.
 
+**`Loader#importer` is the import the loader uses for a file.** `require`
+loads a file with an `imports` thunk when one is set, else
+`importer(url.href)`, else its own `import(url.href)`. A host whose
+application code runs in a module graph of its own must set it: under vitest
+a test imports `app/models/story.ts` through vite's graph, while
+`@blazetrails/zeitwerk` is an externalized dependency whose own `import()` is
+Node's, so the class the loader seats is a second module instance the test
+never touched. `trails new`'s `config/environment.ts` sets
+`loader.importer = (url) => import(url)` on every loader before
+`Trails.initialize()`; that `import()` is written in the application, so it
+resolves in whichever graph loaded the application. The URL carries the reload
+generation, so a reload goes through it too. trails' own suite cannot see the
+second instance, because its vitest config aliases every package to its
+source; trailmap's suite is what found it. `@noRailsEquivalent PERMANENT`.
+
 ## An action's name is its method's name (`AbstractController::Base#action_methods`)
 
 Moved to [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#an-actions-name-is-its-methods-name-abstractcontrollerbaseaction_methods).
