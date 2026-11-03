@@ -59,6 +59,8 @@ export interface ProcessAdapter {
   setExitCode(code: number): void;
   setSourceMapsSupport?(enabled: boolean): void;
   onSignal(name: SignalName, handler: () => void): () => void;
+  /** @noRailsEquivalent PERMANENT */
+  signalListenerCount?(name: SignalName): number;
   readonly stdout: WriteStream;
   readonly stderr: WriteStream;
   readonly stdin: ReadStream;
@@ -547,6 +549,7 @@ interface NodeProcessLike {
   exit(code?: number): never;
   exitCode: number | string | undefined;
   on(event: string, handler: () => void): void;
+  listenerCount(event: string): number;
   off(event: string, handler: () => void): void;
   stdout: NodeStream;
   stderr: NodeStream;
@@ -666,6 +669,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       }
       nodeModule.registerHooks(hooks);
     },
+    signalListenerCount: (name) => proc.listenerCount(name),
     onSignal: (name, handler) => {
       proc.on(name, handler);
       return () => {

@@ -69,9 +69,11 @@ export const ObjectSpace = {
       for (const signo of ["SIGINT", "SIGTERM"] as const) {
         const off = onSignal(signo, () => {
           off();
-          callFinalizers();
           const adapter = getProcessAdapter();
-          adapter.kill?.(adapter.pid(), signo);
+          if ((adapter.signalListenerCount?.(signo) ?? 0) > 0) return;
+          callFinalizers();
+          if (adapter.kill) adapter.kill(adapter.pid(), signo);
+          else adapter.exit(128 + (adapter.signo?.(signo) ?? 0));
         });
       }
     }

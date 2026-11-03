@@ -356,6 +356,7 @@ class Remover {
     this.path = path;
   }
 
+  /** @missingRailsCall puts — CONVERGEABLE tempfile-remover-debug-output */
   call = (): void => {
     if (this.pid !== Process.pid) return;
 
