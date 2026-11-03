@@ -56,8 +56,11 @@ describe("joinType propagation in joinConstraints", () => {
   beforeEach(() => {
     for (const m of [Post, Comment]) {
       (m as any)._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
   });
 

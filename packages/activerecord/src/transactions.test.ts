@@ -18,9 +18,8 @@ import { itIfSupports } from "./support/supports.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
-import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Movie } from "./test-helpers/models/movie.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Base } from "./base.js";
@@ -36,25 +35,12 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
+import "./test-helpers/models/reply.js";
+import "./test-helpers/models/topic.js";
 
 const Topic = CanonicalTopic;
 
 class SomeError extends StandardError {}
-for (const klass of [
-  Topic,
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  CpkBook,
-  CpkOrder,
-  CpkAuthor,
-  CpkChapter,
-  Author,
-  Book,
-]) {
-  constSet(TopLevel, klass.name, klass);
-}
 
 describe("TransactionTest", () => {
   const { topics } = fixtures(["topics", "developers", "authors", "authorAddresses", "posts"], {

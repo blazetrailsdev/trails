@@ -59,7 +59,6 @@ describe("excluding a model with a composite primary key (trails)", () => {
 
   it("builds the predicate over the composite key rather than raising", async () => {
     const { CpkBook } = await import("./test-helpers/models/cpk.js");
-    constSet(TopLevel, CpkBook.name, CpkBook);
     const book = (await CpkBook.all())[0];
 
     const relation = CpkBook.excluding(book);

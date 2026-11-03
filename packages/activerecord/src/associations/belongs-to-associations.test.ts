@@ -30,18 +30,10 @@ import { Essay } from "../test-helpers/models/essay.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Client, Firm, Company } from "../test-helpers/models/company.js";
 import { Topic, WebTopic } from "../test-helpers/models/topic.js";
-import {
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  WebReply,
-} from "../test-helpers/models/reply.js";
-import { Car } from "../test-helpers/models/car.js";
+import { Reply, SillyReply, WebReply } from "../test-helpers/models/reply.js";
 import { Wheel } from "../test-helpers/models/wheel.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment, CommentWithAfterCreateUpdate } from "../test-helpers/models/comment.js";
-import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Member } from "../test-helpers/models/member.js";
@@ -49,7 +41,6 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Node } from "../test-helpers/models/node.js";
-import { Tree } from "../test-helpers/models/tree.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Citation } from "../test-helpers/models/citation.js";
 import { Record } from "../test-helpers/models/record.js";
@@ -58,7 +49,6 @@ import { Toy } from "../test-helpers/models/toy.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
 import { Project } from "../test-helpers/models/project.js";
 import { AdminUser } from "../test-helpers/models/admin/user.js";
-import { AdminAccount } from "../test-helpers/models/admin/account.js";
 import { LineItem } from "../test-helpers/models/line-item.js";
 import {
   CpkAuthor,
@@ -69,7 +59,6 @@ import {
   CpkNonCpkBook,
   CpkNonCpkOrder,
   CpkOrder,
-  CpkOrderWithSpecialPrimaryKey,
   CpkPost,
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
@@ -94,6 +83,12 @@ import {
   belongsToRequiredValidatesForeignKey,
   setBelongsToRequiredValidatesForeignKey,
 } from "../active-record.js";
+import "../test-helpers/models/car.js";
+import "../test-helpers/models/tag.js";
+import "../test-helpers/models/tree.js";
+import "../test-helpers/models/admin/account.js";
+import "../test-helpers/models/category.js";
+import "../test-helpers/models/wheel.js";
 
 class CarPolymorphicName extends Base {
   declare wheels: AssociationProxy<Wheel>;
@@ -108,6 +103,8 @@ class CarPolymorphicName extends Base {
     return "polymorphic_car";
   }
 }
+constSet(TopLevel, "CarPolymorphicName", CarPolymorphicName);
+DescendantsTracker.registerSubclass(Base, CarPolymorphicName);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class WheelPolymorphicName extends Base {
@@ -126,6 +123,8 @@ class WheelPolymorphicName extends Base {
     return CarPolymorphicName;
   }
 }
+constSet(TopLevel, "WheelPolymorphicName", WheelPolymorphicName);
+DescendantsTracker.registerSubclass(Base, WheelPolymorphicName);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 interface WheelPolymorphicName {
   get wheelable(): Base | null | Promise<Base | null>;
@@ -138,6 +137,8 @@ class EssayDestroy extends Base {
     this.belongsTo("book", { dependent: "destroy", className: "DestroyableBook" });
   }
 }
+constSet(TopLevel, "EssayDestroy", EssayDestroy);
+DescendantsTracker.registerSubclass(Base, EssayDestroy);
 
 class DestroyableBook extends Base {
   static _tableName = "books";
@@ -145,6 +146,8 @@ class DestroyableBook extends Base {
     this.belongsTo("author", { className: "UndestroyableAuthor", dependent: "destroy" });
   }
 }
+constSet(TopLevel, "DestroyableBook", DestroyableBook);
+DescendantsTracker.registerSubclass(Base, DestroyableBook);
 
 class UndestroyableAuthor extends Base {
   static _tableName = "authors";
@@ -155,64 +158,8 @@ class UndestroyableAuthor extends Base {
     });
   }
 }
-
-for (const m of [
-  Author,
-  AuthorAddress,
-  Essay,
-  Client,
-  Firm,
-  Company,
-  Account,
-  Topic,
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  WebTopic,
-  WebReply,
-  Post,
-  Comment,
-  CommentWithAfterCreateUpdate,
-  Tag,
-  Tagging,
-  Sponsor,
-  Member,
-  Computer,
-  Developer,
-  Ship,
-  Node,
-  Tree,
-  Book,
-  Citation,
-  Record,
-  Column,
-  Toy,
-  Invoice,
-  LineItem,
-  Car,
-  Wheel,
-  CarPolymorphicName,
-  WheelPolymorphicName,
-  CpkAuthor,
-  CpkBook,
-  CpkBrokenBook,
-  CpkBrokenBookWithNonCpkOrder,
-  CpkComment,
-  CpkNonCpkBook,
-  CpkNonCpkOrder,
-  CpkOrder,
-  CpkOrderWithSpecialPrimaryKey,
-  CpkPost,
-  Project,
-  AdminUser,
-  AdminAccount,
-  EssayDestroy,
-  DestroyableBook,
-  UndestroyableAuthor,
-]) {
-  constSet(TopLevel, m.name, m);
-}
+constSet(TopLevel, "UndestroyableAuthor", UndestroyableAuthor);
+DescendantsTracker.registerSubclass(Base, UndestroyableAuthor);
 
 describe("BelongsToWithForeignKeyTest", () => {
   const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"]);

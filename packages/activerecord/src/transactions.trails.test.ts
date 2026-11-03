@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Fiber, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import {
   IsolatedExecutionState,
@@ -12,7 +12,7 @@ import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -37,10 +37,6 @@ interface CpkRestoreView {
 
 interface AdapterTxView {
   currentTransaction?(): unknown;
-}
-
-for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
-  constSet(TopLevel, klass.name, klass);
 }
 
 const openAdapters: SQLite3Adapter[] = [];

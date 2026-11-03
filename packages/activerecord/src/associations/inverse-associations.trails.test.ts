@@ -1,16 +1,13 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Face } from "../test-helpers/models/face.js";
 import { Human } from "../test-helpers/models/human.js";
-import { Interest } from "../test-helpers/models/interest.js";
 import type { HasOneAssociation } from "./has-one-association.js";
+import "../test-helpers/models/interest.js";
+import "../test-helpers/models/face.js";
 
 describe("InversePolymorphicBelongsToTests", () => {
   fixtures(["humans", "faces", "interests"]);
-  beforeAll(() => {
-    [Human, Face, Interest].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("has_one createBang stores a single record as target, not an array", async () => {
     const human = await Human.createBang({});

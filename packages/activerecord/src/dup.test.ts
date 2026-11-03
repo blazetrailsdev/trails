@@ -8,13 +8,9 @@ import { DefaultScope } from "./scoping/default.js";
 import type { Relation } from "./relation.js";
 import { RecordInvalid } from "./validations.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Movie } from "./test-helpers/models/movie.js";
-
-for (const klass of [Topic, Reply, SillyReply, UniqueReply, SillyUniqueReply]) {
-  constSet(TopLevel, klass.name, klass);
-}
+import "./test-helpers/models/reply.js";
 
 describe("DupTest", () => {
   fixtures(["topics", "cars"]);

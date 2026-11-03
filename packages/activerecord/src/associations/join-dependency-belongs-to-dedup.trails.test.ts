@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -29,8 +30,11 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   beforeEach(() => {
     for (const m of [Author, Post]) {
       m._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     Associations.belongsTo.call(Post, "author", { className: "Author" });
   });

@@ -42,8 +42,15 @@ describe("JoinDependency walk() deduplication", () => {
     for (const m of [Post, Comment, Author, Like]) {
       (m as any)._reflections = {};
       clearReflectionsCache(m);
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Like", Like);
+    DescendantsTracker.registerSubclass(Base, Like);
 
     Post.hasMany("comments", { className: "Comment" });
     Comment.belongsTo("author", { className: "Author" });

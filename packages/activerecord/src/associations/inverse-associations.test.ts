@@ -21,14 +21,13 @@ import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
 import { Interest } from "../test-helpers/models/interest.js";
-import { Zine } from "../test-helpers/models/zine.js";
 import { MixedCaseMonkey } from "../test-helpers/models/mixed-case-monkey.js";
 import { Car } from "../test-helpers/models/car.js";
 import { CpkCar, CpkCarReview, CpkAuthor, CpkBook, CpkOrder } from "../test-helpers/models/cpk.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
-import { Post, SpecialPost } from "../test-helpers/models/post.js";
+import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Sponsor } from "../test-helpers/models/sponsor.js";
 import { Club } from "../test-helpers/models/club.js";
@@ -38,11 +37,20 @@ import { User } from "../test-helpers/models/user.js";
 import { Room } from "../test-helpers/models/room.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Developer, AuditLog } from "../test-helpers/models/developer.js";
+import { Developer } from "../test-helpers/models/developer.js";
 import { SpecialContract } from "../test-helpers/models/contract.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
-import { Subscriber } from "../test-helpers/models/subscriber.js";
+import "../test-helpers/models/zine.js";
+import "../test-helpers/models/subscriber.js";
+import "../test-helpers/models/mixed-case-monkey.js";
+import "../test-helpers/models/author.js";
+import "../test-helpers/models/sponsor.js";
+import "../test-helpers/models/club.js";
+import "../test-helpers/models/admin/account.js";
+import "../test-helpers/models/admin/user.js";
+import "../test-helpers/models/contract.js";
+import "../test-helpers/models/subscription.js";
 
 describe("AutomaticInverseFindingTests", () => {
   const { self, books } = fixtures([
@@ -54,31 +62,6 @@ describe("AutomaticInverseFindingTests", () => {
     "subscriptions",
     "subscribers",
   ]);
-  beforeAll(() => {
-    [
-      MixedCaseMonkey,
-      Human,
-      Face,
-      Car,
-      Bulb,
-      Comment,
-      Rating,
-      Post,
-      SpecialPost,
-      Author,
-      AdminAccount,
-      AdminUser,
-      User,
-      Room,
-      Company,
-      SpecialContract,
-      Book,
-      Subscription,
-      Subscriber,
-      CpkCar,
-      CpkCarReview,
-    ].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
     const monkeyReflection = (MixedCaseMonkey as any).reflectOnAssociation("human");
@@ -295,9 +278,6 @@ describe("InverseAssociationTests", () => {
   });
 
   beforeAll(() => {
-    [Human, Face, Interest, Club, Sponsor, Company, Firm, Developer, Project, AuditLog].forEach(
-      (m) => constSet(TopLevel, m.name, m),
-    );
     Company.inheritanceColumn = "type";
     constSet(TopLevel, "Firm", Firm);
   });
@@ -487,9 +467,6 @@ describe("InverseHasManyTests", () => {
     "cpkBooks",
   ]);
   beforeAll(async () => {
-    [Human, Interest, Post, SpecialPost, Author, Comment, CpkAuthor, CpkBook, CpkOrder].forEach(
-      (m) => constSet(TopLevel, m.name, m),
-    );
     await (CpkAuthor as any).loadSchema();
     await (CpkBook as any).loadSchema();
     await (CpkOrder as any).loadSchema();
@@ -835,9 +812,6 @@ describe("InverseHasManyTests", () => {
 
 describe("InverseBelongsToTests", () => {
   const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
-  beforeAll(() => {
-    [Human, Face, Interest].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("trusting");
@@ -1032,9 +1006,6 @@ describe("InverseBelongsToTests", () => {
 
 describe("InversePolymorphicBelongsToTests", () => {
   const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
-  beforeAll(() => {
-    [Human, Face, Interest].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("child instance should be shared with parent on find", async () => {
     const face = faces("confused");
@@ -1177,9 +1148,6 @@ describe("InversePolymorphicBelongsToTests", () => {
 
 describe("InverseMultipleHasManyInversesForSameModel", () => {
   fixtures(["humans", "interests", "zines"]);
-  beforeAll(() => {
-    [Human, Interest, Zine].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
     await assertNothingRaised(async () => {
@@ -1201,9 +1169,6 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 
 describe("InverseBelongsToTests", () => {
   const { self } = fixtures({});
-  beforeAll(() => {
-    [Branch, BrokenBranch].forEach((m) => constSet(TopLevel, m.name, m));
-  });
 
   it("recursive model has many inversing", async () => {
     await self().withHasManyInversing(Branch, async () => {

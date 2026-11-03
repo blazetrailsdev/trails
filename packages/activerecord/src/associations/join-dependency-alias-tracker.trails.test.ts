@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 import { Associations } from "../associations.js";
@@ -30,8 +31,13 @@ describe("JoinDependency AliasTracker wiring", () => {
   beforeEach(() => {
     for (const m of [Post, Comment, Tag]) {
       (m as any)._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Tag", Tag);
+    DescendantsTracker.registerSubclass(Base, Tag);
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "postId" });
     Associations.hasMany.call(Post, "tags", { className: "Tag", foreignKey: "postId" });
   });

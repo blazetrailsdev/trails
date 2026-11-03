@@ -2458,7 +2458,6 @@ describe("FinderTest", () => {
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
   constSet(TopLevel, "Topic", Topic);
-  constSet(TopLevel, Post.name, Post);
   constSet(TopLevel, "Account", Account);
   constSet(TopLevel, "Dog", Dog);
 

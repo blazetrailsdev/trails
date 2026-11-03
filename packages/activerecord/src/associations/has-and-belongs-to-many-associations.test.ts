@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { readFile } from "fs/promises";
@@ -22,16 +23,11 @@ import {
   Developer,
   SubDeveloper,
   DeveloperWithBeforeDestroyRaise,
-  AuditLog,
   LazyBlockDeveloperCalledDavid,
 } from "../test-helpers/models/developer.js";
-import { Mentor } from "../test-helpers/models/mentor.js";
 import { Tag } from "../test-helpers/models/tag.js";
-import { Tagging } from "../test-helpers/models/tagging.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Author } from "../test-helpers/models/author.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
 import { Country } from "../test-helpers/models/country.js";
 import { Treaty } from "../test-helpers/models/treaty.js";
 import { Vertex } from "../test-helpers/models/vertex.js";
@@ -41,15 +37,21 @@ import { User } from "../test-helpers/models/user.js";
 import { Parrot } from "../test-helpers/models/parrot.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
-import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
 import { RichPerson } from "../test-helpers/models/person.js";
-import { Job } from "../test-helpers/models/job.js";
-import { Computer } from "../test-helpers/models/computer.js";
 import { PublisherArticle } from "../test-helpers/models/publisher/article.js";
 import { PublisherMagazine } from "../test-helpers/models/publisher/magazine.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
+import "../test-helpers/models/mentor.js";
+import "../test-helpers/models/tagging.js";
+import "../test-helpers/models/author.js";
+import "../test-helpers/models/categorization.js";
+import "../test-helpers/models/price-estimate.js";
+import "../test-helpers/models/job.js";
+import "../test-helpers/models/computer.js";
+import "../test-helpers/models/vertex.js";
+import "../test-helpers/models/user.js";
 
 class ProjectWithSymbolsForKeys extends Base {
   static {
@@ -62,6 +64,8 @@ class ProjectWithSymbolsForKeys extends Base {
     });
   }
 }
+constSet(TopLevel, "ProjectWithSymbolsForKeys", ProjectWithSymbolsForKeys);
+DescendantsTracker.registerSubclass(Base, ProjectWithSymbolsForKeys);
 
 class DeveloperWithSymbolsForKeys extends Base {
   static {
@@ -74,6 +78,8 @@ class DeveloperWithSymbolsForKeys extends Base {
     });
   }
 }
+constSet(TopLevel, "DeveloperWithSymbolsForKeys", DeveloperWithSymbolsForKeys);
+DescendantsTracker.registerSubclass(Base, DeveloperWithSymbolsForKeys);
 
 class DeveloperWithSymbolClassName extends Developer {
   static {
@@ -82,6 +88,8 @@ class DeveloperWithSymbolClassName extends Developer {
     });
   }
 }
+constSet(TopLevel, "DeveloperWithSymbolClassName", DeveloperWithSymbolClassName);
+DescendantsTracker.registerSubclass(Developer, DeveloperWithSymbolClassName);
 
 class DeveloperForProjectWithAfterCreateHook extends Base {
   static {
@@ -94,6 +102,12 @@ class DeveloperForProjectWithAfterCreateHook extends Base {
     });
   }
 }
+constSet(
+  TopLevel,
+  "DeveloperForProjectWithAfterCreateHook",
+  DeveloperForProjectWithAfterCreateHook,
+);
+DescendantsTracker.registerSubclass(Base, DeveloperForProjectWithAfterCreateHook);
 
 class ProjectWithAfterCreateHook extends Base {
   static {
@@ -111,6 +125,8 @@ class ProjectWithAfterCreateHook extends Base {
     });
   }
 }
+constSet(TopLevel, "ProjectWithAfterCreateHook", ProjectWithAfterCreateHook);
+DescendantsTracker.registerSubclass(Base, ProjectWithAfterCreateHook);
 
 class DeveloperWithExtendOption extends Developer {
   static namedExtension = {
@@ -123,6 +139,8 @@ class DeveloperWithExtendOption extends Developer {
     this.hasAndBelongsToMany("projects", { extend: DeveloperWithExtendOption.namedExtension });
   }
 }
+constSet(TopLevel, "DeveloperWithExtendOption", DeveloperWithExtendOption);
+DescendantsTracker.registerSubclass(Developer, DeveloperWithExtendOption);
 
 class ProjectUnscopingDavidDefaultScope extends Base {
   static {
@@ -141,12 +159,16 @@ class ProjectUnscopingDavidDefaultScope extends Base {
     );
   }
 }
+constSet(TopLevel, "ProjectUnscopingDavidDefaultScope", ProjectUnscopingDavidDefaultScope);
+DescendantsTracker.registerSubclass(Base, ProjectUnscopingDavidDefaultScope);
 
 class Kitchen extends Base {
   static {
     this.hasOne("sink");
   }
 }
+constSet(TopLevel, "Kitchen", Kitchen);
+DescendantsTracker.registerSubclass(Base, Kitchen);
 
 class Sink extends Base {
   static {
@@ -160,6 +182,8 @@ class Sink extends Base {
     this.acceptsNestedAttributesFor("kitchen");
   }
 }
+constSet(TopLevel, "Sink", Sink);
+DescendantsTracker.registerSubclass(Base, Sink);
 
 class Source extends Base {
   static {
@@ -172,6 +196,8 @@ class Source extends Base {
     });
   }
 }
+constSet(TopLevel, "Source", Source);
+DescendantsTracker.registerSubclass(Base, Source);
 
 async function assertIncludes(
   collection: { isInclude(obj: unknown): boolean | Promise<boolean> },
@@ -205,49 +231,6 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   withSecondPool();
 
   beforeAll(async () => {
-    for (const m of [
-      Developer,
-      SubDeveloper,
-      DeveloperWithBeforeDestroyRaise,
-      AuditLog,
-      Mentor,
-      Project,
-      SpecialProject,
-      Category,
-      Post,
-      Author,
-      Categorization,
-      Country,
-      Treaty,
-      Vertex,
-      Student,
-      Lesson,
-      User,
-      Job,
-      Parrot,
-      Pirate,
-      Treasure,
-      RichPerson,
-      Tag,
-      Tagging,
-      Computer,
-      PublisherArticle,
-      PublisherMagazine,
-      ProjectWithSymbolsForKeys,
-      DeveloperWithSymbolsForKeys,
-      DeveloperWithSymbolClassName,
-      DeveloperForProjectWithAfterCreateHook,
-      ProjectWithAfterCreateHook,
-      DeveloperWithExtendOption,
-      ProjectUnscopingDavidDefaultScope,
-      LazyBlockDeveloperCalledDavid,
-      Kitchen,
-      Sink,
-      Source,
-      PriceEstimate,
-    ]) {
-      constSet(TopLevel, m.name, m);
-    }
     await Country.loadSchema();
     await Treaty.loadSchema();
   });

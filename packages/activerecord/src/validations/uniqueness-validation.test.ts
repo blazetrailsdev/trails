@@ -24,7 +24,9 @@ import {
   assertEmpty,
   assertNothingRaised,
   assertRaises,
+  DescendantsTracker,
 } from "@blazetrails/activesupport";
+import "../test-helpers/models/cpk.js";
 
 const INT_MAX_VALUE = 2147483647;
 
@@ -89,12 +91,20 @@ class BookWithUniqueRevision extends CpkBook {
   }
 }
 
-for (const klass of [ReplyWithTitleObject, CoolTopic, TopicWithAfterCreate]) {
-  constSet(TopLevel, klass.name, klass);
-}
-for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
-  constSet(TopLevel, klass.name, klass);
-}
+constSet(TopLevel, "ReplyWithTitleObject", ReplyWithTitleObject);
+DescendantsTracker.registerSubclass(Reply, ReplyWithTitleObject);
+constSet(TopLevel, "CoolTopic", CoolTopic);
+DescendantsTracker.registerSubclass(Topic, CoolTopic);
+constSet(TopLevel, "TopicWithAfterCreate", TopicWithAfterCreate);
+DescendantsTracker.registerSubclass(Topic, TopicWithAfterCreate);
+constSet(TopLevel, "Wizard", Wizard);
+DescendantsTracker.registerSubclass(Base, Wizard);
+constSet(TopLevel, "IneptWizard", IneptWizard);
+DescendantsTracker.registerSubclass(Wizard, IneptWizard);
+constSet(TopLevel, "Conjurer", Conjurer);
+DescendantsTracker.registerSubclass(IneptWizard, Conjurer);
+constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
+DescendantsTracker.registerSubclass(IneptWizard, Thaumaturgist);
 
 describe("UniquenessValidationTest", () => {
   fixtures(["topics", "warehouseThings"]);
@@ -999,6 +1009,11 @@ class TopicWithUniqEvent extends Topic {
   }
 }
 
-for (const klass of [BigIntTest, BigIntReverseTest, TopicWithEvent, TopicWithUniqEvent]) {
-  constSet(TopLevel, klass.name, klass);
-}
+constSet(TopLevel, "BigIntTest", BigIntTest);
+DescendantsTracker.registerSubclass(Base, BigIntTest);
+constSet(TopLevel, "BigIntReverseTest", BigIntReverseTest);
+DescendantsTracker.registerSubclass(Base, BigIntReverseTest);
+constSet(TopLevel, "TopicWithEvent", TopicWithEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithEvent);
+constSet(TopLevel, "TopicWithUniqEvent", TopicWithUniqEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithUniqEvent);

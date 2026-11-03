@@ -31,8 +31,6 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 
-for (const m of [Task, Topic, Category, Post]) constSet(TopLevel, m.name, m);
-
 function middleware(
   app: (env?: unknown) => unknown | Promise<unknown>,
 ): (env?: unknown) => Promise<unknown> {

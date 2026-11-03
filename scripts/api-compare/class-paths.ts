@@ -335,14 +335,23 @@ async function entryFile(cwd: string): Promise<string> {
   return `./${entry.replace(/^\.\//, "")}`;
 }
 
-async function checkSeatedPaths(dir: string): Promise<void> {
+async function checkSeatedPaths(dir: string, paths: readonly string[]): Promise<void> {
   const cwd = path.join(ROOT_DIR, "packages", dir);
   const script = [
     `await import(${JSON.stringify(await entryFile(cwd))});`,
-    'const { classPathMismatches } = await import("@blazetrails/ruby-compat");',
+    'const { classPathMismatches, constGet } = await import("@blazetrails/ruby-compat");',
+    `for (const p of ${JSON.stringify(paths)}) {`,
+    "  try { constGet(Object, p); } catch (e) { console.error(`${p}: constGet raised ${e}`); process.exitCode = 1; }",
+    "}",
     "console.log(JSON.stringify(classPathMismatches()));",
   ].join("\n");
-  const { stdout } = await run("node", ["--input-type=module", "-e", script], { cwd });
+  const { stdout } = await run("node", ["--input-type=module", "-e", script], { cwd }).catch(
+    (e: { stdout: string; stderr: string }) => {
+      console.error(`${dir}: ${e.stderr.trim()}`);
+      process.exitCode = 1;
+      return e;
+    },
+  );
   const entry = await entryFile(cwd);
   const table = `${path.dirname(entry)}/constants.generated.js`;
   await run("node", ["--input-type=module", "-e", `await import(${JSON.stringify(table)});`], {
@@ -588,7 +597,18 @@ async function main(): Promise<void> {
         console.error(`${dir}/src/${file} does not import its constant table`);
         process.exitCode = 1;
       }
-      if (entries.length > 0) await checkSeatedPaths(dir);
+      if (entries.length > 0) {
+        await checkSeatedPaths(
+          dir,
+          entries.filter((e) => !e.excluded && !e.table).map((e) => e.fqn),
+        );
+      }
+    }
+    if (only === undefined || only === "ruby-compat") {
+      await checkSeatedPaths(
+        "ruby-compat",
+        CORE_CLASSES.map(([p]) => p),
+      );
     }
   }
   if (stale.length > 0) {
