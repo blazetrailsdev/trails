@@ -286,7 +286,7 @@ export class Server {
   _server: HandlerLike | null = null;
   /** @internal */
   _wrappedApp: unknown = null;
-  /** @noRailsEquivalent PERMANENT */
+  /** @internal */
   _ready: Promise<void> = Promise.resolve();
 
   constructor(options: ServerOptions | null = null) {

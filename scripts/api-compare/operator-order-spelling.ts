@@ -98,6 +98,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Rake::TaskArguments": { "[]": ["get"] },
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
   "Rack::Response": { "self.[]": ["get"] },
+  // rackup/handler.rb:30 `def self.[](name)` → handler.ts `static aref`; the
+  // `get` spelling is taken by `self.get` (:40).
+  "Rackup::Handler": { "self.[]": ["aref"] },
   "I18n::Locale::Fallbacks": { "[]": ["get"] },
   "I18n::Backend::KeyValue::SubtreeProxy": { "[]": ["get"] },
   "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
