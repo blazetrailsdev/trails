@@ -421,7 +421,7 @@ describe("Mapper block receivers", () => {
 
   afterAll(() => {
     for (const name of names)
-      if (constDefined(Object, `${camelize(name)}Controller`))
+      if (constDefined(Object, `${camelize(name)}Controller`, false))
         rbModRemoveConst(Object, `${camelize(name)}Controller`);
   });
 

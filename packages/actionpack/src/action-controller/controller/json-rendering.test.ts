@@ -13,7 +13,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 afterEach(() => {
-  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("Controller JSON rendering integration", () => {

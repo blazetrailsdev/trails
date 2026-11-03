@@ -10,7 +10,7 @@ import { constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 afterEach(() => {
-  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("ScaffoldControllerGenerator (dispatch)", () => {

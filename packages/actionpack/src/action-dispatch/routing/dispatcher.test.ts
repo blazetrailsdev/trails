@@ -52,7 +52,7 @@ describe("RouteDispatcher", () => {
 
   afterEach(() => {
     for (const controller of registered.splice(0))
-      if (constDefined(Object, `${camelize(controller)}Controller`))
+      if (constDefined(Object, `${camelize(controller)}Controller`, false))
         rbModRemoveConst(Object, `${camelize(controller)}Controller`);
   });
 
@@ -205,7 +205,7 @@ describe("Dispatcher over the controller constant table", () => {
     constSet(TopLevel, "PostsController", PostsController);
   });
   afterEach(() => {
-    if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
+    if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
   });
 
   const reqFor = (params: Record<string, unknown>): RouterRequest => {

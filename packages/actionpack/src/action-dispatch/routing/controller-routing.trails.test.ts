@@ -34,7 +34,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
 });
 
 let capturedEnv: RackEnv = {};

@@ -120,7 +120,8 @@ describe("Request", () => {
         req.pathParameters = { controller: "repos", action };
         return req.GET();
       } finally {
-        if (constDefined(Object, "ReposController")) rbModRemoveConst(Object, "ReposController");
+        if (constDefined(Object, "ReposController", false))
+          rbModRemoveConst(Object, "ReposController");
       }
     }
 
@@ -315,7 +316,8 @@ describe("RequestControllerClass", () => {
     try {
       expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
     } finally {
-      if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
+      if (constDefined(Object, "PostsController", false))
+        rbModRemoveConst(Object, "PostsController");
     }
   });
 
