@@ -53,6 +53,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
+  CacheExpiry: typeof import("./cache-expiry.js");
   Base: typeof Base;
   FileSystemResolver: typeof FileSystemResolver;
   Template: typeof Template;

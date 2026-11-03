@@ -1,3 +1,5 @@
+import { ActiveModel } from "./namespaces.js";
+import * as LintModule from "./lint.js";
 import { assert, assertEqual, assertKindOf, assertRespondTo } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -85,3 +87,5 @@ export const {
   testModelNaming,
   testErrorsAref,
 } = Tests;
+
+ActiveModel.Lint = LintModule;

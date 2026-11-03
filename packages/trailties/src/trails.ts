@@ -21,6 +21,8 @@ import { InfoController } from "./info-controller.js";
 import { WelcomeController } from "./welcome-controller.js";
 import { HealthController } from "./health-controller.js";
 import { PwaController } from "./pwa-controller.js";
+import * as TrailsConfiguration from "./configuration.js";
+import * as Paths from "./paths.js";
 
 let _application: Application | null = null;
 
@@ -40,6 +42,9 @@ export class Trails {
   declare static InfoController: typeof InfoController;
   declare static PwaController: typeof PwaController;
   declare static WelcomeController: typeof WelcomeController;
+  declare static Configuration: typeof TrailsConfiguration;
+  declare static Paths: typeof Paths;
+  declare static Rack?: typeof import("./rack.js");
 
   declare static eagerLoadBang: () => Promise<void>;
 
@@ -174,3 +179,5 @@ Trails.HealthController = HealthController;
 Trails.InfoController = InfoController;
 Trails.PwaController = PwaController;
 Trails.WelcomeController = WelcomeController;
+Trails.Configuration = TrailsConfiguration;
+Trails.Paths = Paths;

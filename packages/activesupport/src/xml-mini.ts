@@ -11,6 +11,8 @@ import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
+import { ActiveSupport } from "./namespaces.js";
+import * as XmlMini from "./xml-mini.js";
 
 export const FileLike = {
   /** @internal */
@@ -500,3 +502,5 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
 }
 
 _backend = XmlMini_REXML;
+
+ActiveSupport.XmlMini = XmlMini;

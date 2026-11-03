@@ -12,6 +12,7 @@ import {
 import {
   MockRequest,
   MockResponse,
+  Rack,
   Request,
   parseNestedQuery,
   release,
@@ -395,3 +396,6 @@ export function encodingAwareStrings(): boolean {
 }
 
 export const MockSession = Session;
+
+export const Test = { name: "Rack::Test" };
+Rack.Test = Test;

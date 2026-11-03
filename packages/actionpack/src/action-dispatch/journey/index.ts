@@ -25,3 +25,8 @@ export {
   type FormatterHost,
 } from "./formatter.js";
 export { Router, type RouterRequest, type RackishResponse, type RoutableApp } from "./router.js";
+
+export * as GTG from "./gtg/index.js";
+export * as Nodes from "./nodes/node.js";
+export * as Path from "./path/index.js";
+export * as Visitors from "./visitors.js";

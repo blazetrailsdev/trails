@@ -16,6 +16,7 @@ import type { CommonField } from "./fields/common-field.js";
 interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
+  Parsers?: typeof import("./parsers.js");
   "new"(...args: unknown[]): Message;
   RANDOM_TAG: string;
   randomTag(): string;

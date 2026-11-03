@@ -106,3 +106,4 @@ export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
 
 import "./constants.generated.js";
+import "./template/sources.js";

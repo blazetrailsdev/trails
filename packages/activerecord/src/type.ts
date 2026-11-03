@@ -12,6 +12,7 @@ import {
 export { ValueType } from "@blazetrails/activemodel";
 
 import { ActiveRecord } from "./namespaces.js";
+import * as Type from "./type.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 
 import { Date } from "./type/date.js";
@@ -118,3 +119,6 @@ export function adapterNameFrom(model: AdapterNameSource): string {
 export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
+
+ActiveRecord.Type = Type;
+export * as Internal from "./type/internal/timezone.js";

@@ -13,6 +13,8 @@ import { STDOUT, TopLevel, constSet } from "@blazetrails/ruby-compat";
 export const SolidQueue = {
   name: "SolidQueue",
 
+  Processes: { name: "SolidQueue::Processes" },
+
   DEFAULT_LOGGER: new Logger(STDOUT),
 
   onWorkerStart(block: () => unknown): void {
@@ -60,6 +62,7 @@ export const SolidQueue = {
   },
 } as {
   name: string;
+  Processes: { name: string };
   DEFAULT_LOGGER: Logger;
   logger: Logger;
   appExecutor: { wrap<T>(block: () => T, options?: { source?: string }): T } | null;

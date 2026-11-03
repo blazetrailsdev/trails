@@ -1,6 +1,8 @@
 import { rbEqual } from "@blazetrails/ruby-compat";
 import { DetailsKey } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
+import { ActionView } from "./namespaces.js";
+import * as CacheExpiry from "./cache-expiry.js";
 
 interface FileWatcher {
   isUpdated(): boolean;
@@ -72,3 +74,5 @@ export class ViewReloader {
     return PathRegistry.allFileSystemResolvers().map((r) => r.path);
   }
 }
+
+ActionView.CacheExpiry = CacheExpiry;

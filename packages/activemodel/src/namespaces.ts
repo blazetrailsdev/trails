@@ -33,6 +33,8 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   ValidationError: typeof ValidationError;
   Validations: typeof Validations;
   Serializers: typeof Serializers;
+  Type: typeof import("./type.js");
+  Lint: typeof import("./lint.js");
 };
 constSet(TopLevel, "ActiveModel", ActiveModel);
 extend(ActiveModel, Autoload);

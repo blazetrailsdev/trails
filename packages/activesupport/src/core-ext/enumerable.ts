@@ -1,11 +1,13 @@
 import {
   ENUMERABLE_METHOD_TABLE,
+  Enumerable,
   StandardError,
   max,
   rbBigNorm,
   rbFSend,
   rbIntegerTypeP,
   rbPlus,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { exclude, indexBy, indexWith, sum as enumerableSum } from "../enumerable-utils.js";
@@ -66,3 +68,11 @@ declare module "@blazetrails/ruby-compat/range" {
 }
 
 Object.assign(Range.prototype, { sum });
+
+TopLevel.Enumerable = Enumerable;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Enumerable?: typeof Enumerable;
+  }
+}

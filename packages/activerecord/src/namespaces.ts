@@ -106,6 +106,20 @@ import type { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_record/middleware/database_selector": () => import("./middleware/database-selector.js"),
+  "active_record/middleware/shard_selector": () => import("./middleware/shard-selector.js"),
+  "active_record/associations/builder/association": () =>
+    import("./associations/builder/association.js"),
+  "active_record/associations/builder/singular_association": () =>
+    import("./associations/builder/singular-association.js"),
+  "active_record/associations/builder/collection_association": () =>
+    import("./associations/builder/collection-association.js"),
+  "active_record/associations/builder/belongs_to": () =>
+    import("./associations/builder/belongs-to.js"),
+  "active_record/associations/builder/has_one": () => import("./associations/builder/has-one.js"),
+  "active_record/associations/builder/has_many": () => import("./associations/builder/has-many.js"),
+  "active_record/associations/builder/has_and_belongs_to_many": () =>
+    import("./associations/builder/has-and-belongs-to-many.js"),
   "active_record/base": () => import("./base.js"),
   "active_record/associations": () => import("./associations.js"),
   "active_record/attribute_methods": () => import("./attribute-methods.js"),
@@ -221,7 +235,18 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
-export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+export const ActiveRecord = {
+  name: "ActiveRecord",
+  loadPath,
+  Trailties: { name: "ActiveRecord::Trailties" },
+} as AutoloadModule & {
+  Enum: typeof import("./enum.js").Enum;
+  Marshalling: typeof import("./marshalling.js");
+  Middleware: typeof Middleware;
+  Sanitization: typeof import("./sanitization.js");
+  SecureToken: typeof import("./secure-token.js");
+  Store: typeof import("./store.js");
+  Trailties: { name: string };
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
@@ -291,7 +316,17 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("Result");
 });
 
+export const Middleware = { name: "ActiveRecord::Middleware", loadPath } as AutoloadModule & {
+  DatabaseSelector: typeof import("./middleware/database-selector.js").DatabaseSelector;
+  ShardSelector: typeof import("./middleware/shard-selector.js").ShardSelector;
+};
+extend(Middleware, Autoload);
+Middleware.autoload("DatabaseSelector");
+Middleware.autoload("ShardSelector");
+ActiveRecord.Middleware = Middleware;
+
 export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
+  Builder: typeof Builder;
   CollectionProxy: typeof CollectionProxy;
   BelongsToAssociation: typeof BelongsToAssociation;
   BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
@@ -306,6 +341,34 @@ export const Associations = { name: "ActiveRecord::Associations", loadPath } as 
   AliasTracker: typeof AliasTracker;
 };
 constSet(ActiveRecord, "Associations", Associations);
+
+export const Builder = {
+  name: "ActiveRecord::Associations::Builder",
+  loadPath,
+} as AutoloadModule & {
+  Association: typeof import("./associations/builder/association.js").Association;
+  SingularAssociation: typeof import("./associations/builder/singular-association.js").SingularAssociation;
+  CollectionAssociation: typeof import("./associations/builder/collection-association.js").CollectionAssociation;
+  BelongsTo: typeof import("./associations/builder/belongs-to.js").BelongsTo;
+  HasOne: typeof import("./associations/builder/has-one.js").HasOne;
+  HasMany: typeof import("./associations/builder/has-many.js").HasMany;
+  HasAndBelongsToMany: typeof import("./associations/builder/has-and-belongs-to-many.js").HasAndBelongsToMany;
+};
+extend(Builder, Autoload);
+Builder.autoload("Association", "active_record/associations/builder/association");
+Builder.autoload("SingularAssociation", "active_record/associations/builder/singular_association");
+Builder.autoload(
+  "CollectionAssociation",
+  "active_record/associations/builder/collection_association",
+);
+Builder.autoload("BelongsTo", "active_record/associations/builder/belongs_to");
+Builder.autoload("HasOne", "active_record/associations/builder/has_one");
+Builder.autoload("HasMany", "active_record/associations/builder/has_many");
+Builder.autoload(
+  "HasAndBelongsToMany",
+  "active_record/associations/builder/has_and_belongs_to_many",
+);
+Associations.Builder = Builder;
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
 Associations.eagerAutoload(() => {

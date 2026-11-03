@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, TSE, TopLevel } from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {
@@ -188,3 +188,11 @@ export const Util = {
   jsonEscape,
   xmlNameEscape,
 };
+
+TopLevel.TSE = TSE;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    TSE?: typeof TSE;
+  }
+}

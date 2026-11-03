@@ -32,6 +32,27 @@ describe("rbModName over the generated class-path table", () => {
     expect(() => constGet(Object, "ConstGetTdz")).toThrow(NameError);
   });
 
+  it("constGet reads the receiver's own constant ahead of a top-level one of the same name", () => {
+    const OwnTool = { name: "ConstGetHost::ConstGetShadowed::Tool" };
+    const Own = { name: "ConstGetShadowed", Tool: OwnTool };
+    const Outer = { name: "ConstGetHost", ConstGetShadowed: Own };
+    (TopLevel as Record<string, unknown>).ConstGetShadowed = { name: "top" };
+    try {
+      expect(constGet(Outer, "ConstGetShadowed")).toBe(Own);
+      expect(constGet(Outer, "ConstGetShadowed::Tool")).toBe(OwnTool);
+    } finally {
+      delete (TopLevel as Record<string, unknown>).ConstGetShadowed;
+    }
+  });
+
+  it("constGet raises NameError for a row whose namespace has no seat", () => {
+    class Leaf {}
+    defineConstants([[() => Leaf, "ConstGetUnseated::Leaf"]]);
+    expect(() => constGet(Object, "ConstGetUnseated::Leaf")).toThrow(
+      "uninitialized constant ConstGetUnseated",
+    );
+  });
+
   it("answers a const_set-bound path ahead of the generated one", () => {
     const Owner = class Owner {};
     class Seated {}

@@ -1,4 +1,5 @@
 import { CollectionAssociation } from "./collection-association.js";
+import { Builder } from "../../namespaces.js";
 
 export class HasMany extends CollectionAssociation {
   static override macro(): "hasMany" {
@@ -31,3 +32,5 @@ export class HasMany extends CollectionAssociation {
     ];
   }
 }
+
+Builder.HasMany = HasMany;

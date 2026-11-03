@@ -1,3 +1,5 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
+import * as Zeitwerk from "./zeitwerk.js";
 import { Loader } from "./loader.js";
 import "./constants.generated.js";
 
@@ -22,5 +24,13 @@ export async function withLoader(block: (loader: Loader) => unknown): Promise<vo
     await block(loader);
   } finally {
     loader.unregister();
+  }
+}
+
+TopLevel.Zeitwerk = Zeitwerk;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Zeitwerk?: typeof Zeitwerk;
   }
 }

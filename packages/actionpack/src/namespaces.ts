@@ -10,6 +10,10 @@ import {
 import { NameError, RuntimeError, rbInspect, constGet, constSet } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
+import * as Journey from "./action-dispatch/journey/index.js";
+import * as Cache from "./action-dispatch/http/cache.js";
+import * as PageDumpHelper from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
+import * as ActionPackGemVersion from "./action-pack/gem-version.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
 import type { MimeNegotiation } from "./action-dispatch/http/mime-negotiation.js";
@@ -115,6 +119,8 @@ export const ActionDispatch = {
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   Http: typeof Http;
+  Journey: typeof Journey;
+  TestHelpers: { name: string; PageDumpHelper: typeof PageDumpHelper };
   testApp: unknown;
   deprecator: () => Deprecation;
 };
@@ -152,8 +158,14 @@ export const Http = { name: "ActionDispatch::Http" } as {
   name: string;
   MimeNegotiation: typeof MimeNegotiation;
   Parameters: typeof HttpParameters;
+  Cache: typeof Cache;
 };
+Http.Cache = Cache;
 ActionDispatch.Http = Http;
+ActionDispatch.Journey = Journey;
+ActionDispatch.TestHelpers = { name: "ActionDispatch::TestHelpers", PageDumpHelper };
+
+export const ActionPack = { name: "ActionPack", VERSION: ActionPackGemVersion.VERSION };
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
   AbstractStore: typeof AbstractStore;
@@ -244,6 +256,8 @@ ActionController.autoloadAt("action_controller/test_case", () => {
 });
 
 TopLevel.ActionDispatch = ActionDispatch;
+TopLevel.ActionPack = ActionPack;
+TopLevel.Mime = Mime;
 constSet(TopLevel, "ActionController", ActionController);
 
 onLoad("action_view", () => {
@@ -251,3 +265,10 @@ onLoad("action_view", () => {
   Template.mimeTypesImplementation = Mime;
   DetailsKey.clear();
 });
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ActionPack?: typeof ActionPack;
+    Mime?: typeof Mime;
+  }
+}

@@ -191,25 +191,26 @@ import * as m188 from "./transactions.js";
 import * as m189 from "./translation.js";
 import * as m190 from "./type-caster/connection.js";
 import * as m191 from "./type-caster/map.js";
-import * as m192 from "./type/adapter-specific-registry.js";
-import * as m193 from "./type/date-time.js";
-import * as m194 from "./type/date.js";
-import * as m195 from "./type/decimal-without-scale.js";
-import * as m196 from "./type/hash-lookup-type-map.js";
-import * as m197 from "./type/internal/timezone.js";
-import * as m198 from "./type/json.js";
-import * as m199 from "./type/serialized.js";
-import * as m200 from "./type/text.js";
-import * as m201 from "./type/time.js";
-import * as m202 from "./type/type-map.js";
-import * as m203 from "./type/unsigned-integer.js";
-import * as m204 from "./validations.js";
-import * as m205 from "./validations/absence.js";
-import * as m206 from "./validations/associated.js";
-import * as m207 from "./validations/length.js";
-import * as m208 from "./validations/numericality.js";
-import * as m209 from "./validations/presence.js";
-import * as m210 from "./validations/uniqueness.js";
+import * as m192 from "./type.js";
+import * as m193 from "./type/adapter-specific-registry.js";
+import * as m194 from "./type/date-time.js";
+import * as m195 from "./type/date.js";
+import * as m196 from "./type/decimal-without-scale.js";
+import * as m197 from "./type/hash-lookup-type-map.js";
+import * as m198 from "./type/internal/timezone.js";
+import * as m199 from "./type/json.js";
+import * as m200 from "./type/serialized.js";
+import * as m201 from "./type/text.js";
+import * as m202 from "./type/time.js";
+import * as m203 from "./type/type-map.js";
+import * as m204 from "./type/unsigned-integer.js";
+import * as m205 from "./validations.js";
+import * as m206 from "./validations/absence.js";
+import * as m207 from "./validations/associated.js";
+import * as m208 from "./validations/length.js";
+import * as m209 from "./validations/numericality.js";
+import * as m210 from "./validations/presence.js";
+import * as m211 from "./validations/uniqueness.js";
 
 defineConstants([
   [() => m111.ActiveRecordError, "ActiveRecord::ActiveRecordError"],
@@ -575,6 +576,7 @@ defineConstants([
   [() => m123.Pessimistic, "ActiveRecord::Locking::Pessimistic"],
   [() => m111.LockWaitTimeout, "ActiveRecord::LockWaitTimeout"],
   [() => m124.LogSubscriber, "ActiveRecord::LogSubscriber"],
+  [() => m125, "ActiveRecord::Marshalling"],
   [() => m125.Methods, "ActiveRecord::Marshalling::Methods"],
   [() => m126.DatabaseSelector, "ActiveRecord::Middleware::DatabaseSelector"],
   [() => m127.Resolver, "ActiveRecord::Middleware::DatabaseSelector::Resolver"],
@@ -662,7 +664,7 @@ defineConstants([
   [() => m144.HasReadonlyAttributes, "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
   [() => m111.ReadOnlyError, "ActiveRecord::ReadOnlyError"],
   [() => m111.ReadOnlyRecord, "ActiveRecord::ReadOnlyRecord"],
-  [() => m204.RecordInvalid, "ActiveRecord::RecordInvalid"],
+  [() => m205.RecordInvalid, "ActiveRecord::RecordInvalid"],
   [() => m111.RecordNotDestroyed, "ActiveRecord::RecordNotDestroyed"],
   [() => m111.RecordNotFound, "ActiveRecord::RecordNotFound"],
   [() => m111.RecordNotSaved, "ActiveRecord::RecordNotSaved"],
@@ -694,6 +696,7 @@ defineConstants([
   [() => m165.Result, "ActiveRecord::Result"],
   [() => m165.IndexedRow, "ActiveRecord::Result::IndexedRow"],
   [() => m111.Rollback, "ActiveRecord::Rollback"],
+  [() => m166, "ActiveRecord::Sanitization"],
   [() => m166.ClassMethods, "ActiveRecord::Sanitization::ClassMethods"],
   [() => m169.Schema, "ActiveRecord::Schema"],
   [() => m169.Definition, "ActiveRecord::Schema::Definition"],
@@ -705,6 +708,7 @@ defineConstants([
   [() => m172, "ActiveRecord::Scoping::Named"],
   [() => m172.ClassMethods, "ActiveRecord::Scoping::Named::ClassMethods"],
   [() => m170.ScopeRegistry, "ActiveRecord::Scoping::ScopeRegistry"],
+  [() => m173, "ActiveRecord::SecureToken"],
   [() => m173.MinimumLengthError, "ActiveRecord::SecureToken::MinimumLengthError"],
   [() => m111.SerializationFailure, "ActiveRecord::SerializationFailure"],
   [() => m111.SerializationTypeMismatch, "ActiveRecord::SerializationTypeMismatch"],
@@ -724,6 +728,7 @@ defineConstants([
   [() => m175.Substitute, "ActiveRecord::StatementCache::Substitute"],
   [() => m111.StatementInvalid, "ActiveRecord::StatementInvalid"],
   [() => m111.StatementTimeout, "ActiveRecord::StatementTimeout"],
+  [() => m176, "ActiveRecord::Store"],
   [() => m176.ClassMethods, "ActiveRecord::Store::ClassMethods"],
   [() => m176.HashAccessor, "ActiveRecord::Store::HashAccessor"],
   [() => m176.IndifferentCoder, "ActiveRecord::Store::IndifferentCoder"],
@@ -759,36 +764,37 @@ defineConstants([
   [() => m111.TransactionRollbackError, "ActiveRecord::TransactionRollbackError"],
   [() => m188.Transactions, "ActiveRecord::Transactions"],
   [() => m189.Translation, "ActiveRecord::Translation"],
-  [() => m192.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [() => m194.Date, "ActiveRecord::Type::Date"],
-  [() => m193.DateTime, "ActiveRecord::Type::DateTime"],
-  [() => m195.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
-  [() => m192.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
-  [() => m196.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
-  [() => m197.Timezone, "ActiveRecord::Type::Internal::Timezone"],
-  [() => m198.Json, "ActiveRecord::Type::Json"],
-  [() => m192.Registration, "ActiveRecord::Type::Registration"],
-  [() => m199.Serialized, "ActiveRecord::Type::Serialized"],
-  [() => m200.Text, "ActiveRecord::Type::Text"],
-  [() => m201.Time, "ActiveRecord::Type::Time"],
-  [() => m201.Value, "ActiveRecord::Type::Time::Value"],
-  [() => m202.TypeMap, "ActiveRecord::Type::TypeMap"],
-  [() => m203.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
+  [() => m192, "ActiveRecord::Type"],
+  [() => m193.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [() => m195.Date, "ActiveRecord::Type::Date"],
+  [() => m194.DateTime, "ActiveRecord::Type::DateTime"],
+  [() => m196.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
+  [() => m193.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
+  [() => m197.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
+  [() => m198.Timezone, "ActiveRecord::Type::Internal::Timezone"],
+  [() => m199.Json, "ActiveRecord::Type::Json"],
+  [() => m193.Registration, "ActiveRecord::Type::Registration"],
+  [() => m200.Serialized, "ActiveRecord::Type::Serialized"],
+  [() => m201.Text, "ActiveRecord::Type::Text"],
+  [() => m202.Time, "ActiveRecord::Type::Time"],
+  [() => m202.Value, "ActiveRecord::Type::Time::Value"],
+  [() => m203.TypeMap, "ActiveRecord::Type::TypeMap"],
+  [() => m204.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
   [() => m190.Connection, "ActiveRecord::TypeCaster::Connection"],
   [() => m191.Map, "ActiveRecord::TypeCaster::Map"],
-  [() => m192.TypeConflictError, "ActiveRecord::TypeConflictError"],
+  [() => m193.TypeConflictError, "ActiveRecord::TypeConflictError"],
   [() => m111.UnknownAttributeReference, "ActiveRecord::UnknownAttributeReference"],
   [() => m130.UnknownMigrationVersionError, "ActiveRecord::UnknownMigrationVersionError"],
   [() => m111.UnknownPrimaryKey, "ActiveRecord::UnknownPrimaryKey"],
   [() => m111.UnmodifiableRelation, "ActiveRecord::UnmodifiableRelation"],
-  [() => m204.Validations, "ActiveRecord::Validations"],
-  [() => m205.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
-  [() => m206.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
-  [() => m205.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
-  [() => m207.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
-  [() => m208.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
-  [() => m209.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
-  [() => m210.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
+  [() => m205.Validations, "ActiveRecord::Validations"],
+  [() => m206.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
+  [() => m207.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
+  [() => m206.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
+  [() => m208.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
+  [() => m209.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
+  [() => m210.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
+  [() => m211.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
   [() => m111.ValueTooLong, "ActiveRecord::ValueTooLong"],
   [() => m116.VERSION, "ActiveRecord::VERSION"],
   [() => m111.WrappedDatabaseException, "ActiveRecord::WrappedDatabaseException"],

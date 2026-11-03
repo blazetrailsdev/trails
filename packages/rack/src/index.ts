@@ -86,3 +86,4 @@ export * as Utils from "./utils.js";
 export * as Handler from "./handler/index.js";
 
 import "./constants.generated.js";
+export { Rack } from "./namespaces.js";

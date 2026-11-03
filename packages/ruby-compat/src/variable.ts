@@ -373,13 +373,7 @@ export function constGet(mod: object, name: string): unknown {
       c = generated;
       continue;
     }
-    try {
-      c = rbConstGet(c, part, i > 0);
-    } catch (e) {
-      const row = mod === Object && e instanceof NameError ? rbConstTableGet(cpath) : undefined;
-      if (row === undefined) throw e;
-      return row;
-    }
+    c = rbConstGet(c, part, i > 0);
   }
   return c;
 }

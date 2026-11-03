@@ -2,6 +2,8 @@ import { base58, camelize } from "@blazetrails/activesupport";
 import { StandardError, rbModDefineMethod } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { generateSecureTokenOn } from "./active-record.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as SecureToken from "./secure-token.js";
 
 export class MinimumLengthError extends StandardError {}
 
@@ -45,3 +47,5 @@ export function generateUniqueSecureToken({
 }: { length?: number } = {}): string {
   return base58(length);
 }
+
+ActiveRecord.SecureToken = SecureToken;
