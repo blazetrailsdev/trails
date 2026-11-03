@@ -8,6 +8,7 @@ import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js"
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { registerController } from "@blazetrails/actionpack";
+import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 afterEach(() => {
   if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
@@ -141,5 +142,80 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     const content = controller();
     expect(content).toContain('return this.params.expect({ post: ["title"] });');
     expect(content).not.toContain(" as Record<string, unknown>");
+  });
+});
+
+describe("ScaffoldControllerGenerator (emitted source)", () => {
+  let tmpDir: string;
+  const runGenerator = (name: string, args: string[] = []) =>
+    capture("stderr", () =>
+      ScaffoldControllerGenerator.start([name, ...args], { destinationRoot: tmpDir }),
+    );
+  const read = (rel: string) => fs.readFileSync(path.join(tmpDir, rel), "utf-8");
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sc-"));
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config/routes.ts"),
+      "Trails.application!.routes().draw(function () {\n});\n",
+    );
+  });
+  afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+  it("does not invoke test framework if required", async () => {
+    await runGenerator("User", ["--no-test-framework"]);
+    expect(fs.existsSync(path.join(tmpDir, "test/controllers/users-controller.test.ts"))).toBe(
+      false,
+    );
+  });
+
+  it("emits valid TypeScript with no Ruby leakage", async () => {
+    await runGenerator("User", ["name:string", "age:integer"]);
+    const c = read("app/controllers/users-controller.ts");
+    expect(parseTs(c).diagnostics).toEqual([]);
+    assertNoRubySource(c);
+    expect(c).not.toMatch(/\brequire\(/);
+  });
+
+  it("api controller", async () => {
+    await runGenerator("User", ["name:string", "--api"]);
+    const c = read("app/controllers/users-controller.ts");
+    expect(c).not.toContain("async new()");
+    expect(c).not.toContain("async edit()");
+    expect(parseTs(c).diagnostics).toEqual([]);
+    assertNoRubySource(c);
+  });
+
+  it("namespaced scaffold controller emits flattened class name and nested paths", async () => {
+    await runGenerator("admin/account", ["name:string"]);
+    const c = read("app/controllers/admin/accounts-controller.ts");
+    expect(c).toContain("class AccountsController");
+    expect(c).not.toMatch(/::/);
+    expect(c).toContain('this.params.expect({ admin_account: ["name"] })');
+    expect(parseTs(c).diagnostics).toEqual([]);
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/admin/accounts-helper.ts"))).toBe(true);
+    const routes = read("config/routes.ts");
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.resources("accounts")');
+    expect(routes).not.toContain('this.resources("admin/accounts")');
+  });
+
+  it("singularizes plural input for model + params key", async () => {
+    await runGenerator("posts", ["title:string"]);
+    const c = read("app/controllers/posts-controller.ts");
+    expect(c).toContain("class PostsController");
+    expect(c).toContain("Post.all()");
+    expect(c).toContain('this.params.expect({ post: ["title"] })');
+    expect(c).toContain("postParams()");
+  });
+
+  it("uses underscored namespace in routes (not dasherized)", async () => {
+    await runGenerator("admin_panel/users");
+    const routes = read("config/routes.ts");
+    expect(routes).toContain('this.namespace("admin_panel"');
+    expect(routes).not.toContain('this.namespace("admin-panel"');
+    expect(routes.match(/\n\n\n/)).toBeNull();
   });
 });

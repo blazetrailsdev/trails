@@ -4,6 +4,56 @@ import * as ts from "typescript/unstable/ast";
 
 let api: API | undefined;
 
+/** @noRailsEquivalent PERMANENT */
+function renderedTitles(node: ts.CallExpression, title: string): string[] | null {
+  if (title === "") return null;
+  const table = node.expression;
+  const isEach = (expression: ts.Node) =>
+    ts.isPropertyAccessExpression(expression) && expression.name.text === "each";
+  const tagged = ts.isTaggedTemplateExpression(table) && isEach(table.tag);
+  const called = ts.isCallExpression(table) && isEach(table.expression);
+  if (!tagged && !called) return [title];
+  if (!/[%$]/.test(title)) return [title];
+  const rows = called ? table.arguments[0] : undefined;
+  if (rows == null || !ts.isArrayLiteralExpression(rows) || title.includes("$")) return null;
+
+  const titles: string[] = [];
+  for (const row of rows.elements) {
+    const args = ts.isArrayLiteralExpression(row) ? [...row.elements] : [row];
+    let index = 0;
+    let rendered = "";
+    let last = 0;
+    for (const match of title.matchAll(/%(.?)/g)) {
+      rendered += title.slice(last, match.index);
+      last = match.index + match[0].length;
+      if (match[1] === "%") {
+        rendered += "%";
+        continue;
+      }
+      const arg = args[index++];
+      if (
+        match[1] === "s" &&
+        arg != null &&
+        (ts.isStringLiteral(arg) ||
+          (ts.isNumericLiteral(arg) && String(Number(arg.text)) === arg.text))
+      ) {
+        rendered += arg.text;
+      } else if (
+        match[1] === "d" &&
+        arg != null &&
+        ts.isNumericLiteral(arg) &&
+        String(Number(arg.text)) === arg.text
+      ) {
+        rendered += arg.text;
+      } else {
+        return null;
+      }
+    }
+    titles.push(rendered + title.slice(last));
+  }
+  return titles;
+}
+
 export class TestParser {
   /** @internal */
   private static beginsToEnds: Record<string, Record<number, number>> = {};
@@ -53,7 +103,7 @@ export class TestParser {
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
     const calls: [number, number, string][] = [];
-    const visit = (node: ts.Node, names: string[], isCallee: boolean): void => {
+    const visit = (node: ts.Node, names: (string | null)[], isCallee: boolean): void => {
       let scope = names;
       if (ts.isCallExpression(node) && !isCallee) {
         let callee: ts.Node = node.expression;
@@ -70,8 +120,9 @@ export class TestParser {
           (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))
             ? argument.text
             : "";
-        if (ts.isIdentifier(callee) && callee.text === "describe" && title !== "") {
-          scope = [...names, title];
+        if (ts.isIdentifier(callee) && callee.text === "describe") {
+          const titles = renderedTitles(node, title);
+          scope = [...names, titles?.length === 1 ? titles[0] : null];
         } else if (
           ts.isIdentifier(callee) &&
           (callee.text === "it" || callee.text === "test") &&
@@ -81,11 +132,13 @@ export class TestParser {
             ["each", "extend"].includes(node.expression.name.text)
           )
         ) {
-          calls.push([
-            line(node.getStart(sourceFile)),
-            line(node.end),
-            title === "" ? "" : [...names, title].join(" "),
-          ]);
+          for (const rendered of renderedTitles(node, title) ?? [""]) {
+            calls.push([
+              line(node.getStart(sourceFile)),
+              line(node.end),
+              names.includes(null) ? "" : [...names, rendered].join(" "),
+            ]);
+          }
         }
       }
       const inner = ts.isTaggedTemplateExpression(node)

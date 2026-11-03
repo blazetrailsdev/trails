@@ -357,6 +357,23 @@ describe("Finisher", () => {
     expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Child]);
   });
 
+  it("replaces a stale model with its reloaded class in subclasses", async () => {
+    vi.resetModules();
+    const { DescendantsTracker } = await import("@blazetrails/activesupport");
+    const { _registerAutoloaded } = await import("./finisher.js");
+    const { Base } = await import("@blazetrails/activerecord");
+    class Parent extends Base {}
+    class Stale extends Parent {}
+    class Reloaded extends Parent {}
+    await _registerAutoloaded("Child", Stale);
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Stale]);
+
+    DescendantsTracker.clear([Stale as never]);
+    await _registerAutoloaded("Child", Reloaded);
+
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Reloaded]);
+  });
+
   it("leaves an autoloaded job resolving through the loader's seat", async () => {
     class SeatedJob extends JobBase {}
     constSet(TopLevel, "SeatedJob", SeatedJob);
