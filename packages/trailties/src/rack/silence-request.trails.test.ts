@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { Logger } from "@blazetrails/activesupport";
 import { SilenceRequest } from "./silence-request.js";
+import { Trails } from "../trails.js";
 import type { RackApp, RackBody } from "@blazetrails/rack";
 
 const emptyBody = (): RackBody => ({
@@ -7,29 +9,26 @@ const emptyBody = (): RackBody => ({
 });
 
 describe("Rack::SilenceRequest", () => {
-  it("prefers silenceAsync when available", async () => {
-    const calls: string[] = [];
-    const logger = {
-      silence(_level: number | string, fn: () => void) {
-        calls.push("silence");
-        fn();
-      },
-      async silenceAsync<T>(_level: number | string, fn: () => Promise<T>): Promise<T> {
-        calls.push("silenceAsync:start");
-        const out = await fn();
-        calls.push("silenceAsync:end");
-        return out;
-      },
-    };
+  const logger = Trails.logger;
+
+  afterEach(() => {
+    Trails.logger = logger;
+  });
+
+  it("keeps the logger silenced across the app's await", async () => {
+    Trails.logger = new Logger(null);
+    Trails.logger.level = Logger.DEBUG;
+    let level: number | undefined;
 
     const app: RackApp = async () => {
-      calls.push("app");
+      await Promise.resolve();
+      level = Trails.logger!.level;
       return [200, {}, emptyBody()];
     };
 
-    const middleware = new SilenceRequest(app, { path: "/up", logger });
-    await middleware.call({ PATH_INFO: "/up" });
+    await new SilenceRequest(app, { path: "/up" }).call({ PATH_INFO: "/up" });
 
-    expect(calls).toEqual(["silenceAsync:start", "app", "silenceAsync:end"]);
+    expect(level).toBe(Logger.ERROR);
+    expect(Trails.logger.level).toBe(Logger.DEBUG);
   });
 });

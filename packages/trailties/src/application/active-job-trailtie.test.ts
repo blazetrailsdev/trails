@@ -2,14 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { include } from "@blazetrails/ruby-compat";
-import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
+import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
+import "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface ActiveJobTrailtieTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ActiveJobTrailtieTest extends TestCase {}
-include(ActiveJobTrailtieTest, Paths);
-include(ActiveJobTrailtieTest, Generation);
 include(ActiveJobTrailtieTest, Isolation);
 
 describe("ApplicationTests::ActiveJobTrailtieTest", () => {
