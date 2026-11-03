@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
 
 export const JobBuffer = {
@@ -18,4 +18,4 @@ export class AddToBufferJob extends ApplicationJob {
     JobBuffer.add(arg);
   }
 }
-registerConstant("AddToBufferJob", AddToBufferJob);
+constSet(TopLevel, "AddToBufferJob", AddToBufferJob);

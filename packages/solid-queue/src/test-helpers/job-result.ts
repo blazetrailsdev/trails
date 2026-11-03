@@ -1,7 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
 import { ApplicationJob } from "./application-job.js";
 
@@ -15,7 +14,6 @@ export class JobResult extends ApplicationRecord {
 export interface JobResult extends Included<typeof Identification> {}
 include(JobResult, Identification);
 GlobalID.setApp("dummy");
-registerConstant("JobResult", JobResult);
 constSet(TopLevel, "JobResult", JobResult);
 
 export class StoreResultJob extends ApplicationJob {
@@ -43,4 +41,4 @@ export class StoreResultJob extends ApplicationJob {
     await result.updateBang({ status });
   }
 }
-registerConstant("StoreResultJob", StoreResultJob);
+constSet(TopLevel, "StoreResultJob", StoreResultJob);
