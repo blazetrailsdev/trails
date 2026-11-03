@@ -754,6 +754,15 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`Loader.for_gem`, `for_gem_extension` and `Registry.loader_for_gem` are not ported: trails " +
+      "has no Ruby packaging concept, and `Registry.loaderForPackage` reads a `package.json` " +
+      '(RFC 0213 § "Non-goals", owner decision on trails#9619). PERMANENT.',
+    names: ["for_gem", "for_gem_extension", "loader_for_gem", "gem_loaders_by_root_file"],
+    rubyFiles: ["loader.rb", "registry.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
       "`Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node " +
       'counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess ' +
       "arm's `runInIsolation` exists. PERMANENT.",

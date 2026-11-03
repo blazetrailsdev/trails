@@ -32,7 +32,10 @@ import { Registry } from "./registry.js";
 
 const MUTEX = new Mutex();
 
-export type Logger = ((message: string) => unknown) | { debug(message: string): unknown };
+export type Logger =
+  | ((message: string) => unknown)
+  | { call(message: string): unknown }
+  | { debug(message: string): unknown };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Loader
