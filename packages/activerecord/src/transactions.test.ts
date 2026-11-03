@@ -1043,7 +1043,6 @@ describe("TransactionTest", () => {
         this._tableName = "topics";
       }
     };
-    constSet(TopLevel, topicWithoutCallbacks.name, topicWithoutCallbacks);
 
     const topic1 = new Topic({ title: "test_1" }) as any;
     const topic2 = new Topic({ title: "test_2" }) as any;
