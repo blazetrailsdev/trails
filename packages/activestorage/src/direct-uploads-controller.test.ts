@@ -69,7 +69,7 @@ describe("ActiveStorage::DiskDirectUploadsControllerTest", () => {
     });
 
     const details = session.response.parsedBody as HashWithIndifferentAccess;
-    expect(await Blob.findSignedBang(details.get("signedId") as string)).toEqual(
+    expect(await Blob.findSignedBang(details.get("signed_id") as string)).toEqual(
       await Blob.find(details.get("id") as number),
     );
     expect(details.get("filename")).toBe("hello.txt");

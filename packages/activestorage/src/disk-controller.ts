@@ -1,4 +1,4 @@
-import { Errno, include, type Included } from "@blazetrails/ruby-compat";
+import { Errno, include, rbEqual, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import { BaseController } from "./base-controller.js";
 import { Blob } from "./blob.js";
@@ -95,7 +95,7 @@ export class DiskController extends BaseController {
   /** @internal */
   private isAcceptableContent(token: Token): boolean {
     return (
-      (this.request.contentMimeType?.equals(token.content_type) ?? false) &&
+      rbEqual(token.content_type, this.request.contentMimeType) &&
       token.content_length === this.request.contentLength
     );
   }
