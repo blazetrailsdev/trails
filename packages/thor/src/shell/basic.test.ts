@@ -1,7 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  Dir,
-  getFs,
   env,
   setEnv,
   stderr as $stderr,
@@ -682,10 +680,6 @@ describe("Thor::Shell::Basic", () => {
 
     describe("when a block is given", () => {
       const block = () => "";
-
-      afterEach(() => {
-        Dir.glob("foo2*").forEach((path) => getFs().rmSync(path));
-      });
 
       const mergeTool = (value: string) =>
         vi

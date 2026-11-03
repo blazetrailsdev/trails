@@ -22,7 +22,7 @@ export interface ReadStream {
   setNoecho?(): void;
 }
 
-export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT";
+export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT" | "exit";
 
 /** @noRailsEquivalent PERMANENT */
 export interface ModuleHooks {
