@@ -829,6 +829,7 @@ export class SMTP {
   }
 }
 
+Net.SMTP = SMTP;
 export const SMTPSession = SMTP;
 
 import "./auth-plain.js";

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { constGet } from "@blazetrails/ruby-compat";
 import { Mail } from "./mail.js";
+import "./index.js";
 import type { Message } from "./message.js";
 
 describe("Mail.new", () => {
@@ -16,5 +18,12 @@ describe("Mail.new", () => {
     });
     expect(mail.subject()).toEqual("source");
     expect([...(mail.to() as string[])]).toEqual(["to@someemail.com"]);
+  });
+});
+
+describe("Mail seat", () => {
+  it("walks Mail::Message from the top level", () => {
+    expect(constGet(Object, "Mail")).toBe(Mail);
+    expect(constGet(Object, "Mail::Message")).toBe(Mail.Message);
   });
 });

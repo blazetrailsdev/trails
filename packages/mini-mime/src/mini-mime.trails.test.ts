@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { constGet } from "@blazetrails/ruby-compat";
+import { MiniMime } from "./mini-mime.js";
 
 describe("MiniMime::Db::PReadFile", () => {
   afterEach(() => {
@@ -22,5 +24,12 @@ describe("MiniMime::Db::PReadFile", () => {
     expect(MiniMime.Db.PReadFile).not.toBe(File);
     expect(MiniMime.lookupByExtension("zip")!.contentType).toBe("application/zip");
     expect(MiniMime.lookupByContentType("text/csv")!.extension).toBe("csv");
+  });
+});
+
+describe("MiniMime seat", () => {
+  it("walks MiniMime::Info from the top level", () => {
+    expect(constGet(Object, "MiniMime")).toBe(MiniMime);
+    expect(constGet(Object, "MiniMime::Info")).toBe(MiniMime.Info);
   });
 });
