@@ -31,19 +31,20 @@ describe("Rackup::Handler", () => {
   it("not need registration for properly coded handlers even if not already required", async () => {
     const path = {
       "rack/handler/unregistered": () =>
-        import("./test-helpers/unregistered-handler/unregistered.js"),
+        import("./test-helpers/unregistered-handler/rack/handler/unregistered.js"),
       "rack/handler/unregistered_long_one": () =>
-        import("./test-helpers/unregistered-handler/unregistered-long-one.js"),
+        import("./test-helpers/unregistered-handler/rack/handler/unregistered-long-one.js"),
     };
     try {
       Object.assign(Handler.loadPath, path);
       const unregistered = await Handler.get("Unregistered");
-      const { Unregistered } = await import("./test-helpers/unregistered-handler/unregistered.js");
+      const { Unregistered } =
+        await import("./test-helpers/unregistered-handler/rack/handler/unregistered.js");
       expect(unregistered).toBe(Unregistered);
       await expect(Handler.get("UnRegistered")).rejects.toThrow(LoadError);
       const unregisteredLongOne = await Handler.get("UnregisteredLongOne");
       const { UnregisteredLongOne } =
-        await import("./test-helpers/unregistered-handler/unregistered-long-one.js");
+        await import("./test-helpers/unregistered-handler/rack/handler/unregistered-long-one.js");
       expect(unregisteredLongOne).toBe(UnregisteredLongOne);
     } finally {
       for (const feature of Object.keys(path)) delete Handler.loadPath[feature];
@@ -53,13 +54,13 @@ describe("Rackup::Handler", () => {
   it("allow autoloaded handlers to be registered properly while being loaded", async () => {
     const path = {
       "rack/handler/registering_myself": () =>
-        import("./test-helpers/registering-handler/registering-myself.js"),
+        import("./test-helpers/registering-handler/rack/handler/registering-myself.js"),
     };
     try {
       Object.assign(Handler.loadPath, path);
       const registeringMyself = await Handler.get("registering_myself");
       const { RegisteringMyself } =
-        await import("./test-helpers/registering-handler/registering-myself.js");
+        await import("./test-helpers/registering-handler/rack/handler/registering-myself.js");
       expect(registeringMyself).toBe(RegisteringMyself);
     } finally {
       for (const feature of Object.keys(path)) delete Handler.loadPath[feature];
