@@ -1561,7 +1561,78 @@ collision, instantiating an `abstract` class through a cast, 24 same-named
 `Base` classes to put `layout_ordinals` under pressure, and the real 202-module
 i18n subgraph. All four compile and run clean. The name is not the mechanism.
 
-## Wall 17: activerecord's own init fails in a mid-sized graph
+## Wall 17, ROOT-CAUSED: `Error().stack` carries no source positions (2026-11-02)
+
+Not an init-ordering bug at all — the first wall on this ladder that is not.
+A native backtrace (`PERRY_KEEP_SYMBOLS=1`, then gdb breaking on the
+`#[no_mangle]` `js_throw_type_error_property_access`) names what `at <anonymous>`
+hid:
+
+```
+PROP=path
+#1  js_object_get_field_nonptr
+#2  Delegation.generate                  at delegation.ts:100
+#3  delegate                             at module-ext.ts:19
+#10 controller_helper init_body          at controller-helper.ts:67
+#16 run_path_initializer  #19 main       at 08-serve.ts:39
+```
+
+`activesupport/src/delegation.ts:100` is the throw:
+
+```ts
+location ||= callerLocations(1, 1)[0];
+const [file, line] = [location.path, location.lineno];
+```
+
+`callerLocations` (`activesupport/src/deprecation.ts:124`) installs a
+V8-specific `Error.prepareStackTrace` hook and parses `new Error().stack` for
+`(file:line:col)`. A 1-module probe (`perry/probe/stack-positions.ts`) measures
+all of it against Node:
+
+| | Node | perry |
+| --- | --- | --- |
+| `prepareStackTrace` invoked | true | **false** |
+| callSites handed to the hook | 4 | never called |
+| `.stack` is the hook's return | true | **false** |
+| frame lines | 5 | **2** |
+| lines matching `callerLocations`' regex | 4 | **0** |
+| frame text | `at <anonymous> (/…/probe.ts:23:15)` | `at <anonymous>` |
+
+Three independent deficiencies, each sufficient on its own:
+
+1. **`Error.prepareStackTrace` is settable but never invoked.** #2904 (closed)
+   made the statics exist, which is why `callerLocations` gets as far as the
+   regex instead of throwing on assignment. Nothing calls the hook.
+2. **Frame text carries no file, line or column.** The regex cannot match.
+3. **There is only one frame.** `lineCount=2` is the message plus a single
+   `at <anonymous>`, so `callerLocations(1, 1)` — which asks for the *caller* —
+   has no caller frame to return even if 1 and 2 were fixed.
+
+**`--debug-symbols` does not fix it**, and that is worth recording because the
+flag looked promising: `object_cache.rs:431` says it flips per-call
+`js_set_call_location` emission. A full `--debug-symbols` build still dies at
+the same 416 modules with the same `PROP=path`. What it does buy is DWARF line
+info on the *native* frames — the `delegation.ts:100` / `controller-helper.ts:67`
+positions above come from that build. Native line info and JS-visible stack
+positions are separate mechanisms in perry.
+
+This is a perry runtime gap, not an init defect, and it will hit any trails code
+that introspects its caller — `delegate` is just the first one the boot reaches.
+It is also the same deficiency that made walls 15 and 16 so expensive to read:
+every perry trace in this file says `at <anonymous>` or
+`at new Base (<anonymous>)` because there are no positions to print.
+
+### The three i18n call sites are reverted
+
+Getting init past wall 16 needed `simple.ts:120`, `chain.ts:142` and
+`key-value.ts:181` patched. Those edits are **measurement scaffolding, not a
+fix** — the defect is perry's, and per CLAUDE.md a framework bug is fixed in the
+framework, not worked around in application or package source. They are
+reverted; the diff is kept at
+`scratchpad/wall16-i18n-scaffolding.patch` for whoever reproduces this. Wall 17
+also reproduces without them, in the 1107-module probe below.
+
+## Wall 17 (first sighting): activerecord's own init fails in a mid-sized graph
 
 A probe importing i18n's `simple.js` _and_ `@blazetrails/activerecord` compiles
 to 1107 modules (1001s) and fails differently:
