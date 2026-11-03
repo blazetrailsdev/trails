@@ -102,7 +102,10 @@ export class EventBuffer {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE extract-ruby-api-records-class-new-constants
+ */
 export class Canceled extends ActiveRecordError {
   constructor(message = "Canceled") {
     super(message);

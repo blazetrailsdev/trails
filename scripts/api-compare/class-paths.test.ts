@@ -136,7 +136,10 @@ describe("unreceiptedExclusions", () => {
     );
   });
 
-  it("has nothing to shrink from before any base record carries excluded", async () => {
-    expect(await unreceiptedExclusions("globalid", record, {})).toEqual([]);
+  it("exempts no key when the base record has none", async () => {
+    expect(await unreceiptedExclusions("globalid", record, {})).toEqual([
+      "locator.ts::BaseLocator",
+      "locator.ts::Locator",
+    ]);
   });
 });
