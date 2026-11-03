@@ -84,3 +84,20 @@ describe("Attachment", () => {
     );
   });
 });
+
+describe("Attachment#variant", () => {
+  it("answers synchronously for a transformation hash once the blob is loaded", async () => {
+    ActiveStorage.verifier = new MessageVerifier("Testing");
+    const attachment = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    await attachment.blob;
+
+    const variant = attachment.variant({ resizeToLimit: [100, 100] });
+
+    expect(variant).not.toBeInstanceOf(Promise);
+    expect((variant as { blob: unknown }).blob).toBe(await attachment.blob);
+  });
+});
