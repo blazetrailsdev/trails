@@ -7,6 +7,15 @@ import "./cache/file-store.js";
 import { lookupStoreClass } from "./cache/store-registry.js";
 import type { CacheStore } from "./cache/index.js";
 import { ActiveSupport } from "./namespaces.js";
+import {
+  Store,
+  ArgumentError,
+  NotImplementedError,
+  WriteOptions,
+  formatVersion,
+  setFormatVersion,
+} from "./cache/store.js";
+import { DeserializationError } from "./cache/deserialization-error.js";
 
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
@@ -80,4 +89,14 @@ function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
   }
 }
 
-Object.assign(ActiveSupport.Cache, { lookupStore, expandCacheKey });
+Object.assign(ActiveSupport.Cache, {
+  Store,
+  ArgumentError,
+  NotImplementedError,
+  WriteOptions,
+  DeserializationError,
+  formatVersion,
+  setFormatVersion,
+  lookupStore,
+  expandCacheKey,
+});

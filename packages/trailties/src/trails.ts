@@ -44,7 +44,7 @@ export class Trails {
   declare static WelcomeController: typeof WelcomeController;
   declare static Configuration: typeof TrailsConfiguration;
   declare static Paths: typeof Paths;
-  declare static Rack: typeof import("./rack.js");
+  declare static Rack?: typeof import("./rack.js");
 
   declare static eagerLoadBang: () => Promise<void>;
 
