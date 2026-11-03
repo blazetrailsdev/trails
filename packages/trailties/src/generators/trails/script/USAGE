@@ -1,0 +1,18 @@
+Description:
+    Generate a one-off or general purpose script, such as a data migration
+    script, cleanup script, etc.
+
+Example:
+    `bin/trails generate script my_script`
+
+    This will create:
+        script/my-script.ts
+
+    You can run the script using:
+        `node script/my-script.ts`
+
+    You can specify a folder:
+        `bin/trails generate script cleanup/my_script`
+
+    This will create:
+        script/cleanup/my-script.ts

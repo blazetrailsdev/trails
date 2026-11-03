@@ -46,3 +46,7 @@ export class ${className}Generator extends NamedBase {}
     }
   }
 }
+
+Object.defineProperty(GeneratorGenerator, "name", {
+  value: "Trails::Generators::GeneratorGenerator",
+});
