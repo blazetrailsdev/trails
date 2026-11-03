@@ -68,9 +68,6 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rubocop: "Eslint",
   capybara: "vitest",
   Capybara: "Vitest",
-  // trails is pnpm only (trails#9634): `dockerfile_yarn_version` and
-  // `yarn_through_corepack?` (railties/lib/rails/generators/app_base.rb:536-545)
-  // credit at the pnpm spelling.
   yarn: "pnpm",
   Yarn: "Pnpm",
 };
