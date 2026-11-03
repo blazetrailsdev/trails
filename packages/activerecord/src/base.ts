@@ -1391,7 +1391,9 @@ export class Base extends Model {
       });
       if (!deferred) {
         initBlock?.(this);
-        this._runInitializeCallbacks();
+        if (!deferringToAssignment(this, () => this._runInitializeCallbacks())) {
+          this._runInitializeCallbacks();
+        }
       }
     }
   }

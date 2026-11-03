@@ -69,6 +69,19 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(topic.id)).title).toBe("after");
   });
 
+  it("create runs after_initialize once an async block settles", async () => {
+    class Settled extends Topic {}
+    let seen: unknown;
+    Settled.afterInitialize((record: Base) => {
+      seen = (record as InstanceType<typeof Topic>).title;
+    });
+    await Settled.create({ title: "before" }, async (t: Base) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      (t as InstanceType<typeof Topic>).title = "after";
+    });
+    expect(seen).toBe("after");
+  });
+
   it("a bare new runs the block and the initialize callbacks once", () => {
     class Counted extends Topic {}
     let initialized = 0;
@@ -102,6 +115,26 @@ describe("PersistenceTest (trails)", () => {
     );
     expect(seen).toEqual(["after", "attached", "block"]);
     expect(topic.isPersisted()).toBe(true);
+  });
+
+  it("after_initialize sees an async block's writes when an earlier writer is async", async () => {
+    let seen: unknown;
+    class DeferredBlock extends Topic {
+      async setAttachment(_value: unknown): Promise<void> {
+        await Promise.resolve();
+      }
+    }
+    DeferredBlock.afterInitialize((record: DeferredBlock) => {
+      seen = record.author_name;
+    });
+    await DeferredBlock.create(
+      { attachment: "file" } as Record<string, unknown>,
+      async (record: Base) => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        (record as DeferredBlock).author_name = "block";
+      },
+    );
+    expect(seen).toBe("block");
   });
 
   it("create inside a scope keeps an explicit attribute over the scope's", async () => {
