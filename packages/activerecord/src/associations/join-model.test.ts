@@ -39,7 +39,6 @@ import { Rating } from "../test-helpers/models/rating.js";
 import { Aircraft } from "../test-helpers/models/aircraft.js";
 import { Engine } from "../test-helpers/models/engine.js";
 import { Car } from "../test-helpers/models/car.js";
-import { CpkOrder } from "../test-helpers/models/cpk.js";
 
 class PostWithHasManyDeleteAll extends Base {
   static {
@@ -117,7 +116,6 @@ describe("AssociationsJoinModelTest", () => {
   constSet(TopLevel, "Aircraft", Aircraft);
   constSet(TopLevel, "Engine", Engine);
   constSet(TopLevel, "Car", Car);
-  constSet(TopLevel, "CpkOrder", CpkOrder);
   constSet(TopLevel, "PostWithHasManyDeleteAll", PostWithHasManyDeleteAll);
   DescendantsTracker.registerSubclass(Base, PostWithHasManyDeleteAll);
   constSet(TopLevel, "PostWithHasManyDestroy", PostWithHasManyDestroy);

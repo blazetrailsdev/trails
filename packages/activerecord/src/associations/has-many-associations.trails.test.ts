@@ -42,8 +42,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
     const orderId = order.readAttribute("id");
     const mk = (authorId: number, id: number) =>

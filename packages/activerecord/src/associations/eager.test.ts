@@ -53,9 +53,7 @@ import { Citation } from "../test-helpers/models/citation.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
-import { ShardedBlog } from "../test-helpers/models/sharded/blog.js";
 import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
-import { ShardedComment } from "../test-helpers/models/sharded/comment.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Rating } from "../test-helpers/models/rating.js";
 import { Membership } from "../test-helpers/models/membership.js";
@@ -137,9 +135,6 @@ describe("EagerAssociationTest", () => {
   ]);
   beforeAll(async () => {
     constSet(TopLevel, "PostWithDefaultScope", PostWithDefaultScope);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
-    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
     constSet(TopLevel, "Mentor", Mentor);
     constSet(TopLevel, "Contract", Contract);
     constSet(TopLevel, "AuditLog", AuditLog);
@@ -2575,9 +2570,6 @@ describe("EagerLoadingTooManyIdsTest", () => {
 
 describe("EagerAssociationTest", () => {
   const { self, shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
-  constSet(TopLevel, "ShardedBlog", ShardedBlog);
-  constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
-  constSet(TopLevel, "ShardedComment", ShardedComment);
 
   it("preloading belongs_to association SQL", async () => {
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];

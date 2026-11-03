@@ -15,7 +15,7 @@ import { Guid } from "../test-helpers/models/guid.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Essay } from "../test-helpers/models/essay.js";
-import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
+import { CpkBook } from "../test-helpers/models/cpk.js";
 import { UuidItem, UuidValidatingItem } from "../test-helpers/models/uuid-item.js";
 import "../support/canonical-model-index.js";
 import { Range } from "@blazetrails/ruby-compat";
@@ -112,8 +112,6 @@ describe("UniquenessValidationTest", () => {
     constSet(TopLevel, "Author", Author);
     constSet(TopLevel, "Person", Person);
     constSet(TopLevel, "Essay", Essay);
-    constSet(TopLevel, "CpkAuthor", CpkAuthor);
-    constSet(TopLevel, "CpkBook", CpkBook);
     constSet(TopLevel, "IneptWizard", IneptWizard);
     constSet(TopLevel, "Conjurer", Conjurer);
     constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
@@ -943,10 +941,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 describe("UniquenessWithCompositeKey", () => {
   fixtures(["cpkAuthors"]);
 
-  beforeAll(() => {
-    constSet(TopLevel, "CpkAuthor", CpkAuthor);
-    constSet(TopLevel, "CpkBook", CpkBook);
-  });
+  beforeAll(() => {});
 
   it("uniqueness validation for model with composite key", async () => {
     const bookOne = await BookWithUniqueRevision.createBang({

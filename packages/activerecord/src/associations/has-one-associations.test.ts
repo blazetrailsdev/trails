@@ -46,11 +46,9 @@ import { Image } from "../test-helpers/models/image.js";
 import { Department } from "../test-helpers/models/department.js";
 import {
   CpkBook,
-  CpkOrder,
   CpkOrderWithNullifiedBook,
   CpkBrokenOrder,
   CpkBrokenOrderWithNonCpkBooks,
-  CpkNonCpkBook,
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -172,12 +170,6 @@ describe("HasOneAssociationsTest", () => {
       "DrinkDesignerWithPolymorphicDependentNullifyChef",
       DrinkDesignerWithPolymorphicDependentNullifyChef,
     );
-    constSet(TopLevel, "CpkBook", CpkBook);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkOrderWithNullifiedBook", CpkOrderWithNullifiedBook);
-    constSet(TopLevel, "CpkBrokenOrder", CpkBrokenOrder);
-    constSet(TopLevel, "CpkBrokenOrderWithNonCpkBooks", CpkBrokenOrderWithNonCpkBooks);
-    constSet(TopLevel, "CpkNonCpkBook", CpkNonCpkBook);
     constSet(TopLevel, "SpecialCar", SpecialCar);
     DescendantsTracker.registerSubclass(Base, SpecialCar);
     constSet(TopLevel, "SpecialBulb", SpecialBulb);
@@ -1197,7 +1189,6 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("composite primary key malformed association class", async () => {
-    constSet(TopLevel, "CpkBook", CpkBook);
     const order = new CpkBrokenOrder();
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");
@@ -1209,7 +1200,6 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("composite primary key malformed association owner class", async () => {
-    constSet(TopLevel, "CpkNonCpkBook", CpkNonCpkBook);
     const order = new CpkBrokenOrderWithNonCpkBooks();
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");

@@ -82,15 +82,7 @@ import { FamilyTree } from "../test-helpers/models/family-tree.js";
 import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
 import { ShardedTag } from "../test-helpers/models/sharded/tag.js";
 import { ShardedBlogPostTag } from "../test-helpers/models/sharded/blog-post-tag.js";
-import {
-  CpkTag,
-  CpkOrder,
-  CpkOrderTag,
-  CpkBook,
-  CpkBookWithOrderAgreements,
-  CpkOrderAgreement,
-  CpkChapter,
-} from "../test-helpers/models/cpk.js";
+import { CpkOrder, CpkOrderTag } from "../test-helpers/models/cpk.js";
 import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
 
 describe("HasManyThroughAssociationsTest", () => {
@@ -232,16 +224,6 @@ describe("HasManyThroughAssociationsTest", () => {
   constSet(TopLevel, "User", User);
   constSet(TopLevel, "Family", Family);
   constSet(TopLevel, "FamilyTree", FamilyTree);
-  constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
-  constSet(TopLevel, "ShardedTag", ShardedTag);
-  constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTag);
-  constSet(TopLevel, "CpkTag", CpkTag);
-  constSet(TopLevel, "CpkOrder", CpkOrder);
-  constSet(TopLevel, "CpkOrderTag", CpkOrderTag);
-  constSet(TopLevel, "CpkBook", CpkBook);
-  constSet(TopLevel, "CpkBookWithOrderAgreements", CpkBookWithOrderAgreements);
-  constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
-  constSet(TopLevel, "CpkChapter", CpkChapter);
   constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
 
   beforeEach(async () => {

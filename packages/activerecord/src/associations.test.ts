@@ -61,10 +61,7 @@ import { Preloader } from "./associations/preloader.js";
 
 describe("AssociationsTest", () => {
   fixtures([]);
-  beforeAll(() => {
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
-  });
+  beforeAll(() => {});
 
   it("loading cpk association when persisted and in memory differ", async () => {
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
@@ -1672,12 +1669,6 @@ describe("AssociationsTest", () => {
     constSet(TopLevel, "Tagging", Tagging);
     constSet(TopLevel, "Developer", Developer);
     constSet(TopLevel, "Project", Project);
-    constSet(TopLevel, "ShardedBlog", ShardedBlog);
-    constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
-    constSet(TopLevel, "ShardedBlogPostWithRevision", ShardedBlogPostWithRevision);
-    constSet(TopLevel, "ShardedComment", ShardedComment);
-    constSet(TopLevel, "ShardedTag", ShardedTag);
-    constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTag);
     constSet(TopLevel, "Company", Company);
     constSet(TopLevel, "Account", Account);
     constSet(TopLevel, "Liquid", Liquid);
@@ -1685,16 +1676,11 @@ describe("AssociationsTest", () => {
     constSet(TopLevel, "Electron", Electron);
     constSet(TopLevel, "Ship", Ship);
     constSet(TopLevel, "ShipPart", ShipPart);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
-    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
     constSet(
       TopLevel,
       "CpkOrderWithPrimaryKeyAssociatedBook",
       CpkOrderWithPrimaryKeyAssociatedBook,
     );
-    constSet(TopLevel, "CpkCar", CpkCar);
-    constSet(TopLevel, "CpkCarReview", CpkCarReview);
     constSet(TopLevel, "Person", Person);
     constSet(TopLevel, "Reader", Reader);
     constSet(TopLevel, "Post", Post);

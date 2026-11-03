@@ -46,7 +46,6 @@ import { Carrier } from "../test-helpers/models/carrier.js";
 import { CustomerCarrier } from "../test-helpers/models/customer-carrier.js";
 import { ShopAccount } from "../test-helpers/models/shop-account.js";
 import {
-  CpkBook,
   CpkOrder,
   CpkBookWithOrderAgreements,
   CpkOrderAgreement,
@@ -123,10 +122,6 @@ describe("HasOneThroughAssociationsTest", () => {
   constSet(TopLevel, "Carrier", Carrier);
   constSet(TopLevel, "CustomerCarrier", CustomerCarrier);
   constSet(TopLevel, "ShopAccount", ShopAccount);
-  constSet(TopLevel, "CpkBook", CpkBook);
-  constSet(TopLevel, "CpkOrder", CpkOrder);
-  constSet(TopLevel, "CpkBookWithOrderAgreements", CpkBookWithOrderAgreements);
-  constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
 
   it("has one through with has one", async () => {
     const member = members("groucho");

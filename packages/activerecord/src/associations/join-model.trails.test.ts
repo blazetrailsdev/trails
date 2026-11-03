@@ -55,7 +55,6 @@ describe("AssociationsJoinModelTest", () => {
   constSet(TopLevel, "Tagging", Tagging);
   constSet(TopLevel, "Comment", Comment);
   constSet(TopLevel, "Rating", Rating);
-  constSet(TopLevel, "CpkOrder", CpkOrder);
   constSet(TopLevel, "WelcomeOnlyTagging", WelcomeOnlyTagging);
   DescendantsTracker.registerSubclass(Base, WelcomeOnlyTagging);
   constSet(TopLevel, "ScopedSourceTag", ScopedSourceTag);

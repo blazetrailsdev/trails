@@ -22,8 +22,6 @@ import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
 constSet(TopLevel, "Minivan", Minivan);
-constSet(TopLevel, "CpkBook", CpkBook);
-constSet(TopLevel, "CpkOrder", CpkOrder);
 
 interface Generatable {
   defineAttributeMethods(): boolean;

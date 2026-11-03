@@ -47,8 +47,6 @@ constSet(TopLevel, "Chef", Chef);
 constSet(TopLevel, "CakeDesigner", CakeDesigner);
 constSet(TopLevel, "Category", Category);
 constSet(TopLevel, "Categorization", Categorization);
-constSet(TopLevel, "CpkBook", CpkBook);
-constSet(TopLevel, "CpkOrder", CpkOrder);
 
 const ids = (records: unknown[]): unknown[] => records.map((r) => (r as any).id);
 const sortedIds = (records: unknown[]): unknown[] => ids(records).slice().sort();

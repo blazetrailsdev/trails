@@ -6,11 +6,9 @@ import { LoaderRecords } from "./association.js";
 import type { Association } from "./association.js";
 import type { Base } from "../../base.js";
 import { Author } from "../../test-helpers/models/author.js";
-import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
+import { CpkOrder } from "../../test-helpers/models/cpk.js";
 
 constSet(TopLevel, "Author", Author);
-constSet(TopLevel, "CpkOrder", CpkOrder);
-constSet(TopLevel, "CpkBook", CpkBook);
 
 describe("Preloader::Association::LoaderRecords", () => {
   const { authors, cpkOrders } = fixtures(["authors", "posts", "cpkOrders", "cpkBooks"]);

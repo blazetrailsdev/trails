@@ -21,8 +21,6 @@ constSet(TopLevel, "Author", Author);
 constSet(TopLevel, "Book", Book);
 constSet(TopLevel, "Human", Human);
 constSet(TopLevel, "Essay", Essay);
-constSet(TopLevel, "CpkAuthor", CpkAuthor);
-constSet(TopLevel, "CpkBook", CpkBook);
 
 const ids = (records: unknown[]): unknown[] => records.map((r) => (r as any).id);
 

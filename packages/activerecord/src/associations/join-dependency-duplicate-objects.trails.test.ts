@@ -92,7 +92,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("keys composite primary keys by the value array, not a delimited string", () => {
-    constSet(TopLevel, "CpkBook", CpkBook);
     const jd = new JoinDependency(CpkBook, CpkBook.arelTable, [], Nodes.OuterJoin);
 
     const rows = [

@@ -123,8 +123,6 @@ describe("RelationTest", () => {
     constSet(TopLevel, "SubAccount", SubAccount);
     constSet(TopLevel, "Entrant", Entrant);
     constSet(TopLevel, "Edge", Edge);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
     constSet(TopLevel, "Subscriber", Subscriber);
     constSet(TopLevel, "Reader", Reader);
     constSet(TopLevel, "Company", Company);

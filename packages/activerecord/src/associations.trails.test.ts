@@ -21,14 +21,6 @@ import { ShardedBlogPostTag } from "./test-helpers/models/sharded/blog-post-tag.
 import { ShardedTag } from "./test-helpers/models/sharded/tag.js";
 
 describe("AssociationsTest", () => {
-  constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
-  constSet(TopLevel, "ShardedComment", ShardedComment);
-  constSet(TopLevel, "ShardedTag", ShardedTag);
-  constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTag);
-  constSet(TopLevel, "CpkOrder", CpkOrder);
-  constSet(TopLevel, "CpkBook", CpkBook);
-  constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
-  constSet(TopLevel, "CpkOrderWithPrimaryKeyAssociatedBook", CpkOrderWithPrimaryKeyAssociatedBook);
   const { shardedBlogs, shardedBlogPosts } = fixtures([
     "shardedBlogs",
     "shardedBlogPosts",

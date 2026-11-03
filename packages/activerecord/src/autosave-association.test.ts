@@ -50,7 +50,6 @@ import { Squeak } from "./test-helpers/models/squeak.js";
 import {
   CpkBook,
   CpkOrder,
-  CpkOrderAgreement,
   CpkOrderWithPrimaryKeyAssociatedBook,
 } from "./test-helpers/models/cpk.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
@@ -117,8 +116,6 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     constSet(TopLevel, "Parrot", CanonicalParrot);
     constSet(TopLevel, "Treasure", Treasure);
     constSet(TopLevel, "PriceEstimate", PriceEstimate);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
   });
 
   let pirate: any;
@@ -694,9 +691,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     { useTransactionalTests: true },
   );
   beforeAll(() => {
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
-    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
     constSet(
       TopLevel,
       "CpkOrderWithPrimaryKeyAssociatedBook",
@@ -1522,8 +1516,6 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     constSet(TopLevel, "Post", CanonicalPost);
     constSet(TopLevel, "Mouse", Mouse);
     constSet(TopLevel, "Squeak", Squeak);
-    constSet(TopLevel, "CpkOrder", CpkOrder);
-    constSet(TopLevel, "CpkBook", CpkBook);
   });
 
   function makeModels() {
