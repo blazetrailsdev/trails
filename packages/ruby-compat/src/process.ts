@@ -1,3 +1,4 @@
+import { NotImplementedError } from "./not-implemented-error.js";
 import { ArgumentError } from "./argument-error.js";
 import type { IO } from "./io.js";
 import { IOError } from "./io-error.js";
@@ -268,6 +269,18 @@ export class Process {
    */
   static get pid(): number {
     return getProcessAdapter().pid();
+  }
+
+  /**
+   * `proc_daemon` (`vendor/ruby/v3.3.11/process.c:6973`) forks, and a host
+   * with no `fork(2)` defines it as `rb_f_notimplement`, which raises
+   * `NotImplementedError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.daemon`
+   * (`vendor/ruby/v3.3.11/process.c:6973`).
+   */
+  static daemon(_nochdir: unknown = null, _noclose: unknown = null): never {
+    throw new NotImplementedError("daemon() function is unimplemented on this machine");
   }
 
   /**

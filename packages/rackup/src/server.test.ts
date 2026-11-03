@@ -1,9 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Lint, MockRequest, ShowExceptions, TempfileReaper } from "@blazetrails/rack";
-import { Hash } from "@blazetrails/ruby-compat";
+import { env, Hash, setEnv } from "@blazetrails/ruby-compat";
 import { Server } from "./server.js";
 
 describe("Rackup::Server", () => {
+  let rackupHandler: string | undefined;
+  beforeEach(() => {
+    rackupHandler = env["RACKUP_HANDLER"];
+    setEnv("RACKUP_HANDLER", "node");
+  });
+  afterEach(() => {
+    setEnv("RACKUP_HANDLER", rackupHandler);
+  });
+
   it("overrides :config if :app is passed in", () => {
     const server = new Server({ app: "FOO" });
     expect(server.app()).toBe("FOO");
@@ -94,8 +103,8 @@ describe("Rackup::Server", () => {
     expect(server.middleware().get("deployment")!.flat()).toContain(TempfileReaper);
   });
 
-  it("be quiet if said so", () => {
+  it("be quiet if said so", async () => {
     const server = new Server({ app: "FOO", quiet: true });
-    expect(Server.loggingMiddleware()(server)).toBeNull();
+    expect(await Server.loggingMiddleware()(server)).toBeNull();
   });
 });

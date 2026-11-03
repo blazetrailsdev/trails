@@ -354,6 +354,7 @@ export {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   abort,
   argv,
+  atExit,
   env,
   exec,
   exit,

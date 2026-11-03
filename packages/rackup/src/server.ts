@@ -17,12 +17,15 @@ import {
   File,
   Hash,
   NameError,
-  NotImplementedError,
   LoadError,
   onSignal,
   OptionParser,
   Process,
   rbFRequire,
+  rbRequireLoaded,
+  atExit,
+  createTmpname,
+  FileUtils,
   rbFRequireFile,
   rbGvSet,
   rbInspect,
@@ -58,7 +61,16 @@ export interface ServerOptions {
   [name: string]: unknown;
 }
 
-type MiddlewareEntry = unknown[] | ((server: Server) => unknown[] | null);
+type MiddlewareEntry = unknown[] | ((server: Server) => Promise<unknown[] | null>);
+
+interface ObjectSpaceLike {
+  traceObjectAllocationsStart(): void;
+  dumpAll(options: { output: unknown }): unknown;
+}
+
+interface StackProfLike {
+  run(options: { mode: string; out: unknown }, block: () => unknown): Promise<unknown>;
+}
 
 interface HandlerLike {
   name?: string;
@@ -80,8 +92,10 @@ export class Options {
     optParser.separator("");
     optParser.separator("Ruby options:");
 
+    let lineno = 1;
     optParser.on("-e", "--eval LINE", "evaluate a LINE of code", (line) => {
-      (0, eval)(line as string);
+      (0, eval)(`${"\n".repeat(lineno - 1)}${line as string}\n//# sourceURL=-e`);
+      lineno += 1;
     });
 
     optParser.on("-d", "--debug", "set debugging flags (set $DEBUG to true)", () => {
@@ -323,9 +337,9 @@ export class Server {
       : this.buildAppAndOptionsFromConfig());
   }
 
-  static loggingMiddleware(): (server: Server) => unknown[] | null {
-    return (server: Server) =>
-      /CGI/.test(server._server?.name ?? "") || server.options.quiet
+  static loggingMiddleware(): (server: Server) => Promise<unknown[] | null> {
+    return async (server: Server) =>
+      /CGI/.test((await server.server()).name ?? "") || server.options.quiet
         ? null
         : [CommonLogger, STDERR];
   }
@@ -356,9 +370,8 @@ export class Server {
     return (this.constructor as typeof Server).middleware();
   }
 
-  async start(block: unknown = null): Promise<unknown> {
+  async start(block: ((...args: unknown[]) => unknown) | null = null): Promise<unknown> {
     await this._ready;
-    await this.server();
     const options = this.options;
 
     if (options.warn) {
@@ -377,7 +390,7 @@ export class Server {
     if (options.debug) {
       rbGvSet("$DEBUG", true);
       STDOUT.puts(rbInspect(options.server));
-      await PP.pp(this.wrappedApp());
+      await PP.pp(await this.wrappedApp());
       await PP.pp(this.app());
     }
 
@@ -391,15 +404,16 @@ export class Server {
 
     if (options.pid != null) await this.writePid();
 
+    const server = await this.server();
     onSignal("SIGINT", () => {
-      if (typeof this._server!.shutdown === "function") {
-        this._server!.shutdown();
+      if (typeof server.shutdown === "function") {
+        server.shutdown();
       } else {
         exit();
       }
     });
 
-    return (await this.server()).run(this.wrappedApp(), options, block);
+    return server.run(await this.wrappedApp(), options, block);
   }
 
   async server(): Promise<HandlerLike> {
@@ -425,15 +439,40 @@ export class Server {
   ): Promise<unknown> {
     if (heapfile != null) {
       await rbFRequire(loadPath, "objspace");
+      const { ObjectSpace } = rbRequireLoaded("objspace") as { ObjectSpace: ObjectSpaceLike };
+      ObjectSpace.traceObjectAllocationsStart();
+      await block();
+      await File.openAsync(heapfile, "w", (f) => ObjectSpace.dumpAll({ output: f }));
       return exit();
     }
 
     if (profileMode != null) {
       await rbFRequire(loadPath, "stackprof");
+      await rbFRequire(loadPath, "tempfile");
+      const { StackProf } = rbRequireLoaded("stackprof") as { StackProf: StackProfLike };
+
+      await this.makeProfileName(filename, async (filename) => {
+        await File.openAsync(filename, "w", async (f) => {
+          await StackProf.run({ mode: profileMode, out: f }, block);
+          STDOUT.puts(`Profile written to: ${filename}`);
+        });
+      });
       return exit();
     }
 
     return block();
+  }
+
+  /** @internal */
+  private async makeProfileName(
+    filename: string | undefined,
+    block: (filename: string) => Promise<void>,
+  ): Promise<void> {
+    if (filename != null) {
+      await block(filename);
+    } else {
+      await createTmpname("profile.dump", null, {}, (tmpname) => block(tmpname));
+    }
   }
 
   /** @internal */
@@ -457,10 +496,11 @@ export class Server {
   }
 
   /** @internal */
-  private buildApp(app: unknown): unknown {
+  private async buildApp(app: unknown): Promise<unknown> {
     const entries = [...this.middleware().get(this.options.environment!)!].reverse();
     for (let middleware of entries) {
-      if (typeof middleware === "function") middleware = middleware(this) as MiddlewareEntry;
+      if (typeof middleware === "function")
+        middleware = (await middleware(this)) as MiddlewareEntry;
       if (middleware == null) continue;
       const [klass, ...args] = middleware as [new (...args: unknown[]) => unknown, ...unknown[]];
       app = new klass(app, ...args);
@@ -469,13 +509,13 @@ export class Server {
   }
 
   /** @internal */
-  private wrappedApp(): unknown {
-    return (this._wrappedApp ??= this.buildApp(this.app()));
+  private async wrappedApp(): Promise<unknown> {
+    return (this._wrappedApp ??= await this.buildApp(this.app()));
   }
 
   /** @internal */
-  private daemonizeApp(): never {
-    throw new NotImplementedError("daemon() function is unimplemented on this machine");
+  private daemonizeApp(): void {
+    Process.daemon(true, this.options.daemonize === "noclose");
   }
 
   /** @internal */
@@ -483,6 +523,7 @@ export class Server {
     for (;;) {
       try {
         await File.writeAsync(this.options.pid!, `${Process.pid}`, { mode: "wx" });
+        atExit(() => FileUtils.rmF(this.options.pid!));
         return;
       } catch (error) {
         if (!(error instanceof Errno.EEXIST)) throw error;
