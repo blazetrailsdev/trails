@@ -59,17 +59,8 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   private constructor(tmpfile: File, opts: TempfileOptions = {}) {
     super(tmpfile);
     this.opts = opts;
-    const [pid, path] = [Process.pid, tmpfile.path()!];
-    // `Tempfile::Remover#call` (`vendor/ruby/v3.3.11/lib/tempfile.rb:313-324`).
-    ObjectSpace.defineFinalizer(this.finalizerObj, () => {
-      if (pid !== Process.pid) return;
-
-      try {
-        File.delete(path);
-      } catch (error) {
-        if ((error as { code?: string }).code !== "ENOENT") throw error;
-      }
-    });
+    ObjectSpace.defineFinalizer(this.finalizerObj, new Remover(tmpfile.path()!).call);
+    ObjectSpace.defineFinalizer(this, new Closer(tmpfile).call);
   }
 
   /**
@@ -344,4 +335,34 @@ function ensure<T>(body: () => T, cleanup: () => void): T {
   if (value instanceof Promise) return value.finally(cleanup) as T;
   cleanup();
   return value;
+}
+
+/** `Tempfile::Closer` (`vendor/ruby/v3.3.11/lib/tempfile.rb:297-305`). */
+class Closer {
+  constructor(private readonly tmpfile: File) {}
+
+  call = (): void => {
+    this.tmpfile.close();
+  };
+}
+
+/** `Tempfile::Remover` (`vendor/ruby/v3.3.11/lib/tempfile.rb:307-325`). */
+class Remover {
+  private readonly pid: number;
+  private readonly path: string;
+
+  constructor(path: string) {
+    this.pid = Process.pid;
+    this.path = path;
+  }
+
+  call = (): void => {
+    if (this.pid !== Process.pid) return;
+
+    try {
+      File.delete(this.path);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "ENOENT") throw error;
+    }
+  };
 }
