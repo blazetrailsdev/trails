@@ -51,6 +51,12 @@ describe("walkedClassPaths", () => {
     expect(record.excluded).toContain("locator.ts::BaseLocator");
     expect(keyed(await walkedClassPaths("globalid", record))).toEqual(keyed(kept));
   });
+
+  it("leaves a walked export no table can seat out of excluded", async () => {
+    const record = await constantResidue("activerecord", []);
+    expect(record.excluded).not.toContain("test-helpers/models/topic.ts::Topic");
+    expect(record.excluded).toContain("future-result.ts::Canceled");
+  });
 });
 
 describe("walkedClassPaths placement", () => {
@@ -136,7 +142,10 @@ describe("unreceiptedExclusions", () => {
     );
   });
 
-  it("has nothing to shrink from before any base record carries excluded", async () => {
-    expect(await unreceiptedExclusions("globalid", record, {})).toEqual([]);
+  it("exempts no key when the base record has none", async () => {
+    expect(await unreceiptedExclusions("globalid", record, {})).toEqual([
+      "locator.ts::BaseLocator",
+      "locator.ts::Locator",
+    ]);
   });
 });

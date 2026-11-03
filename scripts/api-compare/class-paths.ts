@@ -517,8 +517,8 @@ async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Pr
 }
 
 /**
- * One package's record: its row count; the walked exports no Ruby constant
- * answers, so no table names them and `rbModName` gives them no path; the
+ * One package's record: its row count; the walked exports a table could
+ * seat but no Ruby constant answers, so no table names them and `rbModName` gives them no path; the
  * rows the walk does not reach (a static member, a module object) but whose
  * path it derives; and the rows whose path the derivation misses.
  */
@@ -546,7 +546,10 @@ export async function constantResidue(
       unwalked.push(key);
     } else residue[key] = fqn;
   }
-  const excluded = [...walked.keys()].filter((key) => !fqns.has(key)).sort();
+  const place = await placement(dir);
+  const excluded = [...walked.keys()]
+    .filter((key) => !fqns.has(key) && place.at(splitKey(key)[0]) !== null)
+    .sort();
   return { rows: entries.length, excluded, unwalked, residue };
 }
 
@@ -561,19 +564,15 @@ async function readRecord(): Promise<Record<string, ConstantResidue>> {
 
 /** The record at the merge-base with `origin/main`, against which `excluded` only shrinks. */
 async function baseRecord(): Promise<Record<string, ConstantResidue>> {
-  try {
-    const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
-      cwd: ROOT_DIR,
-    });
-    const { stdout } = await run(
-      "git",
-      ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
-      { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
-    );
-    return JSON.parse(stdout) as Record<string, ConstantResidue>;
-  } catch {
-    return {};
-  }
+  const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
+    cwd: ROOT_DIR,
+  });
+  const { stdout } = await run(
+    "git",
+    ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
+    { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
+  ).catch(() => ({ stdout: "{}" }));
+  return JSON.parse(stdout) as Record<string, ConstantResidue>;
 }
 
 /**
@@ -606,16 +605,14 @@ function renamedKey(key: string): string {
 }
 
 /**
- * The keys `record` adds to `excluded` over `base` with no receipt. Before
- * any base record carries `excluded` there is nothing to shrink from; after,
- * a package new to the record starts from an empty list.
+ * The keys `record` adds to `excluded` over `base` with no receipt. A
+ * package new to the record starts from an empty list.
  */
 export async function unreceiptedExclusions(
   dir: string,
   record: ConstantResidue,
   base: Record<string, ConstantResidue>,
 ): Promise<string[]> {
-  if (!Object.values(base).some((r) => Array.isArray(r.excluded))) return [];
   const before = new Set((base[dir]?.excluded ?? []).map(renamedKey));
   const out: string[] = [];
   for (const key of record.excluded) {
