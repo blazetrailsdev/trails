@@ -71,12 +71,13 @@ TopLevel.Trails = {
 class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
-await import("../../config/routes.js");
 for (const railtie of [GlobalIDRailtie, ActionViewRailtie, ActionControllerRailtie, Engine]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
   }
 }
+
+await import("../../config/routes.js");
 
 runLoadHooks("after_initialize", app);
 ActiveStorage.logger = new NullLogger();
