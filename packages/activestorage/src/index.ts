@@ -11,6 +11,8 @@ export { Filename } from "./filename.js";
 export { Record } from "./record.js";
 export { Current } from "./current.js";
 export { BaseController } from "./base-controller.js";
+export { DirectUploadsController } from "./direct-uploads-controller.js";
+export { DiskController } from "./disk-controller.js";
 export { DisableSession } from "./disable-session.js";
 export { FileServer } from "./file-server.js";
 export { SetBlob } from "./set-blob.js";
