@@ -34,10 +34,16 @@ function renderedTitles(node: ts.CallExpression, title: string): string[] | null
       if (
         match[1] === "s" &&
         arg != null &&
-        (ts.isStringLiteral(arg) || ts.isNumericLiteral(arg))
+        (ts.isStringLiteral(arg) ||
+          (ts.isNumericLiteral(arg) && String(Number(arg.text)) === arg.text))
       ) {
         rendered += arg.text;
-      } else if (match[1] === "d" && arg != null && ts.isNumericLiteral(arg)) {
+      } else if (
+        match[1] === "d" &&
+        arg != null &&
+        ts.isNumericLiteral(arg) &&
+        String(Number(arg.text)) === arg.text
+      ) {
         rendered += arg.text;
       } else {
         return null;
