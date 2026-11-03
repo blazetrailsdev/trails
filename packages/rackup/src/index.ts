@@ -3,9 +3,10 @@ import { VERSION } from "./version.js";
 import { Handler } from "./handler.js";
 import { Server } from "./server.js";
 
-export { VERSION, Handler, Server };
+export { VERSION } from "./version.js";
+export { Handler, Server };
 
-export const Rackup = { name: "Rackup", VERSION, Handler, Server };
+const Rackup = { name: "Rackup", VERSION, Handler, Server };
 TopLevel.Rackup = Rackup;
 
 declare module "@blazetrails/ruby-compat" {

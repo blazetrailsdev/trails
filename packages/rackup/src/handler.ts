@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 export class Handler {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
   /** @internal */
