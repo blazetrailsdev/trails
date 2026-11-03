@@ -340,6 +340,11 @@ async function checkSeatedPaths(dir: string): Promise<void> {
     "console.log(JSON.stringify(classPathMismatches()));",
   ].join("\n");
   const { stdout } = await run("node", ["--input-type=module", "-e", script], { cwd });
+  const entry = await entryFile(cwd);
+  const table = `${path.dirname(entry)}/constants.generated.js`;
+  await run("node", ["--input-type=module", "-e", `await import(${JSON.stringify(table)});`], {
+    cwd,
+  });
   for (const [seated, generated] of JSON.parse(stdout) as [string, string][]) {
     console.error(`${dir}: seated ${seated}, generated ${generated}`);
     process.exitCode = 1;
