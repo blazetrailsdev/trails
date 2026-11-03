@@ -1,4 +1,3 @@
-import * as TypeModule from "./type.js";
 import {
   BigIntegerType,
   BinaryType,
@@ -119,5 +118,3 @@ export function adapterNameFrom(model: AdapterNameSource): string {
 export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
-
-ActiveRecord.Type = TypeModule;
