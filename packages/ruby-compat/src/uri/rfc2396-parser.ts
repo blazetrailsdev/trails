@@ -1,9 +1,9 @@
 import { strNew } from "../string/bytes.js";
-import { TopLevel } from "../object.js";
-import type { Generic } from "./generic.js";
 import { ArgumentError } from "../argument-error.js";
 import { regexpEscape } from "../regexp.js";
 import { b } from "../string/b.js";
+import { TopLevel } from "../object.js";
+import type { Generic } from "./generic.js";
 import type { SplitComponents } from "./rfc3986-parser.js";
 
 /**
