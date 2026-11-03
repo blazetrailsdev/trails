@@ -3,6 +3,7 @@ import { GeneratorBase } from "../../base.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
+/** @noRailsEquivalent CONVERGEABLE generator-classes-pair-in-constant-residue */
 export class ApplicationRecordGenerator extends GeneratorBase {
   private _applicationRecordFileName?: string;
 

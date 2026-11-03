@@ -355,9 +355,7 @@ export default { development: env("development"), test: env("test"), production:
       File.join(appPath, "config/application.ts"),
       "utf-8",
     );
-    const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*\}\n\nApplication\.register[\s\S]*)$/.exec(
-      environment,
-    );
+    const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*}\n\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
     if (match) {
       await puts(
         File.join(appPath, "config/application.ts"),
