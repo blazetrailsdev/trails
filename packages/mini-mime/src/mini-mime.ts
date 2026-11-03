@@ -227,4 +227,4 @@ export const MiniMime = {
   Db,
 };
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

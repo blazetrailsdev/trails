@@ -1,4 +1,4 @@
-import "../class-paths.encrypted.generated.js";
+import "../constants.encrypted.generated.js";
 import { presence } from "@blazetrails/activesupport";
 import { InvalidContentError, type EncryptedConfiguration } from "@blazetrails/activesupport";
 import { MissingKeyError } from "@blazetrails/activesupport/encrypted-file";

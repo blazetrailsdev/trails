@@ -23,4 +23,4 @@ import "./nodes/equality.js";
 import "./nodes/in.js";
 import "./nodes/casted.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

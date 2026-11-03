@@ -1,4 +1,4 @@
-import "../../../class-paths.diffing.generated.js";
+import "../../../constants.diffing.generated.js";
 import { root } from "../../../command.js";
 import { Dir, File, Pathname, defineModule, rbFSystem } from "@blazetrails/ruby-compat";
 

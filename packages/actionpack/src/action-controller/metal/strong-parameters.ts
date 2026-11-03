@@ -36,7 +36,7 @@ import {
   toH,
   transformValues,
   filterMap,
-  registerClassPaths,
+  defineConstants,
   ArgumentError,
   IndexError,
 } from "@blazetrails/ruby-compat";
@@ -1044,7 +1044,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-registerClassPaths([[() => Parameters, "ActionController::Parameters"]]);
+defineConstants([[() => Parameters, "ActionController::Parameters"]]);
 ActionController.Parameters = Parameters;
 Parameters.hookIntoYamlLoading();
 

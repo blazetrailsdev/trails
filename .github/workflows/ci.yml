@@ -2245,7 +2245,7 @@ jobs:
         # in MISSING_TAG_PACKAGES (lint-inlined-from.ts), an only-grow set.
         run: pnpm exec tsx scripts/api-compare/lint-inlined-from.ts
       - name: Class-path table gate
-        # RFC 0205. Each package's src/class-paths.generated.ts is generated from
+        # RFC 0205. Each package's src/constants.generated.ts is generated from
         # rails-api.json by `pnpm parity:class-paths`; a stale table, a paired
         # class no table can import, or a generated path that disagrees with a
         # const_set-bound one is red.
