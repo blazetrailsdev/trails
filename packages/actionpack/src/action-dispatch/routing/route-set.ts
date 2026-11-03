@@ -1101,7 +1101,7 @@ export class RouteSet {
       deprecator().warn(
         squish(`
           Using a dynamic :controller segment in a route is deprecated and
-          will be removed in Trails 8.1.
+          will be removed in Rails 8.1.
         `),
       );
     }
@@ -1110,7 +1110,7 @@ export class RouteSet {
       deprecator().warn(
         squish(`
           Using a dynamic :action segment in a route is deprecated and
-          will be removed in Trails 8.1.
+          will be removed in Rails 8.1.
         `),
       );
     }

@@ -222,7 +222,7 @@ export class Base implements RoutesFormatter {
     }
     this.buffer.push(msg);
     this.buffer.push(
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     );
   }
 }
@@ -351,8 +351,8 @@ export class HtmlTableFormatter {
 <ul>
   <li>Please add some routes in <tt>config/routes.rb</tt>.</li>
   <li>
-    For more information about routes, please see the Trails guide
-    <a href="https://guides.rubyonrails.org/routing.html">Trails Routing from the Outside In</a>.
+    For more information about routes, please see the Rails guide
+    <a href="https://guides.rubyonrails.org/routing.html">Rails Routing from the Outside In</a>.
   </li>
 </ul>
 `);

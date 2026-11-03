@@ -7,7 +7,7 @@ let _utcToLocalReturnsUtcOffsetTimes = false;
 export function preserveTimezone(): boolean | string {
   if (_preserveTimezone === null) {
     deprecator().warn(
-      "`to_time` will always preserve the receiver timezone rather than system local time in Trails 8.1." +
+      "`to_time` will always preserve the receiver timezone rather than system local time in Rails 8.1." +
         "To opt in to the new behavior, set `config.active_support.to_time_preserves_timezone = :zone`.",
     );
 

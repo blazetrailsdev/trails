@@ -579,7 +579,7 @@ export class TimeWithZone {
         result = datetimeSince(this.utc().toDatetime(), other as { toR(): Rational });
         deprecator().warn(
           `Adding an instance of ${rbObjClassname(other)} to an instance of ${rbObjClassname(this)} is deprecated. This behavior will raise ` +
-            "a `TypeError` in Trails 8.1.",
+            "a `TypeError` in Rails 8.1.",
         );
         inTimeZone(result as Time, this.timeZone);
       }

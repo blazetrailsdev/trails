@@ -12,7 +12,7 @@ declare module "@blazetrails/ruby-compat" {
 
 TopLevel.STATS_DIRECTORIES = new DeprecatedObjectProxy(
   DIRECTORIES,
-  "`STATS_DIRECTORIES` is deprecated and will be removed in Trails 8.1! Use `Trails::CodeStatistics.register_directory('My Directory', 'path/to/dir)` instead.",
+  "`STATS_DIRECTORIES` is deprecated and will be removed in Rails 8.1! Use `Trails::CodeStatistics.register_directory('My Directory', 'path/to/dir)` instead.",
   deprecator(),
 ) as unknown as DirectoryPair[];
 
@@ -29,7 +29,7 @@ DSL.task(
 
     STDERR.puts(
       deprecator().warn(
-        "`bin/rake stats` has been deprecated and will be removed in Trails 8.1.\nPlease use `bin/trails stats` as Rails command instead.\n\n",
+        "`bin/rake stats` has been deprecated and will be removed in Rails 8.1.\nPlease use `bin/trails stats` as Rails command instead.\n\n",
         callerLocations(0, 2),
       ) ?? null,
     );

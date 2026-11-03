@@ -228,7 +228,7 @@ export function since(this: RubyTime, seconds: number | Duration | RubyTime): Ru
     const result = dateTimeSince(this.toDatetime(), seconds as RubyTime);
     deprecator().warn(
       `Passing an instance of ${rbObjClassname(seconds)} to ${rbObjClassname(this)}#since is deprecated. This behavior will raise ` +
-        "a `TypeError` in Trails 8.1.",
+        "a `TypeError` in Rails 8.1.",
     );
     return result as unknown as RubyTime;
   }

@@ -81,8 +81,8 @@ for (const meth of [
 ClassMethods.deprecateOption = function (name: unknown): void {
   Deprecation._instance().warn(
     `The ${name} option is deprecated ` +
-      "and has no effect. Until Trails 5 the old behavior can still be " +
+      "and has no effect. Until Rails 5 the old behavior can still be " +
       "installed. To do this add the `rails-deprecated-sanitizer` to " +
-      "your Gemfile. Consult the Trails 4.2 upgrade guide for more information.",
+      "your Gemfile. Consult the Rails 4.2 upgrade guide for more information.",
   );
 };

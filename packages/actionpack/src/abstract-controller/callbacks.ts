@@ -84,7 +84,7 @@ export class ActionFilter implements CallbackPredicateLike {
           `The ${missingAction} action could not be found for the ${filterNames} ` +
           `callback on ${controller.constructor.name}, but it is listed in the controller's ` +
           `:${this._conditionalKey} option.\n\n` +
-          `Raising for missing callback actions is a new default in Trails 7.1; ` +
+          `Raising for missing callback actions is a new default in Rails 7.1; ` +
           `set \`raiseOnMissingCallbackActions = false\` on the controller class to opt out.`;
         throw new ActionNotFound(message, controller, missingAction);
       }

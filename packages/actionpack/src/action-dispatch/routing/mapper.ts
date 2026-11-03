@@ -1676,7 +1676,7 @@ export class Mapper {
     if (paths.length > 1) {
       deprecator().warn(
         squish(`Mapping a route with multiple paths is deprecated and
-          will be removed in Trails 8.1. Please use multiple method calls instead.`),
+          will be removed in Rails 8.1. Please use multiple method calls instead.`),
       );
     }
 

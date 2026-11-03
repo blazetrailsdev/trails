@@ -1064,7 +1064,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       setBusyHandlerTimeout(this._rawConnection!, timeout);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
-        "The retries option is deprecated and will be removed in Trails 8.1. Use timeout instead.\n",
+        "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
       const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
       this._rawConnection!.busyHandler = (count) => count <= retries;

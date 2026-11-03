@@ -396,7 +396,7 @@ describe("RoutesInspectorTest", () => {
     );
     expect(output).toEqual([
       "No routes were found for this grep pattern.",
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -410,7 +410,7 @@ describe("RoutesInspectorTest", () => {
       "",
       "Please add some routes in config/routes.rb.",
       "",
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -460,7 +460,7 @@ describe("RoutesInspectorTest", () => {
     );
     expect(output).toEqual([
       "No routes were found for this controller.",
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -473,7 +473,7 @@ describe("RoutesInspectorTest", () => {
     );
     expect(output).toEqual([
       "No routes were found for this grep pattern.",
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -484,7 +484,7 @@ describe("RoutesInspectorTest", () => {
       "",
       "Please add some routes in config/routes.rb.",
       "",
-      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 

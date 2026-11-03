@@ -1203,7 +1203,7 @@ ${
     await this.createFile(
       "config/initializers/content-security-policy.ts",
       `// Define an application-wide content security policy.
-// See the Securing Trails Guide for more information:
+// See the Securing Rails Guide for more information:
 // https://github.com/blazetrailsdev/blazetrails
 
 // export default {
