@@ -133,6 +133,12 @@ export class OrderedOptions {
     return this;
   }
 
+  delete(key: string): unknown {
+    const value = this.data.get(String(key));
+    this.data.delete(String(key));
+    return value ?? null;
+  }
+
   clear(): this {
     this.data.clear();
     return this;

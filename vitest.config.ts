@@ -380,6 +380,7 @@ const alias = {
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
+  "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/src/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/src/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/src/smtp.ts"),
