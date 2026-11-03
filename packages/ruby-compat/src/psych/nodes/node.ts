@@ -1,10 +1,7 @@
 import { classpaths } from "../../classpath.js";
 import { toEnum } from "../../enumerator.js";
-import { constGet } from "../../variable.js";
+import { TopLevel } from "../../object.js";
 import type { PsychIO } from "../../psych-adapter.js";
-import type { Emitter } from "../visitors/emitter.js";
-import type { DepthFirst } from "../visitors/depth-first.js";
-import type { ToRuby } from "../visitors/to-ruby.js";
 
 /**
  * `Psych::Nodes::Node` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:11`).
@@ -32,9 +29,7 @@ export class Node {
    */
   each(block?: (node: Node) => unknown): unknown {
     if (!block) return toEnum(this, "each");
-    return new (constGet(Object, "Psych::Visitors::DepthFirst") as typeof DepthFirst)(block).accept(
-      this,
-    );
+    return new TopLevel.Psych!.Visitors.DepthFirst(block).accept(this);
   }
 
   /**
@@ -43,9 +38,9 @@ export class Node {
    * @noRailsEquivalent PERMANENT
    */
   toRuby({ symbolizeNames = false, freeze = false, strictInteger = false } = {}): unknown {
-    return (constGet(Object, "Psych::Visitors::ToRuby") as typeof ToRuby)
-      .create({ symbolizeNames, freeze, strictInteger })
-      .accept(this);
+    return TopLevel.Psych!.Visitors.ToRuby.create({ symbolizeNames, freeze, strictInteger }).accept(
+      this,
+    );
   }
 
   /**
@@ -59,9 +54,7 @@ export class Node {
   ): string | PsychIO {
     let string = "";
     const realIo = io ?? { write: (s: string) => (string += s) };
-    new (constGet(Object, "Psych::Visitors::Emitter") as typeof Emitter)(realIo, options).accept(
-      this,
-    );
+    new TopLevel.Psych!.Visitors.Emitter(realIo, options).accept(this);
     if (!io) return string;
     return io;
   }

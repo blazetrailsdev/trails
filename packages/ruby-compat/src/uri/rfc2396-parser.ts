@@ -2,8 +2,7 @@ import { strNew } from "../string/bytes.js";
 import { ArgumentError } from "../argument-error.js";
 import { regexpEscape } from "../regexp.js";
 import { b } from "../string/b.js";
-import { constGet } from "../variable.js";
-import type { InvalidURIError, URI } from "./common.js";
+import { TopLevel } from "../object.js";
 import type { Generic } from "./generic.js";
 import type { SplitComponents } from "./rfc3986-parser.js";
 
@@ -85,14 +84,10 @@ export class RFC2396Parser {
       [scheme, opaque, userinfo, host, port, registry, path, query, fragment] = group(m, 9);
 
       if (scheme == null) {
-        throw new (constGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
-          `bad URI(absolute but no scheme): ${uri}`,
-        );
+        throw new TopLevel.URI!.InvalidURIError(`bad URI(absolute but no scheme): ${uri}`);
       }
       if (opaque == null && path == null && host == null && registry == null) {
-        throw new (constGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
-          `bad URI(absolute but no path): ${uri}`,
-        );
+        throw new TopLevel.URI!.InvalidURIError(`bad URI(absolute but no path): ${uri}`);
       }
     } else if ((m = this.regexp.REL_URI.exec(uri))) {
       scheme = null;
@@ -109,9 +104,7 @@ export class RFC2396Parser {
         path = absPath;
       }
     } else {
-      throw new (constGet(Object, "URI::InvalidURIError") as typeof InvalidURIError)(
-        `bad URI(is not URI?): ${uri}`,
-      );
+      throw new TopLevel.URI!.InvalidURIError(`bad URI(is not URI?): ${uri}`);
     }
 
     if (path == null && opaque == null) path = "";
@@ -120,7 +113,7 @@ export class RFC2396Parser {
 
   /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:205`). */
   parse(uri: string): Generic {
-    return (constGet(Object, "URI") as typeof URI).for(...this.split(uri), this);
+    return TopLevel.URI!.for(...this.split(uri), this);
   }
 
   /**
@@ -280,7 +273,7 @@ export class RFC2396Parser {
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails.
    */
   convertToUri(uri: Generic | string): Generic {
-    if (uri instanceof (constGet(Object, "URI::Generic") as typeof Generic)) {
+    if (uri instanceof TopLevel.URI!.Generic) {
       return uri;
     } else if (typeof uri === "string") {
       return this.parse(uri);
