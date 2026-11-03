@@ -31,7 +31,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -43,7 +43,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
         throw new globalThis.Error();
       };
 
-      await expect(loader.eagerLoadNamespace(Object)).resolves.toBeUndefined();
+      await loader.eagerLoadNamespace(Object);
     });
   });
 
@@ -52,7 +52,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(anonymous());
 
-      expect(isRequired(files[0])).toBe(false);
+      expect(!isRequired(files[0])).toBeTruthy();
     });
   });
 
@@ -66,7 +66,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -78,9 +78,9 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     ];
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(await get(Object, "M"));
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
-      expect(isRequired(files[2])).toBe(true);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
+      expect(isRequired(files[2])).toBeTruthy();
     });
   });
 
@@ -94,7 +94,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, { dirs: [".", "nested"] }, async () => {
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 
@@ -106,8 +106,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(await get(Object, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -116,7 +116,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(TestEagerLoadNamespaceWithObjectRootNamespace);
 
-      expect(isRequired(files[0])).toBe(false);
+      expect(!isRequired(files[0])).toBeTruthy();
     });
   });
 
@@ -128,8 +128,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -141,8 +141,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -155,8 +155,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
       await loader.doNotEagerLoad("rd1");
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -169,8 +169,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -183,8 +183,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(await get(Object, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -197,8 +197,8 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(await get(await get(Object, "M"), "N"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -213,17 +213,18 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
 
       await (await newLoader({ dirs: "b" })).eagerLoadNamespace(await get(Object, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
   it("raises if the argument is not a class or module object", async () => {
     await withSetup(loader, [], {}, async () => {
       const name = TestEagerLoadNamespaceWithObjectRootNamespace.name;
-      const e = await loader.eagerLoadNamespace(name).catch((error: unknown) => error);
-      expect(e).toBeInstanceOf(ZeitwerkError);
-      expect((e as ZeitwerkError).message).toBe(`"${name}" is not a class or module object`);
+      const eagerLoadNamespace = loader.eagerLoadNamespace(name);
+      await expect(eagerLoadNamespace).rejects.toThrow(ZeitwerkError);
+      const e = await eagerLoadNamespace.catch((error: Error) => error);
+      expect((e as Error).message).toBe(`"${name}" is not a class or module object`);
     });
   });
 
@@ -231,9 +232,10 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, [], {}, async () => {
       await loader.eagerLoad();
       const name = TestEagerLoadNamespaceWithObjectRootNamespace.name;
-      const e = await loader.eagerLoadNamespace(name).catch((error: unknown) => error);
-      expect(e).toBeInstanceOf(ZeitwerkError);
-      expect((e as ZeitwerkError).message).toBe(`"${name}" is not a class or module object`);
+      const eagerLoadNamespace = loader.eagerLoadNamespace(name);
+      await expect(eagerLoadNamespace).rejects.toThrow(ZeitwerkError);
+      const e = await eagerLoadNamespace.catch((error: Error) => error);
+      expect((e as Error).message).toBe(`"${name}" is not a class or module object`);
     });
   });
 });
@@ -266,7 +268,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await withSetup(loader, files, { namespace: CN }, async () => {
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(isRequired(...files)).toBe(true);
+        expect(isRequired(...files)).toBeTruthy();
       });
     });
 
@@ -280,7 +282,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await withSetup(loader, files, { namespace: CN }, async () => {
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(isRequired(...files)).toBe(true);
+        expect(isRequired(...files)).toBeTruthy();
       });
     });
 
@@ -294,7 +296,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await withSetup(loader, files, { dirs: [".", "nested"], namespace: CN }, async () => {
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(isRequired(...files)).toBe(true);
+        expect(isRequired(...files)).toBeTruthy();
       });
     });
 
@@ -311,9 +313,10 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
         await loader.setup();
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(isRequired(...files.slice(0, 2))).toBe(true);
-        expect(isRequired(files[2])).toBe(ancestor === Object);
-        expect(isRequired(files[3])).toBe(ancestor === Object);
+        expect(ancestor !== Object || isRequired(...files)).toBeTruthy();
+        expect(ancestor === Object || isRequired(...files.slice(0, 2))).toBeTruthy();
+        expect(ancestor === Object || !isRequired(files[2])).toBeTruthy();
+        expect(ancestor === Object || !isRequired(files[3])).toBeTruthy();
       });
     });
 
@@ -330,9 +333,10 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
         await loader.setup();
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(isRequired(files[0])).toBe(ancestor === Object);
-        expect(isRequired(files[1])).toBe(ancestor === Object);
-        expect(isRequired(...files.slice(2, 4))).toBe(true);
+        expect(ancestor !== Object || isRequired(...files)).toBeTruthy();
+        expect(ancestor === Object || !isRequired(files[0])).toBeTruthy();
+        expect(ancestor === Object || !isRequired(files[1])).toBeTruthy();
+        expect(ancestor === Object || isRequired(...files.slice(2, 4))).toBeTruthy();
       });
     });
   }
@@ -342,7 +346,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, { namespace: CN }, async () => {
       await loader.eagerLoadNamespace(anonymous());
 
-      expect(isRequired(files[0])).toBe(false);
+      expect(!isRequired(files[0])).toBeTruthy();
     });
   });
 
@@ -354,8 +358,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, { namespace: CN }, async () => {
       await loader.eagerLoadNamespace(await get(CN, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -364,7 +368,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, { namespace: CN }, async () => {
       await loader.eagerLoadNamespace(String);
 
-      expect(isRequired(files[0])).toBe(false);
+      expect(!isRequired(files[0])).toBeTruthy();
     });
   });
 
@@ -376,8 +380,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, { namespace: CN }, async () => {
       await loader.eagerLoadNamespace(CN);
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -389,8 +393,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, { namespace: CN }, async () => {
       await loader.eagerLoadNamespace(CN);
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -403,8 +407,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await loader.doNotEagerLoad("rd1");
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -417,8 +421,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await loader.doNotEagerLoad("rd1");
       await loader.eagerLoadNamespace(CN);
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -431,8 +435,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(Object);
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -445,8 +449,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(await get(CN, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -459,8 +463,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       await loader.doNotEagerLoad("rd1/m");
       await loader.eagerLoadNamespace(await get(await get(CN, "M"), "N"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -476,8 +480,8 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
       const other = await newLoader({ dirs: "b", namespace: CN });
       await other.eagerLoadNamespace(await get(CN, "M"));
 
-      expect(isRequired(files[0])).toBe(false);
-      expect(isRequired(files[1])).toBe(true);
+      expect(!isRequired(files[0])).toBeTruthy();
+      expect(isRequired(files[1])).toBeTruthy();
     });
   });
 
@@ -502,13 +506,13 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
 
       await Loader.eagerLoadNamespace(await get(Object, "M"));
 
-      expect(isRequired(files[0])).toBe(true);
-      expect(isRequired(files[1])).toBe(false);
+      expect(isRequired(files[0])).toBeTruthy();
+      expect(!isRequired(files[1])).toBeTruthy();
 
-      expect(isRequired(files[2])).toBe(true);
-      expect(isRequired(files[3])).toBe(false);
+      expect(isRequired(files[2])).toBeTruthy();
+      expect(!isRequired(files[3])).toBeTruthy();
 
-      expect(isRequired(files[4])).toBe(false);
+      expect(!isRequired(files[4])).toBeTruthy();
     });
   });
 
@@ -517,7 +521,7 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
     await withSetup(loader, files, {}, async () => {
       await newLoader({ setup: false });
       await Loader.eagerLoadNamespace(await get(Object, "M"));
-      expect(isRequired(...files)).toBe(true);
+      expect(isRequired(...files)).toBeTruthy();
     });
   });
 });
