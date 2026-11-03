@@ -72,7 +72,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/** @missingRailsCall parse — PERMANENT */
+/**
+ * @missingRailsCall parse — PERMANENT
+ * @inventedArm import — PERMANENT
+ */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
@@ -140,6 +143,10 @@ export class Engine extends TrailsEngine {
     ];
 
     this.config.eagerLoadNamespaces.push(ActiveStorage);
+
+    this.initializer("active_storage.app", { before: "setup_main_autoloader" }, async () => {
+      await import("./index.js");
+    });
 
     this.initializer("active_storage.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("activeStorage", ActiveStorage.deprecator());

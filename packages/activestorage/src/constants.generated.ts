@@ -53,19 +53,22 @@ import * as m50 from "./previewer/video-previewer.js";
 import * as m51 from "./purge-job.js";
 import * as m52 from "./record.js";
 import * as m53 from "./reflection.js";
-import * as m54 from "./service.js";
-import * as m55 from "./service/configurator.js";
-import * as m56 from "./service/disk-service.js";
-import * as m57 from "./service/mirror-service.js";
-import * as m58 from "./service/registry.js";
-import * as m59 from "./set-blob.js";
-import * as m60 from "./set-current.js";
-import * as m61 from "./streaming.js";
-import * as m62 from "./transform-job.js";
-import * as m63 from "./variant-record.js";
-import * as m64 from "./variant-with-record.js";
-import * as m65 from "./variant.js";
-import * as m66 from "./variation.js";
+import * as m54 from "./representations/base-controller.js";
+import * as m55 from "./representations/proxy-controller.js";
+import * as m56 from "./representations/redirect-controller.js";
+import * as m57 from "./service.js";
+import * as m58 from "./service/configurator.js";
+import * as m59 from "./service/disk-service.js";
+import * as m60 from "./service/mirror-service.js";
+import * as m61 from "./service/registry.js";
+import * as m62 from "./set-blob.js";
+import * as m63 from "./set-current.js";
+import * as m64 from "./streaming.js";
+import * as m65 from "./transform-job.js";
+import * as m66 from "./variant-record.js";
+import * as m67 from "./variant-with-record.js";
+import * as m68 from "./variant.js";
+import * as m69 from "./variation.js";
 
 defineConstants([
   [() => m0.AnalyzeJob, "ActiveStorage::AnalyzeJob"],
@@ -130,20 +133,23 @@ defineConstants([
   [() => m53.HasManyAttachedReflection, "ActiveStorage::Reflection::HasManyAttachedReflection"],
   [() => m53.HasOneAttachedReflection, "ActiveStorage::Reflection::HasOneAttachedReflection"],
   [() => m53.ReflectionExtension, "ActiveStorage::Reflection::ReflectionExtension"],
-  [() => m54.Service, "ActiveStorage::Service"],
-  [() => m55.Configurator, "ActiveStorage::Service::Configurator"],
-  [() => m56.DiskService, "ActiveStorage::Service::DiskService"],
-  [() => m57.MirrorService, "ActiveStorage::Service::MirrorService"],
-  [() => m58.Registry, "ActiveStorage::Service::Registry"],
-  [() => m59.SetBlob, "ActiveStorage::SetBlob"],
-  [() => m60.SetCurrent, "ActiveStorage::SetCurrent"],
-  [() => m61.Streaming, "ActiveStorage::Streaming"],
-  [() => m62.TransformJob, "ActiveStorage::TransformJob"],
+  [() => m54.BaseController, "ActiveStorage::Representations::BaseController"],
+  [() => m55.ProxyController, "ActiveStorage::Representations::ProxyController"],
+  [() => m56.RedirectController, "ActiveStorage::Representations::RedirectController"],
+  [() => m57.Service, "ActiveStorage::Service"],
+  [() => m58.Configurator, "ActiveStorage::Service::Configurator"],
+  [() => m59.DiskService, "ActiveStorage::Service::DiskService"],
+  [() => m60.MirrorService, "ActiveStorage::Service::MirrorService"],
+  [() => m61.Registry, "ActiveStorage::Service::Registry"],
+  [() => m62.SetBlob, "ActiveStorage::SetBlob"],
+  [() => m63.SetCurrent, "ActiveStorage::SetCurrent"],
+  [() => m64.Streaming, "ActiveStorage::Streaming"],
+  [() => m65.TransformJob, "ActiveStorage::TransformJob"],
   [() => m37.UnpreviewableError, "ActiveStorage::UnpreviewableError"],
   [() => m37.UnrepresentableError, "ActiveStorage::UnrepresentableError"],
-  [() => m65.Variant, "ActiveStorage::Variant"],
-  [() => m63.VariantRecord, "ActiveStorage::VariantRecord"],
-  [() => m64.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
-  [() => m66.Variation, "ActiveStorage::Variation"],
+  [() => m68.Variant, "ActiveStorage::Variant"],
+  [() => m66.VariantRecord, "ActiveStorage::VariantRecord"],
+  [() => m67.VariantWithRecord, "ActiveStorage::VariantWithRecord"],
+  [() => m69.Variation, "ActiveStorage::Variation"],
   [() => m41.VERSION, "ActiveStorage::VERSION"],
 ]);
