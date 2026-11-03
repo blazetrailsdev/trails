@@ -1,8 +1,11 @@
 import { StandardError, Timeout, TopLevel } from "@blazetrails/ruby-compat";
-import type { SMTPAuthenticationError } from "./smtp.js";
+import type { SMTP, SMTPAuthenticationError } from "./smtp.js";
 
 /** @noRailsEquivalent PERMANENT */
-export const Net: { SMTPAuthenticationError?: typeof SMTPAuthenticationError } = {};
+export const Net: {
+  SMTP?: typeof SMTP;
+  SMTPAuthenticationError?: typeof SMTPAuthenticationError;
+} = {};
 TopLevel.Net = Net;
 
 declare module "@blazetrails/ruby-compat" {

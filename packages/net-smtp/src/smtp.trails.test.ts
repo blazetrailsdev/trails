@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { createServer } from "node:net";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
+import { constGet } from "@blazetrails/ruby-compat";
 import { ReadTimeout } from "./protocol.js";
-import { SMTP, SMTPFatalError } from "./smtp.js";
+import { SMTP, SMTPAuthenticationError, SMTPFatalError } from "./smtp.js";
 
 const servers: SMTPServer[] = [];
 
@@ -162,5 +163,12 @@ describe("SMTP (trails)", () => {
       smtp.sendMessage("message", "a@example.com", "ok@example.com", "bad@example.com"),
     ).rejects.toBeInstanceOf(SMTPFatalError);
     expect(delivered).toBe(false);
+  });
+});
+
+describe("Net seat", () => {
+  it("walks Net::SMTP from the top level", () => {
+    expect(constGet(Object, "Net::SMTP")).toBe(SMTP);
+    expect(constGet(Object, "Net::SMTPAuthenticationError")).toBe(SMTPAuthenticationError);
   });
 });
