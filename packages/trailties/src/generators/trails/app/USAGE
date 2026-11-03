@@ -1,0 +1,24 @@
+Description:
+    The `trails new` command creates a new Trails application with a default
+    directory structure and configuration at the path you specify.
+
+    You can specify extra command-line arguments to be used every time
+    `trails new` runs in the .trailsrc configuration file in your home directory,
+    or in $XDG_CONFIG_HOME/trails/trailsrc if XDG_CONFIG_HOME is set.
+
+    Note that the arguments specified in the .trailsrc file don't affect the
+    default values shown above in this help message.
+
+Examples:
+    `trails new ~/Code/TypeScript/weblog`
+
+    This generates a new Trails app in ~/Code/TypeScript/weblog.
+
+    `trails new weblog --api`
+
+    This generates a new Trails app in API mode in ./weblog.
+
+    `trails new weblog --skip-action-mailer`
+
+    This generates a new Trails app without Action Mailer in ./weblog.
+    Any part of Trails can be skipped during app generation.

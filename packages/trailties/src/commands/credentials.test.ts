@@ -17,7 +17,7 @@ function assertNoFile(relative: string): void {
 
 describe("Trails::Command::CredentialsTest", () => {
   let appPath: string, cwd: string, output: string[];
-  const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR };
+  const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR, TRAILS_ENV: env.TRAILS_ENV };
 
   const run = async (command: string, args: string[] = []): Promise<string> => {
     output = [];
@@ -41,17 +41,14 @@ describe("Trails::Command::CredentialsTest", () => {
     const config = {
       root: appPath,
       get credentials() {
-        return new InheritableOptions(
-          File.isExist("config/credentials/production.yml.enc")
-            ? {
-                contentPath: `${appPath}/config/credentials/production.yml.enc`,
-                keyPath: `${appPath}/config/credentials/production.key`,
-              }
-            : {
-                contentPath: `${appPath}/config/credentials.yml.enc`,
-                keyPath: `${appPath}/config/master.key`,
-              },
-        );
+        let contentPath = `config/credentials/${env.TRAILS_ENV}.yml.enc`;
+        if (!File.isExist(contentPath)) contentPath = "config/credentials.yml.enc";
+        let keyPath = `config/credentials/${env.TRAILS_ENV}.key`;
+        if (!File.isExist(keyPath)) keyPath = "config/master.key";
+        return new InheritableOptions({
+          contentPath: `${appPath}/${contentPath}`,
+          keyPath: `${appPath}/${keyPath}`,
+        });
       },
     };
     vi.spyOn(Trails, "application", "get").mockReturnValue({
@@ -74,6 +71,7 @@ describe("Trails::Command::CredentialsTest", () => {
     vi.restoreAllMocks();
     setEnv("VISUAL", saved.VISUAL);
     setEnv("EDITOR", saved.EDITOR);
+    setEnv("TRAILS_ENV", saved.TRAILS_ENV);
     Dir.chdir(cwd);
     FileUtils.rmRf(appPath);
   });

@@ -1,3 +1,4 @@
+import "./constants.command.generated.js";
 import { Trails } from "./trails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";

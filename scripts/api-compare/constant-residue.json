@@ -1071,7 +1071,7 @@
     }
   },
   "trailties": {
-    "rows": 63,
+    "rows": 65,
     "excluded": [
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
@@ -1097,6 +1097,8 @@
       "autoloaders.ts::Autoloaders": "Trails::Autoloaders",
       "autoloaders/inflector.ts::Inflector": "Trails::Autoloaders::Inflector",
       "backtrace-cleaner.ts::BacktraceCleaner": "Trails::BacktraceCleaner",
+      "command.ts::CorrectableNameError": "Trails::Command::CorrectableNameError",
+      "command.ts::UnrecognizedCommandError": "Trails::Command::UnrecognizedCommandError",
       "commands/console.ts::Console": "Trails::Console",
       "commands/console.ts::ConsoleCommand": "Trails::Command::ConsoleCommand",
       "commands/console/irb-console.ts::IRBConsole": "Trails::Console::IRBConsole",

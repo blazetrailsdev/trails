@@ -205,7 +205,9 @@ describe("Trails::Command::ServerTest", () => {
 
   it("test_using_server_mistype", () => {
     const output = suggestion("tin");
-    expect(output).toMatch(/Could not find server 'tin'\. \(.*CorrectableNameError\)/);
+    expect(output).toMatch(
+      /Could not find server 'tin'\. \(Trails::Command::CorrectableNameError\)/,
+    );
     expect(output).toContain("Did you mean?  thin");
   });
 

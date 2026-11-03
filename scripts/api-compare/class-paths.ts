@@ -53,7 +53,7 @@ const SUBPATH_ENTRIES: Record<string, string> = {
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
 
 /** A directory whose files load one at a time, so each carries its own table and loads no sibling. */
-const LAZY_DIRS: Record<string, string> = { trailties: "commands/" };
+const LAZY_DIRS: Record<string, string[]> = { trailties: ["commands/", "command.ts"] };
 
 function separateTable(subpath: string): string {
   return `constants.${path.basename(subpath, ".ts")}.generated.ts`;
@@ -188,7 +188,10 @@ async function placement(dir: string) {
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
     const rel = path.join("src", file);
     const separated = !reachable.has(file) && separateGraph.has(file);
-    const lazy = lazyOk && !reachable.has(file) && file.startsWith(LAZY_DIRS[dir] ?? "\0");
+    const lazy =
+      lazyOk &&
+      !reachable.has(file) &&
+      (LAZY_DIRS[dir] ?? []).some((prefix) => file.startsWith(prefix));
     const ownTable =
       excluded.includes(rel) ||
       separated ||
@@ -505,11 +508,11 @@ async function lazyTablesOnDisk(dir: string): Promise<string[]> {
 
 /** A lazy file is outside the entry graph, so only its own import loads its table. */
 async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Promise<string[]> {
-  const prefix = LAZY_DIRS[dir];
-  if (prefix === undefined) return [];
+  const prefixes = LAZY_DIRS[dir];
+  if (prefixes === undefined) return [];
   const missing = new Set<string>();
   for (const { file, table } of entries) {
-    if (!table || !file.startsWith(prefix)) continue;
+    if (!table || !prefixes.some((prefix) => file.startsWith(prefix))) continue;
     const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
     if (!source.includes(`/${table.replace(/\.ts$/, ".js")}"`)) missing.add(file);
   }
