@@ -3,7 +3,12 @@ import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { createMigration, migrationTemplate, type MigrationTemplateHost } from "../../migration.js";
-import { nextMigrationNumber } from "../migration.js";
+import {
+  configuredMigratePath,
+  dbMigratePath,
+  defaultMigratePath,
+  nextMigrationNumber,
+} from "../migration.js";
 import { GeneratedAttribute } from "../../generated-attribute.js";
 import {
   camelize,
@@ -16,6 +21,7 @@ import {
 export interface MigrationGeneratorOptions extends GeneratorOptions {
   timestamps?: boolean;
   primaryKeyType?: string;
+  database?: string;
   [key: string]: unknown;
 }
 
@@ -41,6 +47,11 @@ export class MigrationGenerator extends NamedBase {
 
     this.classOption("timestamps", { type: "boolean" });
     this.classOption("primaryKeyType", { type: "string", desc: "The type for primary key" });
+    this.classOption("database", {
+      type: "string",
+      aliases: ["--db"],
+      desc: "The database for your migration. By default, the current environment's primary database is used.",
+    });
 
     this.methodAdded("createMigrationFile");
   }
@@ -55,6 +66,9 @@ export class MigrationGenerator extends NamedBase {
 
   private migrationTemplate = "migration.ts";
   createMigration = createMigration;
+  dbMigratePath = dbMigratePath;
+  defaultMigratePath = defaultMigratePath;
+  configuredMigratePath = configuredMigratePath;
   private migrationAction: string | undefined;
   private joinTables: string[] = [];
 
@@ -74,7 +88,7 @@ export class MigrationGenerator extends NamedBase {
         erb.filename = source;
         return erb.result(rbFBinding(this));
       },
-      File.join("db/migrate", `${underscore(name)}${this.ext()}`),
+      File.join(this.dbMigratePath(), `${underscore(name)}${this.ext()}`),
     );
   }
 

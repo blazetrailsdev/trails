@@ -1,7 +1,8 @@
+import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { MigrationGenerator } from "../migration/migration-generator.js";
-import { camelize, classify } from "@blazetrails/activesupport";
+import { camelize, classify, underscore } from "@blazetrails/activesupport";
 
 export interface ModelGeneratorOptions extends GeneratorOptions {
   migration?: boolean;
@@ -9,6 +10,7 @@ export interface ModelGeneratorOptions extends GeneratorOptions {
   parent?: string;
   indexes?: boolean;
   primaryKeyType?: string;
+  database?: string;
 }
 
 export class ModelGenerator extends NamedBase {
@@ -56,6 +58,7 @@ export class ModelGenerator extends NamedBase {
   }
 
   async createModelFile(): Promise<void> {
+    if (this.database() != null && !this.isCustomParent()) await this.generateAbstractClass();
     const regularClassPath = this.regularClassPath();
     const className = camelize(this.fileName);
     const fileName = dasherize(this.filePath());
@@ -129,11 +132,36 @@ ${staticBlock}}
   }
 
   private isSkipMigrationCreation(): boolean {
-    return this.isCustomParent() || !this.migration();
+    return (this.isCustomParent() && this.database() == null) || !this.migration();
   }
 
   private parentClassName(): string {
-    return this.parent();
+    if (this.isCustomParent()) {
+      return this.parent();
+    } else if (this.database() != null) {
+      return this.abstractClassName();
+    } else {
+      return this.parent();
+    }
+  }
+
+  /** @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing */
+  private async generateAbstractClass(): Promise<void> {
+    const path = File.join(
+      "app/models",
+      `${dasherize(underscore(this.database()!))}-record${this.ext()}`,
+    );
+    if (await File.isExistAsync(path)) return;
+
+    await this.template("abstract_base_class.ts", path);
+  }
+
+  private abstractClassName(): string {
+    return `${camelize(this.database()!)}Record`;
+  }
+
+  private database(): string | undefined {
+    return this.options.database;
   }
 
   private parent(): string {
@@ -165,4 +193,9 @@ ModelGenerator.classOption("indexes", {
   desc: "Add indexes for references and belongs_to columns",
 });
 ModelGenerator.classOption("primaryKeyType", { type: "string", desc: "The type for primary key" });
+ModelGenerator.classOption("database", {
+  type: "string",
+  aliases: ["--db"],
+  desc: "The database for your model's migration. By default, the current environment's primary database is used.",
+});
 ModelGenerator.hookFor("testFramework");
