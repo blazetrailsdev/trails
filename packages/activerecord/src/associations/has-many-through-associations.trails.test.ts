@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base, RecordInvalid } from "../index.js";
@@ -149,6 +150,7 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "IrpvTagging", IrpvTagging);
+    DescendantsTracker.registerSubclass(Base, IrpvTagging);
 
     const post = await Post.create({ title: "Test", body: "" });
     const tag = await Tag.create({ name: "testjoin" });
@@ -163,6 +165,7 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "IrpvPost", IrpvPost);
+    DescendantsTracker.registerSubclass(Base, IrpvPost);
 
     const irpvPost = await IrpvPost.find(post.id);
     const assoc = irpvPost.association("irpvTags") as CollectionAssociation;

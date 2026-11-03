@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -72,8 +73,11 @@ describe("disable_joins shapes the deleted routing gate rejected", () => {
       t.string("name");
     });
     constSet(TopLevel, "RjAuthor", RjAuthor);
+    DescendantsTracker.registerSubclass(Base, RjAuthor);
     constSet(TopLevel, "RjComment", RjComment);
+    DescendantsTracker.registerSubclass(Base, RjComment);
     constSet(TopLevel, "RjMember", RjMember);
+    DescendantsTracker.registerSubclass(Base, RjMember);
   });
 
   afterAll(async () => {

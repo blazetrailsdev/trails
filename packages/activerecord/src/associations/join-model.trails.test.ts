@@ -57,7 +57,9 @@ describe("AssociationsJoinModelTest", () => {
   constSet(TopLevel, "Rating", Rating);
   constSet(TopLevel, "CpkOrder", CpkOrder);
   constSet(TopLevel, "WelcomeOnlyTagging", WelcomeOnlyTagging);
+  DescendantsTracker.registerSubclass(Base, WelcomeOnlyTagging);
   constSet(TopLevel, "ScopedSourceTag", ScopedSourceTag);
+  DescendantsTracker.registerSubclass(Base, ScopedSourceTag);
 
   it("has many polymorphic with source type merges source reflection scope", async () => {
     const general = await ScopedSourceTag.find(tags("general").id);

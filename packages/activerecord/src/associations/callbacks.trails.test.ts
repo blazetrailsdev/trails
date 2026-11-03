@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "./collection-association.js";
 import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
@@ -38,6 +39,7 @@ describe("association callbacks — object callbacks (trails)", () => {
       }
     }
     constSet(TopLevel, "ObjectCbAuthor", ObjectCbAuthor);
+    DescendantsTracker.registerSubclass(Base, ObjectCbAuthor);
 
     const author = await ObjectCbAuthor.create({ name: "David" });
     const proxy = (author.association("posts") as CollectionAssociation).reader;
@@ -65,6 +67,7 @@ function makeAuthorWithCallbacks(
     }
   }
   constSet(TopLevel, `TrailsAuthorWithCallbacks${idx}`, CbAuthor);
+  DescendantsTracker.registerSubclass(Base, CbAuthor);
   return { Author: CbAuthor, Post };
 }
 

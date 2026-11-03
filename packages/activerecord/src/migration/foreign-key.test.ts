@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { StandardError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -78,7 +79,9 @@ class Astronaut extends Base {
 }
 
 constSet(TopLevel, "Rocket", Rocket);
+DescendantsTracker.registerSubclass(Base, Rocket);
 constSet(TopLevel, "Astronaut", Astronaut);
+DescendantsTracker.registerSubclass(Base, Astronaut);
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {

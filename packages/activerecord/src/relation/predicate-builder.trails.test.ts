@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType, ValueType } from "@blazetrails/activemodel";
@@ -381,6 +382,7 @@ describe("PredicateBuilder hash building and bind handling", () => {
     beforeAll(() => {
       constSet(TopLevel, "Author", Author);
       constSet(TopLevel, "Post", PbTestPost);
+      DescendantsTracker.registerSubclass(Base, PbTestPost);
     });
 
     afterAll(() => {

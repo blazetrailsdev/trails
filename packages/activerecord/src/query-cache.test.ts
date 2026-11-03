@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -798,6 +799,7 @@ describe("QueryCacheMutableParamTest", () => {
     }
   }
   constSet(TopLevel, "JsonObj", JsonObj);
+  DescendantsTracker.registerSubclass(Base, JsonObj);
 
   beforeEach(async () => {
     const columnType =

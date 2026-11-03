@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
@@ -30,9 +31,13 @@ class Distinct extends Base {
   static tableName = "distinct";
 }
 constSet(TopLevel, "Group", Group);
+DescendantsTracker.registerSubclass(Base, Group);
 constSet(TopLevel, "Select", Select);
+DescendantsTracker.registerSubclass(Base, Select);
 constSet(TopLevel, "Values", Values);
+DescendantsTracker.registerSubclass(Base, Values);
 constSet(TopLevel, "Distinct", Distinct);
+DescendantsTracker.registerSubclass(Base, Distinct);
 Associations.belongsTo.call(Group, "select");
 Associations.hasOne.call(Group, "values");
 Associations.hasMany.call(Select, "groups");

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { TypeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
@@ -210,7 +211,9 @@ describe("where-hash key resolves to the referenced join alias", () => {
   HaToy.attribute("name", "string");
   HaToy.attribute("pet_id", "integer");
   constSet(TopLevel, "HaPet", HaPet);
+  DescendantsTracker.registerSubclass(Base, HaPet);
   constSet(TopLevel, "HaToy", HaToy);
+  DescendantsTracker.registerSubclass(Base, HaToy);
 
   it("aliases the JOIN to the reference name and binds the WHERE to it", () => {
     const sql = (HaPet as any)

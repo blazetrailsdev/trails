@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
@@ -163,8 +164,11 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "CJDAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "CJDPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     constSet(TopLevel, "CJDComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     const sql = Author.all().leftJoins([":posts", ":comments"]).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
@@ -191,8 +195,11 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "HashAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "HashPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     constSet(TopLevel, "HashComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     const sql = Author.all().leftJoins({ ":posts": ":comments" }).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
@@ -229,7 +236,9 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "LeftJoinAuthor2", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "LeftJoinPost2", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.leftJoins(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
@@ -250,7 +259,9 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "LazyRaiseAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "LazyRaisePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.leftJoins(5 as any);
     expect((rel as any).leftOuterJoinsValues).toContain(5);
@@ -271,7 +282,9 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "RefLeftAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "RefLeftPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.all().includes(":posts").references("posts").leftJoins(":posts");
     const sqlStr = rel.toSql();
@@ -293,7 +306,9 @@ describe("RelationTest", () => {
       }
     }
     constSet(TopLevel, "EagerLeftAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "EagerLeftPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     const rel = Author.leftJoins(":posts").eagerLoad(":posts");
     expect((rel as any).eagerLoadValues).toContain(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
@@ -494,7 +509,9 @@ describe("Relation#arel build_arel convergence", () => {
   fixtures([]);
   beforeAll(() => {
     constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
     constSet(TopLevel, "Gadget", Gadget);
+    DescendantsTracker.registerSubclass(Base, Gadget);
   });
 
   class Widget extends Base {

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
@@ -34,8 +35,11 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   beforeAll(() => {
     constSet(TopLevel, "CpcAuthor", CpcAuthor);
+    DescendantsTracker.registerSubclass(Base, CpcAuthor);
     constSet(TopLevel, "CpcPost", CpcPost);
+    DescendantsTracker.registerSubclass(Base, CpcPost);
     constSet(TopLevel, "CpcComment", CpcComment);
+    DescendantsTracker.registerSubclass(Base, CpcComment);
     (CpcAuthor as any)._reflections = {};
     (CpcPost as any)._reflections = {};
     (CpcComment as any)._reflections = {};

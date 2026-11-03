@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 
@@ -27,7 +28,9 @@ class BigIntCpkComment extends Base {
 
 describe("belongs_to composite-FK staleState with a BigInt component", () => {
   constSet(TopLevel, "BigIntCpkBlogPost", BigIntCpkBlogPost);
+  DescendantsTracker.registerSubclass(Base, BigIntCpkBlogPost);
   constSet(TopLevel, "BigIntCpkComment", BigIntCpkComment);
+  DescendantsTracker.registerSubclass(Base, BigIntCpkComment);
 
   it("serializes a BigInt FK component without throwing", () => {
     const comment = new BigIntCpkComment({ blog_id: 1, blog_post_id: 9007199254740993n });

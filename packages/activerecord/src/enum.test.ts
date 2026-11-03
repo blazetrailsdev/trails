@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range } from "./index.js";
@@ -604,6 +605,7 @@ describe("EnumTest", () => {
       }
     }
     constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
     await (Klass as any).deleteAll();
     await Klass.createBang({ status: "proposed" });
     const book = new Klass({ status: "written" }) as any;
@@ -719,6 +721,7 @@ describe("EnumTest", () => {
       }
     }
     constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     let record: any = await (Klass as any).proposed().create();
     expect(record.isProposed()).toBeTruthy();
@@ -1026,6 +1029,7 @@ describe("EnumTest", () => {
       }
     }
     constSet(TopLevel, "K", K);
+    DescendantsTracker.registerSubclass(Base, K);
     const b = await K.create({ status: 0 });
     expect((b as any).status).toBe("proposed");
     expect((b as any).isProposed()).toBeTruthy();

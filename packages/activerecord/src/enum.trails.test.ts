@@ -546,6 +546,7 @@ describe("Enum declared on an attribute with no column type", () => {
       }
     }
     constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     await expect(Klass.create({ status: "written" })).rejects.toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
@@ -568,6 +569,7 @@ describe("Enum declared on an attribute with no column type", () => {
       }
     }
     constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     expect(() => Klass.typeForAttribute("nullable_status")).not.toThrow();
     expect(() => new Klass().isSingle()).not.toThrow();

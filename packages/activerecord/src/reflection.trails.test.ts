@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "./test-helpers/models/admin.js";
 import { describe, it, expect } from "vitest";
 import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
@@ -34,7 +35,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "NsTagB", NsTagB);
+    DescendantsTracker.registerSubclass(Base, NsTagB);
     constSet(TopLevel, "NsPostB", NsPostB);
+    DescendantsTracker.registerSubclass(Base, NsPostB);
     const fn = function namedFactory() {
       return "NsPostB";
     };
@@ -60,7 +63,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "HostA", HostA);
+    DescendantsTracker.registerSubclass(Base, HostA);
     constSet(TopLevel, "TargetA", TargetA);
+    DescendantsTracker.registerSubclass(Base, TargetA);
     const fn = function namedFactory() {
       return "TargetA";
     };
@@ -84,6 +89,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "User", TopUser);
+    DescendantsTracker.registerSubclass(Base, TopUser);
     constSet(Admin, "User", NsAdminUser);
     const ref = reflectOnAssociation(NsAdminUser, "user");
     expect(ref!.klass).toBe(TopUser);
@@ -104,11 +110,14 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "ShStableOwner", ShStableOwner);
+    DescendantsTracker.registerSubclass(Base, ShStableOwner);
     constSet(TopLevel, "ShStableTarget", ShStableTarget);
+    DescendantsTracker.registerSubclass(Base, ShStableTarget);
 
     const ref = reflectOnAssociation(ShStableOwner, "shStableTargets")!;
     expect(ref.klass).toBe(ShStableTarget);
     constSet(TopLevel, "ShStableTarget", ShStableTarget);
+    DescendantsTracker.registerSubclass(Base, ShStableTarget);
     expect(ref.klass).toBe(ShStableTarget);
   });
 
@@ -131,6 +140,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "NilNameOwner", NilNameOwner);
+    DescendantsTracker.registerSubclass(Base, NilNameOwner);
     const reflection = create("hasMany", null, null, {}, NilNameOwner);
     expect(reflection.name).toBeNull();
     expect(reflection.pluralName).toBe("");
@@ -143,6 +153,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "NilDerivOwner", NilDerivOwner);
+    DescendantsTracker.registerSubclass(Base, NilDerivOwner);
 
     const hasMany = create("hasMany", null, null, {}, NilDerivOwner);
     expect(hasMany.className).toBe("");
@@ -162,6 +173,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "NilThroughOwner", NilThroughOwner);
+    DescendantsTracker.registerSubclass(Base, NilThroughOwner);
 
     const through = create(
       "hasMany",
@@ -186,7 +198,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "PluralOwner", PluralOwner);
+    DescendantsTracker.registerSubclass(Base, PluralOwner);
     constSet(TopLevel, "SingularOwner", SingularOwner);
+    DescendantsTracker.registerSubclass(Base, SingularOwner);
     expect(create("hasMany", "comment", null, {}, PluralOwner).pluralName).toBe("comments");
     expect(create("hasMany", "comment", null, {}, SingularOwner).pluralName).toBe("comment");
   });
@@ -217,6 +231,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "NeMember", NeMember);
+    DescendantsTracker.registerSubclass(Base, NeMember);
 
     const ref = reflectOnAssociation(NeMember, "neClubs") as ThroughReflection;
     expect(() => ref.sourceReflectionName()).toThrow(
@@ -242,6 +257,7 @@ describe("Reflection.create", () => {
   it("raises Unsupported Macro for a macro reflection_class_for has no case for", () => {
     class Widget extends Base {}
     constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
 
     expect(() => create("hasAndBelongsToMany" as never, "gadgets", null, {}, Widget)).toThrow(
       new RuntimeError("Unsupported Macro: hasAndBelongsToMany"),
@@ -258,6 +274,7 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
       }
     }
     constSet(TopLevel, "NsrPost", NsrPost);
+    DescendantsTracker.registerSubclass(Base, NsrPost);
     const ref = reflectOnAssociation(NsrPost, "nsrTags") as ThroughReflection;
     Object.defineProperty(ref, "sourceReflection", { value: null });
 
@@ -280,6 +297,7 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
       }
     }
     constSet(TopLevel, "NsrAuthor", NsrAuthor);
+    DescendantsTracker.registerSubclass(Base, NsrAuthor);
     const ref = reflectOnAssociation(NsrAuthor, "nsrComments") as ThroughReflection;
     Object.defineProperty(ref, "sourceReflection", { value: null });
 

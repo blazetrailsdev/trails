@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
@@ -27,6 +28,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
 
   beforeAll(() => {
     constSet(TopLevel, "AtComment", AtComment);
+    DescendantsTracker.registerSubclass(Base, AtComment);
   });
 
   it("AliasTracker: bare table on first visit, aliased on repeat, thunk only invoked on repeat", () => {

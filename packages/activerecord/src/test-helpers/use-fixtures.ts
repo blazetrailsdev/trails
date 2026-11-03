@@ -5,6 +5,7 @@ import {
   StandardError,
   rbClassInheritedP,
   constSet,
+  rbModName,
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
@@ -145,13 +146,15 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
     if ("addOn" in entry) await entry.addOn?.();
     const resolved = await entry.model();
     const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
-    for (const model of models) constSet(TopLevel, model.name, model);
+    for (const model of models) {
+      if (!rbModName(model)?.includes("::")) constSet(TopLevel, model.name, model);
+    }
     classNames[fsName] = models[0];
   }
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
     if (typeof model === "function" && rbClassInheritedP(model, Base) === true) {
-      constSet(TopLevel, model.name, model);
+      if (!rbModName(model)?.includes("::")) constSet(TopLevel, model.name, model);
     }
   }
 }

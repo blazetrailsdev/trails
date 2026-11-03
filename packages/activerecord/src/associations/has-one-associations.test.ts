@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Marshal, kernelThrow, rbFSend, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
@@ -158,8 +159,11 @@ describe("HasOneAssociationsTest", () => {
     constSet(TopLevel, "Room", Room);
     constSet(TopLevel, "User", User);
     constSet(TopLevel, "SpecialBook", SpecialBook);
+    DescendantsTracker.registerSubclass(Base, SpecialBook);
     constSet(TopLevel, "SpecialAuthor", SpecialAuthor);
+    DescendantsTracker.registerSubclass(Base, SpecialAuthor);
     constSet(TopLevel, "SpecialSubscription", SpecialSubscription);
+    DescendantsTracker.registerSubclass(Base, SpecialSubscription);
     constSet(TopLevel, "Image", Image);
     constSet(TopLevel, "Department", Department);
     constSet(TopLevel, "Chef", Chef);
@@ -175,7 +179,9 @@ describe("HasOneAssociationsTest", () => {
     constSet(TopLevel, "CpkBrokenOrderWithNonCpkBooks", CpkBrokenOrderWithNonCpkBooks);
     constSet(TopLevel, "CpkNonCpkBook", CpkNonCpkBook);
     constSet(TopLevel, "SpecialCar", SpecialCar);
+    DescendantsTracker.registerSubclass(Base, SpecialCar);
     constSet(TopLevel, "SpecialBulb", SpecialBulb);
+    DescendantsTracker.registerSubclass(Base, SpecialBulb);
     constSet(TopLevel, "Club", Club);
     constSet(TopLevel, "Membership", Membership);
     constSet(
@@ -1112,7 +1118,9 @@ describe("HasOneAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "DestroyByParentBook", DestroyByParentBook);
+    DescendantsTracker.registerSubclass(Base, DestroyByParentBook);
     constSet(TopLevel, "DestroyByParentAuthor", DestroyByParentAuthor);
+    DescendantsTracker.registerSubclass(Base, DestroyByParentAuthor);
     const author = await DestroyByParentAuthor.create({ name: "Test" });
     const book = await (DestroyByParentBook as any).create({ author });
     await author.destroy();
@@ -1141,7 +1149,9 @@ describe("HasOneAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "DbaReplBook", DbaReplBook);
+    DescendantsTracker.registerSubclass(Base, DbaReplBook);
     constSet(TopLevel, "DbaReplAuthor", DbaReplAuthor);
+    DescendantsTracker.registerSubclass(Base, DbaReplAuthor);
     const author = await DbaReplAuthor.create({ name: "Test" });
     const book = await (DbaReplBook as any).create({ author });
     await (author.association("book") as any).loadTarget();
@@ -1172,7 +1182,9 @@ describe("HasOneAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "UndestroyableBook", UndestroyableBook);
+    DescendantsTracker.registerSubclass(Base, UndestroyableBook);
     constSet(TopLevel, "DestroyableAuthor", DestroyableAuthor);
+    DescendantsTracker.registerSubclass(Base, DestroyableAuthor);
     const author = await DestroyableAuthor.create({ name: "Test" });
     await (UndestroyableBook as any).create({ author });
     await assertNoDifference(

@@ -623,6 +623,7 @@ describe("InheritanceAttributeTest", () => {
   }
 
   constSet(TopLevel, "AttrTestCompany", AttrTestCompany);
+  DescendantsTracker.registerSubclass(Base, AttrTestCompany);
   constSet(TopLevel, "AttrTestStartup", AttrTestStartup);
   DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestStartup);
   constSet(TopLevel, "AttrTestEmpire", AttrTestEmpire);
@@ -687,6 +688,7 @@ describe("InheritanceAttributeMappingTest", () => {
   }
 
   constSet(TopLevel, "IamtCompany", IamtCompany);
+  DescendantsTracker.registerSubclass(Base, IamtCompany);
   constSet(TopLevel, "IamtStartup", IamtStartup);
   DescendantsTracker.registerSubclass(IamtCompany, IamtStartup);
   constSet(TopLevel, "IamtEmpire", IamtEmpire);
@@ -710,6 +712,7 @@ describe("InheritanceAttributeMappingTest", () => {
     set sponsorable(value: Base | null);
   }
   constSet(TopLevel, "IamtSponsor", IamtSponsor);
+  DescendantsTracker.registerSubclass(Base, IamtSponsor);
 
   beforeEach(async () => {
     await IamtCompany.deleteAll();

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
@@ -1326,6 +1327,7 @@ describe("OverridingAssociationsTest", () => {
 
   class DifferentPerson extends Base {}
   constSet(TopLevel, "DifferentPerson", DifferentPerson);
+  DescendantsTracker.registerSubclass(Base, DifferentPerson);
 
   class PeopleList extends Base {
     static {

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, RecordNotFound, REJECT_ALL_BLANK_PROC, TooManyRecords } from "./index.js";
@@ -1590,6 +1591,7 @@ describe("TestNestedAttributesWithExtend", () => {
       }
     }
     constSet(TopLevel, "SuperPirate", SuperPirate);
+    DescendantsTracker.registerSubclass(Base, SuperPirate);
 
     const pirate = await SuperPirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",

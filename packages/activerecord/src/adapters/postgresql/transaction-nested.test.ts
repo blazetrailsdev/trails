@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport";
@@ -23,7 +24,9 @@ class Bit extends Base {
   }
 }
 constSet(TopLevel, "Sample", Sample);
+DescendantsTracker.registerSubclass(Base, Sample);
 constSet(TopLevel, "Bit", Bit);
+DescendantsTracker.registerSubclass(Base, Bit);
 
 function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   let count = 0;

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, registerConstant, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
@@ -457,7 +458,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     }
     constSet(TopLevel, "UuidPostInverse", UuidPost);
+    DescendantsTracker.registerSubclass(Base, UuidPost);
     constSet(TopLevel, "UuidCommentInverse", UuidComment);
+    DescendantsTracker.registerSubclass(Base, UuidComment);
 
     beforeEach(async () => {
       await adapter.transaction(async () => {

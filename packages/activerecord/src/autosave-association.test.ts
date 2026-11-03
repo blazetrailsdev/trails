@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
@@ -1546,7 +1547,9 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
       }
     }
     constSet(TopLevel, "BelongsToAutosaveAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "BelongsToAutosavePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       autosave: true,
       className: "BelongsToAutosaveAuthor",
@@ -1773,6 +1776,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     constSet(TopLevel, "Post", CanonicalPost);
     constSet(TopLevel, "Comment", CanonicalComment);
     constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
   });
 
   let ship: any;
@@ -1990,7 +1994,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       }
     }
     constSet(TopLevel, `${seed}Parent`, Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
     constSet(TopLevel, `${seed}Child`, Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {
@@ -2409,6 +2415,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     constSet(TopLevel, "PostWithAfterCreateCallback", PostWithAfterCreateCallback);
     constSet(TopLevel, "Comment", CanonicalComment);
     constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "Category", CanonicalCategory);
   });
   it("autosave new record on belongs to can be disabled per relationship", async () => {
@@ -2498,6 +2505,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
     constSet(TopLevel, "Pirate", CanonicalPirate);
     constSet(TopLevel, "Bird", CanonicalBird);
     constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "Book", Book);
     constSet(TopLevel, "PublishedBook", PublishedBook);
     constSet(TopLevel, "FamousPirate", FamousPirate);
@@ -2665,6 +2673,7 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
     constSet(TopLevel, "Member", Member);
     constSet(TopLevel, "MemberDetail", MemberDetail);
     constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "Post", CanonicalPost);
     constSet(TopLevel, "Comment", CanonicalComment);
     constSet(TopLevel, "FirstPost", FirstPost);
@@ -2781,7 +2790,9 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
       set post(value: Post | null);
     }
     constSet(TopLevel, "AscbInversePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     constSet(TopLevel, "AscbPostComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     return { Post, Comment };
   }
 
@@ -2803,6 +2814,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
     constSet(TopLevel, "Translation", Translation);
     constSet(TopLevel, "Attachment", Attachment);
     constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
   });
 
   it("should not raise error", async () => {

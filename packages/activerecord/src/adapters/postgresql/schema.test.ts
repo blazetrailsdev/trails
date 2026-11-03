@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   StringIO,
@@ -80,7 +81,9 @@ function makeSongAlbumModels(): {
     }
   }
   constSet(TopLevel, "Song", Song);
+  DescendantsTracker.registerSubclass(Base, Song);
   constSet(TopLevel, "Album", Album);
+  DescendantsTracker.registerSubclass(Base, Album);
   return {
     Song: Song as unknown as ModelCtor,
     Album: Album as unknown as ModelCtor,

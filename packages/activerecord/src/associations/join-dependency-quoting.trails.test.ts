@@ -44,7 +44,9 @@ describe("JoinDependency Arel node construction", () => {
     (Owner as any)._reflections = {};
     (Asset as any)._reflections = {};
     constSet(TopLevel, "Owner", Owner);
+    DescendantsTracker.registerSubclass(Base, Owner);
     constSet(TopLevel, "Asset", Asset);
+    DescendantsTracker.registerSubclass(Base, Asset);
   });
 
   it("emits OuterJoin with polymorphic :as type predicate as Nodes.And", () => {
@@ -90,6 +92,7 @@ describe("JoinDependency Arel node construction", () => {
     (StiOwner as any)._reflections = {};
     (StiSubOwner as any)._reflections = {};
     constSet(TopLevel, "StiOwner", StiOwner);
+    DescendantsTracker.registerSubclass(Base, StiOwner);
     constSet(TopLevel, "StiSubOwner", StiSubOwner);
     DescendantsTracker.registerSubclass(StiOwner, StiSubOwner);
 
@@ -121,6 +124,7 @@ describe("JoinDependency Arel node construction", () => {
       }
     }
     constSet(TopLevel, "ClientOwner", ClientOwner);
+    DescendantsTracker.registerSubclass(Base, ClientOwner);
 
     const jd = new JoinDependency(ClientOwner, ClientOwner.arelTable, "clients", Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
@@ -204,6 +208,7 @@ describe("JoinDependency Arel node construction", () => {
     }
     (Comment as any)._reflections = {};
     constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
 
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     Associations.hasMany.call(Asset, "comments", { className: "Comment", foreignKey: "asset_id" });

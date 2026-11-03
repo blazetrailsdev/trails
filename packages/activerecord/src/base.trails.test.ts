@@ -126,6 +126,7 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
     ScopeStiVehicle.inheritanceColumn = "type";
     class ScopeStiCar extends ScopeStiVehicle {}
     constSet(TopLevel, "ScopeStiVehicle", ScopeStiVehicle);
+    DescendantsTracker.registerSubclass(Base, ScopeStiVehicle);
     constSet(TopLevel, "ScopeStiCar", ScopeStiCar);
     DescendantsTracker.registerSubclass(ScopeStiVehicle, ScopeStiCar);
 

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -644,6 +645,7 @@ describe("HasOneThroughAssociationsTest", () => {
         set thing(value: Base | null);
       }
       constSet(TopLevel, "Thing", Thing);
+      DescendantsTracker.registerSubclass(Base, Thing);
       void Thing;
     }).toThrow(ArgumentError);
   });

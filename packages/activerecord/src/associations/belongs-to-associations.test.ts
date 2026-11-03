@@ -603,6 +603,7 @@ describe("BelongsToAssociationsTest", () => {
       class AdminRegion extends Base {}
       constSet(Admin, "Region", AdminRegion);
       constSet(TopLevel, "AdminRegion", AdminRegion);
+      DescendantsTracker.registerSubclass(Base, AdminRegion);
       constSet(TopLevel, "AdminRegionalUser", AdminRegionalUser);
       DescendantsTracker.registerSubclass(AdminUser, AdminRegionalUser);
 

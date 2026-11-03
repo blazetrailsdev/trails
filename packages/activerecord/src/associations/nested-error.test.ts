@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
@@ -109,7 +110,9 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
       set pet(value: ValidatedPet | null);
     }
     constSet(TopLevel, "NestedErrorValidatedPet", ValidatedPet);
+    DescendantsTracker.registerSubclass(Base, ValidatedPet);
     constSet(TopLevel, "NestedErrorPetOwner", PetOwner);
+    DescendantsTracker.registerSubclass(Base, PetOwner);
 
     it("no index when singular association", async () => {
       const oldAttributeConfig = indexNestedAttributeErrors();

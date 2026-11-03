@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
@@ -110,8 +111,11 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
     constSet(TopLevel, "Client", Client);
     constSet(TopLevel, "ArrowFieldAccount", ArrowFieldAccount);
+    DescendantsTracker.registerSubclass(Base, ArrowFieldAccount);
     constSet(TopLevel, "ProtoHelperAccount", ProtoHelperAccount);
+    DescendantsTracker.registerSubclass(Base, ProtoHelperAccount);
     constSet(TopLevel, "ReentrantDestroyAccount", ReentrantDestroyAccount);
+    DescendantsTracker.registerSubclass(Base, ReentrantDestroyAccount);
     await Company.loadSchema();
     await ArrowFieldAccount.loadSchema();
     await ProtoHelperAccount.loadSchema();

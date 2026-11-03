@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { CollectionAssociation } from "./collection-association.js";
 import { Enumerable, Range, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
@@ -384,6 +385,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
     }
   }
   constSet(TopLevel, "AuthorWithRaisingAfterRemove", AuthorWithRaisingAfterRemove);
+  DescendantsTracker.registerSubclass(Base, AuthorWithRaisingAfterRemove);
 
   it("rolls back the nullify update_all when after_remove raises", async () => {
     const author = await AuthorWithRaisingAfterRemove.create({ name: "Owner" });
@@ -436,6 +438,7 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
     }
   }
   constSet(TopLevel, "AuthorWithAbortingBeforeRemove", AuthorWithAbortingBeforeRemove);
+  DescendantsTracker.registerSubclass(Base, AuthorWithAbortingBeforeRemove);
 
   it("returns nil when delete is called with no records", async () => {
     const author = await Author.create({ name: "Owner" });
@@ -481,6 +484,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     }
   }
   constSet(TopLevel, "PostWithAbortingTagRemove", PostWithAbortingTagRemove);
+  DescendantsTracker.registerSubclass(Base, PostWithAbortingTagRemove);
 
   it("returns nil when a through delete is called with no records", async () => {
     const post = await Post.create({ title: "p", body: "p" });

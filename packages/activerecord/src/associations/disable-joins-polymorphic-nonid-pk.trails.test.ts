@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
@@ -64,9 +65,13 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
       },
     );
     constSet(TopLevel, "DpAuthor", DpAuthor);
+    DescendantsTracker.registerSubclass(Base, DpAuthor);
     constSet(TopLevel, "DpGallery", DpGallery);
+    DescendantsTracker.registerSubclass(Base, DpGallery);
     constSet(TopLevel, "DpNonIdPhoto", DpNonIdPhoto);
+    DescendantsTracker.registerSubclass(Base, DpNonIdPhoto);
     constSet(TopLevel, "DpNonIdArticle", DpNonIdArticle);
+    DescendantsTracker.registerSubclass(Base, DpNonIdArticle);
     (DpAuthor as any)._reflections = {};
     (DpGallery as any)._reflections = {};
 

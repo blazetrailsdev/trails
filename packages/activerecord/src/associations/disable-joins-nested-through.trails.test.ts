@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
@@ -61,9 +62,13 @@ describe("DJAS routing widening — nested-through", () => {
       t.integer("value");
     });
     constSet(TopLevel, "NtAuthor", NtAuthor);
+    DescendantsTracker.registerSubclass(Base, NtAuthor);
     constSet(TopLevel, "NtPost", NtPost);
+    DescendantsTracker.registerSubclass(Base, NtPost);
     constSet(TopLevel, "NtComment", NtComment);
+    DescendantsTracker.registerSubclass(Base, NtComment);
     constSet(TopLevel, "NtRating", NtRating);
+    DescendantsTracker.registerSubclass(Base, NtRating);
     (NtAuthor as any)._reflections = {};
     (NtPost as any)._reflections = {};
     (NtComment as any)._reflections = {};

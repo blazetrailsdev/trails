@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Namespaced } from "../test-helpers/models/company.js";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
@@ -25,6 +26,7 @@ class NamespacedPost extends Base {
 
 constSet(TopLevel, "Tagging", Tagging);
 constSet(TopLevel, "NamespacedPost", NamespacedPost);
+DescendantsTracker.registerSubclass(Base, NamespacedPost);
 constSet(TopLevel, "Post", Post);
 
 type FindByTitle = { findByTitle(title: string): Promise<NamespacedPost | null> };

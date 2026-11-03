@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -21,7 +22,9 @@ describe("Relation#unscope — full Rails key coverage", () => {
 
   beforeEach(() => {
     constSet(TopLevel, "UscAuthor", UscAuthor);
+    DescendantsTracker.registerSubclass(Base, UscAuthor);
     constSet(TopLevel, "UscPost", UscPost);
+    DescendantsTracker.registerSubclass(Base, UscPost);
     (UscAuthor as any)._reflections = {};
     (UscPost as any)._reflections = {};
     Associations.hasMany.call(UscAuthor, "uscPosts", {

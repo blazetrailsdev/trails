@@ -105,6 +105,7 @@ class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
 constSet(TopLevel, "CreditCard", CreditCard);
+DescendantsTracker.registerSubclass(Base, CreditCard);
 class PinNumber extends Base {
   static {
     constSet(CreditCard, "PinNumber", this);

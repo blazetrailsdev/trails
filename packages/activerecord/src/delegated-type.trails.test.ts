@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -51,6 +52,7 @@ describe("DelegatedTypeTest (trails)", () => {
       }
     }
     constSet(TopLevel, "NoticeMessage", NoticeMessage);
+    DescendantsTracker.registerSubclass(Base, NoticeMessage);
     Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     expect(
       typeof (Entry3 as unknown as { accessNoticeMessages: unknown }).accessNoticeMessages,
@@ -79,6 +81,7 @@ describe("DelegatedTypeTest (trails)", () => {
       }
     }
     constSet(TopLevel, "NoticeMessage", NoticeMessage);
+    DescendantsTracker.registerSubclass(Base, NoticeMessage);
     class Entry4 extends Base {
       declare entryable_type: string;
       static {

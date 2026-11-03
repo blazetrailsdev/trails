@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
@@ -118,10 +119,15 @@ describe("AssociationsJoinModelTest", () => {
   constSet(TopLevel, "Car", Car);
   constSet(TopLevel, "CpkOrder", CpkOrder);
   constSet(TopLevel, "PostWithHasManyDeleteAll", PostWithHasManyDeleteAll);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyDeleteAll);
   constSet(TopLevel, "PostWithHasManyDestroy", PostWithHasManyDestroy);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyDestroy);
   constSet(TopLevel, "PostWithHasManyNullify", PostWithHasManyNullify);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyNullify);
   constSet(TopLevel, "PostWithHasOneDestroy", PostWithHasOneDestroy);
+  DescendantsTracker.registerSubclass(Base, PostWithHasOneDestroy);
   constSet(TopLevel, "PostWithHasOneNullify", PostWithHasOneNullify);
+  DescendantsTracker.registerSubclass(Base, PostWithHasOneNullify);
 
   async function findPostWithDependency(postId: number, klass: typeof Base): Promise<Base> {
     const post = await Post.find(postId);

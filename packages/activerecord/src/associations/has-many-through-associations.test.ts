@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "./collection-association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -358,6 +359,7 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "PersonPrime", PersonPrime);
+    DescendantsTracker.registerSubclass(Base, PersonPrime);
 
     const posts = await (PersonPrime as any)
       .includes(":posts")
@@ -423,8 +425,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "NoPkLesson", NoPkLesson);
+    DescendantsTracker.registerSubclass(Base, NoPkLesson);
     constSet(TopLevel, "NoPkLessonStudent", NoPkLessonStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkLessonStudent);
     constSet(TopLevel, "NoPkStudent", NoPkStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkStudent);
 
     const sicp = new NoPkLesson({ name: "SICP" });
     const ben = new NoPkStudent({ name: "Ben Bitdiddle" });
@@ -474,8 +479,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "NoPkDelLesson", NoPkDelLesson);
+    DescendantsTracker.registerSubclass(Base, NoPkDelLesson);
     constSet(TopLevel, "NoPkDelLessonStudent", NoPkDelLessonStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkDelLessonStudent);
     constSet(TopLevel, "NoPkDelStudent", NoPkDelStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkDelStudent);
 
     const sicp = new NoPkDelLesson({ name: "SICP" });
     const ben = new NoPkDelStudent({ name: "Ben Bitdiddle" });
@@ -548,8 +556,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     constSet(TopLevel, "NoPkCbLesson", NoPkCbLesson);
+    DescendantsTracker.registerSubclass(Base, NoPkCbLesson);
     constSet(TopLevel, "NoPkCbLessonStudent", NoPkCbLessonStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkCbLessonStudent);
     constSet(TopLevel, "NoPkCbStudent", NoPkCbStudent);
+    DescendantsTracker.registerSubclass(Base, NoPkCbStudent);
 
     const sicp = new NoPkCbLesson({ name: "SICP" });
     const ben = new NoPkCbStudent({ name: "Ben Bitdiddle" });

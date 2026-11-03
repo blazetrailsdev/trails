@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
@@ -28,9 +29,13 @@ class StvMember extends Base {
 }
 
 constSet(TopLevel, "StvAuthor", StvAuthor);
+DescendantsTracker.registerSubclass(Base, StvAuthor);
 constSet(TopLevel, "StvComment", StvComment);
+DescendantsTracker.registerSubclass(Base, StvComment);
 constSet(TopLevel, "StvPost", StvPost);
+DescendantsTracker.registerSubclass(Base, StvPost);
 constSet(TopLevel, "StvMember", StvMember);
+DescendantsTracker.registerSubclass(Base, StvMember);
 
 function freshAssociations() {
   (StvAuthor as any)._reflections = {};

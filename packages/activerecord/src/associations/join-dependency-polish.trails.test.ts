@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -20,6 +21,7 @@ describe("JoinBase.table", () => {
   beforeEach(() => {
     (Post as any)._reflections = {};
     constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
   });
 
   it("returns the Arel Table passed at construction", () => {

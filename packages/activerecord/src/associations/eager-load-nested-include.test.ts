@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
@@ -97,13 +98,21 @@ class NonPolyTwo extends Base {
 }
 
 constSet(TopLevel, "ShapeExpression", ShapeExpression);
+DescendantsTracker.registerSubclass(Base, ShapeExpression);
 constSet(TopLevel, "Circle", Circle);
+DescendantsTracker.registerSubclass(Base, Circle);
 constSet(TopLevel, "Square", Square);
+DescendantsTracker.registerSubclass(Base, Square);
 constSet(TopLevel, "Triangle", Triangle);
+DescendantsTracker.registerSubclass(Base, Triangle);
 constSet(TopLevel, "PaintColor", PaintColor);
+DescendantsTracker.registerSubclass(Base, PaintColor);
 constSet(TopLevel, "PaintTexture", PaintTexture);
+DescendantsTracker.registerSubclass(Base, PaintTexture);
 constSet(TopLevel, "NonPolyOne", NonPolyOne);
+DescendantsTracker.registerSubclass(Base, NonPolyOne);
 constSet(TopLevel, "NonPolyTwo", NonPolyTwo);
+DescendantsTracker.registerSubclass(Base, NonPolyTwo);
 
 const NUM_SIMPLE_OBJS = 50;
 const NUM_SHAPE_EXPRESSIONS = 100;

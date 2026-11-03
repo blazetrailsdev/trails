@@ -70,7 +70,9 @@ describe("AssociationScope", () => {
       set as_author(value: AsAuthor | null);
     }
     constSet(TopLevel, "AsAuthor", AsAuthor);
+    DescendantsTracker.registerSubclass(Base, AsAuthor);
     constSet(TopLevel, "AsPost", AsPost);
+    DescendantsTracker.registerSubclass(Base, AsPost);
     return { AsAuthor, AsPost };
   }
 
@@ -158,7 +160,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "CountAuthor", CountAuthor);
+    DescendantsTracker.registerSubclass(Base, CountAuthor);
     constSet(TopLevel, "CountPost", CountPost);
+    DescendantsTracker.registerSubclass(Base, CountPost);
     Associations.hasMany.call(
       CountAuthor,
       "count_posts",
@@ -198,6 +202,7 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "StiOwner", StiOwner);
+    DescendantsTracker.registerSubclass(Base, StiOwner);
 
     const owner = new StiOwner({ owner_id: 3 });
     const reflection = (StiOwner as any)._reflectOnAssociation("very_special_clients");
@@ -235,7 +240,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "DsAuthor", DsAuthor);
+    DescendantsTracker.registerSubclass(Base, DsAuthor);
     constSet(TopLevel, "DsPost", DsPost);
+    DescendantsTracker.registerSubclass(Base, DsPost);
 
     const author = new DsAuthor({ id: 1 });
     const reflection = (DsAuthor as any)._reflectOnAssociation("ds_posts");
@@ -288,7 +295,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "ZeroArityAuthor", ZeroArityAuthor);
+    DescendantsTracker.registerSubclass(Base, ZeroArityAuthor);
     constSet(TopLevel, "ZeroArityPost", ZeroArityPost);
+    DescendantsTracker.registerSubclass(Base, ZeroArityPost);
 
     const owner = new ZeroArityAuthor({ id: 1 });
     const reflection = (ZeroArityAuthor as any)._reflectOnAssociation("zero_arity_posts");
@@ -320,7 +329,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "AsOwner", AsOwner);
+    DescendantsTracker.registerSubclass(Base, AsOwner);
     constSet(TopLevel, "AsComment", AsComment);
+    DescendantsTracker.registerSubclass(Base, AsComment);
     const owner = new AsOwner({ id: 7 });
     const reflection = (AsOwner as any)._reflectOnAssociation("as_comments");
     const sql = (
@@ -353,9 +364,11 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "StiAsOwner", StiAsOwner);
+    DescendantsTracker.registerSubclass(Base, StiAsOwner);
     constSet(TopLevel, "StiAsSubOwner", StiAsSubOwner);
     DescendantsTracker.registerSubclass(StiAsOwner, StiAsSubOwner);
     constSet(TopLevel, "StiAsComment", StiAsComment);
+    DescendantsTracker.registerSubclass(Base, StiAsComment);
     Associations.hasMany.call(StiAsSubOwner, "as_comments", {
       className: "StiAsComment",
       as: "commentable",
@@ -394,7 +407,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "AsOneOwner", AsOneOwner);
+    DescendantsTracker.registerSubclass(Base, AsOneOwner);
     constSet(TopLevel, "AsOneImage", AsOneImage);
+    DescendantsTracker.registerSubclass(Base, AsOneImage);
     const owner = new AsOneOwner({ id: 3 });
     const reflection = (AsOneOwner as any)._reflectOnAssociation("as_one_image");
     const sql = (
@@ -428,7 +443,9 @@ describe("AssociationScope", () => {
       set commentable(value: Base | null);
     }
     constSet(TopLevel, "PolyTarget", PolyTarget);
+    DescendantsTracker.registerSubclass(Base, PolyTarget);
     constSet(TopLevel, "PolyComment", PolyComment);
+    DescendantsTracker.registerSubclass(Base, PolyComment);
     const comment = new PolyComment({ commentable_id: 99, commentable_type: "PolyTarget" });
     const reflection = (PolyComment as any)._reflectOnAssociation("commentable");
     const sql = (
@@ -461,7 +478,9 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "AscCpkBook", AscCpkBook);
+    DescendantsTracker.registerSubclass(Base, AscCpkBook);
     constSet(TopLevel, "AscCpkBrokenOrder", AscCpkBrokenOrder);
+    DescendantsTracker.registerSubclass(Base, AscCpkBrokenOrder);
     const owner = new AscCpkBrokenOrder({ shop_id: 1, status: "active" });
     let error: Error | undefined;
     try {
@@ -501,7 +520,9 @@ describe("AssociationScope", () => {
       set commentable(value: Base | null);
     }
     constSet(TopLevel, "UuidTarget", UuidTarget);
+    DescendantsTracker.registerSubclass(Base, UuidTarget);
     constSet(TopLevel, "UuidComment", UuidComment);
+    DescendantsTracker.registerSubclass(Base, UuidComment);
     const comment = new UuidComment({
       commentable_id: "abc-123",
       commentable_type: "UuidTarget",
@@ -565,8 +586,11 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "CcAuthor", CcAuthor);
+    DescendantsTracker.registerSubclass(Base, CcAuthor);
     constSet(TopLevel, "CcMembership", CcMembership);
+    DescendantsTracker.registerSubclass(Base, CcMembership);
     constSet(TopLevel, "CcTag", CcTag);
+    DescendantsTracker.registerSubclass(Base, CcTag);
 
     const author = new CcAuthor({ id: 1 });
     const reflection = (CcAuthor as any)._reflectOnAssociation("cc_tags");
@@ -729,8 +753,11 @@ describe("AssociationScope", () => {
       }
     }
     constSet(TopLevel, "ThroughAuthor", ThroughAuthor);
+    DescendantsTracker.registerSubclass(Base, ThroughAuthor);
     constSet(TopLevel, "ThroughMembership", ThroughMembership);
+    DescendantsTracker.registerSubclass(Base, ThroughMembership);
     constSet(TopLevel, "ThroughPost", ThroughPost);
+    DescendantsTracker.registerSubclass(Base, ThroughPost);
 
     const author = new ThroughAuthor({ id: 1 });
     const reflection = (ThroughAuthor as any)._reflectOnAssociation("through_posts");
@@ -783,6 +810,7 @@ describe("AssociationScope", () => {
       set imageable(value: Base | null);
     }
     constSet(TopLevel, "PstGallery", PstGallery);
+    DescendantsTracker.registerSubclass(Base, PstGallery);
 
     const owner = new PstGallery({});
     (owner as any).id = 5;

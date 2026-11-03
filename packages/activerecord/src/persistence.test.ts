@@ -1997,6 +1997,7 @@ describe("PersistenceTest", () => {
           static _tableName = "postgresql_identity_table";
         }
         constSet(TopLevel, "IdentityTable", IdentityTable);
+        DescendantsTracker.registerSubclass(Base, IdentityTable);
         await (IdentityTable as unknown as { loadSchema(): Promise<void> }).loadSchema();
         const identityRecord = (await IdentityTable.createBang()) as any;
         expect(identityRecord.id).not.toBeNull();

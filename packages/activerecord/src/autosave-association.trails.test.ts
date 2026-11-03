@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll, vi } from "vitest";
@@ -59,6 +60,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     constSet(TopLevel, "CancellingFace", CancellingFace);
+    DescendantsTracker.registerSubclass(Base, CancellingFace);
 
     class HumanWithCancellingFace extends Base {
       declare name: string | null;
@@ -74,6 +76,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       }
     }
     constSet(TopLevel, "HumanWithCancellingFace", HumanWithCancellingFace);
+    DescendantsTracker.registerSubclass(Base, HumanWithCancellingFace);
 
     const human = new HumanWithCancellingFace({ name: "Steve" });
     cacheAssoc(human, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
@@ -132,7 +135,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
     constSet(TopLevel, "WidgetOwner", WidgetOwner);
+    DescendantsTracker.registerSubclass(Base, WidgetOwner);
 
     const owner = await WidgetOwner.create({ name: "Alice" });
     const widget = await Widget.create({ name: "", author_id: owner.id });
@@ -165,7 +170,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     constSet(TopLevel, "DefaultBelongsToAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "DefaultBelongsToPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
       className: "DefaultBelongsToAuthor",
@@ -201,7 +208,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     constSet(TopLevel, "ZipParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
     constSet(TopLevel, "ZipChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: "id",
       foreignKey: ["parent_id", "group"],
@@ -240,7 +249,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     constSet(TopLevel, "DefaultAutosaveAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
     constSet(TopLevel, "DefaultAutosavePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
       className: "DefaultAutosaveAuthor",
@@ -275,7 +286,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       }
     }
     constSet(TopLevel, "LongPkParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
     constSet(TopLevel, "LongPkChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: ["id", "name"],
       foreignKey: "author_id",
@@ -369,6 +382,7 @@ describe("TestAutosaveAssociationsInGeneral changed_for_autosave?", () => {
       override markedForDestruction = (): boolean => true;
     }
     constSet(TopLevel, "ChangedForAutosaveGadget", Gadget);
+    DescendantsTracker.registerSubclass(Base, Gadget);
 
     const gadget = await Gadget.create({ name: "widget" });
 
@@ -526,7 +540,9 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
       }
     }
     constSet(TopLevel, "QcOwner", QcOwner);
+    DescendantsTracker.registerSubclass(Base, QcOwner);
     constSet(TopLevel, "QcChild", QcChild);
+    DescendantsTracker.registerSubclass(Base, QcChild);
     const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ name: "Doc" });
     owner.association("qcChild").setTarget(child);

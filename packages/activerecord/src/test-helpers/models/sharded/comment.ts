@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet } from "@blazetrails/ruby-compat";
-import { Sharded } from "../sharded.js";
+import { Sharded } from "./namespace.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";

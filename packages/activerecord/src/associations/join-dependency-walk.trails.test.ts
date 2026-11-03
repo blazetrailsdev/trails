@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -94,6 +95,7 @@ describe("JoinDependency walk() deduplication", () => {
     (Tag as any)._reflections = {};
     clearReflectionsCache(Tag);
     constSet(TopLevel, "Tag", Tag);
+    DescendantsTracker.registerSubclass(Base, Tag);
     Post.hasMany("tags", { className: "Tag" });
 
     const jd2 = new JoinDependency(Post, Post.arelTable, "tags", Nodes.OuterJoin);

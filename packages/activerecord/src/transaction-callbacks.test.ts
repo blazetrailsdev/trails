@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
@@ -90,6 +91,7 @@ class TopicWithCallbacks extends Base {
   }
 }
 constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+DescendantsTracker.registerSubclass(Base, TopicWithCallbacks);
 
 fixtures(["topics", "owners", "pets"]);
 
@@ -262,7 +264,9 @@ describe("TransactionCallbacksTest", () => {
       }
     }
     constSet(TopLevel, "ReplyForAssoc", ReplyForAssoc);
+    DescendantsTracker.registerSubclass(Base, ReplyForAssoc);
     constSet(TopLevel, "TopicForAssoc", TopicForAssoc);
+    DescendantsTracker.registerSubclass(Base, TopicForAssoc);
 
     const topic = (await TopicForAssoc.create({ title: "Parent" })) as any;
     await topic.assocReplies.create({});

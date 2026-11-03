@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
@@ -13,6 +14,7 @@ import { Project } from "../test-helpers/models/project.js";
 constSet(TopLevel, "Post", Post);
 constSet(TopLevel, "Comment", Comment);
 constSet(TopLevel, "Developer", Developer);
+DescendantsTracker.registerSubclass(Base, Developer);
 constSet(TopLevel, "Project", Project);
 
 describe("AssociationsExtensionsTest", () => {

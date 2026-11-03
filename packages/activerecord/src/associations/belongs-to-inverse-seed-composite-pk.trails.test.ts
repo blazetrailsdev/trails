@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 
@@ -41,7 +42,9 @@ class CpkTenantChild extends Base {
 
 describe("belongs_to inverse seeding with a composite-PK target", () => {
   constSet(TopLevel, "CompositePkParent", CompositePkParent);
+  DescendantsTracker.registerSubclass(Base, CompositePkParent);
   constSet(TopLevel, "CpkSeedChild", CpkSeedChild);
+  DescendantsTracker.registerSubclass(Base, CpkSeedChild);
 
   it("seeds the holder without resolving the target class from the registry", () => {
     const child = new CpkSeedChild();
@@ -94,7 +97,9 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
 describe("belongs_to to a composite-PK target without an id column", () => {
   constSet(TopLevel, "TenantPkParent", TenantPkParent);
+  DescendantsTracker.registerSubclass(Base, TenantPkParent);
   constSet(TopLevel, "CpkTenantChild", CpkTenantChild);
+  DescendantsTracker.registerSubclass(Base, CpkTenantChild);
 
   it("raises a composite-PK/FK length mismatch at first association access", () => {
     const child = new CpkTenantChild();

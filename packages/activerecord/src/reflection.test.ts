@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import "./support/canonical-model-index.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
@@ -96,8 +97,11 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "RfAuthor", RfAuthor);
+    DescendantsTracker.registerSubclass(Base, RfAuthor);
     constSet(TopLevel, "RfBook", RfBook);
+    DescendantsTracker.registerSubclass(Base, RfBook);
     constSet(TopLevel, "RfChapter", RfChapter);
+    DescendantsTracker.registerSubclass(Base, RfChapter);
     return { Author: RfAuthor, Book: RfBook, Chapter: RfChapter };
   }
 
@@ -291,7 +295,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "RfPerson", RfPerson);
+    DescendantsTracker.registerSubclass(Base, RfPerson);
     constSet(TopLevel, "RfAddress", RfAddress);
+    DescendantsTracker.registerSubclass(Base, RfAddress);
     const ref = reflectOnAssociation(RfPerson, "addresses");
     expect(ref!.klass).toBe(RfAddress);
   });
@@ -333,6 +339,7 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "RfNestedNestedUser", RfNestedNestedUser);
+    DescendantsTracker.registerSubclass(Base, RfNestedNestedUser);
     const ref = reflectOnAssociation(RfNestedNestedUser, "nestedUsers");
     expect(ref!.klass).toBe(RfNestedNestedUser);
   });
@@ -811,7 +818,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "RfProject", RfProject);
+    DescendantsTracker.registerSubclass(Base, RfProject);
     constSet(TopLevel, "RfTask", RfTask);
+    DescendantsTracker.registerSubclass(Base, RfTask);
     const ref = reflectOnAssociation(RfProject, "tasks");
     expect(ref!.klass).toBe(RfTask);
   });
@@ -933,7 +942,9 @@ describe("ReflectionTest", () => {
       }
     }
     constSet(TopLevel, "DjtCategory", DjtCategory);
+    DescendantsTracker.registerSubclass(Base, DjtCategory);
     constSet(TopLevel, "DjtProduct", DjtProduct);
+    DescendantsTracker.registerSubclass(Base, DjtProduct);
     const ref1 = reflectOnAssociation(DjtProduct, "categories");
     expect(ref1!.joinTable).toBe("categories_products");
 
