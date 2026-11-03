@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
 import { RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
@@ -68,14 +68,14 @@ describe("ActiveStorage::Engine", () => {
     activeStorage.serviceConfigurations = undefined;
     try {
       const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
-      const error = await initializer
-        .bind(Engine.instance())
-        .run(app)
+      const error = await Promise.resolve()
+        .then(() => initializer.bind(Engine.instance()).run(app))
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(RuntimeError);
       expect((error as Error).message).toBe(
         "Couldn't find Active Storage configuration in /nonexistent-trails-root/config/storage.ts",
       );
+      expect(() => runLoadHooks("active_storage_blob", Blob)).toThrow(RuntimeError);
     } finally {
       root.mockRestore();
       activeStorage.serviceConfigurations = configs;

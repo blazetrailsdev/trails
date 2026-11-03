@@ -197,38 +197,36 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("active_storage.services", async () => {
-      let hook: Promise<void> | undefined;
+      let configFile = File.join(
+        TopLevel.Trails!.root()!,
+        `config/storage/${TopLevel.Trails!.env}.ts`,
+      );
+      if (!(await File.isExistAsync(configFile)))
+        configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
+      const configFileExist = await File.isExistAsync(configFile);
+      const mod: { default?: Record<string, Record<string, unknown>> } | null = configFileExist
+        ? await import(getPath().pathToFileURL!(configFile).href)
+        : null;
+
       onLoad("active_storage_blob", () => {
-        hook = (async () => {
-          const activeStorage = (
-            TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig }
-          ).activeStorage;
-          const configs = (activeStorage.serviceConfigurations ||= await (async () => {
-            let configFile = File.join(
-              TopLevel.Trails!.root()!,
-              `config/storage/${TopLevel.Trails!.env}.ts`,
-            );
-            if (!(await File.isExistAsync(configFile)))
-              configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
-            if (!(await File.isExistAsync(configFile)))
-              throw new RuntimeError(`Couldn't find Active Storage configuration in ${configFile}`);
+        const activeStorage = (
+          TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig }
+        ).activeStorage;
+        const configs = (activeStorage.serviceConfigurations ||= (() => {
+          if (!configFileExist)
+            throw new RuntimeError(`Couldn't find Active Storage configuration in ${configFile}`);
 
-            const mod: { default?: Record<string, Record<string, unknown>> } = await import(
-              getPath().pathToFileURL!(configFile).href
-            );
-            return mod.default ?? {};
-          })());
+          return mod!.default ?? {};
+        })());
 
-          const blob = ActiveStorage.Blob as typeof Blob;
-          blob.services = new Registry(configs);
+        const blob = ActiveStorage.Blob as typeof Blob;
+        blob.services = new Registry(configs);
 
-          const configChoice = activeStorage.service;
-          if (configChoice != null) {
-            blob.service = blob.services.fetch(configChoice);
-          }
-        })();
+        const configChoice = activeStorage.service;
+        if (configChoice != null) {
+          blob.service = blob.services.fetch(configChoice);
+        }
       });
-      await hook;
     });
 
     this.initializer("active_storage.queues", () => {
