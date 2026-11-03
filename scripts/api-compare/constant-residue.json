@@ -1380,7 +1380,7 @@
     }
   },
   "activestorage": {
-    "rows": 79,
+    "rows": 82,
     "excluded": [
       "engine.ts::Engine",
       "test-helpers/database/create-groups-migration.ts::ActiveStorageCreateGroups",
@@ -1399,7 +1399,8 @@
       "file-server.ts::FileServer",
       "gem-version.ts::VERSION",
       "set-blob.ts::SetBlob",
-      "set-current.ts::SetCurrent"
+      "set-current.ts::SetCurrent",
+      "streaming.ts::Streaming"
     ],
     "residue": {
       "reflection.ts::ActiveRecordExtensions": "ActiveStorage::Reflection::ActiveRecordExtensions",

@@ -1,6 +1,12 @@
 import { afterAll } from "vitest";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { EnvironmentInquirer, getEnv, NullLogger, TopLevel } from "@blazetrails/activesupport";
+import {
+  runLoadHooks,
+  EnvironmentInquirer,
+  getEnv,
+  NullLogger,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { RouteSet } from "@blazetrails/actionpack";
@@ -20,7 +26,6 @@ import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
 import { Engine } from "../../engine.js";
-import { Registry } from "../../service/registry.js";
 import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
@@ -38,10 +43,29 @@ const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  application: { routes: () => routes },
+  root: () => File.expandPath("..", import.meta.dirname),
+  application: { routes: () => routes, envConfig: () => ({}) },
   configuration: {
     generators: configuration.appGenerators.bind(configuration),
-    activeStorage: { service: "local" },
+    activeStorage: {
+      service: "local",
+      serviceConfigurations: {
+        local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
+        local_public: {
+          service: "Disk",
+          root: File.join(Dir.tmpdir(), "active_storage_public_blobs"),
+          public: true,
+        },
+        disk_mirror_1: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_1") },
+        disk_mirror_2: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_2") },
+        disk_mirror_3: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_3") },
+        mirror: {
+          service: "Mirror",
+          primary: "local",
+          mirrors: ["disk_mirror_1", "disk_mirror_2", "disk_mirror_3"],
+        },
+      },
+    },
   },
 } as unknown as typeof TopLevel.Trails;
 
@@ -56,50 +80,11 @@ for (const railtie of [GlobalIDRailtie, Engine]) {
   }
 }
 
+runLoadHooks("after_initialize", app);
+ActiveStorage.logger = new NullLogger();
 ActiveStorage.trackVariants = true;
-ActiveStorage.contentTypesToServeAsBinary = [
-  "text/html",
-  "image/svg+xml",
-  "application/postscript",
-  "application/x-shockwave-flash",
-  "text/xml",
-  "application/xml",
-  "application/xhtml+xml",
-  "application/mathml+xml",
-  "text/cache-manifest",
-];
-ActiveStorage.contentTypesAllowedInline = [
-  "image/webp",
-  "image/avif",
-  "image/png",
-  "image/gif",
-  "image/jpeg",
-  "image/tiff",
-  "image/bmp",
-  "image/vnd.adobe.photoshop",
-  "image/vnd.microsoft.icon",
-  "application/pdf",
-];
 
 GlobalID.setApp("ActiveStorageExampleApp");
-
-Blob.services = new Registry({
-  local: { service: "Disk", root: File.join(Dir.tmpdir(), "active_storage_blobs") },
-  local_public: {
-    service: "Disk",
-    root: File.join(Dir.tmpdir(), "active_storage_public_blobs"),
-    public: true,
-  },
-  disk_mirror_1: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_1") },
-  disk_mirror_2: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_2") },
-  disk_mirror_3: { service: "Disk", root: Dir.mktmpdir("active_storage_tests_3") },
-  mirror: {
-    service: "Mirror",
-    primary: "local",
-    mirrors: ["disk_mirror_1", "disk_mirror_2", "disk_mirror_3"],
-  },
-});
-Blob.service = Blob.services.fetch("local");
 
 const configurations = Base.configurations();
 const arunit = configurations.configsFor({ envName: "arunit", name: "primary" })!;
