@@ -384,10 +384,6 @@ export function constGet(mod: object, name: string): unknown {
   }
   if (qualified) mod = Object;
   if (Object.hasOwn(tbl, cpath)) return tbl[cpath];
-  if (mod === Object) {
-    const generated = generatedClass(cpath);
-    if (generated !== undefined) return generated;
-  }
   let path = "";
   let c: unknown = mod;
   for (const [i, part] of parts.entries()) {
@@ -400,7 +396,17 @@ export function constGet(mod: object, name: string): unknown {
       continue;
     }
     const generated = mod === Object && !(part in c) ? generatedClass(path) : undefined;
-    c = generated !== undefined ? generated : rbConstGet(c, part, i > 0);
+    if (generated !== undefined) {
+      c = generated;
+      continue;
+    }
+    try {
+      c = rbConstGet(c, part, i > 0);
+    } catch (e) {
+      const row = mod === Object && e instanceof NameError ? generatedClass(cpath) : undefined;
+      if (row === undefined) throw e;
+      return row;
+    }
   }
   return c;
 }
