@@ -30,7 +30,9 @@ function integrationTest(name: string): Session {
 }
 
 type Readable = Parameters<typeof readImage>[0];
-type Variable = Blob & { previewImage: { isAttached(): boolean; variant(t: unknown): unknown } };
+type Variable = Blob & {
+  previewImage: { load(): Promise<unknown>; isAttached(): boolean; variant(t: unknown): unknown };
+};
 
 function getRepresentation(t: Session, blob: Blob, signedBlobId: string, variationKey: string) {
   return t.get(
@@ -120,7 +122,8 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsTest", (
   it("showing preview inline", async () => {
     await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
 
-    expect(blob.previewImage.isAttached()).toBe(true);
+    await blob.previewImage.load();
+    expect(blob.previewImage.isAttached()).toBeTruthy();
     t.assertRedirectedTo(/report\.png/);
     await t.followRedirectBang();
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
@@ -165,12 +168,14 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsWithStri
       getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit)),
     );
 
-    expect(blob.previewImage.isAttached()).toBe(true);
+    await blob.previewImage.load();
+    expect(blob.previewImage.isAttached()).toBeTruthy();
     t.assertRedirectedTo(/report\.png/);
     await t.followRedirectBang();
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
 
     await blob.reload();
+    await blob.previewImage.load();
     const image = await readImage(blob.previewImage.variant(resizeToLimit) as Readable);
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
