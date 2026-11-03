@@ -567,14 +567,42 @@ async function baseRecord(): Promise<Record<string, ConstantResidue>> {
   }
 }
 
-/** A class whose declaration carries `@noRailsEquivalent` is excluded by its receipt. */
-export async function isReceipted(dir: string, key: string): Promise<boolean> {
-  const [file, tsName] = splitKey(key);
-  const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
-  const decl = new RegExp(`^export\\s+(?:abstract\\s+)?class\\s+${tsName}\\b`, "m").exec(source);
+/**
+ * A class excluded by its receipt: the JSDoc directly above its declaration
+ * carries `@noRailsEquivalent PERMANENT` or `@noRailsEquivalent CONVERGEABLE <story-id>`.
+ */
+export function isReceipted(source: string, tsName: string): boolean {
+  const decl = new RegExp(
+    `^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${tsName.replace(/[$]/g, "\\$")}\\b`,
+    "m",
+  ).exec(source);
   if (decl === null) return false;
   const jsdoc = /\/\*\*((?:(?!\*\/)[^])*)\*\/\s*$/.exec(source.slice(0, decl.index));
-  return jsdoc?.[1].includes("@noRailsEquivalent") ?? false;
+  return /@noRailsEquivalent\s+(?:PERMANENT\b|CONVERGEABLE\s+[a-z0-9][a-z0-9-]*)/.test(
+    jsdoc?.[1] ?? "",
+  );
+}
+
+/**
+ * The keys `record` adds to `excluded` over `base` with no receipt. Before
+ * any base record carries `excluded` there is nothing to shrink from; after,
+ * a package new to the record starts from an empty list.
+ */
+export async function unreceiptedExclusions(
+  dir: string,
+  record: ConstantResidue,
+  base: Record<string, ConstantResidue>,
+): Promise<string[]> {
+  if (!Object.values(base).some((r) => Array.isArray(r.excluded))) return [];
+  const before = new Set(base[dir]?.excluded ?? []);
+  const out: string[] = [];
+  for (const key of record.excluded) {
+    if (before.has(key)) continue;
+    const [file, tsName] = splitKey(key);
+    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    if (!isReceipted(source, tsName)) out.push(key);
+  }
+  return out;
 }
 
 /** The tables the walk writes, from `constant-residue.json`. */
@@ -609,9 +637,7 @@ async function checkConstantResidue(
       continue;
     }
     record[dir] = await constantResidue(dir, entries);
-    const before = new Set(base[dir]?.excluded);
-    for (const key of base[dir]?.excluded ? record[dir].excluded : []) {
-      if (before.has(key) || (await isReceipted(dir, key))) continue;
+    for (const key of await unreceiptedExclusions(dir, record[dir], base)) {
       console.error(
         `${dir}: ${key} is a new walked export with no Ruby counterpart: receipt it with @noRailsEquivalent, or remove it`,
       );
