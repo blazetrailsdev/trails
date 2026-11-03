@@ -1,3 +1,5 @@
+import "@blazetrails/vitest-matchers/setup";
+import "@blazetrails/vitest-matchers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Loader } from "./loader.js";
 import { get, newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
