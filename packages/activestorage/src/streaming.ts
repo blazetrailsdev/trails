@@ -55,16 +55,13 @@ async function sendBlobByteRangeData(
   this.response.headers.set("Accept-Ranges", "bytes");
   this.response.headers.set("Content-Length", data.length.toString());
 
-  return this.sendData(
-    data as never,
-    {
-      disposition:
-        blob.forcedDispositionForServing() ?? disposition ?? DEFAULT_BLOB_STREAMING_DISPOSITION,
-      filename: blob.filename.sanitized(),
-      status: "partial_content",
-      type: contentType,
-    } as never,
-  );
+  return this.sendData(data as never, {
+    disposition:
+      blob.forcedDispositionForServing() ?? disposition ?? DEFAULT_BLOB_STREAMING_DISPOSITION,
+    filename: blob.filename.sanitized(),
+    status: "partial_content",
+    type: contentType,
+  });
 }
 
 /** @internal */

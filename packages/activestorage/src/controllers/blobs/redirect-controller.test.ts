@@ -8,11 +8,11 @@ import {
 } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack";
-import "../test-helpers/database/setup.js";
-import { ActiveStorage } from "../active-storage.js";
-import type { Blob } from "../blob.js";
-import { createFileBlob } from "../test-helpers/test-helper.js";
-import "./redirect-controller.js";
+import "../../test-helpers/database/setup.js";
+import { ActiveStorage } from "../../active-storage.js";
+import type { Blob } from "../../blob.js";
+import { createFileBlob } from "../../test-helpers/test-helper.js";
+import "../../blobs/redirect-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {

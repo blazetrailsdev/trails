@@ -10,11 +10,11 @@ import {
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActionController, IntegrationTest } from "@blazetrails/actionpack";
 import { SecureRandom, StandardError } from "@blazetrails/ruby-compat";
-import "../test-helpers/database/setup.js";
-import { ActiveStorage } from "../active-storage.js";
-import { FileNotFoundError } from "../errors.js";
-import { createBlob, createFileBlob } from "../test-helpers/test-helper.js";
-import { ProxyController } from "./proxy-controller.js";
+import "../../test-helpers/database/setup.js";
+import { ActiveStorage } from "../../active-storage.js";
+import { FileNotFoundError } from "../../errors.js";
+import { createBlob, createFileBlob } from "../../test-helpers/test-helper.js";
+import { ProxyController } from "../../blobs/proxy-controller.js";
 
 type Url = (...args: unknown[]) => string;
 type Session = IntegrationTest & {
