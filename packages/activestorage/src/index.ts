@@ -1,4 +1,6 @@
 import "./constants.generated.js";
+import "./representations/redirect-controller.js";
+import "./representations/proxy-controller.js";
 export * as Reflection from "./reflection.js";
 export { NamedVariant } from "./named-variant.js";
 export { ActiveStorage, Transformers } from "./active-storage.js";

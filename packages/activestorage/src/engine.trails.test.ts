@@ -11,7 +11,7 @@ import { VariantRecord } from "./variant-record.js";
 import { ActiveRecordExtensions } from "./reflection.js";
 import { app } from "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
-import { TopLevel } from "@blazetrails/activesupport";
+import { TopLevel, constantize } from "@blazetrails/activesupport";
 import type { RouteSet } from "@blazetrails/actionpack";
 
 describe("ActiveStorage::Engine", () => {
@@ -87,5 +87,22 @@ describe("ActiveStorage::Engine", () => {
     const { ActiveStorage: fresh } = await import("./active-storage.js");
     await import("./engine.js");
     expect(fresh.Blob).toBeUndefined();
+  });
+
+  it("seats the engine's models and controllers before the application's autoloader", async () => {
+    vi.resetModules();
+    const { ActiveStorage: fresh } = await import("./active-storage.js");
+    const { Engine: freshEngine } = await import("./engine.js");
+    const initializer = freshEngine.initializers.find((i) => i.name === "active_storage.app")!;
+    expect(initializer.before).toBe("setup_main_autoloader");
+    await initializer.bind(freshEngine.instance()).run(app);
+    expect(fresh.Blob).toBeDefined();
+    expect(fresh.Attachment).toBeDefined();
+    expect(fresh.VariantRecord).toBeDefined();
+    expect(fresh.Representations.RedirectController).toBeDefined();
+    expect(fresh.Representations.ProxyController).toBeDefined();
+    expect(
+      (constantize("ActiveStorage::Representations::RedirectController") as { name: string }).name,
+    ).toBe("RedirectController");
   });
 });
