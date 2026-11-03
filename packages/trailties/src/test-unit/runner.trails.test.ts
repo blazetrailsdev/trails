@@ -170,6 +170,14 @@ describe("Runner", () => {
     expect(await internals.testLocations([file], /saves 3/)).toEqual([`${file}:3`]);
   });
 
+  it("testLocations selects an it.each title it cannot render", async () => {
+    await app();
+    const file = "test/models/unrendered.test.ts";
+    await getFs().writeFile!(file, 'it.each([1])("saves %j", () => {});\nit("other", () => {});\n');
+    await Runner.loadTests([`${file}:2`]);
+    expect(await internals.testLocations([file], /nothing/)).toEqual([`${file}:1`, `${file}:2`]);
+  });
+
   it("testLocations selects a test under a non-literal describe title", async () => {
     await app();
     const file = "test/models/computed.test.ts";

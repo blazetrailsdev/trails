@@ -211,7 +211,10 @@ export class Runner {
     return filter;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   private static async testLocations(tests: string[], name: RegExp | null): Promise<string[]> {
     const locations: string[] = [];
     for (const path of tests) {

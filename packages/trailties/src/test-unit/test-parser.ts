@@ -20,13 +20,30 @@ function renderedTitles(node: ts.CallExpression, title: string): string[] | null
   const titles: string[] = [];
   for (const row of rows.elements) {
     const args = ts.isArrayLiteralExpression(row) ? [...row.elements] : [row];
-    if (!args.every((arg) => ts.isStringLiteral(arg) || ts.isNumericLiteral(arg))) return null;
     let index = 0;
-    titles.push(
-      title.replace(/%([sdif%])/g, (format, kind: string) =>
-        kind === "%" ? "%" : ((args[index++] as ts.StringLiteral | undefined)?.text ?? format),
-      ),
-    );
+    let rendered = "";
+    let last = 0;
+    for (const match of title.matchAll(/%(.?)/g)) {
+      rendered += title.slice(last, match.index);
+      last = match.index + match[0].length;
+      if (match[1] === "%") {
+        rendered += "%";
+        continue;
+      }
+      const arg = args[index++];
+      if (
+        match[1] === "s" &&
+        arg != null &&
+        (ts.isStringLiteral(arg) || ts.isNumericLiteral(arg))
+      ) {
+        rendered += arg.text;
+      } else if (match[1] === "d" && arg != null && ts.isNumericLiteral(arg)) {
+        rendered += arg.text;
+      } else {
+        return null;
+      }
+    }
+    titles.push(rendered + title.slice(last));
   }
   return titles;
 }
