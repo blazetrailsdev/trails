@@ -594,6 +594,22 @@ export function isReceipted(source: string, tsName: string): boolean {
 }
 
 /**
+ * A base key with each `TOKEN_RENAMES` path segment applied, so a file moved
+ * by a token rename (`generators/rails/` → `generators/trails/`) keeps its row.
+ */
+function renamedKey(key: string): string {
+  const [file, tsName] = splitKey(key);
+  const renamed = file
+    .split("/")
+    .map((segment) => {
+      const [stem, ...ext] = segment.split(".");
+      return [TOKEN_RENAMES[stem] ?? stem, ...ext].join(".");
+    })
+    .join("/");
+  return `${renamed}::${tsName}`;
+}
+
+/**
  * The keys `record` adds to `excluded` over `base` with no receipt. Before
  * any base record carries `excluded` there is nothing to shrink from; after,
  * a package new to the record starts from an empty list.
@@ -604,7 +620,7 @@ export async function unreceiptedExclusions(
   base: Record<string, ConstantResidue>,
 ): Promise<string[]> {
   if (!Object.values(base).some((r) => Array.isArray(r.excluded))) return [];
-  const before = new Set(base[dir]?.excluded ?? []);
+  const before = new Set((base[dir]?.excluded ?? []).map(renamedKey));
   const out: string[] = [];
   for (const key of record.excluded) {
     if (before.has(key)) continue;
