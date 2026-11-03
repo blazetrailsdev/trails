@@ -9,6 +9,8 @@ import {
 } from "@blazetrails/ruby-compat";
 
 export class Handler {
+  declare static Node: typeof import("./handler/node.js").Node;
+
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 

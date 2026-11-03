@@ -16,6 +16,7 @@
     { "path": "../activejob" },
     { "path": "../activerecord-cli" },
     { "path": "../rack" },
+    { "path": "../rackup" },
     { "path": "../actioncable" },
     { "path": "../actionpack" },
     { "path": "../actionview" },

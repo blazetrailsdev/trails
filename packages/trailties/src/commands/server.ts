@@ -21,7 +21,8 @@ import {
   toI,
   type Included,
 } from "@blazetrails/ruby-compat";
-import { Handler, type RackEnv } from "@blazetrails/rack";
+import { type RackEnv } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { demodulize, isPresent, underscore } from "@blazetrails/activesupport";
 import { DetailsKey } from "@blazetrails/actionview";
 import type { ThorClass } from "@blazetrails/thor";

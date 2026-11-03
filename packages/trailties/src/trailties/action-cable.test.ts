@@ -2,7 +2,7 @@ import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
 import { Worker } from "@blazetrails/actioncable/server/worker";
 import { OrderedOptions } from "@blazetrails/activesupport";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../application.js";

@@ -1,5 +1,5 @@
 import { Logger } from "@blazetrails/activesupport";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { StringIO, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import * as Client from "@rails/actioncable";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

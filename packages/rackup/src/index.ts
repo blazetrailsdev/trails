@@ -3,6 +3,7 @@ import { VERSION } from "./version.js";
 import { Handler } from "./handler.js";
 import { Lobster } from "./lobster.js";
 import { Server } from "./server.js";
+import "./handler/node.js";
 
 export { VERSION } from "./version.js";
 export { Handler, Lobster, Server };

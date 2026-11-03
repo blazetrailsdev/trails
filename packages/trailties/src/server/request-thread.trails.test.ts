@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import type { RackApp } from "@blazetrails/rack";
 import { getHttpAsync } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";

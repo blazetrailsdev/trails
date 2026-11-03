@@ -124,6 +124,7 @@
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
     "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",

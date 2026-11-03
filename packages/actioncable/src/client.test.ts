@@ -1,5 +1,5 @@
 import { Logger, assertCalled } from "@blazetrails/activesupport";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import {
   AtomicFixnum,
   Concurrent,
