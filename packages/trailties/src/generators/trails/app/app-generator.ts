@@ -862,8 +862,6 @@ declare module "@blazetrails/trailties" {
 // Load the trails application.
 import "./application.ts";
 
-// Load application files through this module graph, so a test and the
-// autoloader share one copy of each class.
 Trails.autoloaders.each((loader) => {
   loader.importer = (url) => import(url);
 });
