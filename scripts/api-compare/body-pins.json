@@ -81120,252 +81120,252 @@
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/authentication/authentication_generator.rb",
+    "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "add_migrations",
     "digest": "7c765312ac554ccc",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/authentication/authentication_generator.rb",
+    "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "configure_application_controller",
     "digest": "8d8781cd9281f196",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/authentication/authentication_generator.rb",
+    "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "configure_authentication_routes",
     "digest": "12ec81e75cb9d0f2",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/authentication/authentication_generator.rb",
+    "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "create_authentication_files",
     "digest": "8edae99f01561424",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/authentication/authentication_generator.rb",
+    "rubyFile": "generators/rails/authentication/authentication_generator.rb",
     "rubyName": "enable_bcrypt",
     "digest": "550172f729a90f4b",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/controller/controller_generator.rb",
+    "rubyFile": "generators/rails/controller/controller_generator.rb",
     "rubyName": "add_routes",
     "digest": "dd946903e18a5c10",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/credentials/credentials_generator.rb",
+    "rubyFile": "generators/rails/credentials/credentials_generator.rb",
     "rubyName": "add_credentials_file",
     "digest": "ae24bd03fee74f03",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/credentials/credentials_generator.rb",
+    "rubyFile": "generators/rails/credentials/credentials_generator.rb",
     "rubyName": "encrypted_file",
     "digest": "cbb9ede8707c732f",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/credentials/credentials_generator.rb",
+    "rubyFile": "generators/rails/credentials/credentials_generator.rb",
     "rubyName": "secret_key_base",
     "digest": "763369711fc30e89",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "database",
     "digest": "76b51c10f6b17bf8",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "edit_compose_yaml",
     "digest": "6237f8ee5e980158",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "edit_database_config",
     "digest": "589122097ef64d9f",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "edit_devcontainer_files",
     "digest": "42c1e6fcf708820f",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "edit_devcontainer_json",
     "digest": "c7310a2305058f0b",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "edit_dockerfile",
     "digest": "b20d9158dcd27349",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/db/system/change/change_generator.rb",
+    "rubyFile": "generators/rails/db/system/change/change_generator.rb",
     "rubyName": "initialize",
     "digest": "627b1cab1105030f",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/devcontainer/devcontainer_generator.rb",
+    "rubyFile": "generators/rails/devcontainer/devcontainer_generator.rb",
     "rubyName": "database",
     "digest": "76b51c10f6b17bf8",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/devcontainer/devcontainer_generator.rb",
+    "rubyFile": "generators/rails/devcontainer/devcontainer_generator.rb",
     "rubyName": "system_test_configuration",
     "digest": "98a320b18714606f",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encrypted_file/encrypted_file_generator.rb",
+    "rubyFile": "generators/rails/encrypted_file/encrypted_file_generator.rb",
     "rubyName": "add_encrypted_file_silently",
     "digest": "be4c9a4b25a22a92",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encryption_key_file/encryption_key_file_generator.rb",
+    "rubyFile": "generators/rails/encryption_key_file/encryption_key_file_generator.rb",
     "rubyName": "add_key_file",
     "digest": "f154762c25c9c002",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encryption_key_file/encryption_key_file_generator.rb",
+    "rubyFile": "generators/rails/encryption_key_file/encryption_key_file_generator.rb",
     "rubyName": "add_key_file_silently",
     "digest": "bd7f04550686ecce",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encryption_key_file/encryption_key_file_generator.rb",
+    "rubyFile": "generators/rails/encryption_key_file/encryption_key_file_generator.rb",
     "rubyName": "ignore_key_file",
     "digest": "46e79e98ec0e7e28",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encryption_key_file/encryption_key_file_generator.rb",
+    "rubyFile": "generators/rails/encryption_key_file/encryption_key_file_generator.rb",
     "rubyName": "ignore_key_file_silently",
     "digest": "a8a75d66e2395187",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/encryption_key_file/encryption_key_file_generator.rb",
+    "rubyFile": "generators/rails/encryption_key_file/encryption_key_file_generator.rb",
     "rubyName": "key_ignore",
     "digest": "c3372c64e1f45429",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/generator/generator_generator.rb",
+    "rubyFile": "generators/rails/generator/generator_generator.rb",
     "rubyName": "generator_dir",
     "digest": "b729d85ea3357067",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "add_master_key_file",
     "digest": "418e910eec2e8212",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "add_master_key_file_silently",
     "digest": "4463ed1da715d1f9",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "ignore_master_key_file",
     "digest": "a7463e5db970dc3a",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "ignore_master_key_file_silently",
     "digest": "d67feec33509e7d4",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "key_file_generator",
     "digest": "ea6d5fe567ee05af",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/master_key/master_key_generator.rb",
+    "rubyFile": "generators/rails/master_key/master_key_generator.rb",
     "rubyName": "key_ignore",
     "digest": "d0fbfe4a54df977d",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/migration/migration_generator.rb",
+    "rubyFile": "generators/rails/migration/migration_generator.rb",
     "rubyName": "exit_on_failure?",
     "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/model/model_generator.rb",
+    "rubyFile": "generators/rails/model/model_generator.rb",
     "rubyName": "initialize",
     "digest": "7a8a70a1373696ea",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/resource/resource_generator.rb",
+    "rubyFile": "generators/rails/resource/resource_generator.rb",
     "rubyName": "initialize",
     "digest": "c7f4a5c5af55fdec",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/resource_route/resource_route_generator.rb",
+    "rubyFile": "generators/rails/resource_route/resource_route_generator.rb",
     "rubyName": "add_resource_route",
     "digest": "2f4914a0a695def4",
     "ref": "v8.0.2"
   },
   {
     "package": "trailties",
-    "rubyFile": "generators/trails/script/script_generator.rb",
+    "rubyFile": "generators/rails/script/script_generator.rb",
     "rubyName": "depth",
     "digest": "cf714fccda0ab124",
     "ref": "v8.0.2"

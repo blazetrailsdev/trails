@@ -152,7 +152,7 @@ describe("ChannelGeneratorTest", () => {
     await runGenerator(["chat"]);
 
     const content = assertFile("config/importmap.rb");
-    expect(content).toMatch(/pin "@trails\/actioncable"/);
+    expect(content).toMatch(/pin "@rails\/actioncable"/);
     expect(content).toMatch(/pin_all_from "app\/javascript\/channels"/);
   });
 
