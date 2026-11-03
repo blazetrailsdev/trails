@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
+import { include, onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
 import { RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
@@ -8,6 +8,8 @@ import { Engine } from "./engine.js";
 import { Model } from "./attached/model.js";
 import { Blob } from "./blob.js";
 import { VariantRecord } from "./variant-record.js";
+import { Record } from "./record.js";
+import { Representable } from "./blob/representable.js";
 import { ActiveRecordExtensions } from "./reflection.js";
 import { app } from "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
@@ -51,6 +53,22 @@ describe("ActiveStorage::Engine", () => {
     const late = vi.fn();
     onLoad("active_storage_reflection", late);
     expect(late).toHaveBeenCalledOnce();
+  });
+
+  it("attaches previewImage and image to a Blob and VariantRecord evaluated after the hook fired", async () => {
+    const saved = ActiveStorage.VariantRecord;
+    try {
+      const late: typeof import("./variant-record.js") =
+        // @ts-expect-error a query string forces a fresh evaluation
+        await import("./variant-record.js?late");
+      expect(late.VariantRecord).not.toBe(VariantRecord);
+      expect(late.VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
+      class LateBlob extends Record {}
+      include(LateBlob, Representable);
+      expect(LateBlob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
+    } finally {
+      ActiveStorage.VariantRecord = saved;
+    }
   });
 
   it("attaches previewImage and image with no service argument", () => {

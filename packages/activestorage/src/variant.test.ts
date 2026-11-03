@@ -46,7 +46,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     }
   }
 
-  const variantOf = (blob: Blob, transformations: Record<string, unknown>) =>
+  const variantOf = (blob: Blob, transformations: Record<string, NonNullable<unknown> | null>) =>
     blob.variant(transformations) as Variant;
 
   it("variations have the same key for different types of the same transformation", async () => {

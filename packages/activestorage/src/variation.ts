@@ -5,7 +5,7 @@ import type { Tempfile } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Transformers } from "./active-storage.js";
 import type { ImageProcessingTransformer } from "./transformers/image-processing-transformer.js";
 
-type Transformations = { [k: string]: unknown };
+type Transformations = { [k: string]: NonNullable<unknown> | null };
 
 export class Variation {
   readonly transformations: Transformations;
