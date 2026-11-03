@@ -16,7 +16,7 @@ export class ProxyController extends BaseController {
 
   async show(): Promise<void> {
     await this.httpCacheForever({ public: true }, async () => {
-      await this.sendBlobStream(this.representation as never, {
+      await this.sendBlobStream(this.representation, {
         disposition: this.params.get("disposition") as string | undefined,
       });
     });
