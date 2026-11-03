@@ -11,7 +11,7 @@ const EXPECTED = [
   "config/database.ts",
   "db/migrate/.gitkeep",
   "db/seeds.ts",
-  "app/models/index.ts",
+  "app/models/.gitkeep",
   "db.ts",
 ];
 
@@ -53,9 +53,10 @@ describe("ArInitTest", () => {
     expect(second.skipped.sort()).toEqual([...expectedSkipped].sort());
   });
 
-  it("scaffolds a manifest the generator considers already up to date", async () => {
+  it("generates the manifest under .trails/, not app/models/", async () => {
     await init(root);
-    const result = await generateManifest(join(root, "app", "models"), { check: true });
+    const result = await generateManifest(join(root, "app", "models"), root);
+    expect(result.path).toBe(join(root, ".trails", "models", "index.ts"));
     expect(result.changed).toBe(false);
   });
 

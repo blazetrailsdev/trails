@@ -3,14 +3,13 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { getFs, include } from "@blazetrails/ruby-compat";
-import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
+import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
+import "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface GenerationTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class GenerationTest extends TestCase {}
-include(GenerationTest, Paths);
-include(GenerationTest, Generation);
 include(GenerationTest, Isolation);
 registerSpecType(/^GenerationTest$/, GenerationTest);
 

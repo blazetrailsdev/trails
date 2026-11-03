@@ -33,7 +33,7 @@ Usage: ar <command> [options]
 Commands:
   new <app-name>                 Create a new directory and scaffold a standalone AR project
   init                           Scaffold config/database.ts, db/, app/models/, and db.ts
-  generate:manifest              Scan app/models/ and (re)write app/models/index.ts
+  generate:manifest              Scan app/models/ and (re)write .trails/models/index.ts
   generate:migration <Name>      Emit db/migrate/<ts>_<snake_name>.ts
   generate:model <Name>          Emit app/models/<snake>.ts + a create migration
   destroy:migration <Name>       Delete the matching db/migrate/*_<snake_name>.ts
@@ -58,7 +58,7 @@ Commands:
 
 Run \`ar <command> --help\` for command-specific help.`;
 
-const MANIFEST_HELP = `ar generate:manifest — regenerate app/models/index.ts
+const MANIFEST_HELP = `ar generate:manifest — regenerate .trails/models/index.ts
 
 Scans the models directory for exported classes that (transitively) extend
 \`Base\` and rewrites the registration manifest in stable alphabetical order.
@@ -66,7 +66,8 @@ Idempotent: a second run is a no-op.
 
 Options:
   --root <dir>   Directory to scan (default: ./app/models)
-  --check        Don't write; exit 1 if app/models/index.ts is out of date (CI).`;
+
+The manifest is build output under .trails/ — gitignore it, don't commit it.`;
 
 const NEW_HELP = `ar new <app-name> — create a new standalone activerecord project
 
@@ -82,8 +83,9 @@ const INIT_HELP = `ar init — scaffold a standalone activerecord project
 
 Run in an existing project root to add @blazetrails/activerecord to it.
 Writes (or updates) package.json, tsconfig.json, config/database.ts (TRAILS_ENV-keyed),
-db/migrate/, db/seeds.ts, app/models/index.ts (the generated manifest), and
-db.ts (bootstrap glue). Does NOT write .gitignore — bring your own.
+db/migrate/, db/seeds.ts, app/models/, .trails/models/index.ts (the generated,
+gitignored manifest), and
+db.ts (bootstrap glue). Does NOT write .gitignore — bring your own, ignoring .trails/.
 If a tsconfig.json already exists, AR-required settings are merged in (JSONC-aware);
 conflicting keys are preserved and reported as warnings. Pass --force to overwrite instead.
 Existing scaffold files are skipped by default; pass --force to overwrite them.
@@ -203,7 +205,7 @@ Options:
   --env <name>   Override TRAILS_ENV for this session.`;
 
 const RUNNER_HELP = `ar runner <script> [args...] — run a script with models registered and connection established.
-app/models/index.ts is imported (side-effect: models registered for AR queries). Remaining args: __ARGV__.
+.trails/models/index.ts is imported (side-effect: models registered for AR queries). Remaining args: __ARGV__.
 Options:
   --env <name>   Override TRAILS_ENV for this invocation.`;
 
@@ -363,19 +365,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       return 1;
     }
     const modelsDir = File.expandPath(root.value ?? "app/models", cwd);
-    const check = rest.includes("--check");
-    const { path, changed } = await generateManifest(modelsDir, { check });
-    if (check) {
-      if (changed) {
-        const fix = root.value
-          ? `ar generate:manifest --root ${root.value}`
-          : "ar generate:manifest";
-        console.error(`ar: ${path} is out of date. Run \`${fix}\`.`);
-        return 1;
-      }
-      console.log(`  ok      ${path} is up to date`);
-      return 0;
-    }
+    const { path, changed } = await generateManifest(modelsDir, cwd);
     console.log(changed ? `  write   ${path}` : `  ok      ${path} (unchanged)`);
     return 0;
   }

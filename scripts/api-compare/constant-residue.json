@@ -1380,7 +1380,7 @@
     }
   },
   "activestorage": {
-    "rows": 77,
+    "rows": 79,
     "excluded": [
       "engine.ts::Engine",
       "test-helpers/database/create-groups-migration.ts::ActiveStorageCreateGroups",
@@ -2033,9 +2033,9 @@
       "server/dev-server.ts::DevServer",
       "test-helpers/isolation/abstract-unit.ts::Bukkit",
       "test-helpers/isolation/abstract-unit.ts::Generation",
-      "test-helpers/isolation/abstract-unit.ts::Paths",
       "test-helpers/isolation/abstract-unit.ts::Rack",
       "test-helpers/isolation/abstract-unit.ts::Reload",
+      "test-helpers/isolation/paths.ts::Paths",
       "test-unit/reporter.ts::TestUnitReporter",
       "test-unit/runner.ts::CompositeFilter",
       "test-unit/runner.ts::Filter",

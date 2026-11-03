@@ -1,50 +1,23 @@
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { Logger as ASLogger } from "@blazetrails/activesupport";
-
-export interface Silencer {
-  silence(level: number | string, fn: () => void): void;
-  silenceAsync?<T>(level: number | string, fn: () => Promise<T>): Promise<T>;
-}
-
-const ERROR_LEVEL = ASLogger.ERROR;
-
-export interface SilenceRequestOptions {
-  path: string;
-  logger?: Silencer;
-}
+import { Trails } from "../trails.js";
 
 export class SilenceRequest {
   private app: RackApp;
   private path: string;
-  private logger?: Silencer;
 
-  constructor(app: RackApp, options: SilenceRequestOptions) {
+  constructor(app: RackApp, { path }: { path: string }) {
     this.app = app;
-    this.path = options.path;
-    this.logger = options.logger;
+    this.path = path;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    if (env["PATH_INFO"] === this.path && this.logger) {
-      const logger = this.logger;
-      if (logger.silenceAsync) {
-        return logger.silenceAsync(
-          ERROR_LEVEL,
-          () => rbProcCall(this.app, env) as ReturnType<typeof this.app>,
-        );
-      }
-      let pending: Promise<RackResponse> | undefined;
-      logger.silence(ERROR_LEVEL, () => {
-        pending = rbProcCall(this.app, env) as ReturnType<typeof this.app>;
-      });
-      if (!pending) {
-        throw new Error(
-          "Silencer.silence did not invoke callback synchronously; provide silenceAsync for async-aware silencing.",
-        );
-      }
-      return pending;
+    if (env["PATH_INFO"] === this.path) {
+      return Trails.logger!.silence(undefined, () =>
+        rbProcCall(this.app, env),
+      ) as Promise<RackResponse>;
+    } else {
+      return rbProcCall(this.app, env) as Promise<RackResponse>;
     }
-    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
   }
 }

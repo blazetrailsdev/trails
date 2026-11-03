@@ -43,7 +43,7 @@ describe("ArCliTest", () => {
     expect(err.join("\n")).toContain('unknown command "frobnicate"');
   });
 
-  it("generate:manifest writes app/models/index.ts, is idempotent, and --check detects drift", async () => {
+  it("generate:manifest writes .trails/models/index.ts and is idempotent", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-cli-"));
     const models = join(dir, "app", "models");
     await mkdir(models, { recursive: true });
@@ -53,17 +53,15 @@ describe("ArCliTest", () => {
       "utf8",
     );
 
-    expect(await run(["generate:manifest", "--check"], dir)).toBe(1);
-    expect(err.join("\n")).toContain("out of date");
-
     expect(await run(["generate:manifest"], dir)).toBe(0);
     expect(out.join("\n")).toContain("write");
-    expect(await readFile(join(models, "index.ts"), "utf8")).toContain("Object.assign(TopLevel");
+    const manifest = await readFile(join(dir, ".trails", "models", "index.ts"), "utf8");
+    expect(manifest).toContain("Object.assign(TopLevel");
+    expect(manifest).toContain(`import { User } from "../../app/models/user.js";`);
 
     out.length = 0;
     expect(await run(["generate:manifest"], dir)).toBe(0);
     expect(out.join("\n")).toContain("unchanged");
-    expect(await run(["generate:manifest", "--check", "--root", models], dir)).toBe(0);
   });
 
   it("resolves a relative --root against the passed cwd, not process.cwd()", async () => {
@@ -77,26 +75,13 @@ describe("ArCliTest", () => {
     );
 
     expect(await run(["generate:manifest", "--root", "src/models"], dir)).toBe(0);
-    expect(await readFile(join(models, "index.ts"), "utf8")).toContain(`import { User }`);
-  });
-
-  it("--check drift message echoes the custom --root in the suggested fix", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "ar-cli-"));
-    await mkdir(join(dir, "src", "models"), { recursive: true });
-    await writeFile(
-      join(dir, "src", "models", "user.ts"),
-      `import { Base } from "@blazetrails/activerecord";\nexport class User extends Base {}\n`,
-      "utf8",
+    expect(await readFile(join(dir, ".trails", "models", "index.ts"), "utf8")).toContain(
+      `import { User } from "../../src/models/user.js";`,
     );
-    expect(await run(["generate:manifest", "--check", "--root", "src/models"], dir)).toBe(1);
-    expect(err.join("\n")).toContain("Run `ar generate:manifest --root src/models`");
   });
 
   it("fails fast when --root is given without a directory argument", async () => {
     expect(await run(["generate:manifest", "--root"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("--root requires a directory");
-    err.length = 0;
-    expect(await run(["generate:manifest", "--root", "--check"], ".")).toBe(1);
     expect(err.join("\n")).toContain("--root requires a directory");
   });
 
