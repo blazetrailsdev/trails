@@ -91,16 +91,17 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
       }
     }
 
-    const ignoredEntries: string[] = [];
+    const ignoredEntries = new Set<string>();
     const walk = async (dir: string): Promise<void> => {
       for (const basename of await Dir.childrenAsync(dir)) {
         const abspath = File.join(dir, basename);
         const isDir = await File.isDirectoryAsync(abspath);
-        ignoredEntries.push(isDir ? `${relative(abspath)}/` : relative(abspath));
+        ignoredEntries.add(isDir ? `${relative(abspath)}/` : relative(abspath));
         if (isDir) await walk(abspath);
       }
     };
     for (const path of loader.ignoredPaths) {
+      if (ignoredEntries.has(`${relative(path)}/`)) continue;
       if (await File.isDirectoryAsync(path)) await walk(path);
     }
 
@@ -110,7 +111,7 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
       shadowed: [...loader.shadowedFiles].map(relative),
       collapsed: [...loader.collapseDirs].map(relative).sort(),
       ignored: [...loader.ignoredPaths].map(relative).sort(),
-      ignoredEntries: ignoredEntries.sort(),
+      ignoredEntries: [...ignoredEntries].sort(),
     };
   } finally {
     for (const cref of Object.values(loader.autoloads)) cref.remove();

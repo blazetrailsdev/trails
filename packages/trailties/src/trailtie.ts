@@ -30,7 +30,7 @@ export class Trailtie extends Initializable {
   static readonly _registry: Array<typeof Trailtie> = [];
 
   protected _config?: Configuration;
-  private _trailtieNamespace?: unknown;
+  private _trailtieNamespace?: { readonly name: string };
 
   constructor() {
     super();
@@ -136,10 +136,10 @@ export class Trailtie extends Initializable {
     block.call(this);
   }
 
-  trailtieNamespace(): unknown {
+  trailtieNamespace(): { readonly name: string } | undefined {
     return (this._trailtieNamespace ??= moduleParents(this.constructor).find((n) =>
       rbObjRespondTo(n, "trailtieNamespace"),
-    ));
+    ) as { readonly name: string } | undefined);
   }
 
   inspect(): string {
