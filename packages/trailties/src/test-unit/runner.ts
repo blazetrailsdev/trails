@@ -214,7 +214,6 @@ export class Runner {
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
-   * @inventedArm if — PERMANENT
    */
   private static async testLocations(tests: string[], name: RegExp | null): Promise<string[]> {
     const locations: string[] = [];
