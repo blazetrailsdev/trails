@@ -1,6 +1,5 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
-import type { Root } from "../../paths.js";
 import { currentMigrationNumber } from "../migration.js";
 
 interface MigrationHost {
@@ -23,8 +22,7 @@ export function dbMigratePath(this: MigrationHost): string {
 }
 
 export function defaultMigratePath(this: MigrationHost): string {
-  const paths = TopLevel.Trails!.application!.config.paths() as unknown as Root;
-  return paths.get("db/migrate")!.toAry()[0];
+  return TopLevel.Trails!.application!.config.paths().get("db/migrate")!.toAry()[0];
 }
 
 export function configuredMigratePath(this: MigrationHost): string | undefined {

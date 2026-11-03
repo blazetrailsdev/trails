@@ -127,9 +127,14 @@ export function registerModel(
 export function seatModel(model: typeof Base): void {
   const cpath = (rbModName(model) ?? model.name).split("::");
   const cname = cpath.pop()!;
-  let mod = TopLevel as unknown as Record<string, object>;
-  for (const segment of cpath) mod = (mod[segment] ??= {}) as Record<string, object>;
-  mod[cname] = model;
+  if (model === ActiveRecord.Base) return;
+  type Mod = Parameters<typeof constSet>[0];
+  let mod: Mod = TopLevel;
+  for (const segment of cpath) {
+    const seated: Mod | undefined = (mod as unknown as Record<string, Mod>)[segment];
+    mod = seated ?? constSet(mod, segment, {});
+  }
+  constSet(mod, cname, model);
   DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 

@@ -14,10 +14,9 @@ export async function copyRoutes(this: TestCase): Promise<void> {
 }
 
 export async function withDatabaseConfiguration(
-  databaseName: string | (() => Promise<void>) = "secondary",
-  block?: () => Promise<void>,
+  databaseName = "secondary",
+  block: () => Promise<void>,
 ): Promise<void> {
-  if (typeof databaseName === "function") [databaseName, block] = ["secondary", databaseName];
   const originalConfigurations = Base.configurations();
   Base.configurations({
     test: {
@@ -29,7 +28,7 @@ export async function withDatabaseConfiguration(
     },
   });
   try {
-    await block!();
+    await block();
   } finally {
     Base.configurations(originalConfigurations);
   }

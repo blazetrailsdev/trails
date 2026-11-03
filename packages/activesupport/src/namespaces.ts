@@ -71,7 +71,9 @@ declare module "@blazetrails/ruby-compat" {
         config: {
           considerAllRequestsLocal: boolean;
           root?: string | null;
-          paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
+          paths(): {
+            get(path: string): { firstSync(): string | undefined; toAry(): string[] } | undefined;
+          };
         };
         reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
         routes(): {

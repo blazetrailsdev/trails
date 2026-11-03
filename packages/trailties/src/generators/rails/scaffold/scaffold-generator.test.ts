@@ -516,7 +516,7 @@ describe("ScaffoldGeneratorTest", () => {
   });
 
   it("scaffold generator multi db abstract class", async () => {
-    await withDatabaseConfiguration(async () => {
+    await withDatabaseConfiguration(undefined, async () => {
       await t.runGenerator(["posts", "--database=secondary"]);
 
       await t.assertMigration("db/secondary_migrate/create_posts.ts");
@@ -529,7 +529,7 @@ describe("ScaffoldGeneratorTest", () => {
   });
 
   it("scaffold generator database with aliases", async () => {
-    await withDatabaseConfiguration(async () => {
+    await withDatabaseConfiguration(undefined, async () => {
       await t.runGenerator(["posts", "--db=secondary"]);
 
       await t.assertMigration("db/secondary_migrate/create_posts.ts");
