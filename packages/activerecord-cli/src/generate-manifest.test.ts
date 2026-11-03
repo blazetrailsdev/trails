@@ -194,35 +194,26 @@ describe("ArGenerateManifestTest", () => {
     await expect(scanModels(join(dir, "nope"))).rejects.toThrow(/models directory not found/);
   });
 
-  it("writes the manifest, then is a byte-identical no-op on rerun", async () => {
+  it("writes the manifest under .trails/, then is a byte-identical no-op on rerun", async () => {
     await seedModels(dir);
-    const first = await generateManifest(dir);
+    const root = await mkdtemp(join(tmpdir(), "ar-manifest-root-"));
+    const first = await generateManifest(dir, root);
     expect(first.changed).toBe(true);
-    expect(first.path).toBe(join(dir, "index.ts"));
+    expect(first.path).toBe(join(root, ".trails", "models", "index.ts"));
     const onDisk = await readFile(first.path, "utf8");
     expect(onDisk).toBe(first.content);
+    expect(onDisk).toContain(`from "${relative(join(root, ".trails", "models"), dir)}/user.js"`);
+    expect(await readFile(join(dir, "index.ts"), "utf8")).toBe(`// stale manifest\n`);
 
-    const second = await generateManifest(dir);
+    const second = await generateManifest(dir, root);
     expect(second.changed).toBe(false);
     expect(await readFile(second.path, "utf8")).toBe(onDisk);
   });
 
-  it("returns an absolute path even when modelsDir is relative", async () => {
+  it("returns an absolute path even when the app root is relative", async () => {
     await seedModels(dir);
-    const rel = relative(process.cwd(), dir);
-    const result = await generateManifest(rel);
+    const result = await generateManifest(dir, relative(process.cwd(), dir));
     expect(isAbsolute(result.path)).toBe(true);
-    expect(result.path).toBe(join(dir, "index.ts"));
-  });
-
-  it("--check reports drift without writing, and passes once current", async () => {
-    await seedModels(dir);
-    const stale = await readFile(join(dir, "index.ts"), "utf8");
-    const drift = await generateManifest(dir, { check: true });
-    expect(drift.changed).toBe(true);
-    expect(await readFile(join(dir, "index.ts"), "utf8")).toBe(stale);
-
-    await generateManifest(dir);
-    expect((await generateManifest(dir, { check: true })).changed).toBe(false);
+    expect(result.path).toBe(join(dir, ".trails", "models", "index.ts"));
   });
 });

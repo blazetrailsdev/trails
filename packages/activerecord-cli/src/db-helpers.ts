@@ -1,3 +1,4 @@
+import { generateManifest, MANIFEST_PATH } from "./generate-manifest.js";
 import { join, resolve } from "path";
 import { File } from "@blazetrails/ruby-compat";
 import { getEnv, presence } from "@blazetrails/activesupport";
@@ -27,7 +28,9 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
 }
 
 export async function tryLoadModels(cwd: string): Promise<Record<string, unknown>> {
-  const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
+  const modelsDir = join(cwd, "app", "models");
+  if (await File.isDirectoryAsync(modelsDir)) await generateManifest(modelsDir, cwd);
+  const modelsPath = resolve(join(cwd, MANIFEST_PATH));
   if (!File.isExist(modelsPath)) return {};
   const { pathToFileURL } = await import("node:url");
   return import(pathToFileURL(modelsPath).href) as Promise<Record<string, unknown>>;

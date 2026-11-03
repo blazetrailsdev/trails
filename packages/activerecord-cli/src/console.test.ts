@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtemp, mkdir, writeFile } from "fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
@@ -46,18 +46,36 @@ describe("ArConsoleTest", () => {
     expect(stub.context["Base"]).toBeDefined();
   });
 
-  it("loads models into REPL context when app/models/index.ts is present", async () => {
+  it("loads models into REPL context when .trails/models/index.ts is present", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-console-models-"));
     await scaffoldProject(dir);
-    await mkdir(join(dir, "app", "models"), { recursive: true });
+    await mkdir(join(dir, ".trails", "models"), { recursive: true });
     await writeFile(
-      join(dir, "app", "models", "index.ts"),
+      join(dir, ".trails", "models", "index.ts"),
       `export const Sentinel = "sentinel-value";\n`,
       "utf8",
     );
     const stub = makeReplStub();
     await arConsole(dir, ["--env", "test"], { startRepl: () => stub });
     expect(stub.context["Sentinel"]).toBe("sentinel-value");
+  });
+
+  it("regenerates the gitignored manifest from app/models before loading it", async () => {
+    const dir = await mkdtemp(join(import.meta.dirname, "..", ".tmp-console-"));
+    try {
+      await scaffoldProject(dir);
+      await mkdir(join(dir, "app", "models"), { recursive: true });
+      await writeFile(
+        join(dir, "app", "models", "widget.ts"),
+        `import { Base } from "@blazetrails/activerecord";\nexport class Widget extends Base {}\n`,
+        "utf8",
+      );
+      const stub = makeReplStub();
+      expect(await arConsole(dir, ["--env", "test"], { startRepl: () => stub })).toBe(0);
+      expect(stub.context["Widget"]).toBeDefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("returns 1 when config/database.ts is missing", async () => {

@@ -141,7 +141,7 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
 
     await writeFile(
       join(tmpDir, "try-runner.ts"),
-      `import { Product } from "./app/models/index.js";
+      `import { Product } from "./.trails/models/index.js";
 const product = await Product.createBang({ name: "Widget" });
 (globalThis as Record<string, unknown>).__runnerProduct = product.name;
 `,

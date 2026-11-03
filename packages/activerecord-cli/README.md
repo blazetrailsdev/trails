@@ -55,7 +55,7 @@ database: .../shop/db/development.sqlite3
  Status   Migration ID    Migration Name
 --------------------------------------------------
    up     20260929192331  Create products
-  write   .../shop/app/models/index.ts
+  write   .../shop/.trails/models/index.ts
 Dumped schema to .../shop/db/schema.ts
 ```
 
@@ -67,7 +67,7 @@ for any other command.
 
 ```ts
 // try-runner.ts
-import { Product } from "./app/models/index.js";
+import { Product } from "./.trails/models/index.js";
 
 const p = await Product.createBang({ name: "Gadget", price: 7 });
 console.log(p.id, await Product.count(), Product.where({ price: 7 }).toSql());
@@ -92,16 +92,16 @@ exports `connect()`, described under [Bootstrap](#bootstrap). It connects to
 `ar new <name>` creates the directory and runs `ar init` in it. `ar init`
 writes:
 
-| Path                  | Purpose                                                                                         |
-| --------------------- | ----------------------------------------------------------------------------------------------- |
-| `package.json`        | `ar` / `migrate` / `seed` / `console` / `runner` scripts (through `tsx`), the driver dependency |
-| `tsconfig.json`       | AR-required compiler settings (merged if one exists)                                            |
-| `config/database.ts`  | Connection config keyed by environment, like Rails' `config/database.yml`                       |
-| `db/migrate/`         | Timestamped migration files                                                                     |
-| `db/seeds.ts`         | Seed data loaded by `ar db:seed`                                                                |
-| `app/models/index.ts` | Generated manifest that registers every model class                                             |
-| `db.ts`               | A `connect()` helper for code that runs outside `ar`                                            |
-| `.gitignore`          | Ignores `node_modules/`, `dist/`, SQLite files                                                  |
+| Path                      | Purpose                                                                                         |
+| ------------------------- | ----------------------------------------------------------------------------------------------- |
+| `package.json`            | `ar` / `migrate` / `seed` / `console` / `runner` scripts (through `tsx`), the driver dependency |
+| `tsconfig.json`           | AR-required compiler settings (merged if one exists)                                            |
+| `config/database.ts`      | Connection config keyed by environment, like Rails' `config/database.yml`                       |
+| `db/migrate/`             | Timestamped migration files                                                                     |
+| `db/seeds.ts`             | Seed data loaded by `ar db:seed`                                                                |
+| `.trails/models/index.ts` | Generated, gitignored manifest that registers every model class                                 |
+| `db.ts`                   | A `connect()` helper for code that runs outside `ar`                                            |
+| `.gitignore`              | Ignores `node_modules/`, `dist/`, `.trails/`, SQLite files                                      |
 
 `ar db:schema:dump` later writes `db/schema.ts`, and `ar generate:model` writes
 `app/models/<name>.ts`.
@@ -121,7 +121,7 @@ then falls back to `development`.
 | `ar init`                                    | Scaffold into the current directory                        |
 | `ar generate:migration <Name> [field:type…]` | Emit `db/migrate/<ts>_<snake>.ts`                          |
 | `ar generate:model <Name> [field:type…]`     | Emit model (with a `declare` per field) + create migration |
-| `ar generate:manifest`                       | Scan `app/models/` and rewrite `app/models/index.ts`       |
+| `ar generate:manifest`                       | Scan `app/models/` and rewrite `.trails/models/index.ts`   |
 | `ar destroy:migration <Name>`                | Delete the matching migration file                         |
 | `ar destroy:model <Name>`                    | Delete model + its create migration                        |
 
@@ -156,7 +156,7 @@ then falls back to `development`.
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ar typecheck`         | Type-check models via `trails-tsc`                                                                                                                                              |
 | `ar models:dump`       | Emit one model class per table in `db/schema.ts`, with `belongsTo` / `hasMany` from foreign keys. `--schema`, `--out`, `--only`, `--ignore`, `--strip-prefix`, `--strip-suffix` |
-| `ar generate:manifest` | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                                                                                                |
+| `ar generate:manifest` | Regenerate `.trails/models/index.ts` (also listed under Scaffolding)                                                                                                            |
 
 Pass `--help` to any command for its full option set.
 
@@ -167,11 +167,11 @@ load time. TypeScript has no equivalent hook for ES modules. The solution is a
 generated barrel:
 
 ```ts
-// app/models/index.ts, as `ar generate:manifest` wrote it for the quickstart
+// .trails/models/index.ts, as `ar generate:manifest` wrote it for the quickstart
 // AUTO-GENERATED by @blazetrails/activerecord-cli. Do not edit by hand.
 // Re-run `ar generate:manifest` (or `ar init`) to update.
 import { TopLevel } from "@blazetrails/activesupport";
-import { Product } from "./product.js";
+import { Product } from "../../app/models/product.js";
 
 export const models = [Product] as const;
 Object.assign(TopLevel, { Product });
@@ -181,12 +181,9 @@ export { Product };
 
 Importing this file registers every model with ActiveRecord, so that
 string class names in associations (`className:`, `through:`) resolve. `ar generate:manifest` keeps it current whenever you add
-or remove a model file. Run it after any model change, or in CI with `--check`
-to catch drift:
-
-```sh
-ar generate:manifest --check   # exits 1 if index.ts is out of date
-```
+or remove a model file. It is build output under `.trails/`: gitignore it and
+run `ar generate:manifest` after any model change (`ar init` runs it too);
+never commit it.
 
 The optional ESLint rule `blazetrails/manifest-complete` enforces the same
 check at lint time.
@@ -229,7 +226,7 @@ if (pending.length > 0) {
 ```ts
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
-import { models } from "./app/models/index.js";
+import { models } from "./.trails/models/index.js";
 
 let connected = false;
 
@@ -253,7 +250,7 @@ with `TRAILS_ENV` and `NODE_ENV` unset, this script printed `2`:
 
 ```ts
 import { connect } from "./db.js";
-import { Product } from "./app/models/index.js";
+import { Product } from "./.trails/models/index.js";
 
 await connect();
 await Product.createBang({ name: "Widget", price: 5 });
@@ -264,8 +261,8 @@ console.log(await Product.count());
 
 - **Generated manifest, not autoload.** ES module loading is static and
   asynchronous — there is no reliable runtime hook equivalent to Ruby's
-  `inherited`. A generated barrel is deterministic, tree-shakeable, and
-  auditable via `--check`.
+  `inherited`. A generated barrel is deterministic and tree-shakeable, and is
+  build output under `.trails/`, never committed.
 
 - **`TRAILS_ENV`, not `NODE_ENV`.** `NODE_ENV` is a build-time optimization
   flag in the JS ecosystem (tree-shaking, minification). Using it to pick a
