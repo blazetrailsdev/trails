@@ -12,6 +12,13 @@ import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ActiveStorage } from "./active-storage.js";
 import { Model } from "./attached/model.js";
+import { ImageMagick } from "./analyzer/image-analyzer/image-magick.js";
+import { Vips } from "./analyzer/image-analyzer/vips.js";
+import { VideoAnalyzer } from "./analyzer/video-analyzer.js";
+import { AudioAnalyzer } from "./analyzer/audio-analyzer.js";
+import { MuPDFPreviewer } from "./previewer/mupdf-previewer.js";
+import { PopplerPDFPreviewer } from "./previewer/poppler-pdf-previewer.js";
+import { VideoPreviewer } from "./previewer/video-previewer.js";
 import { ActiveRecordExtensions, ReflectionExtension } from "./reflection.js";
 
 export class Engine extends TrailsEngine {
@@ -26,9 +33,19 @@ export class Engine extends TrailsEngine {
 
     const activeStorage = new OrderedOptions() as unknown as { [k: string]: unknown };
     this.config.set("activeStorage", activeStorage);
+    activeStorage.previewers = [PopplerPDFPreviewer, MuPDFPreviewer, VideoPreviewer];
+    activeStorage.analyzers = [Vips, ImageMagick, VideoAnalyzer, AudioAnalyzer];
     activeStorage.paths = new OrderedOptions();
     activeStorage.queues = new InheritableOptions();
     activeStorage.precompileAssets = true;
+
+    this.initializer("active_storage.configs", () => {
+      this.config.afterInitialize((app) => {
+        const config = app.config.get("activeStorage") as typeof activeStorage;
+        ActiveStorage.previewers = (config.previewers as typeof ActiveStorage.previewers) ?? [];
+        ActiveStorage.analyzers = (config.analyzers as typeof ActiveStorage.analyzers) ?? [];
+      });
+    });
 
     this.initializer("active_storage.attached", () => {
       onLoad("active_record", function (this: typeof Base) {

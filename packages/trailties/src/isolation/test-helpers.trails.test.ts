@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { Dir, getFs, include } from "@blazetrails/ruby-compat";
+import { getFs, include } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
@@ -38,14 +38,7 @@ describe("TestHelpers::Generation#build_app", () => {
     t = new GenerationTest("test");
     await t.buildApp();
 
-    await t.addToConfig(`this.config.cacheStore = ":memory_store";`);
-    const pwd = Dir.pwd();
-    Dir.chdir(await t.appPath());
-    try {
-      await t.bootTrails();
-    } finally {
-      Dir.chdir(pwd);
-    }
+    await t.bootTrails();
 
     expect(Trails.application).not.toBeNull();
     expect(Application.appClass).not.toBeNull();

@@ -818,6 +818,8 @@ ${this.trailsRequireStatement()}
 
 export class ${this.appConstBase()} extends Application {
   static {
+    Application.register(this, import.meta.dirname);
+
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("${this.configTargetVersion()}");
 ${
@@ -839,8 +841,6 @@ ${
   // config.timeZone = "Central Time (US & Canada)";
   // config.eagerLoadPaths.push("extras");
 }
-
-Application.register(${this.appConstBase()}, import.meta.dirname);
 
 // Please, add to the \`ignore\` list any other \`lib\` subdirectories that do
 // not contain \`.ts\` files, or that should not be reloaded or eager loaded.

@@ -3,14 +3,12 @@ import { Rake, TaskManager, type Application as RakeApplication } from "@blazetr
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
-import { subclasses } from "../command/behavior.js";
 import { UnrecognizedCommandError, printingCommands, root } from "../command.js";
 
 export class RakeCommand extends Base {
   static {
     extend(this, Actions);
     this.namespace("rake");
-    subclasses().push(this);
   }
 
   static override async printingCommands(): Promise<[string, string | null][]> {

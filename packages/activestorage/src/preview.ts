@@ -37,21 +37,21 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  get filename(): Promise<Filename> {
-    return this.isProcessed()
-      .then(() => this.presentation())
-      .then((presentation) => presentation.filename);
+  private _presentation: Presented | null = null;
+
+  get filename(): Filename {
+    return this._presentation!.filename;
   }
 
-  get contentType(): Promise<string | null> {
-    return this.isProcessed()
-      .then(() => this.presentation())
-      .then((presentation) => presentation.contentType);
+  get contentType(): string | null {
+    return this._presentation!.contentType;
   }
 
+  /** @inventedArm presentation — PERMANENT */
   async processed(): Promise<this> {
     if (!(await this.isProcessed())) await this.process();
     if (this.isVariant()) await (await this.variant()).processed();
+    this._presentation = await this.presentation();
     return this;
   }
 

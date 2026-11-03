@@ -6,6 +6,7 @@ import {
   dasherize as _dasherize,
   extractOptionsBang,
   humanize,
+  isBlank,
 } from "@blazetrails/activesupport";
 import {
   File,
@@ -97,6 +98,8 @@ export interface GeneratorBase extends Invocation, GeneratorActionsState {
   template(source: string, ...args: unknown[]): Promise<unknown>;
   removeFile(path: string, ...args: unknown[]): Promise<unknown>;
   removeDir(path: string, ...args: unknown[]): Promise<unknown>;
+  capture: OmitThisParameter<typeof ThorActions.Actions.capture>;
+  concat: OmitThisParameter<typeof ThorActions.Actions.concat>;
 }
 
 export abstract class GeneratorBase extends (Group as unknown as (abstract new (
@@ -107,6 +110,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   GroupStatics) {
   declare static _sourcePaths?: string[];
   declare static _sourceRoot?: string | null;
+  declare static _namespace?: string;
   /** @internal */
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
@@ -181,6 +185,15 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return klass._desc;
   }
 
+  static override namespace(name: string | null = null): string {
+    if (name != null) return super.namespace(name);
+    if (Object.hasOwn(this, "_namespace") && this._namespace != null) return this._namespace;
+    return (this._namespace = super
+      .namespace()
+      .replace(/_generator$/, "")
+      .replace(/:generators:/, ":"));
+  }
+
   static async defaultSourceRoot(): Promise<string | undefined> {
     if (!(this.baseName() != null && this.generatorName() != null)) return;
     if ((await this.defaultGeneratorRoot()) == null) return;
@@ -203,6 +216,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
   _sourcePaths?: string[];
   private _namespaceDirs?: string[];
+  private _namespacedPath?: string;
 
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
@@ -468,6 +482,26 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     }
   }
 
+  protected moduleNamespacing(block: () => unknown): void {
+    let content = this.capture(block);
+    if (this.isNamespaced()) content = this.wrapWithNamespace(content);
+    this.concat(content);
+  }
+
+  /** @missingRailsArgs join — PERMANENT */
+  protected indent(content: string, multiplier = 2): string {
+    const spaces = " ".repeat(multiplier);
+    return content
+      .split(/(?<=\n)/)
+      .map((line) => (isBlank(line) ? line : `${spaces}${line}`))
+      .join("");
+  }
+
+  protected wrapWithNamespace(content: string): string {
+    content = this.indent(content).replace(/\r?\n$/, "");
+    return `export namespace ${this.namespace()!.name} {\n${content}\n}\n`;
+  }
+
   /** @internal */
   protected namespace(): { readonly name: string } | null {
     return Generators.namespace;
@@ -483,6 +517,10 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return (this._namespaceDirs ??= this.namespace()!
       .name.split("::")
       .map((n) => _underscore(n)));
+  }
+
+  protected namespacedPath(): string {
+    return (this._namespacedPath ??= this.namespaceDirs().join("/"));
   }
 
   protected isTypeScript(): boolean {
