@@ -113,6 +113,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "rack",
   "rack-session",
   "rack-test",
+  "rackup",
   "rails-dom-testing",
   "rake",
   "solid-cable",

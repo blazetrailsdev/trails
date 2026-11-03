@@ -200,6 +200,7 @@ export const MANIFEST_PACKAGES = [
   "rack",
   "rack-session",
   "rack-test",
+  "rackup",
   "globalid",
   "i18n",
   "did-you-mean",

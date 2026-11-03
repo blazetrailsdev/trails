@@ -61,6 +61,8 @@ export interface ProcessAdapter {
   onSignal(name: SignalName, handler: () => void): () => void;
   /** @noRailsEquivalent PERMANENT */
   signalListenerCount?(name: SignalName): number;
+  /** @noRailsEquivalent PERMANENT */
+  onExit?(handler: () => void): void;
   readonly stdout: WriteStream;
   readonly stderr: WriteStream;
   readonly stdin: ReadStream;
@@ -400,6 +402,25 @@ export function setSourceMapsSupport(enabled: boolean): void {
   requireAdapter().setSourceMapsSupport?.(enabled);
 }
 
+const endProcs: (() => void)[] = [];
+
+/**
+ * `rb_f_at_exit` (`vendor/ruby/v3.3.11/eval_jump.c:38`), `Kernel#at_exit`,
+ * through `rb_set_end_proc` (`:59`): the blocks run once, newest first, when
+ * the process exits.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function atExit(block: () => void): () => void {
+  if (endProcs.length === 0) {
+    requireAdapter().onExit?.(() => {
+      for (const proc of endProcs.splice(0).reverse()) proc();
+    });
+  }
+  endProcs.push(block);
+  return block;
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
@@ -670,6 +691,9 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       nodeModule.registerHooks(hooks);
     },
     signalListenerCount: (name) => proc.listenerCount(name),
+    onExit: (handler) => {
+      proc.on("exit", handler);
+    },
     onSignal: (name, handler) => {
       proc.on(name, handler);
       return () => {

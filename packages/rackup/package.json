@@ -1,0 +1,22 @@
+{
+  "name": "@blazetrails/rackup",
+  "version": "0.1.0",
+  "description": "A general server command for Rack applications, mirroring Ruby's rackup",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

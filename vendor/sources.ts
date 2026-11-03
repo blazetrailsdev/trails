@@ -245,6 +245,18 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rackup",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rackup.git",
+      // vendor/rails/Gemfile.lock:445 resolves rackup (2.2.1), required by
+      // railties `rackup (>= 1.0.0)` (vendor/rails/Gemfile.lock:93).
+      ref: "v2.2.1",
+    },
+    // `lib/rackup/` (the Rackup module root), the same shape as `rack`.
+    packages: [{ name: "rackup", libPath: "lib/rackup", testPath: "test" }],
+  },
+  {
     name: "did_you_mean",
     origin: {
       type: "git",
