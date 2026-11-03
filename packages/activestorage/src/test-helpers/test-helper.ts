@@ -279,8 +279,13 @@ export async function directlyUploadFileBlob({
   return blob;
 }
 
-export async function readImage(blobOrVariant: { service: Service; key: string }) {
-  return await Image.open((blobOrVariant.service as DiskService).pathFor(blobOrVariant.key));
+export async function readImage(blobOrVariant: {
+  service: Service;
+  key: string | Promise<string | null>;
+}) {
+  return await Image.open(
+    (blobOrVariant.service as DiskService).pathFor((await blobOrVariant.key)!),
+  );
 }
 
 export async function extractMetadataFrom(blob: Blob) {
