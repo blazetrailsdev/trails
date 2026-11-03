@@ -1090,7 +1090,7 @@
     }
   },
   "trailties": {
-    "rows": 65,
+    "rows": 66,
     "excluded": [
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
@@ -1157,6 +1157,7 @@
       "paths.ts::Path": "Trails::Paths::Path",
       "paths.ts::Root": "Trails::Paths::Root",
       "pwa-controller.ts::PwaController": "Trails::PwaController",
+      "rack.ts::Rack": "Trails::Rack",
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
       "source-annotation-extractor.ts::Annotation": "Trails::SourceAnnotationExtractor::Annotation",

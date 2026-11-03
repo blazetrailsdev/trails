@@ -6,3 +6,4 @@ export { Trailtie } from "./trailtie.js";
 
 import "./constants.generated.js";
 export { ZeitwerkChecker } from "./zeitwerk-checker.js";
+import "./rack.js";

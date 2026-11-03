@@ -86,3 +86,4 @@ export { AttachmentsList } from "./attachments-list.js";
 export { Multibyte, EncodingError } from "./multibyte.js";
 export { Chars } from "./multibyte/chars.js";
 export { Unicode } from "./multibyte/unicode.js";
+import "./parsers.js";

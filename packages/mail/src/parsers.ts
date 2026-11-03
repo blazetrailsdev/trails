@@ -1,3 +1,6 @@
+import { Mail } from "./mail.js";
+import * as Parsers from "./parsers.js";
+
 export { AddressListsParser } from "./parsers/address-lists-parser.js";
 export { ContentDispositionParser } from "./parsers/content-disposition-parser.js";
 export { ContentLocationParser } from "./parsers/content-location-parser.js";
@@ -9,3 +12,5 @@ export { MessageIdsParser } from "./parsers/message-ids-parser.js";
 export { MimeVersionParser } from "./parsers/mime-version-parser.js";
 export { PhraseListsParser } from "./parsers/phrase-lists-parser.js";
 export { ReceivedParser } from "./parsers/received-parser.js";
+
+Mail.Parsers = Parsers;
