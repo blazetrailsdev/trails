@@ -1173,8 +1173,8 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
   site, and that a plain import can reach, is an import (§ "Call-time constant
   resolution"), or a module-private map or `switch` beside the reader.
 - **`registerModel`, `registerController`, `registerJob`, `registerChannel` and
-  `registerConnection` retire** under RFC 0213. Until then they seat through
-  `registerConstant`, and the walk finds what they seated.
+  `registerConnection` are retired** under RFC 0213. A constant is seated on its
+  namespace (`constSet(TopLevel, "Name", Klass)`), and the walk finds it there.
 - **Full-path seats and class-path tables are transitional.** `registerConstant`
   seats `"A::B"` whole and `generatedClass` holds a class no namespace does, so
   the walk reads both where it reaches them, until

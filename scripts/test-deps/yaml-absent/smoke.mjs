@@ -19,7 +19,8 @@ for (const name of (await readdir(packagesDir)).sort()) {
 }
 
 const dist = (path) => import(new URL(path, packagesDir).href);
-const { Base, registerModel } = await dist("activerecord/dist/index.js");
+const { Base } = await dist("activerecord/dist/index.js");
+const { constSet, TopLevel } = await dist("ruby-compat/dist/index.js");
 const { FixtureSet } = await dist("activerecord/dist/fixtures.js");
 const { loadCanonicalSchema } = await dist("activerecord/dist/support/canonical-schema.js");
 const { File: FixtureFile } = await dist("activerecord/dist/fixture-set/file.js");
@@ -32,7 +33,7 @@ await loadDatabaseConfig(appDir.pathname);
 class Topic extends Base {
   static {
     this.serialize("content", { coder: JSON });
-    registerModel(this);
+    constSet(TopLevel, this.name, this);
   }
 }
 

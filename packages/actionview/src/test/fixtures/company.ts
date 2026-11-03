@@ -1,4 +1,4 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Company extends Base {
@@ -17,4 +17,3 @@ Object.assign(Company.prototype, {
   },
 });
 (TopLevel as { Company?: typeof Company }).Company = Company;
-registerModel(Company);

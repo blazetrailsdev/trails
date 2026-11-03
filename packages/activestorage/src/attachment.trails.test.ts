@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DelegationError } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { registerModel } from "@blazetrails/activerecord";
 import { ArgumentError, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
@@ -22,8 +21,6 @@ describe("Attachment", () => {
   });
 
   it("keeps its qualified name through registerModel", () => {
-    registerModel(Attachment);
-
     expect(rbModName(Attachment)).toBe("ActiveStorage::Attachment");
     expect(User.computeType("ActiveStorage::Attachment")).toBe(Attachment);
   });

@@ -1,4 +1,4 @@
-import { Base, type Relation, registerModel } from "@blazetrails/activerecord";
+import { Base, type Relation } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Project extends Base {
@@ -18,4 +18,3 @@ export class Project extends Base {
   }
 }
 (TopLevel as { Project?: typeof Project }).Project = Project;
-registerModel(Project);

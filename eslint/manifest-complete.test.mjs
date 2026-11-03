@@ -46,7 +46,7 @@ tester.run("manifest-complete", rule, {
     // Extra non-relative import (e.g. framework import) is ignored.
     {
       filename: manifestPath,
-      code: 'import { registerModel } from "@blazetrails/activerecord";\n' + BOTH_IMPORTS,
+      code: 'import { TopLevel } from "@blazetrails/activesupport";\n' + BOTH_IMPORTS,
     },
   ],
   invalid: [
@@ -59,7 +59,7 @@ tester.run("manifest-complete", rule, {
     // Both model files missing from an empty manifest.
     {
       filename: manifestPath,
-      code: 'import { registerModel } from "@blazetrails/activerecord";\n',
+      code: 'import { TopLevel } from "@blazetrails/activesupport";\n',
       errors: [
         { messageId: "missingImport", data: { file: "post.ts" } },
         { messageId: "missingImport", data: { file: "user.ts" } },

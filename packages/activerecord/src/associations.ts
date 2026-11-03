@@ -2,27 +2,18 @@ import type { Base } from "./base.js";
 import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
-import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
+import { Associations as AssociationsNamespace } from "./namespaces.js";
 
-import { ArgumentError } from "@blazetrails/activemodel";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import { Autoload, DescendantsTracker } from "@blazetrails/activesupport";
+import { Autoload } from "@blazetrails/activesupport";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
-import {
-  include,
-  rbClassInheritedP,
-  rbClassSuperclass,
-  constSet,
-  rbModName,
-  registerConstant,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { include, constSet, rbCallSuper } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
   | string
@@ -84,42 +75,6 @@ export interface ReflectionLike {
   isThroughReflection?: () => boolean;
   isNested?: () => boolean;
   sourceReflection?: { belongsTo?: () => boolean; isPolymorphic?: () => boolean } | null;
-}
-
-/** @internal */
-function assertActiveRecordBase(model: typeof Base): void {
-  if (typeof model !== "function" || rbClassInheritedP(model, ActiveRecord.Base) !== true) {
-    throw new ArgumentError(
-      `registerModel expects an ActiveRecord::Base subclass, got ${String(model?.name ?? model)}`,
-    );
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function registerModel(model: typeof Base): void;
-export function registerModel(name: string, model: typeof Base): void;
-export function registerModel(models: (typeof Base)[]): void;
-export function registerModel(
-  nameOrModel: string | typeof Base | (typeof Base)[],
-  model?: typeof Base,
-): void {
-  if (Array.isArray(nameOrModel)) {
-    for (const m of nameOrModel) registerModel(m);
-    return;
-  }
-  if (typeof nameOrModel === "string") {
-    if (!model) throw new ArgumentError("registerModel(name, model) requires a model class");
-    assertActiveRecordBase(model);
-    registerConstant(nameOrModel, model);
-  } else {
-    model = nameOrModel;
-    assertActiveRecordBase(model);
-    const qualified = rbModName(model) ?? model.name;
-    registerConstant(qualified, model);
-    if (qualified !== model.name) registerConstant(model.name, model);
-  }
-  if (model === ActiveRecord.Base) return;
-  DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 
 /** @internal */
