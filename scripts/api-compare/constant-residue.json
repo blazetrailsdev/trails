@@ -1941,7 +1941,7 @@
     }
   },
   "trailties": {
-    "rows": 62,
+    "rows": 63,
     "excluded": [
       "__fixtures__/boot-app/app/channels/application-cable/channel.ts::Channel",
       "__fixtures__/boot-app/app/channels/application-cable/connection.ts::Connection",
@@ -2076,6 +2076,7 @@
       "commands/console/irb-console.ts::IRBConsole": "Trails::Console::IRBConsole",
       "commands/credentials.ts::CredentialsCommand": "Trails::Command::CredentialsCommand",
       "commands/credentials/credentials-command/diffing.ts::Diffing": "Trails::Command::CredentialsCommand::Diffing",
+      "commands/db/system/change/change-command.ts::ChangeCommand": "Trails::Command::Db::System::ChangeCommand",
       "commands/dbconsole.ts::DBConsole": "Trails::DBConsole",
       "commands/dbconsole.ts::DbconsoleCommand": "Trails::Command::DbconsoleCommand",
       "commands/destroy.ts::DestroyCommand": "Trails::Command::DestroyCommand",
