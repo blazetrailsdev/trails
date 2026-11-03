@@ -10,7 +10,7 @@ import {
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
@@ -30,7 +30,7 @@ class Person {
 describe("SignedGlobalIDTest", () => {
   beforeEach(() => {
     GlobalID.setApp(TEST_APP);
-    registerConstant("Person", Person);
+    constSet(TopLevel, "Person", Person);
   });
   afterEach(() => {
     GlobalID["_app"] = undefined;

@@ -1,10 +1,11 @@
+import { constSet } from "./include.js";
+import { TopLevel } from "./object.js";
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
 import { StandardError } from "./standard-error.js";
-import { registerConstant } from "./variable.js";
 
 class ZError extends StandardError {}
 
@@ -331,4 +332,5 @@ export const Zlib = {
   },
 };
 
-registerConstant("Zlib::Error", ZError);
+constSet(TopLevel, "Zlib", Zlib);
+constSet(Zlib, "Error", ZError);

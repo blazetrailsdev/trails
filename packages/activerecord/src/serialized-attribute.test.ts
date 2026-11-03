@@ -13,7 +13,7 @@ import {
   constSet,
   rbObjClass,
   rbObjDup,
-  registerConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -38,7 +38,7 @@ import {
 } from "./active-record.js";
 
 const SerializedAttributeTest = {};
-registerConstant("SerializedAttributeTest", SerializedAttributeTest);
+constSet(TopLevel, "SerializedAttributeTest", SerializedAttributeTest);
 
 const MyObject = constSet(
   SerializedAttributeTest,

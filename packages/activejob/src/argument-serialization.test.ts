@@ -24,7 +24,7 @@ import {
   constSet,
   rbObjClass,
   rbObjIsKindOf,
-  registerConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { DeserializationError, SerializationError } from "./arguments.js";
 import { ActiveJob } from "./namespaces.js";
@@ -42,7 +42,7 @@ class ArgumentSerializationTest {
     return "ArgumentSerializationTest";
   }
 }
-registerConstant("ArgumentSerializationTest", ArgumentSerializationTest);
+constSet(TopLevel, "ArgumentSerializationTest", ArgumentSerializationTest);
 
 const ModuleArgument = defineModule({});
 constSet(ArgumentSerializationTest, "ModuleArgument", ModuleArgument);

@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { Hash, kernelThrow, constSet, registerConstant, TopLevel } from "@blazetrails/ruby-compat";
+import { Hash, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -97,7 +97,7 @@ constSet(TopLevel, "SpecialCo", SpecialCo);
 DescendantsTracker.registerSubclass(Company, SpecialCo);
 
 export const Namespaced = {};
-registerConstant("Namespaced", Namespaced);
+constSet(TopLevel, "Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {
   static {

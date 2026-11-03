@@ -1,12 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { ScopeOn } from "../../scoping/named.js";
-import {
-  kernelThrow,
-  rbCallSuper,
-  registerConstant,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { kernelThrow, rbCallSuper, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -1104,7 +1098,7 @@ export class FakeKlass {
     FakeKlass.initializeRelationDelegateCache.call(this as unknown as typeof Base);
   }
 }
-registerConstant("FakeKlass", FakeKlass);
+constSet(TopLevel, "FakeKlass", FakeKlass);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Postesque extends Base {

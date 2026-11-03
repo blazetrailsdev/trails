@@ -2,12 +2,12 @@ import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver, MissingTemplate } from "@blazetrails/actionview";
 import { assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
 
 {
-  registerConstant("RenderAction", { name: "RenderAction" });
+  constSet(TopLevel, "RenderAction", { name: "RenderAction" });
 
   class BasicController extends Base {
     static {
@@ -147,7 +147,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
 }
 
 {
-  registerConstant("RenderActionWithApplicationLayout", {
+  constSet(TopLevel, "RenderActionWithApplicationLayout", {
     name: "RenderActionWithApplicationLayout",
   });
 
@@ -264,7 +264,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
 }
 
 {
-  registerConstant("RenderActionWithControllerLayout", {
+  constSet(TopLevel, "RenderActionWithControllerLayout", {
     name: "RenderActionWithControllerLayout",
   });
 
@@ -347,7 +347,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
 }
 
 {
-  registerConstant("RenderActionWithBothLayouts", { name: "RenderActionWithBothLayouts" });
+  constSet(TopLevel, "RenderActionWithBothLayouts", { name: "RenderActionWithBothLayouts" });
 
   class BasicController extends Base {
     static {

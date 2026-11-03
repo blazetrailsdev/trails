@@ -1,5 +1,5 @@
 import { Logger, TaggedLogging } from "@blazetrails/activesupport";
-import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class OverriddenLoggingJob extends Base {
@@ -17,4 +17,4 @@ export class OverriddenLoggingJob extends Base {
     return (this._logger ??= TaggedLogging.new(new Logger(null)));
   }
 }
-registerConstant("OverriddenLoggingJob", OverriddenLoggingJob);
+constSet(TopLevel, "OverriddenLoggingJob", OverriddenLoggingJob);

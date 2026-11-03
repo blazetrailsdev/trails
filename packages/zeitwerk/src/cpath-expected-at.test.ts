@@ -1,4 +1,4 @@
-import { File, Pathname, registerConstant } from "@blazetrails/ruby-compat";
+import { File, Pathname, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Error as ZeitwerkError, NameError } from "./error.js";
 import type { Loader } from "./loader.js";
@@ -101,7 +101,8 @@ describe("TestCpathExpectedAtNil", () => {
 describe("TestCpathExpectedAtString", () => {
   const M = {};
   Object.defineProperty(M, "name", { value: "Overridden" });
-  registerConstant("TestCpathExpectedAtString::M", M);
+  constSet(TopLevel, "TestCpathExpectedAtString", {});
+  constSet(constGet(Object, "TestCpathExpectedAtString") as object, "M", M);
   const M_REAL_NAME = "TestCpathExpectedAtString::M";
 
   const s = hooks();

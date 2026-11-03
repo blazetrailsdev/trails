@@ -1,7 +1,7 @@
 import { SolidQueue } from "./solid-queue.js";
 import { RecordNotUnique, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { constSet, Range, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, Range } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import type { Job } from "./job.js";
 
@@ -130,4 +130,3 @@ export class Proxy {
     return this.job.concurrencyLimit() ?? 1;
   }
 }
-registerConstant("SolidQueue::Semaphore::Proxy", Proxy);

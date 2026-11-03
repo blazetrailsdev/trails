@@ -1,5 +1,6 @@
+import { classpaths } from "../classpath.js";
 import { RuntimeError } from "../runtime-error.js";
-import { registerConstant } from "../variable.js";
+
 import type { PsychIO } from "../psych-adapter.js";
 import { Scalar } from "./nodes/scalar.js";
 import { Sequence } from "./nodes/sequence.js";
@@ -1196,4 +1197,4 @@ export class Emitter {
   }
 }
 
-registerConstant("Psych::Emitter", Emitter);
+classpaths.set(Emitter, { path: "Psych::Emitter", permanent: true });

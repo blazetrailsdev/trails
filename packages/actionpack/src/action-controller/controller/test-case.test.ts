@@ -1,4 +1,4 @@
-import { forceEncoding, registerConstant } from "@blazetrails/ruby-compat";
+import { forceEncoding, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { htmlSafe } from "@blazetrails/activesupport";
 import {
   assert,
@@ -45,9 +45,9 @@ import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ContentController } from "../../test-helpers/lib/controller/fake-controllers.js";
 
-registerConstant("EngineControllerTests", { name: "EngineControllerTests" });
-registerConstant("ResponseDefaultHeadersTest", { name: "ResponseDefaultHeadersTest" });
-registerConstant("TestCaseTest", { name: "TestCaseTest" });
+constSet(TopLevel, "EngineControllerTests", { name: "EngineControllerTests" });
+constSet(TopLevel, "ResponseDefaultHeadersTest", { name: "ResponseDefaultHeadersTest" });
+constSet(TopLevel, "TestCaseTest", { name: "TestCaseTest" });
 
 class TestController extends Base {
   declare counter: number | undefined;

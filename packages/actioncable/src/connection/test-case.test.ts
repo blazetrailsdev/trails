@@ -1,6 +1,6 @@
 import { describe, expect, it, type TestContext } from "vitest";
 import { Assertion, assertMatch, assertRaises, presence } from "@blazetrails/activesupport";
-import { hashAref, registerConstant } from "@blazetrails/ruby-compat";
+import { hashAref, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../test-helpers/test-helper.js";
 import { Base } from "./base.js";
 import { TestCase, type TestRequest } from "./test-case.js";
@@ -24,11 +24,11 @@ class SimpleConnection extends Base {
   }
 }
 SimpleConnection.identifiedBy("userId");
-registerConstant("SimpleConnection", SimpleConnection);
+constSet(TopLevel, "SimpleConnection", SimpleConnection);
 
 class ConnectionSimpleTest extends TestCase {}
 ConnectionSimpleTest.tests(SimpleConnection);
-registerConstant("ConnectionSimpleTest", ConnectionSimpleTest);
+constSet(TopLevel, "ConnectionSimpleTest", ConnectionSimpleTest);
 
 const cookiesOf = (t: TestCase): Cookies => t.cookies() as unknown as Cookies;
 const connectionOf = <T>(t: TestCase): T => t.connection as unknown as T;
@@ -107,10 +107,10 @@ class Connection extends Base {
 }
 Connection.identifiedBy("currentUserId");
 Connection.identifiedBy("token");
-registerConstant("Connection", Connection);
+constSet(TopLevel, "Connection", Connection);
 
 class ConnectionTest extends TestCase {}
-registerConstant("ConnectionTest", ConnectionTest);
+constSet(TopLevel, "ConnectionTest", ConnectionTest);
 
 describe("ConnectionTest", () => {
   it("connected with signed cookies and headers", async ({ testCase: t }: ConnectionContext) => {
@@ -157,11 +157,11 @@ class EncryptedCookiesConnection extends Base {
   }
 }
 EncryptedCookiesConnection.identifiedBy("userId");
-registerConstant("EncryptedCookiesConnection", EncryptedCookiesConnection);
+constSet(TopLevel, "EncryptedCookiesConnection", EncryptedCookiesConnection);
 
 class EncryptedCookiesConnectionTest extends TestCase {}
 EncryptedCookiesConnectionTest.tests(EncryptedCookiesConnection);
-registerConstant("EncryptedCookiesConnectionTest", EncryptedCookiesConnectionTest);
+constSet(TopLevel, "EncryptedCookiesConnectionTest", EncryptedCookiesConnectionTest);
 
 describe("EncryptedCookiesConnectionTest", () => {
   it("connected with encrypted cookies", async ({ testCase: t }: ConnectionContext) => {
@@ -203,11 +203,11 @@ class SessionConnection extends Base {
   }
 }
 SessionConnection.identifiedBy("userId");
-registerConstant("SessionConnection", SessionConnection);
+constSet(TopLevel, "SessionConnection", SessionConnection);
 
 class SessionConnectionTest extends TestCase {}
 SessionConnectionTest.tests(SessionConnection);
-registerConstant("SessionConnectionTest", SessionConnectionTest);
+constSet(TopLevel, "SessionConnectionTest", SessionConnectionTest);
 
 describe("SessionConnectionTest", () => {
   it("connected with encrypted cookies", async ({ testCase: t }: ConnectionContext) => {
@@ -236,11 +236,11 @@ class EnvConnection extends Base {
   }
 }
 EnvConnection.identifiedBy("user");
-registerConstant("EnvConnection", EnvConnection);
+constSet(TopLevel, "EnvConnection", EnvConnection);
 
 class EnvConnectionTest extends TestCase {}
 EnvConnectionTest.tests(EnvConnection);
-registerConstant("EnvConnectionTest", EnvConnectionTest);
+constSet(TopLevel, "EnvConnectionTest", EnvConnectionTest);
 
 describe("EnvConnectionTest", () => {
   it("connected with env", async ({ testCase: t }: ConnectionContext) => {

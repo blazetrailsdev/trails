@@ -25,13 +25,13 @@ import {
   rbFSend,
   constSet,
   rbObjIvarGet,
-  registerConstant,
   RuntimeError,
   stringToSym,
   Struct,
   type StructInstance,
   Tempfile,
   toI,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Rendering as AbstractControllerRendering } from "../../abstract-controller/rendering.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
@@ -114,7 +114,7 @@ class ImplicitRenderTestController extends Base {
 }
 
 const Namespaced = {} as { ImplicitRenderTestController: typeof Base };
-registerConstant("Namespaced", Namespaced);
+constSet(TopLevel, "Namespaced", Namespaced);
 constSet(
   Namespaced,
   "ImplicitRenderTestController",

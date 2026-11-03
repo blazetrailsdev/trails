@@ -1,10 +1,11 @@
+import { classpaths } from "../../classpath.js";
 import { Hash } from "../../hash.js";
 import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Struct, StructInstance } from "../../struct.js";
 import { Psych } from "../../psych.js";
-import { registerConstant } from "../../variable.js";
+
 import { Alias } from "../nodes/alias.js";
 import type { Document } from "../nodes/document.js";
 import { Mapping } from "../nodes/mapping.js";
@@ -363,4 +364,4 @@ export class NoAliasRuby extends ToRuby {
   }
 }
 
-registerConstant("Psych::Visitors::ToRuby", ToRuby);
+classpaths.set(ToRuby, { path: "Psych::Visitors::ToRuby", permanent: true });

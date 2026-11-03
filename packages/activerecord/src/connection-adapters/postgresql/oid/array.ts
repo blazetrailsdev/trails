@@ -1,6 +1,7 @@
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { PG } from "../../../pg/pg.js";
-import { rbEqual, rbFSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFSend, rbObjAsString, constSet } from "@blazetrails/ruby-compat";
 
 export interface ArraySubtype {
   readonly type?: string | (() => string | undefined);
@@ -137,4 +138,4 @@ export class Data {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Array", Array);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Array", Array);

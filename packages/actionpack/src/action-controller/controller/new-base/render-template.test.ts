@@ -2,13 +2,13 @@ import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { assertMatch } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
 
-registerConstant("RenderTemplate", { name: "RenderTemplate" });
+constSet(TopLevel, "RenderTemplate", { name: "RenderTemplate" });
 
 class WithoutLayoutController extends Base {
   static {

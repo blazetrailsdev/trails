@@ -8,7 +8,7 @@ import {
   seconds,
   type Duration,
 } from "@blazetrails/activesupport";
-import { STDOUT, registerConstant } from "@blazetrails/ruby-compat";
+import { STDOUT, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 export const SolidQueue = {
   name: "SolidQueue",
@@ -111,6 +111,6 @@ mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
 
-registerConstant("SolidQueue", SolidQueue);
+constSet(TopLevel, "SolidQueue", SolidQueue);
 
 runLoadHooks("solid_queue", SolidQueue);

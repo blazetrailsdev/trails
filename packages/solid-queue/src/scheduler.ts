@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { include, presence } from "@blazetrails/activesupport";
 import { SolidQueue } from "./solid-queue.js";
 import {
@@ -103,5 +102,3 @@ export interface Scheduler {
 }
 
 SolidQueue.Scheduler = Scheduler;
-
-registerConstant("SolidQueue::Scheduler", Scheduler);

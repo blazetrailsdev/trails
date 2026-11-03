@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 export class ArgumentsRoundTripJob extends Base {
@@ -10,4 +10,4 @@ export class ArgumentsRoundTripJob extends Base {
     JobBuffer.add(arguments_);
   }
 }
-registerConstant("ArgumentsRoundTripJob", ArgumentsRoundTripJob);
+constSet(TopLevel, "ArgumentsRoundTripJob", ArgumentsRoundTripJob);

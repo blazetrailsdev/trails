@@ -9,8 +9,9 @@ import {
 } from "@blazetrails/activesupport";
 import {
   isRegisteredConstant,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -63,7 +64,7 @@ describe("ModulesTest", () => {
 
   afterEach(() => {
     for (const [constant, value] of Object.entries(undefinedConsts)) {
-      if (value != null) registerConstant(constant, value);
+      if (value != null) constSet(TopLevel, constant, value);
     }
 
     Base.storeFullStiClass = true;

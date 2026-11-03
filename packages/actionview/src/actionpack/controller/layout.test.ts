@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { describe, expect, test } from "vitest";
 import { dasherize, extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
@@ -9,7 +9,7 @@ import { type TemplateHandler } from "../../template/handlers.js";
 import { Template } from "../../template.js";
 import { DetailsKey } from "../../lookup-context.js";
 
-registerConstant("ControllerNameSpace", { name: "ControllerNameSpace" });
+constSet(TopLevel, "ControllerNameSpace", { name: "ControllerNameSpace" });
 
 class LayoutTest extends ActionController.Base {
   static override controllerPath(): string {

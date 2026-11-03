@@ -21,7 +21,7 @@ import type {
   TestConnection,
 } from "./connection/test-case.js";
 import type { TestHelper } from "./test-helper.js";
-import { rbDeclareIvar, registerConstant } from "@blazetrails/ruby-compat";
+import { rbDeclareIvar, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -80,6 +80,6 @@ export const ActionCable = {
   Engine?: unknown;
   _server?: unknown;
 };
-registerConstant("ActionCable", ActionCable);
+constSet(TopLevel, "ActionCable", ActionCable);
 extend(ActionCable, Autoload);
 rbDeclareIvar({ prototype: ActionCable }, "@server", "_server");

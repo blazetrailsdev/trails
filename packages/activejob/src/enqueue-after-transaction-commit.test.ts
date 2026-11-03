@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertDifference, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { block, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { block, constSet, constGet } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { EnqueueError } from "./enqueuing.js";
 import "./test-helpers/helper.js";
@@ -42,7 +42,12 @@ class EnqueueAfterCommitJob extends Base {
   perform(): void {}
 }
 EnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
-registerConstant("EnqueueAfterTransactionCommitTest::EnqueueAfterCommitJob", EnqueueAfterCommitJob);
+constSet(TopLevel, "EnqueueAfterTransactionCommitTest", {});
+constSet(
+  constGet(Object, "EnqueueAfterTransactionCommitTest") as object,
+  "EnqueueAfterCommitJob",
+  EnqueueAfterCommitJob,
+);
 
 class EnqueueErrorAdapter {
   enqueue(..._args: unknown[]): never {
@@ -61,14 +66,19 @@ class ErrorEnqueueAfterCommitJob extends EnqueueErrorJob {
 
   override perform(): void {}
 }
-registerConstant(
-  "EnqueueAfterTransactionCommitTest::ErrorEnqueueAfterCommitJob",
+constSet(
+  constGet(Object, "EnqueueAfterTransactionCommitTest") as object,
+  "ErrorEnqueueAfterCommitJob",
   ErrorEnqueueAfterCommitJob,
 );
 constSet(ErrorEnqueueAfterCommitJob, "EnqueueErrorAdapter", EnqueueErrorAdapter);
 ErrorEnqueueAfterCommitJob.setQueueAdapter(new EnqueueErrorAdapter());
 ErrorEnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
-registerConstant("EnqueueAfterTransactionCommitTest::EnqueueAfterCommitJob", EnqueueAfterCommitJob);
+constSet(
+  constGet(Object, "EnqueueAfterTransactionCommitTest") as object,
+  "EnqueueAfterCommitJob",
+  EnqueueAfterCommitJob,
+);
 
 const topLevel = TopLevel as Record<string, unknown>;
 

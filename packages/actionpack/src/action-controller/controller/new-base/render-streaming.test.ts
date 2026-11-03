@@ -2,11 +2,11 @@ import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { Base as ActionViewBase, FixtureResolver } from "@blazetrails/actionview";
 import { assertEqual, assertMatch, Logger } from "@blazetrails/activesupport";
-import { registerConstant, StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
 
-registerConstant("RenderStreaming", { name: "RenderStreaming" });
+constSet(TopLevel, "RenderStreaming", { name: "RenderStreaming" });
 
 class BasicController extends Base {
   static {

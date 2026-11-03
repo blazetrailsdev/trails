@@ -1,5 +1,5 @@
 import { LocalJumpError } from "./local-jump-error.js";
-import { classpaths, generatedClassPath, isModuleObject } from "./classpath.js";
+import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
@@ -144,7 +144,7 @@ export interface ConstantTable {} // eslint-disable-line @typescript-eslint/no-e
  * Ruby's top-level `Object`, whose constant table is
  * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`). It
  * lives with `rb_cObject` so `object.ts` reads it without importing
- * `variable.ts`, whose load-time `registerConstant` calls need this module
+ * `variable.ts`, whose load-time core-class seats need this module
  * evaluated first. It has no prototype, so a name such as `constructor` is
  * not a constant.
  *
@@ -154,7 +154,7 @@ export const TopLevel = Object.create(null) as TopLevelConstants;
 
 /**
  * The one class object a core class has once a gem reopens it
- * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
+ * (`class Date extends rbCDate`, seated on `TopLevel`): MRI has one
  * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
  * the class reopening it are the same class. A class nothing reopens is
  * answered as it is.
@@ -493,7 +493,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  const path = classpaths.get(klass)?.path ?? generatedClassPath(klass);
+  const path = rbClassPath(klass);
   if (path !== undefined) return path;
   const name = (klass as { name?: string | null }).name;
   if (!name) return null;

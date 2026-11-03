@@ -1,5 +1,5 @@
 import { include, minutes } from "@blazetrails/activesupport";
-import { rbFArray, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFArray, constSet } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
@@ -86,5 +86,3 @@ export class Worker extends Poller {
 }
 
 constSet(SolidQueue as never, "Worker", Worker);
-
-registerConstant("SolidQueue::Worker", Worker);

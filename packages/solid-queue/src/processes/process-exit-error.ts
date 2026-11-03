@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 
 interface Status {
   pid: number | string | null;
@@ -22,5 +22,3 @@ export class ProcessExitError extends RuntimeError {
     super(message);
   }
 }
-
-registerConstant("SolidQueue::Processes::ProcessExitError", ProcessExitError);

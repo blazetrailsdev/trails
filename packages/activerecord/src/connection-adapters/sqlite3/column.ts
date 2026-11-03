@@ -1,7 +1,8 @@
+import { ConnectionAdapters } from "../../namespaces.js";
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { rbHash, registerConstant } from "@blazetrails/ruby-compat";
+import { rbHash, constSet } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _autoIncrement: boolean;
@@ -78,4 +79,4 @@ export class Column extends BaseColumn {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::SQLite3::Column", Column);
+constSet(ConnectionAdapters.SQLite3, "Column", Column);

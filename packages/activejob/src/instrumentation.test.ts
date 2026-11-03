@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, type TestContext } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { TestHelper } from "./test-helper.js";
 import { isAdapterIs } from "./test-helpers/helper.js";
 import { HelloJob } from "./test-helpers/jobs/hello-job.js";
@@ -14,7 +14,7 @@ class InstrumentationTest extends TestCase {
   }
 }
 include(InstrumentationTest, TestHelper);
-registerConstant("InstrumentationTest", InstrumentationTest);
+constSet(TopLevel, "InstrumentationTest", InstrumentationTest);
 
 async function subscribed(name: string | RegExp, block: () => unknown): Promise<unknown[][]> {
   const events: unknown[][] = [];

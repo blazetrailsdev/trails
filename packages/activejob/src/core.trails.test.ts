@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { days, freezeTime, travelBack, useZone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbHashSRuby2KeywordsHashP, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbHashSRuby2KeywordsHashP, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 import { Base } from "./base.js";
 
 class HelloJob extends Base {}
-registerConstant("HelloJob", HelloJob);
+constSet(TopLevel, "HelloJob", HelloJob);
 
 class LoggingJob extends Base {
   get jobId(): string {

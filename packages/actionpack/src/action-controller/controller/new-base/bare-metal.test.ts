@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertEmpty,
@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { MockRequest, Response as RackResponseObject } from "@blazetrails/rack";
 import type { RackResponse as RackTriplet } from "@blazetrails/rack";
-import { include, registerConstant, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included, constGet, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { Metal } from "../../metal.js";
 import { Head } from "../../metal/head.js";
@@ -41,7 +41,8 @@ class BareController extends Metal {
   }
 }
 Object.defineProperty(BareController, "name", { value: "BareMetalTest::BareController" });
-registerConstant("BareMetalTest::BareController", BareController);
+constSet(TopLevel, "BareMetalTest", {});
+constSet(constGet(Object, "BareMetalTest") as object, "BareController", BareController);
 
 describe("BareTest", () => {
   it("response body is a Rack-compatible response", async () => {

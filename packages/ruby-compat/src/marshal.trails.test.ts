@@ -12,13 +12,14 @@ import {
   rbObjIvarSet,
   rbObjSingletonClass,
   rbSetClassPathString,
+  TopLevel,
 } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Set as RbSet } from "./set.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
-import { registerConstant, unregisterConstant } from "./variable.js";
+import { unregisterConstant } from "./variable.js";
 
 const fixtures = JSON.parse(
   readFileSync(new URL("./marshal.fixtures.json", import.meta.url), "utf8"),
@@ -99,7 +100,7 @@ function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: 
 const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Point };
 
 beforeAll(() => {
-  for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);
+  for (const [name, value] of Object.entries(CONSTANTS)) constSet(TopLevel, name, value);
 });
 afterAll(() => {
   for (const [name, value] of Object.entries(CONSTANTS)) unregisterConstant(name, value);
@@ -315,7 +316,7 @@ describe("Marshal.dump", () => {
       new ArgumentError("undefined class/module Unreachable"),
     );
     const other = class {};
-    registerConstant("Unreachable", other);
+    constSet(TopLevel, "Unreachable", other);
     try {
       expect(() => Marshal.dump(new Unreachable())).toThrow(
         new TypeError("Unreachable can't be referred to"),

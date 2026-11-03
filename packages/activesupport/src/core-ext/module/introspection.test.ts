@@ -1,12 +1,17 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { unregisterConstant, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
 import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
 import { assertNil } from "../../testing/assertions.js";
 
 function namedModule(name: string): { name: string } {
   const mod = {};
   Object.defineProperty(mod, "name", { value: name, configurable: true });
-  registerConstant(name, mod);
+  const i = name.lastIndexOf("::");
+  constSet(
+    i < 0 ? TopLevel : (constGet(Object, name.slice(0, i)) as object),
+    i < 0 ? name : name.slice(i + 2),
+    mod,
+  );
   return mod as { name: string };
 }
 

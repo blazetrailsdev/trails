@@ -1,11 +1,12 @@
+import { constSet } from "../include.js";
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { ArgumentError } from "../argument-error.js";
 import { Exception } from "../exception.js";
-import { rbModName } from "../object.js";
+import { rbModName, TopLevel } from "../object.js";
 import { Psych } from "../psych.js";
 import { Range } from "../range.js";
 import { RuntimeError } from "../runtime-error.js";
-import { registerConstant, unregisterConstant } from "../variable.js";
+import { unregisterConstant, constGet } from "../variable.js";
 
 class Widget {}
 class Point {}
@@ -23,8 +24,8 @@ function restricted(classes: string[], symbols: string[], aliases = false) {
 
 describe("Psych::ClassLoader", () => {
   beforeEach(() => {
-    registerConstant("LoaderWidget", Widget);
-    registerConstant("Struct::LoaderPoint", Point);
+    constSet(TopLevel, "LoaderWidget", Widget);
+    constSet(constGet(Object, "Struct") as object, "LoaderPoint", Point);
   });
 
   afterEach(() => {
@@ -72,7 +73,9 @@ describe("Psych::ClassLoader", () => {
 });
 
 describe("Psych::ClassLoader::Restricted", () => {
-  beforeEach(() => registerConstant("LoaderWidget", Widget));
+  beforeEach(() => {
+    constSet(TopLevel, "LoaderWidget", Widget);
+  });
   afterEach(() => unregisterConstant("LoaderWidget", Widget));
 
   it("loads a permitted class by its name", () => {

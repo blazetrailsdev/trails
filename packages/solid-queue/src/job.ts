@@ -9,7 +9,6 @@ import {
   excBacktrace,
   excSetBacktrace,
   rbModName,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import type { Execution } from "./execution.js";
@@ -161,4 +160,3 @@ export class Job extends Record {
       (await this.blockedExecution)) as Execution | null;
   }
 }
-registerConstant("SolidQueue::Job::EnqueueError", EnqueueError);

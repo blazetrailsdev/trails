@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -28,6 +28,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import type { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import type { LibSQLAdapter } from "./connection-adapters/libsql-adapter.js";
 import type { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
@@ -64,6 +65,10 @@ import type { Config } from "./encryption/config.js";
 import type { Context } from "./encryption/context.js";
 import type { DerivedSecretKeyProvider } from "./encryption/derived-secret-key-provider.js";
 import type { EncryptableRecord } from "./encryption/encryptable-record.js";
+import type { ColumnSerializer } from "./coders/column-serializer.js";
+import type { JSON as JSONCoder } from "./coders/json.js";
+import type { YAMLColumn } from "./coders/yaml-column.js";
+import type * as TypeModule from "./type.js";
 import type { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import type { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import type { EncryptingOnlyEncryptor } from "./encryption/encrypting-only-encryptor.js";
@@ -231,6 +236,12 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   AssociationRelation: typeof AssociationRelationClass;
   Associations: typeof Associations;
   AttributeMethods: typeof AttributeMethods;
+  Coders: {
+    name: string;
+    ColumnSerializer: typeof ColumnSerializer;
+    JSON: typeof JSONCoder;
+    YAMLColumn: typeof YAMLColumn;
+  };
   ConnectionAdapters: typeof ConnectionAdapters;
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Locking: typeof Locking;
@@ -238,6 +249,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Result: typeof Result;
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
+  Type: typeof TypeModule;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;
@@ -258,7 +270,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   HasOneThroughNestedAssociationsAreReadonly: typeof HasOneThroughNestedAssociationsAreReadonly;
   afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
-registerConstant("ActiveRecord", ActiveRecord);
+constSet(TopLevel, "ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
@@ -374,6 +386,7 @@ Tasks.autoload("MySQLDatabaseTasks", "active_record/tasks/mysql_database_tasks")
 Tasks.autoload("PostgreSQLDatabaseTasks", "active_record/tasks/postgresql_database_tasks");
 Tasks.autoload("SQLiteDatabaseTasks", "active_record/tasks/sqlite_database_tasks");
 ActiveRecord.Tasks = Tasks;
+ActiveRecord.Coders = { name: "ActiveRecord::Coders" } as typeof ActiveRecord.Coders;
 
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",
@@ -383,8 +396,11 @@ export const ConnectionAdapters = {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
   MySQL: { name: string; Column: typeof MySQLColumn };
+  PostgreSQL: { name: string; OID: { name: string } };
+  SQLite3: { name: string };
   AbstractAdapter: typeof AbstractAdapter;
   BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
+  SQLite3Adapter: typeof SQLite3Adapter;
   ExpoSQLiteAdapter: typeof ExpoSQLiteAdapter;
   LibSQLAdapter: typeof LibSQLAdapter;
   LibSQLRemoteAdapter: typeof LibSQLRemoteAdapter;
@@ -403,6 +419,11 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 ConnectionAdapters.MySQL = {
   name: "ActiveRecord::ConnectionAdapters::MySQL",
 } as typeof ConnectionAdapters.MySQL;
+ConnectionAdapters.PostgreSQL = {
+  name: "ActiveRecord::ConnectionAdapters::PostgreSQL",
+  OID: { name: "ActiveRecord::ConnectionAdapters::PostgreSQL::OID" },
+};
+ConnectionAdapters.SQLite3 = { name: "ActiveRecord::ConnectionAdapters::SQLite3" };
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   AutoFilteredParameters: typeof AutoFilteredParameters;

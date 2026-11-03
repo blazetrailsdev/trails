@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Address {
@@ -24,7 +24,7 @@ export class Address {
     );
   }
 }
-registerConstant("Address", Address);
+constSet(TopLevel, "Address", Address);
 
 export class Money {
   amount: number;
@@ -44,7 +44,7 @@ export class Money {
     );
   }
 }
-registerConstant("Money", Money);
+constSet(TopLevel, "Money", Money);
 
 export class GpsLocation {
   gpsLocation: string;
@@ -65,7 +65,7 @@ export class GpsLocation {
     return this.latitude === other.latitude && this.longitude === other.longitude;
   }
 }
-registerConstant("GpsLocation", GpsLocation);
+constSet(TopLevel, "GpsLocation", GpsLocation);
 
 export class Fullname {
   first: string;
@@ -94,7 +94,7 @@ export class Fullname {
     return this.toS;
   }
 }
-registerConstant("Fullname", Fullname);
+constSet(TopLevel, "Fullname", Fullname);
 
 export class Customer extends Base {
   declare address: Address | null;

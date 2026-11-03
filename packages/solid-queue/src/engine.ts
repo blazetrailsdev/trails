@@ -1,7 +1,7 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
@@ -73,5 +73,3 @@ export class Engine extends TrailsEngine {
     });
   }
 }
-
-registerConstant("SolidQueue::Engine", Engine);

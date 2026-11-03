@@ -1,4 +1,4 @@
-import { block, kernelThrow, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import { block, kernelThrow, StandardError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 class MyError extends StandardError {}
@@ -25,7 +25,7 @@ export class AbortBeforeEnqueueJob extends Base {
     }
   }
 }
-registerConstant("AbortBeforeEnqueueJob", AbortBeforeEnqueueJob);
+constSet(TopLevel, "AbortBeforeEnqueueJob", AbortBeforeEnqueueJob);
 
 AbortBeforeEnqueueJob.beforeEnqueue(":throwOrRaise");
 AbortBeforeEnqueueJob.afterEnqueue(

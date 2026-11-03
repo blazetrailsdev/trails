@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type * as AtModule from "./at.js";
 import type * as CronModule from "./cron.js";
 import type * as DurationModule from "./duration.js";
@@ -35,4 +35,4 @@ export const Fugit = { name: "Fugit" } as {
   Duration: typeof DurationModule.Duration;
   Nat: typeof NatModule.Nat;
 };
-registerConstant("Fugit", Fugit);
+constSet(TopLevel, "Fugit", Fugit);

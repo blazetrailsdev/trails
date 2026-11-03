@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { registerConstant, Thread, unregisterConstant } from "@blazetrails/ruby-compat";
+import { Thread, unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../test-helpers/helper.js";
 import { Base } from "../base.js";
 import { AsyncAdapter } from "./async-adapter.js";
@@ -19,7 +19,7 @@ class ThreadRecordingJob extends Base {
     threads.push(thread);
   }
 }
-registerConstant("ThreadRecordingJob", ThreadRecordingJob);
+constSet(TopLevel, "ThreadRecordingJob", ThreadRecordingJob);
 afterAll(() => unregisterConstant("ThreadRecordingJob", ThreadRecordingJob));
 
 describe("AsyncAdapter", () => {

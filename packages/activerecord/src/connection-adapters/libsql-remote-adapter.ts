@@ -1,13 +1,6 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 import { ConnectionAdapters } from "../namespaces.js";
-import {
-  extend,
-  hasKey,
-  include,
-  constSet,
-  rbObjAsString,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { extend, hasKey, include, constSet, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { libsqlRemoteDriver } from "../sqlite/libsql.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
@@ -54,5 +47,4 @@ for (const name of ["ADAPTER_NAME", "TYPE_MAP", "EXTENDED_TYPE_MAPS"] as const) 
   constSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
 }
 
-ConnectionAdapters.LibSQLRemoteAdapter = LibSQLRemoteAdapter;
-registerConstant("ActiveRecord::ConnectionAdapters::LibSQLRemoteAdapter", LibSQLRemoteAdapter);
+constSet(ConnectionAdapters, "LibSQLRemoteAdapter", LibSQLRemoteAdapter);

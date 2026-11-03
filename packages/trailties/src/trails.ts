@@ -3,7 +3,7 @@ import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
 import { ActiveSupport, Autoload, extend } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
@@ -168,7 +168,7 @@ export function _resetTrailsEnv(): void {
 }
 
 extend(Trails, Autoload);
-registerConstant("Trails", Trails);
+constSet(TopLevel, "Trails", Trails);
 
 Trails.HealthController = HealthController;
 Trails.InfoController = InfoController;

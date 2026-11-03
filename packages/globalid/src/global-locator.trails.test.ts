@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
 
@@ -23,8 +23,8 @@ class Person {
 class PersonChild extends Person {}
 
 function registerConstants(): void {
-  registerConstant("Person", Person);
-  registerConstant("PersonChild", PersonChild);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "PersonChild", PersonChild);
 }
 
 describe("Locator (non-Rails coverage)", () => {

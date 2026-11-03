@@ -1,4 +1,4 @@
-import { LoadError, registerConstant, warn } from "@blazetrails/ruby-compat";
+import { LoadError, warn, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -133,4 +133,4 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-registerConstant("ActiveSupport", ActiveSupport);
+constSet(TopLevel, "ActiveSupport", ActiveSupport);

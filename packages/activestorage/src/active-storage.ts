@@ -7,7 +7,7 @@ import {
   type Extended,
   type Logger,
 } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Analyzer } from "./analyzer.js";
@@ -80,7 +80,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
 extend(ActiveStorage, Autoload);
 ActiveStorage.Blobs = {};
 ActiveStorage.Representations = {};
-registerConstant("ActiveStorage", ActiveStorage);
+constSet(TopLevel, "ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");
 ActiveStorage.autoload("FixtureSet");

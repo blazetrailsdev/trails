@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import type { Time } from "@blazetrails/date";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
@@ -41,7 +41,7 @@ class SchedulerTest extends TestCase {
     (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
   }
 }
-registerConstant("SchedulerTest", SchedulerTest);
+constSet(TopLevel, "SchedulerTest", SchedulerTest);
 
 describe("SchedulerTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;

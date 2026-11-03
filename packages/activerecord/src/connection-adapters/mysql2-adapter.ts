@@ -9,7 +9,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo, constSet } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -389,5 +389,4 @@ Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 
 include(Mysql2Adapter, Mysql2DatabaseStatements);
 
-ConnectionAdapters.Mysql2Adapter = Mysql2Adapter;
-registerConstant("ActiveRecord::ConnectionAdapters::Mysql2Adapter", Mysql2Adapter);
+constSet(ConnectionAdapters, "Mysql2Adapter", Mysql2Adapter);

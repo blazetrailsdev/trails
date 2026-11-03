@@ -1,6 +1,6 @@
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
-import { NotImplementedError, type Thread, registerConstant } from "@blazetrails/ruby-compat";
+import { NotImplementedError, type Thread } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import { Base } from "./base.js";
 import { Runnable } from "./runnable.js";
@@ -79,5 +79,3 @@ export interface Poller {
   setProcline(): void;
   isAllWorkCompleted(): Promise<boolean>;
 }
-
-registerConstant("SolidQueue::Processes::Poller", Poller);

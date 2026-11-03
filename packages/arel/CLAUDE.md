@@ -33,3 +33,8 @@ builds them with `const_set name, Class.new(Binary)`
 — a computed name with no declaration to assign at. A class's qualified Ruby
 path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
+
+`Arel` itself is seated with `constSet(TopLevel, "Arel", Arel)` and each
+namespace object with `constSet(Arel, "Nodes", Nodes)`, the `rb_const_set` a
+nested `module` keyword makes, so `constantize("Arel::Nodes::Not")` walks
+`TopLevel` a segment at a time. There is no full-path seat.

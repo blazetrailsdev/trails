@@ -1,10 +1,11 @@
+import { ConnectionAdapters } from "../../namespaces.js";
 import {
   DelegateClass,
   include,
   type Included,
   rbEqual,
   rbHash,
-  registerConstant,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Deduplicable } from "../deduplicable.js";
 import type { ClassMethods } from "../deduplicable.js";
@@ -57,4 +58,4 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
 
 include(TypeMetadata, Deduplicable);
 
-registerConstant("ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata", TypeMetadata);
+constSet(ConnectionAdapters.MySQL, "TypeMetadata", TypeMetadata);

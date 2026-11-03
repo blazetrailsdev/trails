@@ -1,4 +1,4 @@
-import { TopLevel, constSet, rbModName, registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, rbModName } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Cref } from "./cref.js";
 
@@ -8,7 +8,7 @@ class LoaderTest {
 
 describe("TestCref", () => {
   class klass extends LoaderTest {}
-  registerConstant("TestCref", klass);
+  constSet(TopLevel, "TestCref", klass);
 
   const newCref = (mod: object = klass, cname = "Foo") => new Cref(mod, cname);
 

@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.3.2/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
 import {
   camelize,
-  constantize,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
@@ -15,7 +14,7 @@ import {
   getFs,
   include,
   hashDelete,
-  isRegisteredConstant,
+  constGet,
   constDefined,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
@@ -317,7 +316,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return super.classOption(name, options);
   }
 
-  /** @inventedArm isRegisteredConstant — CONVERGEABLE delete-register-constant-and-class-path-api */
   protected classCollisions(...classNames: Array<string | string[]>): void {
     if (this.behavior !== "invoke") return;
     const options = this.options as GeneratorOptions & { skipCollisionCheck?: boolean };
@@ -332,11 +330,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       const lastName = nesting.pop()!;
       const last = this.extractLastModule(nesting);
 
-      if (
-        last &&
-        (isRegisteredConstant([...nesting, camelize(lastName)].join("::")) ||
-          constDefined(last, camelize(lastName), false))
-      ) {
+      if (last && constDefined(last, camelize(lastName), false)) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +
             "or reserved by Trails. Please choose an alternative or use --skip-collision-check " +
@@ -348,16 +342,9 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
   protected extractLastModule(nesting: string[]): object | undefined {
     let lastModule: object = Object;
-    const path: string[] = [];
     for (const nest of nesting) {
-      path.push(nest);
-      if (isRegisteredConstant(path.join("::"))) {
-        lastModule = constantize(path.join("::")) as object;
-      } else if (lastModule !== Object && Object.hasOwn(lastModule, nest)) {
-        lastModule = (lastModule as Record<string, object>)[nest];
-      } else {
-        return undefined;
-      }
+      if (!constDefined(lastModule, nest, false)) return undefined;
+      lastModule = constGet(lastModule, nest) as object;
     }
     return lastModule;
   }

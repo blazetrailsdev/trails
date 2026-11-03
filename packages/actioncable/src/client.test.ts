@@ -7,7 +7,7 @@ import {
   SecureRandom,
   StringIO,
   constSet,
-  registerConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Base as ChannelBase } from "./channel/base.js";
@@ -25,7 +25,7 @@ const sleep = (seconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, seconds * 1000));
 
 class ClientTest extends TestCase {}
-registerConstant("ClientTest", ClientTest);
+constSet(TopLevel, "ClientTest", ClientTest);
 
 class Connection extends ConnectionBase {
   declare id: string;

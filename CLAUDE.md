@@ -1175,17 +1175,16 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
 - **`registerModel`, `registerController`, `registerJob`, `registerChannel` and
   `registerConnection` are retired** under RFC 0213. A constant is seated on its
   namespace (`constSet(TopLevel, "Name", Klass)`), and the walk finds it there.
-- **Full-path seats and class-path tables are transitional.** `registerConstant`
-  seats `"A::B"` whole and `generatedClass` holds a class no namespace does, so
-  the walk reads both where it reaches them, until
-  `delete-register-constant-and-class-path-api`. Do not add a caller.
+- **There are no full-path seats.** A nested constant is seated on its owner
+  (`constSet(Owner, "Name", Klass)`), and a class only a generated table names
+  is read where the walk reaches it.
 - **Class-path tables answer class → Ruby name.** That direction is output:
   `rbModName`, `rbInspect` and exception text, and every Rails body that reads a
   class's `name` to build a string. They are ruby-compat internals. The
   generated `constants*.generated.ts` file each package carries is the one
   place outside ruby-compat that calls `defineConstants`. Hand-written code outside
-  ruby-compat never calls `defineConstants`, `generatedClass`,
-  `generatedClassPath` or reads `classpaths`; it reaches a Ruby name only
+  ruby-compat never calls `defineConstants`, `rbClassPath`,
+  `rbConstTableGet` or reads `classpaths`; it reaches a Ruby name only
   through `rbModName` / `rbInspect`.
 
 **A slot or seat read carries no guard**, because the Ruby body it mirrors

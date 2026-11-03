@@ -1,3 +1,4 @@
+import { classpaths } from "../../classpath.js";
 import type { PsychIO } from "../../psych-adapter.js";
 import { Emitter as PsychEmitter, type DumperOptions } from "../emitter.js";
 import type { Alias } from "../nodes/alias.js";
@@ -6,7 +7,7 @@ import type { Mapping } from "../nodes/mapping.js";
 import type { Scalar } from "../nodes/scalar.js";
 import type { Sequence } from "../nodes/sequence.js";
 import type { Stream } from "../nodes/stream.js";
-import { registerConstant } from "../../variable.js";
+
 import { Visitor } from "./visitor.js";
 
 /**
@@ -72,4 +73,4 @@ export class Emitter extends Visitor {
   }
 }
 
-registerConstant("Psych::Visitors::Emitter", Emitter);
+classpaths.set(Emitter, { path: "Psych::Visitors::Emitter", permanent: true });

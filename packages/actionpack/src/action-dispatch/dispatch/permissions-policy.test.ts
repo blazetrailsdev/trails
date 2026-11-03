@@ -3,9 +3,10 @@ import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  registerConstant,
   unregisterConstant,
   rbFSend,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import {
   CONTENT_TYPE,
@@ -216,9 +217,18 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     },
   };
 
-  const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
-  registerConstant(helperName, ApplicationHelper);
-  afterAll(() => unregisterConstant(helperName, ApplicationHelper));
+  const PermissionsPolicyWithHelpersIntegrationTest = constSet(
+    TopLevel,
+    "PermissionsPolicyWithHelpersIntegrationTest",
+    {},
+  );
+  constSet(PermissionsPolicyWithHelpersIntegrationTest, "ApplicationHelper", ApplicationHelper);
+  afterAll(() =>
+    unregisterConstant(
+      "PermissionsPolicyWithHelpersIntegrationTest",
+      PermissionsPolicyWithHelpersIntegrationTest,
+    ),
+  );
 
   class ApplicationController extends Base {
     static override name = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationController";

@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { DateTime } from "./date-time.js";
 
 export class Timestamp extends DateTime {
@@ -7,4 +8,4 @@ export class Timestamp extends DateTime {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Timestamp", Timestamp);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Timestamp", Timestamp);

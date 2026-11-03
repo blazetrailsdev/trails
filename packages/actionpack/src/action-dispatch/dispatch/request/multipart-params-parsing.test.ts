@@ -5,7 +5,8 @@ import {
   EOFError,
   File,
   rbObjEncoding,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertNil } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
@@ -22,7 +23,7 @@ interface UploadedFile {
 }
 
 class MultipartParamsParsingTest extends IntegrationTest {}
-registerConstant("MultipartParamsParsingTest", MultipartParamsParsingTest);
+constSet(TopLevel, "MultipartParamsParsingTest", MultipartParamsParsingTest);
 
 describe("MultipartParamsParsingTest", () => {
   class TestController extends Base {

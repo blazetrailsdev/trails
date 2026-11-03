@@ -1,6 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { EmailValidator as BaseEmailValidator } from "../email-validator.js";
 
 export class EmailValidator extends BaseEmailValidator {}
 
-registerConstant("Namespace::EmailValidator", EmailValidator);
+constSet(TopLevel, "Namespace", {});
+constSet(constGet(Object, "Namespace") as object, "EmailValidator", EmailValidator);

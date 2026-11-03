@@ -30,8 +30,9 @@ import {
   ArgumentError,
   RuntimeError,
   rbObjDup,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import type { MiddlewareFactory } from "../middleware/stack.js";
@@ -1020,7 +1021,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
       return false;
     },
   };
-  registerConstant("ApplicationHelper", ApplicationHelper);
+  constSet(TopLevel, "ApplicationHelper", ApplicationHelper);
   afterAll(() => unregisterConstant("ApplicationHelper", ApplicationHelper));
 
   class ApplicationController extends Base {

@@ -13,6 +13,7 @@ export {
 } from "./encryption/auto-filtered-parameters.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
+import * as TypeModule from "./type.js";
 
 export { Relation, Range } from "./relation.js";
 export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
@@ -222,7 +223,8 @@ export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.j
 export * from "./active-record.js";
 export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
-export { ActiveRecord } from "./namespaces.js";
+import { ActiveRecord } from "./namespaces.js";
+export { ActiveRecord };
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {
@@ -261,5 +263,7 @@ export { DatabaseSelector } from "./middleware/database-selector.js";
 export { ShardSelector } from "./middleware/shard-selector.js";
 
 import "./associations/disable-joins-association-scope.js";
+
+ActiveRecord.Type = TypeModule;
 
 import "./constants.generated.js";

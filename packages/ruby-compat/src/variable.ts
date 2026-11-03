@@ -26,7 +26,7 @@ import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { TopLevel, classpaths, rbCBasicObject, rbCSymbol, rbModName, rbModToS } from "./object.js";
 import { Range } from "./range.js";
-import { generatedClass } from "./classpath.js";
+import { rbConstTableGet } from "./classpath.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
@@ -57,37 +57,22 @@ export function rbGvSet<T>(name: string, val: T): T {
 }
 
 /**
- * `rb_const_set` (`vendor/ruby/v3.3.11/variable.c:3674`) on `rb_cObject`: JS
- * has no table of top-level constants, so a class or module is seated here
- * under its full Ruby path. Like `const_set` (`vendor/ruby/v3.3.11/variable.c:3648-3654`),
- * it names a class or module that has no permanent classpath yet, which
- * `rbModName` reads. A trails module can be a plain object, so an object is
- * named too.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function registerConstant(name: string, value: unknown): void {
-  tbl[name] = value;
-  if (
-    (typeof value === "object" && value !== null) ||
-    (typeof value === "function" &&
-      Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
-  ) {
-    if (classpaths.get(value)?.permanent !== true) {
-      classpaths.set(value, { path: name, permanent: true });
-    }
-  }
-}
-
-/**
- * `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`) on `rb_cObject`,
- * for the seat `registerConstant` wrote.
+ * `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`) on the namespace
+ * a `::` path names under `rb_cObject`, for a seat `constSet` wrote.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function unregisterConstant(name: string, expected: unknown): void {
-  if (tbl[name] !== expected) return;
-  delete tbl[name];
+  const parts = name.split("::");
+  let mod: Record<string, unknown> | undefined = tbl;
+  for (const part of parts.slice(0, -1)) {
+    const next: unknown = Object.hasOwn(mod, part) ? mod[part] : undefined;
+    if (next === null || (typeof next !== "object" && typeof next !== "function")) return;
+    mod = next as Record<string, unknown>;
+  }
+  const id = parts.at(-1)!;
+  if (!Object.hasOwn(mod, id) || mod[id] !== expected) return;
+  delete mod[id];
 }
 
 /**
@@ -95,7 +80,7 @@ export function unregisterConstant(name: string, expected: unknown): void {
  * `Module#remove_const`: removes the constant from `mod`'s own table and
  * answers its value. `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`)
  * raises `NameError` through `undefined_constant` for a name `mod` does not
- * hold. `rb_cObject`'s table is the one `registerConstant` fills.
+ * hold. `rb_cObject`'s table is `TopLevel`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -120,7 +105,7 @@ export function isRegisteredConstant(name: string): boolean {
 }
 
 /**
- * The seat `registerConstant` wrote (`vendor/ruby/v3.3.11/variable.c:3674`
+ * The seat a `constSet` on `TopLevel` wrote (`vendor/ruby/v3.3.11/variable.c:3674`
  * `rb_const_set` on `rb_cObject`), or `undefined`.
  *
  * @noRailsEquivalent PERMANENT
@@ -146,7 +131,7 @@ export function rbFBinding<T extends object>(self: T): T {
 }
 
 /**
- * Empties the table `registerConstant` (`vendor/ruby/v3.3.11/variable.c:3674`
+ * Empties the `TopLevel` table `rb_const_set` (`vendor/ruby/v3.3.11/variable.c:3674`
  * `rb_const_set` on `rb_cObject`) fills, down to the core classes seated at
  * load, which no teardown removes from `rb_cObject`. A top-level module object
  * stays too: a gem seats its namespace at load, and its readers carry no guard.
@@ -165,8 +150,7 @@ export function resetConstants(): void {
  * `Psych::ClassLoader#path2class` (`vendor/ruby/v3.3.11/ext/psych/psych_to_ruby.c:22`).
  * `rb_const_search` (`vendor/ruby/v3.3.11/variable.c:3190`) reads a segment
  * from the `rb_cObject` table and then from the namespace before it, without
- * its ancestors. The table seats a constant under its full path and not
- * every prefix of it, so a seated path is read whole. A JS global is not a
+ * its ancestors. A JS global is not a
  * top-level Ruby constant, as for `constantize`, and only a constant-shaped
  * own property is a constant. `rb_namespace_p`
  * (`vendor/ruby/v3.3.11/variable.c:83`) admits a function or an object: a trails
@@ -184,10 +168,8 @@ export function rbPathToClass(pathname: string): unknown {
     throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
   }
   while (p < pend) {
-    if (Object.hasOwn(tbl, pathname)) p = pend;
     while (p < pend && pathname[p] !== ":") p++;
     const id = pathname.slice(pbeg, p);
-    const path = pathname.slice(0, p);
     if (p < pend && pathname[p] === ":") {
       if (pend - p < 2 || pathname[p + 1] !== ":") {
         throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
@@ -198,13 +180,10 @@ export function rbPathToClass(pathname: string): unknown {
     if (id === "") {
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
-    c = Object.hasOwn(tbl, path)
-      ? tbl[path]
-      : c !== Object && /^[A-Z]/.test(id) && Object.hasOwn(c as object, id)
-        ? (c as Record<string, unknown>)[id]
-        : undefined;
+    const tbl0 = c === Object ? tbl : (c as Record<string, unknown>);
+    c = /^[A-Z]/.test(id) && Object.hasOwn(tbl0, id) ? tbl0[id] : undefined;
     if (c === undefined) {
-      const generated = generatedClass(pathname);
+      const generated = rbConstTableGet(pathname);
       if (generated !== undefined) return generated;
       throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
     }
@@ -265,7 +244,7 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
  * then its ancestors. The superclasses are the prototype chain `in` reads, the
  * included modules are the {@link rbModAncestors} entries no prototype link
  * carries, and `rb_cObject`, where the walk ends, is the table
- * `registerConstant` fills, skipped under `exclude` as `rb_const_get_from`
+ * `TopLevel` holds, skipped under `exclude` as `rb_const_get_from`
  * (`vendor/ruby/v3.3.11/variable.c:3204`) skips it. A miss goes to `rb_const_missing`
  * (`vendor/ruby/v3.3.11/variable.c:2346`), which sends `const_missing` to `klass`.
  *
@@ -369,9 +348,8 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
  * leading `::` starts at `Object`, and a name that is not a constant path
  * raises `NameError`. The first segment is {@link rbConstGet}; each later one
  * is `rb_const_get_from`, which skips the top level. A value that is not a
- * namespace raises `TypeError`. A full-path `registerConstant` seat, and a class
- * only a generated table holds, are read where the walk reaches them, until
- * `delete-register-constant-and-class-path-api` removes both.
+ * namespace raises `TypeError`. A class only a generated table holds is read
+ * where the walk reaches it.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -383,7 +361,6 @@ export function constGet(mod: object, name: string): unknown {
     throw new NameError(`wrong constant name ${name}`, name);
   }
   if (qualified) mod = Object;
-  if (Object.hasOwn(tbl, cpath)) return tbl[cpath];
   let path = "";
   let c: unknown = mod;
   for (const [i, part] of parts.entries()) {
@@ -391,11 +368,7 @@ export function constGet(mod: object, name: string): unknown {
       throw new TypeError(`${path} does not refer to class/module`);
     }
     path = i === 0 ? part : `${path}::${part}`;
-    if (Object.hasOwn(tbl, path)) {
-      c = tbl[path];
-      continue;
-    }
-    const generated = mod === Object && !(part in c) ? generatedClass(path) : undefined;
+    const generated = mod === Object && !(part in c) ? rbConstTableGet(path) : undefined;
     if (generated !== undefined) {
       c = generated;
       continue;
@@ -403,7 +376,7 @@ export function constGet(mod: object, name: string): unknown {
     try {
       c = rbConstGet(c, part, i > 0);
     } catch (e) {
-      const row = mod === Object && e instanceof NameError ? generatedClass(cpath) : undefined;
+      const row = mod === Object && e instanceof NameError ? rbConstTableGet(cpath) : undefined;
       if (row === undefined) throw e;
       return row;
     }
@@ -411,40 +384,50 @@ export function constGet(mod: object, name: string): unknown {
   return c;
 }
 
-registerConstant("BasicObject", rbCBasicObject);
-registerConstant("Object", Object);
-registerConstant("Array", Array);
-registerConstant("Hash", Hash);
-registerConstant("Exception", Exception);
-registerConstant("SignalException", SignalException);
-registerConstant("Interrupt", Interrupt);
-registerConstant("StandardError", StandardError);
-registerConstant("TypeError", TypeError);
-registerConstant("ArgumentError", ArgumentError);
-registerConstant("IndexError", IndexError);
-registerConstant("KeyError", KeyError);
-registerConstant("RangeError", RangeError);
-registerConstant("LoadError", LoadError);
-registerConstant("NotImplementedError", NotImplementedError);
-registerConstant("NameError", NameError);
-registerConstant("NoMethodError", NoMethodError);
-registerConstant("RuntimeError", RuntimeError);
-registerConstant("FrozenError", FrozenError);
-registerConstant("EncodingError", EncodingError);
-registerConstant("SystemCallError", SystemCallError);
-registerConstant("ZeroDivisionError", ZeroDivisionError);
-registerConstant("FloatDomainError", FloatDomainError);
-registerConstant("IOError", IOError);
-registerConstant("EOFError", EOFError);
-registerConstant("StopIteration", StopIteration);
-registerConstant("LocalJumpError", LocalJumpError);
-registerConstant("ThreadError", ThreadError);
-registerConstant("FiberError", FiberError);
-registerConstant("Range", Range);
-registerConstant("Regexp", RegExp);
-registerConstant("Struct", Struct);
-registerConstant("Symbol", rbCSymbol);
-
-registerConstant("Rational", Rational);
-
-const _coreConstants = { ...tbl };
+/**
+ * The core classes `Init_Object` (`vendor/ruby/v3.3.11/object.c:4527`) and its
+ * siblings define on `rb_cObject` with `rb_define_class`, each named by the
+ * constant it is bound to.
+ */
+const _coreConstants: Record<string, unknown> = {
+  BasicObject: rbCBasicObject,
+  Object,
+  Array,
+  Hash,
+  Exception,
+  SignalException,
+  Interrupt,
+  StandardError,
+  TypeError,
+  ArgumentError,
+  IndexError,
+  KeyError,
+  RangeError,
+  LoadError,
+  NotImplementedError,
+  NameError,
+  NoMethodError,
+  RuntimeError,
+  FrozenError,
+  EncodingError,
+  SystemCallError,
+  ZeroDivisionError,
+  FloatDomainError,
+  IOError,
+  EOFError,
+  StopIteration,
+  LocalJumpError,
+  ThreadError,
+  FiberError,
+  Range,
+  Regexp: RegExp,
+  Struct,
+  Symbol: rbCSymbol,
+  Rational,
+};
+for (const [name, value] of Object.entries(_coreConstants)) {
+  tbl[name] = value;
+  if (classpaths.get(value as object)?.permanent !== true) {
+    classpaths.set(value as object, { path: name, permanent: true });
+  }
+}

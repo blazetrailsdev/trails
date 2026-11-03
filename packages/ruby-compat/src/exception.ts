@@ -1,4 +1,4 @@
-import { classpaths, generatedClassPath } from "./classpath.js";
+import { rbClassPath } from "./classpath.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
@@ -38,12 +38,7 @@ Object.defineProperty(Exception.prototype, "name", {
   configurable: true,
   get(this: Exception) {
     const klass = this.constructor;
-    return (
-      classpaths.get(klass)?.path ??
-      generatedClassPath(klass) ??
-      declaredNames.get(klass) ??
-      (klass.name || "Exception")
-    );
+    return rbClassPath(klass) ?? declaredNames.get(klass) ?? (klass.name || "Exception");
   },
   set(this: Exception, value: unknown) {
     if (Object.hasOwn(this, "constructor")) declaredNames.set(this.constructor, value);
@@ -66,7 +61,7 @@ Exception.prototype.toS = function (this: Exception): string {
 
   if (mesg == null) {
     const klass = this.constructor;
-    return classpaths.get(klass)?.path ?? generatedClassPath(klass) ?? (klass.name || "");
+    return rbClassPath(klass) ?? (klass.name || "");
   }
   return String(mesg);
 };

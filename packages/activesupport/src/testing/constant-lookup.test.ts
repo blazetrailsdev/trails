@@ -2,8 +2,9 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   include,
   isPlainHash,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { TestCase } from "../test-case.js";
 import { ClassMethods, ConstantLookup } from "./constant-lookup.js";
@@ -15,9 +16,9 @@ class Bar extends Foo {
 }
 const FooBar = {};
 
-registerConstant("Foo", Foo);
-registerConstant("Bar", Bar);
-registerConstant("FooBar", FooBar);
+constSet(TopLevel, "Foo", Foo);
+constSet(TopLevel, "Bar", Bar);
+constSet(TopLevel, "FooBar", FooBar);
 
 class ConstantLookupTest extends TestCase {
   declare static determineConstantFromTestName: (typeof ClassMethods)["determineConstantFromTestName"];

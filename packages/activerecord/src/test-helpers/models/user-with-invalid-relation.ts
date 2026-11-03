@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class UserWithInvalidRelation extends Base {
@@ -25,10 +25,10 @@ constSet(TopLevel, "UserWithInvalidRelation", UserWithInvalidRelation);
 DescendantsTracker.registerSubclass(Base, UserWithInvalidRelation);
 
 export class AccountInvalid {}
-registerConstant("AccountInvalid", AccountInvalid);
+constSet(TopLevel, "AccountInvalid", AccountInvalid);
 
 export class InfoInvalid {}
-registerConstant("InfoInvalid", InfoInvalid);
+constSet(TopLevel, "InfoInvalid", InfoInvalid);
 
 export class UserInfoInvalid extends Base {
   static {

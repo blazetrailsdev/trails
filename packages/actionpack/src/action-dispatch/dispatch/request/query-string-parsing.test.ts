@@ -5,7 +5,7 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { rbFSend, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Request } from "../../http/request.js";
 import { Base } from "../../../action-controller/base.js";
 import { deprecator } from "../../deprecator.js";
@@ -14,7 +14,7 @@ import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class QueryStringParsingTest extends IntegrationTest {}
-registerConstant("QueryStringParsingTest", QueryStringParsingTest);
+constSet(TopLevel, "QueryStringParsingTest", QueryStringParsingTest);
 
 describe("QueryStringParsingTest", () => {
   class TestController extends Base {

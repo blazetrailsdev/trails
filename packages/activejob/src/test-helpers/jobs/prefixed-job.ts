@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 export class PrefixedJob extends Base {
   static toString(): string {
@@ -7,5 +7,5 @@ export class PrefixedJob extends Base {
 
   perform(): void {}
 }
-registerConstant("PrefixedJob", PrefixedJob);
+constSet(TopLevel, "PrefixedJob", PrefixedJob);
 PrefixedJob.queueNamePrefix = "production";

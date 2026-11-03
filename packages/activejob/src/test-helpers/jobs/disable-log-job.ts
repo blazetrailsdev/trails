@@ -1,4 +1,4 @@
-import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
@@ -20,4 +20,4 @@ export class DisableLogJob extends Base {
   }
 }
 DisableLogJob.logArguments = false;
-registerConstant("DisableLogJob", DisableLogJob);
+constSet(TopLevel, "DisableLogJob", DisableLogJob);

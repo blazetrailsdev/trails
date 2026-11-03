@@ -14,12 +14,7 @@ import {
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";
-import {
-  include,
-  publicInstanceMethods,
-  constSet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { include, publicInstanceMethods, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../deprecator.js";
 import { TestCase } from "../test-case.js";
@@ -54,7 +49,7 @@ class Comment {
   }
 }
 
-registerConstant("Submodule", { name: "Submodule" });
+constSet(TopLevel, "Submodule", { name: "Submodule" });
 class ContainedEmptyController extends Base {}
 Object.defineProperty(ContainedEmptyController, "name", {
   value: "Submodule::ContainedEmptyController",

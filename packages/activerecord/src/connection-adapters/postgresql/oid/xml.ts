@@ -1,4 +1,5 @@
-import { registerConstant, rtest } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
+import { rtest, constSet } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Xml extends StringType {
@@ -24,4 +25,4 @@ export class Data {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml", Xml);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Xml", Xml);

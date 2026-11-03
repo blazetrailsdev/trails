@@ -1,6 +1,7 @@
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { DecimalType } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class Decimal extends DecimalType {
   infinity(options: { negative?: boolean } = {}): BigDecimal {
@@ -8,4 +9,4 @@ export class Decimal extends DecimalType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Decimal", Decimal);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Decimal", Decimal);

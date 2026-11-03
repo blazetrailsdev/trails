@@ -35,7 +35,8 @@ import {
   include,
   publicInstanceMethods,
   rbObjSingletonClass,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
@@ -2515,7 +2516,7 @@ describe("FormHelperTest", () => {
   });
 
   it("lazy loading default form builder", () => {
-    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    constSet(TopLevel, "FormHelperTest", { LabelledFormBuilder });
     const base = Base as unknown as { defaultFormBuilder: unknown };
     const oldDefaultFormBuilder = base.defaultFormBuilder;
     base.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
@@ -2786,7 +2787,7 @@ describe("FormHelperTest", () => {
   });
 
   it("lazy loading form builder override", () => {
-    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    constSet(TopLevel, "FormHelperTest", { LabelledFormBuilder });
     view.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
 
     rendered = view.fieldsFor("post", post, {}, (f) => {

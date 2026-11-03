@@ -1,5 +1,5 @@
 import { constantize } from "@blazetrails/activesupport";
-import { constSet, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import { constSet, StandardError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 class MyError extends StandardError {}
@@ -16,7 +16,7 @@ export class RaisingJob extends Base {
     throw new klass();
   }
 }
-registerConstant("RaisingJob", RaisingJob);
+constSet(TopLevel, "RaisingJob", RaisingJob);
 constSet(RaisingJob, "MyError", MyError);
 
 RaisingJob.retryOn(MyError, { attempts: 2 });

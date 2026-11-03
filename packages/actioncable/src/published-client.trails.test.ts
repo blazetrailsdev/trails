@@ -1,6 +1,6 @@
 import { Logger } from "@blazetrails/activesupport";
 import { Handler } from "@blazetrails/rack";
-import { StringIO, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { StringIO, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import * as Client from "@rails/actioncable";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base as ChannelBase } from "./channel/base.js";
@@ -12,7 +12,7 @@ import "./test-helpers/test-helper.js";
 type Message = Record<string, unknown>;
 
 const PublishedClientTest = { name: "PublishedClientTest" };
-registerConstant("PublishedClientTest", PublishedClientTest);
+constSet(TopLevel, "PublishedClientTest", PublishedClientTest);
 
 class Connection extends ConnectionBase {
   declare id: string;

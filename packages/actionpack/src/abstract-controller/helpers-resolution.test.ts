@@ -8,8 +8,9 @@ import {
   extend,
   include,
   publicInstanceMethods,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from "./helpers.js";
@@ -22,17 +23,18 @@ const NamespacedHelper = { ns: () => "NS" };
 
 type Probe = Record<string, () => unknown>;
 
-const registry: Record<string, HelperMethodsModule> = {
-  FooHelper,
-  BarHelper,
-  "Foo::BarHelper": NamespacedHelper,
-};
+const Foo = { BarHelper: NamespacedHelper };
 
 beforeAll(() => {
-  for (const [name, mod] of Object.entries(registry)) registerConstant(name, mod);
+  constSet(TopLevel, "FooHelper", FooHelper);
+  constSet(TopLevel, "BarHelper", BarHelper);
+  constSet(TopLevel, "Foo", Foo);
+  constSet(Foo, "BarHelper", NamespacedHelper);
 });
 afterAll(() => {
-  for (const [name, mod] of Object.entries(registry)) unregisterConstant(name, mod);
+  unregisterConstant("FooHelper", FooHelper);
+  unregisterConstant("BarHelper", BarHelper);
+  unregisterConstant("Foo", Foo);
 });
 
 function controller(name: string): HelpersClass {

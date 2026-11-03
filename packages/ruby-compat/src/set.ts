@@ -1,9 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
 import { Hash, dup, update } from "./hash.js";
-import { rbDefineAllocFunc, rbObjDup } from "./include.js";
+import { rbDefineAllocFunc, rbObjDup, constSet } from "./include.js";
 import { NotImplementedError } from "./not-implemented-error.js";
-import { registerConstant } from "./variable.js";
-import { rbDeclareIvar, rbModName, rbObjClass, rbObjRespondTo } from "./object.js";
+
+import { rbDeclareIvar, rbModName, rbObjClass, rbObjRespondTo, TopLevel } from "./object.js";
 
 const JsSet = globalThis.Set;
 
@@ -345,4 +345,4 @@ export class Set<T> extends JsSet<T> {
 
 rbDeclareIvar(Set, "@hash", "_hash");
 rbDefineAllocFunc(Set, (klass) => Reflect.construct(JsSet, [], klass) as Set<unknown>);
-registerConstant("Set", Set);
+constSet(TopLevel, "Set", Set);

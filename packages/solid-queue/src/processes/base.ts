@@ -1,11 +1,5 @@
 import { demodulize, include } from "@blazetrails/activesupport";
-import {
-  Process,
-  SecureRandom,
-  Socket,
-  registerConstant,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { Process, SecureRandom, Socket, rbModName } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { Callbacks } from "./callbacks.js";
 import { Procline } from "./procline.js";
@@ -74,5 +68,3 @@ export interface Base {
   isRegistered(): boolean;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
-
-registerConstant("SolidQueue::Processes::Base", Base);

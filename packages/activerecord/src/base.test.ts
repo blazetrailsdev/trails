@@ -63,9 +63,9 @@ import {
   RuntimeError,
   sort,
   constSet,
-  registerConstant,
   unregisterConstant,
   TopLevel,
+  constGet,
 } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
@@ -1199,7 +1199,8 @@ describe("BasicsTest", async () => {
   class DeveloperSalary {
     constructor(public amount: number) {}
   }
-  registerConstant("BasicsTest::DeveloperSalary", DeveloperSalary);
+  constSet(TopLevel, "BasicsTest", {});
+  constSet(constGet(Object, "BasicsTest") as object, "DeveloperSalary", DeveloperSalary);
   afterAll(() => unregisterConstant("BasicsTest::DeveloperSalary", DeveloperSalary));
 
   it("dup with aggregate of same name as attribute", async () => {

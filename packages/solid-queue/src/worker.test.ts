@@ -6,7 +6,7 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
-import { RuntimeError, StringIO, rbModName, registerConstant } from "@blazetrails/ruby-compat";
+import { RuntimeError, StringIO, rbModName, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
@@ -22,7 +22,7 @@ import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
 
 class ExpectedTestError extends RuntimeError {}
-registerConstant("ExpectedTestError", ExpectedTestError);
+constSet(TopLevel, "ExpectedTestError", ExpectedTestError);
 
 class RaisingJob extends ApplicationJob {
   static {
@@ -34,7 +34,7 @@ class RaisingJob extends ApplicationJob {
   }
 }
 
-registerConstant("RaisingJob", RaisingJob);
+constSet(TopLevel, "RaisingJob", RaisingJob);
 
 class ErrorBuffer {
   errors: [Error, unknown][] = [];

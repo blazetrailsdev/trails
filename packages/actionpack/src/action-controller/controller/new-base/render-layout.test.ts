@@ -1,11 +1,11 @@
 import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
 import { TestRenderable } from "../../../test-helpers/lib/test-renderable.js";
 
-registerConstant("ControllerLayouts", { name: "ControllerLayouts" });
+constSet(TopLevel, "ControllerLayouts", { name: "ControllerLayouts" });
 
 class ImplicitController extends ApplicationController {
   static {

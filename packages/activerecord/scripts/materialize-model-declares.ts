@@ -75,10 +75,12 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
   for (const file of files) {
     const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
-      if (ts.isExpressionStatement(stmt) && isCall(stmt.expression, "registerConstant")) {
-        const [name, value] = stmt.expression.arguments;
-        if (ts.isStringLiteralLikeNode(name) && ts.isIdentifier(value)) {
-          paths.set(value.text, name.text);
+      if (ts.isExpressionStatement(stmt) && isCall(stmt.expression, "constSet")) {
+        const [owner, name, value] = stmt.expression.arguments;
+        if (ts.isIdentifier(owner) && ts.isStringLiteralLikeNode(name) && ts.isIdentifier(value)) {
+          const prefix =
+            owner.text === "TopLevel" ? "" : `${paths.get(owner.text) ?? owner.text}::`;
+          paths.set(value.text, `${prefix}${name.text}`);
         }
       }
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;

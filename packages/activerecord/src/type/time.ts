@@ -1,4 +1,4 @@
-import { DelegateClass, registerConstant } from "@blazetrails/ruby-compat";
+import { DelegateClass } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
@@ -42,6 +42,3 @@ export class Time extends ActiveModelTime {
 }
 
 include(Time, Timezone);
-
-registerConstant("ActiveRecord::Type::Time", Time);
-registerConstant("ActiveRecord::Type::Time::Value", Value);

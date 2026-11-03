@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Range, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { Range, unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
@@ -24,7 +24,7 @@ class Tagged {
 
 describe("Psych object protocol", () => {
   it("dumps an object's fields under its !ruby/object tag and revives it", () => {
-    registerConstant("Point", Point);
+    constSet(TopLevel, "Point", Point);
     try {
       const yaml = Psych.dump(new Point());
       expect(yaml).toContain("!ruby/object:Point");
@@ -37,7 +37,7 @@ describe("Psych object protocol", () => {
   });
 
   it("round-trips encode_with / init_with, keeping a coder key named tag", () => {
-    registerConstant("Tagged", Tagged);
+    constSet(TopLevel, "Tagged", Tagged);
     try {
       const loaded = Psych.unsafeLoad(Psych.dump(new Tagged())) as Tagged;
       expect(loaded.seen).toEqual({ tag: "kept", name: "tagged" });
@@ -128,7 +128,7 @@ describe("Psych object protocol", () => {
   });
 
   it("resolves a legacy tag through load_tags", () => {
-    registerConstant("Point", Point);
+    constSet(TopLevel, "Point", Point);
     Psych.loadTags["!ruby/object:Legacy::Point"] = "Point";
     try {
       expect(Psych.unsafeLoad("--- !ruby/object:Legacy::Point\nx: 3\n")).toBeInstanceOf(Point);

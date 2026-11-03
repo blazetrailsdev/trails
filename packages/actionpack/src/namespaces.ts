@@ -7,13 +7,7 @@ import {
   type Deprecation,
   type Extended,
 } from "@blazetrails/activesupport";
-import {
-  NameError,
-  RuntimeError,
-  rbInspect,
-  constGet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { NameError, RuntimeError, rbInspect, constGet, constSet } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
@@ -197,7 +191,7 @@ Session.resolveStore = function (sessionStore: string): unknown {
 ActionDispatch.Session = Session;
 
 export const AbstractController = { name: "AbstractController" };
-registerConstant("AbstractController", AbstractController);
+constSet(TopLevel, "AbstractController", AbstractController);
 
 export const ActionController = { name: "ActionController", loadPath } as AutoloadModule & {
   Base: typeof ControllerBase;
@@ -250,7 +244,7 @@ ActionController.autoloadAt("action_controller/test_case", () => {
 });
 
 TopLevel.ActionDispatch = ActionDispatch;
-registerConstant("ActionController", ActionController);
+constSet(TopLevel, "ActionController", ActionController);
 
 onLoad("action_view", () => {
   Base.defaultFormats ??= MimeType.SET.symbols;

@@ -5,11 +5,11 @@ import { beforeEach, describe, it } from "vitest";
 import { FileSystemResolver, FixtureResolver } from "@blazetrails/actionview";
 import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { File, registerConstant } from "@blazetrails/ruby-compat";
+import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ActionNotFound } from "../../../abstract-controller/base.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
 
-registerConstant("RenderImplicitAction", { name: "RenderImplicitAction" });
+constSet(TopLevel, "RenderImplicitAction", { name: "RenderImplicitAction" });
 
 class SimpleController extends ApplicationController {
   static {

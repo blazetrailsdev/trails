@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { AbstractSecureStore, AbstractStore, StaleSessionCheck } from "./abstract-store.js";
 import { MemCacheStore } from "./mem-cache-store.js";
 
@@ -7,7 +7,7 @@ describe("AbstractStore", () => {
   describe("StaleSessionCheck.staleSessionCheckBang", () => {
     it("retries the block once the class it names resolves", () => {
       class Loadable {}
-      registerConstant("StaleSessionCheckLoadable", Loadable);
+      constSet(TopLevel, "StaleSessionCheckLoadable", Loadable);
       let calls = 0;
       try {
         expect(
@@ -26,7 +26,7 @@ describe("AbstractStore", () => {
 
     it("retries an async block once the class its rejection names resolves", async () => {
       class LoadableAsync {}
-      registerConstant("StaleSessionCheckLoadableAsync", LoadableAsync);
+      constSet(TopLevel, "StaleSessionCheckLoadableAsync", LoadableAsync);
       let calls = 0;
       try {
         expect(

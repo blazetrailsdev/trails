@@ -1,4 +1,4 @@
-import { block, registerConstant } from "@blazetrails/ruby-compat";
+import { block, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach } from "vitest";
 import {
   assertEqual,
@@ -28,7 +28,7 @@ import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 
-registerConstant("Another", { name: "Another" });
+constSet(TopLevel, "Another", { name: "Another" });
 
 class SpecialException extends Exception {}
 

@@ -1,3 +1,4 @@
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { Temporal } from "@blazetrails/date";
 import {
   DateType,
@@ -6,7 +7,7 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { format, rbStrSend, toI, registerConstant } from "@blazetrails/ruby-compat";
+import { format, rbStrSend, toI, constSet } from "@blazetrails/ruby-compat";
 
 export class Date extends DateType {
   override castValue(
@@ -31,4 +32,4 @@ export class Date extends DateType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Date", Date);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Date", Date);

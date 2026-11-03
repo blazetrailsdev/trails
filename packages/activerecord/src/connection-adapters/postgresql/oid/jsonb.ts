@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { Json } from "../../../type/json.js";
 
 export class Jsonb extends Json {
@@ -7,4 +8,4 @@ export class Jsonb extends Json {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Jsonb", Jsonb);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Jsonb", Jsonb);

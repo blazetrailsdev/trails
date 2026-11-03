@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { Range, rbDeclareIvar, rbModToS, toI, registerConstant } from "@blazetrails/ruby-compat";
+import { Range, rbDeclareIvar, rbModToS, toI } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
@@ -94,5 +94,3 @@ export class IntegerType extends NumericValueType {
 }
 
 rbDeclareIvar(IntegerType, "@range", "_range");
-
-registerConstant("ActiveModel::Type::Integer", IntegerType);

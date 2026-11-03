@@ -1,12 +1,13 @@
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
 import { include, isPlainObject } from "@blazetrails/activesupport";
 import {
   eachPair,
   rbEqual,
   rbObjRespondTo,
-  registerConstant,
   stringInspect,
   StringScanner,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
@@ -116,4 +117,4 @@ function escapeHstore(value: string | null | undefined): string {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Hstore", Hstore);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Hstore", Hstore);

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { assert, assertEqual, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 import { ObjectSerializer } from "./serializers/object-serializer.js";
 import type { SerializerLike } from "./namespaces.js";
@@ -11,7 +11,7 @@ class SerializersTest {
     return "SerializersTest";
   }
 }
-registerConstant("SerializersTest", SerializersTest);
+constSet(TopLevel, "SerializersTest", SerializersTest);
 
 class DummyValueObject {
   value: unknown;

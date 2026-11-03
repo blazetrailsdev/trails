@@ -1,7 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 export class TrailsFirstAdapter {}
 export class TrailsSecondAdapter {}
 
-registerConstant("TrailsFirstAdapter", TrailsFirstAdapter);
-registerConstant("TrailsSecondAdapter", TrailsSecondAdapter);
+constSet(TopLevel, "TrailsFirstAdapter", TrailsFirstAdapter);
+constSet(TopLevel, "TrailsSecondAdapter", TrailsSecondAdapter);

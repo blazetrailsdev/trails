@@ -6,16 +6,17 @@ import {
   RUBY_PLATFORM,
   env,
   rbModRemoveConst,
-  registerConstant,
   registeredConstant,
   setEnv,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import type { EoTime } from "@blazetrails/et-orbi";
 import { TZInfo, type Timezone } from "@blazetrails/tzinfo";
 import "../fugit.js";
 import { TimeCursor } from "../cron.js";
 
-registerConstant("Khronic", registeredConstant("Chronic"));
+constSet(TopLevel, "Khronic", registeredConstant("Chronic"));
 rbModRemoveConst(Object, "Chronic");
 
 export function isJruby(): boolean {
@@ -60,7 +61,7 @@ export function inActiveSupportZone<T>(zoneName: string, block: () => T): T {
 }
 
 export function requireChronic(): void {
-  registerConstant("Chronic", registeredConstant("Khronic"));
+  constSet(TopLevel, "Chronic", registeredConstant("Khronic"));
 }
 
 export function unrequireChronic(): void {

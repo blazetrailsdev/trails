@@ -1,3 +1,4 @@
+import { ActiveRecord } from "../namespaces.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   rbClassNewInstance,
@@ -5,7 +6,6 @@ import {
   rbModToS,
   rbObjClassname,
   rbObjIsKindOf,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
@@ -88,4 +88,4 @@ export class ColumnSerializer {
   }
 }
 
-registerConstant("ActiveRecord::Coders::ColumnSerializer", ColumnSerializer);
+ActiveRecord.Coders.ColumnSerializer = ColumnSerializer;

@@ -8,7 +8,6 @@ import {
   numericMul,
   rbModInstanceMethod,
   rbObjAsString as toS,
-  registerConstant,
   toI,
 } from "@blazetrails/ruby-compat";
 import {
@@ -103,5 +102,3 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({ defaults: { "4
 include(DateTimeType, acceptsMultiparameterTime);
 
 include(DateTimeType, TimeValue);
-
-registerConstant("ActiveModel::Type::DateTime", DateTimeType);

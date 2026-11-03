@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { capture, include } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { unregisterConstant } from "@blazetrails/ruby-compat";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
@@ -86,7 +86,7 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
       static UsersController = class {};
     }
     class Admin extends Parent {}
-    registerConstant("Admin", Admin);
+    constSet(TopLevel, "Admin", Admin);
     try {
       expect(await collision("admin/user")).toBeNull();
       Object.defineProperty(Admin, "UsersController", { value: class {} });
@@ -99,8 +99,8 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
   it("finds a nested constant registered by its full path", async () => {
     const Admin = class {};
     const UsersController = class {};
-    registerConstant("Admin", Admin);
-    registerConstant("Admin::UsersController", UsersController);
+    constSet(TopLevel, "Admin", Admin);
+    constSet(Admin, "UsersController", UsersController);
     try {
       expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
     } finally {

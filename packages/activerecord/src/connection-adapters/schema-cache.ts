@@ -6,7 +6,6 @@ import {
   Zlib,
   forceEncoding,
   isModuleIncluded,
-  registerConstant,
   rbObjRespondTo,
   sort,
   synchronize,
@@ -733,5 +732,3 @@ export function deepDeduplicate<T>(value: T): T {
   }
   return value;
 }
-
-registerConstant("ActiveRecord::ConnectionAdapters::SchemaCache", SchemaCache);

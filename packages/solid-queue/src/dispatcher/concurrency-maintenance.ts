@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { TimerTask, registerConstant } from "@blazetrails/ruby-compat";
+import { TimerTask } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { BlockedExecution } from "../blocked-execution.js";
 import { Semaphore } from "../semaphore.js";
@@ -61,5 +61,3 @@ export interface ConcurrencyMaintenance {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
-
-registerConstant("SolidQueue::Dispatcher::ConcurrencyMaintenance", ConcurrencyMaintenance);

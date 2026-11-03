@@ -1,11 +1,11 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import "../../destroy-association-async-job.js";
-import { kernelThrow, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 
 export const Cpk = {};
-registerConstant("Cpk", Cpk);
+constSet(TopLevel, "Cpk", Cpk);
 
 export class CpkAuthor extends Base {
   declare books: AssociationProxy<CpkBook>;

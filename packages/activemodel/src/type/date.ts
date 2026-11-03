@@ -11,7 +11,6 @@ import {
   rbModInstanceMethod,
   rbObjRespondTo,
   StandardError,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
@@ -113,5 +112,3 @@ include(DateType, Timezone);
 
 const acceptsMultiparameterTime = new AcceptsMultiparameterTime();
 include(DateType, acceptsMultiparameterTime);
-
-registerConstant("ActiveModel::Type::Date", DateType);

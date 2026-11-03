@@ -1,8 +1,11 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  constGet,
+  constSet, TopLevel, isRegisteredConstant } from "@blazetrails/ruby-compat";
 
 export const PdfHelper = {
   foobar(): string {
     return "baz";
   },
 };
-registerConstant("Fun::PdfHelper", PdfHelper);
+if (!isRegisteredConstant("Fun")) constSet(TopLevel, "Fun", {});
+constSet(constGet(Object, "Fun") as object, "PdfHelper", PdfHelper);

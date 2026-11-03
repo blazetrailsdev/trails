@@ -1,6 +1,6 @@
 import { describe, it, type TestContext } from "vitest";
 import { assertIncludes, assertKindOf, assertNil } from "@blazetrails/activesupport";
-import { NotImplementedError, rbModAncestors, registerConstant } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModAncestors, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 import "./queue-adapters/async-adapter.js";
@@ -15,7 +15,7 @@ class ActiveJobTestCaseTest extends TestCase {
     return "ActiveJobTestCaseTest";
   }
 }
-registerConstant("ActiveJobTestCaseTest", ActiveJobTestCaseTest);
+constSet(TopLevel, "ActiveJobTestCaseTest", ActiveJobTestCaseTest);
 
 class TestClassAttributeInheritanceJob extends Base {
   static override setQueueAdapter(): void {

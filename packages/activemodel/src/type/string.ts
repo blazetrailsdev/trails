@@ -1,4 +1,4 @@
-import { rbEqual, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
@@ -26,5 +26,3 @@ export class StringType extends ImmutableStringType {
     else return toS(value);
   }
 }
-
-registerConstant("ActiveModel::Type::String", StringType);

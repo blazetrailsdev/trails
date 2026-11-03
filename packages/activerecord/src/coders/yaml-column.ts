@@ -1,5 +1,6 @@
+import { ActiveRecord } from "../namespaces.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 
@@ -73,5 +74,6 @@ export interface YamlColumnOptions {
   unsafeLoad?: boolean | null;
 }
 
-registerConstant("ActiveRecord::Coders::YAMLColumn", YAMLColumn);
-registerConstant("ActiveRecord::Coders::YAMLColumn::SafeCoder", SafeCoder);
+constSet(YAMLColumn, "SafeCoder", SafeCoder);
+
+ActiveRecord.Coders.YAMLColumn = YAMLColumn;

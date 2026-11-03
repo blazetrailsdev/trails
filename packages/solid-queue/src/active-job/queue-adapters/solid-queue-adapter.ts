@@ -1,5 +1,6 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import { QueueAdapters } from "@blazetrails/activejob";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import { Time } from "@blazetrails/date";
 import { Job } from "../../job.js";
 
@@ -29,5 +30,4 @@ export class SolidQueueAdapter {
   }
 }
 
-QueueAdapters.SolidQueueAdapter = SolidQueueAdapter;
-registerConstant("ActiveJob::QueueAdapters::SolidQueueAdapter", SolidQueueAdapter);
+constSet(QueueAdapters, "SolidQueueAdapter", SolidQueueAdapter);

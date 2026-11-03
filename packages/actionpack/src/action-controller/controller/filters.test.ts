@@ -1,6 +1,6 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
 import {
   assert,
@@ -16,7 +16,7 @@ import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 
-registerConstant("FilterTest", { name: "FilterTest" });
+constSet(TopLevel, "FilterTest", { name: "FilterTest" });
 import "../../test-helpers/abstract-unit.js";
 
 type Ctor = new () => Base;

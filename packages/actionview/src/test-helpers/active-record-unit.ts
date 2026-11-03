@@ -14,8 +14,9 @@ import {
   RuntimeError,
   getFs,
   isRegisteredConstant,
-  registerConstant,
   warn,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
@@ -62,7 +63,7 @@ export class ActiveRecordTestConnector {
       await Base.leaseConnection();
 
       if (!isRegisteredConstant("QUOTED_TYPE")) {
-        registerConstant("QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
+        constSet(TopLevel, "QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
       }
     } else {
       throw new RuntimeError("Can't setup connection since ActiveRecord isn't loaded.");
