@@ -482,13 +482,17 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     }
   }
 
+  /** @internal */
   protected moduleNamespacing(block: () => unknown): void {
     let content = this.capture(block);
     if (this.isNamespaced()) content = this.wrapWithNamespace(content);
     this.concat(content);
   }
 
-  /** @missingRailsArgs join — PERMANENT */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   protected indent(content: string, multiplier = 2): string {
     const spaces = " ".repeat(multiplier);
     return content
@@ -497,8 +501,9 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       .join("");
   }
 
+  /** @internal */
   protected wrapWithNamespace(content: string): string {
-    content = this.indent(content).replace(/\r?\n$/, "");
+    content = this.indent(content).replace(/(\r\n|\n|\r)$/, "");
     return `export namespace ${this.namespace()!.name} {\n${content}\n}\n`;
   }
 
@@ -519,6 +524,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       .map((n) => _underscore(n)));
   }
 
+  /** @internal */
   protected namespacedPath(): string {
     return (this._namespacedPath ??= this.namespaceDirs().join("/"));
   }

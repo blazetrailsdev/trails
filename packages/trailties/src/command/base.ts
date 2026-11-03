@@ -83,6 +83,7 @@ export class Base extends Thor {
   /**
    * @inventedArm replaceAll — PERMANENT
    * @inventedArm push — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   static namespace(name: string | null = null): string {
     const thor = Thor as unknown as ThorClass;

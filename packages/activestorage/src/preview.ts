@@ -40,11 +40,13 @@ export class Preview {
   private _presentation: Presented | null = null;
 
   get filename(): Filename {
-    return this._presentation!.filename;
+    if (this._presentation == null) throw new UnprocessedError();
+    return this._presentation.filename;
   }
 
   get contentType(): string | null {
-    return this._presentation!.contentType;
+    if (this._presentation == null) throw new UnprocessedError();
+    return this._presentation.contentType;
   }
 
   /** @inventedArm presentation — PERMANENT */
