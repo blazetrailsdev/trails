@@ -3,6 +3,8 @@ import { classPathMismatches, defineConstants } from "./classpath.js";
 import { TopLevel, rbModName, rbModToS } from "./object.js";
 import { rbPathToClass } from "./variable.js";
 import { constSet } from "./include.js";
+import { constGet } from "./index.js";
+import { NameError } from "./name-error.js";
 
 describe("rbModName over the generated class-path table", () => {
   it("answers a generated path", () => {
@@ -11,6 +13,23 @@ describe("rbModName over the generated class-path table", () => {
     expect(rbModName(Generated)).toBe("Outer::Inner::Generated");
     expect(rbModToS(Generated)).toBe("Outer::Inner::Generated");
     expect(rbPathToClass("Outer::Inner::Generated")).toBe(Generated);
+  });
+
+  it("constGet resolves a generated row, and a row in TDZ misses", () => {
+    class Outer {}
+    class Resolved {}
+    defineConstants([
+      [() => Outer, "ConstGetOuter"],
+      [() => Resolved, "ConstGetOuter::Resolved"],
+      [
+        () => {
+          throw new ReferenceError("Cannot access before initialization");
+        },
+        "ConstGetTdz",
+      ],
+    ]);
+    expect(constGet(Object, "ConstGetOuter::Resolved")).toBe(Resolved);
+    expect(() => constGet(Object, "ConstGetTdz")).toThrow(NameError);
   });
 
   it("answers a const_set-bound path ahead of the generated one", () => {
