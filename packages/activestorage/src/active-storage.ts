@@ -31,6 +31,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Blob?: typeof Blob;
   VariantRecord?: unknown;
   Transformers: typeof Transformers;
+  Blobs: { RedirectController?: unknown; ProxyController?: unknown };
   Error: typeof Errors.Error;
   InvariableError: typeof Errors.InvariableError;
   UnpreviewableError: typeof Errors.UnpreviewableError;
@@ -64,6 +65,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   videoPreviewArguments: string;
 };
 extend(ActiveStorage, Autoload);
+ActiveStorage.Blobs = {};
 registerConstant("ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");

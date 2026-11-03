@@ -52,6 +52,7 @@ export {
   InvalidCrossOriginRequest,
 } from "./metal/request-forgery-protection.js";
 export {
+  Live,
   SSE,
   ClientDisconnected,
   Buffer as LiveBuffer,
