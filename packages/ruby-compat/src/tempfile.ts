@@ -54,12 +54,12 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   /** `@opts` (`vendor/ruby/v3.3.11/lib/tempfile.rb:152`). */
   private readonly opts: TempfileOptions;
   /** `@finalizer_obj` (`vendor/ruby/v3.3.11/lib/tempfile.rb:155`). */
-  private readonly finalizerObj = {};
+  readonly #finalizerObj = {};
 
   private constructor(tmpfile: File, opts: TempfileOptions = {}) {
     super(tmpfile);
     this.opts = opts;
-    ObjectSpace.defineFinalizer(this.finalizerObj, new Remover(tmpfile.path()!).call);
+    ObjectSpace.defineFinalizer(this.#finalizerObj, new Remover(tmpfile.path()!).call);
     ObjectSpace.defineFinalizer(this, new Closer(tmpfile).call);
   }
 
@@ -285,7 +285,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
       if (code === "EACCES") return null;
       if (code !== "ENOENT") throw error;
     }
-    ObjectSpace.undefineFinalizer(this.finalizerObj);
+    ObjectSpace.undefineFinalizer(this.#finalizerObj);
     return (this.unlinked = true);
   }
 
