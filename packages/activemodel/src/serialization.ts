@@ -25,7 +25,6 @@ export interface SerializationRecord {
 
 export type SerializableHash = Record<string, unknown> & PromiseLike<Record<string, unknown>>;
 
-/** @inventedArm if — PERMANENT */
 export function serializableHash(
   this: SerializationRecord,
   options: SerializeOptions | null = null,

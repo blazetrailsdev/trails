@@ -28,7 +28,6 @@ export async function loadEnvironmentConfigBang(this: {
   if (APP_PATH != null) await Trails.application!.initializeBang("_");
 }
 
-/** @inventedArm if — PERMANENT */
 async function loadTasks(): Promise<void> {
   if (ENGINE_PATH != null) {
     await Rake.application!.init("trails");
@@ -38,7 +37,6 @@ async function loadTasks(): Promise<void> {
   }
 }
 
-/** @inventedArm if — PERMANENT */
 async function loadGenerators(): Promise<void> {
   if (ENGINE_PATH != null) {
     const engine = (await Engine.find(ENGINE_ROOT!))!;
