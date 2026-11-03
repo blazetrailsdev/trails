@@ -257,8 +257,8 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
 
     const service = blob.service as unknown as { upload: (...args: unknown[]) => unknown };
-    const mockUpload = (_key: unknown, _io: unknown, options: { contentType?: unknown } = {}) => {
-      expect(options.contentType).toBe("image/jpeg");
+    const mockUpload = (_key: unknown, _io: unknown, options: unknown = {}) => {
+      expect((options as { contentType?: unknown }).contentType).toBe("image/jpeg");
     };
 
     service.upload = mockUpload;

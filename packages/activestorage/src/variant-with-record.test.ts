@@ -84,6 +84,8 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
 
     await assertDifference(
       () => blob.variantRecords.count(),
+      undefined,
+      null,
       async () => {
         await variantOf(blob, { resizeToLimit: [100, 100] }).processed();
       },
@@ -125,7 +127,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       await user.highlightsWithVariants.attach(blob);
     }
 
-    for (const highlight of (await user.highlightsWithVariants.toArray()) as Attachment[]) {
+    for (const highlight of await user.highlightsWithVariants.attachments) {
       const rep = await representationOf(highlight, "thumb");
       await rep.processed();
       await rep.key;
@@ -134,7 +136,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
     const found = (await (User as unknown as { withAttachedHighlightsWithVariants(): typeof User })
       .withAttachedHighlightsWithVariants()
       .findBy({ name: "Justin" })) as User;
-    const highlights = (await found.highlightsWithVariants.toArray()) as Attachment[];
+    const highlights = await found.highlightsWithVariants.attachments;
 
     await assertQueriesCount(0, false, async () => {
       for (const highlight of highlights) {
@@ -161,7 +163,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       await user.highlightsWithVariants.attach(blob);
     }
 
-    for (const highlight of (await user.highlightsWithVariants.toArray()) as Attachment[]) {
+    for (const highlight of await user.highlightsWithVariants.attachments) {
       const rep = await representationOf(highlight, "thumb");
       await rep.processed();
       await rep.key;
