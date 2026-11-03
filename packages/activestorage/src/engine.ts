@@ -204,9 +204,12 @@ export class Engine extends TrailsEngine {
       if (!(await File.isExistAsync(configFile)))
         configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
       const configFileExist = await File.isExistAsync(configFile);
-      const mod: { default?: Record<string, Record<string, unknown>> } | null = configFileExist
-        ? await import(getPath().pathToFileURL!(configFile).href)
-        : null;
+      const mod: { default?: Record<string, Record<string, unknown>> } | null =
+        configFileExist &&
+        (TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig })
+          .activeStorage.serviceConfigurations == null
+          ? await import(getPath().pathToFileURL!(configFile).href)
+          : null;
 
       onLoad("active_storage_blob", () => {
         const activeStorage = (
