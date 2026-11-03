@@ -11,7 +11,13 @@ import { Namespace } from "./namespace.js";
 
 import type { Node } from "../html5/node.js";
 import * as Searchable from "./searchable.js";
+import { registerNodeSetCtor } from "./node-set-ctor.js";
 import type { SearchableHost } from "./searchable.js";
+// Load `xpath-context.js` for its side effect: it registers `XPathContext`
+// with the late-binding holder that `searchable.ts` resolves at query time.
+// `searchable.ts` cannot import it directly without re-entering the import
+// cycle that left its namespace half-built during boot (see node-set-ctor.ts).
+import "./xpath-context.js";
 
 export class NodeSet implements Iterable<Node> {
   declare atCss: (...args: unknown[]) => Node | undefined;
@@ -98,3 +104,6 @@ export class NodeSet implements Iterable<Node> {
 include(NodeSet, Enumerable);
 include(NodeSet, Searchable);
 rbModConstSet(XML, "NodeSet", NodeSet);
+// Last step of this module's initialisation: hand `NodeSet` to the late-binding
+// holder so `searchable.ts` never has to import this module at runtime.
+registerNodeSetCtor(NodeSet);

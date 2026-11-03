@@ -21,7 +21,8 @@ import { Node } from "../html5/node.js";
 import { XML } from "../namespaces.js";
 import { Attr } from "./attr.js";
 import { XmlNode as XMLNode } from "./node.js";
-import { NodeSet } from "./node-set.js";
+import type { NodeSet } from "./node-set.js";
+import { nodeSetCtor, registerXPathContextCtor } from "./node-set-ctor.js";
 import { Namespace } from "./namespace.js";
 import {
   evaluate,
@@ -260,7 +261,7 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
 };
 
-interface ContextHost {
+export interface ContextHost {
   readonly document: unknown;
   readonly _node: unknown;
 }
@@ -424,7 +425,7 @@ export class XPathContext {
 
   private xpath2ruby(value: Value<XPathNode>): NodeSet | string | number | boolean {
     if (Array.isArray(value)) {
-      return new NodeSet(
+      return new (nodeSetCtor())(
         this._document,
         value.map((n) => this.wrap(n)),
       );
@@ -452,10 +453,10 @@ export class XPathContext {
     if (rbRetval === false) return false;
     if (rbRetval == null) return null;
     if (Array.isArray(rbRetval)) {
-      const rbNodeSet = new NodeSet(this._document, rbRetval as Node[]);
+      const rbNodeSet = new (nodeSetCtor())(this._document, rbRetval as Node[]);
       return rbNodeSet.map((n) => (n as unknown as { _node: XPathNode })._node);
     }
-    if (rbRetval instanceof NodeSet) {
+    if (rbRetval instanceof nodeSetCtor()) {
       return rbRetval.map((n) => (n as unknown as { _node: XPathNode })._node);
     }
     throw new RuntimeError("Invalid return type");
@@ -463,3 +464,7 @@ export class XPathContext {
 }
 
 rbModConstSet(XML, "XPathContext", XPathContext);
+
+// Last step of this module's initialisation, so `searchable.ts` never has to
+// import this module at runtime. See node-set-ctor.ts for why.
+registerXPathContextCtor(XPathContext);

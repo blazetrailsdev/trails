@@ -7,6 +7,11 @@ import { XmlNode } from "./node.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
+// Load `xpath-context.js` for its side effect: it registers `XPathContext`
+// with the late-binding holder that `searchable.ts` resolves at query time.
+// `searchable.ts` cannot import it directly without re-entering the import
+// cycle that left its namespace half-built during boot (see node-set-ctor.ts).
+import "./xpath-context.js";
 
 export class XmlDocument {
   declare css: (...args: unknown[]) => NodeSet;
