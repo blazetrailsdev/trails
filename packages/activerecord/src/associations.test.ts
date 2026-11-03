@@ -431,13 +431,6 @@ describe("PreloaderTest", () => {
     constSet(TopLevel, "ShippingLine", ShippingLine);
     constSet(TopLevel, "ShippingLineDiscountApplication", ShippingLineDiscountApplication);
     constSet(TopLevel, "Discount", Discount);
-    constSet(TopLevel, "ShardedBlog", ShardedBlogPL);
-    constSet(TopLevel, "ShardedBlogPost", ShardedBlogPostPL);
-    constSet(TopLevel, "ShardedComment", ShardedCommentPL);
-    constSet(TopLevel, "ShardedTag", ShardedTagPL);
-    constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTagPL);
-    constSet(TopLevel, "CpkOrder", CpkOrderPL);
-    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreementPL);
     constSet(TopLevel, "Dog", Dog);
     constSet(TopLevel, "OtherDog", OtherDog);
     constSet(TopLevel, "EssaySpecial", EssaySpecial);
