@@ -1,3 +1,4 @@
+import { classpaths } from "../classpath.js";
 import { b } from "../string/b.js";
 import { ArgumentError } from "../argument-error.js";
 import { rbEqual } from "../rb-equal.js";
@@ -794,3 +795,5 @@ export class Generic {
     return str;
   }
 }
+
+classpaths.set(Generic, { path: "URI::Generic", permanent: true });

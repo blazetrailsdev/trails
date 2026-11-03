@@ -1,4 +1,5 @@
-import { classpaths } from "./classpath.js";
+import { constSet } from "./include.js";
+import { TopLevel } from "./object.js";
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
@@ -331,4 +332,5 @@ export const Zlib = {
   },
 };
 
-classpaths.set(ZError, { path: "Zlib::Error", permanent: true });
+constSet(TopLevel, "Zlib", Zlib);
+constSet(Zlib, "Error", ZError);

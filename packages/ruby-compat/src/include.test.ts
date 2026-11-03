@@ -1858,6 +1858,12 @@ describe("Module#const_defined?", () => {
     expect(constDefined(Reply, "Generated", false)).toBe(false);
   });
 
+  it("does not read the top-level table for another module when recur is false", () => {
+    class Topic {}
+    expect(constDefined(Topic, "Object", false)).toBe(false);
+    expect(constDefined(Topic, "Object")).toBe(true);
+  });
+
   it("raises NameError for a name that is not a constant name", () => {
     class Topic {}
     expect(() => constDefined(Topic, "name")).toThrow(NameError);

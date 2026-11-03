@@ -70,6 +70,7 @@ import {
   reopened,
   rbSeatSuper,
   superSlots,
+  type TopLevelConstants,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
 
@@ -100,7 +101,16 @@ type ModuleHooks = {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function constSet<T>(mod: object, id: string, value: T): T {
+export function constSet<T>(
+  mod:
+    | Module
+    | (abstract new (...args: never) => unknown)
+    | { readonly name: string }
+    | ModuleObject
+    | TopLevelConstants,
+  id: string,
+  value: T,
+): T {
   if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(id)) {
     throw new NameError(`wrong constant name ${id}`, id);
   }

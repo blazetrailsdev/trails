@@ -1,3 +1,4 @@
+import { ActiveRecord } from "../namespaces.js";
 import { ActiveSupportJSON, isBlank } from "@blazetrails/activesupport";
 
 export class JSON {
@@ -9,3 +10,5 @@ export class JSON {
     return isBlank(json) ? null : ActiveSupportJSON.decode(json as string | Uint8Array);
   }
 }
+
+ActiveRecord.Coders.JSON = JSON;

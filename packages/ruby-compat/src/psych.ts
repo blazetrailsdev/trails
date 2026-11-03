@@ -23,9 +23,15 @@ import { Emitter as VisitorsEmitter } from "./psych/visitors/emitter.js";
 import { Parser as PsychParser } from "./psych/parser.js";
 import { TreeBuilder as PsychTreeBuilder } from "./psych/tree-builder.js";
 import { DepthFirst } from "./psych/visitors/depth-first.js";
+import { Alias as NodesAlias } from "./psych/nodes/alias.js";
+import { Document as NodesDocument } from "./psych/nodes/document.js";
+import { Mapping as NodesMapping } from "./psych/nodes/mapping.js";
+import { Node as NodesNode } from "./psych/nodes/node.js";
+import { Scalar as NodesScalar } from "./psych/nodes/scalar.js";
+import { Sequence as NodesSequence } from "./psych/nodes/sequence.js";
+import { Stream as NodesStream } from "./psych/nodes/stream.js";
+import { Emitter as PsychEmitter } from "./psych/emitter.js";
 import { DocumentStream } from "./psych/handlers/document-stream.js";
-import type { Document as PsychDocument } from "./psych/nodes/document.js";
-import type { Stream as PsychStream } from "./psych/nodes/stream.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
 
 export { coderTag } from "./psych/coder.js";
@@ -141,6 +147,42 @@ export namespace Psych {
       return DepthFirst;
     },
   };
+
+  /**
+   * `Psych::Nodes` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes.rb:76`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const Nodes = {
+    get Alias() {
+      return NodesAlias;
+    },
+    get Document() {
+      return NodesDocument;
+    },
+    get Mapping() {
+      return NodesMapping;
+    },
+    get Node() {
+      return NodesNode;
+    },
+    get Scalar() {
+      return NodesScalar;
+    },
+    get Sequence() {
+      return NodesSequence;
+    },
+    get Stream() {
+      return NodesStream;
+    },
+  };
+
+  /**
+   * `Psych::Emitter` (`vendor/ruby/v3.3.11/ext/psych/psych_emitter.c:527`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const Emitter = PsychEmitter;
 
   /* eslint-disable prefer-const */
   /**
@@ -265,7 +307,7 @@ export namespace Psych {
   export function parse(
     yaml: string | Uint8Array | IO,
     { filename = null as string | null } = {},
-  ): PsychDocument | false {
+  ): NodesDocument | false {
     const done = {};
     try {
       parseStream(yaml, { filename }, (node) => {
@@ -273,7 +315,7 @@ export namespace Psych {
       });
     } catch (e) {
       if (e !== done) throw e;
-      return (done as { node: PsychDocument }).node;
+      return (done as { node: NodesDocument }).node;
     }
     return false;
   }
@@ -295,8 +337,8 @@ export namespace Psych {
   export function parseStream(
     yaml: string | Uint8Array | IO,
     { filename = null as string | null } = {},
-    block?: (node: PsychDocument) => unknown,
-  ): PsychStream | PsychParser {
+    block?: (node: NodesDocument) => unknown,
+  ): NodesStream | PsychParser {
     if (block) {
       const parser = new PsychParser(new DocumentStream(block));
       return parser.parse(yaml, filename);

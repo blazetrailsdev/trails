@@ -186,6 +186,15 @@ export const Util = {
  */
 export class URI {
   /**
+   * `URI::Generic` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static get Generic(): typeof Generic {
+    return Generic;
+  }
+
+  /**
    * `URI.register_scheme` (`vendor/ruby/v3.3.11/lib/uri/common.rb:81`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
@@ -340,4 +349,3 @@ export class URI {
 constSet(TopLevel, "URI", URI);
 
 constSet(URI, "InvalidURIError", InvalidURIError);
-constSet(URI, "Generic", Generic);

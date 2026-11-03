@@ -1,3 +1,4 @@
+import { ActiveRecord } from "../namespaces.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   rbClassNewInstance,
@@ -86,3 +87,5 @@ export class ColumnSerializer {
     }
   }
 }
+
+ActiveRecord.Coders.ColumnSerializer = ColumnSerializer;

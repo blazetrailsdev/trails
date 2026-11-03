@@ -1,3 +1,4 @@
+import { ActiveRecord } from "../namespaces.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { constSet } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
@@ -74,3 +75,5 @@ export interface YamlColumnOptions {
 }
 
 constSet(YAMLColumn, "SafeCoder", SafeCoder);
+
+ActiveRecord.Coders.YAMLColumn = YAMLColumn;
