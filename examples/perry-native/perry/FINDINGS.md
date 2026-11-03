@@ -1716,6 +1716,121 @@ Wall 16 took six experiments, five of which were wrong, and every wrong one
 reasoned from the shape of the code instead of changing one variable and
 measuring. The one that worked changed a single call site.
 
+## Walls 18-20, all FIXED: three unrelated lowering defects (2026-11-03)
+
+With wall 17's `callerLocations` fallback in place the eager chain reached 416
+and then hit three more defects in a row. All three are now fixed in trails, and
+two of them have 1-module minimal repros under `perry/probe/`.
+
+| wall | init lines after the fix | error it threw |
+| --- | --- | --- |
+| 18 | 514 -> 545 -> **842** | `TypeError: Cannot convert undefined or null to object` in `rbModAppendFeatures` |
+| 19 | **869** | `ReferenceError: Base64 is not defined` |
+| 20 | (next build) | `TypeError: Cannot set properties of undefined (setting 'withRouting')` |
+
+### Wall 18 - a mixin namespace read while its module was half-built
+
+`include(Document, Searchable)` at `nokogiri/src/html5/document.ts:95` received
+`undefined`. Measured, not guessed: a `console.log` at `rbModAppendFeatures`'
+entry printed `WALL18: appendFeatures got mod=undefined for klass=Document`
+exactly once.
+
+`xml/searchable.ts` sat inside an **8-module** strongly-connected component, so
+whichever of its five `include(X, Searchable)` consumers initialised first could
+read its namespace mid-build. Three shapes were refuted with probes first (6-10s
+each): a plain 2-module cycle, a 3-module cycle with a separate importer, and
+the namespace of an in-progress module - perry handles all three correctly, and
+on the third it is *more* permissive than Node, which throws a TDZ
+`ReferenceError`.
+
+What found the cut was a Tarjan SCC pass over nokogiri's runtime imports (type-only
+imports excluded). `searchable.ts`'s only out-edge into the knot was
+`xpath-context.ts`, and the failing reads were all of *searchable's* namespace,
+so the knot never needed untangling - one edge did. `NodeSet` and `XPathContext`
+are now resolved through a late-binding holder (`xml/node-set-ctor.ts`) at query
+time, which is always after boot.
+
+Two wrong turns worth recording: the first fix cut only `searchable ->
+node-set`, which moved the frontier 31 modules and failed again because the
+cycle was two levels deep; and making `searchable.ts`'s import of
+`xpath-context.js` type-only orphaned that module entirely (nothing else
+imported it at runtime), so it never registered and every css/xpath query threw.
+The five consumers now load it for its side effect.
+
+### Wall 19 - a named class expression's own name is not bound in its body
+
+`rack-session/src/cookie.ts` had `static Base64 = class Base64 { static Marshal
+= class Marshal extends Base64 {} ... }`. Per spec a named class expression
+binds its name inside its own body; perry does not create that binding.
+
+`perry/probe/named-class-expr.ts` (15 lines) and
+`perry/probe/named-class-decl.ts` isolate it exactly:
+
+| shape | Node | perry |
+| --- | --- | --- |
+| `class Base64 {}` **declaration**, self-reference in a static initialiser | works | **works** |
+| `= class Base64 {}` **expression**, same self-reference | works | **ReferenceError** |
+
+Fixed by hoisting to a module-level declaration, keeping the name `Base64` so
+`.name` and the `Rack::Session::Cookie::Base64` class path are unchanged
+(verified at runtime).
+
+### Wall 20 - a top-level namespace colliding with a nested one
+
+`actionpack/src/action-dispatch/testing/assertions/routing.ts` declared a
+top-level `ClassMethods` (RoutingAssertions') and a nested
+`WithIntegrationRouting.ClassMethods` in the same module. Narrowed with three
+probes:
+
+- nested `Outer.ClassMethods` alone - fine
+- `A.ClassMethods` and `B.ClassMethods` in different outers - fine
+- a top-level `ClassMethods` **plus** a nested one - **throws**
+
+`perry/probe/ns-collide.ts` is the 16-line repro. Declaration merging (the same
+top-level namespace twice) is also fine - `perry/probe/ns-merge.ts`.
+`WithIntegrationRouting` moved to its own module and is re-exported, a shape
+verified on both runtimes before the change.
+
+### The tree is now clean of both lowering shapes
+
+A scan of every non-test, non-generated `.ts` in `packages/` finds **no**
+remaining instance of wall 19's shape (a named class expression subclassed by
+its own members) or wall 20's (a top-level namespace name reused nested). Both
+fixes were complete rather than one-site patches, so the next wall is a new
+shape.
+
+### Method, since it changed the cost per wall
+
+Wall 16 took six experiments and hours of full builds. Walls 19 and 20 took one
+probe cycle each, because:
+
+- `PERRY_KEEP_SYMBOLS=1` plus a gdb breakpoint on a `#[no_mangle]` runtime throw
+  (`js_typeerror_new`, `js_throw_type_error_property_access`) names the frame
+  that `at <anonymous>` hides. **The last `INIT:` line is not the throwing
+  module** - it prints before dispatch, and a deferred module prints nothing, so
+  wall 18's real thrower was four nested `init_evaluate` frames below the last
+  printed line.
+- A 1-module probe compiles in ~6s against ~15-25min for the ladder. Kill
+  hypotheses with probes; use the ladder only to confirm.
+- When probes will not reproduce it, instrument the real graph. One
+  `console.log` at the suspect function's entry beat further shape-guessing.
+
+### Build environment: the memory limit is the cgroup, not the machine
+
+Four builds were OOM-killed while `free` still showed 20-30GB available. Every
+session of this user shares `user-1000.slice`, whose `memory.max` is **48GiB**;
+with a neighbouring session holding ~20GB, perry's ~11.5GB peak exceeds the
+slice and the kernel kills perry:
+
+```
+Memory cgroup out of memory: Killed process (perry) anon-rss:11445972kB
+```
+
+`PERRY_CODEGEN_MEMORY_MB` is a **scheduling hint, not a ceiling** - set to 6000,
+perry still reached 11.4GB, so lowering it does not help. `MemoryMax=` on the
+build's own scope is not the operative limit either. Gate on slice headroom
+(`memory.max - memory.current` >= ~18GiB) instead of `free`.
+
 ## A bare import that cannot be resolved compiles anyway
 
 Found by accident while building the probes above, and filable on its own.
