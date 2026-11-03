@@ -17,7 +17,6 @@ export class ControllerGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
     await this.template(
       "functional_test.ts",

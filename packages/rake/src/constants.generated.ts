@@ -35,6 +35,7 @@ defineConstants([
   [() => m0.Application, "Rake::Application"],
   [() => m1.Backtrace, "Rake::Backtrace"],
   [() => m2.Cloneable, "Rake::Cloneable"],
+  [() => m0.CommandLineOptionError, "Rake::CommandLineOptionError"],
   [() => m3.CpuCounter, "Rake::CpuCounter"],
   [() => m4.DefaultLoader, "Rake::DefaultLoader"],
   [() => m5.DSL, "Rake::DSL"],

@@ -1,4 +1,4 @@
-import { underscore } from "@blazetrails/activesupport";
+import { moduleParents, underscore } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
 import {
   NoMethodError,
@@ -30,6 +30,7 @@ export class Trailtie extends Initializable {
   static readonly _registry: Array<typeof Trailtie> = [];
 
   protected _config?: Configuration;
+  private _trailtieNamespace?: unknown;
 
   constructor() {
     super();
@@ -133,6 +134,12 @@ export class Trailtie extends Initializable {
 
   configure(block: (this: this) => void): void {
     block.call(this);
+  }
+
+  trailtieNamespace(): unknown {
+    return (this._trailtieNamespace ??= moduleParents(this.constructor).find((n) =>
+      rbObjRespondTo(n, "trailtieNamespace"),
+    ));
   }
 
   inspect(): string {

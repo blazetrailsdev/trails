@@ -261,6 +261,7 @@ defineConstants([
   [() => m92.Html, "ActionView::Template::Handlers::Html"],
   [() => m93.Raw, "ActionView::Template::Handlers::Raw"],
   [() => m94.TSE, "ActionView::Template::Handlers::TSE"],
+  [() => m94.LocationParsingError, "ActionView::Template::Handlers::TSE::LocationParsingError"],
   [() => m95.HTML, "ActionView::Template::HTML"],
   [() => m96.Inline, "ActionView::Template::Inline"],
   [() => m97.RawFile, "ActionView::Template::RawFile"],

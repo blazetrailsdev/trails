@@ -25,15 +25,10 @@ export class DirectUploadsController extends BaseController {
     ) as BlobArgs;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs as_json — PERMANENT
-   * @inventedArm signedId — PERMANENT
-   */
+  /** @internal */
   private async directUploadJson(blob: Blob): Promise<Record<string, unknown>> {
     return {
-      ...blob.asJson({ root: false }),
-      signed_id: blob.signedId(),
+      ...blob.asJson({ root: false, methods: "signed_id" }),
       direct_upload: {
         url: await blob.serviceUrlForDirectUpload(),
         headers: blob.serviceHeadersForDirectUpload(),

@@ -123,9 +123,9 @@ describe("JsonSerializationTest", () => {
       /"label":"Has cheezburger"/,
     );
 
-    const methodsJson = contact.toJSON({ only: "name", methods: ["label", "favoriteQuote"] });
+    const methodsJson = contact.toJSON({ only: "name", methods: ["label", "favorite_quote"] });
     expect(methodsJson).toMatch(/"label":"Has cheezburger"/);
-    expect(methodsJson).toMatch(/"favoriteQuote":"Constraints are liberating"/);
+    expect(methodsJson).toMatch(/"favorite_quote":"Constraints are liberating"/);
   });
 
   it("should return Hash for errors", () => {

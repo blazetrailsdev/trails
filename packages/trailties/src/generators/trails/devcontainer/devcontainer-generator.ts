@@ -115,7 +115,6 @@ export class DevcontainerGenerator extends GeneratorBase {
     await this.template("devcontainer/compose.yaml", ".devcontainer/compose.yaml");
   }
 
-  /** @missingRailsArgs expand_path — PERMANENT */
   async updateApplicationSystemTestCase(): Promise<void> {
     if (!this.options.systemTest) return;
 

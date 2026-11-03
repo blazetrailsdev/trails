@@ -662,7 +662,7 @@ export class ConnectionPool implements ReapablePool {
 
   private async checkoutAndVerify(c: DatabaseAdapter): Promise<DatabaseAdapter> {
     try {
-      c._runCheckoutCallbacks(() => {
+      await c._runCheckoutCallbacks(() => {
         c.cleanBang();
       });
       return c;

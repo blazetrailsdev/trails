@@ -1070,6 +1070,23 @@ describe("checkout/checkin callbacks", () => {
     }
   });
 
+  it("an async :checkout :after callback settles before checkout resolves", async () => {
+    const calls: string[] = [];
+    const callback = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      calls.push("after");
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      await pool.checkout();
+      expect(calls).toEqual(["after"]);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
   it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", async () => {
     class SubAdapter extends AbstractAdapter {}
     const before = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks.entries.length;

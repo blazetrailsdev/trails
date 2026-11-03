@@ -76,7 +76,6 @@ export class ScaffoldGenerator extends Base {
     await this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async copyViewFiles(): Promise<void> {
     const viewDirectory = dasherize(this.controllerFilePath());
     for (const view of this.availableViews()) {

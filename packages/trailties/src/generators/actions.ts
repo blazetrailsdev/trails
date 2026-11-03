@@ -206,10 +206,6 @@ export interface RouteOptions {
   namespace?: string | string[] | null;
 }
 
-/**
- * @missingRailsArgs inject_into_file — PERMANENT
- * @missingRailsArgs match_file — PERMANENT
- */
 export async function route(
   this: ActionsHost,
   routingCode: string,

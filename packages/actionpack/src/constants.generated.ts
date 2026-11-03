@@ -387,6 +387,7 @@ defineConstants([
   [() => m65.Request, "ActionDispatch::Request"],
   [() => m65.PASS_NOT_FOUND, "ActionDispatch::Request::PASS_NOT_FOUND"],
   [() => m106.Session, "ActionDispatch::Request::Session"],
+  [() => m106.DisabledSessionError, "ActionDispatch::Request::Session::DisabledSessionError"],
   [() => m106.Options, "ActionDispatch::Request::Session::Options"],
   [() => m107.Utils, "ActionDispatch::Request::Utils"],
   [() => m107.CustomParamEncoder, "ActionDispatch::Request::Utils::CustomParamEncoder"],
