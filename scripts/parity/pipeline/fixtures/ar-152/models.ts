@@ -1,4 +1,5 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 export class Author extends Base {
   static {
@@ -13,7 +14,7 @@ export class Author extends Base {
         className: "Book",
       },
     );
-    registerModel(this);
+    constSet(TopLevel, this.name, this);
   }
 }
 
@@ -21,6 +22,6 @@ export class Book extends Base {
   static {
     this.tableName = "books";
     this.belongsTo("author");
-    registerModel(this);
+    constSet(TopLevel, this.name, this);
   }
 }

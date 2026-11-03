@@ -303,10 +303,6 @@ A JS `class Foo extends Base {}` does neither, so each half has its own port
   model the loader seats, and a test that needs it calls
   `DescendantsTracker.registerSubclass`.
 
-`registerModel` (`associations.ts`) retires. activerecord's own tests and models
-no longer call it; it stays defined for the other packages' tests until
-`register-x-retires-from-other-tests` deletes it. Do not add a caller.
-
 ## A create path awaits its block before saving (`create`'s `&block`)
 
 Rails' create paths yield the caller's block synchronously while building the

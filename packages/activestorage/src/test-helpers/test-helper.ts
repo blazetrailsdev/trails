@@ -2,7 +2,14 @@ import { Notifications, type Extended } from "@blazetrails/activesupport";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ActionController } from "@blazetrails/actionpack";
 import { Image } from "@blazetrails/mini-magick/image";
-import { File, OpenSSL, StringIO, type Pathname } from "@blazetrails/ruby-compat";
+import {
+  File,
+  OpenSSL,
+  StringIO,
+  type Pathname,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import type { ClassMethods } from "../attached/model.js";
 import type { Attachment } from "../attachment.js";
@@ -12,7 +19,7 @@ import { Blob } from "../blob.js";
 import { FixtureSet } from "../fixture-set.js";
 import { Service } from "../service.js";
 import type { DiskService } from "../service/disk-service.js";
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import type { AssociationProxy } from "@blazetrails/activerecord/associations/collection-proxy";
 
 export class User extends Base {
@@ -126,7 +133,7 @@ export class User extends Base {
     }
   }
 }
-registerModel(User);
+constSet(TopLevel, "User", User);
 
 export class Group extends Base {
   declare avatar: One;
@@ -139,7 +146,7 @@ export class Group extends Base {
     this.acceptsNestedAttributesFor("users");
   }
 }
-registerModel(Group);
+constSet(TopLevel, "Group", Group);
 
 FixtureSet.fileFixturePath = File.expandPath("fixtures/files", import.meta.dirname);
 

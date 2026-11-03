@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DelegationError } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { registerModel } from "@blazetrails/activerecord";
-import { ArgumentError, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
@@ -19,13 +18,6 @@ describe("Attachment", () => {
       record: await User.createBang({ name: "Josh" }),
       blob: await createBlob({ filename: "hello.txt" }),
     });
-  });
-
-  it("keeps its qualified name through registerModel", () => {
-    registerModel(Attachment);
-
-    expect(rbModName(Attachment)).toBe("ActiveStorage::Attachment");
-    expect(User.computeType("ActiveStorage::Attachment")).toBe(Attachment);
   });
 
   it("delegates missing names to a loaded blob", async () => {

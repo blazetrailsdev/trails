@@ -1,4 +1,4 @@
-import { Base, type Relation, registerModel } from "@blazetrails/activerecord";
+import { Base, type Relation } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Reply extends Base {
@@ -15,4 +15,3 @@ export class Reply extends Base {
   }
 }
 (TopLevel as { Reply?: typeof Reply }).Reply = Reply;
-registerModel(Reply);

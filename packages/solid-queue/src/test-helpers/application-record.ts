@@ -1,8 +1,9 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 export class ApplicationRecord extends Base {
   static {
     this.primaryAbstractClass();
   }
 }
-registerModel(ApplicationRecord);
+constSet(TopLevel, "ApplicationRecord", ApplicationRecord);

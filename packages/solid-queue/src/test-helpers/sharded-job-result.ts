@@ -1,7 +1,7 @@
-import { registerModel } from "@blazetrails/activerecord";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ShardedRecord } from "./sharded-record.js";
 
 export class ShardedJobResult extends ShardedRecord {
   declare value: string | null;
 }
-registerModel(ShardedJobResult);
+constSet(TopLevel, "ShardedJobResult", ShardedJobResult);

@@ -430,9 +430,9 @@ function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === "registerModel"
+      node.expression.text === "constSet"
     ) {
-      const [nameArg, classArg] = node.arguments;
+      const [, nameArg, classArg] = node.arguments;
       if (
         nameArg &&
         ts.isStringLiteralLikeNode(nameArg) &&

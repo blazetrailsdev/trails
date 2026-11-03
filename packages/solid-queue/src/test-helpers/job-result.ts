@@ -1,4 +1,4 @@
-import { registerModel } from "@blazetrails/activerecord";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
 import { registerConstant } from "@blazetrails/ruby-compat";
@@ -16,7 +16,7 @@ export interface JobResult extends Included<typeof Identification> {}
 include(JobResult, Identification);
 GlobalID.setApp("dummy");
 registerConstant("JobResult", JobResult);
-registerModel(JobResult);
+constSet(TopLevel, "JobResult", JobResult);
 
 export class StoreResultJob extends ApplicationJob {
   static {

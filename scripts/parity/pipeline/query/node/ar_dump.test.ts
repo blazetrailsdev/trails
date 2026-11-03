@@ -80,7 +80,7 @@ describe("ar_dump.ts", () => {
   });
 
   it("dumps ar-12 (User.order hash) with table-qualified columns", () => {
-    // ar-12's models.ts never calls registerModel, and its relation is built at
+    // ar-12's models.ts seats no constant, and its relation is built at
     // module scope — so this fails with a bare "created_at" unless the schema
     // warm-up covers unregistered exports AND runs before query.ts is imported.
     const { code, stdout, stderr, json } = runDumpReadJson("ar-12");

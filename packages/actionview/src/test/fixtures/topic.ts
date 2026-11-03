@@ -1,4 +1,4 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Topic extends Base {
@@ -7,4 +7,3 @@ export class Topic extends Base {
   }
 }
 (TopLevel as { Topic?: typeof Topic }).Topic = Topic;
-registerModel(Topic);
