@@ -27,7 +27,7 @@ import { DetailsKey } from "@blazetrails/actionview";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import * as Command from "../command.js";
-import { requireApplicationBang, setApplicationDirectoryBang } from "../command/actions.js";
+import { requireApplicationBang } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
@@ -281,7 +281,7 @@ export class ServerCommand extends Base {
   }
 
   async perform(): Promise<void> {
-    setApplicationDirectoryBang();
+    this.setApplicationDirectoryBang();
     this.prepareRestart();
 
     const server = new Server(this.serverOptions());
