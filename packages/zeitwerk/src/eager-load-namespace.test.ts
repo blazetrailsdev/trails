@@ -221,7 +221,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
   it("raises if the argument is not a class or module object", async () => {
     await withSetup(loader, [], {}, async () => {
       const name = TestEagerLoadNamespaceWithObjectRootNamespace.name;
-      const e = await loader.eagerLoadNamespace(name as never).catch((error: unknown) => error);
+      const e = await loader.eagerLoadNamespace(name).catch((error: unknown) => error);
       expect(e).toBeInstanceOf(ZeitwerkError);
       expect((e as ZeitwerkError).message).toBe(`"${name}" is not a class or module object`);
     });
@@ -231,7 +231,7 @@ describe("TestEagerLoadNamespaceWithObjectRootNamespace", () => {
     await withSetup(loader, [], {}, async () => {
       await loader.eagerLoad();
       const name = TestEagerLoadNamespaceWithObjectRootNamespace.name;
-      const e = await loader.eagerLoadNamespace(name as never).catch((error: unknown) => error);
+      const e = await loader.eagerLoadNamespace(name).catch((error: unknown) => error);
       expect(e).toBeInstanceOf(ZeitwerkError);
       expect((e as ZeitwerkError).message).toBe(`"${name}" is not a class or module object`);
     });
@@ -254,7 +254,6 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
 
   beforeEach(async () => {
     loader = await newLoader({ setup: false });
-    for (const cname of Object.keys(CN)) delete (CN as unknown as Record<string, unknown>)[cname];
   });
   afterEach(teardown);
 
@@ -312,9 +311,9 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
         await loader.setup();
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(files.map((file) => isRequired(file))).toEqual(
-          ancestor === Object ? [true, true, true, true] : [true, true, false, false],
-        );
+        expect(isRequired(...files.slice(0, 2))).toBe(true);
+        expect(isRequired(files[2])).toBe(ancestor === Object);
+        expect(isRequired(files[3])).toBe(ancestor === Object);
       });
     });
 
@@ -331,9 +330,9 @@ describe("TestEagerLoadNamespaceWithCustomRootNamespace", () => {
         await loader.setup();
         await loader.eagerLoadNamespace(ancestor);
 
-        expect(files.map((file) => isRequired(file))).toEqual(
-          ancestor === Object ? [true, true, true, true] : [false, false, true, true],
-        );
+        expect(isRequired(files[0])).toBe(ancestor === Object);
+        expect(isRequired(files[1])).toBe(ancestor === Object);
+        expect(isRequired(...files.slice(2, 4))).toBe(true);
       });
     });
   }
