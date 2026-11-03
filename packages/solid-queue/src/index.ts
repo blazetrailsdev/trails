@@ -27,4 +27,4 @@ export { Configuration } from "./configuration.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { Engine } from "./engine.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

@@ -1,4 +1,4 @@
-import "../class-paths.dbconsole.generated.js";
+import "../constants.dbconsole.generated.js";
 import {
   AbstractAdapter,
   AdapterNotFound,

@@ -1,11 +1,10 @@
 /**
- * The Ruby class-path table (RFC 0205, story
- * derive-class-path-from-registered-namespaces): one checked-in module per
- * package, `src/class-paths.generated.ts`, mapping each exported TS class or
- * module that `parity:api` pairs with a Ruby class or module to its `fqn` in
- * `output/rails-api.json`. ruby-compat's `rbModName` reads it after the
- * `classpaths` a `const_set` or a module-eval seat wrote, and before
- * `klass.name`.
+ * The framework constant table (RFC 0213 § "Framework constants"): one
+ * checked-in module per package, `src/constants.generated.ts`, mapping each
+ * exported TS class or module that `parity:api` pairs with a Ruby class or
+ * module to its `fqn` in `output/rails-api.json`. ruby-compat's `rbModName`
+ * reads it after the `classpaths` a `const_set` or a module-eval seat wrote,
+ * and before `klass.name`.
  *
  *   pnpm parity:class-paths           # rewrite the tables
  *   pnpm parity:class-paths --check   # red on a stale table, or on a generated
@@ -35,9 +34,9 @@ import type { ClassInfo } from "@blazetrails/parity/types";
 
 const run = promisify(execFile);
 const OUTPUT_DIR = path.join(ROOT_DIR, "scripts/api-compare/output");
-const GENERATED = "class-paths.generated.ts";
+const GENERATED = "constants.generated.ts";
 /** The table for the classes in files outside the package entry's graph, which those files import. */
-const EXCLUDED_GENERATED = "class-paths.excluded.generated.ts";
+const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 
 /** The api-compare packages whose classes are not loaded from the package entry. */
 const SKIPPED = new Set(["activerecord-test-support"]);
@@ -54,7 +53,7 @@ const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "varia
 const LAZY_DIRS: Record<string, string> = { trailties: "commands/" };
 
 function separateTable(subpath: string): string {
-  return `class-paths.${path.basename(subpath, ".ts")}.generated.ts`;
+  return `constants.${path.basename(subpath, ".ts")}.generated.ts`;
 }
 
 interface Manifest {
@@ -287,7 +286,14 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
   return byDir;
 }
 
-export function renderClassPaths(entries: readonly ClassPathEntry[]): string {
+/** A table imported by a module besides the entry (thor's `command.ts`) must not load the entry itself. */
+const ENTRY_FIRST = new Set(["i18n", "solid-queue"]);
+
+/**
+ * `entry` is the package entry an `ENTRY_FIRST` table imports first: entered at
+ * the table, the entry's own order still runs, so no `extends` meets a class in TDZ.
+ */
+export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: string): string {
   const sorted = [...entries].sort((a, b) => a.fqn.localeCompare(b.fqn));
   const files = [...new Set(sorted.map((e) => e.file))].sort();
   const alias = new Map<string, string>();
@@ -297,10 +303,11 @@ export function renderClassPaths(entries: readonly ClassPathEntry[]): string {
     return `import * as ${ns} from "./${file.replace(/\.ts$/, ".js")}";`;
   });
   return [
-    'import { registerClassPaths } from "@blazetrails/ruby-compat";',
+    'import { defineConstants } from "@blazetrails/ruby-compat";',
+    ...(entry === undefined ? [] : [`import "./${entry}";`]),
     ...imports,
     "",
-    "registerClassPaths([",
+    "defineConstants([",
     ...sorted.map(
       (e) =>
         `  [() => ${alias.get(e.file)}${e.namespace ? "" : `.${e.tsName}`}, ${JSON.stringify(e.fqn)}],`,
@@ -336,6 +343,11 @@ async function checkSeatedPaths(dir: string): Promise<void> {
     "console.log(JSON.stringify(classPathMismatches()));",
   ].join("\n");
   const { stdout } = await run("node", ["--input-type=module", "-e", script], { cwd });
+  const entry = await entryFile(cwd);
+  const table = `${path.dirname(entry)}/constants.generated.js`;
+  await run("node", ["--input-type=module", "-e", `await import(${JSON.stringify(table)});`], {
+    cwd,
+  });
   for (const [seated, generated] of JSON.parse(stdout) as [string, string][]) {
     console.error(`${dir}: seated ${seated}, generated ${generated}`);
     process.exitCode = 1;
@@ -422,7 +434,7 @@ async function lazyTablesOnDisk(dir: string): Promise<string[]> {
   const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, "src"));
   return files.filter(
     (file) =>
-      /^class-paths\..+\.generated\.ts$/.test(file) &&
+      /^constants\..+\.generated\.ts$/.test(file) &&
       file !== EXCLUDED_GENERATED &&
       file !== separateTable(SEPARATE_SUBPATH_ENTRIES[dir] ?? ""),
   );
@@ -545,7 +557,11 @@ async function main(): Promise<void> {
       }
       continue;
     }
-    const next = await prettier.format(renderClassPaths(entries), {
+    const entry =
+      table === GENERATED && ENTRY_FIRST.has(dir)
+        ? (await entryFile(path.join(ROOT_DIR, "packages", dir))).replace(/^\.\/dist\//, "")
+        : undefined;
+    const next = await prettier.format(renderClassPaths(entries, entry), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
     });
@@ -569,7 +585,7 @@ async function main(): Promise<void> {
   if (check) {
     for (const [dir, entries] of tables) {
       for (const file of await lazyFilesMissingTable(dir, entries)) {
-        console.error(`${dir}/src/${file} does not import its class-path table`);
+        console.error(`${dir}/src/${file} does not import its constant table`);
         process.exitCode = 1;
       }
       if (entries.length > 0) await checkSeatedPaths(dir);
@@ -577,7 +593,7 @@ async function main(): Promise<void> {
   }
   if (stale.length > 0) {
     console.error(
-      `Stale class-path tables — run \`pnpm parity:class-paths\`:\n  ${stale.join("\n  ")}`,
+      `Stale constant tables — run \`pnpm parity:class-paths\`:\n  ${stale.join("\n  ")}`,
     );
     process.exitCode = 1;
   }

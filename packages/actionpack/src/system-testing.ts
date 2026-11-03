@@ -11,4 +11,4 @@ export {
 } from "./action-dispatch/system-testing/driver.js";
 export { Server } from "./action-dispatch/system-testing/server.js";
 
-import "./class-paths.excluded.generated.js";
+import "./constants.excluded.generated.js";

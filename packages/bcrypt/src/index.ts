@@ -18,4 +18,4 @@ BCrypt.Engine = Engine;
 BCrypt.Password = Password;
 TopLevel.BCrypt = BCrypt;
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

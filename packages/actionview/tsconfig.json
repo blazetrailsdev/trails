@@ -11,7 +11,7 @@
     "src/test-helpers",
     "src/test",
     "src/test-case.ts",
-    "src/class-paths.excluded.generated.ts"
+    "src/constants.excluded.generated.ts"
   ],
   "references": [
     { "path": "../builder" },

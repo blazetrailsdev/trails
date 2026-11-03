@@ -4,7 +4,7 @@ export { Application } from "./application.js";
 export { Engine } from "./engine.js";
 export { Trailtie } from "./trailtie.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { HealthController } from "./health-controller.js";
 import { InfoController } from "./info-controller.js";

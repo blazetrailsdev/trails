@@ -1180,11 +1180,9 @@ Ruby finds a class by name at run time: `constantize`, `const_get`,
 - **Class-path tables answer class → Ruby name.** That direction is output:
   `rbModName`, `rbInspect` and exception text, and every Rails body that reads a
   class's `name` to build a string. They are ruby-compat internals. The
-  generated `class-paths*.generated.ts` file each package carries is the one
-  place outside ruby-compat that calls `registerClassPaths`; the hand-written
-  row in `actionpack/src/action-controller/metal/strong-parameters.ts` is debt,
-  to move into actionpack's generated table. Hand-written code outside
-  ruby-compat never calls `registerClassPaths`, `generatedClass`,
+  generated `constants*.generated.ts` file each package carries is the one
+  place outside ruby-compat that calls `defineConstants`. Hand-written code outside
+  ruby-compat never calls `defineConstants`, `generatedClass`,
   `generatedClassPath` or reads `classpaths`; it reaches a Ruby name only
   through `rbModName` / `rbInspect`.
 

@@ -95,4 +95,4 @@ rbSetClassPathString(Error, { name: "MiniMagick" }, "Error");
 rbSetClassPathString(Invalid, { name: "MiniMagick" }, "Invalid");
 rbSetClassPathString(TimeoutError, { name: "MiniMagick" }, "TimeoutError");
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

@@ -1,4 +1,4 @@
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 export * as Reflection from "./reflection.js";
 export { NamedVariant } from "./named-variant.js";
 export { ActiveStorage, Transformers } from "./active-storage.js";

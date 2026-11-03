@@ -34,4 +34,4 @@ export { registerChannel } from "./channel/base.js";
 import "./channel/test-case.js";
 import "./connection/test-case.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
