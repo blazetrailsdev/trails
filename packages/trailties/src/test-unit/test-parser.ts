@@ -4,6 +4,7 @@ import * as ts from "typescript/unstable/ast";
 
 let api: API | undefined;
 
+/** @noRailsEquivalent PERMANENT */
 function renderedTitles(node: ts.CallExpression, title: string): string[] | null {
   if (title === "") return null;
   const table = node.expression;
