@@ -108,7 +108,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     return this._strBody;
   }
 
-  write(string: string): void {
+  write(string: string | Uint8Array): void {
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;

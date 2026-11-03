@@ -1,7 +1,7 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { Concern, extend, isBlank } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
-import { include, Range, rbStrPlus, SecureRandom } from "@blazetrails/ruby-compat";
+import { include, rbStrPlus, SecureRandom } from "@blazetrails/ruby-compat";
 import type { Blob } from "./blob.js";
 import { FileNotFoundError } from "./errors.js";
 
@@ -29,22 +29,25 @@ async function sendBlobByteRangeData(
   if (ranges!.length === 1) {
     const range = ranges![0];
     contentType = blob.contentTypeForServing()!;
-    data = await blob.downloadChunk(new Range(range[0], range[1]));
+    data = await blob.downloadChunk(range);
 
-    this.response.headers.set("Content-Range", `bytes ${range[0]}-${range[1]}/${blob.byte_size}`);
+    this.response.headers.set(
+      "Content-Range",
+      `bytes ${range.begin}-${range.end}/${blob.byte_size}`,
+    );
   } else {
     const boundary = SecureRandom.hex();
     contentType = `multipart/byteranges; boundary=${boundary}`;
     data = new Uint8Array();
 
     for (const range of ranges!.filter((range) => range != null)) {
-      const chunk = await blob.downloadChunk(new Range(range[0], range[1]));
+      const chunk = await blob.downloadChunk(range);
 
       data = rbStrPlus(data, `\r\n--${boundary}\r\n`) as Uint8Array;
       data = rbStrPlus(data, `Content-Type: ${blob.contentTypeForServing()}\r\n`) as Uint8Array;
       data = rbStrPlus(
         data,
-        `Content-Range: bytes ${range[0]}-${range[1]}/${blob.byte_size}\r\n\r\n`,
+        `Content-Range: bytes ${range.begin}-${range.end}/${blob.byte_size}\r\n\r\n`,
       ) as Uint8Array;
       data = rbStrPlus(data, chunk) as Uint8Array;
     }
@@ -55,7 +58,7 @@ async function sendBlobByteRangeData(
   this.response.headers.set("Accept-Ranges", "bytes");
   this.response.headers.set("Content-Length", data.length.toString());
 
-  return this.sendData(data as never, {
+  return this.sendData(data, {
     disposition:
       blob.forcedDispositionForServing() ?? disposition ?? DEFAULT_BLOB_STREAMING_DISPOSITION,
     filename: blob.filename.sanitized(),
@@ -80,7 +83,7 @@ async function sendBlobStream(
     async (stream: ActionController.LiveBuffer) => {
       try {
         await blob.download((chunk) => {
-          stream.write(chunk as never);
+          stream.write(chunk);
         });
       } catch (error) {
         if (error instanceof FileNotFoundError) {

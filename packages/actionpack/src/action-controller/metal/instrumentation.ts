@@ -101,7 +101,7 @@ export function sendFile(
 
 export function sendData(
   this: DataStreamingHost,
-  data: string | Buffer,
+  data: string | Uint8Array,
   options: SendDataOptions = {},
 ): void | Promise<void> {
   return Notifications.instrument(

@@ -59,7 +59,7 @@ export function sendFile(
 /** @internal */
 export function sendData(
   this: DataStreamingHost,
-  data: string | Buffer,
+  data: string | Uint8Array,
   options: SendDataOptions = {},
 ): unknown {
   this.sendFileHeadersBang(options);
