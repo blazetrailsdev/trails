@@ -13,12 +13,6 @@ import { Base } from "../base.js";
 import { Migration, Migrator, type MigrationProxy } from "../migration.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 
-interface MigrationRailtie {
-  railtieName: string;
-  root(): string | null;
-  paths?(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
-}
-
 DSL.namespace("db", () => {
   DSL.task(
     { load_config: "environment" },
@@ -39,10 +33,7 @@ DSL.namespace("railties", () => {
       block(async () => {
         const toLoad = isBlank(ENV["FROM"]) ? "all" : ENV["FROM"]!.split(",").map((s) => s.trim());
         const railties: Record<string, string> = {};
-        const application = TopLevel.Trails!.application as unknown as {
-          migrationRailties(): MigrationRailtie[];
-        };
-        for (const railtie of application.migrationRailties()) {
+        for (const railtie of TopLevel.Trails!.application!.migrationRailties()) {
           if (!(toLoad === "all" || toLoad.includes(railtie.railtieName))) continue;
 
           let path: string | undefined;
