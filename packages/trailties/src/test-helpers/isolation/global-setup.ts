@@ -25,6 +25,11 @@ export default async function setup(): Promise<void> {
     `import "@blazetrails/trailties/all";\n`,
   );
 
+  await getFs().writeFile!(
+    File.join(appTemplatePath, "config/storage.ts"),
+    `export default {\n  test: { service: "Disk", root: "tmp/storage" },\n  local: { service: "Disk", root: "storage" },\n};\n`,
+  );
+
   await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
   await getFs().writeFile!(File.join(appTemplatePath, "app/javascript/application.js"), "\n");
 
