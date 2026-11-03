@@ -10,9 +10,11 @@ import {
   getFs,
   getPath,
   Hash,
+  exit,
   include,
   LoadError,
   NameError,
+  onSignal,
   setEnv,
   STDERR,
   STDOUT,
@@ -25,7 +27,7 @@ import { DetailsKey } from "@blazetrails/actionview";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import * as Command from "../command.js";
-import { requireApplicationBang } from "../command/actions.js";
+import { requireApplicationBang, setApplicationDirectoryBang } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
@@ -77,6 +79,7 @@ export class Server {
 
   async start(afterStopCallback: (() => void) | null = null): Promise<void> {
     try {
+      onSignal("SIGINT", () => exit());
       this.createTmpDirectories();
       this.setupDevCaching();
       const app = await Trails.initialize();
@@ -277,13 +280,13 @@ export class ServerCommand extends Base {
     this._originalOptions = (args[1] as string[]).filter((option) => option !== "--restart");
   }
 
-  /** @missingRailsCall application — CONVERGEABLE server-start-after-stop-callback-and-trap */
   async perform(): Promise<void> {
+    setApplicationDirectoryBang();
     this.prepareRestart();
 
     const server = new Server(this.serverOptions());
     await requireApplicationBang();
-    Dir.chdir(Trails.root()!);
+    Dir.chdir(Trails.application!.root()!);
 
     if (server.isServeable()) {
       this.printBootInformation(server.server().name, server.servedUrl());

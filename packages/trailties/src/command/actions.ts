@@ -1,9 +1,13 @@
 import { Rake } from "@blazetrails/rake";
-import { defineModule, getPath } from "@blazetrails/ruby-compat";
+import { defineModule, Dir, File, getPath } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH, ENGINE_ROOT } from "../app-path.js";
 import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
+
+export function setApplicationDirectoryBang(): void {
+  if (!File.isExist(File.expandPath("config.ru"))) Dir.chdir(File.expandPath("../..", APP_PATH));
+}
 
 export async function requireApplicationBang(): Promise<void> {
   const p = getPath();
@@ -48,6 +52,7 @@ async function loadGenerators(): Promise<void> {
 }
 
 export const Actions = defineModule({
+  setApplicationDirectoryBang,
   requireApplicationBang,
   bootApplicationBang,
   loadEnvironmentConfigBang,
