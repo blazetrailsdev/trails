@@ -29,6 +29,7 @@ import {
 } from "../parity/conventions.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
+import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
 import type { ClassInfo } from "@blazetrails/parity/types";
 
@@ -88,15 +89,6 @@ async function tsconfigExcludes(dir: string): Promise<string[]> {
   const raw = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "tsconfig.json"), "utf8");
   return (JSON.parse(raw) as { exclude?: string[] }).exclude ?? [];
 }
-
-/**
- * The `TS_CLASS_RENAMES` a class path takes: `Railtie` is `Trailtie`. The
- * top-level `Rails` keeps its name, because a route's controller path
- * (`rails/info#index`) resolves `Rails::InfoController` through the name
- * `registerController` seats, and the others (`Name` is `ModelName`) dodge a
- * JS identifier and keep Ruby's path.
- */
-const BRAND_RENAMES = ["Railtie", "Railties"];
 
 /**
  * trails spells a renamed token its own way in a constant too: `Handlers::ERB`
@@ -449,6 +441,56 @@ async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Pr
   return [...missing];
 }
 
+/** One package's derivation: table rows, walked exports no table names, and the rows the path misses. */
+export interface ConstantResidue {
+  rows: number;
+  unpaired: number;
+  residue: Record<string, string>;
+}
+
+export async function constantResidue(
+  dir: string,
+  entries: readonly ClassPathEntry[],
+): Promise<ConstantResidue> {
+  const residue: Record<string, string> = {};
+  const sorted = [...entries].sort((a, b) =>
+    `${a.file}::${a.tsName}`.localeCompare(`${b.file}::${b.tsName}`),
+  );
+  const named = new Set(sorted.map((e) => `${e.file}::${e.tsName}`));
+  for (const { file, tsName, fqn } of sorted) {
+    if ((await derivedConstantPath(dir, file, tsName)) !== fqn) residue[`${file}::${tsName}`] = fqn;
+  }
+  const unpaired = [...(await walkConstants(dir)).keys()].filter((key) => !named.has(key)).length;
+  return { rows: entries.length, unpaired, residue };
+}
+
+/** `constant-residue.json`, refreshed from the manifest; `--check` reds a miss it does not record. */
+async function syncConstantResidue(
+  tables: Map<string, ClassPathEntry[]>,
+  check: boolean,
+  stale: string[],
+  only?: string,
+): Promise<void> {
+  const target = path.join(ROOT_DIR, "scripts/api-compare/constant-residue.json");
+  const current = await fs.readFile(target, "utf8").catch(() => "{}");
+  const record = JSON.parse(current) as Record<string, ConstantResidue>;
+  for (const [dir, entries] of tables) {
+    if (entries.length > 0) record[dir] = await constantResidue(dir, entries);
+    else delete record[dir];
+  }
+  if (only === undefined) {
+    for (const dir of Object.keys(record)) if (!tables.has(dir)) delete record[dir];
+  }
+  const sorted = Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
+  const next = await prettier.format(JSON.stringify(sorted), {
+    ...(await prettier.resolveConfig(target)),
+    filepath: target,
+  });
+  if (current === next) return;
+  if (check) stale.push(path.relative(ROOT_DIR, target));
+  else await fs.writeFile(target, next);
+}
+
 async function main(): Promise<void> {
   const check = process.argv.includes("--check");
   const at = process.argv.indexOf("--package");
@@ -513,6 +555,7 @@ async function main(): Promise<void> {
     if (check) stale.push(path.relative(ROOT_DIR, target));
     else await fs.writeFile(target, next);
   }
+  await syncConstantResidue(tables, check, stale, only);
   if (check && unexportedModules.length > 0) {
     console.warn(
       `Modules paired with a Ruby module but with no exported binding (not gated):\n  ${unexportedModules.join("\n  ")}`,
