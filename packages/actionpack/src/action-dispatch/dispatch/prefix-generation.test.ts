@@ -185,7 +185,7 @@ describe("WithMountedEngine", () => {
   }
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
   include(OutsideEngineGeneratingController, TrailsApplication.routes().urlHelpers());
-  registerController("OutsideEngineGeneratingController", OutsideEngineGeneratingController);
+  constSet(TopLevel, "OutsideEngineGeneratingController", OutsideEngineGeneratingController);
 
   class EngineObject {
     constructor(_kw: { kw: unknown }) {}
@@ -481,7 +481,7 @@ describe("EngineMountedAtRoot", () => {
   }
   include(PostsController, BlogEngine.routes().urlHelpers());
   include(PostsController, TrailsApplication.routes().mountedHelpers());
-  registerController("PostsController", PostsController);
+  constSet(TopLevel, "PostsController", PostsController);
 
   class EngineMountedAtRoot extends IntegrationTest {
     override get app(): unknown {
