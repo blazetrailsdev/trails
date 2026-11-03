@@ -16,21 +16,21 @@ if (ActiveStorage.drawRoutes) {
     this.scope(ActiveStorage.routesPrefix, function (this: Mapper) {
       this.get("/blobs/redirect/:signed_id/*filename", {
         to: "active_storage/blobs/redirect#show",
-        as: "rails_service_blob",
+        as: "trails_service_blob",
       });
       this.get("/blobs/proxy/:signed_id/*filename", {
         to: "active_storage/blobs/proxy#show",
-        as: "rails_service_blob_proxy",
+        as: "trails_service_blob_proxy",
       });
       this.get("/blobs/:signed_id/*filename", { to: "active_storage/blobs/redirect#show" });
 
       this.get("/representations/redirect/:signed_blob_id/:variation_key/*filename", {
         to: "active_storage/representations/redirect#show",
-        as: "rails_blob_representation",
+        as: "trails_blob_representation",
       });
       this.get("/representations/proxy/:signed_blob_id/:variation_key/*filename", {
         to: "active_storage/representations/proxy#show",
-        as: "rails_blob_representation_proxy",
+        as: "trails_blob_representation_proxy",
       });
       this.get("/representations/:signed_blob_id/:variation_key/*filename", {
         to: "active_storage/representations/redirect#show",
@@ -38,19 +38,19 @@ if (ActiveStorage.drawRoutes) {
 
       this.get("/disk/:encoded_key/*filename", {
         to: "active_storage/disk#show",
-        as: "rails_disk_service",
+        as: "trails_disk_service",
       });
       this.put("/disk/:encoded_token", {
         to: "active_storage/disk#update",
-        as: "update_rails_disk_service",
+        as: "update_trails_disk_service",
       });
       this.post("/direct_uploads", {
         to: "active_storage/direct_uploads#create",
-        as: "rails_direct_uploads",
+        as: "trails_direct_uploads",
       });
     });
 
-    this.direct("rails_representation", {}, function (representation, options) {
+    this.direct("trails_representation", {}, function (representation, options) {
       return (this as unknown as Host).routeFor(
         ActiveStorage.resolveModelToRoute,
         representation,
@@ -77,7 +77,7 @@ if (ActiveStorage.drawRoutes) {
       },
     );
 
-    this.direct("rails_blob", {}, function (blob, options) {
+    this.direct("trails_blob", {}, function (blob, options) {
       return (this as unknown as Host).routeFor(ActiveStorage.resolveModelToRoute, blob, options);
     });
 
@@ -95,7 +95,7 @@ if (ActiveStorage.drawRoutes) {
       },
     );
 
-    this.direct("rails_storage_proxy", {}, function (model, options) {
+    this.direct("trails_storage_proxy", {}, function (model, options) {
       const expiresIn = hashDelete(
         options as Options,
         "expiresIn",
@@ -105,7 +105,7 @@ if (ActiveStorage.drawRoutes) {
 
       if (rbObjRespondTo(model, "signedId")) {
         return (this as unknown as Host).routeFor(
-          "rails_service_blob_proxy",
+          "trails_service_blob_proxy",
           (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt }),
           (model as Blob).filename,
           options,
@@ -119,7 +119,7 @@ if (ActiveStorage.drawRoutes) {
         const filename = (model as Representation).blob.filename;
 
         return (this as unknown as Host).routeFor(
-          "rails_blob_representation_proxy",
+          "trails_blob_representation_proxy",
           signedBlobId,
           variationKey,
           filename,
@@ -128,7 +128,7 @@ if (ActiveStorage.drawRoutes) {
       }
     });
 
-    this.direct("rails_storage_redirect", {}, function (model, options) {
+    this.direct("trails_storage_redirect", {}, function (model, options) {
       const expiresIn = hashDelete(
         options as Options,
         "expiresIn",
@@ -138,7 +138,7 @@ if (ActiveStorage.drawRoutes) {
 
       if (rbObjRespondTo(model, "signedId")) {
         return (this as unknown as Host).routeFor(
-          "rails_service_blob",
+          "trails_service_blob",
           (model as Blob).signedId({ expiresIn: expiresIn, expiresAt: expiresAt }),
           (model as Blob).filename,
           options,
@@ -152,7 +152,7 @@ if (ActiveStorage.drawRoutes) {
         const filename = (model as Representation).blob.filename;
 
         return (this as unknown as Host).routeFor(
-          "rails_blob_representation",
+          "trails_blob_representation",
           signedBlobId,
           variationKey,
           filename,

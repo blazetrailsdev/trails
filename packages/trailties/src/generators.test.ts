@@ -21,12 +21,12 @@ async function help(): Promise<string> {
 describe("GeneratorsTest", () => {
   it("simple invoke", async () => {
     expect(
-      fs.existsSync(nodePath.join(GENERATORS_PATH, "rails", "helper", "helper-generator.ts")),
+      fs.existsSync(nodePath.join(GENERATORS_PATH, "trails", "helper", "helper-generator.ts")),
     ).toBeTruthy();
-    const klass = (await Generators.findByNamespace("rails:helper"))!;
+    const klass = (await Generators.findByNamespace("trails:helper"))!;
     const config = { destinationRoot: "/tmp" };
     const start = vi.spyOn(klass, "start").mockResolvedValue([]);
-    await Generators.invoke("rails:helper", ["Account"], config);
+    await Generators.invoke("trails:helper", ["Account"], config);
     expect(start).toHaveBeenCalledWith(["Account"], config);
     start.mockRestore();
   });
@@ -49,28 +49,28 @@ describe("GeneratorsTest", () => {
   });
 
   it("find by namespace", async () => {
-    const klass = await Generators.findByNamespace("rails:model");
+    const klass = await Generators.findByNamespace("trails:model");
     expect(klass).toBeTruthy();
-    expect(klass!.namespace()).toEqual("rails:model");
+    expect(klass!.namespace()).toEqual("trails:model");
   });
 
   it("find by namespace with base", async () => {
-    const klass = await Generators.findByNamespace("model", "rails");
+    const klass = await Generators.findByNamespace("model", "trails");
     expect(klass).toBeTruthy();
-    expect(klass!.namespace()).toEqual("rails:model");
+    expect(klass!.namespace()).toEqual("trails:model");
   });
 
-  it("rails generators help with builtin information", async () => {
+  it("trails generators help with builtin information", async () => {
     const output = await help();
     /* eslint-disable no-regex-spaces -- the indent width is `print_list`'s, verbatim from generators_test.rb:141-144 */
-    expect(output).toMatch(/Rails:/);
+    expect(output).toMatch(/Trails:/);
     expect(output).toMatch(/^  model$/m);
     expect(output).toMatch(/^  scaffold-controller$/m);
     expect(output).not.toMatch(/^  app$/m);
     /* eslint-enable no-regex-spaces */
   });
 
-  it("rails generators help does not include app nor plugin new", async () => {
+  it("trails generators help does not include app nor plugin new", async () => {
     const output = await help();
     expect(output).not.toMatch(/app\W/);
     expect(output).not.toMatch(/[^:]plugin/);

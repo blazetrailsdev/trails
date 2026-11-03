@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
-import { controllerPathHelpers } from "../../rails/controller/controller-paths.js";
+import { controllerPathHelpers } from "../../trails/controller/controller-paths.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 

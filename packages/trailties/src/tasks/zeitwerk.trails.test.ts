@@ -12,7 +12,7 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 import { Loader, NameError } from "@blazetrails/zeitwerk";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 describe("zeitwerk:check", () => {
   let out: string[];

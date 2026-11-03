@@ -13,11 +13,11 @@ export class Autoloaders {
 
   constructor() {
     this.main = new Loader();
-    this.main.tag = "rails.main";
+    this.main.tag = "trails.main";
     this.main.inflector = Inflector as unknown as Loader["inflector"];
 
     this.once = new Loader();
-    this.once.tag = "rails.once";
+    this.once.tag = "trails.once";
     this.once.inflector = Inflector as unknown as Loader["inflector"];
   }
 

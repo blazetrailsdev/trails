@@ -1,6 +1,6 @@
 import type { ThorClass } from "@blazetrails/thor";
 import { Command } from "commander";
-import { AppGenerator } from "../generators/rails/app/app-generator.js";
+import { AppGenerator } from "../generators/trails/app/app-generator.js";
 
 AppGenerator.isExitOnFailure = () => true;
 

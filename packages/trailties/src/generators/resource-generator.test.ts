@@ -9,11 +9,11 @@ import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 
 class ResourceGeneratorApp extends Application {}
-let ResourceGenerator: typeof import("./rails/resource/resource-generator.js").ResourceGenerator;
+let ResourceGenerator: typeof import("./trails/resource/resource-generator.js").ResourceGenerator;
 
 beforeAll(async () => {
   await ResourceGeneratorApp.instance().loadGenerators();
-  ({ ResourceGenerator } = await import("./rails/resource/resource-generator.js"));
+  ({ ResourceGenerator } = await import("./trails/resource/resource-generator.js"));
 });
 
 let tmpDir: string;

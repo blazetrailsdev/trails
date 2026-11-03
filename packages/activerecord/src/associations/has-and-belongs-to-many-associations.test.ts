@@ -1068,7 +1068,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("symbols as keys", async () => {
     const developer = new DeveloperWithSymbolsForKeys({ name: "David" });
-    const project = new ProjectWithSymbolsForKeys({ name: "Rails Testing" });
+    const project = new ProjectWithSymbolsForKeys({ name: "Trails Testing" });
     await (project as any).developers.push(developer);
     await (project as any).saveBang();
 

@@ -1,8 +1,8 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "./model-helpers.js";
-import { ResourceGenerator } from "./rails/resource/resource-generator.js";
-import type { ResourceGeneratorOptions } from "./rails/resource/resource-generator.js";
+import { ResourceGenerator } from "./trails/resource/resource-generator.js";
+import type { ResourceGeneratorOptions } from "./trails/resource/resource-generator.js";
 import { ScaffoldGenerator } from "./test-unit/scaffold/scaffold-generator.js";
 
 const build = (name: string, modelName?: string) =>

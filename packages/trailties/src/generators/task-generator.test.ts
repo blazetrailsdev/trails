@@ -1,7 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, expect, it } from "vitest";
-import { TaskGenerator } from "./rails/task/task-generator.js";
+import { TaskGenerator } from "./trails/task/task-generator.js";
 import { TestCase } from "./test-case.js";
 
 class TaskGeneratorTest extends TestCase {}

@@ -181,7 +181,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows route with defaults", () => {
+  it("trails routes shows route with defaults", () => {
     const output = draw(function () {
       this.get({ "photos/:id": "photos#show", defaults: { format: "jpg" } });
     });
@@ -192,7 +192,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows route with constraints", () => {
+  it("trails routes shows route with constraints", () => {
     const output = draw(function () {
       this.get({ "photos/:id": "photos#show", id: /[A-Z]\d{5}/ });
     });
@@ -203,7 +203,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows routes with dashes", () => {
+  it("trails routes shows routes with dashes", () => {
     const output = draw(function () {
       this.get({ "about-us": "pages#about_us" });
       this.get("our-work/latest");
@@ -226,7 +226,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows route with rack app", () => {
+  it("trails routes shows route with rack app", () => {
     const output = draw(function () {
       this.get({ "foo/:id": mountedRackApp, id: /[A-Z]\d{5}/ });
     });
@@ -237,7 +237,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows named route with mounted rack app", () => {
+  it("trails routes shows named route with mounted rack app", () => {
     const output = draw(function () {
       this.mount(mountedRackApp, { at: "/foo" });
     });
@@ -247,7 +247,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows overridden named route with mounted rack app with name", () => {
+  it("trails routes shows overridden named route with mounted rack app with name", () => {
     const output = draw(function () {
       this.mount(mountedRackApp, { at: "/foo", as: "blog" });
     });
@@ -257,7 +257,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes shows route with rack app nested with dynamic constraints", () => {
+  it("trails routes shows route with rack app nested with dynamic constraints", () => {
     const constraint = class {
       inspect(): string {
         return "( my custom constraint )";
@@ -276,7 +276,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it("rails routes dont show app mounted in assets prefix", () => {
+  it("trails routes dont show app mounted in assets prefix", () => {
     const output = draw(function () {
       this.get({ "/sprockets": mountedRackApp });
     });
@@ -284,7 +284,7 @@ describe("RoutesInspectorTest", () => {
     expect(output[0]).not.toMatch(/\/sprockets/);
   });
 
-  it("rails routes shows route defined in under assets prefix", () => {
+  it("trails routes shows route defined in under assets prefix", () => {
     const output = draw(function () {
       this.scope("/sprockets", () => {
         this.get("/foo", { to: "foo#bar" });
@@ -392,17 +392,17 @@ describe("RoutesInspectorTest", () => {
       function () {
         this.get("photos/:id", { to: "photos#show" });
       },
-      { grep: "rails/dummy", formatter: new ConsoleFormatter.Expanded() },
+      { grep: "trails/dummy", formatter: new ConsoleFormatter.Expanded() },
     );
     expect(output).toEqual([
       "No routes were found for this grep pattern.",
-      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
   it("not routes when expanded", () => {
     const output = draw(function () {}, {
-      grep: "rails/dummy",
+      grep: "trails/dummy",
       formatter: new ConsoleFormatter.Expanded(),
     });
     expect(output).toEqual([
@@ -410,7 +410,7 @@ describe("RoutesInspectorTest", () => {
       "",
       "Please add some routes in config/routes.rb.",
       "",
-      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -456,11 +456,11 @@ describe("RoutesInspectorTest", () => {
       function () {
         this.get("photos/:id", { to: "photos#show" });
       },
-      { controller: "Rails::MissingController" },
+      { controller: "Trails::MissingController" },
     );
     expect(output).toEqual([
       "No routes were found for this controller.",
-      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
@@ -469,22 +469,22 @@ describe("RoutesInspectorTest", () => {
       function () {
         this.get("photos/:id", { to: "photos#show" });
       },
-      { grep: "rails/dummy" },
+      { grep: "trails/dummy" },
     );
     expect(output).toEqual([
       "No routes were found for this grep pattern.",
-      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 
   it("no routes were defined", () => {
-    const output = draw(function () {}, { grep: "Rails::DummyController" });
+    const output = draw(function () {}, { grep: "Trails::DummyController" });
     expect(output).toEqual([
       "You don't have any routes defined!",
       "",
       "Please add some routes in config/routes.rb.",
       "",
-      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+      "For more information about routes, see the Trails guide: https://guides.rubyonrails.org/routing.html.",
     ]);
   });
 

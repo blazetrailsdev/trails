@@ -2189,11 +2189,11 @@ describe("RelationTest", () => {
 
   it("intersection with array", async () => {
     const relation = Author.where({ name: "David" });
-    const railsAuthor = (await relation.first())!;
+    const trailsAuthor = (await relation.first())!;
 
     const arr = await relation;
-    expect(arr.filter((a) => a.equals(railsAuthor))).toEqual([railsAuthor]);
-    expect([railsAuthor].filter((a) => arr.some((b) => b.equals(a)))).toEqual([railsAuthor]);
+    expect(arr.filter((a) => a.equals(trailsAuthor))).toEqual([trailsAuthor]);
+    expect([trailsAuthor].filter((a) => arr.some((b) => b.equals(a)))).toEqual([trailsAuthor]);
   });
 
   it("primary key", () => {

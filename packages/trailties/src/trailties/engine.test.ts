@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Engine } from "../engine.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 describe("EngineTest", () => {
   it("adds its fixtures path to fixture_paths", async () => {

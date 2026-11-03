@@ -529,7 +529,7 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
   }
 }
 
-Object.defineProperty(Engine, "name", { value: "Rails::Engine" });
+Object.defineProperty(Engine, "name", { value: "Trails::Engine" });
 
 include(Engine, ASCallbacks);
 Engine.defineCallbacks("load_seed");

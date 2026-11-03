@@ -3,7 +3,7 @@ import { ActionController } from "@blazetrails/actionpack";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import "./all.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("a generated app's config files configure the application", () => {
   let previousEnv: string | undefined;

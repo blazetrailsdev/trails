@@ -4,7 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { appTemplateCommand } from "./app.js";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 class AppCommandTestApp extends Application {}
 Trails.application = AppCommandTestApp.instance();

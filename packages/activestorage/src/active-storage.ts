@@ -386,9 +386,9 @@ mattrAccessor.call(ActiveStorage, "serviceUrlsExpireIn", { default: minutes(5) }
 mattrAccessor.call(ActiveStorage, "touchAttachmentRecords", { default: true });
 mattrAccessor.call(ActiveStorage, "urlsExpireIn");
 
-mattrAccessor.call(ActiveStorage, "routesPrefix", { default: "/rails/active_storage" });
+mattrAccessor.call(ActiveStorage, "routesPrefix", { default: "/trails/active_storage" });
 mattrAccessor.call(ActiveStorage, "drawRoutes", { default: true });
-mattrAccessor.call(ActiveStorage, "resolveModelToRoute", { default: "rails_storage_redirect" });
+mattrAccessor.call(ActiveStorage, "resolveModelToRoute", { default: "trails_storage_redirect" });
 
 mattrAccessor.call(ActiveStorage, "trackVariants", { default: false });
 

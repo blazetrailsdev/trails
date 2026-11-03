@@ -240,12 +240,12 @@ function renderSchemaColumnDeclares(
     if (col === "id") continue;
     if (composedCols?.has(col)) continue;
     if (info.skipSchemaColumns.has(col)) continue;
-    const railsType = typeof value === "string" ? value : value.type;
+    const trailsType = typeof value === "string" ? value : value.type;
     const keyLike = isForeignKeyColumn(col, value) || isDefaultTypedPrimaryKey(value);
     const tsType = keyLike
       ? `${AR_IMPORT}.PrimaryKeyValue`
       : renderSchemaValueType(value, opts.timeZoneAwareAttributes);
-    const writerType = keyLike ? tsType : writerTsTypeFor(railsType, tsType);
+    const writerType = keyLike ? tsType : writerTsTypeFor(trailsType, tsType);
     out.push(attributeLine(renderDeclaredMemberName(col), tsType, col, writerType));
   }
   return out;
@@ -413,18 +413,18 @@ function renderAttribute(
 ): RenderedLine[] {
   if (call.name === "id") return [];
   const memberName = renderDeclaredMemberName(call.name);
-  if (isForeignKeyColumn(call.name, call.railsType)) {
+  if (isForeignKeyColumn(call.name, call.trailsType)) {
     const pk = `${AR_IMPORT}.PrimaryKeyValue`;
     return [attributeLine(memberName, pk, call.name, pk)];
   }
-  const tsType = tsTypeFor(call.railsType, timeZoneAware);
+  const tsType = tsTypeFor(call.trailsType, timeZoneAware);
   const rendered = nullable
     ? tsType.includes("|")
       ? `(${tsType}) | null`
       : `${tsType} | null`
     : tsType;
   return [
-    attributeLine(memberName, rendered, call.name, writerTsTypeFor(call.railsType, rendered)),
+    attributeLine(memberName, rendered, call.name, writerTsTypeFor(call.trailsType, rendered)),
   ];
 }
 

@@ -26,7 +26,7 @@ export const UrlForDefaults = {
 export function _routes(): never {
   throw new RuntimeError(
     "In order to use #url_for, you must include routing helpers explicitly. " +
-      "For instance, `include Rails.application.routes.url_helpers`.",
+      "For instance, `include Trails.application.routes.url_helpers`.",
   );
 }
 

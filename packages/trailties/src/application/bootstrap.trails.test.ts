@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
 import { Configuration } from "./configuration.js";
 import type { MiddlewareStackProxy } from "../configuration.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 const baseConfig = (): BootstrapConfig => ({
   root: null,

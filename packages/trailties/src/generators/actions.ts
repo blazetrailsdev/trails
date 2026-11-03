@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
@@ -174,29 +174,29 @@ export function rake(
 
 const commandModule = "../command.js";
 const loadPath: Record<string, () => Promise<unknown>> = {
-  "rails/command": () => import(commandModule),
+  "trails/command": () => import(commandModule),
 };
 
-export interface RailsCommandOptions extends RakeOptions {
+export interface TrailsCommandOptions extends RakeOptions {
   inline?: boolean;
 }
 
 /** @inventedArm rbFRequire — PERMANENT */
-export async function railsCommand(
+export async function trailsCommand(
   this: ActionsHost,
   command: string,
-  options: RailsCommandOptions = {},
+  options: TrailsCommandOptions = {},
 ): Promise<unknown> {
   if (options.inline) {
-    log.call(this, "rails", command);
+    log.call(this, "trails", command);
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
-    await rbFRequire(loadPath, "rails/command");
+    await rbFRequire(loadPath, "trails/command");
     return await this.inRoot(() =>
       silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
     );
   } else {
-    return await executeCommand.call(this, "rails", command, options);
+    return await executeCommand.call(this, "trails", command, options);
   }
 }
 

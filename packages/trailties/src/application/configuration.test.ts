@@ -19,7 +19,7 @@ import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 
 function switchEnv(key: string, value: string | undefined, block: () => void): void {
   const old = env[key];
@@ -31,9 +31,9 @@ function switchEnv(key: string, value: string | undefined, block: () => void): v
   }
 }
 
-function withRailsEnv(railsEnv: string | undefined, block: () => void): void {
+function withTrailsEnv(trailsEnv: string | undefined, block: () => void): void {
   _resetTrailsEnv();
-  switchEnv("TRAILS_ENV", railsEnv, () => switchEnv("NODE_ENV", undefined, block));
+  switchEnv("TRAILS_ENV", trailsEnv, () => switchEnv("NODE_ENV", undefined, block));
 }
 
 function withRackEnv(rackEnv: string | undefined, block: () => void): void {
@@ -47,8 +47,8 @@ async function setCustomConfig(contents: string): Promise<void> {
   await writeFile(join(appPath, "config", "custom.ts"), contents);
 }
 
-async function app(railsEnv: string): Promise<Application> {
-  setEnv("TRAILS_ENV", railsEnv);
+async function app(trailsEnv: string): Promise<Application> {
+  setEnv("TRAILS_ENV", trailsEnv);
   _resetTrailsEnv();
   class A extends Application {}
   Application.register(A, appPath);
@@ -77,13 +77,13 @@ describe("ConfigurationTest", () => {
     await rm(appPath, { recursive: true, force: true });
   });
 
-  it("Rails.env falls back to development if RAILS_ENV is blank and RACK_ENV is nil", () => {
-    withRailsEnv("", () => {
+  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", () => {
+    withTrailsEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
 
-  it("Rails.env falls back to development if RACK_ENV is blank and RAILS_ENV is nil", () => {
+  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", () => {
     withRackEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as ActiveModel from "@blazetrails/activemodel";
 import { Deprecators } from "@blazetrails/activesupport";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { _resetTrailsEnv } from "../rails.js";
+import { _resetTrailsEnv } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { Trailtie, type ActiveModelConfig } from "./active-model.js";
 

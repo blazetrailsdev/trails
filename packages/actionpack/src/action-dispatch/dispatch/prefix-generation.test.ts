@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
-   Ruby `include BlogEngine.routes.url_helpers` / `include RailsApplication.routes.mounted_helpers`;
+   Ruby `include BlogEngine.routes.url_helpers` / `include TrailsApplication.routes.mounted_helpers`;
    the class/interface merge is how `include()` surfaces those members on the type side. */
 import { beforeEach, describe, it, expect } from "vitest";
 import { ModelName, Naming } from "@blazetrails/activemodel";
@@ -83,12 +83,12 @@ describe("WithMountedEngine", () => {
     }
   }
 
-  class RailsApplication extends Engine {
+  class TrailsApplication extends Engine {
     declare static routes: () => RouteSet;
 
     static {
       Object.defineProperty(this, "name", {
-        value: "TestGenerationPrefix::WithMountedEngine::RailsApplication",
+        value: "TestGenerationPrefix::WithMountedEngine::TrailsApplication",
       });
       Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
       this.routes().draw(function () {
@@ -116,7 +116,7 @@ describe("WithMountedEngine", () => {
     }
   }
 
-  RailsApplication.routes().defineMountedHelper("main_app");
+  TrailsApplication.routes().defineMountedHelper("main_app");
 
   class InsideEngineGeneratingController extends Base {
     async index(): Promise<void> {
@@ -151,7 +151,7 @@ describe("WithMountedEngine", () => {
     mainApp: RoutesProxyInstance;
   }
   include(InsideEngineGeneratingController, BlogEngine.routes().urlHelpers());
-  include(InsideEngineGeneratingController, RailsApplication.routes().mountedHelpers());
+  include(InsideEngineGeneratingController, TrailsApplication.routes().mountedHelpers());
   registerController("InsideEngineGeneratingController", InsideEngineGeneratingController);
 
   class OutsideEngineGeneratingController extends Base {
@@ -185,7 +185,7 @@ describe("WithMountedEngine", () => {
     blogEngine: RoutesProxyInstance;
   }
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
-  include(OutsideEngineGeneratingController, RailsApplication.routes().urlHelpers());
+  include(OutsideEngineGeneratingController, TrailsApplication.routes().urlHelpers());
   registerController("OutsideEngineGeneratingController", OutsideEngineGeneratingController);
 
   class EngineObject {
@@ -209,11 +209,11 @@ describe("WithMountedEngine", () => {
     rootPath: Helper;
   }
   include(AppObject, UrlFor);
-  include(AppObject, RailsApplication.routes().urlHelpers());
+  include(AppObject, TrailsApplication.routes().urlHelpers());
 
   class WithMountedEngine extends IntegrationTest {
     override get app(): unknown {
-      return RailsApplication.instance();
+      return TrailsApplication.instance();
     }
 
     engineObject!: EngineObject;
@@ -221,7 +221,7 @@ describe("WithMountedEngine", () => {
 
     static {
       this.prototype.setup = function (this: WithMountedEngine): void {
-        RailsApplication.routes().defaultUrlOptions = {};
+        TrailsApplication.routes().defaultUrlOptions = {};
         this.engineObject = new EngineObject({ kw: 1 });
         this.appObject = new AppObject({ kw: 2 });
       };
@@ -330,7 +330,7 @@ describe("WithMountedEngine", () => {
   });
 
   it("[APP] generating engine's route includes default_url_options[:script_name]", async () => {
-    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    TrailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
     await t.get("/generate");
     expect(t.response.body).toBe("/something/awesome/blog/posts/1");
   });
@@ -369,7 +369,7 @@ describe("WithMountedEngine", () => {
   });
 
   it("[OBJECT] generating engine's route includes default_url_options[:script_name]", () => {
-    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    TrailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
     expect(t.engineObject.postPath({ id: 3, omg: "pure-awesomeness" })).toBe(
       "/something/pure-awesomeness/blog/posts/3",
     );
@@ -380,12 +380,12 @@ describe("WithMountedEngine", () => {
   });
 
   it("[OBJECT] generating application's route includes default_url_options[:script_name]", () => {
-    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    TrailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
     expect(t.appObject.rootPath()).toBe("/something/");
   });
 
   it("[OBJECT] generating application's route includes default_url_options[:trailing_slash]", () => {
-    RailsApplication.routes().defaultUrlOptions["trailingSlash"] = true;
+    TrailsApplication.routes().defaultUrlOptions["trailingSlash"] = true;
     expect(t.engineObject.postsPath()).toBe("/awesome/blog/posts");
   });
 
@@ -458,12 +458,12 @@ describe("EngineMountedAtRoot", () => {
     }
   }
 
-  class RailsApplication extends Engine {
+  class TrailsApplication extends Engine {
     declare static routes: () => RouteSet;
 
     static {
       Object.defineProperty(this, "name", {
-        value: "TestGenerationPrefix::EngineMountedAtRoot::RailsApplication",
+        value: "TestGenerationPrefix::EngineMountedAtRoot::TrailsApplication",
       });
       Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
       this.routes().draw(function () {
@@ -481,12 +481,12 @@ describe("EngineMountedAtRoot", () => {
     postPath: Helper;
   }
   include(PostsController, BlogEngine.routes().urlHelpers());
-  include(PostsController, RailsApplication.routes().mountedHelpers());
+  include(PostsController, TrailsApplication.routes().mountedHelpers());
   registerController("PostsController", PostsController);
 
   class EngineMountedAtRoot extends IntegrationTest {
     override get app(): unknown {
-      return RailsApplication.instance();
+      return TrailsApplication.instance();
     }
   }
 

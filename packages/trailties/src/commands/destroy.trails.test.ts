@@ -8,7 +8,7 @@ import { createProgram } from "../cli.js";
 import { invoke as commandInvoke } from "../command.js";
 import { Generators } from "../generators.js";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 
 class DestroyCommandApp extends Application {}

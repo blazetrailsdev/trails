@@ -69,7 +69,7 @@ describe("the production server entry point", () => {
   it("cannot reach the generator that imports vite, however it reaches the others", () => {
     const generators = rel(server.files).filter((f) => f.startsWith("generators/"));
     expect(generators).not.toEqual([]);
-    expect(generators).not.toContain("generators/rails/app/app-generator.ts");
+    expect(generators).not.toContain("generators/trails/app/app-generator.ts");
   });
 
   it("is not reached by the CLI's server command, which stays the ported file", () => {
@@ -84,8 +84,8 @@ describe("the production server entry point", () => {
   }, 30_000);
 
   it("keeps rails.ts's generators import type-only, which is all that holds vite out", () => {
-    const rails = fs.readFileSync(path.join(SRC, "rails.ts"), "utf8");
-    const edges = [...rails.matchAll(/^.*from\s*["']\.\/generators\/.*$/gm)].map((m) =>
+    const trails = fs.readFileSync(path.join(SRC, "trails.ts"), "utf8");
+    const edges = [...trails.matchAll(/^.*from\s*["']\.\/generators\/.*$/gm)].map((m) =>
       m[0].trim(),
     );
     expect(edges).not.toEqual([]);

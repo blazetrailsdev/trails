@@ -3,7 +3,7 @@ import { rbFSend, rbModName, registeredConstant } from "@blazetrails/ruby-compat
 import type { RackResponse } from "@blazetrails/rack";
 import type { Base } from "@blazetrails/activerecord";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("a generated app's models resolve string association targets", () => {
   afterEach(() => {

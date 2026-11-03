@@ -1354,7 +1354,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     };
 
     await Topic.transaction(async () => {
-      topic.title = "Rails is broken";
+      topic.title = "Trails is broken";
       await topic.save();
       throw new Rollback();
     });
@@ -1372,7 +1372,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     };
 
     await Topic.transaction(async () => {
-      topic.title = "Rails is broken";
+      topic.title = "Trails is broken";
       await topic.save();
       throw new Rollback();
     });

@@ -235,7 +235,8 @@ function foldRenamedExtensionToken(token: string): string {
   return `s:${token
     .slice(2)
     .replace(RENAMED_EXTENSION_RE, (_m, tok: string) => `.${TOKEN_RENAMES[tok]}`)
-    .replace(TS_SOURCE_EXTENSION_RE, `.${TOKEN_RENAMES.rb}`)}`;
+    .replace(TS_SOURCE_EXTENSION_RE, `.${TOKEN_RENAMES.rb}`)
+    .replace(/(?<![A-Za-z])(?:rails|Rails|RAILS)(?![a-z])/g, (tok) => TOKEN_RENAMES[tok])}`;
 }
 
 /**

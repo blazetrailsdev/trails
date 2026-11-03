@@ -5,7 +5,7 @@ import { Base } from "@blazetrails/activerecord";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 import { copyRoutes } from "./generators-test-helper.js";
@@ -15,13 +15,13 @@ class MigrationGeneratorApp extends Application {}
 class MigrationGeneratorTest extends TestCase {}
 MigrationGeneratorTest.destination(Dir.mktmpdir());
 registerSpecType(/^MigrationGeneratorTest$/, MigrationGeneratorTest);
-let MigrationGenerator: typeof import("./rails/migration/migration-generator.js").MigrationGenerator;
+let MigrationGenerator: typeof import("./trails/migration/migration-generator.js").MigrationGenerator;
 let t: TestCase & { generatorClass?: typeof MigrationGenerator };
 let oldBelongsToRequiredByDefault: boolean | undefined;
 
 beforeAll(async () => {
   await MigrationGeneratorApp.instance().loadGenerators();
-  ({ MigrationGenerator } = await import("./rails/migration/migration-generator.js"));
+  ({ MigrationGenerator } = await import("./trails/migration/migration-generator.js"));
   MigrationGeneratorTest.tests(MigrationGenerator);
 });
 

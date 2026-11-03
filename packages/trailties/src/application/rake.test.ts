@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
 import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 describe("RakeTest", () => {
   let appPath: string;
@@ -23,7 +23,7 @@ describe("RakeTest", () => {
     });
     expect(File.isExist(File.join(appPath, "lib", "templates", "tse", "controller"))).toBeTruthy();
     for (const dir of ["controller", "helper", "scaffold-controller"]) {
-      expect(File.isExist(File.join(appPath, "lib", "templates", "rails", dir))).toBeTruthy();
+      expect(File.isExist(File.join(appPath, "lib", "templates", "trails", dir))).toBeTruthy();
     }
   });
 });

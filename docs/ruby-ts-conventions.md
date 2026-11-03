@@ -147,6 +147,9 @@ trails:
 | `Rubocop`  | `Eslint`     |
 | `capybara` | `vitest`     |
 | `Capybara` | `Vitest`     |
+| `rails`    | `trails`     |
+| `Rails`    | `Trails`     |
+| `RAILS`    | `TRAILS`     |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`

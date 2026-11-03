@@ -2,7 +2,7 @@ import { Dir } from "@blazetrails/ruby-compat";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, it } from "vitest";
-import { AppGenerator } from "./rails/app/app-generator.js";
+import { AppGenerator } from "./trails/app/app-generator.js";
 import { TestCase } from "./test-case.js";
 
 const destinationRoot = Dir.mktmpdir();

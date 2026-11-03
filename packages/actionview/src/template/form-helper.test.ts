@@ -295,9 +295,9 @@ type View = Base &
 describe("FormHelperTest", () => {
   class WithActiveStorageRoutesControllers extends ActionController.Base {
     static ROUTES = this.testRoutes(function () {
-      this.post("/rails/active_storage/direct_uploads", {
+      this.post("/trails/active_storage/direct_uploads", {
         to: "active_storage/direct_uploads#create",
-        as: "rails_direct_uploads",
+        as: "trails_direct_uploads",
       });
     });
 
@@ -954,12 +954,12 @@ describe("FormHelperTest", () => {
     }
   });
 
-  it("file field with direct upload when rails direct uploads url is not defined", () => {
+  it("file field with direct upload when trails direct uploads url is not defined", () => {
     const expected = '<input type="file" name="import[file]" id="import_file" />';
     assertDomEqual(expected, view.fileField("import", "file", { directUpload: true }));
   });
 
-  it("file field with direct upload when rails direct uploads url is defined", () => {
+  it("file field with direct upload when trails direct uploads url is defined", () => {
     const controller = new WithActiveStorageRoutesControllers();
     view = new (Base.withEmptyTemplateCache())(
       new LookupContext(null, {}, []),
@@ -969,7 +969,7 @@ describe("FormHelperTest", () => {
     include(rbObjSingletonClass(view), WithActiveStorageRoutesControllers.ROUTES.urlHelpers());
 
     const expected =
-      '<input data-direct-upload-url="http://testtwo.host/rails/active_storage/direct_uploads" type="file" name="import[file]" id="import_file" />';
+      '<input data-direct-upload-url="http://testtwo.host/trails/active_storage/direct_uploads" type="file" name="import[file]" id="import_file" />';
     assertDomEqual(expected, view.fileField("import", "file", { directUpload: true }));
   });
 

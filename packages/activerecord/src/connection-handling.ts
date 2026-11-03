@@ -368,10 +368,10 @@ export function appendToConnectedToStack(entry: {
   connectedToStack().push(entry);
 }
 
-export const RAILS_ENV = (): string | null | undefined =>
+export const TRAILS_ENV = (): string | null | undefined =>
   TopLevel.Trails?.env.toString() ?? presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
 
-export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";
+export const DEFAULT_ENV = (): string => TRAILS_ENV() || "default_env";
 
 export async function establishConnection(
   this: typeof Base,

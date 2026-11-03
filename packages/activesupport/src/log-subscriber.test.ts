@@ -59,7 +59,7 @@ describe("SyncLogSubscriberTest", () => {
     LogSubscriber.logLevels.clear();
   });
 
-  it("proxies method to rails logger", () => {
+  it("proxies method to trails logger", () => {
     logSubscriber.foo(null);
     expect(logger.logged(":debug")).toEqual(["debug"]);
     expect(logger.logged(":info")).toEqual(["info"]);

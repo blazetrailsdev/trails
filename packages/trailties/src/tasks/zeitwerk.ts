@@ -1,7 +1,7 @@
 import { DSL } from "@blazetrails/rake";
 import { STDOUT, abort, block, regexpEscape } from "@blazetrails/ruby-compat";
 import { NameError } from "@blazetrails/zeitwerk";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { ZeitwerkChecker } from "../zeitwerk-checker.js";
 
 const reportUnchecked = (unchecked: string[]): void => {

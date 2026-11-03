@@ -228,7 +228,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   generate = Actions.generate;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
-  railsCommand = Actions.railsCommand;
+  trailsCommand = Actions.trailsCommand;
   route = Actions.route;
   readme = Actions.readme;
   log = Actions.log;
@@ -351,7 +351,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static banner(): string {
-    const namespace = this.namespace().replace(/^rails:/, "");
+    const namespace = this.namespace().replace(/^trails:/, "");
     const usage = this.arguments()
       .map((argument) => argument.usage())
       .join(" ");
@@ -404,8 +404,8 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       return c[name];
     } else if (baseName && (c = config[baseName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (Object.hasOwn(config["rails"], name)) {
-      return config["rails"][name];
+    } else if (Object.hasOwn(config["trails"], name)) {
+      return config["trails"][name];
     } else {
       return defaultValue;
     }

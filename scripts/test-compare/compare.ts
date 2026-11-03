@@ -268,8 +268,12 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
           .replace(/_/g, "-");
 
   // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
-  tsDir = tsDir.replace(/\berb\b/g, "tse");
-  const mappedTsFile = tsFile.replace(/\berb\b/g, "tse");
+  tsDir = tsDir
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+  const mappedTsFile = tsFile
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
 
   if (!tsDir) return mappedTsFile;
   return path.join(tsDir, mappedTsFile);
@@ -319,7 +323,8 @@ function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
     .replace(/rubocop/g, "eslint")
-    .replace(/capybara/g, "vitest");
+    .replace(/capybara/g, "vitest")
+    .replace(/(?<![a-z])rails/g, "trails");
 }
 
 /**

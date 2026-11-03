@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { setAppPath } from "../app-path.js";
 import { Actions } from "./actions.js";
 
-describe("Rails::Command::Actions", () => {
+describe("Trails::Command::Actions", () => {
   afterEach(() => {
     setAppPath(undefined);
   });

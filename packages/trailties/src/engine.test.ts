@@ -73,7 +73,7 @@ afterEach(() => {
 describe("Engine", () => {
   it("Engine is abstract and cannot be instantiated directly", () => {
     expect(() => new Engine()).toThrow(
-      "Rails::Engine is abstract, you cannot instantiate it directly.",
+      "Trails::Engine is abstract, you cannot instantiate it directly.",
     );
   });
 
@@ -313,7 +313,7 @@ describe("Engine", () => {
     cfg.generators((g) => {
       (g as unknown as { orm: string }).orm = "active_record";
     });
-    expect(cfg.generators().options.get("rails")).toEqual({ orm: "active_record" });
+    expect(cfg.generators().options.get("trails")).toEqual({ orm: "active_record" });
     expect(cfg.generators().templates).toEqual([]);
   });
 

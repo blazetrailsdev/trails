@@ -18,7 +18,7 @@ function makeSchemaThingModel(): ModelCtor {
 
 const TABLE_NAME = "schema_things";
 const COLUMNS = "id serial primary key, name character varying(50)";
-const USERS = ["rails_pg_schema_user1", "rails_pg_schema_user2"];
+const USERS = ["trails_pg_schema_user1", "trails_pg_schema_user2"];
 
 fixtures({}, { useTransactionalTests: false });
 

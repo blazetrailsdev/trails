@@ -2117,7 +2117,7 @@ const TEST_SUPPORT_BASENAMES = new Set(["test-helper.ts", "test-helpers.ts"]);
 /**
  * An engine's `db/` (`activestorage/db/migrate/`, `db/update_migrate/`) sits beside `lib/`,
  * so its ported migrations have no lib counterpart either. Only the package's top-level
- * `db/` counts: trailties' `generators/rails/db/` mirrors lib.
+ * `db/` counts: trailties' `generators/trails/db/` mirrors lib.
  */
 const ENGINE_DB_DIRS = new Set(["migrate", "update-migrate"]);
 

@@ -222,7 +222,7 @@ Vitest reports no assertion count or Minitest timing, so the adapter's closing
 `N runs, N failures, N errors, N skips` line is `Minitest::SummaryReporter`'s
 summary as far as Vitest allows, built from the results it recorded. The
 `executable` default is `bin/trails test`, where `reporter.rb:9` says
-`bin/rails test`, because generated applications ship `bin/trails`.
+`bin/trails test`, because generated applications ship `bin/trails`.
 
 ## `SourceAnnotationExtractor.enumerate` is async (`begin require "prism"`)
 

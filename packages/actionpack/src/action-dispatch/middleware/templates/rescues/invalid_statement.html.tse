@@ -11,10 +11,10 @@
   <h2>
     <%= h(this.exception.message) %>
     <% if (TopLevel.ActiveStorage != null && new RegExp(`${TopLevel.ActiveStorage.Blob.tableName}|${TopLevel.ActiveStorage.Attachment.tableName}`).test(this.exception.message)) { %>
-      <br />To resolve this issue run: bin/rails active_storage:install
+      <br />To resolve this issue run: bin/trails active_storage:install
     <% } %>
     <% if (TopLevel.ActionMailbox != null && new RegExp(`${TopLevel.ActionMailbox.InboundEmail.tableName}`).test(this.exception.message)) { %>
-      <br />To resolve this issue run: bin/rails action_mailbox:install
+      <br />To resolve this issue run: bin/trails action_mailbox:install
     <% } %>
   </h2>
 

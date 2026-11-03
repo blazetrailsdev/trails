@@ -34,7 +34,7 @@ export function lookupStore(store?: unknown, ...parameters: unknown[]): CacheSto
 export function expandCacheKey(key: unknown, namespace?: string | null): string {
   let expandedCacheKey = namespace != null ? `${namespace}/` : "";
 
-  const prefix = env["RAILS_CACHE_ID"] ?? env["RAILS_APP_VERSION"];
+  const prefix = env["TRAILS_CACHE_ID"] ?? env["TRAILS_APP_VERSION"];
   if (prefix != null) {
     expandedCacheKey += `${prefix}/`;
   }

@@ -4,7 +4,7 @@ import { Base } from "@blazetrails/activerecord";
 import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { invoke } from "../command.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { lookupBang } from "../command/behavior.js";
 
 await lookupBang();
@@ -49,7 +49,7 @@ describe("RoutesCommand", () => {
     const output = await capture(":stdout", () => invoke("routes"));
     expect(output).not.toContain("You don't have any routes defined!");
     expect(output).toMatch(/posts GET\s+\/posts\(\.:format\)\s+posts#index/);
-    expect(output).toMatch(/rails_health_check GET\s+\/up\(\.:format\)\s+rails\/health#show/);
+    expect(output).toMatch(/trails_health_check GET\s+\/up\(\.:format\)\s+trails\/health#show/);
 
     const controller = await capture(":stdout", () => invoke("routes", ["-c", "admin/users"]));
     expect(controller).toContain("admin/users#index");

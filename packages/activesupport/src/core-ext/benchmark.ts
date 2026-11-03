@@ -4,7 +4,7 @@ import { deprecator } from "../deprecator.js";
 /** @deprecated */
 function ms<T>(block: () => T): number {
   deprecator().warn(
-    "`Benchmark.ms` is deprecated and will be removed in Rails 8.1 without replacement.\n",
+    "`Benchmark.ms` is deprecated and will be removed in Trails 8.1 without replacement.\n",
   );
   return ActiveSupportBenchmark.realtime(":float_millisecond", block);
 }

@@ -8,7 +8,7 @@ import { File, Monitor, rbClassSuperclass, rbObjIsKindOf } from "@blazetrails/ru
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
@@ -205,15 +205,15 @@ Finisher.initializer("configure_executor_for_concurrency", function (this: Finis
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
   if (!Trails.env["development?"]()) return;
   this.routes().prepend(function () {
-    this.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
-    this.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
-    this.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
-    this.get("/rails/info", { to: "rails/info#index", internal: true });
+    this.get("/trails/info/properties", { to: "trails/info#properties", internal: true });
+    this.get("/trails/info/routes", { to: "trails/info#routes", internal: true });
+    this.get("/trails/info/notes", { to: "trails/info#notes", internal: true });
+    this.get("/trails/info", { to: "trails/info#index", internal: true });
   });
 
   this.routesReloader().runAfterLoadPaths = () => {
     this.routes().append(function () {
-      this.get("/", { to: "rails/welcome#index", internal: true });
+      this.get("/", { to: "trails/welcome#index", internal: true });
     });
   };
 });

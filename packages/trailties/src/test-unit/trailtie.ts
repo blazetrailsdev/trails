@@ -20,4 +20,4 @@ export class TestUnitRailtie extends Trailtie {
   }
 }
 
-Object.defineProperty(TestUnitRailtie, "name", { value: "Rails::TestUnitRailtie" });
+Object.defineProperty(TestUnitRailtie, "name", { value: "Trails::TestUnitRailtie" });

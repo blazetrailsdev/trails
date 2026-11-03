@@ -5,7 +5,7 @@ export type AssociationKind = "hasMany" | "hasAndBelongsToMany" | "belongsTo" | 
 export interface AttributeCall {
   kind: "attribute";
   name: string;
-  railsType: string;
+  trailsType: string;
   options: RecordLiteral;
 }
 
@@ -356,7 +356,7 @@ function readAttributeCall(call: ts.CallExpression): AttributeCall | null {
   return {
     kind: "attribute",
     name: nameArg.text,
-    railsType: typeArg.text,
+    trailsType: typeArg.text,
     options: readRecordLiteral(optsArg),
   };
 }

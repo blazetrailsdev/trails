@@ -1,7 +1,7 @@
 import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { DSL, main } from "@blazetrails/rake";
 import { File, RuntimeError, block } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 DSL.namespace("app", () => {
   DSL.desc("Apply the template supplied by LOCATION=(/path/to/template) or URL");
@@ -14,7 +14,7 @@ DSL.namespace("app", () => {
           "No LOCATION value given. Please set LOCATION either as path to a file or a URL",
         );
       }
-      const { AppGenerator } = await import("../generators/rails/app/app-generator.js");
+      const { AppGenerator } = await import("../generators/trails/app/app-generator.js");
       await AppGenerator.applyTrailsTemplate(template!, Trails.root()!.toString());
     }),
   );
@@ -28,7 +28,7 @@ DSL.namespace("app", () => {
 
         const defaultTemplates = {
           tse: ["controller", "mailer", "scaffold"],
-          rails: ["controller", "helper", "scaffold-controller"],
+          trails: ["controller", "helper", "scaffold-controller"],
         };
 
         for (const [type, names] of Object.entries(defaultTemplates)) {

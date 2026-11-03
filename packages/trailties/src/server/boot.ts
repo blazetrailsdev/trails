@@ -3,7 +3,7 @@ import { setEnv } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
 import { Handler, type RackEnv } from "@blazetrails/rack";
 import { requireApplicationBang } from "../command/actions.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface ServeOptions {

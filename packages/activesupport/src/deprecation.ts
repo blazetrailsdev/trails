@@ -229,7 +229,7 @@ export class Deprecation {
     this._silenced = silenced;
   }
 
-  constructor(deprecationHorizon = "8.1", gemName = "Rails") {
+  constructor(deprecationHorizon = "8.1", gemName = "Trails") {
     this.gemName = gemName;
     this.deprecationHorizon = deprecationHorizon;
     this.silenced = false;

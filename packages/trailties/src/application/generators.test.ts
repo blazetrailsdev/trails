@@ -11,7 +11,7 @@ import {
 import { assertNoMatch, assertNothingRaised, capture } from "@blazetrails/activesupport";
 import { Configuration } from "./configuration.js";
 import type { Generators } from "../configuration.js";
-import { Generators as RailsGenerators } from "../generators.js";
+import { Generators as TrailsGenerators } from "../generators.js";
 
 type ConfiguredGenerators = Generators & Record<string, unknown>;
 
@@ -33,21 +33,21 @@ describe("GeneratorsTest", () => {
     });
   });
 
-  it("generators set rails options", () => {
+  it("generators set trails options", () => {
     withBareConfig((c) => {
       const g = c.generators() as ConfiguredGenerators;
       g.orm = "data_mapper";
       g.testFramework = "rspec";
       g.helper = false;
-      const expected = { rails: { orm: "data_mapper", testFramework: "rspec", helper: false } };
+      const expected = { trails: { orm: "data_mapper", testFramework: "rspec", helper: false } };
       expect(toHash(c.generators().options)).toEqual(expected);
     });
   });
 
-  it("generators set rails aliases", () => {
+  it("generators set trails aliases", () => {
     withBareConfig((c) => {
-      c.generators().aliases = new Map([["rails", { testFramework: "-w" }]]) as never;
-      const expected = { rails: { testFramework: "-w" } };
+      c.generators().aliases = new Map([["trails", { testFramework: "-w" }]]) as never;
+      const expected = { trails: { testFramework: "-w" } };
       expect(toHash(c.generators().aliases)).toEqual(expected);
     });
   });
@@ -61,7 +61,7 @@ describe("GeneratorsTest", () => {
       });
 
       const expected = {
-        rails: { orm: "data_mapper" },
+        trails: { orm: "data_mapper" },
         plugin: { generator: true },
         data_mapper: { migration: false },
       };
@@ -79,7 +79,7 @@ describe("GeneratorsTest", () => {
       });
 
       const expected = {
-        rails: { orm: "data_mapper" },
+        trails: { orm: "data_mapper" },
         data_mapper: { migration: false },
       };
 
@@ -108,14 +108,14 @@ describe("GeneratorsTest", () => {
 
   afterEach(() => {
     childProcessAdapterConfig.adapter = previousAdapter;
-    RailsGenerators.afterGenerateCallbacks().length = 0;
+    TrailsGenerators.afterGenerateCallbacks().length = 0;
     FileUtils.rmRf(appRoot);
   });
 
-  function rails(...args: string[]): Promise<string> {
+  function trails(...args: string[]): Promise<string> {
     const [, namespace, ...rest] = args;
     return capture(":stdout", () =>
-      RailsGenerators.invoke(namespace, rest, {
+      TrailsGenerators.invoke(namespace, rest, {
         destinationRoot: appRoot,
         behavior: "invoke",
       }),
@@ -125,21 +125,21 @@ describe("GeneratorsTest", () => {
   it("generators with apply_eslint_autocorrect_after_generate!", async () => {
     withBareConfig((c) => {
       c.generators().applyEslintAutocorrectAfterGenerateBang();
-      RailsGenerators.configureBang(c.generators());
+      TrailsGenerators.configureBang(c.generators());
     });
 
-    const output = await rails("generate", "model", "post", "title:string", "body:string");
+    const output = await trails("generate", "model", "post", "title:string", "body:string");
     assertNoMatch(/3 files inspected, no offenses detected/, output);
   });
 
   it("generators with apply_eslint_autocorrect_after_generate! and pretend", async () => {
     withBareConfig((c) => {
       c.generators().applyEslintAutocorrectAfterGenerateBang();
-      RailsGenerators.configureBang(c.generators());
+      TrailsGenerators.configureBang(c.generators());
     });
 
     await assertNothingRaised(() =>
-      rails("generate", "model", "post", "title:string", "body:string", "--pretend"),
+      trails("generate", "model", "post", "title:string", "body:string", "--pretend"),
     );
   });
 });

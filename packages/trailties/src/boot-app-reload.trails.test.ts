@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { constantize, onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("a generated app reloads its views in development", () => {
   let tmp: string;

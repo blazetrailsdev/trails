@@ -22,7 +22,7 @@ import { LogSubscriber } from "@blazetrails/activejob/log-subscriber";
 import { Callbacks } from "@blazetrails/activejob/callbacks";
 import { TestHelper } from "@blazetrails/activejob/test-helper";
 import { QueryLogs } from "@blazetrails/activerecord";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActiveJobConfig extends OrderedOptions {
@@ -73,7 +73,7 @@ export class Trailtie extends BaseTrailtie {
           if (app.config.activeJob.isKey("enqueueAfterTransactionCommit")) {
             deprecator().warn(
               squish(`
-                \`config.active_job.enqueue_after_transaction_commit\` is deprecated and will be removed in Rails 8.1.
+                \`config.active_job.enqueue_after_transaction_commit\` is deprecated and will be removed in Trails 8.1.
                 This configuration can still be set on individual jobs using \`self.enqueue_after_transaction_commit=\`,
                 but due the nature of this behavior, it is not recommended to be set globally.
               `),

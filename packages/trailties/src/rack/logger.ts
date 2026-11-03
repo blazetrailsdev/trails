@@ -38,13 +38,13 @@ export class Logger {
     const tagCount = this.logger.pushTags
       ? this.logger.pushTags(...this.computeTags(request)).length
       : 0;
-    env["rails.rackLoggerTagCount"] = tagCount;
+    env["trails.rackLoggerTagCount"] = tagCount;
 
     return this.callApp(request, env);
   }
 
   private async callApp(request: Request, env: RackEnv): Promise<RackResponse> {
-    const loggerTagPopCount = env["rails.rackLoggerTagCount"] as number;
+    const loggerTagPopCount = env["trails.rackLoggerTagCount"] as number;
 
     const instrumenter = Notifications.instrumenter;
     const handle = instrumenter.buildHandle("request.action_dispatch", { request });

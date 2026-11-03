@@ -44,7 +44,7 @@ import { Encryption } from "@blazetrails/activerecord/encryption";
 import { Configuration } from "../application/configuration.js";
 import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
 import { MiddlewareStackProxy } from "../configuration.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Application } from "../application.js";
 import type { ActiveRecordConfig } from "./active-record.js";
 
@@ -52,7 +52,7 @@ const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration
   const encrypted = new EncryptedConfiguration({
     configPath: `${dir}/credentials.yml.enc`,
     keyPath: `${dir}/master.key`,
-    envKey: "RAILS_MASTER_KEY",
+    envKey: "TRAILS_MASTER_KEY",
     raiseIfMissingKey: false,
   });
   await encrypted.config();
@@ -333,7 +333,7 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
     expect(new ExceptionWrapper(null, new RecordNotSaved("unsaved")).statusCode).toBe(422);
   });
 });
-describe("ActiveRecord::ConnectionHandling::RAILS_ENV", () => {
+describe("ActiveRecord::ConnectionHandling::TRAILS_ENV", () => {
   it("reads Trails.env before TRAILS_ENV, so a booted app resolves its own environment's config", () => {
     const originalEnv = Trails.env;
     Trails.env = "staging";

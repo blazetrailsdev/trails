@@ -224,9 +224,9 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T1.
 
-- `packages/trailties/src/generators/rails/model/model-generator.ts`
-- `packages/trailties/src/generators/rails/migration/migration-generator.ts`
-- `packages/trailties/src/generators/rails/resource-route/resource-route-generator.ts`
+- `packages/trailties/src/generators/trails/model/model-generator.ts`
+- `packages/trailties/src/generators/trails/migration/migration-generator.ts`
+- `packages/trailties/src/generators/trails/resource-route/resource-route-generator.ts`
 - Per-generator `__snapshots__/` covering the attribute-type matrix.
 - Per-generator test contract (snapshot + `parseTs` + `assertNoRubySource`).
 
@@ -236,7 +236,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 - `packages/trailties/src/generators/controller-generator.ts`
 - `packages/trailties/src/generators/scaffold-generator.ts`
-- Relocate both into `packages/trailties/src/generators/rails/` Rails layout
+- Relocate both into `packages/trailties/src/generators/trails/` Rails layout
   in the same PR.
 - Factor out controller-template prose helpers used by T4 and PR 1.14b-cont.
 - Test contract as T2.
@@ -245,7 +245,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T3.
 
-- `packages/trailties/src/generators/rails/authentication/authentication-generator.ts`
+- `packages/trailties/src/generators/trails/authentication/authentication-generator.ts`
 - Snapshots for all 7 emitted files (`app/models/{user,session,current}`,
   `app/controllers/{sessions,passwords,concerns/authentication}`,
   `app/mailers/passwords_mailer`).
@@ -260,7 +260,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T1 (builder).
 
-- `packages/trailties/src/generators/rails/devcontainer/devcontainer-generator.ts`
+- `packages/trailties/src/generators/trails/devcontainer/devcontainer-generator.ts`
 - `update_devcontainer_db_host` / `update_devcontainer_db_feature` /
   `edit_compose_yaml` ports emit `devcontainer.json` AND `compose.yaml`
   via `JSON.stringify(..., null, 2)`. The `.yaml` extension stays

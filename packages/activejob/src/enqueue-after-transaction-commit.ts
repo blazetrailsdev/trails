@@ -17,7 +17,7 @@ async function rawEnqueue(this: EnqueueAfterTransactionCommitJob): Promise<unkno
     case ":always":
       deprecator().warn(
         squish(`
-          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :always\` is deprecated and will be removed in Rails 8.1.
+          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :always\` is deprecated and will be removed in Trails 8.1.
           Set to \`true\` to always enqueue the job after the transaction is committed.
         `),
       );
@@ -26,7 +26,7 @@ async function rawEnqueue(this: EnqueueAfterTransactionCommitJob): Promise<unkno
     case ":never":
       deprecator().warn(
         squish(`
-          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :never\` is deprecated and will be removed in Rails 8.1.
+          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :never\` is deprecated and will be removed in Trails 8.1.
           Set to \`false\` to never enqueue the job after the transaction is committed.
         `),
       );
@@ -35,7 +35,7 @@ async function rawEnqueue(this: EnqueueAfterTransactionCommitJob): Promise<unkno
     case ":default":
       deprecator().warn(
         squish(`
-          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :default\` is deprecated and will be removed in Rails 8.1.
+          Setting \`${rbModName(klass)}.enqueue_after_transaction_commit = :default\` is deprecated and will be removed in Trails 8.1.
           Set to \`false\` to never enqueue the job after the transaction is committed.
         `),
       );

@@ -6,7 +6,7 @@ import { Handler } from "@blazetrails/rack";
 import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../application.js";
-import { _resetTrailsEnv } from "../rails.js";
+import { _resetTrailsEnv } from "../trails.js";
 import { Engine } from "./action-cable.js";
 
 let appPath: string;

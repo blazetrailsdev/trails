@@ -252,7 +252,7 @@ describe("TestTSETemplate", () => {
     expect(error.cause).toBeInstanceOf(ArgumentError);
   });
 
-  it("rails injected locals does not raise error if not passed", async () => {
+  it("trails injected locals does not raise error if not passed", async () => {
     template = newTemplate("<%# locals: (message:) -%>");
     await assertNothingRaised(() =>
       render({ message: "Hi", message_counter: 1, message_iteration: 1 }, [
@@ -262,17 +262,17 @@ describe("TestTSETemplate", () => {
     );
   });
 
-  it("rails injected locals can be specified", async () => {
+  it("trails injected locals can be specified", async () => {
     template = newTemplate("<%# locals: (message: 'Hello') -%>\n<%= message %>");
     expect(await render({ message: "Hello" }, ["message"])).toBe("Hello");
   });
 
-  it("rails local assigns and strict locals", async () => {
+  it("trails local assigns and strict locals", async () => {
     template = newTemplate('<%# locals: (class: ) -%>\n<%= localAssigns["class"] %>');
     expect(await render({ class: "some-class" }, ["message"])).toBe("some-class");
   });
 
-  it("rails injected locals can be specified as kwargs", async () => {
+  it("trails injected locals can be specified as kwargs", async () => {
     template = newTemplate(
       "<%# locals: (message: 'Hello', **kwargs) -%>\n<%= kwargs.message_counter %>-<%= kwargs.message_iteration %>",
     );
@@ -284,7 +284,7 @@ describe("TestTSETemplate", () => {
     ).toBe("1-2");
   });
 
-  it("rails injected locals can be specified as required argument", async () => {
+  it("trails injected locals can be specified as required argument", async () => {
     template = newTemplate(
       "<%# locals: (message: 'Hello', message_iteration:) -%>\n<%= message %>-<%= message_iteration %>",
     );

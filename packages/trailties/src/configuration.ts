@@ -173,22 +173,22 @@ export class Generators {
     method = method.endsWith("=") ? method.slice(0, -1) : method;
 
     if (args.length === 0) {
-      if (method === "rails") {
+      if (method === "trails") {
         return this.options.get(method);
       } else {
-        return this.options.get("rails")![method];
+        return this.options.get("trails")![method];
       }
     }
 
     let namespace: unknown;
     let configuration: Record<string, unknown> | undefined;
-    if (method === "rails" || isPlainObject(args[0])) {
+    if (method === "trails" || isPlainObject(args[0])) {
       namespace = method;
       configuration = args.shift() as Record<string, unknown> | undefined;
     } else {
       namespace = args.shift();
       configuration = args.shift() as Record<string, unknown> | undefined;
-      this.options.get("rails")![method] = namespace;
+      this.options.get("trails")![method] = namespace;
     }
 
     if (configuration != null) {

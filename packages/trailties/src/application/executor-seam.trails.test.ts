@@ -124,7 +124,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   });
 });
 
-describe("Rails::Application#executor and #reloader are per-application (trails)", () => {
+describe("Trails::Application#executor and #reloader are per-application (trails)", () => {
   class TestApplication extends Application {}
 
   it("does not share callbacks between two applications", () => {

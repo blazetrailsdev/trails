@@ -3,7 +3,7 @@ import { MockRequest } from "@blazetrails/rack";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { LazyRouteSet } from "./lazy-route-set.js";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { registerController } from "@blazetrails/actionpack";
 
 class StubController extends ActionController.Base {

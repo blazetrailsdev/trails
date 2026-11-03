@@ -17,7 +17,7 @@ export class ActionableExceptions {
   }
 
   static {
-    cattrAccessor.call(ActionableExceptions, "endpoint", { default: "/rails/actions" });
+    cattrAccessor.call(ActionableExceptions, "endpoint", { default: "/trails/actions" });
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

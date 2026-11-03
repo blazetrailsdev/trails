@@ -48,7 +48,7 @@ export class QueryParser {
     } else if (SEMICOLON_COMPAT && s.includes(";")) {
       if (this.strictQueryStringSeparator == null) {
         deprecator().warn(
-          "Using semicolon as a query string separator is deprecated and will not be supported in Rails 8.1 or Rack 3.0. Use `&` instead.",
+          "Using semicolon as a query string separator is deprecated and will not be supported in Trails 8.1 or Rack 3.0. Use `&` instead.",
         );
       }
       splitter = COMPAT_SEP;

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Dir, getFs, include } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type

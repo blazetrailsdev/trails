@@ -13,7 +13,7 @@ import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indiffere
 import { environment } from "../command.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { IRBConsole } from "./console/irb-console.js";
 
 interface ConsoleOptions {
@@ -157,10 +157,10 @@ export class ConsoleCommand extends Base {
    */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
-    const railsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
-    if (railsConsole.isSandbox()) {
+    const trailsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
+    if (trailsConsole.isSandbox()) {
       throw new NotImplementedError("console sandbox rollback is not ported");
     }
-    await railsConsole.start();
+    await trailsConsole.start();
   }
 }

@@ -7,7 +7,7 @@ import {
   type StringIO,
 } from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT } from "../app-path.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 type Io = Pick<StringIO, "print" | "puts" | "write"> & { isTty?(): boolean };
 

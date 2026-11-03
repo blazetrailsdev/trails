@@ -13,15 +13,15 @@ import {
 
 describe("Paths remaining surface", () => {
   it("edits a path's list and reads Root's hash surface", async () => {
-    const root = new Root("/rails");
+    const root = new Root("/trails");
     const path = root.add("app", { glob: "*.{rb,ts}" });
     path.concat(["lib"]);
     path.unshift("vendor");
 
     expect(path.toAry()).toEqual(["vendor", "app", "lib"]);
     expect(path.extensions()).toEqual(["rb", "ts"]);
-    expect(path.absoluteCurrent()).toBe("/rails/app");
-    expect(await path.last()).toBe("/rails/lib");
+    expect(path.absoluteCurrent()).toBe("/trails/app");
+    expect(await path.last()).toBe("/trails/lib");
     expect(root.keys()).toEqual(["app"]);
     expect(root.valuesAt("app")).toEqual(root.values());
   });

@@ -2,7 +2,7 @@ import {
   LogSubscriber as BaseLogSubscriber,
   Notifications,
   NotificationEvent as Event,
-  trailsRoot,
+  trailsRoot as appTrailsRoot,
 } from "@blazetrails/activesupport";
 import type { Logger, Subscriber } from "@blazetrails/activesupport";
 import { round } from "@blazetrails/ruby-compat";
@@ -22,15 +22,15 @@ export function logger(): Logger | null {
 }
 
 /** @internal */
-export function fromRailsRoot(this: UtilsHost, string: string): string {
-  string = string.replace(railsRoot.call(this), "");
+export function fromTrailsRoot(this: UtilsHost, string: string): string {
+  string = string.replace(trailsRoot.call(this), "");
   string = string.replace(VIEWS_PATTERN, "");
   return string;
 }
 
 /** @internal */
-export function railsRoot(this: UtilsHost): string {
-  this.root ??= `${trailsRoot() ?? ""}/`;
+export function trailsRoot(this: UtilsHost): string {
+  this.root ??= `${appTrailsRoot() ?? ""}/`;
   return this.root;
 }
 
@@ -41,9 +41,9 @@ export class Start implements UtilsHost {
   /** @internal */
   logger = logger;
   /** @internal */
-  fromRailsRoot = fromRailsRoot;
+  fromTrailsRoot = fromTrailsRoot;
   /** @internal */
-  railsRoot = railsRoot;
+  trailsRoot = trailsRoot;
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (!this.logger()) return;
@@ -57,9 +57,9 @@ export class Start implements UtilsHost {
     if (qualifier === undefined) return;
 
     this.logger()!.debug(undefined, () => {
-      let message = `  Rendering ${qualifier}${this.fromRailsRoot(payload["identifier"] as string)}`;
+      let message = `  Rendering ${qualifier}${this.fromTrailsRoot(payload["identifier"] as string)}`;
       if (payload["layout"] != null && payload["layout"] !== false) {
-        message += ` within ${this.fromRailsRoot(payload["layout"] as string)}`;
+        message += ` within ${this.fromTrailsRoot(payload["layout"] as string)}`;
       }
       return message;
     });
@@ -81,9 +81,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
   root: string | null;
 
   /** @internal */
-  fromRailsRoot = fromRailsRoot;
+  fromTrailsRoot = fromTrailsRoot;
   /** @internal */
-  railsRoot = railsRoot;
+  trailsRoot = trailsRoot;
 
   constructor() {
     super();
@@ -96,9 +96,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
 
   renderTemplate(event: Event): void {
     this.info(undefined, () => {
-      let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
+      let message = `  Rendered ${this.fromTrailsRoot(event.payload["identifier"] as string)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
-        message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;
+        message += ` within ${this.fromTrailsRoot(event.payload["layout"] as string)}`;
       }
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;
@@ -111,9 +111,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
 
   renderPartial(event: Event): void {
     this.debug(undefined, () => {
-      let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
+      let message = `  Rendered ${this.fromTrailsRoot(event.payload["identifier"] as string)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
-        message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;
+        message += ` within ${this.fromTrailsRoot(event.payload["layout"] as string)}`;
       }
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       if (event.payload["cache_hit"] != null) {
@@ -129,7 +129,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
 
   renderLayout(event: Event): void {
     this.info(undefined, () => {
-      let message = `  Rendered layout ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
+      let message = `  Rendered layout ${this.fromTrailsRoot(event.payload["identifier"] as string)}`;
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;
     });
@@ -146,9 +146,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
         : "templates";
 
     this.debug(undefined, () => {
-      let message = `  Rendered collection of ${this.fromRailsRoot(identifier)}`;
+      let message = `  Rendered collection of ${this.fromTrailsRoot(identifier)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
-        message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;
+        message += ` within ${this.fromTrailsRoot(event.payload["layout"] as string)}`;
       }
       message += ` ${this.renderCount(event.payload)} (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;

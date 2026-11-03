@@ -15,7 +15,7 @@ import { isPresent } from "@blazetrails/activesupport";
 import { environment } from "../command.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 const AsyncFunction = (async () => {}).constructor as new (
   ...args: string[]
@@ -43,7 +43,7 @@ export class RunnerCommand extends Base {
     klass.classOption("skip_executor", {
       type: "boolean",
       aliases: "-w",
-      desc: "Don't wrap with Rails Executor",
+      desc: "Don't wrap with Trails Executor",
       default: false,
     });
     klass.noCommands(() => klass.methodAdded("help"));

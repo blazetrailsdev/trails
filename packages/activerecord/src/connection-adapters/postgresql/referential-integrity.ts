@@ -39,9 +39,9 @@ export async function disableReferentialIntegrity(
   } catch (e) {
     if (e instanceof InvalidForeignKey) {
       console.warn(
-        `WARNING: Rails was not able to disable referential integrity.\n\n` +
+        `WARNING: Trails was not able to disable referential integrity.\n\n` +
           `This is most likely caused due to missing permissions.\n` +
-          `Rails needs superuser privileges to disable referential integrity.\n\n` +
+          `Trails needs superuser privileges to disable referential integrity.\n\n` +
           `    cause: ${originalException?.message ?? ""}\n`,
       );
     }

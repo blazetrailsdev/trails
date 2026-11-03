@@ -58,7 +58,7 @@ describe("ActiveJob::ConfiguredJob", () => {
     expect(JobBuffer.lastValue()).toBe("Bo says hello");
   });
 
-  it("perform_all_later calls a class method Rails 8.0.2 does not define", async () => {
+  it("perform_all_later calls a class method Trails 8.0.2 does not define", async () => {
     await expect(new ConfiguredJob(HelloJob).performAllLater([["a"]])).rejects.toThrow(TypeError);
   });
 });

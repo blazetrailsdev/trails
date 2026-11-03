@@ -8,17 +8,17 @@ import { printingCommands } from "../command.js";
 import { NotesCommand } from "../commands/notes.js";
 import { UnusedRoutesCommand } from "../commands/unused-routes.js";
 
-describe("Rails::Command::Base.perform", () => {
+describe("Trails::Command::Base.perform", () => {
   it("dispatches --help to help with the command name, as base.rb:68-71 does", async () => {
     const out = (
       await capture(":stdout", () => UnusedRoutesCommand.perform("unused-routes", ["--help"], {}))
     ).split("\n");
-    expect(out.slice(0, 2)).toEqual(["Usage:", "  bin/rails unused-routes"]);
+    expect(out.slice(0, 2)).toEqual(["Usage:", "  bin/trails unused-routes"]);
     expect(out).toContain("  -g, [--grep=GREP]              # Grep routes by a specific pattern.");
   });
 });
 
-describe("Rails::Command::Base helpers", () => {
+describe("Trails::Command::Base helpers", () => {
   it("keeps executable and invokeCommand out of allCommands", () => {
     const commands = (Base as unknown as ThorClass).allCommands();
     expect(Object.keys(commands)).not.toContain("executable");
@@ -26,7 +26,7 @@ describe("Rails::Command::Base helpers", () => {
   });
 });
 
-describe("Rails::Command::Base class surface", () => {
+describe("Trails::Command::Base class surface", () => {
   it("banner prints a multi-word command and namespace in kebab-case", () => {
     class MultiWordCommand extends Base {
       doThing(): void {}
@@ -37,7 +37,7 @@ describe("Rails::Command::Base class surface", () => {
       }
     }
     const command = (MultiWordCommand as unknown as ThorClass).commands()["do-thing"];
-    expect(MultiWordCommand.banner(command)).toBe("bin/rails multi-word:do-thing");
+    expect(MultiWordCommand.banner(command)).toBe("bin/trails multi-word:do-thing");
   });
 
   it("desc with no usage answers class_usage, nil with no USAGE file", async () => {
@@ -57,7 +57,7 @@ describe("Rails::Command::Base class surface", () => {
           return usage;
         }
       }
-      expect(await RenderedUsageCommand.classUsage()).toBe("bin/rails rendered-usage x\n");
+      expect(await RenderedUsageCommand.classUsage()).toBe("bin/trails rendered-usage x\n");
     } finally {
       await getFs().rm!(dir, { recursive: true, force: true });
     }
@@ -69,10 +69,10 @@ describe("Rails::Command::Base class surface", () => {
   });
 
   it("base_name is the first path segment, underscored", () => {
-    expect(NotesCommand.baseName()).toBe("rails");
+    expect(NotesCommand.baseName()).toBe("trails");
   });
 
-  it("Rails::Command.printing_commands skips hidden_commands", async () => {
+  it("Trails::Command.printing_commands skips hidden_commands", async () => {
     const names = (await printingCommands()).map(([name]) => name);
     expect(names).toContain("notes");
     expect(names).not.toContain("unused-routes");

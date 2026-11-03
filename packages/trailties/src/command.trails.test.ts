@@ -20,10 +20,10 @@ function programName(command: Awaited<ReturnType<typeof findByNamespace>>): unkn
   return (command as Program | undefined)?.name();
 }
 
-describe("Rails::Command.find_by_namespace", () => {
+describe("Trails::Command.find_by_namespace", () => {
   it("loads only the candidate command, as lookup requires only its file", async () => {
     const server = (await findByNamespace("server", "server")) as typeof Base;
-    expect(server.namespace()).toBe("rails:server");
+    expect(server.namespace()).toBe("trails:server");
     expect(loaded).toEqual([]);
   }, 30_000);
 
@@ -32,7 +32,7 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
     expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
-      "rails:credentials",
+      "trails:credentials",
     );
   }, 30_000);
 
@@ -120,7 +120,7 @@ describe("Rails::Command.find_by_namespace", () => {
   });
 });
 
-describe("Rails::Command.root", () => {
+describe("Trails::Command.root", () => {
   afterEach(() => {
     setAppPath(undefined);
     setEngineRoot(undefined);

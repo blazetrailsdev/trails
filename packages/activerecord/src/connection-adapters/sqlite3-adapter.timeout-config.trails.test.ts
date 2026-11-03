@@ -50,7 +50,7 @@ describe("SQLite3Adapter timeout config coercion", () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:", retries: 3 });
     await adapter.execute("SELECT 1");
     expect(warn).toHaveBeenCalledWith(
-      "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
+      "The retries option is deprecated and will be removed in Trails 8.1. Use timeout instead.\n",
     );
   });
 });

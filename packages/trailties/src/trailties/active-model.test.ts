@@ -1,6 +1,6 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Trailtie, type ActiveModelConfig } from "./active-model.js";
 import { Deprecators } from "@blazetrails/activesupport";
 let deprecators: Deprecators;

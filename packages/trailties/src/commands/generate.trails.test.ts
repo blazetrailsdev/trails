@@ -3,7 +3,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { invoke as commandInvoke } from "../command.js";
 import { Application } from "../application.js";
 import { Generators } from "../generators.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { GenerateCommand } from "./generate.js";
 
 class GenerateCommandTestApp extends Application {}

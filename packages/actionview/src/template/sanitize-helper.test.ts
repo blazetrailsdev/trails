@@ -4,7 +4,7 @@ import { include } from "@blazetrails/ruby-compat";
 import { assertEqual, assertKindOf, assertRespondTo, isHtmlSafe } from "@blazetrails/activesupport";
 
 declare const Loofah: unknown;
-declare const Rails: unknown;
+declare const Trails: unknown;
 import { HTML4, HTML5, Html } from "@blazetrails/html-sanitizer";
 import { SanitizeHelper } from "../helpers/sanitize-helper.js";
 import type {
@@ -293,7 +293,7 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
 
   // BLOCKED: html-sanitizer-port-scrubbers
   it.skip("sanitize with custom scrubber option", () => {
-    const scrubber = new (class extends (Rails as any).HTML.PermitScrubber {
+    const scrubber = new (class extends (Trails as any).HTML.PermitScrubber {
       constructor() {
         super();
         this.tags = ["div"];

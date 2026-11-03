@@ -133,6 +133,14 @@ describe("snakeToCamel", () => {
     expect(snakeToCamel("load_bundle")).toBe("loadBundle");
   });
 
+  it("renames rails as a whole token only", () => {
+    expect(snakeToCamel("rails_env")).toBe("trailsEnv");
+    expect(snakeToCamel("from_rails_root")).toBe("fromTrailsRoot");
+    expect(snakeToCamel("guardrails")).toBe("guardrails");
+    expect(snakeToCamel("trails_env")).toBe("trailsEnv");
+    expect(rubyFileToTs("rails/dom/testing.rb")).not.toContain("ttrails");
+  });
+
   it("honors every TOKEN_RENAMES entry", () => {
     // The `rb: js` entry was dead code on main until #6043 — the table and the
     // substitution's alternation were two sources of truth and drifted. The

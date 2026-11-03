@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import "./index.js";
 import { Application } from "./application.js";
 import { HealthController } from "./health-controller.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 async function requestUp(): Promise<[number, string]> {
   const [status, , body] = await (rbFSend(Trails.application!.app(), "call", {
@@ -15,7 +15,7 @@ async function requestUp(): Promise<[number, string]> {
   return [status, [...(body as Iterable<string>)].join("")];
 }
 
-describe("a generated app routes /up to Rails::HealthController", () => {
+describe("a generated app routes /up to Trails::HealthController", () => {
   beforeAll(async () => {
     await import("./__fixtures__/boot-app/config/application.js");
     Trails.application!.config.setRoot(

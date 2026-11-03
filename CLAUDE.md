@@ -448,6 +448,8 @@ and not added ones.
   `it("TSE::Util.html_escape should escape unsafe characters")`; `parity:test`
   normalizes both sides, so the renamed name still credits. `ERB` survives only
   where the text quotes the Ruby side (a `Mirrors:` JSDoc line, a Rails path).
+  `rails` is `trails` the same way: `test "rails env is dev"` is
+  `it("trails env is dev")`, unless the test is about real Rails interop.
 - **Canonical tables only — no bespoke tables.** In AR tests, get the canonical
   schema + fixtures through `fixtures({ ... })` (the endgame surface: one call
   wires the handler, transactional fixtures, and the canonical schema); never

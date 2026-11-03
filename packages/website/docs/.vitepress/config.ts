@@ -4,7 +4,7 @@ const siteRoot = process.env.SITE_ROOT || "https://frontiers.deanoftech.com";
 
 export default defineConfig({
   title: "BlazeTrails",
-  description: "Rails API for TypeScript",
+  description: "Trails API for TypeScript",
   base: "/docs/",
   outDir: "../build/docs",
   cleanUrls: true,
@@ -28,7 +28,7 @@ export default defineConfig({
           ],
         },
         {
-          text: "Rails Deviations",
+          text: "Trails Deviations",
           items: [
             { text: "Arel", link: "/guides/arel-rails-deviations" },
             { text: "ActiveModel", link: "/guides/activemodel-rails-deviations" },

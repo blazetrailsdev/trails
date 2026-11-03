@@ -9,7 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Initializable } from "../initializable.js";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 const baseConfig = (): BootstrapConfig => ({
   root: null,

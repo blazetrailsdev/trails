@@ -17,7 +17,7 @@ describe("ServerCommand", () => {
   });
 });
 
-describe("Rails::Command::ServerTest", () => {
+describe("Trails::Command::ServerTest", () => {
   const parseArguments = (args: string[] = []) => new ServerCommand([], args).serverOptions();
 
   function withEnv<T>(env: Record<string, string | undefined>, fn: () => T): T {
@@ -81,7 +81,7 @@ describe("Rails::Command::ServerTest", () => {
     });
   });
 
-  it("test_environment_with_rails_env", () => {
+  it("test_environment_with_trails_env", () => {
     withEnv({ NODE_ENV: undefined, TRAILS_ENV: "production" }, () =>
       expect(parseArguments().environment).toBe("production"),
     );
@@ -182,7 +182,7 @@ describe("Rails::Command::ServerTest", () => {
       " ",
     );
     expect(parseArguments(args).restartCmd).toBe(
-      "bin/rails server -p 4567 -b 127.0.0.1 -c dummy_config.ru -d -e test -P tmp/server.pid -C --restart",
+      "bin/trails server -p 4567 -b 127.0.0.1 -c dummy_config.ru -d -e test -P tmp/server.pid -C --restart",
     );
   });
 

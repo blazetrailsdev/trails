@@ -78,21 +78,21 @@ describe("I18nInterpolateTest", () => {
     expect(I18n.interpolate("%{name} %<num>f", { name: "foo", num: 1.0 })).toBe("foo 1.000000");
   });
 
-  class RailsSafeBuffer extends String {
+  class TrailsSafeBuffer extends String {
     override replace: typeof String.prototype.replace = (searchValue, replaceValue) =>
       this.toString().replace(searchValue as string, replaceValue as string);
   }
 
   it("with String subclass that redefined gsub method", () => {
     expect(
-      I18n.interpolate(new RailsSafeBuffer("Hello %{planet} world") as unknown as string, {
+      I18n.interpolate(new TrailsSafeBuffer("Hello %{planet} world") as unknown as string, {
         planet: "mars",
       }),
     ).toBe("Hello mars world");
   });
 
   it("with String subclass that redefined gsub method returns same object if no interpolations", () => {
-    const string = new RailsSafeBuffer("Hello world");
+    const string = new TrailsSafeBuffer("Hello world");
     expect(I18n.interpolate(string as unknown as string, { planet: "mars" })).toBe(
       string as unknown as string,
     );

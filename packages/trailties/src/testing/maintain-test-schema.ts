@@ -1,7 +1,7 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import { PendingMigrationError } from "@blazetrails/activerecord/migration";
 import { exit, stdout } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 try {
   await Migration.maintainTestSchemaBang();

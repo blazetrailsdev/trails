@@ -39,9 +39,9 @@ let oldNamespace: typeof Generators.namespace;
 
 beforeAll(async () => {
   await NamespacedGeneratorsApp.instance().loadGenerators();
-  const { ControllerGenerator } = await import("./rails/controller/controller-generator.js");
-  const { ModelGenerator } = await import("./rails/model/model-generator.js");
-  const { ScaffoldGenerator } = await import("./rails/scaffold/scaffold-generator.js");
+  const { ControllerGenerator } = await import("./trails/controller/controller-generator.js");
+  const { ModelGenerator } = await import("./trails/model/model-generator.js");
+  const { ScaffoldGenerator } = await import("./trails/scaffold/scaffold-generator.js");
   NamespacedControllerGeneratorTest.tests(ControllerGenerator);
   NamespacedModelGeneratorTest.tests(ModelGenerator);
   NamespacedScaffoldGeneratorTest.tests(ScaffoldGenerator);

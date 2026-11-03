@@ -47,7 +47,7 @@ export const fixtureFileUpload = fileFixtureUpload;
 
 export function assigns(this: TestProcessHost, _key?: string | symbol): never {
   throw new NoMethodError(
-    'assigns has been extracted to a gem. To continue using it, add `gem "rails-controller-testing"` to your Gemfile.',
+    'assigns has been extracted to a gem. To continue using it, add `gem "trails-controller-testing"` to your Gemfile.',
   );
 }
 

@@ -107,7 +107,7 @@ describe("FileStoreTest", () => {
   });
 
   it("delete matched when cache directory does not exist", async () => {
-    const nonExistent = new FileStore("/tmp/does_not_exist_rails_ts_test_" + Date.now());
+    const nonExistent = new FileStore("/tmp/does_not_exist_trails_ts_test_" + Date.now());
     expect(() => nonExistent.deleteMatched(/does_not_exist/)).not.toThrow();
   });
 

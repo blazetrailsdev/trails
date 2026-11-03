@@ -15,7 +15,7 @@ Trails.application.configure(function () {
   this.config.logTags = [":request_id"];
   this.config.logger = TaggedLogging.logger(process.stdout);
 
-  this.config.logLevel = process.env.RAILS_LOG_LEVEL ?? "warn";
+  this.config.logLevel = process.env.TRAILS_LOG_LEVEL ?? "warn";
 
   this.config.activeSupport.reportDeprecations = false;
 

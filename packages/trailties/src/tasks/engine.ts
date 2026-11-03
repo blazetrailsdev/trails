@@ -52,12 +52,12 @@ DSL.namespace("db", () => {
   appTask("migrate:status");
 
   DSL.desc(
-    "Create the database from config/database.yml for the current Rails.env (use db:create:all to create all databases in the config)",
+    "Create the database from config/database.yml for the current Trails.env (use db:create:all to create all databases in the config)",
   );
   appTask("create");
   appTask("create:all");
 
-  DSL.desc("Drop the database for the current Rails.env (use db:drop:all to drop all databases)");
+  DSL.desc("Drop the database for the current Trails.env (use db:drop:all to drop all databases)");
   appTask("drop");
   appTask("drop:all");
 

@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Actions } from "../command/actions.js";
 import {
   env,

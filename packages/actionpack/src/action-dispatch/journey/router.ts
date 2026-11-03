@@ -74,15 +74,15 @@ export class Router {
   }
 
   recognize(
-    railsReq: RouterRequest,
+    trailsReq: RouterRequest,
     block: (route: Route, parameters: Record<string, unknown>) => unknown,
   ): void {
-    for (const { match, parameters, route } of this.findRoutes(railsReq)) {
+    for (const { match, parameters, route } of this.findRoutes(trailsReq)) {
       if (!route.path.anchored) {
-        railsReq.scriptName = match.toString();
+        trailsReq.scriptName = match.toString();
         let post = match.postMatch();
         if (!post.startsWith("/")) post = "/" + post;
-        railsReq.pathInfo = post;
+        trailsReq.pathInfo = post;
       }
       const merged: Record<string, unknown> = { ...route.defaults, ...parameters };
       if (block(route, merged) === true) return;

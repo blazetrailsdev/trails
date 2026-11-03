@@ -55,7 +55,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
 - `TopLevel` in `ruby-compat/src/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
-  (`trailties/src/rails.ts`), `TopLevel.ActionDispatch` /
+  (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /
   `TopLevel.ActionController` (`actionpack/src/namespaces.ts`), and
   `TopLevel.BCrypt` (`bcrypt/src/index.ts`; an unseated `BCrypt` is
   `has_secure_password`'s `LoadError` arm, `secure_password.rb:120-125`). A

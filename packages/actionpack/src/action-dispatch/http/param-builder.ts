@@ -140,7 +140,7 @@ export class ParamBuilder {
             (k !== matched || (after !== "" && !after.startsWith("[")))
           ) {
             deprecator().warn(
-              `Skipping over leading brackets in parameter name ${JSON.stringify(name)} is deprecated and will parse differently in Rails 8.1 or Rack 3.0.`,
+              `Skipping over leading brackets in parameter name ${JSON.stringify(name)} is deprecated and will parse differently in Trails 8.1 or Rack 3.0.`,
             );
           }
         } else {

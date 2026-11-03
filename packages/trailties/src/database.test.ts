@@ -5,7 +5,7 @@ import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 import { databaseConfiguration, loadDatabaseConfig } from "./database.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("databaseConfiguration", () => {
   let tmpRoot: string;

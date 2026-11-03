@@ -17,14 +17,14 @@ export const FIXTURE_DATA = Uint8Array.from(
 
 const routes = new RouteSet();
 routes.draw(function () {
-  this.scope("/rails/active_storage", function () {
+  this.scope("/trails/active_storage", function () {
     this.get("/disk/:encoded_key/*filename", {
       to: "active_storage/disk#show",
-      as: "rails_disk_service",
+      as: "trails_disk_service",
     });
     this.put("/disk/:encoded_token", {
       to: "active_storage/disk#update",
-      as: "update_rails_disk_service",
+      as: "update_trails_disk_service",
     });
   });
 });

@@ -32,7 +32,7 @@ import {
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { databaseConfiguration } from "../database.js";
 

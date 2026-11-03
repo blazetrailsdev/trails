@@ -1,6 +1,6 @@
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 

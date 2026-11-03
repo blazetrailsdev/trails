@@ -17,7 +17,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
@@ -53,7 +53,7 @@ export interface AppBase extends Included<typeof AppName> {
 export abstract class AppBase extends GeneratorBase {
   declare appPath: string;
   declare options: AppBaseOptions;
-  declare railsTemplate?: string;
+  declare trailsTemplate?: string;
   private _database?: Database;
   /** @internal */
   private _impliedOptions?: Record<string, string[]>;
@@ -74,15 +74,15 @@ export abstract class AppBase extends GeneratorBase {
     this.argument("appPath", { type: "string" });
     this.noCommands(() => this.methodAdded("requiredRailties"));
     this.noCommands(() => this.methodAdded("includeAllRailties"));
-    this.noCommands(() => this.methodAdded("railsRequireStatement"));
+    this.noCommands(() => this.methodAdded("trailsRequireStatement"));
     this.noCommands(() => this.methodAdded("sqlite3"));
     this.noCommands(() => this.methodAdded("skipStorage"));
     this.noCommands(() => this.methodAdded("keeps"));
     this.noCommands(() => this.methodAdded("isDevcontainer"));
     this.noCommands(() => this.methodAdded("skipDevcontainer"));
     this.noCommands(() => this.methodAdded("dependsOnSystemTest"));
-    this.noCommands(() => this.methodAdded("railsGemfileEntry"));
-    this.noCommands(() => this.methodAdded("railsDevPackages"));
+    this.noCommands(() => this.methodAdded("trailsGemfileEntry"));
+    this.noCommands(() => this.methodAdded("trailsDevPackages"));
     this.noCommands(() => this.methodAdded("applyTrailsTemplate"));
     this.noCommands(() => this.methodAdded("setDefaultAccessorsBang"));
     this.noCommands(() => this.methodAdded("reportImpliedOptions"));
@@ -229,17 +229,17 @@ export abstract class AppBase extends GeneratorBase {
     this.classOption("rc", {
       type: "string",
       default: null,
-      desc: "Path to file containing extra configuration options for rails command",
+      desc: "Path to file containing extra configuration options for trails command",
     });
     this.classOption("noRc", {
       type: "boolean",
       default: null,
-      desc: "Skip loading of extra configuration options from .railsrc file",
+      desc: "Skip loading of extra configuration options from .trailsrc file",
     });
     this.classOption("help", {
       type: "boolean",
       aliases: "-h",
-      group: "rails",
+      group: "trails",
       desc: "Show this help message and quit",
     });
   }
@@ -409,7 +409,7 @@ export abstract class AppBase extends GeneratorBase {
   }
 
   /** @internal */
-  railsRequireStatement(): string {
+  trailsRequireStatement(): string {
     if (this.includeAllRailties()) {
       return `import "@blazetrails/trailties/all";`;
     } else {
@@ -417,7 +417,7 @@ export abstract class AppBase extends GeneratorBase {
         ([railtie, required]) => `${!required ? "// " : ""}import "${railtie}";`,
       );
 
-      return `import "@blazetrails/trailties/rails";
+      return `import "@blazetrails/trailties/trails";
 // Pick the frameworks you want:
 ${requireStatements.join("\n")}`;
     }
@@ -502,14 +502,14 @@ ${requireStatements.join("\n")}`;
     return this.options.skipSolid;
   }
   /** @internal */
-  protected railsPrerelease(): boolean {
+  protected trailsPrerelease(): boolean {
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
   /** @internal */
-  railsGemfileEntry(name: string, packageManager: string): string {
+  trailsGemfileEntry(name: string, packageManager: string): string {
     if (this.options.dev) {
-      const path = this.railsDevPackages()[name];
+      const path = this.trailsDevPackages()[name];
       return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
     } else {
       return "*";
@@ -651,8 +651,8 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @noRailsEquivalent PERMANENT */
-  railsDevPackages(): Record<string, string> {
-    const packages = File.join(Generators.RAILS_DEV_PATH, "packages");
+  trailsDevPackages(): Record<string, string> {
+    const packages = File.join(Generators.TRAILS_DEV_PATH, "packages");
     const out: Record<string, string> = {};
     for (const dir of Dir.children(packages).sort()) {
       const manifest = File.join(packages, dir, "package.json");
@@ -665,11 +665,11 @@ ${requireStatements.join("\n")}`;
 
   async applyTrailsTemplate(): Promise<void> {
     try {
-      if (this.railsTemplate != null) await this.apply(this.railsTemplate);
+      if (this.trailsTemplate != null) await this.apply(this.trailsTemplate);
     } catch (e) {
       if (e instanceof ThorError || e instanceof LoadError || e instanceof Errno.ENOENT) {
         throw new GeneratorError(
-          `The template [${this.railsTemplate}] could not be loaded. Error: ${(e as Error).message}`,
+          `The template [${this.trailsTemplate}] could not be loaded. Error: ${(e as Error).message}`,
         );
       }
       throw e;
@@ -684,9 +684,9 @@ ${requireStatements.join("\n")}`;
         /\$(\w+)|\$\{(\w+)\}|%(\w+)%/g,
         (m, a, b, c) => env[a ?? b ?? c] ?? m,
       );
-      this.railsTemplate = File.expandPath(interpolated);
+      this.trailsTemplate = File.expandPath(interpolated);
     } else {
-      this.railsTemplate = this.options.template;
+      this.trailsTemplate = this.options.template;
     }
   }
 
@@ -715,13 +715,13 @@ ${requireStatements.join("\n")}`;
 
     switch (this.options.javascript) {
       case "importmap":
-        await this.railsCommand("importmap:install");
+        await this.trailsCommand("importmap:install");
         break;
       case "webpack":
       case "bun":
       case "esbuild":
       case "rollup":
-        await this.railsCommand(`javascript:install:${this.options.javascript}`);
+        await this.trailsCommand(`javascript:install:${this.options.javascript}`);
         break;
     }
   }
@@ -730,7 +730,7 @@ ${requireStatements.join("\n")}`;
   protected async runHotwire(): Promise<void> {
     if (this.options.skipHotwire || !this.isInstall()) return;
 
-    await this.railsCommand("turbo:install stimulus:install");
+    await this.trailsCommand("turbo:install stimulus:install");
   }
 
   /** @internal */
@@ -738,11 +738,11 @@ ${requireStatements.join("\n")}`;
     if (!this.options.css || !this.isInstall()) return;
 
     if (!this.usingJsRuntime() && this.options.css === "tailwind") {
-      await this.railsCommand("tailwindcss:install");
+      await this.trailsCommand("tailwindcss:install");
     } else if (!this.usingJsRuntime() && this.options.css === "sass") {
-      await this.railsCommand("dartsass:install");
+      await this.trailsCommand("dartsass:install");
     } else {
-      await this.railsCommand(`css:install:${this.options.css}`);
+      await this.trailsCommand(`css:install:${this.options.css}`);
     }
   }
 
@@ -753,7 +753,7 @@ ${requireStatements.join("\n")}`;
     let commands = "solid_cache:install solid_queue:install";
     if (!this.skipActionCable()) commands += " solid_cable:install";
 
-    await this.railsCommand(commands);
+    await this.trailsCommand(commands);
   }
 
   /** @internal */

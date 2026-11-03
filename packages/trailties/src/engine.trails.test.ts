@@ -36,7 +36,7 @@ describe("Engine#buildRequest", () => {
 
 describe("Railtie class-level method_missing", () => {
   it("forwards routes and call to the instance, so RoutesInspector prints a mounted Engine's routes", async () => {
-    await import("./rails.js");
+    await import("./trails.js");
     const { RouteSet, RoutesInspector, ConsoleFormatter } = await import("@blazetrails/actionpack");
     class BlogEngine extends Engine {
       static inspect(): string {

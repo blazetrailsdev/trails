@@ -636,7 +636,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     );
   });
 
-  it("creates test and development databases when rails env is development", async () => {
+  it("creates test and development databases when trails env is development", async () => {
     const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
 
@@ -754,7 +754,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     );
   });
 
-  it("creates test and development databases when rails env is development", async () => {
+  it("creates test and development databases when trails env is development", async () => {
     const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
 
@@ -940,7 +940,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     );
   });
 
-  it("drops testand development databases when rails env is development", async () => {
+  it("drops testand development databases when trails env is development", async () => {
     const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
 
@@ -1031,7 +1031,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
     );
   });
 
-  it("drops testand development databases when rails env is development", async () => {
+  it("drops testand development databases when trails env is development", async () => {
     const oldEnv = getEnv("TRAILS_ENV");
     setEnv("TRAILS_ENV", "development");
 

@@ -511,7 +511,7 @@ describe("ResponseIntegrationTest", () => {
     testCase = new IntegrationTest(task.name);
   });
 
-  function railsishApp(block: (resp: Response) => void) {
+  function trailsishApp(block: (resp: Response) => void) {
     return () => {
       const resp = new Response();
       block(resp);
@@ -525,7 +525,7 @@ describe("ResponseIntegrationTest", () => {
   }
 
   it("response cache control from railsish app", async () => {
-    testCase.app = railsishApp((resp) => {
+    testCase.app = trailsishApp((resp) => {
       resp.cacheControl.public = true;
       resp.etag = "123";
       resp.body = "Hello";
@@ -558,7 +558,7 @@ describe("ResponseIntegrationTest", () => {
   });
 
   it("response charset and content type from railsish app", async () => {
-    testCase.app = railsishApp((resp) => {
+    testCase.app = trailsishApp((resp) => {
       resp.charset = "utf-16";
       resp.contentType = Mime.get("xml")!;
       resp.body = "Hello";
@@ -586,7 +586,7 @@ describe("ResponseIntegrationTest", () => {
   });
 
   it("strong ETag validator", async () => {
-    testCase.app = railsishApp((resp) => {
+    testCase.app = trailsishApp((resp) => {
       resp.strongEtag("123");
       resp.body = "Hello";
     });

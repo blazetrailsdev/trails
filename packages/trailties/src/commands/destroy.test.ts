@@ -5,7 +5,7 @@ import * as os from "node:os";
 import { DestroyCommand } from "./destroy.js";
 import { lookupBang } from "../command/behavior.js";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 
 class DestroyCommandTestApp extends Application {}

@@ -277,13 +277,13 @@ describe("ModuleTest", () => {
   });
 
   it("delegation with allow nil", () => {
-    const rails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
-    expect(rails.name()).toEqual("David");
+    const trails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
+    expect(trails.name()).toEqual("David");
   });
 
   it("delegation with allow nil and nil value", () => {
-    const rails = new Project("Rails") as Project & Record<string, any>;
-    expect(rails.name()).toBeUndefined();
+    const trails = new Project("Rails") as Project & Record<string, any>;
+    expect(trails.name()).toBeUndefined();
   });
 
   it("delegation with allow nil and false value", async () => {
@@ -292,14 +292,14 @@ describe("ModuleTest", () => {
   });
 
   it("delegation with allow nil and invalid value", async () => {
-    const rails = new Project("Rails", 42) as Project & Record<string, any>;
-    await assertRaise([NoMethodError], {}, () => rails.name());
+    const trails = new Project("Rails", 42) as Project & Record<string, any>;
+    await assertRaise([NoMethodError], {}, () => trails.name());
   });
 
   it("delegation with allow nil and nil value and prefix", () => {
     delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
-    const rails = new Project("Rails") as Project & Record<string, any>;
-    expect(rails.person_name()).toBeUndefined();
+    const trails = new Project("Rails") as Project & Record<string, any>;
+    expect(trails.person_name()).toBeUndefined();
   });
 
   it("delegation without allow nil and nil value", async () => {

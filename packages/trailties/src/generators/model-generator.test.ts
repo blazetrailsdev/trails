@@ -8,18 +8,18 @@ import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Dir } from "@blazetrails/ruby-compat";
 import { ModelHelpers } from "./model-helpers.js";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "@blazetrails/activerecord";
 
 class ModelGeneratorTestApp extends Application {}
-let ModelGenerator: typeof import("./rails/model/model-generator.js").ModelGenerator;
+let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGenerator;
 
 beforeAll(async () => {
   await ModelGeneratorTestApp.instance().loadGenerators();
-  ({ ModelGenerator } = await import("./rails/model/model-generator.js"));
+  ({ ModelGenerator } = await import("./trails/model/model-generator.js"));
 });
 let oldBelongsToRequiredByDefault: boolean | undefined;
 

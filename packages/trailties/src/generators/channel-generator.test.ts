@@ -2,12 +2,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../test-unit/trailtie.js";
 import { TestCase } from "./test-case.js";
 
 class ChannelGeneratorApp extends Application {}
-let ChannelGenerator: typeof import("./rails/channel/channel-generator.js").ChannelGenerator;
+let ChannelGenerator: typeof import("./trails/channel/channel-generator.js").ChannelGenerator;
 class ChannelGeneratorTest extends TestCase {}
 ChannelGeneratorTest.destination(Dir.mktmpdir());
 registerSpecType(/^ChannelGeneratorTest$/, ChannelGeneratorTest);
@@ -15,7 +15,7 @@ let testCase: TestCase;
 
 beforeAll(async () => {
   await ChannelGeneratorApp.instance().loadGenerators();
-  ({ ChannelGenerator } = await import("./rails/channel/channel-generator.js"));
+  ({ ChannelGenerator } = await import("./trails/channel/channel-generator.js"));
   ChannelGeneratorTest.tests(ChannelGenerator);
 });
 
@@ -152,7 +152,7 @@ describe("ChannelGeneratorTest", () => {
     await runGenerator(["chat"]);
 
     const content = assertFile("config/importmap.rb");
-    expect(content).toMatch(/pin "@rails\/actioncable"/);
+    expect(content).toMatch(/pin "@trails\/actioncable"/);
     expect(content).toMatch(/pin_all_from "app\/javascript\/channels"/);
   });
 

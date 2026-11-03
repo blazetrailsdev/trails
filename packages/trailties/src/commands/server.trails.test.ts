@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Handler, MockRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Application } from "../application.js";
 import { DetailsKey } from "@blazetrails/actionview";
 import type { BuildViewsResult, WatchViewsOptions } from "@blazetrails/trails-tsc";
@@ -199,9 +199,9 @@ describe("trails server environment (trails)", () => {
       Application.appClass = null;
     });
 
-    async function served(railsApp: RackApp): Promise<RackEnv> {
+    async function served(trailsApp: RackApp): Promise<RackEnv> {
       const rackEnv = MockRequest.envFor("/up", { HTTP_ACCEPT: "*/*" });
-      const [status] = await railsApp(rackEnv);
+      const [status] = await trailsApp(rackEnv);
       expect(status).toBe(200);
       return rackEnv;
     }

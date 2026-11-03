@@ -20,9 +20,9 @@
       "default": "./dist/server/index.js"
     },
     "./all": "./dist/all.js",
-    "./rails": {
-      "types": "./dist/rails.d.ts",
-      "default": "./dist/rails.js"
+    "./trails": {
+      "types": "./dist/trails.d.ts",
+      "default": "./dist/trails.js"
     },
     "./trailties/*": {
       "types": "./dist/trailties/*.d.ts",
@@ -104,7 +104,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'runner', 'test']) require('fs').cpSync('src/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
+    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'runner', 'test']) require('fs').cpSync('src/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('src/templates/trails', 'dist/templates/trails', { recursive: true })\" && trails-tsc-views build --views dist/templates/trails --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
   },
   "files": [
     "dist",

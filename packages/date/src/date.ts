@@ -60,7 +60,7 @@ const ABBR_MONTH_NAMES = [
 
 function objClassName(obj: object): string {
   const klass = obj.constructor as typeof Date;
-  return Object.hasOwn(klass, "_railsClassName") ? klass._railsClassName : klass.name;
+  return Object.hasOwn(klass, "_railsClassName") ? klass._trailsClassName : klass.name;
 }
 
 function pad2(n: number): string {
@@ -4521,7 +4521,7 @@ function deconstructKeys(
 }
 
 export class Date extends rbCDate {
-  static _railsClassName = "Date";
+  static _trailsClassName = "Date";
 
   static Error = DateError;
 
@@ -5875,7 +5875,7 @@ const DateWithoutParseStatics: (new (
 
 /** @noRailsEquivalent PERMANENT */
 export class DateTime extends DateWithoutParseStatics {
-  static override _railsClassName = "DateTime";
+  static override _trailsClassName = "DateTime";
 
   /** @internal */
   #jd?: number;

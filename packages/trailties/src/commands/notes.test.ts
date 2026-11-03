@@ -31,8 +31,8 @@ async function runNotesCommand(args: string[] = []): Promise<string> {
   return output;
 }
 
-describe("Rails::Command::NotesTest", { timeout: 30_000 }, () => {
-  it("`rails notes` displays results for default directories and default annotations with aligned line number and annotation tag", async () => {
+describe("Trails::Command::NotesTest", { timeout: 30_000 }, () => {
+  it("`trails notes` displays results for default directories and default annotations with aligned line number and annotation tag", async () => {
     appFile("app/controllers/some_controller.ts", "// OPTIMIZE: note in app directory");
     appFile("config/initializers/some_initializer.ts", "// TODO: note in config directory");
     appFile("db/some_seeds.ts", "// FIXME: note in db directory");
@@ -50,11 +50,11 @@ describe("Rails::Command::NotesTest", { timeout: 30_000 }, () => {
     );
   });
 
-  it("`rails notes` displays an empty string when no results were found", async () => {
+  it("`trails notes` displays an empty string when no results were found", async () => {
     expect(await runNotesCommand()).toBe("");
   });
 
-  it("`rails notes --annotations` displays results for a single annotation without being prefixed by a tag", async () => {
+  it("`trails notes --annotations` displays results for a single annotation without being prefixed by a tag", async () => {
     appFile("db/some_seeds.ts", "// FIXME: note in db directory");
     appFile("test/some_test.ts", "// FIXME: note in test directory");
 
@@ -67,7 +67,7 @@ describe("Rails::Command::NotesTest", { timeout: 30_000 }, () => {
     );
   });
 
-  it("`rails notes --annotations` displays results for multiple annotations being prefixed by a tag", async () => {
+  it("`trails notes --annotations` displays results for multiple annotations being prefixed by a tag", async () => {
     appFile("app/controllers/some_controller.ts", "// FOOBAR: note in app directory");
     appFile("config/initializers/some_initializer.ts", "// TODO: note in config directory");
     appFile("lib/some_file.ts", "// TODO: note in lib directory");

@@ -11,7 +11,7 @@ export interface RouteSearchResult {
 
 export class InfoController extends ApplicationController {
   static override controllerPath(): string {
-    return "rails/info";
+    return "trails/info";
   }
 
   static {
@@ -21,7 +21,7 @@ export class InfoController extends ApplicationController {
   }
 
   index(): void {
-    this.redirectTo("/rails/info/routes");
+    this.redirectTo("/trails/info/routes");
   }
 
   async properties(): Promise<void> {

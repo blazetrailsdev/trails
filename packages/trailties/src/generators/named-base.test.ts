@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "@blazetrails/activerecord";
-import { ScaffoldControllerGenerator } from "./rails/scaffold-controller/scaffold-controller-generator.js";
+import { ScaffoldControllerGenerator } from "./trails/scaffold-controller/scaffold-controller-generator.js";
 
 function generator(name: string, options: { modelName?: string } = {}) {
   return new ScaffoldControllerGenerator([name], options, { destinationRoot: "/" });

@@ -29,7 +29,7 @@ const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration
   const encrypted = new EncryptedConfiguration({
     configPath: `${dir}/credentials.yml.enc`,
     keyPath: `${dir}/master.key`,
-    envKey: "RAILS_MASTER_KEY",
+    envKey: "TRAILS_MASTER_KEY",
     raiseIfMissingKey: false,
   });
   await encrypted.config();

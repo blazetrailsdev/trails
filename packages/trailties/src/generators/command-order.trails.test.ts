@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HelperGenerator } from "./rails/helper/helper-generator.js";
+import { HelperGenerator } from "./trails/helper/helper-generator.js";
 import { ModelGenerator } from "./test-unit/model/model-generator.js";
 
 const order = (klass: unknown): string[] =>

@@ -273,7 +273,7 @@ export class Basic {
 
   /** @internal */
   protected async showDiff(destination: string, content: unknown): Promise<void> {
-    const diffCmd = env["THOR_DIFF"] ?? env["RAILS_DIFF"] ?? "diff -u";
+    const diffCmd = env["THOR_DIFF"] ?? env["TRAILS_DIFF"] ?? "diff -u";
 
     await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
       temp.write(content as string | Uint8Array);

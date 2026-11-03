@@ -195,7 +195,7 @@ function validateSchemaShape(
     process.exit(1);
   };
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    fail("expected a top-level object of { [table]: { [column]: railsType | richValue } }");
+    fail("expected a top-level object of { [table]: { [column]: trailsType | richValue } }");
   }
   const out: Record<string, Record<string, SchemaColumnValue>> = Object.create(null);
   for (const table of Object.keys(value as object)) {
@@ -224,7 +224,7 @@ function validateColumnValue(
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
     const got = raw === null ? "null" : Array.isArray(raw) ? "array" : typeof raw;
     fail(
-      `column "${fqColumn}" must be a Rails type string or an object ` +
+      `column "${fqColumn}" must be a Trails type string or an object ` +
         `with at least { type: string } (got ${got})`,
     );
   }

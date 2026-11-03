@@ -56,17 +56,17 @@ function makeHost(store?: MemoryStore): HostClass & FragmentsHost {
   return new HostClass() as unknown as HostClass & FragmentsHost;
 }
 
-const origCache = process.env.RAILS_CACHE_ID;
-const origVer = process.env.RAILS_APP_VERSION;
+const origCache = process.env.TRAILS_CACHE_ID;
+const origVer = process.env.TRAILS_APP_VERSION;
 beforeEach(async () => {
-  delete process.env.RAILS_CACHE_ID;
-  delete process.env.RAILS_APP_VERSION;
+  delete process.env.TRAILS_CACHE_ID;
+  delete process.env.TRAILS_APP_VERSION;
 });
 afterEach(async () => {
-  if (origCache === undefined) delete process.env.RAILS_CACHE_ID;
-  else process.env.RAILS_CACHE_ID = origCache;
-  if (origVer === undefined) delete process.env.RAILS_APP_VERSION;
-  else process.env.RAILS_APP_VERSION = origVer;
+  if (origCache === undefined) delete process.env.TRAILS_CACHE_ID;
+  else process.env.TRAILS_CACHE_ID = origCache;
+  if (origVer === undefined) delete process.env.TRAILS_APP_VERSION;
+  else process.env.TRAILS_APP_VERSION = origVer;
 });
 
 describe("class config", () => {
@@ -94,22 +94,22 @@ describe("included", () => {
 });
 
 describe("combinedFragmentCacheKey", () => {
-  it("prepends :views, includes RAILS_CACHE_ID || RAILS_APP_VERSION, drops nulls", async () => {
+  it("prepends :views, includes TRAILS_CACHE_ID || TRAILS_APP_VERSION, drops nulls", async () => {
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "n"]);
 
-    process.env.RAILS_APP_VERSION = "1.2.3";
+    process.env.TRAILS_APP_VERSION = "1.2.3";
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "1.2.3", "n"]);
 
-    process.env.RAILS_CACHE_ID = "deploy-42";
+    process.env.TRAILS_CACHE_ID = "deploy-42";
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "deploy-42", "n"]);
   });
 
   it("falls through empty-string env vars (|| semantics, not ??)", async () => {
-    process.env.RAILS_CACHE_ID = "";
-    process.env.RAILS_APP_VERSION = "1.2.3";
+    process.env.TRAILS_CACHE_ID = "";
+    process.env.TRAILS_APP_VERSION = "1.2.3";
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "1.2.3", "n"]);
 
-    process.env.RAILS_APP_VERSION = "";
+    process.env.TRAILS_APP_VERSION = "";
     expect(combinedFragmentCacheKey.call(makeHost(), "n")).toEqual(["views", "n"]);
   });
 
