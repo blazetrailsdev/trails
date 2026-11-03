@@ -226,7 +226,7 @@ if (pending.length > 0) {
 ```ts
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
-import { models } from "./app/models/index.js";
+import { models } from "./.trails/models/index.js";
 
 let connected = false;
 

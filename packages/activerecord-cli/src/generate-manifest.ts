@@ -224,7 +224,7 @@ export function renderManifest(entries: ModelEntry[], modelsImportDir = "."): st
       : `import type { Base } from "@blazetrails/activerecord";\n`;
   for (const e of entries) {
     const binding = e.isDefault ? e.className : `{ ${e.className} }`;
-    out += `import ${binding} from "${modelsImportDir}/${e.importPath.slice(2)}";\n`;
+    out += `import ${binding} from "${modelsImportDir}/${e.importPath.replace(/^\.\//, "")}";\n`;
   }
   out +=
     names.length > 0
@@ -239,7 +239,7 @@ export function renderManifest(entries: ModelEntry[], modelsImportDir = "."): st
 
 function relativeModelsDir(modelsDir: string, manifestDir: string): string {
   const rel = new Pathname(File.expandPath(modelsDir)).relativePathFrom(manifestDir).toString();
-  return rel.startsWith(".") ? rel : `./${rel}`;
+  return rel === "." || rel === ".." || rel.startsWith("../") ? rel : `./${rel}`;
 }
 
 export async function buildManifest(modelsDir: string, manifestDir = modelsDir): Promise<string> {
