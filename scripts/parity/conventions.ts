@@ -68,9 +68,6 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rubocop: "Eslint",
   capybara: "vitest",
   Capybara: "Vitest",
-  // trails is the framework's own name: everything Rails names after itself
-  // (`rails_env`, `Rails::HealthController`, `RAILS_MASTER_KEY`) is spelled for
-  // trails. Whole tokens only, so `guardrails` and `Trails` never match.
   rails: "trails",
   Rails: "Trails",
   RAILS: "TRAILS",

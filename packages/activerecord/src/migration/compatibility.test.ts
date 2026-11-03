@@ -738,7 +738,7 @@ describe("Migration", () => {
       );
     });
 
-    it("change column null with non boolean arguments does not raise in old rails versions", async () => {
+    it("change column null with non boolean arguments does not raise in old trails versions", async () => {
       const migration = class extends Migration.get(7.0) {
         async up(): Promise<void> {
           await this.addColumn("testings", "name", "string");
@@ -751,7 +751,7 @@ describe("Migration", () => {
       });
     });
 
-    it("change column null with boolean arguments does not raise in old rails versions", async () => {
+    it("change column null with boolean arguments does not raise in old trails versions", async () => {
       const migration = class extends Migration.get(7.0) {
         async up(): Promise<void> {
           await this.addColumn("testings", "name", "string");

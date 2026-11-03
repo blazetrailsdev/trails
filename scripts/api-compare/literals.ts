@@ -108,7 +108,8 @@ export function normalizeLiteral(lit: LiteralValue): string | null {
     case "symbol":
       return `str:${canonString(String(lit.value ?? ""))
         .replace(/(?<![A-Za-z])(?:rails|Rails|RAILS)(?![A-Za-z])/g, (tok) => TOKEN_RENAMES[tok])
-        .replace(/\.railsrc\b/g, ".trailsrc")}`;
+        .replace(/\.railsrc\b/g, ".trailsrc")
+        .replace("Ruby on Trails", "Trails")}`;
     case "bool":
       return `bool:${lit.value}`;
     case "nil":

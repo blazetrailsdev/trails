@@ -827,7 +827,7 @@ describe("DeprecationTest", () => {
     expect(deprecator.messages[deprecator.messages.length - 1]).toMatch("foo");
   });
 
-  it("default deprecation_horizon is greater than the current Rails version", () => {
+  it("default deprecation_horizon is greater than the current Trails version", () => {
     expect(new Deprecation().deprecationHorizon.localeCompare(VERSION.STRING)).toBeGreaterThan(0);
   });
 

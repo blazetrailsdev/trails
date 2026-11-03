@@ -25,7 +25,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampTest", () => {
-    it("timestamp with zone values with rails time zone support and no time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and no time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("timestamp with zone values without rails time zone support", async () => {
+    it("timestamp with zone values without trails time zone support", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -74,7 +74,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampWithAwareTypesTest", () => {
-    it("timestamp with zone values with rails time zone support and time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -109,7 +109,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
-    it("timestamp with zone values with rails time zone support and timestamptz and no time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and timestamptz and no time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -140,7 +140,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
-    it("timestamp with zone values with rails time zone support and timestamptz and time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and timestamptz and time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );

@@ -326,7 +326,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       ) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +
-            "or reserved by Ruby on Rails. Please choose an alternative or use --skip-collision-check " +
+            "or reserved by Trails. Please choose an alternative or use --skip-collision-check " +
             "or --force to skip this check and run this generator again.",
         );
       }
