@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 import {
@@ -20,7 +21,6 @@ import { Middleware, PermissionsPolicy } from "../http/permissions-policy.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
-import { registerController } from "../../action-controller/base.js";
 
 describe("PermissionsPolicyTest", () => {
   it("mappings", () => {
@@ -149,7 +149,7 @@ describe("PermissionsPolicyIntegrationTest", () => {
       this.head("ok");
     }
   }
-  registerController("PermissionsPolicyIntegrationTest::PolicyController", PolicyController);
+  constSetPath("PermissionsPolicyIntegrationTest::PolicyController", PolicyController);
 
   const ROUTES = new RouteSet();
   ROUTES.draw(function () {
@@ -275,10 +275,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     middleware.use(Lint as MiddlewareFactory);
   });
 
-  registerController(
-    "PermissionsPolicyWithHelpersIntegrationTest::PolicyController",
-    PolicyController,
-  );
+  constSetPath("PermissionsPolicyWithHelpersIntegrationTest::PolicyController", PolicyController);
 
   let t: IntegrationTest;
   beforeEach(({ task }) => {

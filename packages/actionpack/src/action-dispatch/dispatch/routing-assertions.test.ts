@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -20,7 +21,6 @@ import type { MountableApp, RouteOptions } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
-import { registerController } from "../../action-controller/base.js";
 
 class ArticlesController extends Base {}
 class BooksController extends Base {}
@@ -48,7 +48,7 @@ beforeAll(() => {
     block_books: BlockBooksController,
     query_books: QueryBooksController,
   })) {
-    registerController(`${camelize(name)}Controller`, klass);
+    constSetPath(`${camelize(name)}Controller`, klass);
   }
 });
 

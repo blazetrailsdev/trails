@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   _assertNothingRaisedOrWarn,
@@ -28,7 +29,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingError } from "../metal/exceptions.js";
 import { TestCase } from "../test-case.js";
 import type { Base } from "../base.js";
-import { registerController } from "../base.js";
 
 type Options = Record<string, any>;
 
@@ -59,8 +59,8 @@ beforeAll(() => {
     "backoffice/admin/products": Backoffice.Admin.ProductsController,
     "backoffice/admin/images": Backoffice.Admin.ImagesController,
   })) {
-    registerController(`${camelize(name)}Controller`, klass);
-    registerController(`${camelize(name).replace(/\//g, "::")}Controller`, klass);
+    constSetPath(`${camelize(name)}Controller`, klass);
+    constSetPath(`${camelize(name).replace(/\//g, "::")}Controller`, klass);
   }
 });
 

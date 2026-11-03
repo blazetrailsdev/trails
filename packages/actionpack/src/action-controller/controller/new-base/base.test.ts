@@ -1,9 +1,9 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
 import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
 registerConstant("Dispatching", { name: "Dispatching" });
 registerConstant("Dispatching::Submodule", { name: "Dispatching::Submodule" });
@@ -67,7 +67,7 @@ for (const [klass, name] of [
 ] as const) {
   Object.defineProperty(klass, "name", { value: name });
 }
-registerController("Dispatching::SimpleController", SimpleController);
+constSetPath("Dispatching::SimpleController", SimpleController);
 
 class BaseTest extends Rack.TestCase {}
 

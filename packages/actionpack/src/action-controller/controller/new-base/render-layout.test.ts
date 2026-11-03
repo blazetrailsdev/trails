@@ -1,9 +1,9 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
 import { TestRenderable } from "../../../test-helpers/lib/test-renderable.js";
-import { registerController } from "../../base.js";
 
 registerConstant("ControllerLayouts", { name: "ControllerLayouts" });
 
@@ -59,8 +59,8 @@ class ImplicitNameController extends ApplicationController {
   }
 }
 
-registerController("ControllerLayouts::ImplicitController", ImplicitController);
-registerController("ControllerLayouts::ImplicitNameController", ImplicitNameController);
+constSetPath("ControllerLayouts::ImplicitController", ImplicitController);
+constSetPath("ControllerLayouts::ImplicitNameController", ImplicitNameController);
 
 class RenderLayoutTest extends Rack.TestCase {}
 
@@ -145,7 +145,7 @@ class MismatchFormatController extends ApplicationController {
   }
 }
 
-registerController("ControllerLayouts::MismatchFormatController", MismatchFormatController);
+constSetPath("ControllerLayouts::MismatchFormatController", MismatchFormatController);
 
 class MismatchFormatTest extends Rack.TestCase {
   static {
@@ -202,7 +202,7 @@ class FalseLayoutMethodController extends ApplicationController {
   index(): void {}
 }
 
-registerController("ControllerLayouts::FalseLayoutMethodController", FalseLayoutMethodController);
+constSetPath("ControllerLayouts::FalseLayoutMethodController", FalseLayoutMethodController);
 
 class FalseLayoutMethodTest extends Rack.TestCase {
   static {

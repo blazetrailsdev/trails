@@ -1,3 +1,4 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { include } from "@blazetrails/activesupport";
@@ -8,7 +9,6 @@ import { Rendering } from "../../metal/rendering.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
 class MinimalController extends Metal {
   declare render: (options: Record<string, unknown>) => void | Promise<void>;
@@ -90,9 +90,9 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-registerController("RenderPlain::MinimalController", MinimalController);
-registerController("RenderPlain::SimpleController", SimpleController);
-registerController("RenderPlain::WithLayoutController", WithLayoutController);
+constSetPath("RenderPlain::MinimalController", MinimalController);
+constSetPath("RenderPlain::SimpleController", SimpleController);
+constSetPath("RenderPlain::WithLayoutController", WithLayoutController);
 
 class RenderPlainTest extends Rack.TestCase {}
 
