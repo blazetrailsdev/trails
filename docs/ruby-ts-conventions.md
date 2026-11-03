@@ -147,6 +147,8 @@ trails:
 | `Rubocop`  | `Eslint`     |
 | `capybara` | `vitest`     |
 | `Capybara` | `Vitest`     |
+| `yarn`     | `pnpm`       |
+| `Yarn`     | `Pnpm`       |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`
