@@ -420,6 +420,22 @@ export function matchesInterpolatedPath(pattern: readonly string[], tsPath: stri
   });
 }
 
+/**
+ * The order the pattern pass visits a file's Ruby cases in: the longest
+ * literal text first. A pattern is a prefix of another whenever one looped
+ * test's name starts with another's (`eager loads everything #{ancestor}` and
+ * `eager loads everything (multiple root directories) #{ancestor}`,
+ * zeitwerk `test_eager_load_namespace.rb`), and in file order the shorter one
+ * would consume every expansion of the longer.
+ */
+export function patternMatchOrder(testCases: readonly { pattern?: readonly string[] }[]): number[] {
+  const literalLength = (pattern: readonly string[] | undefined) =>
+    (pattern ?? []).join("").split(DYNAMIC_TITLE_PLACEHOLDER).join("").length;
+  return testCases
+    .map((_, ri) => ri)
+    .sort((a, b) => literalLength(testCases[b].pattern) - literalLength(testCases[a].pattern));
+}
+
 function normPath(ancestors: string[], description: string): string {
   return [...ancestors, description].map(normalizeErb).join(" > ");
 }
@@ -1114,7 +1130,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
-      for (let ri = 0; ri < file.testCases.length; ri++) {
+      for (const ri of patternMatchOrder(file.testCases)) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
         if (tc.pattern === undefined) continue;

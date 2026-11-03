@@ -72,7 +72,7 @@ export const EagerLoad = {
     await this.actualEagerLoadDir(abspath, namespace);
   },
 
-  async eagerLoadNamespace(this: Loader, mod: object): Promise<void> {
+  async eagerLoadNamespace(this: Loader, mod: unknown): Promise<void> {
     if (!this._setup) throw new SetupRequired();
 
     if (!_isModule(mod)) {

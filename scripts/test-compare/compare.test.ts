@@ -11,6 +11,7 @@ import {
   isAssertionCountMismatch,
   main,
   matchesInterpolatedPath,
+  patternMatchOrder,
   PKG_SRC_DIRS,
   misplacedLocation,
   sharingPackages,
@@ -709,5 +710,16 @@ describe("matchesInterpolatedPath", () => {
   it("reads regex metacharacters in a name literally", () => {
     expect(matchesInterpolatedPath(["a.b (<expr>)"], "a.b (1)")).toBe(true);
     expect(matchesInterpolatedPath(["a.b (<expr>)"], "axb (1)")).toBe(false);
+  });
+});
+
+describe("patternMatchOrder", () => {
+  it("visits a longer pattern before one that is its prefix", () => {
+    const testCases = [
+      { pattern: ["T", "eager loads everything <expr>"] },
+      {},
+      { pattern: ["T", "eager loads everything (multiple root directories) <expr>"] },
+    ];
+    expect(patternMatchOrder(testCases)).toEqual([2, 0, 1]);
   });
 });

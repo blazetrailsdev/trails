@@ -339,7 +339,7 @@ export class Loader {
     }
   }
 
-  static async eagerLoadNamespace(mod: object): Promise<void> {
+  static async eagerLoadNamespace(mod: unknown): Promise<void> {
     for (const loader of Registry.loaders) {
       try {
         await loader.eagerLoadNamespace(mod);
