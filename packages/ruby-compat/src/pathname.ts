@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
+import { Errno } from "./errno.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
 import { rbBlockGivenP } from "./hash.js";
@@ -78,7 +79,15 @@ export class Pathname {
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1288` `path_unlink` */
   async delete(): Promise<number> {
-    return File.deleteAsync(this._path);
+    try {
+      const fs = getFs();
+      if (fs.rmdir) await fs.rmdir(this._path);
+      else fs.rmdirSync(this._path);
+      return 0;
+    } catch (e) {
+      if (!(e instanceof Errno.ENOTDIR)) throw e;
+      return File.deleteAsync(this._path);
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1055` `path_empty_p` */
