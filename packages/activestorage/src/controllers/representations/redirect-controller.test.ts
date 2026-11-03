@@ -7,8 +7,10 @@ import { ActiveStorage } from "../../active-storage.js";
 import type { Blob } from "../../blob.js";
 import { Variation } from "../../variation.js";
 import {
+  SERVICE_CONFIGURATIONS,
   createFileBlob,
   readImage,
+  withRaiseOnOpenRedirects,
   withStrictLoadingByDefault,
 } from "../../test-helpers/test-helper.js";
 import "../../representations/redirect-controller.js";
@@ -173,4 +175,52 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsWithStri
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
   });
+});
+
+describe("ActiveStorage::Representations::RedirectControllerWithOpenRedirectTest", () => {
+  let t: Session;
+
+  beforeEach(({ task }) => {
+    ActiveStorage.verifier = new MessageVerifier("Testing");
+    t = integrationTest(task.name);
+  });
+
+  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).s3)(
+    "showing existing variant stored in s3",
+    async () => {
+      await withRaiseOnOpenRedirects("s3", async () => {
+        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "s3" });
+
+        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
+
+        t.assertRedirectedTo(/racecar\.jpg/);
+      });
+    },
+  );
+
+  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).azure)(
+    "showing existing variant stored in azure",
+    async () => {
+      await withRaiseOnOpenRedirects("azure", async () => {
+        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "azure" });
+
+        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
+
+        t.assertRedirectedTo(/racecar\.jpg/);
+      });
+    },
+  );
+
+  it.skipIf(!(SERVICE_CONFIGURATIONS as Record<string, unknown>).gcs)(
+    "showing existing variant stored in gcs",
+    async () => {
+      await withRaiseOnOpenRedirects("gcs", async () => {
+        const blob = await createFileBlob({ filename: "racecar.jpg", serviceName: "gcs" });
+
+        await getRepresentation(t, blob, blob.signedId(), Variation.encode(resizeToLimit));
+
+        t.assertRedirectedTo(/racecar\.jpg/);
+      });
+    },
+  );
 });
