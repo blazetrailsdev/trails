@@ -1,7 +1,3 @@
-import type { HealthController } from "./health-controller.js";
-import type { InfoController } from "./info-controller.js";
-import type { PwaController } from "./pwa-controller.js";
-import type { WelcomeController } from "./welcome-controller.js";
 import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
@@ -21,10 +17,10 @@ import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/trails/app/app-generator.js";
 import { VERSION, gemVersion } from "./gem-version.js";
 import { version } from "./version.js";
-import "./info-controller.js";
-import "./welcome-controller.js";
-import "./health-controller.js";
-import "./pwa-controller.js";
+import { InfoController } from "./info-controller.js";
+import { WelcomeController } from "./welcome-controller.js";
+import { HealthController } from "./health-controller.js";
+import { PwaController } from "./pwa-controller.js";
 
 let _application: Application | null = null;
 
@@ -173,3 +169,8 @@ export function _resetTrailsEnv(): void {
 
 extend(Trails, Autoload);
 registerConstant("Trails", Trails);
+
+Trails.HealthController = HealthController;
+Trails.InfoController = InfoController;
+Trails.PwaController = PwaController;
+Trails.WelcomeController = WelcomeController;

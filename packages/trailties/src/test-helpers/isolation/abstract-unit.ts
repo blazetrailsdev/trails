@@ -7,21 +7,21 @@ import {
   Shellwords,
   classModule,
   env as ENV,
+  include,
   getFs,
   rbFArray,
   rbFBackquote,
   rbInspect,
   setEnv,
 } from "@blazetrails/ruby-compat";
-import { Dependencies } from "@blazetrails/activesupport";
+import { Dependencies, Stream } from "@blazetrails/activesupport";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
 import { Application } from "../../application.js";
-import { AppGenerator } from "../../generators/trails/app/app-generator.js";
 import { Trails } from "../../trails.js";
+import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
 
-export const TRAILS_FRAMEWORK_ROOT = File.expandPath(
-  decodeURIComponent(new URL("../../../../..", import.meta.url).pathname),
-);
+export { Paths, TRAILS_FRAMEWORK_ROOT };
 
 type RackResponse = [number, Record<string, string>, AsyncIterable<string> | Iterable<string>];
 interface RackHost {
@@ -32,48 +32,6 @@ async function puts(file: string, string: string, mode: "w" | "a" = "w"): Promis
   const fs = getFs();
   const prior = mode === "a" && (await fs.exists(file)) ? await fs.readFile(file, "utf-8") : "";
   await fs.writeFile!(file, prior + (string.endsWith("\n") ? string : `${string}\n`));
-}
-
-export class Paths {
-  static readonly [classModule] = true;
-  declare _tmpPath: string | undefined;
-
-  appTemplatePath(): string {
-    return File.join(TRAILS_FRAMEWORK_ROOT, "tmp/templates/app_template");
-  }
-
-  bootsnapCachePath(): string {
-    return File.join(TRAILS_FRAMEWORK_ROOT, "tmp/templates/bootsnap");
-  }
-
-  async tmpPath(...args: string[]): Promise<string> {
-    const fs = getFs();
-    this._tmpPath ??= await fs.realpath!(
-      await fs.mkdtemp!(`${File.join(TRAILS_FRAMEWORK_ROOT, "tmp")}/d`),
-    );
-    return File.join(this._tmpPath, ...args);
-  }
-
-  async appPath(): Promise<string>;
-  async appPath(...args: string[]): Promise<string>;
-  async appPath<T>(...args: [...string[], (path: string) => T]): Promise<T>;
-  async appPath(...args: unknown[]): Promise<unknown> {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as (p: string) => unknown) : null;
-    const path = await this.tmpPath(...["app", ...(args as string[])]);
-    if (block != null) {
-      return block(path);
-    } else {
-      return path;
-    }
-  }
-
-  frameworkPath(): string {
-    return TRAILS_FRAMEWORK_ROOT;
-  }
-
-  trailsRoot(): Promise<string> {
-    return this.appPath();
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -514,31 +472,28 @@ export class Reload {
 
 export const TestHelpers = { Paths, Rack, Generation, Reload };
 
-export default async function setup(): Promise<void> {
-  if (ENV["ISOLATION_TEST"] != null) return;
+include(TestCase, Paths);
+include(TestCase, Rack);
+include(TestCase, Generation);
+include(TestCase, Reload);
+include(TestCase, Stream);
 
-  const appTemplatePath = Paths.prototype.appTemplatePath();
-
-  await FileUtils.rmRfAsync(appTemplatePath);
-  await FileUtils.mkdirPAsync(appTemplatePath);
-
-  const pwd = Dir.pwd();
+async function withEnv<T>(
+  this: TestCase,
+  env: Record<string, string>,
+  block: () => T | Promise<T>,
+): Promise<T> {
   try {
-    await new AppGenerator(
-      [File.basename(appTemplatePath)],
-      { skipInstall: true, quiet: true },
-      { destinationRoot: File.dirname(appTemplatePath) },
-    ).invokeAll();
+    for (const [k, v] of Object.entries(env)) setEnv(k, v);
+    return await block();
   } finally {
-    Dir.chdir(pwd);
+    for (const k of Object.keys(env)) setEnv(k, undefined);
   }
-  await puts(File.join(appTemplatePath, "config/boot.ts"), `import "@blazetrails/trailties/all";`);
+}
+TestCase.prototype.withEnv = withEnv;
 
-  await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
-  await getFs().writeFile!(File.join(appTemplatePath, "app/javascript/application.js"), "\n");
-
-  await FileUtils.lnSfAsync(
-    File.join(TRAILS_FRAMEWORK_ROOT, "packages/trailties/node_modules"),
-    File.join(TRAILS_FRAMEWORK_ROOT, "tmp/node_modules"),
-  );
+declare module "@blazetrails/activesupport/test-case" {
+  interface TestCase {
+    withEnv: typeof withEnv;
+  }
 }

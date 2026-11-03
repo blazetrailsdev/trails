@@ -1,16 +1,15 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { Dir, getFs, include } from "@blazetrails/ruby-compat";
+import { Dir, getFs, env as ENV } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails } from "../trails.js";
-import { Generation, Paths } from "../test-helpers/isolation/abstract-unit.js";
+import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
+import "../test-helpers/isolation/abstract-unit.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface GenerationTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class GenerationTest extends TestCase {}
-include(GenerationTest, Paths);
-include(GenerationTest, Generation);
 
 describe("TestHelpers::Generation#build_app", () => {
   let t: GenerationTest;
@@ -51,4 +50,14 @@ describe("TestHelpers::Generation#build_app", () => {
     expect(Application.appClass).not.toBeNull();
     expect(String(Trails.application!.config.root)).toBe(await t.appPath());
   }, 60_000);
+});
+
+describe("TestCase#with_env", () => {
+  it("sets the variables for the block and deletes them after", async () => {
+    const t = new GenerationTest("test");
+    const seen = await t.withEnv({ WITH_ENV_PROBE: "1" }, () => ENV["WITH_ENV_PROBE"]);
+
+    expect(seen).toBe("1");
+    expect("WITH_ENV_PROBE" in ENV).toBe(false);
+  });
 });
