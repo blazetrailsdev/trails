@@ -108,6 +108,7 @@ describe("autoload artifacts", () => {
         "shadowed",
         "collapsed",
         "ignored",
+        "ignoredEntries",
       ]);
     });
   });
@@ -153,6 +154,7 @@ describe("autoload artifacts", () => {
         shadowed: [],
         collapsed: [],
         ignored: [],
+        ignoredEntries: [],
       };
       const { constants } = await buildManifest(loader);
       expect(constants).toHaveProperty("M::Y");
@@ -384,6 +386,7 @@ describe("autoload artifacts", () => {
         await reader.setup();
 
         await expect(reader.loadFile("ignored_dir/x.js")).rejects.toThrow(/is ignored/);
+        await expect(reader.loadFile("ignored_dir/nope.js")).rejects.toThrow(/does not exist/);
         expect(await reader.cpathExpectedAt("ignored_dir/x.js")).toBeNull();
       } finally {
         fsAdapterConfig.adapter = previous;

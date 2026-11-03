@@ -723,12 +723,15 @@ class ApiExtractor
         @namespace_stack.pop
       elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
             lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
-            (body = class_new_body(rhs))
+            (call = class_new_call(rhs))
+        superclass = class_new_superclass(call)
+        body = class_new_body(rhs)
         @namespace_stack.push(lhs[1][1])
         @visibility_stack.push(:public)
         fqn = current_fqn
         @classes[fqn] ||= new_class_info(lhs[1][1], fqn)
-        walk_body(body)
+        @classes[fqn][:superclass] = superclass if superclass
+        walk_body(body) if body
         @visibility_stack.pop
         @namespace_stack.pop
       else
@@ -803,6 +806,26 @@ class ApiExtractor
     return nil unless call.is_a?(Array) &&
                       (call[0] == :method_add_arg || call[0] == :command_call)
     const_name(call[1]) == "Struct" ? call : nil
+  end
+
+  def class_new_call(rhs)
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :call && rhs[3].is_a?(Array) && rhs[3][1] == "new" &&
+                    rhs[1].is_a?(Array) && rhs[1][0] == :method_add_block
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :method_add_block
+    call = rhs.is_a?(Array) && rhs[0] == :method_add_arg ? rhs : nil
+    head = call ? call[1] : rhs
+    return nil unless head.is_a?(Array) && head[0] == :call &&
+                      const_name(head[1]) == "Class" && head[3].is_a?(Array) && head[3][1] == "new"
+    call || head
+  end
+
+  def class_new_superclass(call)
+    return nil unless call[0] == :method_add_arg
+    paren = call[2]
+    args = paren.is_a?(Array) && paren[0] == :arg_paren ? paren[1] : nil
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    first = args.is_a?(Array) ? args[0] : nil
+    first.is_a?(Array) ? qualified_const_name(first) : nil
   end
 
   def class_new_body(rhs)

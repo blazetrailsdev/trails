@@ -662,7 +662,7 @@ export class ConnectionPool implements ReapablePool {
 
   private async checkoutAndVerify(c: DatabaseAdapter): Promise<DatabaseAdapter> {
     try {
-      c._runCheckoutCallbacks(() => {
+      await c._runCheckoutCallbacks(() => {
         c.cleanBang();
       });
       return c;
@@ -772,9 +772,13 @@ export class ConnectionPool implements ReapablePool {
       );
     }
     try {
-      conn._runCheckoutCallbacks(() => {
+      const ran = conn._runCheckoutCallbacks(() => {
         conn.cleanBang();
       });
+      if (ran instanceof Promise) {
+        ran.catch(() => {});
+        throw new RuntimeError("Async :checkout callback on a synchronous connection lease");
+      }
       conn._queryCache ||= this.queryCache;
       return conn;
     } catch (err) {

@@ -227,6 +227,11 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
 
+/** A path argument names the port's file: `routes.rb` is `routes.ts` and
+ *  `application.html.erb` is `application.html.tse` (docs/ruby-ts-conventions.md). */
+const RUBY_FILE_EXTENSIONS: Record<string, string> = { ".rb": ".ts", ".erb": ".tse" };
+const RUBY_FILE_EXTENSION = /\.e?rb(?![A-Za-z0-9_])/g;
+
 /**
  * A literal's key, through literals.ts#normalizeLiteral so escapes, numeric
  * underscores and symbol-vs-string spellings are absorbed exactly once.
@@ -246,7 +251,8 @@ function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string 
   if (!key.startsWith("str:")) return key;
   const text = key.slice("str:".length);
   const bare = text.startsWith(":") ? text.slice(1) : text;
-  return IDENTIFIER_STRING.test(bare) ? `str:${snakeToCamel(bare)}` : key;
+  if (IDENTIFIER_STRING.test(bare)) return `str:${snakeToCamel(bare)}`;
+  return `str:${text.replace(RUBY_FILE_EXTENSION, (ext) => RUBY_FILE_EXTENSIONS[ext])}`;
 }
 
 /** Split a `kwargs{…}` body on its TOP-LEVEL commas — a value can itself be a

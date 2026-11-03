@@ -372,6 +372,7 @@ export class Loader {
       stale ||
       !Array.isArray(manifest.collapsed) ||
       !Array.isArray(manifest.ignored) ||
+      !Array.isArray(manifest.ignoredEntries) ||
       manifest.digest !== configurationDigest(this)
     ) {
       throw new ZeitwerkError(
@@ -385,6 +386,11 @@ export class Loader {
     for (const path of manifest.ignored) {
       this.ignoredPaths.add(File.expandPath(path, root));
       this._indexManifestPath(File.expandPath(path, root), null);
+    }
+    for (const entry of manifest.ignoredEntries) {
+      const isDir = entry.endsWith("/");
+      const abspath = File.expandPath(isDir ? entry.slice(0, -1) : entry, root);
+      this._indexManifestPath(abspath, isDir ? new Set() : null);
     }
     for (const row of Object.values(manifest.constants)) {
       if (row.export != null) this._indexManifestPath(File.expandPath(row.path, root), null);

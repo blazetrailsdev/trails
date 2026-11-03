@@ -11,7 +11,6 @@ export class JobGenerator extends NamedBase {
     this.methodAdded("createTestFile");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFile(): Promise<void> {
     await this.template(
       "unit_test.ts",

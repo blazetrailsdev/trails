@@ -1752,7 +1752,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** @missingRailsArgs remove_file — PERMANENT */
   async deleteAppViewsIfApiOption(): Promise<void> {
     if (this.options.api) {
       if (this.options.skipActionMailer) {

@@ -15,7 +15,6 @@ export class TaskGenerator extends NamedBase {
 
   declare actions: string[];
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTaskFiles(): Promise<void> {
     await this.template("task.ts", File.join("lib/tasks", `${this.fileName}${this.ext()}`));
   }

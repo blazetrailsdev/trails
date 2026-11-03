@@ -501,6 +501,7 @@ defineConstants([
   [() => m113.ExplainSubscriber, "ActiveRecord::ExplainSubscriber"],
   [() => m151.FinderMethods, "ActiveRecord::FinderMethods"],
   [() => m115.FutureResult, "ActiveRecord::FutureResult"],
+  [() => m115.Canceled, "ActiveRecord::FutureResult::Canceled"],
   [() => m115.Complete, "ActiveRecord::FutureResult::Complete"],
   [() => m115.EventBuffer, "ActiveRecord::FutureResult::EventBuffer"],
   [() => m115.SelectAll, "ActiveRecord::FutureResult::SelectAll"],

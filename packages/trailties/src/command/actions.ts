@@ -1,5 +1,8 @@
+import { Rake } from "@blazetrails/rake";
 import { defineModule, getPath } from "@blazetrails/ruby-compat";
-import { APP_PATH, ENGINE_PATH } from "../app-path.js";
+import { APP_PATH, ENGINE_PATH, ENGINE_ROOT } from "../app-path.js";
+import { Engine } from "../engine.js";
+import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
 
 export async function requireApplicationBang(): Promise<void> {
@@ -25,14 +28,29 @@ export async function loadEnvironmentConfigBang(this: {
   if (APP_PATH != null) await Trails.application!.initializeBang("_");
 }
 
-/** @missingRailsCall find — CONVERGEABLE generators-configure-bang-api-only-no-color-fallbacks-templates */
+async function loadTasks(): Promise<void> {
+  if (ENGINE_PATH != null) {
+    await Rake.application!.init("trails");
+    await Rake.application!.loadRakefile();
+  } else {
+    await Trails.application!.loadTasks();
+  }
+}
+
 async function loadGenerators(): Promise<void> {
-  await Trails.application!.loadGenerators();
+  if (ENGINE_PATH != null) {
+    const engine = (await Engine.find(ENGINE_ROOT!))!;
+    Generators.namespace = engine.trailtieNamespace() ?? null;
+    await engine.loadGenerators();
+  } else {
+    await Trails.application!.loadGenerators();
+  }
 }
 
 export const Actions = defineModule({
   requireApplicationBang,
   bootApplicationBang,
   loadEnvironmentConfigBang,
+  loadTasks,
   loadGenerators,
 });

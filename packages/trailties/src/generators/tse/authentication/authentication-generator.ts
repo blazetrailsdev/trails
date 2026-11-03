@@ -9,7 +9,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("createFiles");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createFiles(): Promise<void> {
     await this.template("app/views/passwords/new.html.tse");
     await this.template("app/views/passwords/edit.html.tse");

@@ -123,7 +123,6 @@ export class PluginBuilder {
     }
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async config(this: PluginBuilderHost): Promise<void> {
     if (this.isEngine()) await this.template("config/routes.ts");
   }
