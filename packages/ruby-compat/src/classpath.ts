@@ -45,7 +45,9 @@ export function defineConstants(entries: readonly [() => unknown, string][]): vo
  * or `undefined`. A path `const_set` wrote under an owner whose own path was
  * still unresolved is re-derived from the owner once it resolves, as
  * `set_namespace_path` (`vendor/ruby/v3.3.11/variable.c:3582`) re-paths the
- * constants under a namespace when the namespace is named.
+ * constants under a namespace when the namespace is named. One whose owner
+ * never resolves keeps a temporary path, as `rb_const_set` gives a constant
+ * under an unnamed owner (`vendor/ruby/v3.3.11/variable.c:3648-3654`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -59,6 +61,7 @@ export function rbClassPath(klass: object): string | undefined {
         seated.under = undefined;
       } else if (pendingClassPaths.length === 0) {
         seated.under = undefined;
+        seated.permanent = false;
       }
     }
     return seated.path;

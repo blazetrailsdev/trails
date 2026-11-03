@@ -380,3 +380,18 @@ describe("resetConstants", () => {
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
   });
 });
+
+describe("a constant under an owner no table names", () => {
+  it("keeps a temporary path that a later named seat replaces", () => {
+    class TemporaryOwner {}
+    class TemporaryInner {}
+    constSet(TemporaryOwner, "TemporaryInner", TemporaryInner);
+    expect(rbModName(TemporaryInner)).toBe("TemporaryOwner::TemporaryInner");
+    constSet(TopLevel, "TemporaryRenamed", TemporaryInner);
+    try {
+      expect(rbModName(TemporaryInner)).toBe("TemporaryRenamed");
+    } finally {
+      unregisterConstant("TemporaryRenamed", TemporaryInner);
+    }
+  });
+});
