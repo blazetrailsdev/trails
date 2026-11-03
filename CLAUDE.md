@@ -2113,8 +2113,9 @@ runs `require` synchronously at first reference. JS has no hook on an unresolved
 identifier and no synchronous `import()`. **The asynchrony goes at the load, and
 the walk's result can be built ahead of time.** In development and test the walk
 runs in process at `setup`. `trails build` (`trails-tsc-views build-autoload`)
-boots the application up to `setup_main_autoloader`, runs the same walk, and
-writes `manifest.json`, `imports.generated.js` and `constants.generated.d.ts` to
+boots the application through `setup_main_autoloader`, with each loader's
+`setup` and `eager_load` stubbed so no application file is imported, runs the
+same walk, and writes `manifest.json`, `imports.generated.js` and `constants.generated.d.ts` to
 `.trails/autoload/<tag>/` for each loader, with paths relative to
 `Loader#manifestRoot`, the application root. Every path names the file the walk
 found: Node runs a `.ts` file as it stands, and a bundler resolves it.
