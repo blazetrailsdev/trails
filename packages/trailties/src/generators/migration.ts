@@ -1,6 +1,6 @@
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { Dir, File, regexpEscape } from "@blazetrails/ruby-compat";
+import { Dir, File, rbStrToI } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
@@ -21,7 +21,7 @@ export const ClassMethods = {
     dirname: string,
     fileName: string,
   ): string | undefined {
-    const re = new RegExp(`\\d+_${regexpEscape(fileName)}\\.(ts|js|rb)$`);
+    const re = new RegExp(`\\d+_${fileName}\\.(ts|js|rb)$`);
     return this.migrationLookupAt(dirname).find((f) => re.test(f));
   },
 
@@ -29,12 +29,10 @@ export const ClassMethods = {
     this: { migrationLookupAt(dirname: string): string[] },
     dirname: string,
   ): number {
-    return Math.max(
-      0,
-      ...this.migrationLookupAt(dirname).map(
-        (file) => parseInt(File.basename(file).split("_")[0], 10) || 0,
-      ),
-    );
+    const max = this.migrationLookupAt(dirname)
+      .map((file) => Number(rbStrToI(File.basename(file).split("_")[0])))
+      .reduce<number | null>((a, b) => (a == null || b > a ? b : a), null);
+    return max ?? 0;
   },
 
   nextMigrationNumber(_dirname: string): never {
