@@ -11,12 +11,11 @@ export class VariantRecord extends Record {
 
   static {
     this.belongsTo("blob");
+    onLoad("active_storage_reflection", () => {
+      (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("image");
+    });
   }
 }
-
-onLoad("active_storage_reflection", () => {
-  (VariantRecord as unknown as Extended<typeof ClassMethods>).hasOneAttached("image");
-});
 
 ActiveStorage.VariantRecord = VariantRecord;
 
