@@ -78,7 +78,7 @@ export function sqliteSiblingDatabase(database: string): string {
   return `${database.slice(0, dot)}_2${database.slice(dot)}`;
 }
 
-export const MYSQL_USERNAME = "trails";
+export const MYSQL_USERNAME = "rails";
 
 export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
   return {

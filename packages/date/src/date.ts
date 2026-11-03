@@ -60,7 +60,7 @@ const ABBR_MONTH_NAMES = [
 
 function objClassName(obj: object): string {
   const klass = obj.constructor as typeof Date;
-  return Object.hasOwn(klass, "_railsClassName") ? klass._trailsClassName : klass.name;
+  return Object.hasOwn(klass, "_trailsClassName") ? klass._trailsClassName : klass.name;
 }
 
 function pad2(n: number): string {

@@ -644,7 +644,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     const { err } = spyExitAndStderr();
     expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
     const combined = err.mock.calls.map((c) => String(c[0])).join("");
-    expect(combined).toMatch(/must be a Rails type string or an object/);
+    expect(combined).toMatch(/must be a Trails type string or an object/);
   });
 
   it("loadSchemaColumns: reports `null` when a column value is null", async () => {
