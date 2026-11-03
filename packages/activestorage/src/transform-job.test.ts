@@ -5,6 +5,8 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
+import type { One } from "./attached/one.js";
+import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
 import { createBlob, createFileBlob } from "./test-helpers/test-helper.js";
 import { TransformJob } from "./transform-job.js";
@@ -61,12 +63,11 @@ describe("ActiveStorage::TransformJobTest", { timeout: 30_000 }, () => {
       },
     );
 
-    const image = blob.preview(transformations).image as unknown as {
-      load(): Promise<void>;
-      variant(transformations: object): Promise<Processable>;
-    };
+    const image = blob.preview(transformations).image as One & Pick<Attachment, "variant">;
     await image.load();
-    expect(await (await image.variant(transformations)).isProcessed()).toBe(true);
+    expect(
+      await ((await image.variant(transformations)) as unknown as Processable).isProcessed(),
+    ).toBe(true);
   });
 
   it("creates variant when untracked", async () => {
