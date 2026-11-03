@@ -94,7 +94,6 @@ export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";
 export * as Mime from "./mime.js";
 export * as Utils from "./utils.js";
-/** @noRailsEquivalent PERMANENT */
 
 import "./constants.generated.js";
 export { Rack } from "./namespaces.js";
