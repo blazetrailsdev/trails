@@ -62,9 +62,11 @@ describe("ActiveStorage::TransformJobTest", { timeout: 30_000 }, () => {
     );
 
     const image = blob.preview(transformations).image as unknown as {
-      variant(transformations: object): Processable;
+      load(): Promise<void>;
+      variant(transformations: object): Promise<Processable>;
     };
-    expect(await image.variant(transformations).isProcessed()).toBe(true);
+    await image.load();
+    expect(await (await image.variant(transformations)).isProcessed()).toBe(true);
   });
 
   it("creates variant when untracked", async () => {
