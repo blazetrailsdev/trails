@@ -216,6 +216,12 @@ async function placement(dir: string) {
  * `excluded` ones no Ruby constant answers, with the record's `residue` paths
  * over the derived ones and its `unwalked` members at their derived path.
  */
+export function splitKey(key: string): [string, string] {
+  const at = key.lastIndexOf("::");
+  if (at === -1) throw new globalThis.Error(`${key} is not a file::name key`);
+  return [key.slice(0, at), key.slice(at + 2)];
+}
+
 export async function walkedClassPaths(
   dir: string,
   record: ConstantResidue,
@@ -223,7 +229,7 @@ export async function walkedClassPaths(
   const rows = await walkConstants(dir);
   for (const key of record.excluded) rows.delete(key);
   for (const key of record.unwalked) {
-    const [file, tsName] = key.split("::");
+    const [file, tsName] = splitKey(key);
     const fqn = await derivedConstantPath(dir, file, tsName);
     if (fqn === null) throw new globalThis.Error(`${dir}: ${key} has no derived path`);
     rows.set(key, fqn);
@@ -232,7 +238,7 @@ export async function walkedClassPaths(
   const place = await placement(dir);
   const entries: ClassPathEntry[] = [];
   for (const [key, fqn] of rows) {
-    const [file, tsName] = key.split("::");
+    const [file, tsName] = splitKey(key);
     const placed = place.at(file);
     if (placed === null) continue;
     const source = await place.read(file);
@@ -526,7 +532,7 @@ export async function constantResidue(
   for (const key of keys) {
     const fqn = fqns.get(key)!;
     if (walked.get(key) === fqn) continue;
-    const [file, tsName] = key.split("::");
+    const [file, tsName] = splitKey(key);
     if (!walked.has(key) && (await derivedConstantPath(dir, file, tsName)) === fqn) {
       unwalked.push(key);
     } else residue[key] = fqn;
@@ -542,6 +548,33 @@ async function readRecord(): Promise<Record<string, ConstantResidue>> {
     string,
     ConstantResidue
   >;
+}
+
+/** The record at the merge-base with `origin/main`, against which `excluded` only shrinks. */
+async function baseRecord(): Promise<Record<string, ConstantResidue>> {
+  try {
+    const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
+      cwd: ROOT_DIR,
+    });
+    const { stdout } = await run(
+      "git",
+      ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
+      { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
+    );
+    return JSON.parse(stdout) as Record<string, ConstantResidue>;
+  } catch {
+    return {};
+  }
+}
+
+/** A class whose declaration carries `@noRailsEquivalent` is excluded by its receipt. */
+export async function isReceipted(dir: string, key: string): Promise<boolean> {
+  const [file, tsName] = splitKey(key);
+  const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+  const decl = new RegExp(`^export\\s+(?:abstract\\s+)?class\\s+${tsName}\\b`, "m").exec(source);
+  if (decl === null) return false;
+  const jsdoc = /\/\*\*((?:(?!\*\/)[^])*)\*\/\s*$/.exec(source.slice(0, decl.index));
+  return jsdoc?.[1].includes("@noRailsEquivalent") ?? false;
 }
 
 /** The tables the walk writes, from `constant-residue.json`. */
@@ -569,12 +602,21 @@ async function checkConstantResidue(
 ): Promise<void> {
   const current = await fs.readFile(RECORD, "utf8").catch(() => "{}");
   const record = JSON.parse(current) as Record<string, ConstantResidue>;
+  const base = await baseRecord();
   for (const [dir, entries] of tables) {
     if (entries.length === 0) {
       delete record[dir];
       continue;
     }
     record[dir] = await constantResidue(dir, entries);
+    const before = new Set(base[dir]?.excluded);
+    for (const key of base[dir]?.excluded ? record[dir].excluded : []) {
+      if (before.has(key) || (await isReceipted(dir, key))) continue;
+      console.error(
+        `${dir}: ${key} is a new walked export with no Ruby counterpart: receipt it with @noRailsEquivalent, or remove it`,
+      );
+      process.exitCode = 1;
+    }
     const walked = new Set((await walkedClassPaths(dir, record[dir])).map(entryKey));
     const paired = new Set(entries.map(entryKey));
     const misses = [...paired].filter((row) => !walked.has(row));
