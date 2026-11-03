@@ -12,6 +12,4 @@ export class ExpoSQLiteAdapter extends SQLite3Adapter {
   }
 }
 
-ConnectionAdapters.ExpoSQLiteAdapter = ExpoSQLiteAdapter;
-
 constSet(ConnectionAdapters, "ExpoSQLiteAdapter", ExpoSQLiteAdapter);

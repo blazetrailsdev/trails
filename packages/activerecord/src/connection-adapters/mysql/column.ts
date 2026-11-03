@@ -29,6 +29,4 @@ export class Column extends BaseColumn {
   }
 }
 
-ConnectionAdapters.MySQL.Column = Column;
-
 constSet(ConnectionAdapters.MySQL, "Column", Column);

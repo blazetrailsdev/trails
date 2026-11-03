@@ -30,6 +30,4 @@ export class SolidQueueAdapter {
   }
 }
 
-QueueAdapters.SolidQueueAdapter = SolidQueueAdapter;
-
 constSet(QueueAdapters, "SolidQueueAdapter", SolidQueueAdapter);

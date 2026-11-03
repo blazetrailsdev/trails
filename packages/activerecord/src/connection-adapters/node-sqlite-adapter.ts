@@ -12,6 +12,4 @@ export class NodeSQLiteAdapter extends SQLite3Adapter {
   }
 }
 
-ConnectionAdapters.NodeSQLiteAdapter = NodeSQLiteAdapter;
-
 constSet(ConnectionAdapters, "NodeSQLiteAdapter", NodeSQLiteAdapter);

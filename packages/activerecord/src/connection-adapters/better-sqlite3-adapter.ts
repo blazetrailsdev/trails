@@ -12,6 +12,4 @@ export class BetterSQLite3Adapter extends SQLite3Adapter {
   }
 }
 
-ConnectionAdapters.BetterSQLite3Adapter = BetterSQLite3Adapter;
-
 constSet(ConnectionAdapters, "BetterSQLite3Adapter", BetterSQLite3Adapter);

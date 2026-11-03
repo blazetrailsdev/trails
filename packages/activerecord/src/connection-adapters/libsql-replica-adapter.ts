@@ -26,6 +26,4 @@ export class LibSQLReplicaAdapter extends SQLite3Adapter {
   }
 }
 
-ConnectionAdapters.LibSQLReplicaAdapter = LibSQLReplicaAdapter;
-
 constSet(ConnectionAdapters, "LibSQLReplicaAdapter", LibSQLReplicaAdapter);

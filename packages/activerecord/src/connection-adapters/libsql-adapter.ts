@@ -12,6 +12,4 @@ export class LibSQLAdapter extends SQLite3Adapter {
   }
 }
 
-ConnectionAdapters.LibSQLAdapter = LibSQLAdapter;
-
 constSet(ConnectionAdapters, "LibSQLAdapter", LibSQLAdapter);

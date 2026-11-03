@@ -47,6 +47,4 @@ for (const name of ["ADAPTER_NAME", "TYPE_MAP", "EXTENDED_TYPE_MAPS"] as const) 
   constSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
 }
 
-ConnectionAdapters.LibSQLRemoteAdapter = LibSQLRemoteAdapter;
-
 constSet(ConnectionAdapters, "LibSQLRemoteAdapter", LibSQLRemoteAdapter);

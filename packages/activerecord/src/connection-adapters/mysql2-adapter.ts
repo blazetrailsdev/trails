@@ -389,6 +389,4 @@ Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 
 include(Mysql2Adapter, Mysql2DatabaseStatements);
 
-ConnectionAdapters.Mysql2Adapter = Mysql2Adapter;
-
 constSet(ConnectionAdapters, "Mysql2Adapter", Mysql2Adapter);

@@ -2126,8 +2126,6 @@ Type.register("uuid", Uuid, { adapter: "postgresql" });
 Type.register("vector", Vector, { adapter: "postgresql" });
 Type.register("xml", Xml, { adapter: "postgresql" });
 
-ConnectionAdapters.PostgreSQLAdapter = PostgreSQLAdapter;
-
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
 
 constSet(ConnectionAdapters, "PostgreSQLAdapter", PostgreSQLAdapter);
