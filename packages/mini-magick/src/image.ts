@@ -114,6 +114,7 @@ export class Image {
     return new this(tempfile.path()!, tempfile);
   }
 
+  /** @inventedArm finally — PERMANENT */
   static attribute(name: string, key: string = name) {
     return rbModDefineMethod(
       this,
