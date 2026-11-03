@@ -23,7 +23,7 @@ export const Diffing = defineModule(
       if (await this.isEnrolledInCredentialsDiffing()) {
         this.say("Project is already enrolled in credentials file diffing.");
       } else {
-        await File.writeAsync(this.gitattributes().toString(), GITATTRIBUTES_ENTRY, { mode: "a" });
+        await this.gitattributes().write(GITATTRIBUTES_ENTRY, { mode: "a" });
 
         this.say("Enrolled project in credentials file diffing!");
         this.say("");
@@ -33,13 +33,12 @@ export const Diffing = defineModule(
       }
     },
 
-    /** @missingRailsCall delete — CONVERGEABLE pathname-answers-read-write-delete */
     async disenrollProjectFromCredentialsDiffing(this: DiffingHost): Promise<void> {
       if (await this.isEnrolledInCredentialsDiffing()) {
-        const path = this.gitattributes().toString();
-        const content = (await File.readAsync(path)).replaceAll(GITATTRIBUTES_ENTRY, "");
-        await File.writeAsync(path, content);
-        if (content === "") await File.deleteAsync(path);
+        await this.gitattributes().write(
+          (await this.gitattributes().read()).replaceAll(GITATTRIBUTES_ENTRY, ""),
+        );
+        if (await this.gitattributes().isEmpty()) await this.gitattributes().delete();
 
         this.say("Disenrolled project from credentials file diffing!");
       } else {
@@ -57,9 +56,9 @@ export const Diffing = defineModule(
   },
   {
     async isEnrolledInCredentialsDiffing(this: DiffingHost): Promise<boolean> {
-      const path = this.gitattributes().toString();
       return (
-        (await File.isFileAsync(path)) && (await File.readAsync(path)).includes(GITATTRIBUTES_ENTRY)
+        (await this.gitattributes().isFile()) &&
+        (await this.gitattributes().read()).includes(GITATTRIBUTES_ENTRY)
       );
     },
 

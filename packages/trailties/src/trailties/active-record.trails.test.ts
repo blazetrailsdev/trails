@@ -145,7 +145,7 @@ describe("RailtieTest (trails-only)", () => {
   it("config.loadDefaults 7.1 makes generate_secure_token_on initialize on a booted app", async () => {
     const saved = Trailtie.config.get("activeRecord");
     try {
-      const config = new Configuration();
+      const config = new Configuration("/app");
       config.set("activeRecord", { encryption: {} });
       config.loadDefaults("7.1");
 
@@ -254,7 +254,7 @@ describe("RailtieTest (trails-only)", () => {
       Trails.application = new BlogApplication() as never;
       try {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });
-        const config = new Configuration();
+        const config = new Configuration("/app");
         if (loadDefaults) config.loadDefaults(loadDefaults);
         const app = { deprecators: new Deprecators(), config, credentials };
         await runTrailtieInitializers(Trailtie, app);

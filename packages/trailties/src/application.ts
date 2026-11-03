@@ -476,10 +476,8 @@ export class Application extends Engine {
 
   async credentials(): Promise<EncryptedConfiguration> {
     if (this._credentials) return this._credentials;
-    const c = this.config.credentials;
-    const def = await this.config.credentialsDefaults();
-    const credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
-      keyPath: c.keyPath ?? def.keyPath,
+    const credentials = await this.encrypted(this.config.credentials.contentPath, {
+      keyPath: this.config.credentials.keyPath,
     });
     await credentials.config();
     return (this._credentials = credentials);

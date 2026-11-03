@@ -584,7 +584,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
 describe("Application::Configuration", () => {
   it("config.session_store writes the store and reads it back resolved", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.isSessionStore()).toBeNull();
     expect(c.sessionStore()).toBeNull();
 
@@ -595,7 +595,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.session_store :disabled reads back as nil", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.sessionStore(":disabled");
     expect(c.isSessionStore()).toBe(":disabled");
     expect(c.sessionStore()).toBeNull();
@@ -605,7 +605,7 @@ describe("Application::Configuration", () => {
     class MyCustomStore extends Session.CookieStore {}
     constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
     try {
-      const c = new Configuration();
+      const c = new Configuration("/app");
       c.sessionStore(":my_custom_store");
       expect(c.sessionStore()).toBe(MyCustomStore);
     } finally {
@@ -614,27 +614,27 @@ describe("Application::Configuration", () => {
   });
 
   it("config.session_store with unknown store raises helpful error", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.sessionStore(":nonexistent_store");
     expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
   });
 
   it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.debugExceptionResponseFormat).toBe("default");
     c.apiOnly = true;
     expect(c.debugExceptionResponseFormat).toBe("api");
   });
 
   it("config.debug_exception_response_format can be overridden", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.apiOnly = true;
     c.debugExceptionResponseFormat = "default";
     expect(c.debugExceptionResponseFormat).toBe("default");
   });
 
   it("defaults match Trails::Application::Configuration#initialize", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.considerAllRequestsLocal).toBe(false);
     expect(c.apiOnly).toBe(false);
     expect(c.timeZone).toBe("UTC");
@@ -660,7 +660,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults 5.0 assigns the 5.0 framework defaults", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("activeRecord", {});
     c.set("actionController", {});
     c.set("activeSupport", {});
@@ -678,7 +678,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults includes defaults for versions prior to the target version", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("activeRecord", { encryption: {} });
 
     c.loadDefaults("7.2");
@@ -695,13 +695,13 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults skips a framework that has not registered its config", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(() => c.loadDefaults("8.0")).not.toThrow();
     expect(c.isRespondTo("assets")).toBe(false);
   });
 
   it("config.load_defaults raises on an unknown version", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
   });
 
@@ -711,7 +711,7 @@ describe("Application::Configuration", () => {
     onTestFinished(() => {
       Trails.application = null;
     });
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.setRoot("/app");
     await c.autoloadLib({ ignore: ["tasks", "generators"] });
 
@@ -725,7 +725,7 @@ describe("Application::Configuration", () => {
     onTestFinished(() => {
       Trails.application = null;
     });
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.setRoot("/app");
     await c.autoloadLib({ ignore: [] });
 
@@ -739,7 +739,7 @@ describe("Application::Configuration", () => {
     onTestFinished(() => {
       Trails.application = null;
     });
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.setRoot("/app");
     await c.autoloadLib({ ignore: "tasks" });
 
@@ -754,7 +754,7 @@ describe("Application::Configuration", () => {
     onTestFinished(() => {
       Trails.application = null;
     });
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.setRoot("/app");
     await c.autoloadLibOnce({ ignore: "tasks" });
 
@@ -800,12 +800,12 @@ describe("Application::Configuration", () => {
   });
 
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.paths().get("public")).toBeDefined();
   });
 
   it("config.enable_reloading is !config.cache_classes", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.cacheClasses = true;
     expect(c.enableReloading).toBe(false);
     c.enableReloading = true;
@@ -821,7 +821,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     return root;
   })();
   const buildApp = () => ({
-    config: new Configuration(),
+    config: new Configuration("/app"),
     executor: class extends Executor {},
     reloader: class extends Reloader {},
   });
@@ -930,7 +930,10 @@ describe("Application key/message/credentials wiring", () => {
   };
 
   it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
-    expect(new Configuration().credentials).toEqual({ contentPath: null, keyPath: null });
+    expect(new Configuration("/app").credentials.toH()).toEqual({
+      contentPath: "/app/config/credentials.yml.enc",
+      keyPath: "/app/config/master.key",
+    });
     class A extends Application {}
     Application.register(A);
     const app = A.instance();

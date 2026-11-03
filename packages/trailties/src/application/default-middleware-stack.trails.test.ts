@@ -36,7 +36,7 @@ import { DefaultMiddlewareStack } from "./default-middleware-stack.js";
 function defaultStack(mutate: (c: Configuration) => void = () => {}) {
   const paths = new Root("/app");
   paths.add("public");
-  const config = new Configuration();
+  const config = new Configuration("/app");
   config.publicFileServer.enabled = false;
   config.enableReloading = false;
   config.considerAllRequestsLocal = false;

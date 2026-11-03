@@ -1,5 +1,5 @@
 import { File, FileUtils, Dir, setEnv, env, getFs } from "@blazetrails/ruby-compat";
-import { EncryptedConfiguration } from "@blazetrails/activesupport";
+import { EncryptedConfiguration, InheritableOptions } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "../command.js";
 import { Trails } from "../trails.js";
@@ -40,17 +40,19 @@ describe("Trails::Command::CredentialsTest", () => {
     File.write(".gitignore", "");
     const config = {
       root: appPath,
-      credentials: { contentPath: null, keyPath: null },
-      credentialsDefaults: async () =>
-        File.isExist("config/credentials/production.yml.enc")
-          ? {
-              contentPath: `${appPath}/config/credentials/production.yml.enc`,
-              keyPath: `${appPath}/config/credentials/production.key`,
-            }
-          : {
-              contentPath: `${appPath}/config/credentials.yml.enc`,
-              keyPath: `${appPath}/config/master.key`,
-            },
+      get credentials() {
+        return new InheritableOptions(
+          File.isExist("config/credentials/production.yml.enc")
+            ? {
+                contentPath: `${appPath}/config/credentials/production.yml.enc`,
+                keyPath: `${appPath}/config/credentials/production.key`,
+              }
+            : {
+                contentPath: `${appPath}/config/credentials.yml.enc`,
+                keyPath: `${appPath}/config/master.key`,
+              },
+        );
+      },
     };
     vi.spyOn(Trails, "application", "get").mockReturnValue({
       config,

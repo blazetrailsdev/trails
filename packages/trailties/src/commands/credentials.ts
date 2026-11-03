@@ -13,6 +13,7 @@ import { Editor } from "../command/helpers/editor.js";
 import { CredentialsGenerator } from "../generators/trails/credentials/credentials-generator.js";
 import { EncryptionKeyFileGenerator } from "../generators/trails/encryption-key-file/encryption-key-file-generator.js";
 import { Trails } from "../trails.js";
+import type { Configuration } from "../application/configuration.js";
 import { Diffing } from "./credentials/credentials-command/diffing.js";
 
 interface CredentialsOptions {
@@ -91,9 +92,9 @@ export class CredentialsCommand extends Base {
     await this.loadGenerators();
 
     if (this.isEnvironmentSpecified()) {
-      if (this.config().contentPath == null)
+      if (!this.config().isOverridden(":contentPath"))
         this._contentPath = `config/credentials/${this.environment()}.yml.enc`;
-      if (this.config().keyPath == null)
+      if (!this.config().isOverridden(":keyPath"))
         this._keyPath = `config/credentials/${this.environment()}.key`;
     }
 
@@ -133,35 +134,24 @@ export class CredentialsCommand extends Base {
   }
 
   /** @internal */
-  private config(): { contentPath: string | null; keyPath: string | null } {
+  private config(): Configuration["credentials"] {
     return Trails.application!.config.credentials;
   }
 
-  /**
-   * @internal
-   * @inventedArm credentialsDefaults — CONVERGEABLE credentials-config-is-inheritable-options
-   */
-  private async contentPath(): Promise<string> {
-    return (this._contentPath ??= this.relativePath(
-      this.config().contentPath ??
-        (await Trails.application!.config.credentialsDefaults()).contentPath,
-    ));
+  /** @internal */
+  private contentPath(): string {
+    return (this._contentPath ??= this.relativePath(this.config().contentPath));
   }
 
-  /**
-   * @internal
-   * @inventedArm credentialsDefaults — CONVERGEABLE credentials-config-is-inheritable-options
-   */
-  private async keyPath(): Promise<string> {
-    return (this._keyPath ??= this.relativePath(
-      this.config().keyPath ?? (await Trails.application!.config.credentialsDefaults()).keyPath,
-    ));
+  /** @internal */
+  private keyPath(): string {
+    return (this._keyPath ??= this.relativePath(this.config().keyPath));
   }
 
   /** @internal */
   private async credentials(): Promise<EncryptedConfiguration> {
-    return (this._credentials ??= await Trails.application!.encrypted(await this.contentPath(), {
-      keyPath: await this.keyPath(),
+    return (this._credentials ??= await Trails.application!.encrypted(this.contentPath(), {
+      keyPath: this.keyPath(),
     }));
   }
 
@@ -170,13 +160,13 @@ export class CredentialsCommand extends Base {
     if (await (await this.credentials()).isKey()) return;
 
     const encryptionKeyFileGenerator = new EncryptionKeyFileGenerator();
-    await encryptionKeyFileGenerator.addKeyFile(await this.keyPath());
-    await encryptionKeyFileGenerator.ignoreKeyFile(await this.keyPath());
+    await encryptionKeyFileGenerator.addKeyFile(this.keyPath());
+    await encryptionKeyFileGenerator.ignoreKeyFile(this.keyPath());
   }
 
   /** @internal */
   private async ensureCredentialsHaveBeenAdded(): Promise<void> {
-    await new CredentialsGenerator([await this.contentPath(), await this.keyPath()], {
+    await new CredentialsGenerator([this.contentPath(), this.keyPath()], {
       skipSecretKeyBase:
         this.isEnvironmentSpecified() && ["development", "test"].includes(this.environment()),
       quiet: true,
@@ -187,7 +177,7 @@ export class CredentialsCommand extends Base {
   private async changeCredentialsInSystemEditor(): Promise<void> {
     try {
       await this.usingSystemEditor(async () => {
-        this.say(`Editing ${await this.contentPath()}...`);
+        this.say(`Editing ${this.contentPath()}...`);
         await (
           await this.credentials()
         ).change(async (tmpPath) => {
@@ -200,7 +190,7 @@ export class CredentialsCommand extends Base {
       if (error instanceof MissingKeyError) {
         this.say(error.message);
       } else if (error instanceof InvalidMessage) {
-        this.say(`Couldn't decrypt ${await this.contentPath()}. Perhaps you passed the wrong key?`);
+        this.say(`Couldn't decrypt ${this.contentPath()}. Perhaps you passed the wrong key?`);
       } else {
         throw error;
       }
@@ -216,7 +206,7 @@ export class CredentialsCommand extends Base {
       this.say(`WARNING: ${error.message}`, "red");
       this.say("");
       this.say(
-        `Your application will not be able to load '${await this.contentPath()}' until the error has been fixed.`,
+        `Your application will not be able to load '${this.contentPath()}' until the error has been fixed.`,
         "red",
       );
     }
@@ -225,9 +215,9 @@ export class CredentialsCommand extends Base {
   /** @internal */
   private async missingCredentialsMessage(): Promise<string> {
     if (!(await (await this.credentials()).isKey())) {
-      return `Missing '${await this.keyPath()}' to decrypt credentials. See \`${this.executable("help")}\`.`;
+      return `Missing '${this.keyPath()}' to decrypt credentials. See \`${this.executable("help")}\`.`;
     } else {
-      return `File '${await this.contentPath()}' does not exist. Use \`${this.executable("edit")}\` to change that.`;
+      return `File '${this.contentPath()}' does not exist. Use \`${this.executable("edit")}\` to change that.`;
     }
   }
 

@@ -8,18 +8,8 @@ import { aliases } from "./commands.js";
 import "./constants.generated.js";
 
 if (APP_PATH == null) {
-  const root = Dir.pwd();
-  const fs = getFs();
-  const p = getPath();
-  for (const candidate of [
-    p.join(root, "dist", "config", "application.js"),
-    p.join(root, "config", "application.ts"),
-  ]) {
-    if (await fs.exists(candidate)) {
-      setAppPath(candidate);
-      break;
-    }
-  }
+  const candidate = getPath().join(Dir.pwd(), "config", "application.ts");
+  if (await getFs().exists(candidate)) setAppPath(candidate);
 }
 
 const [, , command = "", ...args] = argv;

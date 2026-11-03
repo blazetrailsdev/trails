@@ -7,6 +7,7 @@ import {
 import {
   FileUpdateChecker,
   getEnv,
+  InheritableOptions,
   isPresent,
   type Logger,
   OrderedOptions,
@@ -15,14 +16,7 @@ import {
 } from "@blazetrails/activesupport";
 import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
-import {
-  ArgumentError,
-  File,
-  getFs,
-  getPath,
-  OpenSSL,
-  SecureRandom,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrails/ruby-compat";
 import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
@@ -88,9 +82,9 @@ export class Configuration extends EngineConfiguration {
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
   private _secretKeyBase: string | null = null;
-  credentials: { contentPath: string | null; keyPath: string | null } = {
-    contentPath: null,
-    keyPath: null,
+  credentials = new InheritableOptions(this.credentialsDefaults()) as InheritableOptions & {
+    contentPath: string;
+    keyPath: string;
   };
   console: { start(): unknown } | null = null;
   disableSandbox = false;
@@ -587,14 +581,14 @@ export class Configuration extends EngineConfiguration {
   }
 
   /** @internal */
-  async credentialsDefaults(): Promise<{ contentPath: string; keyPath: string }> {
+  private credentialsDefaults(): { contentPath: string; keyPath: string } {
     const root = this.root as string;
     let contentPath = getPath().join(root, `config/credentials/${Trails.env}.yml.enc`);
-    if (!(await getFs().exists(contentPath)))
+    if (!File.isExist(contentPath))
       contentPath = getPath().join(root, "config/credentials.yml.enc");
 
     let keyPath = getPath().join(root, `config/credentials/${Trails.env}.key`);
-    if (!(await getFs().exists(keyPath))) keyPath = getPath().join(root, "config/master.key");
+    if (!File.isExist(keyPath)) keyPath = getPath().join(root, "config/master.key");
 
     return { contentPath: contentPath, keyPath: keyPath };
   }
