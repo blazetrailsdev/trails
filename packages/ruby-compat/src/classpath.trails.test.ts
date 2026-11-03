@@ -32,6 +32,14 @@ describe("rbModName over the generated class-path table", () => {
     expect(() => constGet(Object, "ConstGetTdz")).toThrow(NameError);
   });
 
+  it("constGet raises NameError for a row whose namespace has no seat", () => {
+    class Leaf {}
+    defineConstants([[() => Leaf, "ConstGetUnseated::Leaf"]]);
+    expect(() => constGet(Object, "ConstGetUnseated::Leaf")).toThrow(
+      "uninitialized constant ConstGetUnseated",
+    );
+  });
+
   it("answers a const_set-bound path ahead of the generated one", () => {
     const Owner = class Owner {};
     class Seated {}
