@@ -1,6 +1,6 @@
-import { defineModule, registerConstant } from "@blazetrails/ruby-compat";
+import { defineModule, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 export const AbcHelper = defineModule({
   bareA(): void {},
 });
-registerConstant("AbcHelper", AbcHelper);
+constSet(TopLevel, "AbcHelper", AbcHelper);

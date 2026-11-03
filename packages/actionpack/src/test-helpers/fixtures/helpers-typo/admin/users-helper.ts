@@ -1,4 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  constGet,
+  constSet, TopLevel, isRegisteredConstant } from "@blazetrails/ruby-compat";
 
 export const UsersHelpeR = {};
-registerConstant("Admin::UsersHelpeR", UsersHelpeR);
+if (!isRegisteredConstant("Admin")) constSet(TopLevel, "Admin", {});
+constSet(constGet(Object, "Admin") as object, "UsersHelpeR", UsersHelpeR);

@@ -3,44 +3,45 @@ import {
   block,
   rbModName,
   rbObjClass,
-  registerConstant,
   StandardError,
   toF,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { DeserializationError } from "../../arguments.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
 export class DefaultsError extends StandardError {}
-registerConstant("DefaultsError", DefaultsError);
+constSet(TopLevel, "DefaultsError", DefaultsError);
 export class DisabledJitterError extends StandardError {}
-registerConstant("DisabledJitterError", DisabledJitterError);
+constSet(TopLevel, "DisabledJitterError", DisabledJitterError);
 export class ZeroJitterError extends StandardError {}
-registerConstant("ZeroJitterError", ZeroJitterError);
+constSet(TopLevel, "ZeroJitterError", ZeroJitterError);
 export class FirstRetryableErrorOfTwo extends StandardError {}
-registerConstant("FirstRetryableErrorOfTwo", FirstRetryableErrorOfTwo);
+constSet(TopLevel, "FirstRetryableErrorOfTwo", FirstRetryableErrorOfTwo);
 export class SecondRetryableErrorOfTwo extends StandardError {}
-registerConstant("SecondRetryableErrorOfTwo", SecondRetryableErrorOfTwo);
+constSet(TopLevel, "SecondRetryableErrorOfTwo", SecondRetryableErrorOfTwo);
 export class LongWaitError extends StandardError {}
-registerConstant("LongWaitError", LongWaitError);
+constSet(TopLevel, "LongWaitError", LongWaitError);
 export class ShortWaitTenAttemptsError extends StandardError {}
-registerConstant("ShortWaitTenAttemptsError", ShortWaitTenAttemptsError);
+constSet(TopLevel, "ShortWaitTenAttemptsError", ShortWaitTenAttemptsError);
 export class PolynomialWaitTenAttemptsError extends StandardError {}
-registerConstant("PolynomialWaitTenAttemptsError", PolynomialWaitTenAttemptsError);
+constSet(TopLevel, "PolynomialWaitTenAttemptsError", PolynomialWaitTenAttemptsError);
 export class CustomWaitTenAttemptsError extends StandardError {}
-registerConstant("CustomWaitTenAttemptsError", CustomWaitTenAttemptsError);
+constSet(TopLevel, "CustomWaitTenAttemptsError", CustomWaitTenAttemptsError);
 export class CustomCatchError extends StandardError {}
-registerConstant("CustomCatchError", CustomCatchError);
+constSet(TopLevel, "CustomCatchError", CustomCatchError);
 export class DiscardableError extends StandardError {}
-registerConstant("DiscardableError", DiscardableError);
+constSet(TopLevel, "DiscardableError", DiscardableError);
 export class FirstDiscardableErrorOfTwo extends StandardError {}
-registerConstant("FirstDiscardableErrorOfTwo", FirstDiscardableErrorOfTwo);
+constSet(TopLevel, "FirstDiscardableErrorOfTwo", FirstDiscardableErrorOfTwo);
 export class SecondDiscardableErrorOfTwo extends StandardError {}
-registerConstant("SecondDiscardableErrorOfTwo", SecondDiscardableErrorOfTwo);
+constSet(TopLevel, "SecondDiscardableErrorOfTwo", SecondDiscardableErrorOfTwo);
 export class CustomDiscardableError extends StandardError {}
-registerConstant("CustomDiscardableError", CustomDiscardableError);
+constSet(TopLevel, "CustomDiscardableError", CustomDiscardableError);
 export class UnlimitedRetryError extends StandardError {}
-registerConstant("UnlimitedRetryError", UnlimitedRetryError);
+constSet(TopLevel, "UnlimitedRetryError", UnlimitedRetryError);
 
 export class RetryJob extends Base {
   static toString(): string {
@@ -58,7 +59,7 @@ export class RetryJob extends Base {
     }
   }
 }
-registerConstant("RetryJob", RetryJob);
+constSet(TopLevel, "RetryJob", RetryJob);
 
 RetryJob.retryOn(DefaultsError);
 RetryJob.retryOn(DisabledJitterError, { jitter: null });

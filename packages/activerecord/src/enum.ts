@@ -17,7 +17,6 @@ import {
   include,
   rbInspect,
   rbModDefineMethod,
-  registerConstant,
   toS,
   rbClassSuperclass,
   rbObjRespondTo,
@@ -448,5 +447,3 @@ export const Enum = {
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
 };
-
-registerConstant("ActiveRecord::Enum::EnumType", EnumType);

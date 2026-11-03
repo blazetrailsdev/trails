@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { toGlobalId, toGid, toSignedGlobalId, toSgid } from "./identification.js";
@@ -27,7 +27,7 @@ describe("GlobalIdentificationTest", () => {
 
   beforeEach(() => {
     GlobalID.setApp("bcx");
-    registerConstant("Person", Person);
+    constSet(TopLevel, "Person", Person);
     model = new Person("1");
   });
   afterEach(() => {

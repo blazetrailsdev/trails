@@ -1,4 +1,4 @@
-import { File, registerConstant } from "@blazetrails/ruby-compat";
+import { File, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Loader } from "./loader.js";
 import { newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
@@ -6,7 +6,8 @@ import { newLoader, teardown, withSetup } from "./test-helpers/loader-test.js";
 describe("TestAllExpectedCpaths", () => {
   const Namespace = {};
   Object.defineProperty(Namespace, "name", { value: "overridden" });
-  registerConstant("TestAllExpectedCpaths::Namespace", Namespace);
+  constSet(TopLevel, "TestAllExpectedCpaths", {});
+  constSet(constGet(Object, "TestAllExpectedCpaths") as object, "Namespace", Namespace);
 
   const fileList = (...names: string[]) => names.map((name): [string] => [name]);
 

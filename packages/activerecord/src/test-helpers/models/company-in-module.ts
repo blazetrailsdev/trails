@@ -1,23 +1,23 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import { Range, registerConstant, constSet } from "@blazetrails/ruby-compat";
+import { Range, constSet, TopLevel, constGet } from "@blazetrails/ruby-compat";
 
-registerConstant("MyApplication", {});
+constSet(TopLevel, "MyApplication", {});
 const Business = {};
-registerConstant("MyApplication::Business", Business);
+constSet(constGet(Object, "MyApplication") as object, "Business", Business);
 const Prefixed = { tableNamePrefix: "prefixed_" };
-registerConstant("MyApplication::Business::Prefixed", Prefixed);
+constSet(Business, "Prefixed", Prefixed);
 const PrefixedNested = {};
-registerConstant("MyApplication::Business::Prefixed::Nested", PrefixedNested);
+constSet(Prefixed, "Nested", PrefixedNested);
 const Suffixed = { tableNameSuffix: "_suffixed" };
-registerConstant("MyApplication::Business::Suffixed", Suffixed);
+constSet(Business, "Suffixed", Suffixed);
 const SuffixedNested = {};
-registerConstant("MyApplication::Business::Suffixed::Nested", SuffixedNested);
+constSet(Suffixed, "Nested", SuffixedNested);
 const Billing = {};
-registerConstant("MyApplication::Billing", Billing);
+constSet(constGet(Object, "MyApplication") as object, "Billing", Billing);
 const BillingNested = {};
-registerConstant("MyApplication::Billing::Nested", BillingNested);
+constSet(Billing, "Nested", BillingNested);
 
 export class MyAppBusinessCompany extends Base {
   static {

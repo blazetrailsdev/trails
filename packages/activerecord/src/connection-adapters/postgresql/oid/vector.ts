@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Vector extends ValueType<unknown> {
@@ -16,4 +17,4 @@ export class Vector extends ValueType<unknown> {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Vector", Vector);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Vector", Vector);

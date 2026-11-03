@@ -1,12 +1,12 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { DerivedSecretKeyProvider } from "../../encryption/derived-secret-key-provider.js";
 
 export class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
   declare keys: string[];
 }
-registerConstant("MutableDerivedSecretKeyProvider", MutableDerivedSecretKeyProvider);
+constSet(TopLevel, "MutableDerivedSecretKeyProvider", MutableDerivedSecretKeyProvider);
 
 export class EncryptedPost extends Base {
   declare title: string;

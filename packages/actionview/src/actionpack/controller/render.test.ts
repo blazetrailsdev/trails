@@ -19,9 +19,9 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjSingletonClass,
-  registerConstant,
   stringSplit,
   Struct,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Template } from "../../template.js";
@@ -33,7 +33,7 @@ import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { BadCustomer, Customer, GoodCustomer, Post } from "../../test-helpers/fake-models.js";
 
 const Quiz = {} as { Question: typeof Question; QuestionsController: typeof QuestionsController };
-registerConstant("Quiz", Quiz);
+constSet(TopLevel, "Quiz", Quiz);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Conversion` (render_test.rb); the class/interface merge is how a mixin surfaces on the type side.
 interface Question extends Included<typeof Conversion> {}
@@ -61,7 +61,7 @@ class QuestionsController extends ActionController.Base {
 constSet(Quiz, "QuestionsController", QuestionsController);
 
 const Fun = {} as { GamesController: typeof GamesController };
-registerConstant("Fun", Fun);
+constSet(TopLevel, "Fun", Fun);
 
 class GamesController extends ActionController.Base {
   async helloWorld(): Promise<void> {}

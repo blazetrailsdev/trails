@@ -4,7 +4,7 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
 import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
-import { File, registerConstant } from "@blazetrails/ruby-compat";
+import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
@@ -18,7 +18,7 @@ let registeredTestAdapters = 0;
 async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string> {
   const adapter = `sqlite3_test_${(registeredTestAdapters += 1)}`;
   const className = `SQLite3TestAdapter${registeredTestAdapters}`;
-  registerConstant(className, function () {
+  constSet(TopLevel, className, function () {
     return build();
   });
   register(adapter, className);

@@ -5,7 +5,7 @@ import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { rbObjAsString as toS, rtest, registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS, rtest } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
 
 export class EncryptedAttributeType extends ValueType {
@@ -260,5 +260,3 @@ export class EncryptedAttributeType extends ValueType {
 }
 
 Encryption.EncryptedAttributeType = EncryptedAttributeType;
-
-registerConstant("ActiveRecord::Encryption::EncryptedAttributeType", EncryptedAttributeType);

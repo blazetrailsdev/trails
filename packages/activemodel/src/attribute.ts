@@ -8,7 +8,6 @@ import {
   rbDeclareIvar,
   rbObjAsString,
   rbObjDup,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
@@ -382,10 +381,3 @@ Attribute.FromUser = FromUser;
 Attribute.WithCastValue = WithCastValue;
 Attribute.Null = Null;
 Attribute.Uninitialized = Uninitialized;
-
-registerConstant("ActiveModel::Attribute", Attribute);
-registerConstant("ActiveModel::Attribute::FromDatabase", FromDatabase);
-registerConstant("ActiveModel::Attribute::FromUser", FromUser);
-registerConstant("ActiveModel::Attribute::WithCastValue", WithCastValue);
-registerConstant("ActiveModel::Attribute::Null", Null);
-registerConstant("ActiveModel::Attribute::Uninitialized", Uninitialized);

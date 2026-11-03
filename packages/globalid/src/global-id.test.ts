@@ -5,9 +5,10 @@ import {
   Enumerable,
   include,
   rbHash,
-  registerConstant,
   resetConstants,
   uniq,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Model } from "@blazetrails/activemodel";
 import { GlobalID } from "./index.js";
@@ -82,7 +83,8 @@ class CompositePrimaryKeyModel {
 
 function registerConstants(registry: Record<string, LocatorModel>): void {
   for (const [name, klass] of Object.entries(registry)) {
-    registerConstant(name, klass);
+    const [owner, id] = name.includes("::") ? name.split("::") : [undefined, name];
+    constSet(owner === undefined ? TopLevel : registry[owner], id, klass);
   }
 }
 
@@ -381,7 +383,7 @@ describe("GlobalIDCreationTest", () => {
     expect(personNamespacedGid.modelClass).toBe(PersonChild);
     expect(personModelGid.modelClass).toBe(PersonModel);
     expect(cpkModelGid.modelClass).toBe(CompositePrimaryKeyModel);
-    registerConstant("SignedGlobalID", SignedGlobalID as unknown as LocatorModel);
+    constSet(TopLevel, "SignedGlobalID", SignedGlobalID as unknown as LocatorModel);
     await expect(GlobalID.find("gid://bcx/SignedGlobalID/5")).rejects.toThrow(ArgumentError);
   });
 

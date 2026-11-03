@@ -1,4 +1,4 @@
-import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
@@ -13,4 +13,4 @@ export class MultipleKwargsJob extends Base {
     );
   }
 }
-registerConstant("MultipleKwargsJob", MultipleKwargsJob);
+constSet(TopLevel, "MultipleKwargsJob", MultipleKwargsJob);

@@ -19,8 +19,8 @@ import {
   constSet,
   rbEqual,
   rbObjIvarGet,
-  registerConstant,
   hashAref,
+  constGet,
 } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
 import { UnknownAttributeError } from "./errors.js";
@@ -41,7 +41,7 @@ expect.addEqualityTesters([
 ]);
 
 const AttributesTest = {};
-registerConstant("ActiveModel::AttributesTest", AttributesTest);
+constSet(constGet(Object, "ActiveModel") as object, "AttributesTest", AttributesTest);
 
 describe("AttributesTest", () => {
   class ModelForAttributesTest extends Model {

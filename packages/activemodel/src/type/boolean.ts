@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 export class BooleanType extends ValueType<boolean> {
@@ -40,5 +39,3 @@ export class BooleanType extends ValueType<boolean> {
     return !BooleanType.FALSE_VALUES.has(value);
   }
 }
-
-registerConstant("ActiveModel::Type::Boolean", BooleanType);

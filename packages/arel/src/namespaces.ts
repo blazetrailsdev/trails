@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Attribute as AttributeClass } from "./attributes/attribute.js";
 import type * as CollectorsModule from "./collectors/index.js";
 import type * as NodesModule from "./nodes/index.js";
@@ -27,7 +27,7 @@ export const Arel = { name: "Arel", loadPath } as AutoloadModule & {
   SelectManager: typeof SelectManager;
   Attribute: typeof AttributeClass;
 };
-registerConstant("Arel", Arel);
+constSet(TopLevel, "Arel", Arel);
 extend(Arel, Autoload);
 Arel.autoload("Table", "arel/table");
 Arel.autoload("SelectManager", "arel/select_manager");

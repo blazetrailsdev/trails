@@ -1,6 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  TopLevel,
+  constSet,
+} from "@blazetrails/ruby-compat";
 
 export const FooHelper = {
   baz(): void {},
 };
-registerConstant("FooHelper", FooHelper);
+constSet(TopLevel, "FooHelper", FooHelper);

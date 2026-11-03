@@ -4,8 +4,8 @@ import {
   anybits,
   fetch,
   rbRegMatchP,
-  registerConstant,
   rbObjAsString,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
@@ -1391,7 +1391,4 @@ export interface SQLite3Adapter {
 
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
 
-registerConstant(
-  "ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer",
-  SQLite3Integer,
-);
+constSet(SQLite3Adapter, "SQLite3Integer", SQLite3Integer);

@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { Cidr } from "./cidr.js";
 
 export class Inet extends Cidr {
@@ -7,4 +8,4 @@ export class Inet extends Cidr {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Inet", Inet);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Inet", Inet);

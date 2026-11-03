@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { EnqueueError } from "../../enqueuing.js";
 
@@ -34,4 +34,4 @@ export class EnqueueErrorJob extends Base {
   }
 }
 EnqueueErrorJob.setQueueAdapter(new EnqueueErrorAdapter());
-registerConstant("EnqueueErrorJob", EnqueueErrorJob);
+constSet(TopLevel, "EnqueueErrorJob", EnqueueErrorJob);

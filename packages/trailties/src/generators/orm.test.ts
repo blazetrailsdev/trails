@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { unregisterConstant, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ScaffoldControllerGenerator } from "./trails/scaffold-controller/scaffold-controller-generator.js";
 
@@ -15,8 +15,14 @@ function generator(name: string, options: { orm?: string } = {}) {
 
 describe("ScaffoldOrmTest", () => {
   beforeAll(() => {
-    registerConstant("ORMWithGenerators::Generators::ActiveModel", ORMWithGeneratorsActiveModel);
-    registerConstant("ORMWithoutGenerators", ORMWithoutGenerators);
+    constSet(TopLevel, "ORMWithGenerators", {});
+    constSet(constGet(Object, "ORMWithGenerators") as object, "Generators", {});
+    constSet(
+      constGet(Object, "ORMWithGenerators::Generators") as object,
+      "ActiveModel",
+      ORMWithGeneratorsActiveModel,
+    );
+    constSet(TopLevel, "ORMWithoutGenerators", ORMWithoutGenerators);
   });
 
   afterAll(() => {

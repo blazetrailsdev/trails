@@ -9,7 +9,7 @@ import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
 import { isPresent } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constGet, constSet } from "@blazetrails/ruby-compat";
 import { Job, Process, ReadyExecution, RecurringTask, SolidQueueAdapter, Worker } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { JobBuffer } from "./test-helpers/add-to-buffer-job.js";
@@ -61,6 +61,11 @@ class JobUsingAsyncAdapter extends ApplicationJob {
   }
 }
 
+const RecurringTaskTest = constSet(
+  constGet(Object, "SolidQueue") as object,
+  "RecurringTaskTest",
+  {},
+);
 for (const job of [
   JobWithoutArguments,
   JobWithRegularHashArguments,
@@ -69,7 +74,7 @@ for (const job of [
   JobWithPriority,
   JobUsingAsyncAdapter,
 ]) {
-  registerConstant(`SolidQueue::RecurringTaskTest::${job.name}`, job);
+  constSet(RecurringTaskTest, job.name, job);
 }
 
 const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));

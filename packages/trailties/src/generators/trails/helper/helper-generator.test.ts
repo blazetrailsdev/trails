@@ -1,7 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { HelperGenerator } from "./helper-generator.js";
 import { TestCase } from "../../test-case.js";
@@ -27,7 +27,7 @@ describe("HelperGeneratorTest", () => {
 
   it("check class collision", async () => {
     const ObjectHelper = class {};
-    registerConstant("ObjectHelper", ObjectHelper);
+    constSet(TopLevel, "ObjectHelper", ObjectHelper);
     try {
       const content = await capture("stderr", () => t.runGenerator(["object"]));
       expect(content).toMatch(

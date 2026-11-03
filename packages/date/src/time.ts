@@ -38,9 +38,10 @@ import {
   rbCheckToInt,
   rbIntegerTypeP,
   rbObjClassname,
-  registerConstant,
   setRubyTzUptodate,
   stringInspect,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
@@ -2087,4 +2088,4 @@ for (const seat of ["Temporal.Instant", "Date"]) {
   table.iso8601 = table.xmlschema;
 }
 
-registerConstant("Time", Time);
+constSet(TopLevel, "Time", Time);

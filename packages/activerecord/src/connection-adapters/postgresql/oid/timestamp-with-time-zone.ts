@@ -1,6 +1,8 @@
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import type { Time } from "@blazetrails/date";
 import { actsLike, TimeWithZone, isBlank } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import { DateTime } from "./date-time.js";
 
 export class TimestampWithTimeZone extends DateTime {
@@ -22,7 +24,4 @@ export class TimestampWithTimeZone extends DateTime {
   }
 }
 
-registerConstant(
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TimestampWithTimeZone",
-  TimestampWithTimeZone,
-);
+constSet(ConnectionAdapters.PostgreSQL.OID, "TimestampWithTimeZone", TimestampWithTimeZone);

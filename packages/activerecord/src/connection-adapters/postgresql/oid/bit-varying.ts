@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { Bit } from "./bit.js";
 
 export class BitVarying extends Bit {
@@ -7,4 +8,4 @@ export class BitVarying extends Bit {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::BitVarying", BitVarying);
+constSet(ConnectionAdapters.PostgreSQL.OID, "BitVarying", BitVarying);

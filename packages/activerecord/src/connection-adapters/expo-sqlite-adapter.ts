@@ -1,6 +1,7 @@
+import { constSet } from "@blazetrails/ruby-compat";
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 import { ConnectionAdapters } from "../namespaces.js";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { expoSqliteDriver } from "../sqlite/expo-sqlite.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
@@ -12,4 +13,5 @@ export class ExpoSQLiteAdapter extends SQLite3Adapter {
 }
 
 ConnectionAdapters.ExpoSQLiteAdapter = ExpoSQLiteAdapter;
-registerConstant("ActiveRecord::ConnectionAdapters::ExpoSQLiteAdapter", ExpoSQLiteAdapter);
+
+constSet(ConnectionAdapters, "ExpoSQLiteAdapter", ExpoSQLiteAdapter);

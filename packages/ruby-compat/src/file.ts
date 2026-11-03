@@ -1,3 +1,5 @@
+import { constSet } from "./include.js";
+import { TopLevel } from "./object.js";
 import { getProcessAdapter } from "./process-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
@@ -6,7 +8,6 @@ import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { stringValue } from "./string/support.js";
-import { registerConstant } from "./variable.js";
 
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
@@ -1114,7 +1115,7 @@ export class File extends IO {
   }
 }
 
-registerConstant("File", File);
+constSet(TopLevel, "File", File);
 
 /**
  * `Inc(p, e, enc)` (`vendor/ruby/v3.3.11/dir.c:237`) — the cursor advance MRI spells

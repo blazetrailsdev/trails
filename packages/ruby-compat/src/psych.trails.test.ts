@@ -76,9 +76,10 @@ describe("Psych with a Struct and the safe paths", () => {
   it("dumps a named Struct by its members and revives it", async () => {
     const { Psych } = await import("./psych.js");
     const { Struct } = await import("./struct.js");
-    const { registerConstant } = await import("./variable.js");
+    const { constSet } = await import("./include.js");
+    const { TopLevel } = await import("./object.js");
     const Point = Struct.new("x", "y");
-    registerConstant("PsychTrailsPoint", Point);
+    constSet(TopLevel, "PsychTrailsPoint", Point);
     const yaml = Psych.dump(new Point(1, "a"));
     expect(yaml).toContain("!ruby/struct:PsychTrailsPoint\nx: 1\ny: a\n");
     const point = Psych.unsafeLoad(yaml) as InstanceType<typeof Point>;
@@ -187,9 +188,10 @@ describe("Psych load_tags, dump_tags and domain_types", () => {
 
   it("revives a load-tagged mapping and dumps under a dump tag", async () => {
     const { Psych } = await import("./psych.js");
-    const { registerConstant } = await import("./variable.js");
+    const { constSet } = await import("./include.js");
+    const { TopLevel } = await import("./object.js");
     class PsychTrailsTagged {}
-    registerConstant("PsychTrailsTagged", PsychTrailsTagged);
+    constSet(TopLevel, "PsychTrailsTagged", PsychTrailsTagged);
     Psych.loadTags["!tagged"] = "PsychTrailsTagged";
     Psych.dumpTags.set(PsychTrailsTagged, "!tagged");
     try {
@@ -218,11 +220,12 @@ describe("Psych load_tags, dump_tags and domain_types", () => {
 describe("Psych.dump of a tagged root", () => {
   it("puts the root tag on the document-start line", async () => {
     const { Psych } = await import("./psych.js");
-    const { registerConstant } = await import("./variable.js");
+    const { constSet } = await import("./include.js");
+    const { TopLevel } = await import("./object.js");
     class PsychTrailsRoot {
       a = 1;
     }
-    registerConstant("PsychTrailsRoot", PsychTrailsRoot);
+    constSet(TopLevel, "PsychTrailsRoot", PsychTrailsRoot);
     expect(Psych.dump(new PsychTrailsRoot())).toBe("--- !ruby/object:PsychTrailsRoot\na: 1\n");
   });
 });
@@ -231,7 +234,8 @@ describe("ToRuby sequences and keys", () => {
   it("revives !omap as a Psych::Omap and !ruby/array:Klass as that class", async () => {
     const { Psych } = await import("./psych.js");
     const { Omap } = await import("./psych/omap.js");
-    const { registerConstant } = await import("./variable.js");
+    const { constSet } = await import("./include.js");
+    const { TopLevel } = await import("./object.js");
     const omap = Psych.unsafeLoad("--- !omap\n- a: 1\n- b: 2\n") as InstanceType<typeof Omap>;
     expect(omap).toBeInstanceOf(Omap);
     expect([...omap.entries()]).toEqual([
@@ -239,7 +243,7 @@ describe("ToRuby sequences and keys", () => {
       ["b", 2],
     ]);
     class PsychTrailsList extends Array {}
-    registerConstant("PsychTrailsList", PsychTrailsList);
+    constSet(TopLevel, "PsychTrailsList", PsychTrailsList);
     const list = Psych.unsafeLoad("--- !ruby/array:PsychTrailsList\n- 1\n- 2\n");
     expect(list).toBeInstanceOf(PsychTrailsList);
     expect([...(list as number[])]).toEqual([1, 2]);
@@ -281,14 +285,15 @@ describe("ToRuby sequences and keys", () => {
 
   it("hands a load-tagged scalar's value to init_with through Coder#scalar", async () => {
     const { Psych } = await import("./psych.js");
-    const { registerConstant } = await import("./variable.js");
+    const { constSet } = await import("./include.js");
+    const { TopLevel } = await import("./object.js");
     class PsychTrailsScalar {
       value: unknown;
       initWith(coder: InstanceType<typeof Psych.Coder>) {
         this.value = coder.scalar();
       }
     }
-    registerConstant("PsychTrailsScalar", PsychTrailsScalar);
+    constSet(TopLevel, "PsychTrailsScalar", PsychTrailsScalar);
     Psych.loadTags["!scalarish"] = "PsychTrailsScalar";
     try {
       expect((Psych.unsafeLoad("--- !scalarish hello\n") as PsychTrailsScalar).value).toBe("hello");

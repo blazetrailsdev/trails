@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  NameError,
-  StandardError,
-  Thread,
-  rbEqual,
-  stderr,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
 import { include, constSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
@@ -89,13 +82,14 @@ expect.addEqualityTesters([
 ]);
 
 class Undeprecated {}
+constSet(TopLevel, "Undeprecated", Undeprecated);
 const UndeprecatedFoo = Object.assign(constSet(Undeprecated, "Foo", {}), {
   BAR: "foo bar",
 });
-registerConstant("Undeprecated::Foo", UndeprecatedFoo);
-registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
+constSet(Undeprecated, "Foo", UndeprecatedFoo);
+constSet(UndeprecatedFoo, "BAR", UndeprecatedFoo.BAR);
 class UndeprecatedError extends StandardError {}
-registerConstant("Undeprecated::Error", UndeprecatedError);
+constSet(Undeprecated, "Error", UndeprecatedError);
 
 class CallerLocationFixture implements CallerLocation {
   path = "packages/activesupport/src/deprecation.test.ts";

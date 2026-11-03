@@ -1,5 +1,5 @@
 import { constantize, ordinalize } from "@blazetrails/activesupport";
-import { block, constSet, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import { block, constSet, StandardError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
@@ -26,7 +26,7 @@ export class AfterDiscardRetryJob extends Base {
     }
   }
 }
-registerConstant("AfterDiscardRetryJob", AfterDiscardRetryJob);
+constSet(TopLevel, "AfterDiscardRetryJob", AfterDiscardRetryJob);
 for (const [name, klass] of Object.entries({
   UnhandledError,
   DefaultsError,

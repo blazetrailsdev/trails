@@ -1,8 +1,11 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  TopLevel,
+  constSet,
+} from "@blazetrails/ruby-compat";
 
 export const Pack1Helper = {
   conflictingHelper(): string {
     return "pack1";
   },
 };
-registerConstant("Pack1Helper", Pack1Helper);
+constSet(TopLevel, "Pack1Helper", Pack1Helper);

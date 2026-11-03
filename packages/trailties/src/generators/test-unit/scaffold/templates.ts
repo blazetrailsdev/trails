@@ -5,6 +5,8 @@ type Template = (this: ScaffoldGenerator) => string;
 function header(this: ScaffoldGenerator) {
   const testClassName = `${this.controllerClassName().split("::").pop()}ControllerTest`;
   const testPath = `${this.controllerClassName()}ControllerTest`;
+  const namespace = this.controllerClassName().split("::").slice(0, -1).join("::");
+  const owner = namespace === "" ? "TopLevel" : `constGet(Object, "${namespace}") as object`;
   const modelClassName = this.className().split("::").pop();
   const singular = this.singularTableName();
   const fixtureName = this.fixtureName();
@@ -13,7 +15,7 @@ function header(this: ScaffoldGenerator) {
 import { IntegrationTest } from "@blazetrails/actionpack";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { assertDifference } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 
@@ -22,7 +24,7 @@ export class ${testClassName} extends IntegrationTest {
   declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 
   static {
-    registerConstant("${testPath}", this);
+    constSet(${owner}, "${testClassName}", this);
     this.setup(async function (this: ${testClassName}) {
       this["@${singular}"] = await this.${fixtureName}("one");
     });

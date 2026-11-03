@@ -1,12 +1,14 @@
 import { constSetPath } from "../../../test-helpers/const-set-path.js";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
 import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
 
-registerConstant("Dispatching", { name: "Dispatching" });
-registerConstant("Dispatching::Submodule", { name: "Dispatching::Submodule" });
+constSet(TopLevel, "Dispatching", { name: "Dispatching" });
+constSet(constGet(Object, "Dispatching") as object, "Submodule", {
+  name: "Dispatching::Submodule",
+});
 
 class SimpleController extends Base {
   static {

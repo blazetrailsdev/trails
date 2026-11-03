@@ -1,14 +1,14 @@
 import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Mime } from "../../../action-dispatch/http/mime-type.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
 
-registerConstant("ContentType", { name: "ContentType" });
+constSet(TopLevel, "ContentType", { name: "ContentType" });
 
 class BaseController extends Base {
   async index(): Promise<void> {

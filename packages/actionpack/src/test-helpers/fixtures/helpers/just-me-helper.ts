@@ -1,8 +1,11 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  TopLevel,
+  constSet,
+} from "@blazetrails/ruby-compat";
 
 export const JustMeHelper = {
   me(): string {
     return "mine!";
   },
 };
-registerConstant("JustMeHelper", JustMeHelper);
+constSet(TopLevel, "JustMeHelper", JustMeHelper);

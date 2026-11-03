@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { block, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
+import { block, kernelThrow, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { ConfiguredJob } from "./configured-job.js";
 import { ActiveJob } from "./namespaces.js";
@@ -12,7 +12,7 @@ class AbortJob extends HelloJob {
     return "AbortJob";
   }
 }
-registerConstant("AbortJob", AbortJob);
+constSet(TopLevel, "AbortJob", AbortJob);
 (AbortJob as unknown as { setCallback(...a: unknown[]): void }).setCallback(
   "enqueue",
   "before",

@@ -12,7 +12,7 @@ import {
 import { Deadlocked, Rollback } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
   EnqueueError,
@@ -50,8 +50,9 @@ class NonOverlappingGroupedJob2 extends NonOverlappingJob {
   }
 }
 
+const JobTest = constSet(constGet(Object, "SolidQueue") as object, "JobTest", {});
 for (const klass of [NonOverlappingJob, NonOverlappingGroupedJob1, NonOverlappingGroupedJob2]) {
-  registerConstant(`SolidQueue::JobTest::${klass.name}`, klass);
+  constSet(JobTest, klass.name, klass);
 }
 
 describe("SolidQueue::JobTest", () => {

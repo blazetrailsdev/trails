@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import { iseqLocationSetup, rbObjMethod, registerConstant } from "@blazetrails/ruby-compat";
+import { iseqLocationSetup, rbObjMethod, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
@@ -188,7 +188,7 @@ describe("TestCase lifecycle hooks", () => {
 class DeclarativeCollisionTest extends TestCase {
   ["test_is_already_defined"](): void {}
 }
-registerConstant("DeclarativeCollisionTest", DeclarativeCollisionTest);
+constSet(TopLevel, "DeclarativeCollisionTest", DeclarativeCollisionTest);
 
 describe("DeclarativeCollisionTest", () => {
   let raised: { name?: string; message?: string } | undefined;

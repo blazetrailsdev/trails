@@ -9,7 +9,6 @@ import {
   rbEqual,
   rbObjEncoding,
   rbStrEnumerateLines,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ENCODING_FLAG } from "../../action-view.js";
@@ -209,5 +208,3 @@ export class TSE implements TemplateHandler {
     return withOffset;
   }
 }
-
-registerConstant("ActionView::Template::Handlers::TSE", TSE);

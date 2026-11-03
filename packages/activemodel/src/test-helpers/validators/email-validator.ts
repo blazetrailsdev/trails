@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { EachValidator } from "../../validator.js";
 import type { ValidatableRecord } from "../../validator.js";
 
@@ -13,4 +13,4 @@ export class EmailValidator extends EachValidator {
   }
 }
 
-registerConstant("EmailValidator", EmailValidator);
+constSet(TopLevel, "EmailValidator", EmailValidator);

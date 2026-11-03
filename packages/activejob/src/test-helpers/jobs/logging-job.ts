@@ -1,4 +1,4 @@
-import { aryJoin, registerConstant } from "@blazetrails/ruby-compat";
+import { aryJoin, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
@@ -19,4 +19,4 @@ export class LoggingJob extends Base {
     this._jobId = value;
   }
 }
-registerConstant("LoggingJob", LoggingJob);
+constSet(TopLevel, "LoggingJob", LoggingJob);

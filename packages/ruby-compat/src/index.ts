@@ -11,8 +11,8 @@ export { File, type FileOpenOpt } from "./file.js";
 export { Base64 } from "./base64.js";
 export {
   classPathMismatches,
-  generatedClass,
-  generatedClassPath,
+  rbClassPath,
+  rbConstTableGet,
   isClassPathPending,
   isModuleObject,
   defineConstants,
@@ -403,7 +403,6 @@ export {
   rbConstMissing,
   rbModConstMissing,
   rbFBinding,
-  registerConstant,
   registeredConstant,
   rbModRemoveConst,
   unregisterConstant,

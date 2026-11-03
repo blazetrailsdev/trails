@@ -1,4 +1,4 @@
-import { registerConstant } from "../../variable.js";
+import { classpaths } from "../../classpath.js";
 import { Node } from "./node.js";
 
 /**
@@ -41,4 +41,4 @@ export class Sequence extends Node {
   }
 }
 
-registerConstant("Psych::Nodes::Sequence", Sequence);
+classpaths.set(Sequence, { path: "Psych::Nodes::Sequence", permanent: true });

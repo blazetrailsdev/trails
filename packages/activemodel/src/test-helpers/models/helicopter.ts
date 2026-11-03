@@ -1,9 +1,9 @@
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Model } from "../../index.js";
 import { ModelName } from "../../naming.js";
 
 export class Helicopter extends Model {}
-registerConstant("Helicopter", Helicopter);
+constSet(TopLevel, "Helicopter", Helicopter);
 
 export class Comanche extends Model {}
 constSet(Helicopter, "Comanche", Comanche);

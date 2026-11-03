@@ -19,8 +19,9 @@ import {
   basicObjRespondTo,
   include,
   kernelThrow,
-  registerConstant,
   StringIO,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { setVerboseEnqueueLogs } from "./active-job.js";
 import { Base } from "./base.js";
@@ -99,7 +100,7 @@ class LoggingTest extends TestCase {
 }
 include(LoggingTest, TestHelper);
 include(LoggingTest, LogSubscriberTestHelper);
-registerConstant("LoggingTest", LoggingTest);
+constSet(TopLevel, "LoggingTest", LoggingTest);
 
 type Ctx = TestContext & { testCase: LoggingTest & TestHelper };
 type Configured = { performLater(...args: unknown[]): Promise<unknown> };

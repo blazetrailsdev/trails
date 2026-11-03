@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { include, Module, constSet } from "./include.js";
 import { NameError } from "./name-error.js";
-import { TopLevel, rbCSymbol, rbModName, rbModToS, rbSetClassPathString } from "./object.js";
+import { TopLevel, rbCSymbol, rbModName } from "./object.js";
 import { TypeError } from "./type-error.js";
 import { Exception } from "./exception.js";
 import { Range } from "./range.js";
@@ -13,7 +13,6 @@ import {
   rbModConstMissing,
   rbModConstants,
   rbPathToClass,
-  registerConstant,
   rbModRemoveConst,
   registeredConstant,
   resetConstants,
@@ -29,28 +28,18 @@ describe("rb_path_to_class", () => {
   class Gadget extends Widget {}
   const Shop = new Module();
 
-  const seated: [string, unknown][] = [
-    ["PathShop", Shop],
-    ["PathShop::Widget", Widget],
-    ["PathShop::Gadget", Gadget],
-    ["PathLimit", 5],
-    ["PathDepot::Aisle::Shelf", Gadget],
-  ];
-  for (const [name, value] of seated) registerConstant(name, value);
-  afterEach(() => {
-    for (const [name, value] of seated) registerConstant(name, value);
-  });
+  const seat = (): void => {
+    constSet(TopLevel, "PathShop", Shop);
+    constSet(Shop, "Widget", Widget);
+    constSet(Shop, "Gadget", Gadget);
+    constSet(TopLevel, "PathLimit", 5);
+  };
+  seat();
+  afterEach(seat);
 
   it("walks each :: segment from the Object table", () => {
     expect(rbPathToClass("PathShop")).toBe(Shop);
     expect(rbPathToClass("PathShop::Widget")).toBe(Widget);
-  });
-
-  it("reads a full path the table seats before walking its prefixes", () => {
-    expect(rbPathToClass("PathDepot::Aisle::Shelf")).toBe(Gadget);
-    expect(() => rbPathToClass("PathDepot::Aisle")).toThrow(
-      new ArgumentError("undefined class/module PathDepot::"),
-    );
   });
 
   it("reads a segment the table does not hold as a constant of the namespace before it", () => {
@@ -110,42 +99,6 @@ describe("rb_path_to_class", () => {
   });
 });
 
-describe("the Object constant table", () => {
-  class Seat {}
-  class Pathed {}
-  rbSetClassPathString(Pathed, { name: "Outer" }, "Pathed");
-  const Hall = new Module();
-
-  it("names a class or module that has no permanent classpath, as const_set does", () => {
-    registerConstant("Table::Seat", Seat);
-    registerConstant("Table::Hall", Hall);
-    expect(isRegisteredConstant("Table::Seat")).toBe(true);
-    expect(registeredConstant("Table::Seat")).toBe(Seat);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-    expect(rbModToS(Seat)).toBe("Table::Seat");
-    expect(Hall.name).toBe("Table::Hall");
-    const Lobby = {};
-    registerConstant("Table::Lobby", Lobby);
-    expect(rbModName(Lobby as never)).toBe("Table::Lobby");
-  });
-
-  it("keeps the permanent classpath a class already has", () => {
-    registerConstant("Table::Alias", Seat);
-    registerConstant("Table::Pathed", Pathed);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-    expect(rbModName(Pathed)).toBe("Outer::Pathed");
-    expect(rbPathToClass("Table::Alias")).toBe(Seat);
-  });
-
-  it("unregisters only the value it was handed, and the class keeps its name", () => {
-    unregisterConstant("Table::Seat", class Seat {});
-    expect(isRegisteredConstant("Table::Seat")).toBe(true);
-    unregisterConstant("Table::Seat", Seat);
-    expect(isRegisteredConstant("Table::Seat")).toBe(false);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-  });
-});
-
 describe("rb_const_get", () => {
   class Checks {}
   class LocalCheck {}
@@ -162,7 +115,6 @@ describe("rb_const_get", () => {
 
   afterEach(() => {
     unregisterConstant("ConstGetTopCheck", TopCheck);
-    unregisterConstant("ConstGetSpace::TopCheck", TopCheck);
   });
 
   it("reads a constant off the class before its included modules", () => {
@@ -175,7 +127,7 @@ describe("rb_const_get", () => {
   });
 
   it("falls through to the top-level table", () => {
-    registerConstant("ConstGetTopCheck", TopCheck);
+    constSet(TopLevel, "ConstGetTopCheck", TopCheck);
     expect(rbConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
   });
 
@@ -210,19 +162,14 @@ describe("rb_const_get", () => {
       unregisterConstant("ConstGetOuter", Outer);
     });
 
-    it("reads a seated path whole", () => {
-      registerConstant("ConstGetSpace::TopCheck", TopCheck);
-      expect(constGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
-    });
-
     it("reads each later segment from the namespace before it", () => {
-      registerConstant("ConstGetOuter", Outer);
+      constSet(TopLevel, "ConstGetOuter", Outer);
       expect(constGet(Sub, "ConstGetOuter::Inner")).toBe(Outer.Inner);
       expect(constGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
     });
 
     it("names the missing segment, not the path", () => {
-      registerConstant("ConstGetOuter", Outer);
+      constSet(TopLevel, "ConstGetOuter", Outer);
       let error: unknown;
       try {
         constGet(Sub, "ConstGetAbsent::Inner");
@@ -382,11 +329,11 @@ describe("rbModDeprecateConstant", () => {
 });
 
 describe("TopLevel", () => {
-  it("is the table registerConstant writes and the readers read", () => {
+  it("is the table constSet writes and the readers read", () => {
     const klass = class Seated {};
     const tbl = TopLevel as Record<string, unknown>;
     try {
-      registerConstant("Seated", klass);
+      constSet(TopLevel, "Seated", klass);
       expect(tbl.Seated).toBe(klass);
       delete tbl.Seated;
       expect(isRegisteredConstant("Seated")).toBe(false);
@@ -427,9 +374,9 @@ describe("resetConstants", () => {
       ["Symbol", rbCSymbol],
     ] as const;
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
-    registerConstant("Table::Reset", class Reset {});
+    constSet(TopLevel, "TableReset", class TableReset {});
     resetConstants();
-    expect(isRegisteredConstant("Table::Reset")).toBe(false);
+    expect(isRegisteredConstant("TableReset")).toBe(false);
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
   });
 });

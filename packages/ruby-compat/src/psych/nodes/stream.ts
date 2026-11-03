@@ -1,4 +1,4 @@
-import { registerConstant } from "../../variable.js";
+import { classpaths } from "../../classpath.js";
 import { Parser } from "../parser.js";
 import { Node } from "./node.js";
 
@@ -32,4 +32,4 @@ export class Stream extends Node {
   }
 }
 
-registerConstant("Psych::Nodes::Stream", Stream);
+classpaths.set(Stream, { path: "Psych::Nodes::Stream", permanent: true });

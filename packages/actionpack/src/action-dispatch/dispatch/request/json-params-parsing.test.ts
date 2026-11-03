@@ -1,5 +1,5 @@
 import { describe, it, afterEach, beforeEach, vi } from "vitest";
-import { registerConstant, stderr, StringIO } from "@blazetrails/ruby-compat";
+import { stderr, StringIO, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertRaise, Logger } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
 import { ParseError } from "../../http/parameters.js";
@@ -11,7 +11,7 @@ import type { MountableApp } from "../../routing/mapper.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class JsonParamsParsingTest extends IntegrationTest {}
-registerConstant("JsonParamsParsingTest", JsonParamsParsingTest);
+constSet(TopLevel, "JsonParamsParsingTest", JsonParamsParsingTest);
 
 describe("JsonParamsParsingTest", () => {
   class TestController extends Base {
@@ -150,7 +150,7 @@ describe("JsonParamsParsingTest", () => {
 });
 
 class RootLessJSONParamsParsingTest extends IntegrationTest {}
-registerConstant("RootLessJSONParamsParsingTest", RootLessJSONParamsParsingTest);
+constSet(TopLevel, "RootLessJSONParamsParsingTest", RootLessJSONParamsParsingTest);
 
 describe("RootLessJSONParamsParsingTest", () => {
   class UsersController extends Base {

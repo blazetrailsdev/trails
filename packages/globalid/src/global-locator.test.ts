@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { assertDeprecated, assertNil } from "@blazetrails/activesupport";
-import { Enumerable, include, registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { Enumerable, include, resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { Identification } from "./identification.js";
@@ -57,7 +57,7 @@ const Forwardable = {};
 
 function registerConstants(registry: Record<string, LocatorModel>): void {
   for (const [name, klass] of Object.entries(registry)) {
-    registerConstant(name, klass);
+    constSet(TopLevel, name, klass);
   }
 }
 
@@ -522,7 +522,7 @@ describe("GlobalLocatorTest", () => {
       }
     }
     registerConstants(REGISTRY);
-    registerConstant("PersonNoPk", PersonNoPk);
+    constSet(TopLevel, "PersonNoPk", PersonNoPk);
 
     const gid = GlobalID.create(new PersonNoPk("id"));
     const found = (await Locator.locate(gid)) as PersonNoPk;
@@ -600,8 +600,8 @@ describe("ScopedRecordLocatingTest", () => {
 
   beforeEach(() => {
     GlobalID.setApp(TEST_APP);
-    registerConstant("PersonScoped", PersonScoped);
-    registerConstant("Person", Person);
+    constSet(TopLevel, "PersonScoped", PersonScoped);
+    constSet(TopLevel, "Person", Person);
     gid = GlobalID.create(new PersonScoped("1"));
   });
   afterEach(() => {

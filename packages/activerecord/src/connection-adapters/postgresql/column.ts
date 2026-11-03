@@ -1,8 +1,9 @@
+import { ConnectionAdapters } from "../../namespaces.js";
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { rbHash, rbStrSend, registerConstant } from "@blazetrails/ruby-compat";
+import { rbHash, rbStrSend, constSet } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -112,4 +113,4 @@ export class Column extends BaseColumn {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::Column", Column);
+constSet(ConnectionAdapters.PostgreSQL, "Column", Column);

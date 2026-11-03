@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { assert, assertNot, inflections } from "@blazetrails/activesupport";
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 class Post {
   static TrackBack = class TrackBack {};
 }
-registerConstant("Post", Post);
+constSet(TopLevel, "Post", Post);
 constSet(Post, "TrackBack", Post.TrackBack);
 
 const Blog = {} as { Post: { name: string } };
-registerConstant("Blog", Blog);
+constSet(TopLevel, "Blog", Blog);
 constSet(Blog, "Post", class Post {});
 
 describe("NamingTest", () => {

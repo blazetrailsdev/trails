@@ -1,10 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import {
-  CancelledOperationError,
-  ScheduledTask,
-  rbFArray,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { CancelledOperationError, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { RecurringTask } from "../recurring-task.js";
 
@@ -98,5 +93,3 @@ export interface RecurringSchedule {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
-
-registerConstant("SolidQueue::Scheduler::RecurringSchedule", RecurringSchedule);

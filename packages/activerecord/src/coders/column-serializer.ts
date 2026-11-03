@@ -5,7 +5,6 @@ import {
   rbModToS,
   rbObjClassname,
   rbObjIsKindOf,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
@@ -87,5 +86,3 @@ export class ColumnSerializer {
     }
   }
 }
-
-registerConstant("ActiveRecord::Coders::ColumnSerializer", ColumnSerializer);

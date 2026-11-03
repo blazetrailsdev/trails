@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Text extends StringType {
@@ -6,5 +5,3 @@ export class Text extends StringType {
     return "text";
   }
 }
-
-registerConstant("ActiveRecord::Type::Text", Text);

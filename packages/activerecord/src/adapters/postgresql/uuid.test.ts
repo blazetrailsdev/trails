@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, registerConstant, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
@@ -504,7 +504,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     const PostgresqlUUIDHasManyThroughDisableJoinsTest = {};
-    registerConstant(
+    constSet(
+      TopLevel,
       "PostgresqlUUIDHasManyThroughDisableJoinsTest",
       PostgresqlUUIDHasManyThroughDisableJoinsTest,
     );

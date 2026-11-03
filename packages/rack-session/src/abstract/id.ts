@@ -9,7 +9,6 @@ import {
   rbInspect as inspect,
   rbObjClassname,
   KeyError,
-  registerConstant,
   eachPair,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
@@ -695,4 +694,3 @@ Object.defineProperty(PersistedSecure, "name", {
   value: "Rack::Session::Abstract::PersistedSecure",
 });
 Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });
-registerConstant("Rack::Session::SessionId", SessionId);

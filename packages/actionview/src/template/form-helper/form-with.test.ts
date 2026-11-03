@@ -24,7 +24,8 @@ import {
   Hash,
   include,
   publicInstanceMethods,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { Base } from "../../base.js";
@@ -3022,7 +3023,7 @@ describe("FormWithActsLikeFormForTest", () => {
     "<label for='title'>Title:</label> <input name='post[title]' type='text' value='Hello World' id='post_title' /><br/>";
 
   it("lazy loading default form builder", () => {
-    registerConstant("FormWithActsLikeFormForTest", { LabelledFormBuilder });
+    constSet(TopLevel, "FormWithActsLikeFormForTest", { LabelledFormBuilder });
     const base = Base as unknown as { defaultFormBuilder: unknown };
     const oldDefaultFormBuilder = base.defaultFormBuilder;
     base.defaultFormBuilder = "FormWithActsLikeFormForTest::LabelledFormBuilder";
@@ -3056,7 +3057,7 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("lazy loading form builder override", () => {
-    registerConstant("FormWithActsLikeFormForTest", { LabelledFormBuilder });
+    constSet(TopLevel, "FormWithActsLikeFormForTest", { LabelledFormBuilder });
     view.defaultFormBuilder = "FormWithActsLikeFormForTest::LabelledFormBuilder";
 
     rendered = view.fields("post", { model: post() }, (f) => {

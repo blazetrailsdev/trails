@@ -1,4 +1,4 @@
-import { File, Pathname, registerConstant } from "@blazetrails/ruby-compat";
+import { File, Pathname, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Error as ZeitwerkError } from "./error.js";
 import type { Loader } from "./loader.js";
@@ -6,7 +6,8 @@ import { newLoader, teardown, withFiles, withSetup } from "./test-helpers/loader
 
 describe("TesPushDir", () => {
   class Namespace {}
-  registerConstant("TesPushDir::Namespace", Namespace);
+  constSet(TopLevel, "TesPushDir", {});
+  constSet(constGet(Object, "TesPushDir") as object, "Namespace", Namespace);
 
   let loader: Loader;
 

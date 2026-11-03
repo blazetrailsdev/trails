@@ -1,5 +1,5 @@
 import { NameError } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { ConfigurationError } from "./errors.js";
@@ -115,7 +115,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
   });
 
   it("resolves a job configured by name and caches the class", () => {
-    registerConstant("ResolvableJob", ResolvableJob);
+    constSet(TopLevel, "ResolvableJob", ResolvableJob);
     expect(ResolvableJobAsync.destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(ResolvableJobAsync._destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(() =>

@@ -5,7 +5,6 @@ import {
   rbInspect as inspect,
   rbEqual,
   rbHash,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 import { SerializeCastValue } from "./serialize-cast-value.js";
@@ -140,5 +139,3 @@ rbDeclareIvar(ValueType, "@scale", "_scale");
 rbDeclareIvar(ValueType, "@limit", "__limit");
 
 ValueType.prototype.eql = ValueType.prototype.equals;
-
-registerConstant("ActiveModel::Type::Value", ValueType);

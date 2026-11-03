@@ -19,7 +19,8 @@ import {
   rbCallSuper,
   rbModName,
   setEnv,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./trails.js";
@@ -34,7 +35,7 @@ class BootAppIntegrationTest extends ActionController.IntegrationTest {
     });
   }
 }
-registerConstant("BootAppIntegrationTest", BootAppIntegrationTest);
+constSet(TopLevel, "BootAppIntegrationTest", BootAppIntegrationTest);
 
 type FixtureHost = { fixturePaths: string[]; fileFixturePath?: string; fixtures?: unknown };
 

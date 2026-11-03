@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 export const Publisher = {};
-registerConstant("Publisher", Publisher);
+constSet(TopLevel, "Publisher", Publisher);

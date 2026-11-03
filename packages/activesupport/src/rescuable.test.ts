@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { block, include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import { block, include, rbObjRespondTo, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 import { Rescuable } from "./rescuable.js";
 
@@ -16,9 +16,9 @@ const WeirdError = Object.defineProperty({}, "caseEquals", {
 });
 
 for (const klass of [WraithAttack, MadRonon, CoolError]) {
-  registerConstant(klass.name, klass);
+  constSet(TopLevel, klass.name, klass);
 }
-registerConstant("WeirdError", WeirdError);
+constSet(TopLevel, "WeirdError", WeirdError);
 
 class Stargate {
   static NuclearExplosion = class NuclearExplosion extends Error {};

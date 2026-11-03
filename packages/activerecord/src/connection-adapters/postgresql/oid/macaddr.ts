@@ -1,4 +1,5 @@
-import { casecmp, rbObjClass, registerConstant, rtest } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../../namespaces.js";
+import { casecmp, rbObjClass, rtest, constSet } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {
@@ -25,4 +26,4 @@ export class Macaddr extends StringType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Macaddr", Macaddr);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Macaddr", Macaddr);

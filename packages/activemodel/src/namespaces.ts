@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Attribute } from "./attribute.js";
 import type { Error } from "./error.js";
 import type {
@@ -34,7 +34,7 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   Validations: typeof Validations;
   Serializers: typeof Serializers;
 };
-registerConstant("ActiveModel", ActiveModel);
+constSet(TopLevel, "ActiveModel", ActiveModel);
 extend(ActiveModel, Autoload);
 ActiveModel.autoload("Attribute");
 ActiveModel.autoload("Validations");

@@ -9,8 +9,11 @@ import {
   getPath,
   setEnv,
   rbFLoad,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constGet,
+  constSet,
+  isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { invoke } from "../command.js";
@@ -33,7 +36,13 @@ function route(requirements: Record<string, string>): Journey.Route {
 describe("UnusedRoutesCommand", () => {
   const seated: [string, unknown][] = [];
   const seat = (name: string, klass: unknown): void => {
-    registerConstant(name, klass);
+    const i = name.lastIndexOf("::");
+    if (i >= 0 && !isRegisteredConstant(name.slice(0, i))) seat(name.slice(0, i), {});
+    constSet(
+      i < 0 ? TopLevel : (constGet(Object, name.slice(0, i)) as object),
+      i < 0 ? name : name.slice(i + 2),
+      klass,
+    );
     seated.push([name, klass]);
   };
 

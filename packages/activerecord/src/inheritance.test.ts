@@ -10,13 +10,7 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import {
-  include,
-  constSet,
-  regexpEscape,
-  registerConstant,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { include, constSet, regexpEscape, TopLevel } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -599,7 +593,7 @@ describe("InheritanceComputeTypeTest", () => {
 
 describe("InheritanceAttributeTest", () => {
   const InheritanceAttributeTest = {};
-  registerConstant("InheritanceAttributeTest", InheritanceAttributeTest);
+  constSet(TopLevel, "InheritanceAttributeTest", InheritanceAttributeTest);
   fixtures(["companies"]);
 
   class AttrTestCompany extends Base {
@@ -646,7 +640,7 @@ describe("InheritanceAttributeTest", () => {
 
 describe("InheritanceAttributeMappingTest", () => {
   const InheritanceAttributeMappingTest = {};
-  registerConstant("InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
+  constSet(TopLevel, "InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
   fixtures(["companies", "sponsors"]);
 
   class OmgStiType extends StringType {

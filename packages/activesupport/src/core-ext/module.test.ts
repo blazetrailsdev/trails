@@ -3,8 +3,10 @@ import {
   ArgumentError,
   NoMethodError,
   rbObjMethod,
-  registerConstant,
   unregisterConstant,
+  TopLevel,
+  constGet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
 import { DelegationError } from "../delegation.js";
@@ -33,7 +35,7 @@ class Somewhere {
     return block();
   }
 }
-registerConstant("Somewhere", Somewhere);
+constSet(TopLevel, "Somewhere", Somewhere);
 
 class Someone {
   static FAILED_DELEGATE_LINE: number;
@@ -165,12 +167,13 @@ class ArityTester {
     block?: unknown,
   ) {}
 }
-registerConstant("ModuleTest::ArityTester", ArityTester);
+constSet(TopLevel, "ModuleTest", {});
+constSet(constGet(Object, "ModuleTest") as object, "ArityTester", ArityTester);
 
 class ArityTesterModule {
   static zero() {}
 }
-registerConstant("ModuleTest::ArityTesterModule", ArityTesterModule);
+constSet(constGet(Object, "ModuleTest") as object, "ArityTesterModule", ArityTesterModule);
 
 class DecoratedReserved {
   constructor(public case_: any) {}
@@ -658,7 +661,8 @@ describe("ModuleTest", () => {
         return JSON.parse(source);
       }
     }
-    registerConstant("Admin::Json", Json);
+    constSet(TopLevel, "Admin", {});
+    constSet(constGet(Object, "Admin") as object, "Json", Json);
     try {
       class C {}
       delegate.call(C, "parse", { to: Json });

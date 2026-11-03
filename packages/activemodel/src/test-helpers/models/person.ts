@@ -1,5 +1,5 @@
 import { extend } from "@blazetrails/activesupport";
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Model } from "../../index.js";
 import { Translation, type TranslationClassMethods } from "../../translation.js";
 import type { ModelName } from "../../naming.js";
@@ -51,7 +51,7 @@ export class Person extends Model {
   }
 }
 
-registerConstant("Person", Person);
+constSet(TopLevel, "Person", Person);
 
 export class Gender {
   static {

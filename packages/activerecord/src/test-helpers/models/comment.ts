@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { ScopeOn } from "../../scoping/named.js";
@@ -21,7 +21,7 @@ declare module "../../relation.js" {
 }
 
 export class OopsError extends Error {}
-registerConstant("OopsError", OopsError);
+constSet(TopLevel, "OopsError", OopsError);
 
 const OopsExtension = {
   destroyAll(): never {

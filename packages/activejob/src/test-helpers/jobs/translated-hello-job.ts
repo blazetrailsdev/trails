@@ -1,5 +1,5 @@
 import { locale } from "@blazetrails/i18n";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
@@ -15,4 +15,4 @@ export class TranslatedHelloJob extends Base {
     JobBuffer.add(`${greeter} says ${hello}`);
   }
 }
-registerConstant("TranslatedHelloJob", TranslatedHelloJob);
+constSet(TopLevel, "TranslatedHelloJob", TranslatedHelloJob);

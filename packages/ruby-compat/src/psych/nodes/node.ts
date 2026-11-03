@@ -1,5 +1,6 @@
+import { classpaths } from "../../classpath.js";
 import { toEnum } from "../../enumerator.js";
-import { registerConstant, registeredConstant } from "../../variable.js";
+import { constGet } from "../../variable.js";
 import type { PsychIO } from "../../psych-adapter.js";
 import type { Emitter } from "../visitors/emitter.js";
 import type { DepthFirst } from "../visitors/depth-first.js";
@@ -31,10 +32,9 @@ export class Node {
    */
   each(block?: (node: Node) => unknown): unknown {
     if (!block) return toEnum(this, "each");
-    const VisitorsDepthFirst = registeredConstant(
-      "Psych::Visitors::DepthFirst",
-    ) as typeof DepthFirst;
-    return new VisitorsDepthFirst(block).accept(this);
+    return new (constGet(Object, "Psych::Visitors::DepthFirst") as typeof DepthFirst)(block).accept(
+      this,
+    );
   }
 
   /**
@@ -43,8 +43,9 @@ export class Node {
    * @noRailsEquivalent PERMANENT
    */
   toRuby({ symbolizeNames = false, freeze = false, strictInteger = false } = {}): unknown {
-    const VisitorsToRuby = registeredConstant("Psych::Visitors::ToRuby") as typeof ToRuby;
-    return VisitorsToRuby.create({ symbolizeNames, freeze, strictInteger }).accept(this);
+    return (constGet(Object, "Psych::Visitors::ToRuby") as typeof ToRuby)
+      .create({ symbolizeNames, freeze, strictInteger })
+      .accept(this);
   }
 
   /**
@@ -58,8 +59,9 @@ export class Node {
   ): string | PsychIO {
     let string = "";
     const realIo = io ?? { write: (s: string) => (string += s) };
-    const VisitorsEmitter = registeredConstant("Psych::Visitors::Emitter") as typeof Emitter;
-    new VisitorsEmitter(realIo, options).accept(this);
+    new (constGet(Object, "Psych::Visitors::Emitter") as typeof Emitter)(realIo, options).accept(
+      this,
+    );
     if (!io) return string;
     return io;
   }
@@ -95,4 +97,4 @@ export class Node {
   }
 }
 
-registerConstant("Psych::Nodes::Node", Node);
+classpaths.set(Node, { path: "Psych::Nodes::Node", permanent: true });

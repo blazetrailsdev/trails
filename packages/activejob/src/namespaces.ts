@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type * as ArgumentsModule from "./arguments.js";
 import type * as SerializersModule from "./serializers.js";
@@ -100,7 +100,7 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   verboseEnqueueLogs: typeof ActiveJobModule.verboseEnqueueLogs;
   setVerboseEnqueueLogs: typeof ActiveJobModule.setVerboseEnqueueLogs;
 };
-registerConstant("ActiveJob", ActiveJob);
+constSet(TopLevel, "ActiveJob", ActiveJob);
 extend(ActiveJob, Autoload);
 ActiveJob.autoload("Base");
 ActiveJob.autoload("QueueAdapters");

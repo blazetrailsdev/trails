@@ -1,16 +1,19 @@
 import { expect } from "vitest";
-import { NameError, registerConstant } from "@blazetrails/ruby-compat";
+import { NameError, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
 
 class AceBaseCase {}
 class AceBaseCaseDice {}
 class ConstantizeTestCases {}
 
 export function registerConstantizeFixtures(): void {
-  registerConstant("Ace::Base::Case", AceBaseCase);
-  registerConstant("Ace::Base::Case::Dice", AceBaseCaseDice);
-  registerConstant("Ace::Gas::Case", AceBaseCase);
-  registerConstant("Ace::Gas::Case::Dice", AceBaseCaseDice);
-  registerConstant("ConstantizeTestCases", ConstantizeTestCases);
+  constSet(TopLevel, "Ace", {});
+  constSet(constGet(Object, "Ace") as object, "Base", {});
+  constSet(constGet(Object, "Ace::Base") as object, "Case", AceBaseCase);
+  constSet(constGet(Object, "Ace::Base::Case") as object, "Dice", AceBaseCaseDice);
+  constSet(constGet(Object, "Ace") as object, "Gas", {});
+  constSet(constGet(Object, "Ace::Gas") as object, "Case", AceBaseCase);
+  constSet(constGet(Object, "Ace::Gas::Case") as object, "Dice", AceBaseCaseDice);
+  constSet(TopLevel, "ConstantizeTestCases", ConstantizeTestCases);
 }
 
 export function runConstantizeTestsOn(yieldFn: (name: string) => unknown): void {

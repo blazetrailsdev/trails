@@ -1,3 +1,4 @@
+import { constSet } from "./include.js";
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
 import type { PsychIO } from "./psych-adapter.js";
@@ -14,10 +15,10 @@ import { SyntaxError as PsychSyntaxError } from "./psych/syntax-error.js";
 import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { Omap as PsychOmap } from "./psych/omap.js";
-import { isPlainHash, rbModToS } from "./object.js";
+import { isPlainHash, rbModToS, TopLevel } from "./object.js";
 import { File } from "./file.js";
 import { IO } from "./io.js";
-import { registerConstant } from "./variable.js";
+
 import { Emitter as VisitorsEmitter } from "./psych/visitors/emitter.js";
 import { Parser as PsychParser } from "./psych/parser.js";
 import { TreeBuilder as PsychTreeBuilder } from "./psych/tree-builder.js";
@@ -397,4 +398,4 @@ export namespace Psych {
   }
 }
 
-registerConstant("Psych", Psych);
+constSet(TopLevel, "Psych", Psych);

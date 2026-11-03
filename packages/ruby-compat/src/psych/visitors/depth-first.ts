@@ -1,5 +1,6 @@
+import { classpaths } from "../../classpath.js";
 import type { Node } from "../nodes/node.js";
-import { registerConstant } from "../../variable.js";
+
 import { Visitor } from "./visitor.js";
 
 /**
@@ -39,4 +40,4 @@ export class DepthFirst extends Visitor {
   visitPsychNodesAlias = this.terminal;
 }
 
-registerConstant("Psych::Visitors::DepthFirst", DepthFirst);
+classpaths.set(DepthFirst, { path: "Psych::Visitors::DepthFirst", permanent: true });

@@ -1,5 +1,4 @@
 import { ActiveSupportJSON, isBlank } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class JSON {
   static dump(obj: unknown): string {
@@ -10,5 +9,3 @@ export class JSON {
     return isBlank(json) ? null : ActiveSupportJSON.decode(json as string | Uint8Array);
   }
 }
-
-registerConstant("ActiveRecord::Coders::JSON", JSON);

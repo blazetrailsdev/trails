@@ -2,7 +2,8 @@ import {
   FloatDomainError,
   FrozenError,
   NoMethodError,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
@@ -6848,6 +6849,6 @@ for (const seat of ["Temporal.Instant", "Date"]) {
     );
 }
 
-registerConstant("Date", Date);
-registerConstant("DateTime", DateTime);
+constSet(TopLevel, "Date", Date);
+constSet(TopLevel, "DateTime", DateTime);
 rbSetClassPathString(DateInfinity, Date, "Infinity");

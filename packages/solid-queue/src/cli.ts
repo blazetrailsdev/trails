@@ -1,4 +1,5 @@
-import { registerConstant, type Hash } from "@blazetrails/ruby-compat";
+import { type Hash, constSet } from "@blazetrails/ruby-compat";
+import { SolidQueue } from "./solid-queue.js";
 import { camelize } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Configuration } from "./configuration.js";
@@ -46,4 +47,4 @@ export class Cli extends Thor {
   }
 }
 
-registerConstant("SolidQueue::Cli", Cli);
+constSet(SolidQueue, "Cli", Cli);

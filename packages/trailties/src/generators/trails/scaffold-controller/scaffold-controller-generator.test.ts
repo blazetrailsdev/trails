@@ -4,8 +4,9 @@ import {
   Dir,
   File,
   TopLevel,
-  registerConstant,
   unregisterConstant,
+  constGet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, it } from "vitest";
 import { ActiveModel } from "../../active-model.js";
@@ -244,7 +245,9 @@ describe("ScaffoldControllerGeneratorTest", () => {
       }
     };
 
-    registerConstant("Unknown::Generators::ActiveModel", klass);
+    constSet(TopLevel, "Unknown", {});
+    constSet(constGet(Object, "Unknown") as object, "Generators", {});
+    constSet(constGet(Object, "Unknown::Generators") as object, "ActiveModel", klass);
     try {
       await t.runGenerator(["User", "--orm=unknown"]);
 

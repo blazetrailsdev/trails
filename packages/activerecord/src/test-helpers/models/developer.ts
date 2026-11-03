@@ -16,13 +16,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import {
-  Range,
-  RuntimeError,
-  registerConstant,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Range, RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -801,7 +795,7 @@ export class DeveloperName extends StringType {
     return `Developer: ${value}`;
   }
 }
-registerConstant("DeveloperName", DeveloperName);
+constSet(TopLevel, "DeveloperName", DeveloperName);
 
 Type.register("developer_name", DeveloperName);
 

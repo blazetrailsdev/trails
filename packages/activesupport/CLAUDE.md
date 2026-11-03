@@ -52,6 +52,11 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   with no `autoload` call: `ActiveSupport.BroadcastLogger` (`active_support.rb:30`,
   read at `logger.rb:21`) and `Attribute.UserProvidedDefault` on the class Rails
   nests it in (`attribute_registration.rb:5`).
+- A namespace object is seated on `TopLevel` with `constSet(TopLevel,
+"ActiveSupport", ActiveSupport)`, and a nested constant on its owner with
+  `constSet(Owner, "Name", Klass)`; there is no full-path `"A::B"` seat, so
+  `constantize` walks one segment at a time. A class the generated table names
+  needs no seat for its name.
 - `TopLevel` in `ruby-compat/src/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`

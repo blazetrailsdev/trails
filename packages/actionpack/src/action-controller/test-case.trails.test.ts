@@ -3,12 +3,12 @@ import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/ac
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   b,
-  registerConstant,
   setVerbose,
   stderr,
   StringIO,
   unregisterConstant,
   verbose,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { SessionId } from "@blazetrails/rack-session";
 import { UploadedFile } from "@blazetrails/rack-test";
@@ -541,7 +541,7 @@ describe("TestCase class helpers", () => {
 
   it("tests(string) resolves <Name>Controller via globalThis", () => {
     class WidgetController extends Base {}
-    registerConstant("WidgetController", WidgetController);
+    constSet(TopLevel, "WidgetController", WidgetController);
     try {
       class Sub extends TestCase {}
       Sub.tests("widget");
@@ -567,7 +567,7 @@ describe("TestCase class helpers", () => {
   });
 
   it("determineDefaultControllerClass strips trailing Test and looks up", () => {
-    registerConstant("BooksController", PostsController);
+    constSet(TopLevel, "BooksController", PostsController);
     try {
       expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
       expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();

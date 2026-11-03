@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { safeConstantize } from "@blazetrails/activesupport";
-import { include, constSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { include, constSet, unregisterConstant, TopLevel } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Naming } from "./naming.js";
 
@@ -17,7 +17,7 @@ describe("ActionCable::Channel::Naming constant names", () => {
   });
 
   it("reads a namespaced channel's full Ruby name and resolves it through safeConstantize", () => {
-    registerConstant("Chat", Chat);
+    constSet(TopLevel, "Chat", Chat);
     constSet(Chat, "AppearancesChannel", AppearancesChannel);
 
     const channelName = (AppearancesChannel as unknown as { channelName: string }).channelName;
@@ -33,7 +33,7 @@ describe("ActionCable::Channel::Naming constant names", () => {
     expect((ChatChannel as unknown as { channelName: string }).channelName).toBe(
       "action_cable:channel:chat",
     );
-    registerConstant("Chat", Chat);
+    constSet(TopLevel, "Chat", Chat);
     constSet(Chat, "AppearancesChannel", AppearancesChannel);
     expect((AppearancesChannel as unknown as { channelName: string }).channelName).toBe(
       "chat:appearances",

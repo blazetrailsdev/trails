@@ -1,5 +1,5 @@
 import { describe, it, afterEach, beforeEach } from "vitest";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
 import { deprecator } from "../../deprecator.js";
@@ -9,7 +9,7 @@ import type { MountableApp } from "../../routing/mapper.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class UrlEncodedParamsParsingTest extends IntegrationTest {}
-registerConstant("UrlEncodedParamsParsingTest", UrlEncodedParamsParsingTest);
+constSet(TopLevel, "UrlEncodedParamsParsingTest", UrlEncodedParamsParsingTest);
 
 describe("UrlEncodedParamsParsingTest", () => {
   class TestController extends Base {

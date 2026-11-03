@@ -9,12 +9,15 @@
  *
  * @noRailsEquivalent PERMANENT
  */
-export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
+export const classpaths = new WeakMap<
+  object,
+  { path: string; permanent: boolean; under?: object; id?: string }
+>();
 
 const pendingClassPaths: [() => unknown, string][] = [];
 let classPathsRegistered = false;
-const generatedClassPaths = new WeakMap<object, string>();
-const generatedClasses = new Map<string, () => unknown>();
+const tableClassPaths = new WeakMap<object, string>();
+const tableClasses = new Map<string, () => unknown>();
 
 /**
  * Seats a package's `constants.generated.ts`: each row gives the path
@@ -32,17 +35,34 @@ export function defineConstants(entries: readonly [() => unknown, string][]): vo
   for (const [klass, path] of entries) {
     pendingClassPaths.push([klass, path]);
     classPathsRegistered = true;
-    generatedClasses.set(path, klass);
+    tableClasses.set(path, klass);
   }
 }
 
 /**
- * The `classpath` `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122`) reads,
- * from the class's generated table, or `undefined`.
+ * `rb_class_path` (`vendor/ruby/v3.3.11/variable.c:364`): the `classpath` a
+ * `const_set` seated, else the class's row in its package's generated table,
+ * or `undefined`. A path `const_set` wrote under an owner whose own path was
+ * still unresolved is re-derived from the owner once it resolves, as
+ * `set_namespace_path` (`vendor/ruby/v3.3.11/variable.c:3582`) re-paths the
+ * constants under a namespace when the namespace is named.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function generatedClassPath(klass: object): string | undefined {
+export function rbClassPath(klass: object): string | undefined {
+  const seated = classpaths.get(klass);
+  if (seated !== undefined) {
+    if (seated.under !== undefined) {
+      const under = rbClassPath(seated.under);
+      if (under !== undefined) {
+        seated.path = `${under}::${seated.id}`;
+        seated.under = undefined;
+      } else if (pendingClassPaths.length === 0) {
+        seated.under = undefined;
+      }
+    }
+    return seated.path;
+  }
   if (classPathsRegistered) {
     classPathsRegistered = false;
     let unresolved = 0;
@@ -58,14 +78,14 @@ export function generatedClassPath(klass: object): string | undefined {
         pendingClassPaths[unresolved++] = entry;
       } else if (
         (typeof value === "function" || (typeof value === "object" && value !== null)) &&
-        !generatedClassPaths.has(value)
+        !tableClassPaths.has(value)
       ) {
-        generatedClassPaths.set(value, entry[1]);
+        tableClassPaths.set(value, entry[1]);
       }
     }
     pendingClassPaths.length = unresolved;
   }
-  const path = generatedClassPaths.get(klass);
+  const path = tableClassPaths.get(klass);
   if (path !== undefined || pendingClassPaths.length === 0) return path;
   const { name } = klass as { name?: unknown };
   for (const entry of pendingClassPaths.filter(
@@ -81,12 +101,12 @@ export function generatedClassPath(klass: object): string | undefined {
     pendingClassPaths.splice(pendingClassPaths.indexOf(entry), 1);
     if (
       (typeof value === "function" || (typeof value === "object" && value !== null)) &&
-      !generatedClassPaths.has(value)
+      !tableClassPaths.has(value)
     ) {
-      generatedClassPaths.set(value, entry[1]);
+      tableClassPaths.set(value, entry[1]);
     }
   }
-  return generatedClassPaths.get(klass);
+  return tableClassPaths.get(klass);
 }
 
 /**
@@ -101,14 +121,15 @@ export function isClassPathPending(klass: object): boolean {
 }
 
 /**
- * The class `rb_path_to_class` (`vendor/ruby/v3.3.11/variable.c:432`) resolves
- * a full path to, from a generated table, or `undefined`.
+ * The class a package's generated table names under a full path, or
+ * `undefined`: the row `rb_const_search` (`vendor/ruby/v3.3.11/variable.c:3190`)
+ * would find in a namespace's constant table.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function generatedClass(path: string): unknown {
+export function rbConstTableGet(path: string): unknown {
   try {
-    return generatedClasses.get(path)?.();
+    return tableClasses.get(path)?.();
   } catch {
     return undefined;
   }
@@ -127,7 +148,7 @@ export function generatedClass(path: string): unknown {
 export function classPathMismatches(): [string, string][] {
   const mismatches: [string, string][] = [];
   const named = new Map<unknown, string>();
-  for (const [path, thunk] of generatedClasses) {
+  for (const [path, thunk] of tableClasses) {
     let klass: unknown;
     try {
       klass = thunk();

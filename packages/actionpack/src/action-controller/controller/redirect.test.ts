@@ -13,8 +13,8 @@ import {
   ArgumentError,
   constSet,
   rbObjSingletonClass,
-  registerConstant,
   RuntimeError,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
@@ -719,7 +719,7 @@ describe("RedirectTest", () => {
 });
 
 const ModuleTest = {} as { ModuleRedirectController: typeof RedirectController };
-registerConstant("ModuleTest", ModuleTest);
+constSet(TopLevel, "ModuleTest", ModuleTest);
 constSet(
   ModuleTest,
   "ModuleRedirectController",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, Mutex, extend, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, Mutex, extend, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
 import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
@@ -24,7 +24,7 @@ class QueueAdapterTest extends TestCase {
     return "QueueAdapterTest";
   }
 }
-registerConstant("QueueAdapterTest", QueueAdapterTest);
+constSet(TopLevel, "QueueAdapterTest", QueueAdapterTest);
 
 describe("QueueAdapterTest", () => {
   it("should forbid nonsense arguments", () => {

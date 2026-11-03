@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { include, constSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { include, constSet, unregisterConstant, TopLevel } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Broadcasting } from "./broadcasting.js";
 import { Naming } from "./naming.js";
@@ -17,11 +17,11 @@ describe("ActionCable::Channel::Broadcasting", () => {
   class RoomsChannel extends ChatChannel {}
   const klass = RoomsChannel as unknown as Host;
 
-  registerConstant("ChatChannel", ChatChannel);
+  constSet(TopLevel, "ChatChannel", ChatChannel);
   afterEach(() => unregisterConstant("Chat", Chat));
 
   it("serializes a namespaced class's channel name with the model", () => {
-    registerConstant("Chat", Chat);
+    constSet(TopLevel, "Chat", Chat);
     constSet(Chat, "RoomsChannel", RoomsChannel);
     expect(klass.broadcastingFor("lobby")).toBe("chat:rooms:lobby");
   });

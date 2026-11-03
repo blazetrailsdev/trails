@@ -12,7 +12,7 @@ import {
   include,
   type Included,
 } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -99,5 +99,3 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
 include(TimeType, acceptsMultiparameterTime);
 
 include(TimeType, TimeValue);
-
-registerConstant("ActiveModel::Type::Time", TimeType);

@@ -11,8 +11,8 @@ import {
   rbFArray,
   rbFCaller,
   rbStrRpartition,
-  registerConstant,
   warn,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 import {
@@ -296,11 +296,5 @@ export class Cookie extends PersistedSecure {
   }
 }
 
-registerConstant("Rack::Session::Cookie", Cookie);
-registerConstant("Rack::Session::Cookie::Base64", Cookie.Base64);
-registerConstant("Rack::Session::Cookie::Base64::Marshal", Cookie.Base64.Marshal);
-registerConstant("Rack::Session::Cookie::Base64::JSON", Cookie.Base64.JSON);
-registerConstant("Rack::Session::Cookie::Base64::ZipJSON", Cookie.Base64.ZipJSON);
-registerConstant("Rack::Session::Cookie::Identity", Cookie.Identity);
-registerConstant("Rack::Session::Cookie::Marshal", Cookie.Marshal);
-registerConstant("Rack::Session::Cookie::SessionId", Cookie.SessionId);
+constSet(Cookie.Base64, "Marshal", Cookie.Base64.Marshal);
+constSet(Cookie, "Marshal", Cookie.Marshal);

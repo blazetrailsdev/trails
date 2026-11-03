@@ -3,7 +3,7 @@ import { Base as JobBase } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
 import { TestAdapter } from "@blazetrails/activejob/queue-adapters/test-adapter";
 import { EnqueueError } from "@blazetrails/activejob/enqueuing";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
@@ -17,7 +17,7 @@ class AfterCommitTopicJob extends JobBase {
   perform(): void {}
 }
 AfterCommitTopicJob.enqueueAfterTransactionCommit = true;
-registerConstant("AfterCommitTopicJob", AfterCommitTopicJob);
+constSet(TopLevel, "AfterCommitTopicJob", AfterCommitTopicJob);
 
 describe("EnqueueAfterTransactionCommit with a real transaction", () => {
   fixtures(["topics"]);

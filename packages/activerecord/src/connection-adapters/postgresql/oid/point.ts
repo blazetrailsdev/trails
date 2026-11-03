@@ -1,11 +1,12 @@
+import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   ArgumentError,
   kernelFloat,
   rbEqual,
   rbObjAsString,
   rbStrSend,
-  registerConstant,
   Struct,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
@@ -92,4 +93,4 @@ function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown]
   return [value.x ?? value["x"], value.y ?? value["y"]];
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Point", Point);
+constSet(ConnectionAdapters.PostgreSQL.OID, "Point", Point);

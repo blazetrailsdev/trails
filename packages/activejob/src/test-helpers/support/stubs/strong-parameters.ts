@@ -1,5 +1,5 @@
 import { withIndifferentAccess, type HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 export class Parameters {
   static toString(): string {
@@ -20,4 +20,4 @@ export class Parameters {
     return this._parameters.toH() as Record<string, unknown>;
   }
 }
-registerConstant("Parameters", Parameters);
+constSet(TopLevel, "Parameters", Parameters);

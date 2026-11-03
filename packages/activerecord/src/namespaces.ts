@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -258,7 +258,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   HasOneThroughNestedAssociationsAreReadonly: typeof HasOneThroughNestedAssociationsAreReadonly;
   afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
-registerConstant("ActiveRecord", ActiveRecord);
+constSet(TopLevel, "ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
@@ -383,6 +383,8 @@ export const ConnectionAdapters = {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
   MySQL: { name: string; Column: typeof MySQLColumn };
+  PostgreSQL: { name: string; OID: { name: string } };
+  SQLite3: { name: string };
   AbstractAdapter: typeof AbstractAdapter;
   BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
   ExpoSQLiteAdapter: typeof ExpoSQLiteAdapter;
@@ -403,6 +405,11 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 ConnectionAdapters.MySQL = {
   name: "ActiveRecord::ConnectionAdapters::MySQL",
 } as typeof ConnectionAdapters.MySQL;
+ConnectionAdapters.PostgreSQL = {
+  name: "ActiveRecord::ConnectionAdapters::PostgreSQL",
+  OID: { name: "ActiveRecord::ConnectionAdapters::PostgreSQL::OID" },
+};
+ConnectionAdapters.SQLite3 = { name: "ActiveRecord::ConnectionAdapters::SQLite3" };
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   AutoFilteredParameters: typeof AutoFilteredParameters;
