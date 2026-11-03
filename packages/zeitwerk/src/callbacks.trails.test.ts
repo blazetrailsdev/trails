@@ -223,6 +223,24 @@ describe("autoloadGet with a load in flight", () => {
     });
   });
 
+  it("imports a reloaded file through Loader#importer with the reload generation", async () => {
+    const loader = await newLoader({ setup: false });
+    await withSetup(loader, [["x.ts", "export class X {}"]], {}, async () => {
+      const urls: string[] = [];
+      loader.importer = async (url) => {
+        urls.push(url);
+        return { X: class X {} };
+      };
+
+      await loader.eagerLoad();
+      await loader.reload();
+      await loader.eagerLoad();
+
+      const href = new URL(`file://${File.expandPath("x.ts")}`).href;
+      expect(urls).toEqual([href, `${href}?zeitwerk=2`]);
+    });
+  });
+
   it("prefers an imports thunk over Loader#importer", async () => {
     const loader = await newLoader({ setup: false });
     await withSetup(loader, [["x.ts", "export class X {}"]], {}, async () => {
