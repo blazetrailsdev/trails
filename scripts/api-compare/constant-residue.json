@@ -1380,13 +1380,7 @@
     }
   },
   "activestorage": {
-<<<<<<< HEAD
-    "rows": 79,
-||||||| parent of c2f78fbb07 (feat(activestorage): port blob redirect and proxy controllers and Streaming)
-    "rows": 77,
-=======
-    "rows": 80,
->>>>>>> c2f78fbb07 (feat(activestorage): port blob redirect and proxy controllers and Streaming)
+    "rows": 82,
     "excluded": [
       "engine.ts::Engine",
       "test-helpers/database/create-groups-migration.ts::ActiveStorageCreateGroups",
