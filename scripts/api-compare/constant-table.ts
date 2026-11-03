@@ -9,6 +9,7 @@
  * hand-kept override list (open question 3), so it keeps its `rails-api.json`
  * source.
  */
+import ts from "typescript-5";
 import { File, getFs } from "@blazetrails/ruby-compat";
 import { Inflector, NameError, Registry, type Loader } from "@blazetrails/zeitwerk";
 import {
@@ -137,10 +138,13 @@ function loaderFor(dir: string): Promise<Loader> {
 }
 
 function rubyCname(short: string): string {
-  const renamed = Object.entries(TS_CLASS_RENAMES).find(
+  const renamed = Object.entries(TS_CLASS_RENAMES).filter(
     ([ruby, ts]) => ts === short && !BRAND_RENAMES.includes(ruby),
   );
-  return renamed?.[0] ?? short;
+  if (renamed.length > 1) {
+    throw new globalThis.Error(`TS_CLASS_RENAMES maps several Ruby names to ${short}`);
+  }
+  return renamed[0]?.[0] ?? short;
 }
 
 /**
@@ -181,7 +185,17 @@ export async function walkConstants(dir: string): Promise<Map<string, string>> {
       if (ftype === "directory") return walk(abspath);
       const source = await getFs().readFile(abspath, "utf8");
       const file = abspath.slice(src.length + 1);
-      for (const [, tsName] of source.matchAll(/^export\s+(?:abstract\s+)?class\s+(\w+)/gm)) {
+      const parsed = ts.createSourceFile(abspath, source, ts.ScriptTarget.Latest);
+      for (const statement of parsed.statements) {
+        if (!ts.isClassDeclaration(statement) || statement.name === undefined) continue;
+        const exported = ts
+          .getModifiers(statement)
+          ?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+        const ambient = ts
+          .getModifiers(statement)
+          ?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
+        if (!exported || ambient) continue;
+        const tsName = statement.name.text;
         const fqn = await derivedConstantPath(dir, file, tsName);
         if (fqn !== null) rows.set(`${file}::${tsName}`, fqn);
       }

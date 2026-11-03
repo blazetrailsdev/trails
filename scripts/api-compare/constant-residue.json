@@ -592,7 +592,7 @@
   },
   "trailties": {
     "rows": 62,
-    "unpaired": 111,
+    "unpaired": 112,
     "residue": {
       "commands/console.ts::ConsoleCommand": "Rails::Command::ConsoleCommand",
       "commands/console/irb-console.ts::IRBConsole": "Rails::Console::IRBConsole",

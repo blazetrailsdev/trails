@@ -45,6 +45,18 @@ describe("derivedConstantPath", () => {
     ).toBe("ActionView::DependencyTracker::RubyTracker");
   });
 
+  it("sets a second class beside the file's own in another siblings package", async () => {
+    expect(await derivedConstantPath("activerecord", "errors.ts", "RecordNotFound")).toBe(
+      "ActiveRecord::RecordNotFound",
+    );
+  });
+
+  it("keeps a dotted name's owner and renames each segment", async () => {
+    expect(await derivedConstantPath("activemodel", "naming.ts", "ModelName.Foo")).toBe(
+      "ActiveModel::Name::Foo",
+    );
+  });
+
   it("answers null for a segment cname_for refuses", async () => {
     expect(await derivedConstantPath("mail", "encodings/7bit.ts", "SevenBit")).toBeNull();
   });
