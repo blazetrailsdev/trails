@@ -72,7 +72,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/** @missingRailsCall parse — PERMANENT */
+/**
+ * @missingRailsCall parse — PERMANENT
+ * @inventedArm import — PERMANENT
+ */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);

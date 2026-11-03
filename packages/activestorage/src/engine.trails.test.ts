@@ -101,6 +101,14 @@ describe("ActiveStorage::Engine", () => {
     expect(fresh.VariantRecord).toBeDefined();
     expect(fresh.Representations.RedirectController).toBeDefined();
     expect(fresh.Representations.ProxyController).toBeDefined();
+    for (const name of [
+      "Blobs::RedirectController",
+      "Blobs::ProxyController",
+      "DirectUploadsController",
+      "DiskController",
+    ]) {
+      expect(constantize(`ActiveStorage::${name}`)).toBeDefined();
+    }
     expect(
       (constantize("ActiveStorage::Representations::RedirectController") as { name: string }).name,
     ).toBe("RedirectController");
