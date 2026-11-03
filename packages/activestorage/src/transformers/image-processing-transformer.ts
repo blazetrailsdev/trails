@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Transformers } from "../active-storage.js";
 import { Transformer } from "./transformer.js";
-import "../class-paths.excluded.generated.js";
+import "../constants.excluded.generated.js";
 
 let ImageProcessing: typeof Namespace;
 try {

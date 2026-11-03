@@ -136,4 +136,4 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 
 export const CoreExt = { HashWithIndifferentAccess };
 
-import "../class-paths.generated.js";
+import "../constants.generated.js";

@@ -82,4 +82,4 @@ export * as Utils from "./utils.js";
 /** @noRailsEquivalent PERMANENT */
 export * as Handler from "./handler/index.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

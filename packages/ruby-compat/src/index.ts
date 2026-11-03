@@ -15,7 +15,7 @@ export {
   generatedClassPath,
   isClassPathPending,
   isModuleObject,
-  registerClassPaths,
+  defineConstants,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";
 export { IO, PipeIO, STDERR, STDIN, STDOUT, print, printf, puts, rbOutputRs } from "./io.js";
@@ -544,5 +544,5 @@ export {
 
 import { Kernel } from "./include.js";
 import { kernelRand } from "./kernel-rand.js";
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 Kernel.rand = kernelRand;

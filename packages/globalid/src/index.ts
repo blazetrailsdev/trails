@@ -28,4 +28,4 @@ export {
   toSgidParam,
 } from "./identification.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

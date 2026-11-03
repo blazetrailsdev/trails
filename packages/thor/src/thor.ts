@@ -845,4 +845,4 @@ include(Thor, Base);
 (Thor as ThorClass).desc("help [COMMAND]", "Describe available commands or one specific command");
 (Thor as ThorClass).methodAdded("help");
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

@@ -147,4 +147,4 @@ Chronic.construct = construct;
 
 export { Chronic };
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

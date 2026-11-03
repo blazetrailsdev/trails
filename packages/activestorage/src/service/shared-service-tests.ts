@@ -1,33 +1,20 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { base58, TopLevel } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { RouteSet } from "@blazetrails/actionpack";
+import type { RouteSet } from "@blazetrails/actionpack";
 import { Digest, OpenSSL, Range, StringIO } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Current } from "../current.js";
 import { FileNotFoundError, IntegrityError } from "../errors.js";
 import { Filename } from "../filename.js";
 import type { Service } from "../service.js";
+import "../test-helpers/database/setup.js";
 
 export const FIXTURE_DATA = Uint8Array.from(
   "89504e470d0a1a0a0000000d4948445200000010000000100103000000253d6d2200000006504c5445000000ffffffa5d99fdd0000003349444154789c63f8ff9fe1ff5f86ff9f190eb033dc3fcc707f32c3cdcd0c378d19ee1483d0bdcf0cf78152cc0c0fc0e8ff7f0051861728ce5d9b500000000049454e44ae426082"
     .match(/../g)!
     .map((byte) => parseInt(byte, 16)),
 );
-
-const routes = new RouteSet();
-routes.draw(function () {
-  this.scope("/trails/active_storage", function () {
-    this.get("/disk/:encoded_key/*filename", {
-      to: "active_storage/disk#show",
-      as: "trails_disk_service",
-    });
-    this.put("/disk/:encoded_token", {
-      to: "active_storage/disk#update",
-      as: "update_trails_disk_service",
-    });
-  });
-});
 
 export function SharedServiceTests<T extends Service>(
   SERVICE: T,
@@ -36,11 +23,11 @@ export function SharedServiceTests<T extends Service>(
   key: string;
   routes: RouteSet;
 } {
+  const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
   const ctx = { service: SERVICE, key: "", routes };
 
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
-    TopLevel.Trails ??= { application: { routes: () => routes } } as never;
     Current.urlOptions = {
       protocol: "https://",
       host: "example.com",

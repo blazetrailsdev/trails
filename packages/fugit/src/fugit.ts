@@ -14,4 +14,4 @@ export { Cron } from "./cron.js";
 export { Duration } from "./duration.js";
 export { Nat } from "./nat.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

@@ -5,7 +5,7 @@ import { Application } from "../../../application.js";
 import { Trails } from "../../../trails.js";
 import "../../../trailties/active-record.js";
 import "../../../test-unit/trailtie.js";
-import { copyRoutes } from "../../generators-test-helper.js";
+import { copyRoutes, withDatabaseConfiguration } from "../../generators-test-helper.js";
 import { TestCase } from "../../test-case.js";
 
 class ScaffoldGeneratorApp extends Application {}
@@ -515,9 +515,26 @@ describe("ScaffoldGeneratorTest", () => {
     });
   });
 
-  it.skip("scaffold generator multi db abstract class", () => {});
+  it("scaffold generator multi db abstract class", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["posts", "--database=secondary"]);
 
-  it.skip("scaffold generator database with aliases", () => {});
+      await t.assertMigration("db/secondary_migrate/create_posts.ts");
+      await t.assertFile("app/models/secondary-record.ts", (content) => {
+        expect(content).toMatch(/class SecondaryRecord extends ApplicationRecord/);
+        expect(content).toMatch(/connectsTo\(\{ database: \{ writing: "secondary" \} \}\)/);
+        expect(content).toMatch(/this\.abstractClass = true/);
+      });
+    });
+  });
+
+  it("scaffold generator database with aliases", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["posts", "--db=secondary"]);
+
+      await t.assertMigration("db/secondary_migrate/create_posts.ts");
+    });
+  });
 
   it("scaffold generator password digest", async () => {
     await t.runGenerator(["user", "name", "password:digest"]);

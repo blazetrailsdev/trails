@@ -5,7 +5,7 @@ import { Dir, SystemExit, argv, setExitCode } from "@blazetrails/ruby-compat";
 import { APP_PATH, setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
 import { aliases } from "./commands.js";
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 
 if (APP_PATH == null) {
   const root = Dir.pwd();

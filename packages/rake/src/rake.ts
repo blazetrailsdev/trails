@@ -3,7 +3,7 @@ export { FileUtilsExt } from "./file-utils-ext.js";
 export { FileUtils } from "./file-utils.js";
 export { PseudoStatus } from "./pseudo-status.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 export { pathmap } from "./ext/string.js";
 export { Backtrace } from "./backtrace.js";
 export { Cloneable } from "./cloneable.js";

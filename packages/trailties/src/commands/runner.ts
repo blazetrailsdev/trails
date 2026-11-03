@@ -1,4 +1,4 @@
-import "../class-paths.runner.generated.js";
+import "../constants.runner.generated.js";
 import {
   File,
   TopLevel,

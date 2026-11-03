@@ -1,4 +1,4 @@
-import "../class-paths.destroy.generated.js";
+import "../constants.destroy.generated.js";
 import { Dir } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";

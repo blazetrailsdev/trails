@@ -1,5 +1,5 @@
 import { Loader } from "./loader.js";
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 
 export { Inflector } from "./inflector.js";
 export { NullInflector } from "./null-inflector.js";

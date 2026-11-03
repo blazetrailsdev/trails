@@ -1,4 +1,4 @@
-import "../class-paths.routes.generated.js";
+import "../constants.routes.generated.js";
 import {
   ConsoleFormatter,
   RoutesInspector,

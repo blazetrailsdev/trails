@@ -4,7 +4,7 @@
  * gave a class or module, and whether it is permanent. Only ruby-compat writes
  * it, for a `const_set` a Rails body makes and for a module-eval namespace
  * seat; every other class's path comes from its package's generated table
- * ({@link registerClassPaths}). `rb_class_path`
+ * ({@link defineConstants}). `rb_class_path`
  * (`vendor/ruby/v3.3.11/variable.c:364`) reads it.
  *
  * @noRailsEquivalent PERMANENT
@@ -17,9 +17,10 @@ const generatedClassPaths = new WeakMap<object, string>();
 const generatedClasses = new Map<string, () => unknown>();
 
 /**
- * Seats a package's generated table of the paths `RCLASS_SET_CLASSPATH`
- * (`vendor/ruby/v3.3.11/internal/class.h:258`) would have written, built by
- * `pnpm parity:class-paths` from `rails-api.json` (RFC 0205). Each class is
+ * Seats a package's `constants.generated.ts`: each row gives the path
+ * `RCLASS_SET_CLASSPATH` (`vendor/ruby/v3.3.11/internal/class.h:258`) would
+ * have written, read class → path by `rb_mod_name` and path → class by
+ * `constGet`, built by `pnpm parity:class-paths` (RFC 0213). Each class is
  * read through a thunk on the first lookup after a registration. A table is
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
@@ -27,7 +28,7 @@ const generatedClasses = new Map<string, () => unknown>();
  *
  * @noRailsEquivalent PERMANENT
  */
-export function registerClassPaths(entries: readonly [() => unknown, string][]): void {
+export function defineConstants(entries: readonly [() => unknown, string][]): void {
   for (const [klass, path] of entries) {
     pendingClassPaths.push([klass, path]);
     classPathsRegistered = true;

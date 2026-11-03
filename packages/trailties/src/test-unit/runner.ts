@@ -231,7 +231,10 @@ export class Runner {
       const seen = new Set<number>();
       for (const [begin, end, title] of TestParser.calls(path)) {
         const test = new Range(begin, end);
-        if (wanted.some((range) => range.overlaps(test)) || (title !== "" && name?.test(title))) {
+        if (
+          wanted.some((range) => range.overlaps(test)) ||
+          (name != null && (title === "" || name.test(title)))
+        ) {
           if (seen.has(begin)) continue;
           seen.add(begin);
           locations.push(`${path}:${begin}`);

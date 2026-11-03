@@ -1,0 +1,9 @@
+import { ApplicationRecord } from "./application-record<%= this.ext() %>";
+
+export class <%= this.abstractClassName() %> extends ApplicationRecord {
+  static {
+    this.abstractClass = true;
+
+    this.connectsTo({ database: { <%= ActiveRecord.writingRole %>: "<%= this.database() %>" } });
+  }
+}

@@ -789,4 +789,4 @@ extend(Raabro, ModuleMethods);
 
 Raabro.makeIncludable();
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

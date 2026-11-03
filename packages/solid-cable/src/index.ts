@@ -8,4 +8,4 @@ export {
   SolidCable as SolidCableAdapter,
   Listener,
 } from "./action-cable/subscription-adapter/solid-cable.js";
-import "./class-paths.generated.js";
+import "./constants.generated.js";

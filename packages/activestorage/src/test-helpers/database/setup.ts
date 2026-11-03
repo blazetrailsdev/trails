@@ -8,7 +8,7 @@ import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/acti
 import { Application } from "@blazetrails/trailties";
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
 import { File, Dir } from "@blazetrails/ruby-compat";
-import "../../class-paths.generated.js";
+import "../../constants.generated.js";
 import { ImageMagick } from "../../analyzer/image-analyzer/image-magick.js";
 import { Vips } from "../../analyzer/image-analyzer/vips.js";
 import { VideoAnalyzer } from "../../analyzer/video-analyzer.js";
