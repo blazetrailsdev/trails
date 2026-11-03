@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { EtOrbi } from "@blazetrails/et-orbi";
-import { registeredConstant } from "@blazetrails/ruby-compat";
+import { constGet } from "@blazetrails/ruby-compat";
 import { Trails } from "./trails.js";
 
 describe("Trails registered constant", () => {
   it("registers Trails as a top-level constant", () => {
-    expect(registeredConstant("Trails")).toBe(Trails);
+    expect(constGet(Object, "Trails")).toBe(Trails);
   });
 
   it("answers et-orbi's rorv with Trails::VERSION::STRING", () => {

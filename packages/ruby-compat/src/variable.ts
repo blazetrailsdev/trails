@@ -57,25 +57,6 @@ export function rbGvSet<T>(name: string, val: T): T {
 }
 
 /**
- * `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`) on the namespace
- * a `::` path names under `rb_cObject`, for a seat `constSet` wrote.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function unregisterConstant(name: string, expected: unknown): void {
-  const parts = name.split("::");
-  let mod: Record<string, unknown> | undefined = tbl;
-  for (const part of parts.slice(0, -1)) {
-    const next: unknown = Object.hasOwn(mod, part) ? mod[part] : undefined;
-    if (next === null || (typeof next !== "object" && typeof next !== "function")) return;
-    mod = next as Record<string, unknown>;
-  }
-  const id = parts.at(-1)!;
-  if (!Object.hasOwn(mod, id) || mod[id] !== expected) return;
-  delete mod[id];
-}
-
-/**
  * `rb_mod_remove_const` (`vendor/ruby/v3.3.11/variable.c:3302`),
  * `Module#remove_const`: removes the constant from `mod`'s own table and
  * answers its value. `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`)

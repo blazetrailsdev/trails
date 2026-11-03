@@ -1,6 +1,6 @@
 import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -421,7 +421,7 @@ describe("Mapper block receivers", () => {
 
   afterAll(() => {
     for (const name of names)
-      if (isRegisteredConstant(`${camelize(name)}Controller`))
+      if (constDefined(Object, `${camelize(name)}Controller`))
         rbModRemoveConst(Object, `${camelize(name)}Controller`);
   });
 

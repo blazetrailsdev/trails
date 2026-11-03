@@ -4,7 +4,7 @@ import {
   kernelThrow,
   constDefined,
   constSet,
-  registeredConstant,
+  constGet,
   TopLevel,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
@@ -533,7 +533,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", async () => {
-    expect(registeredConstant("Region")).toBeUndefined();
+    expect(constGet(Object, "Region")).toBeUndefined();
 
     const connection = (await Base.leaseConnection()) as any;
     try {

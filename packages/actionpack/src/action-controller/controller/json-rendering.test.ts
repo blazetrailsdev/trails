@@ -6,14 +6,14 @@ import { Base } from "../base.js";
 import { API } from "../api.js";
 import {
   StringIO,
-  isRegisteredConstant,
+  constDefined,
   rbModRemoveConst,
   constSet,
   TopLevel,
 } from "@blazetrails/ruby-compat";
 
 afterEach(() => {
-  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("Controller JSON rendering integration", () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
-import { constGet, unregisterConstant } from "./variable.js";
+import { constGet, rbModRemoveConst } from "./variable.js";
 import { Hash } from "./hash.js";
 import {
   rbInspect,
@@ -1846,7 +1846,8 @@ describe("Module#const_defined?", () => {
         "uninitialized constant ConstDefinedTrailsNope",
       );
     } finally {
-      unregisterConstant("ConstDefinedTrailsDb", db);
+      if (constDefined(Object, "ConstDefinedTrailsDb", false))
+        rbModRemoveConst(Object, "ConstDefinedTrailsDb");
     }
   });
 

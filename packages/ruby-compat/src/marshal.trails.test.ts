@@ -19,7 +19,8 @@ import { RuntimeError } from "./runtime-error.js";
 import { Set as RbSet } from "./set.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
-import { unregisterConstant } from "./variable.js";
+import { rbModRemoveConst } from "./variable.js";
+import { constDefined } from "./include.js";
 
 const fixtures = JSON.parse(
   readFileSync(new URL("./marshal.fixtures.json", import.meta.url), "utf8"),
@@ -103,7 +104,9 @@ beforeAll(() => {
   for (const [name, value] of Object.entries(CONSTANTS)) constSet(TopLevel, name, value);
 });
 afterAll(() => {
-  for (const [name, value] of Object.entries(CONSTANTS)) unregisterConstant(name, value);
+  for (const name of Object.keys(CONSTANTS)) {
+    if (constDefined(Object, name, false)) rbModRemoveConst(Object, name);
+  }
 });
 
 function bytes(name: string): string {
@@ -322,7 +325,7 @@ describe("Marshal.dump", () => {
         new TypeError("Unreachable can't be referred to"),
       );
     } finally {
-      unregisterConstant("Unreachable", other);
+      if (constDefined(Object, "Unreachable", false)) rbModRemoveConst(Object, "Unreachable");
     }
   });
 

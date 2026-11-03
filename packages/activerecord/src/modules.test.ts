@@ -5,14 +5,8 @@ import {
   assertNot,
   assertNotNil,
   assertNothingRaised,
-  constantize,
 } from "@blazetrails/activesupport";
-import {
-  isRegisteredConstant,
-  unregisterConstant,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { constDefined, rbModRemoveConst, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
@@ -53,9 +47,8 @@ describe("ModulesTest", () => {
     undefinedConsts = {};
 
     for (const constant of ["Firm", "Client"]) {
-      if (isRegisteredConstant(constant)) {
-        undefinedConsts[constant] = constantize(constant);
-        unregisterConstant(constant, undefinedConsts[constant]);
+      if (constDefined(Object, constant, false)) {
+        undefinedConsts[constant] = rbModRemoveConst(Object, constant);
       }
     }
 

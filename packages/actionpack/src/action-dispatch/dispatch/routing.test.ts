@@ -29,7 +29,7 @@ import {
   rbConstGet,
   rbObjRespondTo,
   rbFSend,
-  isRegisteredConstant,
+  constDefined,
   rbModRemoveConst,
   constSet,
   TopLevel,
@@ -137,7 +137,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
@@ -4598,7 +4598,7 @@ describe("TestDefaultScope", () => {
     constSetPath("Blog::PostsController", PostsController);
   });
   afterEach(() => {
-    if (isRegisteredConstant("Blog::PostsController"))
+    if (constDefined(Object, "Blog::PostsController"))
       rbModRemoveConst(Object, "Blog::PostsController");
   });
 
@@ -4869,7 +4869,7 @@ describe("TestNamespaceWithControllerOption", () => {
     t = testCase as TestNamespaceWithControllerOption;
   });
   afterEach(() => {
-    if (isRegisteredConstant("Admin::StorageFilesController"))
+    if (constDefined(Object, "Admin::StorageFilesController"))
       rbModRemoveConst(Object, "Admin::StorageFilesController");
   });
 
@@ -5245,7 +5245,7 @@ describe("TestInvalidUrls", () => {
     t = testCase as TestInvalidUrls;
   });
   afterEach(() => {
-    if (isRegisteredConstant("TestInvalidUrls::FooController"))
+    if (constDefined(Object, "TestInvalidUrls::FooController"))
       rbModRemoveConst(Object, "TestInvalidUrls::FooController");
   });
   const get = (path: string) => t.get(path);
@@ -5651,7 +5651,7 @@ describe("TestErrorsInController", () => {
     t = testCase as TestErrorsInController;
   });
   afterEach(() => {
-    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+    if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
   });
 
   it("legit no method errors are not caught", async () => {
@@ -6145,7 +6145,7 @@ describe("TestMultipleNestedController", () => {
     t = testCase as TestMultipleNestedController;
   });
   afterEach(() => {
-    if (isRegisteredConstant("Foo::Bar::BazController"))
+    if (constDefined(Object, "Foo::Bar::BazController"))
       rbModRemoveConst(Object, "Foo::Bar::BazController");
   });
 

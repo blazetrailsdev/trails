@@ -9,11 +9,11 @@ import {
   getPath,
   setEnv,
   rbFLoad,
-  unregisterConstant,
+  rbModRemoveConst,
   TopLevel,
   constGet,
   constSet,
-  isRegisteredConstant,
+  constDefined,
 } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { invoke } from "../command.js";
@@ -37,7 +37,7 @@ describe("UnusedRoutesCommand", () => {
   const seated: [string, unknown][] = [];
   const seat = (name: string, klass: unknown): void => {
     const i = name.lastIndexOf("::");
-    if (i >= 0 && !isRegisteredConstant(name.slice(0, i))) seat(name.slice(0, i), {});
+    if (i >= 0 && !constDefined(Object, name.slice(0, i))) seat(name.slice(0, i), {});
     constSet(
       i < 0 ? TopLevel : (constGet(Object, name.slice(0, i)) as object),
       i < 0 ? name : name.slice(i + 2),
@@ -47,7 +47,14 @@ describe("UnusedRoutesCommand", () => {
   };
 
   afterEach(() => {
-    for (const [name, klass] of seated.splice(0)) unregisterConstant(name, klass);
+    for (const [name] of seated.splice(0)) {
+      if (!constDefined(Object, name, false)) continue;
+      const i = name.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, name.slice(0, i)) as object),
+        i < 0 ? name : name.slice(i + 2),
+      );
+    }
   });
 
   it("RouteInfo is unused when the controller class is not registered", async () => {

@@ -1,11 +1,6 @@
 import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import {
-  isRegisteredConstant,
-  rbModRemoveConst,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { constDefined, rbModRemoveConst, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
@@ -39,7 +34,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 let capturedEnv: RackEnv = {};

@@ -1,5 +1,11 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { unregisterConstant, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
+import {
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
 import { assertNil } from "../../testing/assertions.js";
 
@@ -48,7 +54,8 @@ describe("IntrospectionTest", () => {
     try {
       expect(moduleParentName(newClass)).toEqual("ParentA");
     } finally {
-      unregisterConstant("ParentA::NewClass", newClass);
+      if (constDefined(Object, "ParentA::NewClass", false))
+        rbModRemoveConst(constGet(Object, "ParentA") as object, "NewClass");
     }
   });
 
@@ -70,7 +77,8 @@ describe("IntrospectionTest", () => {
     try {
       expect(moduleParent(newClass)).toBe(ParentA);
     } finally {
-      unregisterConstant("ParentA::NewClass", newClass);
+      if (constDefined(Object, "ParentA::NewClass", false))
+        rbModRemoveConst(constGet(Object, "ParentA") as object, "NewClass");
     }
   });
 });

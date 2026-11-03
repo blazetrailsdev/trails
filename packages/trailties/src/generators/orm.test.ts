@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { unregisterConstant, TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
+import {
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ScaffoldControllerGenerator } from "./trails/scaffold-controller/scaffold-controller-generator.js";
 
@@ -26,8 +32,10 @@ describe("ScaffoldOrmTest", () => {
   });
 
   afterAll(() => {
-    unregisterConstant("ORMWithGenerators::Generators::ActiveModel", ORMWithGeneratorsActiveModel);
-    unregisterConstant("ORMWithoutGenerators", ORMWithoutGenerators);
+    if (constDefined(Object, "ORMWithGenerators::Generators::ActiveModel", false))
+      rbModRemoveConst(constGet(Object, "ORMWithGenerators::Generators") as object, "ActiveModel");
+    if (constDefined(Object, "ORMWithoutGenerators", false))
+      rbModRemoveConst(Object, "ORMWithoutGenerators");
   });
 
   it("orm class returns custom generator if supported custom orm set", () => {

@@ -4,12 +4,12 @@ import {
   ArgumentError,
   fetch,
   block,
-  isRegisteredConstant,
+  constDefined,
   Rational,
   rbEqual,
   rbInspect,
   rbObjRespondTo,
-  registeredConstant,
+  constGet,
   toF,
 } from "@blazetrails/ruby-compat";
 import { EoTime } from "./time.js";
@@ -80,7 +80,7 @@ export function make(...a: unknown[]): EoTime {
 
 /** @internal */
 export function chronicParse(str: string, opts: Record<string, unknown>): Time | null | false {
-  if (!isRegisteredConstant("Chronic")) return false;
+  if (!constDefined(Object, "Chronic")) return false;
   if (
     !fetch(
       opts,
@@ -92,13 +92,13 @@ export function chronicParse(str: string, opts: Record<string, unknown>): Time |
 
   const os = Object.fromEntries(
     Object.entries(opts).filter(([k]) =>
-      Object.keys((registeredConstant("Chronic") as ChronicModule).Parser.DEFAULT_OPTIONS).includes(
+      Object.keys((constGet(Object, "Chronic") as ChronicModule).Parser.DEFAULT_OPTIONS).includes(
         k,
       ),
     ),
   );
 
-  return (registeredConstant("Chronic") as ChronicModule).parse(str, os);
+  return (constGet(Object, "Chronic") as ChronicModule).parse(str, os);
 }
 
 /** @internal */

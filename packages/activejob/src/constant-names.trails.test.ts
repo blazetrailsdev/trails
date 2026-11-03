@@ -4,10 +4,11 @@ import {
   NameError,
   TypeError,
   rbModName,
-  unregisterConstant,
   TopLevel,
   constGet,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 
@@ -16,9 +17,10 @@ describe("ActiveJob constant names", () => {
   class NestedJob extends Base {}
 
   afterEach(() => {
-    unregisterConstant("HelloJob", HelloJob);
-    unregisterConstant("Admin::NestedJob", NestedJob);
-    unregisterConstant("Raising", Raising);
+    if (constDefined(Object, "HelloJob", false)) rbModRemoveConst(Object, "HelloJob");
+    if (constDefined(Object, "Admin::NestedJob", false))
+      rbModRemoveConst(constGet(Object, "Admin") as object, "NestedJob");
+    if (constDefined(Object, "Raising", false)) rbModRemoveConst(Object, "Raising");
   });
 
   const Raising = {

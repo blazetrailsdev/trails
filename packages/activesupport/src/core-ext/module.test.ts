@@ -3,10 +3,11 @@ import {
   ArgumentError,
   NoMethodError,
   rbObjMethod,
-  unregisterConstant,
   TopLevel,
   constGet,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
 import { DelegationError } from "../delegation.js";
@@ -669,7 +670,8 @@ describe("ModuleTest", () => {
       const c = C as typeof C & { parse(source: string): unknown };
       expect(c.parse("[1]")).toEqual([1]);
     } finally {
-      unregisterConstant("Admin::Json", Json);
+      if (constDefined(Object, "Admin::Json", false))
+        rbModRemoveConst(constGet(Object, "Admin") as object, "Json");
     }
   });
 

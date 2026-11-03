@@ -1,5 +1,5 @@
 import { NameError } from "@blazetrails/activesupport";
-import { unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { ConfigurationError } from "./errors.js";
@@ -50,7 +50,7 @@ class ResolvableJobAsync extends Base {
 
 describe("DestroyAssociationAsyncJobTest", () => {
   afterAll(() => {
-    unregisterConstant("ResolvableJob", ResolvableJob);
+    if (constDefined(Object, "ResolvableJob", false)) rbModRemoveConst(Object, "ResolvableJob");
   });
 
   it("destroy_association_async_job requires valid job class", () => {

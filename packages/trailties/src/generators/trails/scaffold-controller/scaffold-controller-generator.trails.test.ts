@@ -1,17 +1,16 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel, constGet } from "@blazetrails/ruby-compat";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { capture, include } from "@blazetrails/activesupport";
-import { unregisterConstant } from "@blazetrails/ruby-compat";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
-import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 afterEach(() => {
-  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController")) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("ScaffoldControllerGenerator (dispatch)", () => {
@@ -92,7 +91,7 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
       Object.defineProperty(Admin, "UsersController", { value: class {} });
       expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
     } finally {
-      unregisterConstant("Admin", Admin);
+      if (constDefined(Object, "Admin", false)) rbModRemoveConst(Object, "Admin");
     }
   });
 
@@ -104,8 +103,9 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
     try {
       expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
     } finally {
-      unregisterConstant("Admin::UsersController", UsersController);
-      unregisterConstant("Admin", Admin);
+      if (constDefined(Object, "Admin::UsersController", false))
+        rbModRemoveConst(constGet(Object, "Admin") as object, "UsersController");
+      if (constDefined(Object, "Admin", false)) rbModRemoveConst(Object, "Admin");
     }
   });
 });

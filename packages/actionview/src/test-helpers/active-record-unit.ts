@@ -13,7 +13,7 @@ import {
   File,
   RuntimeError,
   getFs,
-  isRegisteredConstant,
+  constDefined,
   warn,
   TopLevel,
   constSet,
@@ -55,14 +55,14 @@ export class ActiveRecordTestConnector {
   }
 
   private static async setupConnection(): Promise<void> {
-    if (isRegisteredConstant("ActiveRecord")) {
+    if (constDefined(Object, "ActiveRecord")) {
       const defaults = { database: ":memory:" };
       const options = { ...defaults, adapter: "sqlite3", timeout: 500 };
       await Base.establishConnection(options);
       Base.configurations({ sqlite3_ar_integration: options });
       await Base.leaseConnection();
 
-      if (!isRegisteredConstant("QUOTED_TYPE")) {
+      if (!constDefined(Object, "QUOTED_TYPE")) {
         constSet(TopLevel, "QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
       }
     } else {

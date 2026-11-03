@@ -8,9 +8,10 @@ import {
   extend,
   include,
   publicInstanceMethods,
-  unregisterConstant,
   TopLevel,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 
 import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from "./helpers.js";
@@ -32,9 +33,9 @@ beforeAll(() => {
   constSet(Foo, "BarHelper", NamespacedHelper);
 });
 afterAll(() => {
-  unregisterConstant("FooHelper", FooHelper);
-  unregisterConstant("BarHelper", BarHelper);
-  unregisterConstant("Foo", Foo);
+  if (constDefined(Object, "FooHelper", false)) rbModRemoveConst(Object, "FooHelper");
+  if (constDefined(Object, "BarHelper", false)) rbModRemoveConst(Object, "BarHelper");
+  if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
 });
 
 function controller(name: string): HelpersClass {

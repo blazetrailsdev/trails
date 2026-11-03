@@ -1,13 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import {
-  StringIO,
-  registeredConstant,
-  unregisterConstant,
-  constSet,
-  TopLevel,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { StringIO, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -90,7 +83,6 @@ function makeSongAlbumModels(): {
     cleanup: () => {
       rbModRemoveConst(TopLevel, "Song");
       rbModRemoveConst(TopLevel, "Album");
-      unregisterConstant("Song::HABTM_Albums", registeredConstant("Song::HABTM_Albums"));
     },
   };
 }
