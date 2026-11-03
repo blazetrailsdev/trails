@@ -564,19 +564,15 @@ async function readRecord(): Promise<Record<string, ConstantResidue>> {
 
 /** The record at the merge-base with `origin/main`, against which `excluded` only shrinks. */
 async function baseRecord(): Promise<Record<string, ConstantResidue>> {
-  try {
-    const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
-      cwd: ROOT_DIR,
-    });
-    const { stdout } = await run(
-      "git",
-      ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
-      { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
-    );
-    return JSON.parse(stdout) as Record<string, ConstantResidue>;
-  } catch {
-    return {};
-  }
+  const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
+    cwd: ROOT_DIR,
+  });
+  const { stdout } = await run(
+    "git",
+    ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
+    { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
+  ).catch(() => ({ stdout: "{}" }));
+  return JSON.parse(stdout) as Record<string, ConstantResidue>;
 }
 
 /**

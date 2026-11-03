@@ -2249,8 +2249,12 @@ jobs:
         # the walk and constant-residue.json by `pnpm parity:class-paths`; this
         # cross-checks both against the rails-api.json pairing. A stale table or
         # record, a paired class no table can import, or a generated path that
-        # disagrees with a const_set-bound one is red.
-        run: pnpm exec tsx scripts/api-compare/class-paths.ts --check
+        # disagrees with a const_set-bound one is red. `excluded` only shrinks
+        # against the record at the merge-base with origin/main, so fetch it.
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=30 origin main:refs/remotes/origin/main
+          pnpm exec tsx scripts/api-compare/class-paths.ts --check
       - name: Ambiguous-parent ratchet
         # RFC 0126. An inheritance edge whose parent name resolves to several
         # same-named candidates, none sharing a leading path segment with the
