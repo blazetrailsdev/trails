@@ -27,7 +27,7 @@ export default async function setup(): Promise<void> {
 
   await getFs().writeFile!(
     File.join(appTemplatePath, "config/storage.ts"),
-    `export default {\n  test: { service: "Disk", root: "tmp/storage" },\n  local: { service: "Disk", root: "storage" },\n};\n`,
+    `export default {\n  local: {\n    service: "Disk",\n    root: "storage",\n  },\n  test: {\n    service: "Disk",\n    root: "tmp/storage",\n  },\n};\n`,
   );
 
   await FileUtils.mkdirPAsync(File.join(appTemplatePath, "app/javascript"));
