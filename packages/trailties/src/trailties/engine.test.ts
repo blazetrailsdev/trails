@@ -99,6 +99,7 @@ describe("RailtiesTest::EngineTest", () => {
   }
 
   it("copying migrations", { timeout: 240_000 }, async () => {
+    await t.addToConfig("this.config.activeRecord.timestampedMigrations = false;");
     await writeBukkitsMigrations();
     await t.appFile(
       "db/migrate/1_create_sessions.ts",
@@ -133,6 +134,7 @@ describe("RailtiesTest::EngineTest", () => {
   });
 
   it("copying migrations to specific database", { timeout: 240_000 }, async () => {
+    await t.addToConfig("this.config.activeRecord.timestampedMigrations = false;");
     await writeBukkitsMigrations();
     await t.appFile(
       "db/animals_migrate/1_create_sessions.ts",
@@ -174,6 +176,8 @@ describe("RailtiesTest::EngineTest", () => {
       const blog = await t.engine("blog", async (plugin) => {
         await plugin.write("lib/blog.ts", engineSource("blog", "Blog"));
       });
+
+      await t.addToConfig("this.config.activeRecord.timestampedMigrations = false;");
 
       await plugin.write("db/migrate/1_create_users.ts", migrationSource("CreateUsers"));
       await blog.write("db/migrate/2_create_blogs.ts", migrationSource("CreateBlogs"));
