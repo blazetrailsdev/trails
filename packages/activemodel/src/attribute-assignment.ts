@@ -192,7 +192,12 @@ export async function awaitingAssignment<R, K = never>(
     record = build(
       block &&
         ((record: K) => {
-          return (yielded = block(record));
+          yielded = block(record);
+          if (yielded instanceof Promise && capture.assigned === undefined) {
+            capture.assigned = yielded;
+            pendingCaptures.set(record as object, capture);
+          }
+          return yielded;
         }),
     );
   } finally {

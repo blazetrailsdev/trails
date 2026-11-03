@@ -69,6 +69,19 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(topic.id)).title).toBe("after");
   });
 
+  it("create runs after_initialize once an async block settles", async () => {
+    class Settled extends Topic {}
+    let seen: unknown;
+    Settled.afterInitialize((record: Base) => {
+      seen = (record as InstanceType<typeof Topic>).title;
+    });
+    await Settled.create({ title: "before" }, async (t: Base) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      (t as InstanceType<typeof Topic>).title = "after";
+    });
+    expect(seen).toBe("after");
+  });
+
   it("a bare new runs the block and the initialize callbacks once", () => {
     class Counted extends Topic {}
     let initialized = 0;
