@@ -374,20 +374,6 @@ describe("AppGenerator", () => {
     expect(setup).not.toContain("pnpm");
   });
 
-  it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
-    const gen = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, packageManager: "yarn" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
-    expect(setup).toContain('system("yarn")');
-    const dockerfile = fs.readFileSync(appPath("Dockerfile"), "utf-8");
-    expect(dockerfile).toContain("yarn.lock");
-    expect(dockerfile).not.toContain("pnpm");
-  });
-
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
     const gen = new AppGenerator(
       ["my-app"],

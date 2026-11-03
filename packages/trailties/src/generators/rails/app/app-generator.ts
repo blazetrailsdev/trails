@@ -24,10 +24,10 @@ const DB_ALIAS: Record<string, DatabaseName> = {
 };
 
 export type AppDatabase = "sqlite" | "postgres" | "mysql" | DatabaseName;
-export type PackageManager = "pnpm" | "npm" | "yarn";
+export type PackageManager = "pnpm" | "npm";
 export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 
-export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm", "yarn"];
+export const VALID_PACKAGE_MANAGERS: readonly PackageManager[] = ["pnpm", "npm"];
 export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
   "better-sqlite3",
   "node-sqlite",
@@ -172,16 +172,12 @@ export class AppBuilder extends ActionMethods {
 
   /** @internal */
   private pmInstall(): string {
-    return this.packageManager === "yarn" ? "yarn" : `${this.packageManager} install`;
+    return `${this.packageManager} install`;
   }
 
   /** @internal */
   private pmLockFile(): string {
-    return this.packageManager === "pnpm"
-      ? "pnpm-lock.yaml"
-      : this.packageManager === "yarn"
-        ? "yarn.lock"
-        : "package-lock.json";
+    return this.packageManager === "pnpm" ? "pnpm-lock.yaml" : "package-lock.json";
   }
 
   /** @internal */
@@ -320,8 +316,7 @@ built module raises \`LoadError\`.
           },
           ...(this.options.dev && this.packageManager !== "pnpm"
             ? {
-                [this.packageManager === "yarn" ? "resolutions" : "overrides"]:
-                  this.railsGemfileEntries(Object.keys(this.railsDevPackages())),
+                overrides: this.railsGemfileEntries(Object.keys(this.railsDevPackages())),
               }
             : {}),
         },
@@ -532,7 +527,7 @@ FROM base AS build
 RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
 COPY package.json ${this.pmLockFile()}* ./
-RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.packageManager === "yarn" ? "corepack enable yarn && yarn" : this.pmInstall()}
+RUN ${this.packageManager === "pnpm" ? "corepack enable pnpm && pnpm install" : this.pmInstall()}
 
 COPY . .
 RUN ${this.packageManager === "pnpm" ? "pnpm" : this.packageManager} run build

@@ -10,7 +10,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { AppGenerator } from "./rails/app/app-generator.js";
-import { packageManagerAdapterConfig, registerPackageManagerAdapter } from "../package-manager.js";
 
 class T extends AppBase {
   static {
@@ -107,40 +106,17 @@ describe("AppBase", () => {
   });
 });
 
-describe("AppBase dockerfilePackageManagerVersion", () => {
+describe("AppBase dockerfilePnpmVersion", () => {
   it("defaults the app generator's packageManager option to pnpm", () => {
     expect(AppGenerator.classOptions()["packageManager"].default).toBe("pnpm");
   });
 
-  it("reads the packageManager option", async () => {
-    const generator = build({
-      javascript: "esbuild",
-      packageManager: "not-a-package-manager",
-    } as Partial<AppBaseOptions>);
+  it("answers the installed pnpm version", async () => {
+    const generator = build({ javascript: "esbuild" });
     const version = (
-      generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
-    ).dockerfilePackageManagerVersion();
-    expect(await version).toBe("latest");
-  });
-
-  it("answers for the selected package manager", async () => {
-    const previous = packageManagerAdapterConfig.adapter;
-    registerPackageManagerAdapter({
-      name: "not-a-package-manager",
-      installArgs: [],
-      addArgs: [],
-      runArgs: [],
-    });
-    packageManagerAdapterConfig.adapter = "not-a-package-manager";
-    try {
-      const generator = build({ javascript: "esbuild" });
-      const version = (
-        generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
-      ).dockerfilePackageManagerVersion();
-      expect(await version).toBe("latest");
-    } finally {
-      packageManagerAdapterConfig.adapter = previous;
-    }
+      generator as unknown as { dockerfilePnpmVersion(): Promise<unknown> }
+    ).dockerfilePnpmVersion();
+    expect(await version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
