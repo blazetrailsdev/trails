@@ -1,5 +1,4 @@
 import { File } from "@blazetrails/ruby-compat";
-import { writingRole } from "@blazetrails/activerecord";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { MigrationGenerator } from "../migration/migration-generator.js";
@@ -153,19 +152,7 @@ ${staticBlock}}
     );
     if (await File.isExistAsync(path)) return;
 
-    await this.createFile(
-      path,
-      `import { ApplicationRecord } from "./application-record${this.ext()}";
-
-export class ${this.abstractClassName()} extends ApplicationRecord {
-  static {
-    this.abstractClass = true;
-
-    this.connectsTo({ database: { ${writingRole()}: "${this.database()}" } });
-  }
-}
-`,
-    );
+    await this.template("abstract_base_class.ts", path);
   }
 
   private abstractClassName(): string {
