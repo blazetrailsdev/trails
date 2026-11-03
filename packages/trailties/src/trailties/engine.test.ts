@@ -127,10 +127,11 @@ describe("RailtiesTest::EngineTest", () => {
 
     expect(lines.join("\n")).not.toMatch(/\d+_create_users/);
 
-    const bukkitsMigrationOrder = lines.findIndex((o) =>
+    const skipped = lines.find((o) =>
       /NOTE: Migration \d+_create_sessions\.ts from bukkits has been skipped/.test(o),
     );
-    expect(bukkitsMigrationOrder, "Expected migration to be skipped").not.toBe(-1);
+    const bukkitsMigrationOrder = skipped === undefined ? null : lines.indexOf(skipped);
+    expect(bukkitsMigrationOrder, "Expected migration to be skipped").not.toBeNull();
   });
 
   it("copying migrations to specific database", { timeout: 240_000 }, async () => {
@@ -163,10 +164,11 @@ describe("RailtiesTest::EngineTest", () => {
 
     expect(lines.join("\n")).not.toMatch(/\d+_create_users/);
 
-    const bukkitsMigrationOrder = lines.findIndex((o) =>
+    const skipped = lines.find((o) =>
       /NOTE: Migration \d+_create_sessions\.ts from bukkits has been skipped/.test(o),
     );
-    expect(bukkitsMigrationOrder, "Expected migration to be skipped").not.toBe(-1);
+    const bukkitsMigrationOrder = skipped === undefined ? null : lines.indexOf(skipped);
+    expect(bukkitsMigrationOrder, "Expected migration to be skipped").not.toBeNull();
   });
 
   it(
