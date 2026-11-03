@@ -7,6 +7,7 @@ import {
   rbStrToI,
   sprintf,
   Thread,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
@@ -56,5 +57,13 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
     return (_uniq = BigInt(_uniq) + 1n);
   },
 } as unknown as MailConstants & Record<`${string}Field`, FieldConstant>;
+
+TopLevel.Mail = Mail;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Mail?: typeof Mail;
+  }
+}
 
 let _uniq: number | bigint = Mail.somethingRandom();
