@@ -941,8 +941,6 @@ describe("UniquenessValidationWithIndexTest", () => {
 describe("UniquenessWithCompositeKey", () => {
   fixtures(["cpkAuthors"]);
 
-  beforeAll(() => {});
-
   it("uniqueness validation for model with composite key", async () => {
     const bookOne = await BookWithUniqueRevision.createBang({
       id: [1, 42] as any,

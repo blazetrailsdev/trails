@@ -2604,34 +2604,12 @@ describe("EagerAssociationTest", () => {
   ]);
 
   beforeAll(async () => {
-    constSet(
-      TopLevel,
-      "ShardedBlog",
-      (await import("../test-helpers/models/sharded/blog.js")).ShardedBlog,
-    );
-    constSet(
-      TopLevel,
-      "ShardedBlogPost",
-      (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
-    );
-    constSet(
-      TopLevel,
-      "ShardedComment",
-      (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
-    );
-    constSet(
-      TopLevel,
-      "ShardedTag",
-      (await import("../test-helpers/models/sharded/tag.js")).ShardedTag,
-    );
-    constSet(
-      TopLevel,
-      "ShardedBlogPostTag",
-      (await import("../test-helpers/models/sharded/blog-post-tag.js")).ShardedBlogPostTag,
-    );
+    await import("../test-helpers/models/sharded/blog.js");
+    await import("../test-helpers/models/sharded/blog-post.js");
+    await import("../test-helpers/models/sharded/comment.js");
+    await import("../test-helpers/models/sharded/tag.js");
+    await import("../test-helpers/models/sharded/blog-post-tag.js");
     const cpk = await import("../test-helpers/models/cpk.js");
-    constSet(TopLevel, "CpkPost", cpk.CpkPost);
-    constSet(TopLevel, "CpkComment", cpk.CpkComment);
   });
 
   it("preloading belongs_to association associated by a composite query_constraints", async () => {

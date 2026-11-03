@@ -61,7 +61,6 @@ import { Preloader } from "./associations/preloader.js";
 
 describe("AssociationsTest", () => {
   fixtures([]);
-  beforeAll(() => {});
 
   it("loading cpk association when persisted and in memory differ", async () => {
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
@@ -1676,11 +1675,6 @@ describe("AssociationsTest", () => {
     constSet(TopLevel, "Electron", Electron);
     constSet(TopLevel, "Ship", Ship);
     constSet(TopLevel, "ShipPart", ShipPart);
-    constSet(
-      TopLevel,
-      "CpkOrderWithPrimaryKeyAssociatedBook",
-      CpkOrderWithPrimaryKeyAssociatedBook,
-    );
     constSet(TopLevel, "Person", Person);
     constSet(TopLevel, "Reader", Reader);
     constSet(TopLevel, "Post", Post);

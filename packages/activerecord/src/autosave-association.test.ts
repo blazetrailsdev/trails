@@ -691,11 +691,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     { useTransactionalTests: true },
   );
   beforeAll(() => {
-    constSet(
-      TopLevel,
-      "CpkOrderWithPrimaryKeyAssociatedBook",
-      CpkOrderWithPrimaryKeyAssociatedBook,
-    );
     constSet(TopLevel, "Company", CanonicalCompany);
     constSet(TopLevel, "Firm", Firm);
     constSet(TopLevel, "Client", Client);

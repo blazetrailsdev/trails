@@ -76,16 +76,8 @@ describe("InnerJoinAssociationTest", () => {
   constSet(TopLevel, "Job", Job);
 
   beforeAll(async () => {
-    constSet(
-      TopLevel,
-      "ShardedBlogPost",
-      (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
-    );
-    constSet(
-      TopLevel,
-      "ShardedComment",
-      (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
-    );
+    await import("../test-helpers/models/sharded/blog-post.js");
+    await import("../test-helpers/models/sharded/comment.js");
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {
