@@ -78,7 +78,7 @@ describe("TestEagerLoadDir", () => {
       loader.doNotEagerLoad("excluded");
       await loader.eagerLoadDir(".");
 
-      expect(files.some((file) => isRequired(file))).toBe(false);
+      expect(!files.some((file) => isRequired(file))).toBeTruthy();
     });
   });
 
@@ -269,7 +269,7 @@ describe("TestEagerLoadDir", () => {
     await withSetup(loader, files, {}, async () => {
       await loader.eagerLoadDir("a");
 
-      expect(files.every((file) => isRequired(file))).toBe(true);
+      expect(files.every((file) => isRequired(file))).toBeTruthy();
     });
   });
 
@@ -310,22 +310,24 @@ describe("TestEagerLoadDir", () => {
         throw new Error();
       };
 
-      await expect(loader.eagerLoadDir(".")).resolves.toBeUndefined();
+      await loader.eagerLoadDir(".");
     });
   });
 
   it("raises Zeitwerk::Error if the argument is not a directory", async () => {
     await withSetup(loader, [], {}, async () => {
-      const e = await loader.eagerLoadDir(import.meta.filename).catch((error: Error) => error);
-      expect(e).toBeInstanceOf(ZeitwerkError);
+      const call = loader.eagerLoadDir(import.meta.filename);
+      await expect(call).rejects.toThrow(ZeitwerkError);
+      const e = await call.catch((error: Error) => error);
       expect((e as Error).message).toEqual(`${import.meta.filename} is not a directory`);
     });
   });
 
   it("raises if the argument is not managed by the loader", async () => {
     await withSetup(loader, [], {}, async () => {
-      const e = await loader.eagerLoadDir(import.meta.dirname).catch((error: Error) => error);
-      expect(e).toBeInstanceOf(ZeitwerkError);
+      const call = loader.eagerLoadDir(import.meta.dirname);
+      await expect(call).rejects.toThrow(ZeitwerkError);
+      const e = await call.catch((error: Error) => error);
       expect((e as Error).message).toEqual(`I do not manage ${import.meta.dirname}`);
     });
   });
