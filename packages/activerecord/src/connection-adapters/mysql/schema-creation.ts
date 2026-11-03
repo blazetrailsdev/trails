@@ -1,3 +1,4 @@
+import "../../constants.mysql-schema-creation.generated.js";
 import {
   SchemaCreation as AbstractSchemaCreation,
   type SchemaCreationConn,

@@ -1,4 +1,3 @@
-/** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 import { ConnectionAdapters } from "../namespaces.js";
 import { extend, hasKey, include, constSet, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteDriver } from "../sqlite-adapter.js";
@@ -7,6 +6,7 @@ import { AbstractAdapter } from "./abstract-adapter.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
+/** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LibSQLRemoteAdapter extends AbstractAdapter {
   /** @internal */
@@ -47,4 +47,4 @@ for (const name of ["ADAPTER_NAME", "TYPE_MAP", "EXTENDED_TYPE_MAPS"] as const) 
   constSet(LibSQLRemoteAdapter, name, SQLite3Adapter[name]);
 }
 
-constSet(ConnectionAdapters, "LibSQLRemoteAdapter", LibSQLRemoteAdapter);
+ConnectionAdapters.LibSQLRemoteAdapter = LibSQLRemoteAdapter;

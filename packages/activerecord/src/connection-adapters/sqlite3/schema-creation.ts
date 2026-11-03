@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-schema-creation.generated.js";
 import { rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as AbstractSchemaCreation } from "../abstract/schema-creation.js";
 import type { ForeignKeyDefinition } from "../abstract/schema-definitions.js";

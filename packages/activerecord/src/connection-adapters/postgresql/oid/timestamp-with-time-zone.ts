@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-timestamp-with-time-zone.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import type { Time } from "@blazetrails/date";
 import { actsLike, TimeWithZone, isBlank } from "@blazetrails/activesupport";
@@ -24,4 +25,4 @@ export class TimestampWithTimeZone extends DateTime {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "TimestampWithTimeZone", TimestampWithTimeZone);
+ConnectionAdapters.PostgreSQL.OID.TimestampWithTimeZone = TimestampWithTimeZone;

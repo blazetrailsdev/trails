@@ -53,7 +53,17 @@ const SUBPATH_ENTRIES: Record<string, string> = {
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
 
 /** A directory whose files load one at a time, so each carries its own table and loads no sibling. */
-const LAZY_DIRS: Record<string, string[]> = { trailties: ["commands/", "command.ts"] };
+const LAZY_DIRS: Record<string, string[]> = {
+  activerecord: ["connection-adapters/"],
+  trailties: ["commands/", "command.ts"],
+};
+
+/** A lazy file's table, named from its path under the prefix so same-named files do not collide. */
+function lazyTable(dir: string, file: string): string {
+  const prefix = (LAZY_DIRS[dir] ?? []).find((p) => p.endsWith("/") && file.startsWith(p));
+  const rel = prefix ? file.slice(prefix.length) : path.basename(file);
+  return `constants.${rel.replace(/\.ts$/, "").replaceAll("/", "-")}.generated.ts`;
+}
 
 function separateTable(subpath: string): string {
   return `constants.${path.basename(subpath, ".ts")}.generated.ts`;
@@ -207,7 +217,7 @@ async function placement(dir: string) {
     return {
       excluded: ownTable,
       ...(separated ? { table: separateTable(separate) } : {}),
-      ...(lazy ? { table: separateTable(file) } : {}),
+      ...(lazy ? { table: lazyTable(dir, file) } : {}),
     };
   };
   return { read, at };

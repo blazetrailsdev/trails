@@ -1,3 +1,4 @@
+import "../../constants.postgresql-schema-definitions.generated.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ConnectionAdapters } from "../../namespaces.js";
 import {

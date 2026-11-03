@@ -1,8 +1,9 @@
+import "../../constants.sqlite3-column.generated.js";
 import { ConnectionAdapters } from "../../namespaces.js";
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { rbHash, constSet } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _autoIncrement: boolean;
@@ -79,4 +80,4 @@ export class Column extends BaseColumn {
   }
 }
 
-constSet(ConnectionAdapters.SQLite3, "Column", Column);
+ConnectionAdapters.SQLite3.Column = Column;

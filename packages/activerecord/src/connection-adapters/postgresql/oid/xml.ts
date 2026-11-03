@@ -1,5 +1,6 @@
+import "../../../constants.postgresql-oid-xml.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { rtest, constSet } from "@blazetrails/ruby-compat";
+import { rtest } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Xml extends StringType {
@@ -25,4 +26,4 @@ export class Data {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Xml", Xml);
+ConnectionAdapters.PostgreSQL.OID.Xml = Xml;

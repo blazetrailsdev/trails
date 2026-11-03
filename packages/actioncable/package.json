@@ -26,19 +26,16 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "websocket-driver": ">=0.7.4"
   },
   "engines": {
     "node": ">=24"
   },
   "peerDependencies": {
-    "pg": ">=8.19.0",
-    "websocket-driver": ">=0.7.4"
+    "pg": ">=8.19.0"
   },
   "peerDependenciesMeta": {
-    "websocket-driver": {
-      "optional": true
-    },
     "pg": {
       "optional": true
     },
@@ -50,7 +47,6 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "@rails/actioncable": "8.0.200",
-    "ioredis": "^6.0.0",
-    "websocket-driver": "0.7.4"
+    "ioredis": "^6.0.0"
   }
 }

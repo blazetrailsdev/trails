@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-enum.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 
@@ -13,4 +14,4 @@ export class Enum extends ValueType<string> {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Enum", Enum);
+ConnectionAdapters.PostgreSQL.OID.Enum = Enum;

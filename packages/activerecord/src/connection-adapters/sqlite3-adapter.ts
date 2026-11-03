@@ -1,3 +1,4 @@
+import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import {
@@ -1392,5 +1393,5 @@ export interface SQLite3Adapter {
 
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
 
-constSet(ConnectionAdapters, "SQLite3Adapter", SQLite3Adapter);
+ConnectionAdapters.SQLite3Adapter = SQLite3Adapter;
 constSet(SQLite3Adapter, "SQLite3Integer", SQLite3Integer);

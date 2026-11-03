@@ -6,7 +6,6 @@ import {
   rbObjAsString,
   rbStrSend,
   Struct,
-  constSet,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
@@ -21,6 +20,7 @@ ActiveRecord.Point = class Point extends Struct.new("x", "y") {
   }
 };
 
+/** @noRailsEquivalent CONVERGEABLE class-paths-pairs-oid-point-beside-activerecord-point */
 export class Point extends ValueType {
   override type(): string {
     return "point";
@@ -93,4 +93,4 @@ function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown]
   return [value.x ?? value["x"], value.y ?? value["y"]];
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Point", Point);
+ConnectionAdapters.PostgreSQL.OID.Point = Point;

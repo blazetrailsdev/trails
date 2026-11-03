@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-explain-pretty-printer.generated.js";
 export interface ExplainResult {
   rows: Array<Array<unknown>>;
 }

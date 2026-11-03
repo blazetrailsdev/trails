@@ -1199,6 +1199,27 @@ jobs:
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/thor/src/*.ts')
 
+  # A generated application's own vitest suite, against packed packages.
+  # trails' vitest config aliases every package to its source, so a defect
+  # that exists only where vitest externalizes the installed packages (a
+  # second module instance of each class the loader seats, trails#9683)
+  # cannot fail any other job.
+  generated-app-tests:
+    name: Generated App Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.trailties_affected == 'true' ||
+      needs.changes.outputs.activerecord_affected == 'true')
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm build
+      - run: scripts/generated-app-smoke.sh "$RUNNER_TEMP/generated-app"
+
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
   # denominator, producing an honest baseline. There is NO threshold gate —
@@ -2719,6 +2740,7 @@ jobs:
       - actionpack-tests
       - system-tests
       - trailties-tests
+      - generated-app-tests
       - sqlite-tests
       - sqlite-mem-tests
       - maria-prepared-tests
@@ -2857,6 +2879,11 @@ jobs:
                   ;;
                 trailties-tests)
                   if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; then
+                    continue
+                  fi
+                  ;;
+                generated-app-tests)
+                  if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$AR_AFFECTED" = "false" ]; then
                     continue
                   fi
                   ;;

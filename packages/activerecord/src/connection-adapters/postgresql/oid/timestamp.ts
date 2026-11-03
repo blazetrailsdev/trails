@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-timestamp.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { DateTime } from "./date-time.js";
 
@@ -8,4 +9,4 @@ export class Timestamp extends DateTime {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Timestamp", Timestamp);
+ConnectionAdapters.PostgreSQL.OID.Timestamp = Timestamp;

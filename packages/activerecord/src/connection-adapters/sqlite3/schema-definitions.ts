@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-schema-definitions.generated.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
 import {
   TableDefinition as AbstractTableDefinition,
