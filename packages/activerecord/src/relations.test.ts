@@ -6,7 +6,6 @@ import {
   RecordInvalid,
   IrreversibleOrderError,
   UnmodifiableRelation,
-  registerModel,
   Base,
 } from "./index.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
@@ -24,7 +23,7 @@ import {
   isPresent,
   toXmlArray,
 } from "@blazetrails/activesupport";
-import { PP, SimpleDelegator } from "@blazetrails/ruby-compat";
+import { PP, SimpleDelegator, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -101,39 +100,37 @@ describe("RelationTest", () => {
   ]);
 
   beforeAll(() => {
-    registerModel(Post);
-    registerModel(Author);
-    registerModel(Comment);
-    registerModel(SpecialComment);
-    registerModel(VerySpecialComment);
-    registerModel(Topic);
-    registerModel(Bird);
-    registerModel(Car);
-    registerModel(CoolCar);
-    registerModel(FastCar);
-    registerModel(Engine);
-    registerModel(Tyre);
-    registerModel(Minivan);
-    registerModel(Developer);
-    registerModel(DeveloperCalledDavid);
-    registerModel(Project);
-    registerModel(AuditLog);
-    registerModel(Tag);
-    registerModel(Tagging);
-    registerModel(Account);
-    registerModel(SubAccount);
-    registerModel(Entrant);
-    registerModel(Edge);
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    registerModel(Subscriber);
-    registerModel(Reader);
-    registerModel(Company);
-    registerModel(Contract);
-    registerModel(DependentFirm);
-    registerModel(AuthorAddress);
-    registerModel(Possession);
-    registerModel(Category);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Comment", Comment);
+    constSet(TopLevel, "SpecialComment", SpecialComment);
+    constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Bird", Bird);
+    constSet(TopLevel, "Car", Car);
+    constSet(TopLevel, "CoolCar", CoolCar);
+    constSet(TopLevel, "FastCar", FastCar);
+    constSet(TopLevel, "Engine", Engine);
+    constSet(TopLevel, "Tyre", Tyre);
+    constSet(TopLevel, "Minivan", Minivan);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "DeveloperCalledDavid", DeveloperCalledDavid);
+    constSet(TopLevel, "Project", Project);
+    constSet(TopLevel, "AuditLog", AuditLog);
+    constSet(TopLevel, "Tag", Tag);
+    constSet(TopLevel, "Tagging", Tagging);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "SubAccount", SubAccount);
+    constSet(TopLevel, "Entrant", Entrant);
+    constSet(TopLevel, "Edge", Edge);
+    constSet(TopLevel, "Subscriber", Subscriber);
+    constSet(TopLevel, "Reader", Reader);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Contract", Contract);
+    constSet(TopLevel, "DependentFirm", DependentFirm);
+    constSet(TopLevel, "AuthorAddress", AuthorAddress);
+    constSet(TopLevel, "Possession", Possession);
+    constSet(TopLevel, "Category", Category);
   });
 
   function customPostRelation(aliasName = "omg_posts") {

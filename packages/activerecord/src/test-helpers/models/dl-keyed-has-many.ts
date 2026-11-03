@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class DlKeyedHasMany extends Base {
   declare destroy_async_parent_id: number;
@@ -9,4 +10,5 @@ export class DlKeyedHasMany extends Base {
     this.primaryKey = "many_key";
   }
 }
-registerModel(DlKeyedHasMany);
+constSet(TopLevel, "DlKeyedHasMany", DlKeyedHasMany);
+DescendantsTracker.registerSubclass(Base, DlKeyedHasMany);

@@ -1,9 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { Account } from "./account.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -43,7 +43,8 @@ export class Reply extends Topic {
     return this.approved();
   }
 }
-registerModel(Reply);
+constSet(TopLevel, "Reply", Reply);
+DescendantsTracker.registerSubclass(Topic, Reply);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reply {
   get topic(): Topic | null | Promise<Topic | null>;
@@ -55,7 +56,8 @@ export class SillyReply extends Topic {
     this.belongsTo("reply", { foreignKey: "parent_id", counterCache: "replies_count" });
   }
 }
-registerModel(SillyReply);
+constSet(TopLevel, "SillyReply", SillyReply);
+DescendantsTracker.registerSubclass(Topic, SillyReply);
 
 export class UniqueReply extends Reply {
   static {
@@ -63,14 +65,16 @@ export class UniqueReply extends Reply {
     this.validatesUniquenessOf("content", { scope: "parent_id" });
   }
 }
-registerModel(UniqueReply);
+constSet(TopLevel, "UniqueReply", UniqueReply);
+DescendantsTracker.registerSubclass(Reply, UniqueReply);
 
 export class SillyUniqueReply extends UniqueReply {
   static {
     this.validates("content", { uniqueness: true });
   }
 }
-registerModel(SillyUniqueReply);
+constSet(TopLevel, "SillyUniqueReply", SillyUniqueReply);
+DescendantsTracker.registerSubclass(UniqueReply, SillyUniqueReply);
 
 export class WrongReply extends Reply {
   static {
@@ -122,11 +126,13 @@ export class WrongReply extends Reply {
     }
   }
 }
-registerModel(WrongReply);
+constSet(TopLevel, "WrongReply", WrongReply);
+DescendantsTracker.registerSubclass(Reply, WrongReply);
 
 export class WebReply extends WebTopic {
   static {
-    registerModel(constSet(Web, "Reply", this));
+    constSet(Web, "Reply", this);
+    DescendantsTracker.registerSubclass(WebTopic, this);
   }
   static {
     this.belongsTo("topic", {

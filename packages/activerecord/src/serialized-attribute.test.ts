@@ -21,7 +21,7 @@ import { assertRaises } from "@blazetrails/activesupport";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { MissingAttributeError, Mutable, StringType, ValueType } from "@blazetrails/activemodel";
-import { Base, SerializationTypeMismatch, registerModel } from "./index.js";
+import { Base, SerializationTypeMismatch } from "./index.js";
 import { JSON as CodersJSON } from "./coders/json.js";
 import { YAMLColumn } from "./coders/yaml-column.js";
 import * as Type from "./type.js";
@@ -53,7 +53,7 @@ class Topic extends Base {
   declare group: any;
 
   static {
-    registerModel(constSet(SerializedAttributeTest, "Topic", this));
+    constSet(SerializedAttributeTest, "Topic", this);
     this.serialize("content");
   }
 }
@@ -62,7 +62,7 @@ class ImportantTopic extends Topic {
   declare important: any;
 
   static {
-    registerModel(constSet(SerializedAttributeTest, "ImportantTopic", this));
+    constSet(SerializedAttributeTest, "ImportantTopic", this);
     this.serialize("important", { type: Hash });
   }
 }
@@ -71,7 +71,7 @@ class ClassifiedTopic extends Topic {
   declare important: any;
 
   static {
-    registerModel(constSet(SerializedAttributeTest, "ClassifiedTopic", this));
+    constSet(SerializedAttributeTest, "ClassifiedTopic", this);
     this.serialize("important", { type: rbCClass });
   }
 }

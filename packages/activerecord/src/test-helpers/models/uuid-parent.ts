@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { UuidChild } from "./uuid-child.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class UuidParent extends Base {
   declare uuidChildren: AssociationProxy<UuidChild>;
@@ -10,4 +11,5 @@ export class UuidParent extends Base {
     this.hasMany("uuidChildren");
   }
 }
-registerModel(UuidParent);
+constSet(TopLevel, "UuidParent", UuidParent);
+DescendantsTracker.registerSubclass(Base, UuidParent);

@@ -1,4 +1,6 @@
-import { registerModel } from "../../../associations.js";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Sharded } from "./namespace.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlogPost } from "./blog-post.js";
@@ -8,7 +10,8 @@ import type { ShardedTag } from "./tag.js";
 export class ShardedBlogPostTag extends Base {
   static _tableName = "sharded_blog_posts_tags";
   static {
-    registerModel("Sharded::BlogPostTag", this);
+    constSet(Sharded, "BlogPostTag", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, StrictLoadingViolationError, type Base } from "./index.js";
+import { StrictLoadingViolationError, type Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -28,8 +29,8 @@ describe("nested attributes update on an unloaded one-to-one association", () =>
   fixtures(["pirates", "ships"]);
 
   beforeAll(() => {
-    registerModel(Pirate);
-    registerModel(Ship);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "Ship", Ship);
   });
 
   it("updates an unloaded existing record in place before the owner is saved", async () => {

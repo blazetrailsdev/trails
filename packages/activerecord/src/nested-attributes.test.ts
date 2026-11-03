@@ -1,12 +1,7 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import {
-  Base,
-  RecordNotFound,
-  registerModel,
-  REJECT_ALL_BLANK_PROC,
-  TooManyRecords,
-} from "./index.js";
+import { Base, RecordNotFound, REJECT_ALL_BLANK_PROC, TooManyRecords } from "./index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
@@ -193,7 +188,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("allows class to override setter and call super", async () => {
     class MeanPirate extends Pirate {}
-    registerModel("MeanPirate", MeanPirate);
+    constSet(TopLevel, "MeanPirate", MeanPirate);
     MeanPirate.acceptsNestedAttributesFor("parrot");
     const proto = MeanPirate.prototype as unknown as Record<string, unknown>;
     const original = proto["setParrotAttributes"] as (
@@ -213,7 +208,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("accepts nested attributes for can be overridden in subclasses", async () => {
     Pirate.acceptsNestedAttributesFor("parrot");
     class MeanPirate extends Pirate {}
-    registerModel("MeanPirate", MeanPirate);
+    constSet(TopLevel, "MeanPirate", MeanPirate);
     MeanPirate.acceptsNestedAttributesFor("parrot");
 
     const meanPirate = new MeanPirate();
@@ -1595,7 +1590,8 @@ describe("TestNestedAttributesWithExtend", () => {
         this.acceptsNestedAttributesFor("treasures");
       }
     }
-    registerModel(SuperPirate);
+    constSet(TopLevel, "SuperPirate", SuperPirate);
+    DescendantsTracker.registerSubclass(Base, SuperPirate);
 
     const pirate = await SuperPirate.createBang({
       catchphrase: "Don' botharrr talkin' like one, savvy?",

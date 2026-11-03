@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, expect } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { buildExplainClause } from "./explain.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { ValueType } from "@blazetrails/activemodel";
@@ -8,8 +9,8 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 
-registerModel(Car);
-registerModel(Bulb);
+constSet(TopLevel, "Car", Car);
+constSet(TopLevel, "Bulb", Bulb);
 
 describe("ExplainTest", () => {
   const { self } = fixtures(["cars", "bulbs"]);

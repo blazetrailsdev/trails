@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -6,7 +8,6 @@ import type { Member } from "./member.js";
 import type { MemberDetail } from "./member-detail.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Organization extends Base {
@@ -35,7 +36,8 @@ export class Organization extends Base {
     });
   }
 }
-registerModel(Organization);
+constSet(TopLevel, "Organization", Organization);
+DescendantsTracker.registerSubclass(Base, Organization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Organization {
   get author(): Author | null | Promise<Author | null>;

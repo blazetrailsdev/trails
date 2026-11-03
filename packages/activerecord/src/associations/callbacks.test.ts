@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { registerModel } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -10,11 +10,11 @@ import { Post } from "../test-helpers/models/post.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 
-registerModel(Project);
-registerModel(Developer);
-registerModel(AuditLog);
-registerModel(Author);
-registerModel(Post);
+constSet(TopLevel, "Project", Project);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "AuditLog", AuditLog);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
 
 describe("AssociationCallbacksTest", () => {
   const { authors, posts } = fixtures(["authors", "posts"]);
@@ -176,13 +176,13 @@ describe("AssociationCallbacksTest", () => {
 describe("AssociationCallbacksTest", () => {
   fixtures({});
   beforeAll(async () => {
-    registerModel(Company);
-    registerModel(Firm);
-    registerModel(Client);
-    registerModel(Account);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "Account", Account);
     Company.inheritanceColumn = "type";
-    registerModel(Firm);
-    registerModel(Client);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
   });
 
   it("has many callbacks for destroy on parent", async () => {

@@ -210,6 +210,10 @@ export class Loader {
     if (!this._setup) throw new SetupRequired();
 
     await this.unload();
+    this.manifest = null;
+    this._manifestConstants = null;
+    this._manifestChildren = null;
+    this._manifestRows = {};
     await this.recomputeIgnoredPaths();
     await this.recomputeCollapseDirs();
     await this.setup();
@@ -364,6 +368,7 @@ export class Loader {
     if (
       stale ||
       !Array.isArray(manifest.collapsed) ||
+      !Array.isArray(manifest.ignored) ||
       manifest.digest !== configurationDigest(this)
     ) {
       throw new ZeitwerkError(
@@ -374,6 +379,10 @@ export class Loader {
     this._manifestConstants = manifest.constants;
     this._manifestChildren = Object.fromEntries(Object.keys(this.roots).map((d) => [d, new Set()]));
     for (const dir of manifest.collapsed) this.collapseDirs.add(File.expandPath(dir, root));
+    for (const path of manifest.ignored) {
+      this.ignoredPaths.add(File.expandPath(path, root));
+      this._indexManifestPath(File.expandPath(path, root), null);
+    }
     for (const row of Object.values(manifest.constants)) {
       if (row.export != null) this._indexManifestPath(File.expandPath(row.path, root), null);
       for (const dir of row.dirs ?? []) {

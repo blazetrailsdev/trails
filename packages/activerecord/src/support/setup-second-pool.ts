@@ -1,7 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeAll } from "vitest";
 import { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { registerModel } from "../associations.js";
 import { loadCanonicalArunit2Schema } from "./canonical-schema.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { Course } from "../test-helpers/models/course.js";
@@ -39,10 +39,10 @@ export async function provisionSecondDatabase(): Promise<void> {
 }
 
 async function setupSecondPool(): Promise<void> {
-  registerModel(College);
-  registerModel(Course);
-  registerModel(Entrant);
-  registerModel(Professor);
+  constSet(TopLevel, "College", College);
+  constSet(TopLevel, "Course", Course);
+  constSet(TopLevel, "Entrant", Entrant);
+  constSet(TopLevel, "Professor", Professor);
   const arunit2 = await ARUnit2Model.leaseConnection();
 
   await arunit2.truncateTables(...ARUNIT2_TABLES);

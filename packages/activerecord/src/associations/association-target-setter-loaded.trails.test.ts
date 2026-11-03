@@ -1,8 +1,8 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface AssociationLike {
@@ -18,8 +18,8 @@ describe("Association#target=", () => {
     (post as unknown as { association(name: string): AssociationLike }).association("author");
 
   it("sets the loaded flag", async () => {
-    registerModel(Author);
-    registerModel(Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
     const author = await Author.find(authors("david").id);
     const post = await Post.find(posts("welcome").id);
     const assoc = association(post);
@@ -30,8 +30,8 @@ describe("Association#target=", () => {
   });
 
   it("snapshots the stale state so a later foreign key change is stale", async () => {
-    registerModel(Author);
-    registerModel(Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
     const author = await Author.find(authors("david").id);
     const post = await Post.find(posts("welcome").id);
     const assoc = association(post);

@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Chef } from "./chef.js";
 import type { Hotel } from "./hotel.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Department extends Base {
@@ -14,7 +15,8 @@ export class Department extends Base {
     this.belongsTo("hotel");
   }
 }
-registerModel(Department);
+constSet(TopLevel, "Department", Department);
+DescendantsTracker.registerSubclass(Base, Department);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Department {
   get hotel(): Hotel | null | Promise<Hotel | null>;

@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
@@ -5,7 +7,6 @@ import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { DlKeyedJoin } from "./dl-keyed-join.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestroyAsyncParent extends Base {
@@ -44,7 +45,8 @@ export class DestroyAsyncParent extends Base {
     });
   }
 }
-registerModel(DestroyAsyncParent);
+constSet(TopLevel, "DestroyAsyncParent", DestroyAsyncParent);
+DescendantsTracker.registerSubclass(Base, DestroyAsyncParent);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;

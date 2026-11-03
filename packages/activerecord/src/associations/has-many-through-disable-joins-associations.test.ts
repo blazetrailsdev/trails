@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertDifference } from "@blazetrails/activesupport";
 import { assertQueriesCount } from "../testing/query-assertions.js";
@@ -28,7 +29,13 @@ function djasScope(owner: Base, assocName: string): any {
 describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   const { self, authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
 
-  registerModel([Author, AuthorAddress, Post, Comment, Rating, Member, MemberType]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Rating", Rating);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "MemberType", MemberType);
 
   let author: Author;
   let post: Post;

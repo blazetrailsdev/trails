@@ -8,6 +8,8 @@ import {
   RuntimeError,
   setEnv,
   toI,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
@@ -85,7 +87,6 @@ FixtureFile.registerModule(
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
-import { registerModel } from "./associations.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Joke } from "./test-helpers/models/joke.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -109,7 +110,7 @@ import "./relation.js";
 import { setVerifyForeignKeysForFixtures, verifyForeignKeysForFixtures } from "./active-record.js";
 
 for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot, Account, Company, Course, Post]) {
-  registerModel(model);
+  constSet(TopLevel, model.name, model);
 }
 
 describe("PrimaryKeyErrorTest", () => {
@@ -1015,7 +1016,7 @@ describe("FixtureNameIsNotTableNameMultipleFixturesTest", () => {
 });
 
 describe("CustomConnectionFixturesTest", () => {
-  registerModel(College);
+  constSet(TopLevel, "College", College);
   const { courses } = fixtures(
     { courses: [Course, courseFixtureData] },
     { useTransactionalTests: false },
@@ -1033,7 +1034,7 @@ describe("CustomConnectionFixturesTest", () => {
 });
 
 describe("TransactionalFixturesOnCustomConnectionTest", () => {
-  registerModel(College);
+  constSet(TopLevel, "College", College);
   const { courses } = fixtures({ courses: [Course, courseFixtureData] });
 
   it("leaky destroy", async () => {

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, AssociationTypeMismatch } from "../index.js";
+import { AssociationTypeMismatch } from "../index.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { Member } from "../test-helpers/models/member.js";
@@ -20,12 +21,12 @@ describe("HasOnePersistedSetterThrows", () => {
   fixtures(["companies", "accounts", "members", "memberships", "clubs"]);
 
   beforeAll(() => {
-    registerModel(Company);
-    registerModel(Firm);
-    registerModel(Account);
-    registerModel(Member);
-    registerModel(Membership);
-    registerModel(Club);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "Membership", Membership);
+    constSet(TopLevel, "Club", Club);
   });
 
   it("set#{Name} persists the replacement on a persisted owner", async () => {

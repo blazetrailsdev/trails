@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../admin.js";
 import { constSet } from "@blazetrails/ruby-compat";
 import {
@@ -7,7 +8,6 @@ import {
 } from "@blazetrails/activesupport";
 import { Base } from "../../../base.js";
 import { YAMLColumn } from "../../../coders/yaml-column.js";
-import { registerModel } from "../../../associations.js";
 
 class Coder {
   #default: Record<string, unknown>;
@@ -33,7 +33,8 @@ export class AdminUser extends Base {
   declare settings: HashWithIndifferentAccess<unknown>;
   declare spouse: HashWithIndifferentAccess<unknown>;
   static {
-    registerModel(constSet(Admin, "User", this));
+    constSet(Admin, "User", this);
+    DescendantsTracker.registerSubclass(Base, this);
     constSet(this, "Coder", Coder);
   }
 

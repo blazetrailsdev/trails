@@ -1,12 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
-import { CpkOrder, CpkOrderTag, CpkTag } from "../test-helpers/models/cpk.js";
+import { CpkOrder, CpkTag } from "../test-helpers/models/cpk.js";
 import type { Relation } from "../relation.js";
-
-registerModel([CpkOrder, CpkOrderTag, CpkTag]);
 
 CpkOrder.hasMany(
   "tagsWithMixedCondition",

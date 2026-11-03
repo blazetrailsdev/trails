@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, transaction } from "../index.js";
+import { transaction } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Publication } from "../test-helpers/models/publication.js";
 import { Editor } from "../test-helpers/models/editor.js";
@@ -9,9 +10,9 @@ describe("ReloadAssociationCacheTest", () => {
   fixtures({});
 
   beforeAll(() => {
-    registerModel(Publication);
-    registerModel(Editor);
-    registerModel(Editorship);
+    constSet(TopLevel, "Publication", Publication);
+    constSet(TopLevel, "Editor", Editor);
+    constSet(TopLevel, "Editorship", Editorship);
   });
 
   it("reload sets correct owner for association cache", async () => {

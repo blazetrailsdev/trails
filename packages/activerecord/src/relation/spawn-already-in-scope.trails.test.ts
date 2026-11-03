@@ -1,9 +1,9 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, test, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
-registerModel([Post]);
+constSet(TopLevel, "Post", Post);
 
 interface ScopeInternals {
   isAlreadyInScope(registry: ScopeRegistryLike): boolean;

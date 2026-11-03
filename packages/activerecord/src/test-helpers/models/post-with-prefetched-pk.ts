@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class PostWithPrefetchedPk extends Base {
   static _tableName = "posts";
@@ -12,4 +13,5 @@ export class PostWithPrefetchedPk extends Base {
     return 123456;
   }
 }
-registerModel(PostWithPrefetchedPk);
+constSet(TopLevel, "PostWithPrefetchedPk", PostWithPrefetchedPk);
+DescendantsTracker.registerSubclass(Base, PostWithPrefetchedPk);

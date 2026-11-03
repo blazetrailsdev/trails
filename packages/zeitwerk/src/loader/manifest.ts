@@ -17,6 +17,7 @@ export interface Manifest {
   constants: Record<string, ManifestRow>;
   shadowed: string[];
   collapsed: string[];
+  ignored: string[];
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -94,6 +95,7 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
       constants,
       shadowed: [...loader.shadowedFiles].map(relative),
       collapsed: [...loader.collapseDirs].map(relative).sort(),
+      ignored: [...loader.ignoredPaths].map(relative).sort(),
     };
   } finally {
     for (const cref of Object.values(loader.autoloads)) cref.remove();

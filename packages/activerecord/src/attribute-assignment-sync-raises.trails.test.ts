@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, type Base } from "./index.js";
+import { type Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -15,8 +16,8 @@ describe("synchronous attribute assignment that owes a read", () => {
   fixtures(["pirates", "ships"]);
 
   beforeAll(async () => {
-    registerModel(Pirate);
-    registerModel(Ship);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "Ship", Ship);
     await Pirate.loadSchema();
     await Ship.loadSchema();
   });

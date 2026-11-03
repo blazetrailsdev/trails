@@ -1,20 +1,18 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
-import { EagerLoadPolymorphicError, type Base } from "../index.js";
+import { EagerLoadPolymorphicError } from "../index.js";
 
 describe("eager_load with an unresolvable association", () => {
   const { authors } = fixtures(["posts", "comments", "taggings", "authors", "essays"]);
 
   beforeAll(() => {
-    [Post, Comment, Tagging, Author, Essay].forEach((m) =>
-      registerModel(m as unknown as typeof Base),
-    );
+    [Post, Comment, Tagging, Author, Essay].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   const expected = /Can't join 'Post' to association named 'monkeys'; perhaps you misspelled it\?/;

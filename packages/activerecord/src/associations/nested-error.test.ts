@@ -1,6 +1,7 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "../active-record.js";
 import { NestedError } from "./nested-error.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -108,8 +109,10 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
       get pet(): ValidatedPet | null | Promise<ValidatedPet | null>;
       set pet(value: ValidatedPet | null);
     }
-    registerModel("NestedErrorValidatedPet", ValidatedPet);
-    registerModel("NestedErrorPetOwner", PetOwner);
+    constSet(TopLevel, "NestedErrorValidatedPet", ValidatedPet);
+    DescendantsTracker.registerSubclass(Base, ValidatedPet);
+    constSet(TopLevel, "NestedErrorPetOwner", PetOwner);
+    DescendantsTracker.registerSubclass(Base, PetOwner);
 
     it("no index when singular association", async () => {
       const oldAttributeConfig = indexNestedAttributeErrors();

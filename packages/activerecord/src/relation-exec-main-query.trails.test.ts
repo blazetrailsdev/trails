@@ -1,11 +1,11 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { registerModel } from "./associations.js";
 import { Author } from "./test-helpers/models/author.js";
 
-registerModel(Author);
+constSet(TopLevel, "Author", Author);
 
 describe("RelationTest", () => {
   fixtures(["authors", "authorAddresses"]);

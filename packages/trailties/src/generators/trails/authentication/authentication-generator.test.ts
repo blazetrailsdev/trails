@@ -183,12 +183,12 @@ describe("AuthenticationGenerator", () => {
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");
   });
 
-  it("emits create_users and create_sessions migrations", async () => {
-    const migrations = (await makeGen().run()).filter((f) => f.startsWith("db/migrate/"));
-    const names = migrations.map((f) => f.replace(/^db\/migrate\/\d+_/, ""));
-    expect(names).toEqual(["create_users.ts", "create_sessions.ts"]);
-    expect(read(migrations[0])).toContain("email_address");
-    expect(read(migrations[1])).toContain("user_agent");
+  it("runs the create_users and create_sessions migration generators in line", async () => {
+    await makeGen().run();
+    const commands = spawned.map((command) => command.join(" "));
+    const generated = commands.filter((command) => command.includes("bin/trails generate"));
+    expect(generated[0]).toContain("generate migration CreateUsers email_address:string!:uniq");
+    expect(generated[1]).toContain("generate migration CreateSessions user:references");
   });
 
   it("adds bcryptjs to the application's dependencies and installs it", async () => {

@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Sharded } from "./namespace.js";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
-import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlogPost } from "./blog-post.js";
@@ -13,7 +15,8 @@ export class ShardedTag extends Base {
 
   static _tableName = "sharded_tags";
   static {
-    registerModel("Sharded::Tag", this);
+    constSet(Sharded, "Tag", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

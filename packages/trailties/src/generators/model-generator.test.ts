@@ -1,89 +1,61 @@
-import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
-import * as Assertions from "./testing/assertions.js";
-import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
-import { Dir } from "@blazetrails/ruby-compat";
+import { File, Dir } from "@blazetrails/ruby-compat";
+import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
+import { Base } from "@blazetrails/activerecord";
 import { ModelHelpers } from "./model-helpers.js";
 import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
-import { Base } from "@blazetrails/activerecord";
+import { copyRoutes } from "./generators-test-helper.js";
+import { TestCase } from "./test-case.js";
 
-class ModelGeneratorTestApp extends Application {}
+class ModelGeneratorApp extends Application {}
+class ModelGeneratorTest extends TestCase {}
+ModelGeneratorTest.destination(Dir.mktmpdir());
+ModelGeneratorTest.arguments(["Account", "name:string", "age:integer"]);
+registerSpecType(/^ModelGeneratorTest$/, ModelGeneratorTest);
 let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGenerator;
-
-beforeAll(async () => {
-  await ModelGeneratorTestApp.instance().loadGenerators();
-  ({ ModelGenerator } = await import("./trails/model/model-generator.js"));
-});
+let t: TestCase & { generatorClass?: typeof ModelGenerator };
 let oldBelongsToRequiredByDefault: boolean | undefined;
 
-let tmpDir: string;
-let lines: string[];
-const destination = { destinationRoot: "" };
-const assertNoMigration = Assertions.assertNoMigration.bind(destination);
-const assertNoFile = Assertions.assertNoFile.bind(destination);
-const assertMigration = Assertions.assertMigration.bind(destination);
-const assertFile = Assertions.assertFile.bind(destination);
-const { assertMethod } = Assertions;
+beforeAll(async () => {
+  await ModelGeneratorApp.instance().loadGenerators();
+  ({ ModelGenerator } = await import("./trails/model/model-generator.js"));
+  ModelGeneratorTest.tests(ModelGenerator);
+});
 
-beforeEach(async () => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-  destination.destinationRoot = tmpDir;
-  lines = [];
-  vi.spyOn(stdout, "write").mockImplementation(
-    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
-  );
-  Trails.application = ModelGeneratorTestApp.instance();
+beforeEach(async (context) => {
+  t = context.testCase as typeof t;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
+  await copyRoutes.call(t);
+  Trails.application = ModelGeneratorApp.instance();
+  ModelHelpers.skipWarn = false;
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
   await Trails.application.loadGenerators();
-  ModelHelpers.skipWarn = false;
 });
 
 afterEach(() => {
   Trails.application!.config.activeRecord.belongsToRequiredByDefault =
     oldBelongsToRequiredByDefault;
-  Trails.application = null;
-  fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function listFiles(root: string): string[] {
-  return (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) =>
-    fs.statSync(path.join(root, f)).isFile(),
-  );
-}
-
-function makeGen(config: object = {}) {
-  return {
-    run: async (name: string, args: string[], flags: string[] = []) => {
-      await ModelGenerator.start([name, ...args, ...flags], {
-        destinationRoot: tmpDir,
-        ...config,
-      });
-      return listFiles(tmpDir);
-    },
-  };
-}
-
 function assertGeneratedFixture(relative: string, parsedContents: unknown): void {
-  expect(yamlLoad(fs.readFileSync(path.join(tmpDir, relative), "utf-8"))).toEqual(parsedContents);
+  expect(yamlLoad(File.read(File.join(t.destinationRoot, relative)))).toEqual(parsedContents);
 }
 
 describe("ModelGeneratorTest", () => {
   it.skip("help shows invoked generators options", () => {});
 
   it("model with missing attribute type", async () => {
-    await makeGen().run("post", ["title", "body:text", "author"]);
+    await t.runGenerator(["post", "title", "body:text", "author"]);
 
-    await assertMigration("db/migrate/create_posts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_posts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/t\.string\("title"\)/, up);
         assertMatch(/t\.text\("body"\)/, up);
         assertMatch(/t\.string\("author"\)/, up);
@@ -94,14 +66,14 @@ describe("ModelGeneratorTest", () => {
   it.skip("migration source paths", () => {});
 
   it("invokes default orm", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    await assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    await t.assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
   });
 
   it("model with parent option", async () => {
-    await makeGen().run("account", [], ["--parent=Admin::Account"]);
-    await assertFile("app/models/account.ts", /class Account extends AdminAccount/);
-    assertNoMigration("db/migrate/create_accounts.ts");
+    await t.runGenerator(["account", "--parent=Admin::Account"]);
+    await t.assertFile("app/models/account.ts", /class Account extends AdminAccount/);
+    t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
   it.skip("model with database option", () => {});
@@ -111,9 +83,9 @@ describe("ModelGeneratorTest", () => {
   it.skip("model with no migration and database option", () => {});
 
   it("model with no migration option", async () => {
-    await makeGen().run("account", [], ["--no-migration"]);
-    await assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
-    assertNoMigration("db/migrate/create_accounts.ts");
+    await t.runGenerator(["account", "--no-migration"]);
+    await t.assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
+    t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
   it.skip("model with parent option database option and no migration option", () => {});
@@ -121,60 +93,149 @@ describe("ModelGeneratorTest", () => {
   it.skip("model with underscored database option", () => {});
 
   it("plural names are singularized", async () => {
-    await makeGen().run("accounts", []);
-    await assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
-    await assertFile("test/models/account.test.ts", /describe\("AccountTest"/);
+    const content = String(await t.runGenerator(["accounts"]));
+    await t.assertFile("app/models/account.ts", /class Account extends ApplicationRecord/);
+    await t.assertFile("test/models/account.test.ts", /describe\("AccountTest"/);
     assertMatch(
       /\[WARNING\] The model name 'accounts' was recognized as a plural, using the singular 'account' instead\. Override with --force-plural or setup custom inflection rules for this noun before running the generator\./,
-      lines.join("\n"),
+      content,
     );
   });
 
-  it.skip("unknown inflection rule are warned", () => {});
+  it("unknown inflection rule are warned", async () => {
+    const content = String(await t.runGenerator(["porsche"]));
+    assertMatch(
+      /\[WARNING\] Trails cannot recover singular form from its plural form 'porsches'\.\nPlease setup custom inflection rules for this noun before running the generator in config\/initializers\/inflections\.rb\./,
+      content,
+    );
+    await t.assertFile("app/models/porsche.ts", /class Porsche extends ApplicationRecord/);
 
-  it.skip("impossible inflection rules raises an error", () => {});
+    const uncountableContent = String(await t.runGenerator(["sheep"]));
+    assertNoMatch(
+      /\[WARNING\] Trails cannot recover singular form from its plural form/,
+      uncountableContent,
+    );
 
-  it.skip("model with underscored parent option", () => {});
+    const regularContent = String(await t.runGenerator(["account"]));
+    assertNoMatch(
+      /\[WARNING\] Trails cannot recover singular form from its plural form/,
+      regularContent,
+    );
+  });
+
+  it("impossible inflection rules raises an error", async () => {
+    const content = await capture("stderr", () => t.runGenerator(["BFF"]));
+    assertMatch(
+      /Trails cannot recover the underscored form from its camelcase form 'BFF'\./,
+      content,
+    );
+  });
+
+  it("model with underscored parent option", async () => {
+    await t.runGenerator(["account", "--parent", "admin/account"]);
+    await t.assertFile("app/models/account.ts", /class Account extends AdminAccount/);
+  });
 
   it("model with namespace", async () => {
-    await makeGen().run("admin/account", []);
-    await assertFile("app/models/admin.ts", /export const Admin = \{/);
-    await assertFile("app/models/admin.ts", /get tableNamePrefix\(\)/);
-    await assertFile("app/models/admin.ts", /"admin_"/);
-    await assertFile(
+    await t.runGenerator(["admin/account"]);
+    await t.assertFile("app/models/admin.ts", /export const Admin = \{/);
+    await t.assertFile("app/models/admin.ts", /get tableNamePrefix\(\)/);
+    await t.assertFile("app/models/admin.ts", /"admin_"/);
+    await t.assertFile(
       "app/models/admin/account.ts",
       /export class Account extends ApplicationRecord/,
     );
   });
 
   it("migration", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    await assertMigration(
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    await t.assertMigration(
       "db/migrate/create_accounts.ts",
       /class CreateAccounts extends Migration\.get\(8\.0\)/,
     );
   });
 
-  it.skip("migration with namespace", () => {});
+  it("migration with namespace", async () => {
+    await t.runGenerator(["Gallery::Image"]);
+    await t.assertMigration(
+      "db/migrate/create_gallery_images.ts",
+      /class CreateGalleryImages extends Migration\.get\([0-9.]+\)/,
+    );
+    t.assertNoMigration("db/migrate/create_images.ts");
+  });
 
-  it.skip("migration with nested namespace", () => {});
+  it("migration with nested namespace", async () => {
+    await t.runGenerator(["Admin::Gallery::Image"]);
+    t.assertNoMigration("db/migrate/create_images.ts");
+    t.assertNoMigration("db/migrate/create_gallery_images.ts");
+    await t.assertMigration(
+      "db/migrate/create_admin_gallery_images.ts",
+      /class CreateAdminGalleryImages extends Migration\.get\([0-9.]+\)/,
+    );
+    await t.assertMigration(
+      "db/migrate/create_admin_gallery_images.ts",
+      /createTable\("admin_gallery_images"/,
+    );
+  });
 
-  it.skip("migration with nested namespace without pluralization", () => {});
+  it("migration with nested namespace without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator(["Admin::Gallery::Image"]);
+      t.assertNoMigration("db/migrate/create_images.ts");
+      t.assertNoMigration("db/migrate/create_gallery_images.ts");
+      t.assertNoMigration("db/migrate/create_admin_gallery_images.ts");
+      await t.assertMigration(
+        "db/migrate/create_admin_gallery_image.ts",
+        /class CreateAdminGalleryImage extends Migration\.get\([0-9.]+\)/,
+      );
+      await t.assertMigration(
+        "db/migrate/create_admin_gallery_image.ts",
+        /createTable\("admin_gallery_image"/,
+      );
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
-  it.skip("migration with namespaces in model name without pluralization", () => {});
+  it("migration with namespaces in model name without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator(["Gallery::Image"]);
+      await t.assertMigration(
+        "db/migrate/create_gallery_image.ts",
+        /class CreateGalleryImage extends Migration\.get\([0-9.]+\)/,
+      );
+      t.assertNoMigration("db/migrate/create_gallery_images.ts");
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
-  it.skip("migration without pluralization", () => {});
+  it("migration without pluralization", async () => {
+    Base.pluralizeTableNames = false;
+    try {
+      await t.runGenerator();
+      await t.assertMigration(
+        "db/migrate/create_account.ts",
+        /class CreateAccount extends Migration\.get\([0-9.]+\)/,
+      );
+      t.assertNoMigration("db/migrate/create_accounts.ts");
+    } finally {
+      Base.pluralizeTableNames = true;
+    }
+  });
 
   it("migration is skipped", async () => {
-    await makeGen().run("account", [], ["--no-migration"]);
-    assertNoMigration("db/migrate/create_accounts.ts");
+    await t.runGenerator(["account", "--no-migration"]);
+    t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
   it("migration with attributes", async () => {
-    await makeGen().run("product", ["name:string", "supplier_id:integer"]);
+    await t.runGenerator(["product", "name:string", "supplier_id:integer"]);
 
-    await assertMigration("db/migrate/create_products.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_products.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/createTable\("products"/, up);
         assertMatch(/t\.string\("name"\)/, up);
         assertMatch(/t\.integer\("supplier_id"\)/, up);
@@ -183,15 +244,16 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("migration with attributes and with index", async () => {
-    await makeGen().run("product", [
+    await t.runGenerator([
+      "product",
       "name:string:index",
       "supplier_id:integer:index",
       "user_id:integer:uniq",
       "order_id:uniq",
     ]);
 
-    await assertMigration("db/migrate/create_products.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_products.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/createTable\("products"/, up);
         assertMatch(/t\.string\("name"\)/, up);
         assertMatch(/t\.integer\("supplier_id"\)/, up);
@@ -207,10 +269,10 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("migration with missing attribute type and with index", async () => {
-    await makeGen().run("product", ["name:index", "supplier_id:integer:index", "year:integer"]);
+    await t.runGenerator(["product", "name:index", "supplier_id:integer:index", "year:integer"]);
 
-    await assertMigration("db/migrate/create_products.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_products.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/createTable\("products"/, up);
         assertMatch(/t\.string\("name"\)/, up);
         assertMatch(/t\.integer\("supplier_id"\)/, up);
@@ -223,7 +285,8 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("add migration with attributes index declaration and attribute options", async () => {
-    await makeGen().run("product", [
+    await t.runGenerator([
+      "product",
       "title:string{40}:index",
       "content:string{255}",
       "price:decimal{5,2}:index",
@@ -231,8 +294,8 @@ describe("ModelGeneratorTest", () => {
       "supplier:references{polymorphic}",
     ]);
 
-    await assertMigration("db/migrate/create_products.ts", async (content) => {
-      await assertMethod("change", content, (up) => {
+    await t.assertMigration("db/migrate/create_products.ts", async (content) => {
+      await t.assertMethod("change", content, (up) => {
         assertMatch(/createTable\("products"/, up);
         assertMatch(/t.string\("title", \{ limit: 40 \}\)/, up);
         assertMatch(/t.string\("content", \{ limit: 255 \}\)/, up);
@@ -250,76 +313,64 @@ describe("ModelGeneratorTest", () => {
   it.skip("migration with configured path", () => {});
 
   it("migration with timestamps", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    await assertMigration("db/migrate/create_accounts.ts", /t\.timestamps/);
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    await t.assertMigration("db/migrate/create_accounts.ts", /t\.timestamps/);
   });
 
   it("migration timestamps are skipped", async () => {
-    await makeGen().run("account", [], ["--no-timestamps"]);
+    await t.runGenerator(["account", "--no-timestamps"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertNoMatch(/t\.timestamps/, up);
       }),
     );
   });
 
   it("migration is skipped with skip option", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    const gen = makeGen();
-    await gen.run("Account", [], ["--skip"]);
-    const output = lines.join("\n");
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    const output = String(await t.runGenerator(["Account", "--skip"]));
     assertMatch(/skip\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
 
   it("migration is ignored as identical with skip option", async () => {
-    await makeGen().run("Account", []);
-    const gen = makeGen();
-    await gen.run("Account", [], ["--skip"]);
-    const output = lines.join("\n");
+    await t.runGenerator(["Account"]);
+    const output = String(await t.runGenerator(["Account", "--skip"]));
     assertMatch(/identical\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
 
   it("migration is skipped on skip behavior", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    const gen = makeGen({ behavior: "skip" });
-    await gen.run("Account", []);
-    const output = lines.join("\n");
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    const output = String(await t.runGenerator(["Account"], { behavior: "skip" }));
     assertMatch(/skip\s+db\/migrate\/\d+_create_accounts\.ts/, output);
   });
 
   it("migration error is not shown on revoke", async () => {
-    await makeGen().run("Account", []);
-    lines = [];
-    await makeGen({ behavior: "revoke" }).run("Account", []);
-    const error = lines.join("\n");
+    await t.runGenerator(["Account"]);
+    const error = String(await t.runGenerator(["Account"], { behavior: "revoke" }));
     assertNoMatch(/Another migration is already named create_accounts/, error);
   });
 
   it("migration is removed on revoke", async () => {
-    await makeGen().run("Account", []);
-    await makeGen({ behavior: "revoke" }).run("Account", []);
-    assertNoMigration("db/migrate/create_accounts.ts");
+    await t.runGenerator(["Account"]);
+    await t.runGenerator(["Account"], { behavior: "revoke" });
+    t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
   it("existing migration is removed on force", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    const oldMigration = Dir.glob(
-      `${destination.destinationRoot}/db/migrate/*_create_accounts.ts`,
-    )[0];
-    const gen = makeGen();
-    await gen.run("Account", [], ["--force"]);
-    const error = lines.join("\n");
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    const oldMigration = Dir.glob(`${t.destinationRoot}/db/migrate/*_create_accounts.ts`)[0];
+    const error = String(await t.runGenerator(["Account", "--force"]));
     assertNoMatch(/Another migration is already named create_accounts/, error);
-    assertNoFile(oldMigration);
-    await assertMigration("db/migrate/create_accounts.ts");
+    t.assertNoFile(oldMigration);
+    await t.assertMigration("db/migrate/create_accounts.ts");
   });
 
   it("invokes default test framework", async () => {
-    await makeGen().run("Account", ["name:string", "age:integer"]);
-    await assertFile("test/models/account.test.ts", /describe\("AccountTest"/);
+    await t.runGenerator(["Account", "name:string", "age:integer"]);
+    await t.assertFile("test/models/account.test.ts", /describe\("AccountTest"/);
 
-    await assertFile("test/fixtures/accounts.yml", /name: MyString/, /age: 1/);
+    await t.assertFile("test/fixtures/accounts.yml", /name: MyString/, /age: 1/);
     assertGeneratedFixture("test/fixtures/accounts.yml", {
       one: { name: "MyString", age: 1 },
       two: { name: "MyString", age: 1 },
@@ -327,9 +378,9 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("fixtures use the references ids", async () => {
-    await makeGen().run("LineItem", ["product:references", "cart:belongs_to"]);
+    await t.runGenerator(["LineItem", "product:references", "cart:belongs_to"]);
 
-    await assertFile("test/fixtures/line_items.yml", /product: one\n {2}cart: one/);
+    await t.assertFile("test/fixtures/line_items.yml", /product: one\n {2}cart: one/);
     assertGeneratedFixture("test/fixtures/line_items.yml", {
       one: { product: "one", cart: "one" },
       two: { product: "two", cart: "two" },
@@ -337,9 +388,9 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("fixtures use the references ids and type", async () => {
-    await makeGen().run("LineItem", ["product:references{polymorphic}", "cart:belongs_to"]);
+    await t.runGenerator(["LineItem", "product:references{polymorphic}", "cart:belongs_to"]);
 
-    await assertFile(
+    await t.assertFile(
       "test/fixtures/line_items.yml",
       /product: one\n {2}product_type: Product\n {2}cart: one/,
     );
@@ -350,7 +401,7 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("fixtures respect reserved yml keywords", async () => {
-    await makeGen().run("LineItem", ["no:integer", "Off:boolean", "ON:boolean"]);
+    await t.runGenerator(["LineItem", "no:integer", "Off:boolean", "ON:boolean"]);
 
     assertGeneratedFixture("test/fixtures/line_items.yml", {
       one: { no: 1, Off: false, ON: false },
@@ -359,21 +410,21 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("fixture is skipped", async () => {
-    await makeGen().run("account", ["--skip-fixture"]);
-    assertNoFile("test/fixtures/accounts.yml");
+    await t.runGenerator(["account", "--skip-fixture"]);
+    t.assertNoFile("test/fixtures/accounts.yml");
   });
 
   it("fixture is skipped if fixture replacement is given", async () => {
-    await makeGen().run("account", ["-r", "factory_girl"]);
-    assertMatch(/factory_girl \[not found\]/, lines.join("\n"));
-    assertNoFile("test/fixtures/accounts.yml");
+    const content = String(await t.runGenerator(["account", "-r", "factory_girl"]));
+    assertMatch(/factory_girl \[not found\]/, content);
+    t.assertNoFile("test/fixtures/accounts.yml");
   });
 
   it("fixture without pluralization", async () => {
     const originalPluralizeTableName = Base.pluralizeTableNames;
     Base.pluralizeTableNames = false;
     try {
-      await makeGen().run("Account", ["name:string", "age:integer"]);
+      await t.runGenerator(["Account", "name:string", "age:integer"]);
       assertGeneratedFixture("test/fixtures/account.yml", {
         one: { name: "MyString", age: 1 },
         two: { name: "MyString", age: 1 },
@@ -383,32 +434,38 @@ describe("ModelGeneratorTest", () => {
     }
   });
 
-  it.skip("check class collision", () => {});
+  it("check class collision", async () => {
+    const content = await capture("stderr", () => t.runGenerator(["object"]));
+    assertMatch(
+      /The name 'Object' is either already used in your application or reserved/,
+      content,
+    );
+  });
 
   it("index is skipped for belongs to association", async () => {
-    await makeGen().run("account", ["supplier:belongs_to"], ["--no-indexes"]);
+    await t.runGenerator(["account", "supplier:belongs_to", "--no-indexes"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertNoMatch(/index: true/, up);
       }),
     );
   });
 
   it("index is skipped for references association", async () => {
-    await makeGen().run("account", ["supplier:references"], ["--no-indexes"]);
+    await t.runGenerator(["account", "supplier:references", "--no-indexes"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertNoMatch(/index: true/, up);
       }),
     );
   });
 
   it("add uuid to create table migration", async () => {
-    await makeGen().run("account", [], ["--primary-key-type=uuid"]);
-    await assertMigration("db/migrate/create_accounts.ts", (content) =>
-      assertMethod("change", content, (change) => {
+    await t.runGenerator(["account", "--primary-key-type=uuid"]);
+    await t.assertMigration("db/migrate/create_accounts.ts", (content) =>
+      t.assertMethod("change", content, (change) => {
         assertMatch(/createTable\("accounts", \{ id: "uuid" \}/, change);
       }),
     );
@@ -419,33 +476,33 @@ describe("ModelGeneratorTest", () => {
   it.skip("database puts migrations in configured folder with aliases", () => {});
 
   it("model with references attribute generates belongs to associations", async () => {
-    await makeGen().run("product", ["name:string", "supplier:references"]);
-    await assertFile("app/models/product.ts", /this\.belongsTo\("supplier"/);
+    await t.runGenerator(["product", "name:string", "supplier:references"]);
+    await t.assertFile("app/models/product.ts", /this\.belongsTo\("supplier"/);
   });
 
   it("model with belongs to attribute generates belongs to associations", async () => {
-    await makeGen().run("product", ["name:string", "supplier:belongs_to"]);
-    await assertFile("app/models/product.ts", /this\.belongsTo\("supplier"/);
+    await t.runGenerator(["product", "name:string", "supplier:belongs_to"]);
+    await t.assertFile("app/models/product.ts", /this\.belongsTo\("supplier"/);
   });
 
   it("model with polymorphic references attribute generates belongs to associations", async () => {
-    await makeGen().run("product", ["name:string", "supplier:references{polymorphic}"]);
-    await assertFile(
+    await t.runGenerator(["product", "name:string", "supplier:references{polymorphic}"]);
+    await t.assertFile(
       "app/models/product.ts",
       /this\.belongsTo\("supplier", \{ polymorphic: true \}\)/,
     );
   });
 
   it("model with polymorphic belongs to attribute generates belongs to associations", async () => {
-    await makeGen().run("product", ["name:string", "supplier:belongs_to{polymorphic}"]);
-    await assertFile(
+    await t.runGenerator(["product", "name:string", "supplier:belongs_to{polymorphic}"]);
+    await t.assertFile(
       "app/models/product.ts",
       /this\.belongsTo\("supplier", \{ polymorphic: true \}\)/,
     );
   });
 
   it("polymorphic belongs to generates correct model", async () => {
-    await makeGen().run("account", ["supplier:references{polymorphic}"]);
+    await t.runGenerator(["account", "supplier:references{polymorphic}"]);
 
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
@@ -459,24 +516,24 @@ export class Account extends ApplicationRecord {
   }
 }
 `;
-    await assertFile("app/models/account.ts", expectedFile);
+    await t.assertFile("app/models/account.ts", expectedFile);
   });
 
   it("null false is added for references by default", async () => {
-    await makeGen().run("account", ["user:references"]);
+    await t.runGenerator(["account", "user:references"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/t\.references\("user",.*\snull: false/, up);
       }),
     );
   });
 
   it("null false is added for belongs to by default", async () => {
-    await makeGen().run("account", ["user:belongs_to"]);
+    await t.runGenerator(["account", "user:belongs_to"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/t\.belongsTo\("user",.*\snull: false/, up);
       }),
     );
@@ -485,30 +542,30 @@ export class Account extends ApplicationRecord {
   it("null false is not added when belongs to required by default global config is false", async () => {
     Trails.application!.config.activeRecord.belongsToRequiredByDefault = false;
 
-    await makeGen().run("account", ["user:belongs_to"]);
+    await t.runGenerator(["account", "user:belongs_to"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/t\.belongsTo\("user"/, up);
       }),
     );
   });
 
   it("foreign key is not added for non references", async () => {
-    await makeGen().run("account", ["supplier:string"]);
+    await t.runGenerator(["account", "supplier:string"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertNoMatch(/foreignKey/, up);
       }),
     );
   });
 
   it("foreign key is added for references", async () => {
-    await makeGen().run("account", ["supplier:belongs_to", "user:references"]);
+    await t.runGenerator(["account", "supplier:belongs_to", "user:references"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertMatch(/t\.belongsTo\("supplier",.*\sforeignKey: true/, up);
         assertMatch(/t\.references\("user",.*\sforeignKey: true/, up);
       }),
@@ -516,17 +573,17 @@ export class Account extends ApplicationRecord {
   });
 
   it("foreign key is skipped for polymorphic references", async () => {
-    await makeGen().run("account", ["supplier:belongs_to{polymorphic}"]);
+    await t.runGenerator(["account", "supplier:belongs_to{polymorphic}"]);
 
-    await assertMigration("db/migrate/create_accounts.ts", (m) =>
-      assertMethod("change", m, (up) => {
+    await t.assertMigration("db/migrate/create_accounts.ts", (m) =>
+      t.assertMethod("change", m, (up) => {
         assertNoMatch(/foreignKey/, up);
       }),
     );
   });
 
   it("token option adds has secure token", async () => {
-    await makeGen().run("user", ["token:token", "auth_token:token"]);
+    await t.runGenerator(["user", "token:token", "auth_token:token"]);
 
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
@@ -541,11 +598,11 @@ export class User extends ApplicationRecord {
   }
 }
 `;
-    await assertFile("app/models/user.ts", expectedFile);
+    await t.assertFile("app/models/user.ts", expectedFile);
   });
 
   it("model with rich text attribute adds has rich text", async () => {
-    await makeGen().run("message", ["content:rich_text"]);
+    await t.runGenerator(["message", "content:rich_text"]);
 
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
@@ -559,11 +616,11 @@ export class Message extends ApplicationRecord {
   }
 }
 `;
-    await assertFile("app/models/message.ts", expectedFile);
+    await t.assertFile("app/models/message.ts", expectedFile);
   });
 
   it("model with attachment attribute adds has one attached", async () => {
-    await makeGen().run("message", ["video:attachment"]);
+    await t.runGenerator(["message", "video:attachment"]);
 
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
@@ -577,11 +634,11 @@ export class Message extends ApplicationRecord {
   }
 }
 `;
-    await assertFile("app/models/message.ts", expectedFile);
+    await t.assertFile("app/models/message.ts", expectedFile);
   });
 
   it("model with attachments attribute adds has many attached", async () => {
-    await makeGen().run("message", ["photos:attachments"]);
+    await t.runGenerator(["message", "photos:attachments"]);
 
     const expectedFile = `import { ApplicationRecord } from "./application-record.ts";
 
@@ -595,57 +652,17 @@ export class Message extends ApplicationRecord {
   }
 }
 `;
-    await assertFile("app/models/message.ts", expectedFile);
+    await t.assertFile("app/models/message.ts", expectedFile);
   });
 
   it("skip virtual fields in fixtures", async () => {
-    await makeGen().run("message", ["content:rich_text", "video:attachment", "photos:attachments"]);
+    await t.runGenerator([
+      "message",
+      "content:rich_text",
+      "video:attachment",
+      "photos:attachments",
+    ]);
 
     assertGeneratedFixture("test/fixtures/messages.yml", { one: null, two: null });
-  });
-});
-
-describe("ModelGenerator (JavaScript project)", () => {
-  let jsTmpDir: string;
-
-  beforeEach(() => {
-    jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
-  });
-
-  afterEach(() => {
-    fs.rmSync(jsTmpDir, { recursive: true, force: true });
-  });
-
-  function makeJsGen() {
-    return {
-      run: async (name: string, args: string[]) => {
-        await ModelGenerator.start([name, ...args], {
-          destinationRoot: jsTmpDir,
-        });
-        return listFiles(jsTmpDir);
-      },
-    };
-  }
-
-  it("generates .js model and test files", async () => {
-    const gen = makeJsGen();
-    const files = await gen.run("User", ["name:string"]);
-    expect(files).toContain("app/models/user.js");
-    expect(files).toContain("test/models/user.test.js");
-  });
-
-  it("generates .js migration file", async () => {
-    const gen = makeJsGen();
-    const files = await gen.run("User", ["name:string"]);
-    const migFile = files.find((f) => f.startsWith("db/migrate/"));
-    expect(migFile).toMatch(/\.js$/);
-  });
-
-  it("uses ESM imports and exports in model", async () => {
-    const gen = makeJsGen();
-    await gen.run("User", ["name:string"]);
-    const content = fs.readFileSync(path.join(jsTmpDir, "app/models/user.js"), "utf-8");
-    expect(content).toContain('import { ApplicationRecord } from "./application-record.js"');
-    expect(content).toContain("export class User");
   });
 });

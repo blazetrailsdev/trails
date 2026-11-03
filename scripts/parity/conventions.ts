@@ -68,6 +68,8 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rubocop: "Eslint",
   capybara: "vitest",
   Capybara: "Vitest",
+  yarn: "pnpm",
+  Yarn: "Pnpm",
   rails: "trails",
   Rails: "Trails",
   RAILS: "TRAILS",

@@ -1,8 +1,9 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
+import { Base, StrictLoadingViolationError } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -54,18 +55,18 @@ describe("StrictLoadingTest", () => {
   const { developers, ships } = fixtures(["developers", "developersProjects", "projects", "ships"]);
 
   beforeAll(() => {
-    registerModel(Developer);
-    registerModel(AuditLog);
-    registerModel(AuditLogRequired);
-    registerModel(Ship);
-    registerModel(ShipPart);
-    registerModel(Mentor);
-    registerModel(Contract);
-    registerModel(Firm);
-    registerModel(Project);
-    registerModel(Computer);
-    registerModel(Pirate);
-    registerModel(Treasure);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "AuditLog", AuditLog);
+    constSet(TopLevel, "AuditLogRequired", AuditLogRequired);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "Mentor", Mentor);
+    constSet(TopLevel, "Contract", Contract);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Project", Project);
+    constSet(TopLevel, "Computer", Computer);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "Treasure", Treasure);
   });
 
   it("strict loading!", async () => {
@@ -754,9 +755,9 @@ describe("StrictLoadingFixturesTest", () => {
   const { strictZines } = fixtures(["strictZines"]);
 
   beforeAll(() => {
-    registerModel(StrictZine);
-    registerModel(Zine);
-    registerModel(Interest);
+    constSet(TopLevel, "StrictZine", StrictZine);
+    constSet(TopLevel, "Zine", Zine);
+    constSet(TopLevel, "Interest", Interest);
   });
 
   it("strict loading violations are ignored on fixtures", async () => {

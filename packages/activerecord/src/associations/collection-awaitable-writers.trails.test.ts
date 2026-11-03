@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { CollectionAssociation } from "./collection-association.js";
-import { registerModel, RecordNotFound } from "../index.js";
+import { RecordNotFound } from "../index.js";
 import { CollectionIdsAssignmentError } from "./errors.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -39,10 +40,10 @@ describe("CollectionAwaitableWriters", () => {
   fixtures(["authors", "posts", "comments"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Comment);
-    registerModel(Category);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Comment", Comment);
+    constSet(TopLevel, "Category", Category);
   });
 
   it("no native = setter is generated for the collection", async () => {

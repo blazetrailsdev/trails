@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { ScopeOn } from "../../scoping/named.js";
@@ -11,7 +12,6 @@ import type { Post } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -149,7 +149,8 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
-registerModel(Comment);
+constSet(TopLevel, "Comment", Comment);
+DescendantsTracker.registerSubclass(Base, Comment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Comment {
   get specialPostWithDefaultScope():
@@ -192,7 +193,8 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
-registerModel(SpecialComment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+DescendantsTracker.registerSubclass(Comment, SpecialComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
@@ -202,10 +204,12 @@ export interface SpecialComment {
 }
 
 export class SubSpecialComment extends SpecialComment {}
-registerModel(SubSpecialComment);
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+DescendantsTracker.registerSubclass(SpecialComment, SubSpecialComment);
 
 export class VerySpecialComment extends Comment {}
-registerModel(VerySpecialComment);
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+DescendantsTracker.registerSubclass(Comment, VerySpecialComment);
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
   static {
@@ -219,7 +223,12 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
     });
   }
 }
-registerModel(CommentThatAutomaticallyAltersPostBody);
+constSet(
+  TopLevel,
+  "CommentThatAutomaticallyAltersPostBody",
+  CommentThatAutomaticallyAltersPostBody,
+);
+DescendantsTracker.registerSubclass(Comment, CommentThatAutomaticallyAltersPostBody);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
@@ -230,7 +239,12 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
     this.belongsTo("developer");
   }
 }
-registerModel(CommentWithDefaultScopeReferencesAssociation);
+constSet(
+  TopLevel,
+  "CommentWithDefaultScopeReferencesAssociation",
+  CommentWithDefaultScopeReferencesAssociation,
+);
+DescendantsTracker.registerSubclass(Comment, CommentWithDefaultScopeReferencesAssociation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentWithDefaultScopeReferencesAssociation {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -244,4 +258,5 @@ export class CommentWithAfterCreateUpdate extends Comment {
     });
   }
 }
-registerModel(CommentWithAfterCreateUpdate);
+constSet(TopLevel, "CommentWithAfterCreateUpdate", CommentWithAfterCreateUpdate);
+DescendantsTracker.registerSubclass(Comment, CommentWithAfterCreateUpdate);

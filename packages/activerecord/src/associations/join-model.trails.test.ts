@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationProxy } from "./collection-proxy.js";
@@ -48,15 +49,16 @@ describe("AssociationsJoinModelTest", () => {
     "comments",
     "cpkOrders",
   ]);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Tag);
-  registerModel(Tagging);
-  registerModel(Comment);
-  registerModel(Rating);
-  registerModel(CpkOrder);
-  registerModel(WelcomeOnlyTagging);
-  registerModel(ScopedSourceTag);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Tag", Tag);
+  constSet(TopLevel, "Tagging", Tagging);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Rating", Rating);
+  constSet(TopLevel, "WelcomeOnlyTagging", WelcomeOnlyTagging);
+  DescendantsTracker.registerSubclass(Base, WelcomeOnlyTagging);
+  constSet(TopLevel, "ScopedSourceTag", ScopedSourceTag);
+  DescendantsTracker.registerSubclass(Base, ScopedSourceTag);
 
   it("has many polymorphic with source type merges source reflection scope", async () => {
     const general = await ScopedSourceTag.find(tags("general").id);
@@ -93,7 +95,8 @@ describe("AssociationsJoinModelTest", () => {
         });
       }
     }
-    registerModel(CpkOrderWithTaggings);
+    constSet(TopLevel, "CpkOrderWithTaggings", CpkOrderWithTaggings);
+    DescendantsTracker.registerSubclass(CpkOrder, CpkOrderWithTaggings);
 
     const order = await CpkOrderWithTaggings.createBang({ shop_id: 42, status: "paid" });
     const tag = await Tag.createBang({ name: "rails-faithful" });

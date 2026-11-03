@@ -1,12 +1,12 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 describe("NamedScopingTest (trails)", () => {
   const { posts } = fixtures(["posts", "comments"]);

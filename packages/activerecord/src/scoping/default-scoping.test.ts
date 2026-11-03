@@ -1,10 +1,11 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Time as RubyTime } from "@blazetrails/date";
 import "../index.js";
-import { registerModel, RecordNotFound } from "../index.js";
+import { RecordNotFound } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
@@ -49,21 +50,29 @@ import { Project } from "../test-helpers/models/project.js";
 import { Lion } from "../test-helpers/models/cat.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
-registerModel(Developer);
-registerModel(Project);
-registerModel(AuditLog);
-registerModel(DeveloperWithIncludes);
-registerModel(Mentor);
-registerModel(Comment);
-registerModel(SpecialComment);
-registerModel(VerySpecialComment);
-registerModel(CommentWithDefaultScopeReferencesAssociation);
-registerModel(Post);
-registerModel(SpecialPost);
-registerModel(SpecialPostWithDefaultScope);
-registerModel(ConditionalStiPost);
-registerModel(SubConditionalStiPost);
-registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "Project", Project);
+constSet(TopLevel, "AuditLog", AuditLog);
+constSet(TopLevel, "DeveloperWithIncludes", DeveloperWithIncludes);
+constSet(TopLevel, "Mentor", Mentor);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+constSet(
+  TopLevel,
+  "CommentWithDefaultScopeReferencesAssociation",
+  CommentWithDefaultScopeReferencesAssociation,
+);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "SpecialPost", SpecialPost);
+constSet(TopLevel, "SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
+constSet(TopLevel, "ConditionalStiPost", ConditionalStiPost);
+constSet(TopLevel, "SubConditionalStiPost", SubConditionalStiPost);
+constSet(
+  TopLevel,
+  "PostWithCommentWithDefaultScopeReferencesAssociation",
+  PostWithCommentWithDefaultScopeReferencesAssociation,
+);
 
 const names = (rows: any[]) => rows.map((r) => r.name);
 const salaries = (rows: any[]) => rows.map((r) => r.salary);

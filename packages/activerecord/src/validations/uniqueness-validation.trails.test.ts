@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -14,7 +14,7 @@ describe("UniquenessValidationContextTest", () => {
   fixtures(["topics"]);
 
   beforeAll(() => {
-    registerModel("Topic", Topic);
+    constSet(TopLevel, "Topic", Topic);
   });
 
   afterEach(() => {
@@ -115,7 +115,7 @@ describe("UniquenessValidationTest", () => {
   fixtures(["topics"]);
 
   beforeAll(() => {
-    registerModel("Topic", Topic);
+    constSet(TopLevel, "Topic", Topic);
   });
 
   afterEach(() => {

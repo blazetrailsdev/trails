@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Family } from "./family.js";
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FamilyTree extends Base {
@@ -14,7 +15,8 @@ export class FamilyTree extends Base {
     this.belongsTo("family");
   }
 }
-registerModel(FamilyTree);
+constSet(TopLevel, "FamilyTree", FamilyTree);
+DescendantsTracker.registerSubclass(Base, FamilyTree);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FamilyTree {
   get member(): User | null | Promise<User | null>;

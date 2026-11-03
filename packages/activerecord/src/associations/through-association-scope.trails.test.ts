@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
@@ -9,11 +9,11 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Comment);
-registerModel(Tag);
-registerModel(Tagging);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
 
 (Tag as any).hasMany(
   "welcomeTaggedPosts",

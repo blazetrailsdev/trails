@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class WithoutTable extends Base {
   static {
@@ -8,4 +9,5 @@ export class WithoutTable extends Base {
     });
   }
 }
-registerModel(WithoutTable);
+constSet(TopLevel, "WithoutTable", WithoutTable);
+DescendantsTracker.registerSubclass(Base, WithoutTable);

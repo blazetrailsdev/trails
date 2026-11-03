@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -8,12 +8,12 @@ import { Firm, Client } from "../test-helpers/models/company.js";
 import { CollectionPersistedAssignmentError } from "./errors.js";
 import { Reader } from "../test-helpers/models/reader.js";
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Person);
-registerModel(Firm);
-registerModel(Client);
-registerModel(Reader);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Person", Person);
+constSet(TopLevel, "Firm", Firm);
+constSet(TopLevel, "Client", Client);
+constSet(TopLevel, "Reader", Reader);
 
 describe("collection replace diffs instead of clearing", () => {
   const { authors, posts, people, companies } = fixtures([

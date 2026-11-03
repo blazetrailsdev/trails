@@ -1,11 +1,11 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "./test-helpers/models/cpk.js";
-import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 for (const klass of [Topic, CpkBook, CpkOrder, CpkAuthor]) {
-  registerModel(klass);
+  constSet(TopLevel, klass.name, klass);
 }
 
 describe("RelationDestroyTrailsTest", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assertDifference, assertRaise } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -10,10 +10,9 @@ import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
 import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 import { RecordNotFound } from "../errors.js";
-import { registerModel } from "../associations.js";
 
 for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, CpkOrderAgreement]) {
-  registerModel(klass as any);
+  constSet(TopLevel, klass.name, klass);
 }
 
 describe("DeleteAllTest", () => {

@@ -1,10 +1,10 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { isSqliteRun } from "./support/sqlite-template.js";
 
-registerModel(Post as never);
+constSet(TopLevel, "Post", Post);
 
 describe("QueryCache DDL dirties (trails)", () => {
   fixtures(["posts"], { useTransactionalTests: false });

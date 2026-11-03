@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
@@ -48,9 +50,12 @@ describe("DisableJoinsAssociationScope", () => {
       t.integer("djs_post_id");
       t.string("body");
     });
-    registerModel("DjsAuthor", DjsAuthor);
-    registerModel("DjsPost", DjsPost);
-    registerModel("DjsComment", DjsComment);
+    constSet(TopLevel, "DjsAuthor", DjsAuthor);
+    DescendantsTracker.registerSubclass(Base, DjsAuthor);
+    constSet(TopLevel, "DjsPost", DjsPost);
+    DescendantsTracker.registerSubclass(Base, DjsPost);
+    constSet(TopLevel, "DjsComment", DjsComment);
+    DescendantsTracker.registerSubclass(Base, DjsComment);
     (DjsAuthor as any)._reflections = {};
     (DjsPost as any)._reflections = {};
     (DjsComment as any)._reflections = {};

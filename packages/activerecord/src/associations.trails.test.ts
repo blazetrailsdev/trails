@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { Preloader } from "./associations/preloader.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -20,16 +21,6 @@ import { ShardedBlogPostTag } from "./test-helpers/models/sharded/blog-post-tag.
 import { ShardedTag } from "./test-helpers/models/sharded/tag.js";
 
 describe("AssociationsTest", () => {
-  registerModel([
-    ShardedBlogPost,
-    ShardedComment,
-    ShardedTag,
-    ShardedBlogPostTag,
-    CpkOrder,
-    CpkBook,
-    CpkOrderAgreement,
-    CpkOrderWithPrimaryKeyAssociatedBook,
-  ]);
   const { shardedBlogs, shardedBlogPosts } = fixtures([
     "shardedBlogs",
     "shardedBlogPosts",
@@ -175,7 +166,9 @@ describe("AssociationsTest", () => {
 });
 
 describe("AssociationProxyTest (trails)", () => {
-  registerModel([Author, Post, FirstPost]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "FirstPost", FirstPost);
   const { self, authors } = fixtures(["authorAddresses", "authors", "posts"]);
 
   it("last! works on loaded associations", async () => {
@@ -215,7 +208,9 @@ describe("AssociationProxyTest (trails)", () => {
 });
 
 describe("PreloaderTest (trails)", () => {
-  registerModel([Author, Post, Comment]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
   const { self, posts, authors } = fixtures(["posts", "comments", "authors"]);
 
   it("isEmpty materializes an empty relation and reports true", async () => {
@@ -254,7 +249,10 @@ describe("PreloaderTest (trails)", () => {
 });
 
 describe("association(name).reader", () => {
-  registerModel([Author, AuthorAddress, Post, Comment]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
   const { authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
 
   it("resets the proxy scope on every read, as CollectionAssociation#reader does", async () => {

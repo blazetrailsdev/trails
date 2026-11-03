@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Computer extends Base {
@@ -17,7 +18,8 @@ export class Computer extends Base {
     this.hasOne("firm", { through: "developer" });
   }
 }
-registerModel(Computer);
+constSet(TopLevel, "Computer", Computer);
+DescendantsTracker.registerSubclass(Base, Computer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Computer {
   get developer(): Developer | null | Promise<Developer | null>;

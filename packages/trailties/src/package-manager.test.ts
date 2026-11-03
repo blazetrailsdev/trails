@@ -64,11 +64,6 @@ describe("detectPackageManager", () => {
     expect(detectPackageManager("/app").name).toBe("pnpm");
   });
 
-  it("picks yarn when yarn.lock is present and no pnpm lock", () => {
-    lockFiles.add("/app/yarn.lock");
-    expect(detectPackageManager("/app").name).toBe("yarn");
-  });
-
   it("picks bun when bun.lockb is present and no pnpm/yarn lock", () => {
     lockFiles.add("/app/bun.lockb");
     expect(detectPackageManager("/app").name).toBe("bun");
@@ -81,18 +76,12 @@ describe("detectPackageManager", () => {
   it("uses the fallback option when no lockfile is present", () => {
     expect(detectPackageManager("/app", { fallback: "pnpm" }).name).toBe("pnpm");
   });
-
-  it("resolves pnpm before yarn when both lockfiles coexist", () => {
-    lockFiles.add("/app/pnpm-lock.yaml");
-    lockFiles.add("/app/yarn.lock");
-    expect(detectPackageManager("/app").name).toBe("pnpm");
-  });
 });
 
 describe("getPackageManager", () => {
   it("honors an explicit adapter override", () => {
-    packageManagerAdapterConfig.adapter = "yarn";
-    expect(getPackageManager("/app").name).toBe("yarn");
+    packageManagerAdapterConfig.adapter = "bun";
+    expect(getPackageManager("/app").name).toBe("bun");
   });
 
   it("falls back to detection when no override is set", () => {

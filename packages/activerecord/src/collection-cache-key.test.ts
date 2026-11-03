@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
@@ -5,7 +6,6 @@ import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -15,11 +15,11 @@ import { Ship } from "./test-helpers/models/ship.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
-registerModel(Developer);
-registerModel(Comment);
-registerModel(Post);
-registerModel(Project);
-registerModel(Ship);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Project", Project);
+constSet(TopLevel, "Ship", Ship);
 
 function expectedUsec(ts: RubyTime | Temporal.Instant | Temporal.PlainDateTime): string {
   const dt =

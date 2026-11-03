@@ -1,11 +1,11 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "../active-record.js";
 
-registerModel(Post);
+constSet(TopLevel, "Post", Post);
 
 describe("relation quoting through the adapter class", () => {
   fixtures(["posts"]);

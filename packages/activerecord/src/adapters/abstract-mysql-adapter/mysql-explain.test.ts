@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
@@ -5,13 +6,12 @@ import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
-import { registerModel } from "../../index.js";
 
 fixtures({}, { useTransactionalTests: false });
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
-  registerModel(Author);
-  registerModel(Post);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
 
   let adapter: Mysql2Adapter;
   beforeAll(async () => {

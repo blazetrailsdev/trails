@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -230,16 +232,26 @@ describe("EagerSingularizationTest", () => {
     set dress(value: Dress | null);
   }
 
-  registerModel("Virus", Virus);
-  registerModel("Octopus", Octopus);
-  registerModel("Pass", Pass);
-  registerModel("Bus", Bus);
-  registerModel("Mess", Mess);
-  registerModel("Crisis", Crisis);
-  registerModel("Success", Success);
-  registerModel("Analysis", Analysis);
-  registerModel("Dress", Dress);
-  registerModel("Compress", Compress);
+  constSet(TopLevel, "Virus", Virus);
+  DescendantsTracker.registerSubclass(Base, Virus);
+  constSet(TopLevel, "Octopus", Octopus);
+  DescendantsTracker.registerSubclass(Base, Octopus);
+  constSet(TopLevel, "Pass", Pass);
+  DescendantsTracker.registerSubclass(Base, Pass);
+  constSet(TopLevel, "Bus", Bus);
+  DescendantsTracker.registerSubclass(Base, Bus);
+  constSet(TopLevel, "Mess", Mess);
+  DescendantsTracker.registerSubclass(Base, Mess);
+  constSet(TopLevel, "Crisis", Crisis);
+  DescendantsTracker.registerSubclass(Base, Crisis);
+  constSet(TopLevel, "Success", Success);
+  DescendantsTracker.registerSubclass(Base, Success);
+  constSet(TopLevel, "Analysis", Analysis);
+  DescendantsTracker.registerSubclass(Base, Analysis);
+  constSet(TopLevel, "Dress", Dress);
+  DescendantsTracker.registerSubclass(Base, Dress);
+  constSet(TopLevel, "Compress", Compress);
+  DescendantsTracker.registerSubclass(Base, Compress);
 
   it("eager no extra singularization belongs to", async () => {
     await assertNothingRaised(() => Virus.all().includes(":octopus").toArray());

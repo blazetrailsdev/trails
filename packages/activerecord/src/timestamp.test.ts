@@ -1,7 +1,8 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertInDelta, assertNothingRaised, travel, travelBack } from "@blazetrails/activesupport";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import {
   Developer,
@@ -23,13 +24,13 @@ import {
   PersonWithTimestampInSave,
 } from "./test-helpers/models/person.js";
 
-registerModel("Developer", Developer);
-registerModel("DeveloperCalledJamis", DeveloperCalledJamis);
-registerModel("Owner", Owner);
-registerModel("Pet", Pet);
-registerModel("Toy", Toy);
-registerModel("Car", Car);
-registerModel("Task", Task);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "DeveloperCalledJamis", DeveloperCalledJamis);
+constSet(TopLevel, "Owner", Owner);
+constSet(TopLevel, "Pet", Pet);
+constSet(TopLevel, "Toy", Toy);
+constSet(TopLevel, "Car", Car);
+constSet(TopLevel, "Task", Task);
 
 describe("TimestampTest", () => {
   const { developers, owners, pets, toys, cars, tasks } = fixtures([

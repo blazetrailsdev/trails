@@ -1,6 +1,7 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { Base, registerModel, Range } from "./index.js";
+import { Base, Range } from "./index.js";
 import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
 import { assertRespondTo, assertRaises, assertEmpty, Logger } from "@blazetrails/activesupport";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
@@ -28,9 +29,9 @@ describe("EnumTest", () => {
   const { books, authors } = fixtures(["books", "authors", "authorAddresses"]);
 
   beforeAll(() => {
-    registerModel(Book);
-    registerModel(PublishedBook);
-    registerModel(Author);
+    constSet(TopLevel, "Book", Book);
+    constSet(TopLevel, "PublishedBook", PublishedBook);
+    constSet(TopLevel, "Author", Author);
   });
 
   let book: Book;
@@ -603,7 +604,8 @@ describe("EnumTest", () => {
         this.validatesUniquenessOf("status");
       }
     }
-    registerModel(Klass);
+    constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
     await (Klass as any).deleteAll();
     await Klass.createBang({ status: "proposed" });
     const book = new Klass({ status: "written" }) as any;
@@ -718,7 +720,8 @@ describe("EnumTest", () => {
         this.enum("aliased_status", ["proposed", "written", "published"]);
       }
     }
-    registerModel(Klass);
+    constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     let record: any = await (Klass as any).proposed().create();
     expect(record.isProposed()).toBeTruthy();
@@ -1025,7 +1028,8 @@ describe("EnumTest", () => {
         this.enum("status", { proposed: 0, written: 1 });
       }
     }
-    registerModel(K);
+    constSet(TopLevel, "K", K);
+    DescendantsTracker.registerSubclass(Base, K);
     const b = await K.create({ status: 0 });
     expect((b as any).status).toBe("proposed");
     expect((b as any).isProposed()).toBeTruthy();

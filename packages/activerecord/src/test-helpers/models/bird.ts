@@ -1,7 +1,7 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bird extends Base {
@@ -49,4 +49,5 @@ export interface Bird {
   set pirate(value: Pirate | null);
 }
 
-registerModel(Bird);
+constSet(TopLevel, "Bird", Bird);
+DescendantsTracker.registerSubclass(Base, Bird);

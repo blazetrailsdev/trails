@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import {
   Company,
   Firm,
@@ -94,23 +96,26 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
   const { self, accounts } = fixtures(["companies", "accounts"]);
 
   beforeAll(async () => {
-    registerModel(Company);
-    registerModel(Firm);
-    registerModel(DependentFirm);
-    registerModel(ExclusivelyDependentFirm);
-    registerModel(RestrictedWithExceptionFirm);
-    registerModel(RestrictedWithErrorFirm);
-    registerModel(Client);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "DependentFirm", DependentFirm);
+    constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+    constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+    constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+    constSet(TopLevel, "Client", Client);
     Company.inheritanceColumn = "type";
-    registerModel(Firm);
-    registerModel(DependentFirm);
-    registerModel(ExclusivelyDependentFirm);
-    registerModel(RestrictedWithExceptionFirm);
-    registerModel(RestrictedWithErrorFirm);
-    registerModel(Client);
-    registerModel("ArrowFieldAccount", ArrowFieldAccount);
-    registerModel("ProtoHelperAccount", ProtoHelperAccount);
-    registerModel("ReentrantDestroyAccount", ReentrantDestroyAccount);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "DependentFirm", DependentFirm);
+    constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+    constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+    constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "ArrowFieldAccount", ArrowFieldAccount);
+    DescendantsTracker.registerSubclass(Base, ArrowFieldAccount);
+    constSet(TopLevel, "ProtoHelperAccount", ProtoHelperAccount);
+    DescendantsTracker.registerSubclass(Base, ProtoHelperAccount);
+    constSet(TopLevel, "ReentrantDestroyAccount", ReentrantDestroyAccount);
+    DescendantsTracker.registerSubclass(Base, ReentrantDestroyAccount);
     await Company.loadSchema();
     await ArrowFieldAccount.loadSchema();
     await ProtoHelperAccount.loadSchema();

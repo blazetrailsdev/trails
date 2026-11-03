@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertRaises, isBlank } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
-import { Base, Range, RecordNotFound, registerModel } from "../index.js";
+import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, Range, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Developer,
@@ -21,14 +21,14 @@ import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { BadReference } from "../test-helpers/models/reference.js";
 
-registerModel(DeveloperOrderedBySalary);
-registerModel(DeveloperFilteredOnJoins);
-registerModel(SpecialComment);
-registerModel(SubSpecialComment);
-registerModel(VerySpecialComment);
-registerModel(BadReference);
-registerModel(FirstPost);
-registerModel(SpecialPostWithDefaultScope);
+constSet(TopLevel, "DeveloperOrderedBySalary", DeveloperOrderedBySalary);
+constSet(TopLevel, "DeveloperFilteredOnJoins", DeveloperFilteredOnJoins);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+constSet(TopLevel, "BadReference", BadReference);
+constSet(TopLevel, "FirstPost", FirstPost);
+constSet(TopLevel, "SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
 
 const { self, developers, people, references, authors, comments } = fixtures([
   "developers",

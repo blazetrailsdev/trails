@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Image extends Base {
@@ -14,7 +15,8 @@ export class Image extends Base {
     });
   }
 }
-registerModel(Image);
+constSet(TopLevel, "Image", Image);
+DescendantsTracker.registerSubclass(Base, Image);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Image {
   get imageable(): Base | null | Promise<Base | null>;

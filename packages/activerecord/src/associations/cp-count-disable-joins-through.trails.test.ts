@@ -1,7 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -53,9 +55,12 @@ describe("CollectionProxy#count — disable_joins through", () => {
       t.integer("cd_comment_id");
       t.integer("value");
     });
-    registerModel("CdAuthor", CdAuthor);
-    registerModel("CdPost", CdPost);
-    registerModel("CdComment", CdComment);
+    constSet(TopLevel, "CdAuthor", CdAuthor);
+    DescendantsTracker.registerSubclass(Base, CdAuthor);
+    constSet(TopLevel, "CdPost", CdPost);
+    DescendantsTracker.registerSubclass(Base, CdPost);
+    constSet(TopLevel, "CdComment", CdComment);
+    DescendantsTracker.registerSubclass(Base, CdComment);
     (CdAuthor as any)._reflections = {};
     (CdPost as any)._reflections = {};
     (CdComment as any)._reflections = {};
@@ -122,7 +127,8 @@ describe("CollectionProxy#count — disable_joins through", () => {
         this.attribute("value", "integer");
       }
     }
-    registerModel("CdRating", CdRating);
+    constSet(TopLevel, "CdRating", CdRating);
+    DescendantsTracker.registerSubclass(Base, CdRating);
     (CdRating as any)._reflections = {};
 
     Associations.hasMany.call(CdComment, "cdRatings", {

@@ -27,12 +27,6 @@ registerPackageManagerAdapter({
   runArgs: ["run"],
 });
 registerPackageManagerAdapter({
-  name: "yarn",
-  installArgs: ["install"],
-  addArgs: ["add"],
-  runArgs: ["run"],
-});
-registerPackageManagerAdapter({
   name: "bun",
   installArgs: ["install"],
   addArgs: ["add"],
@@ -54,7 +48,6 @@ export interface DetectOptions {
 
 export function detectPackageManager(cwd: string, opts: DetectOptions = {}): PackageManagerAdapter {
   if (File.isExist(File.join(cwd, "pnpm-lock.yaml"))) return registry.get("pnpm")!;
-  if (File.isExist(File.join(cwd, "yarn.lock"))) return registry.get("yarn")!;
   if (File.isExist(File.join(cwd, "bun.lockb"))) return registry.get("bun")!;
   const fallback = opts.fallback ?? "npm";
   const adapter = registry.get(fallback);

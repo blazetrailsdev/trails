@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import "../../destroy-association-async-job.js";
 import type { BookDestroyAsync } from "./book-destroy-async.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class EssayDestroyAsync extends Base {
@@ -12,7 +13,8 @@ export class EssayDestroyAsync extends Base {
     this.belongsTo("writer", { polymorphic: true, dependent: "destroyAsync" });
   }
 }
-registerModel(EssayDestroyAsync);
+constSet(TopLevel, "EssayDestroyAsync", EssayDestroyAsync);
+DescendantsTracker.registerSubclass(Base, EssayDestroyAsync);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface EssayDestroyAsync {
   get book(): BookDestroyAsync | null | Promise<BookDestroyAsync | null>;
@@ -22,7 +24,9 @@ export interface EssayDestroyAsync {
 }
 
 export class LongEssayDestroyAsync extends EssayDestroyAsync {}
-registerModel(LongEssayDestroyAsync);
+constSet(TopLevel, "LongEssayDestroyAsync", LongEssayDestroyAsync);
+DescendantsTracker.registerSubclass(EssayDestroyAsync, LongEssayDestroyAsync);
 
 export class ShortEssayDestroyAsync extends EssayDestroyAsync {}
-registerModel(ShortEssayDestroyAsync);
+constSet(TopLevel, "ShortEssayDestroyAsync", ShortEssayDestroyAsync);
+DescendantsTracker.registerSubclass(EssayDestroyAsync, ShortEssayDestroyAsync);

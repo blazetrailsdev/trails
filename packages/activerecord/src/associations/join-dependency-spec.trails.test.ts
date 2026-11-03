@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -40,7 +41,7 @@ describe("JoinDependency#build", () => {
     for (const m of [Post, Comment, Author, Tag]) {
       (m as any)._reflections = {};
       clearReflectionsCache(m);
-      registerModel(m);
+      constSet(TopLevel, m.name, m);
     }
     Post.hasMany("comments", { className: "Comment" });
     Comment.belongsTo("author", { className: "Author" });

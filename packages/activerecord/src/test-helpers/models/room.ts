@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Room extends Base {
@@ -25,7 +26,8 @@ export class Room extends Base {
     });
   }
 }
-registerModel(Room);
+constSet(TopLevel, "Room", Room);
+DescendantsTracker.registerSubclass(Base, Room);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Room {
   get user(): User | null | Promise<User | null>;

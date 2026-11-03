@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class WarehouseThing extends Base {
   static _tableName = "warehouse-things";
@@ -8,4 +9,5 @@ export class WarehouseThing extends Base {
     this.validates("value", { uniqueness: true });
   }
 }
-registerModel(WarehouseThing);
+constSet(TopLevel, "WarehouseThing", WarehouseThing);
+DescendantsTracker.registerSubclass(Base, WarehouseThing);

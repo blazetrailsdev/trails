@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { ConnectionNotEstablished } from "../../errors.js";
 import { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
 import type { MergeColumnOptions } from "../../support/fake-adapter.js";
-import { registerModel } from "../../associations.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
@@ -55,7 +56,8 @@ export class Contact extends Base {
 
   static column = column;
 }
-registerModel(Contact);
+constSet(TopLevel, "Contact", Contact);
+DescendantsTracker.registerSubclass(Base, Contact);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Contact {
   get alternative(): Contact | null | Promise<Contact | null>;
@@ -72,7 +74,8 @@ export class ContactSti extends Base {
     return "ContactSti";
   }
 }
-registerModel(ContactSti);
+constSet(TopLevel, "ContactSti", ContactSti);
+DescendantsTracker.registerSubclass(Base, ContactSti);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContactSti {
   get alternative(): Contact | null | Promise<Contact | null>;

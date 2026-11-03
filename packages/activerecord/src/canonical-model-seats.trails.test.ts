@@ -3,7 +3,7 @@ import {
   rbClassInheritedP,
   rbClassSuperclass,
   rbModName,
-  registeredConstant,
+  constGet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import * as models from "./test-helpers/models/index.js";
@@ -27,7 +27,7 @@ describe("canonical model seats", () => {
       (klass): klass is typeof Base =>
         typeof klass === "function" && rbClassInheritedP(klass as never, Base) === true,
     );
-    const unseated = klasses.filter((klass) => registeredConstant(rbModName(klass)!) !== klass);
+    const unseated = klasses.filter((klass) => constGet(Object, rbModName(klass)!) !== klass);
 
     expect(unseated.map((klass) => klass.name)).toEqual([]);
   });

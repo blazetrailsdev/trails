@@ -1,9 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { Deadlocked, Rollback, StatementInvalid } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
@@ -15,7 +15,8 @@ class Sample extends Base {
     this.tableName = "samples";
   }
 }
-registerModel([Sample]);
+constSet(TopLevel, "Sample", Sample);
+DescendantsTracker.registerSubclass(Base, Sample);
 
 function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   let count = 0;

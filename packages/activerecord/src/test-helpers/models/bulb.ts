@@ -1,10 +1,10 @@
-import { RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { RuntimeError, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 import { association as associationInstance } from "../../associations.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -51,7 +51,8 @@ export class Bulb extends Base {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
 }
-registerModel(Bulb);
+constSet(TopLevel, "Bulb", Bulb);
+DescendantsTracker.registerSubclass(Base, Bulb);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Bulb {
   get car(): Car | null | Promise<Car | null>;
@@ -72,7 +73,8 @@ export class CustomBulb extends Bulb {
     }
   }
 }
-registerModel(CustomBulb);
+constSet(TopLevel, "CustomBulb", CustomBulb);
+DescendantsTracker.registerSubclass(Bulb, CustomBulb);
 
 export class FunkyBulb extends Bulb {
   static {
@@ -81,7 +83,8 @@ export class FunkyBulb extends Bulb {
     });
   }
 }
-registerModel(FunkyBulb);
+constSet(TopLevel, "FunkyBulb", FunkyBulb);
+DescendantsTracker.registerSubclass(Bulb, FunkyBulb);
 
 export class FailedBulb extends Bulb {
   static {
@@ -90,4 +93,5 @@ export class FailedBulb extends Bulb {
     });
   }
 }
-registerModel(FailedBulb);
+constSet(TopLevel, "FailedBulb", FailedBulb);
+DescendantsTracker.registerSubclass(Bulb, FailedBulb);

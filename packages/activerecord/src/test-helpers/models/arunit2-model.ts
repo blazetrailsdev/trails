@@ -1,9 +1,11 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class ARUnit2Model extends Base {
   static {
     this.abstractClass = true;
   }
 }
-registerModel(ARUnit2Model);
+constSet(TopLevel, "ARUnit2Model", ARUnit2Model);
+DescendantsTracker.registerSubclass(Base, ARUnit2Model);

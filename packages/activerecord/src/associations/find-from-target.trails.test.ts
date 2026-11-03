@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
@@ -29,10 +29,10 @@ describe("FindFromTarget", () => {
   fixtures(["authors", "posts", "developers"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Developer);
-    registerModel(AuditLog);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "AuditLog", AuditLog);
   });
 
   it("is false for an unloaded association with an untouched target", async () => {

@@ -1,9 +1,10 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
-import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class UuidType extends ValueType {
@@ -42,11 +43,13 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerModel(Circle);
+    constSet(TopLevel, "Circle", Circle);
+    DescendantsTracker.registerSubclass(Shape, Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerModel(Ticket);
+    constSet(TopLevel, "Ticket", Ticket);
+    DescendantsTracker.registerSubclass(Circle, Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -76,11 +79,13 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerModel(Circle);
+    constSet(TopLevel, "Circle", Circle);
+    DescendantsTracker.registerSubclass(Shape, Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerModel(Ticket);
+    constSet(TopLevel, "Ticket", Ticket);
+    DescendantsTracker.registerSubclass(Circle, Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -105,7 +110,8 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     class Ticket extends Shape {
       static override tableName = "tickets";
     }
-    registerModel(Ticket);
+    constSet(TopLevel, "Ticket", Ticket);
+    DescendantsTracker.registerSubclass(Shape, Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Ticket]) {

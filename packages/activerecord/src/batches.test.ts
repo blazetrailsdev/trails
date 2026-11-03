@@ -4,7 +4,7 @@ import { ORDER_IGNORE_MESSAGE } from "./relation/batches.js";
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
-import { StringIO, regexpEscape } from "@blazetrails/ruby-compat";
+import { StringIO, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { Logger, assertEqual, isPresent } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
@@ -20,10 +20,10 @@ import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import "./test-helpers/models/category.js";
-import { registerModel } from "./associations.js";
 import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js";
 
-registerModel([Tagging, Tag]);
+constSet(TopLevel, "Tagging", Tagging);
+constSet(TopLevel, "Tag", Tag);
 
 describe("EachTest", () => {
   const { self, posts } = fixtures(["posts", "subscribers", "developers", "cpkOrders"]);

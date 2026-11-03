@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { nodeAt, nodePaths, aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
@@ -13,7 +13,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   async function seedBooks(): Promise<void> {

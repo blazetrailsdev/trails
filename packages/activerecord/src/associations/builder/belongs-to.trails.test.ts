@@ -1,12 +1,12 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Invoice } from "../../test-helpers/models/invoice.js";
 import { LineItem } from "../../test-helpers/models/line-item.js";
-import { registerModel } from "../../associations.js";
 
-registerModel(Invoice);
-registerModel(LineItem);
+constSet(TopLevel, "Invoice", Invoice);
+constSet(TopLevel, "LineItem", LineItem);
 
 describe("Builder::BelongsTo.add_touch_callbacks", () => {
   fixtures([]);

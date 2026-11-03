@@ -547,19 +547,17 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
-  protected async dockerfilePackageManagerVersion(): Promise<string | false | undefined> {
+  protected async dockerfilePnpmVersion(): Promise<string | false | undefined> {
     try {
-      return (
-        this.usingNode() &&
-        (
-          await rbFBackquote(
-            `${(this.options as { packageManager?: string }).packageManager ?? getPackageManager(this.destinationRoot).name} --version`,
-          )
-        ).match(/\d+\.\d+\.\d+/)?.[0]
-      );
+      return this.usingNode() && (await rbFBackquote("pnpm --version")).match(/\d+\.\d+\.\d+/)?.[0];
     } catch {
       return "latest";
     }
+  }
+
+  /** @internal */
+  protected async isPnpmThroughCorepack(): Promise<boolean> {
+    return ((await this.dockerfilePnpmVersion()) as string) >= "2";
   }
 
   /** @internal */

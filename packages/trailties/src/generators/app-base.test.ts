@@ -7,10 +7,10 @@ import {
   env,
   registerChildProcessAdapter,
   setEnv,
+  type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { AppGenerator } from "./trails/app/app-generator.js";
-import { packageManagerAdapterConfig, registerPackageManagerAdapter } from "../package-manager.js";
 
 class T extends AppBase {
   static {
@@ -107,40 +107,49 @@ describe("AppBase", () => {
   });
 });
 
-describe("AppBase dockerfilePackageManagerVersion", () => {
+describe("AppBase dockerfilePnpmVersion", () => {
   it("defaults the app generator's packageManager option to pnpm", () => {
     expect(AppGenerator.classOptions()["packageManager"].default).toBe("pnpm");
   });
 
-  it("reads the packageManager option", async () => {
-    const generator = build({
-      javascript: "esbuild",
-      packageManager: "not-a-package-manager",
-    } as Partial<AppBaseOptions>);
-    const version = (
-      generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
-    ).dockerfilePackageManagerVersion();
-    expect(await version).toBe("latest");
+  async function withPnpm<T>(capture3: ChildProcessAdapter["capture3"], body: () => Promise<T>) {
+    const previous = childProcessAdapterConfig.adapter;
+    registerChildProcessAdapter("pnpm-version-test", {
+      spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+      capture3,
+    });
+    childProcessAdapterConfig.adapter = "pnpm-version-test";
+    try {
+      return await body();
+    } finally {
+      childProcessAdapterConfig.adapter = previous;
+    }
+  }
+
+  type Versions = {
+    dockerfilePnpmVersion(): Promise<unknown>;
+    isPnpmThroughCorepack(): Promise<boolean>;
+  };
+  const versions = () => build({ javascript: "esbuild" }) as unknown as Versions;
+
+  it("reads the version out of pnpm --version", async () => {
+    const commands: unknown[] = [];
+    const capture3 = (async (prog: unknown, _env: unknown, args: unknown) => {
+      commands.push([prog, args]);
+      return ["pnpm 1.22.4\n", "", { status: 0 }];
+    }) as unknown as ChildProcessAdapter["capture3"];
+    await withPnpm(capture3, async () => {
+      expect(await versions().dockerfilePnpmVersion()).toBe("1.22.4");
+      expect(await versions().isPnpmThroughCorepack()).toBe(false);
+    });
+    expect(JSON.stringify(commands)).toContain("pnpm");
   });
 
-  it("answers for the selected package manager", async () => {
-    const previous = packageManagerAdapterConfig.adapter;
-    registerPackageManagerAdapter({
-      name: "not-a-package-manager",
-      installArgs: [],
-      addArgs: [],
-      runArgs: [],
+  it("answers latest when pnpm cannot run", async () => {
+    await withPnpm(undefined, async () => {
+      expect(await versions().dockerfilePnpmVersion()).toBe("latest");
+      expect(await versions().isPnpmThroughCorepack()).toBe(true);
     });
-    packageManagerAdapterConfig.adapter = "not-a-package-manager";
-    try {
-      const generator = build({ javascript: "esbuild" });
-      const version = (
-        generator as unknown as { dockerfilePackageManagerVersion(): Promise<unknown> }
-      ).dockerfilePackageManagerVersion();
-      expect(await version).toBe("latest");
-    } finally {
-      packageManagerAdapterConfig.adapter = previous;
-    }
   });
 });
 

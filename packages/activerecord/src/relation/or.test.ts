@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { registerModel } from "../index.js";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -10,7 +9,11 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Paragraph } from "../test-helpers/models/paragraph.js";
 import "../test-helpers/models/categorization.js";
 
-registerModel([Author, Post, SpecialPost, Comment, Paragraph]);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "SpecialPost", SpecialPost);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Paragraph", Paragraph);
 
 const byId = (records: any[]) =>
   [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

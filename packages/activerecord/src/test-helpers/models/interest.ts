@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Human } from "./human.js";
 import type { Zine } from "./zine.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Interest extends Base {
@@ -28,7 +29,8 @@ export class Interest extends Base {
     this.belongsTo("zine", { inverseOf: "interests" });
   }
 }
-registerModel(Interest);
+constSet(TopLevel, "Interest", Interest);
+DescendantsTracker.registerSubclass(Base, Interest);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Interest {
   get human(): Human | null | Promise<Human | null>;

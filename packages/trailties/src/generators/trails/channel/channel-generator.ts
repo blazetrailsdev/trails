@@ -130,7 +130,7 @@ export class ChannelGenerator extends NamedBase {
     if (await this.isUsingBun()) {
       await this.run("bun add @rails/actioncable");
     } else if (await this.isUsingNode()) {
-      await this.run("yarn add @rails/actioncable");
+      await this.run("pnpm add @rails/actioncable");
     }
   }
 

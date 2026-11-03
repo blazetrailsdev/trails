@@ -1,13 +1,13 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { registerModel } from "../associations.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { DeferredIdsIn } from "./predicate-builder/deferred-distinct-pk-in.js";
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 describe("update_all / delete_all over an eager-loaded limited subquery (trails)", () => {
   fixtures(["posts", "comments"]);

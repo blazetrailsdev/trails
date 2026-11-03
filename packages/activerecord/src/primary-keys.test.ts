@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import {
   assertChanges,
@@ -30,8 +31,8 @@ describe("PrimaryKeysTest", () => {
   ]);
 
   beforeAll(async () => {
-    registerModel(Reply);
-    registerModel(SillyReply);
+    constSet(TopLevel, "Reply", Reply);
+    constSet(TopLevel, "SillyReply", SillyReply);
   });
 
   it("to key with default primary key", async () => {

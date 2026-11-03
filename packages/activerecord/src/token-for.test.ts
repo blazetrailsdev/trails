@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { RecordNotFound, registerModel } from "./index.js";
+import { RecordNotFound } from "./index.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { User } from "./test-helpers/models/user.js";
 import { Matey } from "./test-helpers/models/matey.js";
@@ -27,7 +28,7 @@ const DAY = 24 * 60 * 60;
 describe("TokenForTest", () => {
   fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
-    registerModel(Room);
+    constSet(TopLevel, "Room", Room);
     await TokenUser.loadSchema();
     await CpkBook.loadSchema();
   });
