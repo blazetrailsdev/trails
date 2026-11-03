@@ -1,5 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
+import { constSet } from "@blazetrails/ruby-compat";
 import { ConnectionAdapters } from "../namespaces.js";
 
 import type { SqliteDriver } from "../sqlite-adapter.js";
