@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 import { ConnectionAdapters } from "../namespaces.js";
 import { extend, hasKey, include, constSet, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteDriver } from "../sqlite-adapter.js";
@@ -7,7 +8,6 @@ import type { SQLite3Config } from "./pool-config.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LibSQLRemoteAdapter extends AbstractAdapter {
   /** @internal */
   declare _connectionParameters: SQLite3Adapter["_connectionParameters"];
@@ -35,7 +35,7 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface LibSQLRemoteAdapter extends Omit<
   SQLite3Adapter,
   keyof AbstractAdapter | "_connectionParameters"

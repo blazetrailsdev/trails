@@ -403,7 +403,7 @@
     }
   },
   "activerecord": {
-    "rows": 531,
+    "rows": 532,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -413,7 +413,6 @@
       "connection-adapters/libsql-remote-adapter.ts::LibSQLRemoteAdapter",
       "connection-adapters/libsql-replica-adapter.ts::LibSQLReplicaAdapter",
       "connection-adapters/node-sqlite-adapter.ts::NodeSQLiteAdapter",
-      "connection-adapters/postgresql/oid/point.ts::Point",
       "connection-adapters/postgresql/pg-text-decoder.ts::PGSimpleDecoder",
       "connection-adapters/postgresql/pg-text-decoder.ts::PGTypeMapByOid",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsIn",
@@ -569,6 +568,7 @@
       "connection-adapters/postgresql/oid/macaddr.ts::Macaddr": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Macaddr",
       "connection-adapters/postgresql/oid/money.ts::Money": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Money",
       "connection-adapters/postgresql/oid/oid.ts::Oid": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Oid",
+      "connection-adapters/postgresql/oid/point.ts::Point": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Point",
       "connection-adapters/postgresql/oid/range.ts::RangeType": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range",
       "connection-adapters/postgresql/oid/specialized-string.ts::SpecializedString": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::SpecializedString",
       "connection-adapters/postgresql/oid/timestamp-with-time-zone.ts::TimestampWithTimeZone": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TimestampWithTimeZone",

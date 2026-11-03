@@ -31,16 +31,16 @@ node "$ROOT/packages/trailties/bin/trails.js" new "$APP" \
 cd "$APP"
 printf 'packages: []\noverrides:\n%sonlyBuiltDependencies:\n  - better-sqlite3\n' "$OVERRIDES" \
   > pnpm-workspace.yaml
-pnpm install --no-frozen-lockfile >/dev/null
+pnpm install --no-frozen-lockfile
 
-pnpm trails generate model Author name:string >/dev/null
-pnpm trails generate model Book title:string author:references >/dev/null
+pnpm trails generate model Author name:string
+pnpm trails generate model Book title:string author:references
 node -e '
 const fs=require("fs"),f="app/models/author.ts";
 const s=fs.readFileSync(f,"utf8").replace(/(class Author extends \w+ \{\n)/, "$1  static {\n    this.hasMany(\"books\");\n  }\n");
 if(!s.includes("hasMany"))throw new Error("could not add hasMany to "+f);
 fs.writeFileSync(f,s);'
-pnpm trails db migrate >/dev/null
+pnpm trails db migrate
 
 cat > test/models/module-graph.test.ts <<'EOF'
 import { describe, expect, it } from "vitest";

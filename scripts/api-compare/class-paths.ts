@@ -58,6 +58,17 @@ const LAZY_DIRS: Record<string, string[]> = {
   trailties: ["commands/", "command.ts"],
 };
 
+/**
+ * Of several Ruby classes one file pairs with the same TS class, the one the
+ * file's namespace seat (`Owner.Name = Name`) names.
+ */
+function seatedFqn(source: string, tsName: string, fqns: string[]): string | undefined {
+  const seats = [...source.matchAll(new RegExp(`^([\\w.]+)\\.${tsName} = ${tsName};$`, "gm"))];
+  const owners = seats.map((m) => `${m[1].replaceAll(".", "::")}::${tsName}`);
+  const hits = fqns.filter((fqn) => owners.some((o) => fqn.endsWith(`::${o}`)));
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
 /** A lazy file's table, named from its path under the prefix so same-named files do not collide. */
 function lazyTable(dir: string, file: string): string {
   const prefix = (LAZY_DIRS[dir] ?? []).find((p) => p.endsWith("/") && file.startsWith(p));
@@ -279,7 +290,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const paired = new Map<string, ClassPathEntry>();
     const modules = new Set<string>();
     const fallbackModules = new Set<string>();
-    const ambiguous = new Set<string>();
+    const ambiguous = new Map<string, string[]>();
     for (const kind of ["classes", "modules"] as const) {
       const tsByFileName = new Map<string, ClassInfo>();
       const tsKinds = kind === "modules" ? (["modules", "classes"] as const) : ([kind] as const);
@@ -308,7 +319,9 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         const file = path.join(subDir, tsCls.file);
         const key = `${file}::${tsCls.name}`;
         if (fallback) fallbackModules.add(key);
-        if (paired.has(key) && paired.get(key)!.fqn !== rubyPath) ambiguous.add(key);
+        if (paired.has(key) && paired.get(key)!.fqn !== rubyPath) {
+          ambiguous.set(key, [...(ambiguous.get(key) ?? [paired.get(key)!.fqn]), rubyPath]);
+        }
         paired.set(key, { file, tsName: tsCls.name, fqn: rubyPath });
         if (kind === "modules") modules.add(key);
       }
@@ -333,8 +346,13 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       const ownerPath = owner ? await tsPath(owner) : (enclosing ?? null);
       return ownerPath === null ? null : `${ownerPath}.${entry.tsName}`;
     };
-    for (const [key, entry] of paired) {
-      if (ambiguous.has(key)) continue;
+    for (const [key, candidate] of paired) {
+      let entry = candidate;
+      if (ambiguous.has(key)) {
+        const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
+        if (seated === undefined) continue;
+        entry = { ...entry, fqn: seated };
+      }
       const placed = place.at(entry.file, !fallbackModules.has(key));
       if (placed === null) continue;
       const source = await read(entry.file);

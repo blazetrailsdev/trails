@@ -435,7 +435,7 @@ describe("ActiveStorage::BlobTest", () => {
     const t = new BlobTest("purgeLater") as unknown as TestHelper;
     await t.assertEnqueuedWith({
       job: PurgeJob,
-      args: [await (await (await variant.image)?.attachment)?.blob],
+      args: [await (await (await variant.image)!.attachment)!.blob],
     });
   });
 

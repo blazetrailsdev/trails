@@ -1,3 +1,4 @@
+import "../../../constants.postgresql-oid-point.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   ArgumentError,
@@ -20,7 +21,6 @@ ActiveRecord.Point = class Point extends Struct.new("x", "y") {
   }
 };
 
-/** @noRailsEquivalent CONVERGEABLE class-paths-pairs-oid-point-beside-activerecord-point */
 export class Point extends ValueType {
   override type(): string {
     return "point";
