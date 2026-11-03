@@ -201,6 +201,31 @@ describe("Serialization — trails-only coverage", () => {
     });
   });
 
+  it("methods: takes Ruby names, keys the hash by them, and calls the TS spelling", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+      favoriteQuote(): string {
+        return "Constraints are liberating";
+      }
+      isAdmin(): boolean {
+        return false;
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+    const p = new Person({ name: "Bob" });
+    expect({ ...p.serializableHash({ methods: ["favorite_quote", "admin?"] }) }).toEqual({
+      name: "Bob",
+      favorite_quote: "Constraints are liberating",
+      "admin?": false,
+    });
+  });
+
   it("a caller option named __sync does not hijack the internal sync re-entry", () => {
     class Person extends Model {
       declare static attribute: AttributesClassHalf["attribute"];

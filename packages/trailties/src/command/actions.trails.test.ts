@@ -31,6 +31,11 @@ describe("Trails::Command::Actions", () => {
     try {
       await Actions.loadGenerators();
       expect(Generators.namespace).toBe(mod);
+      const { ModelGenerator } = await import("../generators/trails/model/model-generator.js");
+      const generator = new ModelGenerator(["Post"]);
+      expect(generator.filePath()).toBe("actions_blog/post");
+      expect(generator.className()).toBe("ActionsBlog::Post");
+      expect(generator.tableName()).toBe("actions_blog_posts");
     } finally {
       Generators.namespace = was;
     }

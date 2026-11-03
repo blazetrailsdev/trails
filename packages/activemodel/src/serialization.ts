@@ -56,7 +56,9 @@ export function serializableHash(
   const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    hashAset(result, method, rbFSend(this, camelize(String(method), false)));
+    const name = String(method);
+    const tsName = name.endsWith("?") ? `is${camelize(name.slice(0, -1))}` : camelize(name, false);
+    hashAset(result, method, rbFSend(this, tsName));
   }
 
   this.serializableAddIncludes(options, (assocName, records, opts) => {

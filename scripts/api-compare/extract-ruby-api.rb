@@ -724,8 +724,6 @@ class ApiExtractor
       elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
             lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
             (call = class_new_call(rhs))
-        # `Canceled = Class.new(ActiveRecordError)` (future_result.rb:51), with
-        # or without a `do … end` body, binds a class nested in the namespace.
         superclass = class_new_superclass(call)
         body = class_new_body(rhs)
         @namespace_stack.push(lhs[1][1])
