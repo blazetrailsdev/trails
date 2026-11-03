@@ -123,7 +123,7 @@ export function registerModel(
   DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE register-x-retires-from-other-tests */
 export function seatModel(model: typeof Base): void {
   const cpath = (rbModName(model) ?? model.name).split("::");
   const cname = cpath.pop()!;
