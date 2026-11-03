@@ -60,7 +60,7 @@ describe("Rackup::Server", () => {
   it("allow subclasses to override middleware", () => {
     const server = class extends Server {
       override middleware() {
-        return new Hash<string, unknown[]>([]) as never;
+        return new Hash<string, never[]>([]);
       }
     };
     expect(server.middleware().get("deployment")).not.toEqual([]);

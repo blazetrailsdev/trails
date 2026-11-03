@@ -66,6 +66,7 @@ interface HandlerLike {
 const loadPath: Record<string, (() => Promise<unknown>) | undefined> = {};
 
 export class Options {
+  /** @missingRailsArgs new — CONVERGEABLE ruby-compat-optparse-initialize-banner-width-indent */
   async parseBang(args: string[]): Promise<ServerOptions> {
     const options: ServerOptions = {};
     const optParser = new OptionParser();
@@ -460,18 +461,12 @@ export class Server {
     return (this._wrappedApp ??= this.buildApp(this.app()));
   }
 
-  /**
-   * @missingRailsCall daemon — PERMANENT
-   * @internal
-   */
+  /** @internal */
   private daemonizeApp(): never {
     throw new NotImplementedError("daemon() function is unimplemented on this machine");
   }
 
-  /**
-   * @missingRailsCall at_exit — CONVERGEABLE rackup-server-write-pid-removes-pidfile-at-exit
-   * @internal
-   */
+  /** @internal */
   private async writePid(): Promise<void> {
     for (;;) {
       try {
