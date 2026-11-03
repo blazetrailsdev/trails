@@ -60,6 +60,8 @@ export class Loader {
   manifestRoot: string | null;
   /** @noRailsEquivalent PERMANENT */
   imports: Record<string, () => Promise<unknown>> | null;
+  /** @noRailsEquivalent PERMANENT */
+  importer: ((url: string) => Promise<unknown>) | null;
   /** @internal */ _manifestConstants: Record<string, ManifestRow> | null;
   /** @internal */ _manifestChildren: Record<string, Set<string> | null> | null;
   /** @internal */ _manifestRows: Record<string, [string, ManifestRow][]>;
@@ -95,6 +97,7 @@ export class Loader {
     this.manifest = null;
     this.manifestRoot = null;
     this.imports = null;
+    this.importer = null;
     this._manifestConstants = null;
     this._manifestChildren = null;
     this._manifestRows = {};

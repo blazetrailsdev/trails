@@ -88,10 +88,11 @@ export async function require(path: string): Promise<boolean> {
         loader._generation === 1 ? loader.imports?.[loader.autoloads[path].path()] : undefined;
       const url = getPath().pathToFileURL!(path);
       if (loader._generation > 1) url.searchParams.set("zeitwerk", String(loader._generation));
-      const exports = (await (thunk !== undefined ? thunk() : import(url.href))) as Record<
-        string,
-        unknown
-      >;
+      const exports = (await (thunk !== undefined
+        ? thunk()
+        : loader.importer !== null
+          ? loader.importer(url.href)
+          : import(url.href))) as Record<string, unknown>;
       LOADED_FEATURES.push(path);
       await loader.onFileAutoloaded(path, exports);
     } else {

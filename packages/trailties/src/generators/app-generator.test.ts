@@ -507,6 +507,9 @@ describe("AppGenerator", () => {
     const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
     expect(environment).toContain(`import "./application.ts";`);
     expect(environment).toContain("await Trails.initialize()");
+    const importer = environment.indexOf("loader.importer = (url) => import(url);");
+    expect(importer).toBeGreaterThan(-1);
+    expect(importer).toBeLessThan(environment.indexOf("await Trails.initialize()"));
 
     const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
     expect(configRu).toContain(`import "./config/environment.ts";`);
