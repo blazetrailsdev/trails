@@ -15,6 +15,9 @@ import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
 import type { ProxyController } from "./blobs/proxy-controller.js";
 import type { RedirectController } from "./blobs/redirect-controller.js";
+import type * as RepresentationsProxy from "./representations/proxy-controller.js";
+import type * as RepresentationsRedirect from "./representations/redirect-controller.js";
+import type * as RepresentationsBase from "./representations/base-controller.js";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 import type { Previewer } from "./previewer.js";
@@ -36,6 +39,11 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Blobs: {
     RedirectController?: typeof RedirectController;
     ProxyController?: typeof ProxyController;
+  };
+  Representations: {
+    BaseController?: typeof RepresentationsBase.BaseController;
+    RedirectController?: typeof RepresentationsRedirect.RedirectController;
+    ProxyController?: typeof RepresentationsProxy.ProxyController;
   };
   Error: typeof Errors.Error;
   InvariableError: typeof Errors.InvariableError;
@@ -71,6 +79,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
 };
 extend(ActiveStorage, Autoload);
 ActiveStorage.Blobs = {};
+ActiveStorage.Representations = {};
 constSet(TopLevel, "ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");

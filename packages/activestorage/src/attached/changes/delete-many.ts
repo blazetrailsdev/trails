@@ -1,6 +1,6 @@
 import type { AssociationWriter, AttachedRecord } from "../../attached.js";
 import { Attachment } from "../../attachment.js";
-import { Blob } from "../../blob.js";
+import { ActiveStorage } from "../../active-storage.js";
 import { Changes } from "../changes.js";
 
 export class DeleteMany {
@@ -21,7 +21,7 @@ export class DeleteMany {
   }
 
   get blobs() {
-    return Blob.none();
+    return ActiveStorage.Blob!.none();
   }
 
   /** @inventedArm writer — PERMANENT */

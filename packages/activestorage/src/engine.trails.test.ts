@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
-import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "./engine.js";
 import { Model } from "./attached/model.js";
@@ -56,5 +56,36 @@ describe("ActiveStorage::Engine", () => {
   it("attaches previewImage and image with no service argument", () => {
     expect(Blob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
     expect(VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
+  });
+
+  it("raises when Blob loads with no storage configuration", async () => {
+    const trails = TopLevel.Trails!;
+    const activeStorage = (
+      trails.configuration as unknown as { activeStorage: { serviceConfigurations?: unknown } }
+    ).activeStorage;
+    const configs = activeStorage.serviceConfigurations;
+    const root = vi.spyOn(trails, "root").mockReturnValue("/nonexistent-trails-root");
+    activeStorage.serviceConfigurations = undefined;
+    try {
+      const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
+      const error = await Promise.resolve()
+        .then(() => initializer.bind(Engine.instance()).run(app))
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(RuntimeError);
+      expect((error as Error).message).toBe(
+        "Couldn't find Active Storage configuration in /nonexistent-trails-root/config/storage.ts",
+      );
+      expect(() => runLoadHooks("active_storage_blob", Blob)).toThrow(RuntimeError);
+    } finally {
+      root.mockRestore();
+      activeStorage.serviceConfigurations = configs;
+    }
+  });
+
+  it("does not load Blob when the engine loads", async () => {
+    vi.resetModules();
+    const { ActiveStorage: fresh } = await import("./active-storage.js");
+    await import("./engine.js");
+    expect(fresh.Blob).toBeUndefined();
   });
 });
