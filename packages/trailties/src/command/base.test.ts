@@ -7,6 +7,7 @@ import { invoke } from "../command.js";
 import { CredentialsCommand } from "../commands/credentials.js";
 import { GenerateCommand } from "../commands/generate.js";
 import { NotesCommand } from "../commands/notes.js";
+import { ChangeCommand } from "../commands/db/system/change/change-command.js";
 
 describe("Trails::Command::BaseTest", () => {
   it("printing commands returns command and description if present", async () => {
@@ -23,14 +24,6 @@ describe("Trails::Command::BaseTest", () => {
       "credentials:show",
       "credentials:diff",
     ]);
-    class ChangeCommand extends Base {
-      perform(): void {}
-
-      static {
-        rbSetClassPathString(this, { name: "Trails::Command::Db::System" }, "ChangeCommand");
-        (this as unknown as ThorClass).methodAdded("perform");
-      }
-    }
     expect((await ChangeCommand.printingCommands()).map(([name]) => name)).toEqual([
       "db:system:change",
     ]);
