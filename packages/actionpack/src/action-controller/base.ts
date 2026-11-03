@@ -229,7 +229,7 @@ export interface RenderOptions {
   xml?: unknown;
   plain?: string | number | boolean | null | object;
   html?: string | SafeBuffer | boolean | null;
-  body?: string | Buffer | boolean | null;
+  body?: string | Uint8Array | boolean | null;
   action?: string;
   template?: string;
   file?: string | { toPath(): string };

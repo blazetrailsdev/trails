@@ -1,4 +1,4 @@
-import { File, IO } from "@blazetrails/ruby-compat";
+import { File, IO, Range } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";
@@ -11,12 +11,12 @@ export const MULTIPART_BOUNDARY = "AaB03x";
 
 export class BaseIterator {
   path: string;
-  ranges: [number, number][];
+  ranges: Range<number>[];
   options: { mimeType: string | null | undefined; size: number };
 
   constructor(
     path: string,
-    ranges: [number, number][],
+    ranges: Range<number>[],
     options: { mimeType?: string | null; size: number },
   ) {
     this.path = path;
@@ -45,7 +45,7 @@ export class BaseIterator {
     let size = 0;
     for (const range of this.ranges) {
       if (this.multipart()) size += Buffer.byteLength(this.multipartHeading(range));
-      size += range[1] - range[0] + 1;
+      size += range.end! - range.begin! + 1;
     }
     if (this.multipart()) size += Buffer.byteLength(`\r\n--${MULTIPART_BOUNDARY}--\r\n`);
     return size;
@@ -59,12 +59,12 @@ export class BaseIterator {
   }
 
   /** @internal */
-  private multipartHeading(range: [number, number]): string {
+  private multipartHeading(range: Range<number>): string {
     const ct = this.options.mimeType ? `content-type: ${this.options.mimeType}\r\n` : "";
     return (
       `\r\n--${MULTIPART_BOUNDARY}\r\n` +
       ct +
-      `content-range: bytes ${range[0]}-${range[1]}/${this.options.size}\r\n\r\n`
+      `content-range: bytes ${range.begin}-${range.end}/${this.options.size}\r\n\r\n`
     );
   }
 
@@ -72,9 +72,9 @@ export class BaseIterator {
    * @internal
    * @missingRailsArgs read — CONVERGEABLE io-read-length-answers-a-binary-string-where-the-ascii-8bit-seat-is-uint8array
    */
-  private eachRangePart(file: IO, range: [number, number], cb: (chunk: Uint8Array) => void): void {
-    file.seek(range[0]);
-    let remainingLen = range[1] - range[0] + 1;
+  private eachRangePart(file: IO, range: Range<number>, cb: (chunk: Uint8Array) => void): void {
+    file.seek(range.begin!);
+    let remainingLen = range.end! - range.begin! + 1;
     while (remainingLen > 0) {
       const outbuf = new Uint8Array(Math.min(8192, remainingLen));
       const part = file.read(outbuf.length, outbuf);
@@ -159,7 +159,7 @@ export class Files {
 
     let ranges = Utils.getByteRanges(request.getHeader("HTTP_RANGE") as string | undefined, size);
     if (ranges === null) {
-      ranges = [[0, size - 1]];
+      ranges = [new Range(0, size - 1)];
     } else if (ranges.length === 0) {
       const response = this.fail(416, "Byte range unsatisfiable");
       response[1]["content-range"] = `bytes */${size}`;
@@ -169,7 +169,7 @@ export class Files {
 
       if (ranges.length === 1) {
         const range = ranges[0];
-        headers["content-range"] = `bytes ${range[0]}-${range[1]}/${size}`;
+        headers["content-range"] = `bytes ${range.begin}-${range.end}/${size}`;
       } else {
         headers[CONTENT_TYPE] = `multipart/byteranges; boundary=${MULTIPART_BOUNDARY}`;
       }

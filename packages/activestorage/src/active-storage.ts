@@ -13,6 +13,8 @@ import type { MessageVerifier } from "@blazetrails/activesupport/message-verifie
 import type { Analyzer } from "./analyzer.js";
 import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
+import type { ProxyController } from "./blobs/proxy-controller.js";
+import type { RedirectController } from "./blobs/redirect-controller.js";
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 import type { Previewer } from "./previewer.js";
@@ -31,6 +33,10 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   Blob?: typeof Blob;
   VariantRecord?: unknown;
   Transformers: typeof Transformers;
+  Blobs: {
+    RedirectController?: typeof RedirectController;
+    ProxyController?: typeof ProxyController;
+  };
   Error: typeof Errors.Error;
   InvariableError: typeof Errors.InvariableError;
   UnpreviewableError: typeof Errors.UnpreviewableError;
@@ -64,6 +70,7 @@ export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModu
   videoPreviewArguments: string;
 };
 extend(ActiveStorage, Autoload);
+ActiveStorage.Blobs = {};
 registerConstant("ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");

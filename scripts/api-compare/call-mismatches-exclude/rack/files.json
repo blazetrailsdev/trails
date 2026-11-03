@@ -1,0 +1,9 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "files.ts",
+    "rubyName": "serving",
+    "call": "order:constructor,fail",
+    "reason": "Ruby's [0..size - 1] is a Range literal with no call; JS has no range literal, so it is new Range(0, size - 1), which the gate reads as a constructor ahead of fail."
+  }
+]

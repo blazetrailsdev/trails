@@ -38,7 +38,7 @@ const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  application: { routes: () => routes },
+  application: { routes: () => routes, envConfig: () => ({}) },
   configuration: {
     generators: configuration.appGenerators.bind(configuration),
     activeStorage: { service: "local" },
