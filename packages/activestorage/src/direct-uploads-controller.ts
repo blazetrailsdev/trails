@@ -10,7 +10,10 @@ export class DirectUploadsController extends BaseController {
     await this.render({ json: await this.directUploadJson(blob) });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm camelize — PERMANENT
+   */
   private blobArgs(): BlobArgs {
     return Object.fromEntries(
       Object.entries(
