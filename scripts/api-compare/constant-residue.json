@@ -834,26 +834,42 @@
       "error.ts::InvalidSecret": "BCrypt::Errors::InvalidSecret"
     }
   },
-  "builder": { "rows": 5, "excluded": [], "unwalked": ["xchar.ts::XChar"], "residue": {} },
+  "builder": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": ["xchar.ts::XChar"],
+    "residue": {}
+  },
   "chronic": {
     "rows": 61,
     "excluded": [],
     "unwalked": ["handlers.ts::Handlers"],
-    "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
+    "residue": {
+      "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick"
+    }
   },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
     "unwalked": [],
-    "residue": { "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker" }
+    "residue": {
+      "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker"
+    }
   },
   "et-orbi": {
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": { "time.ts::EoTime": "EtOrbi::EoTime" }
+    "residue": {
+      "time.ts::EoTime": "EtOrbi::EoTime"
+    }
   },
-  "fugit": { "rows": 13, "excluded": [], "unwalked": [], "residue": {} },
+  "fugit": {
+    "rows": 13,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "globalid": {
     "rows": 12,
     "excluded": ["global-id.ts::GlobalID", "signed-global-id.ts::SignedGlobalID"],
@@ -910,7 +926,12 @@
       "fields/common-address-field.ts::AddressContainer": "Mail::AddressContainer"
     }
   },
-  "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
+  "marcel": {
+    "rows": 2,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "mini-magick": {
     "rows": 10,
     "excluded": [],
@@ -934,7 +955,9 @@
       "unpacker.ts::UnpackError"
     ],
     "unwalked": ["bigint.ts::Bigint", "core-ext.ts::CoreExt", "time.ts::Time"],
-    "residue": { "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool" }
+    "residue": {
+      "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool"
+    }
   },
   "net-smtp": {
     "rows": 15,
@@ -963,7 +986,12 @@
       "smtp.ts::SMTPUnsupportedCommand": "Net::SMTPUnsupportedCommand"
     }
   },
-  "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
+  "raabro": {
+    "rows": 3,
+    "excluded": ["raabro.ts::Raabro"],
+    "unwalked": [],
+    "residue": {}
+  },
   "rack": {
     "rows": 56,
     "excluded": ["handler/node.ts::Node"],
@@ -1020,7 +1048,9 @@
       "version.ts::Version",
       "win32.ts::Win32"
     ],
-    "residue": { "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError" }
+    "residue": {
+      "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError"
+    }
   },
   "solid-cable": {
     "rows": 4,
@@ -1097,6 +1127,8 @@
       "autoloaders.ts::Autoloaders": "Trails::Autoloaders",
       "autoloaders/inflector.ts::Inflector": "Trails::Autoloaders::Inflector",
       "backtrace-cleaner.ts::BacktraceCleaner": "Trails::BacktraceCleaner",
+      "command.ts::CorrectableNameError": "Trails::Command::CorrectableNameError",
+      "command.ts::UnrecognizedCommandError": "Trails::Command::UnrecognizedCommandError",
       "commands/console.ts::Console": "Trails::Console",
       "commands/console.ts::ConsoleCommand": "Trails::Command::ConsoleCommand",
       "commands/console/irb-console.ts::IRBConsole": "Trails::Console::IRBConsole",
