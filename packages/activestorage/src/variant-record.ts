@@ -4,6 +4,7 @@ import { ActiveStorage } from "./active-storage.js";
 import type { One } from "./attached/one.js";
 import { Record } from "./record.js";
 
+/** @inventedArm onLoad — CONVERGEABLE active-storage-models-call-has-one-attached-directly */
 export class VariantRecord extends Record {
   declare variation_digest: string;
   declare image: One;

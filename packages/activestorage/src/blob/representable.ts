@@ -126,6 +126,7 @@ export const Representable = {
 };
 
 Object.defineProperty(Representable, included, {
+  /** @inventedArm onLoad — CONVERGEABLE active-storage-models-call-has-one-attached-directly */
   value(base: typeof Blob) {
     base.hasMany("variantRecords", {
       className: "ActiveStorage::VariantRecord",
