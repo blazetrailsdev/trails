@@ -4,7 +4,7 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { ModelName, Naming } from "@blazetrails/activemodel";
 import { assertRespondTo, extend, TopLevel } from "@blazetrails/activesupport";
-import { File, include } from "@blazetrails/ruby-compat";
+import { File, include, constSet } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
@@ -15,7 +15,6 @@ import type { RoutesProxyInstance } from "../routing/routes-proxy.js";
 import { UrlFor } from "../routing/url-for.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
-import { registerController } from "../../action-controller/base.js";
 
 TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
@@ -152,7 +151,7 @@ describe("WithMountedEngine", () => {
   }
   include(InsideEngineGeneratingController, BlogEngine.routes().urlHelpers());
   include(InsideEngineGeneratingController, TrailsApplication.routes().mountedHelpers());
-  registerController("InsideEngineGeneratingController", InsideEngineGeneratingController);
+  constSet(TopLevel, "InsideEngineGeneratingController", InsideEngineGeneratingController);
 
   class OutsideEngineGeneratingController extends Base {
     async index(): Promise<void> {
@@ -186,7 +185,7 @@ describe("WithMountedEngine", () => {
   }
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
   include(OutsideEngineGeneratingController, TrailsApplication.routes().urlHelpers());
-  registerController("OutsideEngineGeneratingController", OutsideEngineGeneratingController);
+  constSet(TopLevel, "OutsideEngineGeneratingController", OutsideEngineGeneratingController);
 
   class EngineObject {
     constructor(_kw: { kw: unknown }) {}
@@ -482,7 +481,7 @@ describe("EngineMountedAtRoot", () => {
   }
   include(PostsController, BlogEngine.routes().urlHelpers());
   include(PostsController, TrailsApplication.routes().mountedHelpers());
-  registerController("PostsController", PostsController);
+  constSet(TopLevel, "PostsController", PostsController);
 
   class EngineMountedAtRoot extends IntegrationTest {
     override get app(): unknown {

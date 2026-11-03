@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Notifications, assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { Lint, MockRequest } from "@blazetrails/rack";
@@ -10,7 +11,6 @@ import { ServerTiming } from "../middleware/server-timing.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
-import { registerController } from "../../action-controller/base.js";
 
 describe("ServerTimingTest", () => {
   class TestController extends Base {
@@ -29,7 +29,7 @@ describe("ServerTimingTest", () => {
       });
     }
   }
-  registerController("ServerTimingTest::TestController", TestController);
+  constSetPath("ServerTimingTest::TestController", TestController);
 
   let middlewares: MiddlewareFactory[];
   let headerName: string;

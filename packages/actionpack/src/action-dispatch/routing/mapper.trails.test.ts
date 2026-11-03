@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -16,7 +17,7 @@ import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { deprecator } from "../deprecator.js";
-import { Base, registerController } from "../../action-controller/base.js";
+import { Base } from "../../action-controller/base.js";
 
 function fakeRequest(): ConstraintsRequest & Request {
   return {
@@ -414,7 +415,7 @@ describe("Mapper block receivers", () => {
 
   beforeAll(() => {
     for (const name of names) {
-      registerController(`${camelize(name)}Controller`, StubController);
+      constSetPath(`${camelize(name)}Controller`, StubController);
     }
   });
 

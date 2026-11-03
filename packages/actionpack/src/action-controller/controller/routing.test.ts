@@ -11,7 +11,15 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
-import { RFC2396_PARSER, URI, first, constDefined, type Module } from "@blazetrails/ruby-compat";
+import {
+  RFC2396_PARSER,
+  URI,
+  first,
+  constDefined,
+  type Module,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -20,7 +28,6 @@ import { RoutingError, UnknownHttpMethod, UrlGenerationError } from "../metal/ex
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
 import "../../test-helpers/lib/controller/fake-controllers.js";
-import { registerController } from "../base.js";
 
 type NamedRoutes = Record<string, (...args: unknown[]) => string>;
 
@@ -35,8 +42,8 @@ class MilestonesController extends Base {
     this.prototype.show = this.prototype.index;
   }
 }
-registerController("MilestonesController", MilestonesController);
-registerController("MilestonesController", MilestonesController);
+constSet(TopLevel, "MilestonesController", MilestonesController);
+constSet(TopLevel, "MilestonesController", MilestonesController);
 
 class UriReservedCharactersRoutingTest {
   set!: RouteSet;

@@ -1,3 +1,4 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, beforeEach, describe, it, expect } from "vitest";
 import {
@@ -10,7 +11,7 @@ import {
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
-import { Base, registerController } from "../../../action-controller/base.js";
+import { Base } from "../../../action-controller/base.js";
 
 class StubController extends Base {
   static actionEncodingTemplate(): null {
@@ -20,7 +21,7 @@ class StubController extends Base {
 
 beforeAll(() => {
   for (const name of ["posts", "late", "seed"]) {
-    registerController(`${camelize(name)}Controller`, StubController);
+    constSetPath(`${camelize(name)}Controller`, StubController);
   }
 });
 

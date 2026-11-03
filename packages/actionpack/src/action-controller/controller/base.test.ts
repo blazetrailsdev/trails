@@ -1,4 +1,4 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
@@ -28,7 +28,6 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import "../../test-helpers/abstract-unit.js";
-import { registerController } from "../base.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -127,8 +126,8 @@ class RecordIdentifierIncludedController extends Base {
 }
 include(RecordIdentifierIncludedController, { domId, domClass });
 
-registerController("UrlOptionsController", UrlOptionsController);
-registerController("DefaultUrlOptionsController", DefaultUrlOptionsController);
+constSet(TopLevel, "UrlOptionsController", UrlOptionsController);
+constSet(TopLevel, "DefaultUrlOptionsController", DefaultUrlOptionsController);
 
 describe("ControllerClassTests", () => {
   it("controller path", () => {

@@ -11,14 +11,7 @@ import {
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import {
-  ArgumentError,
-  isModuleIncluded,
-  rbClassInheritedP,
-  constGet,
-  rbModName,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { isModuleIncluded, constGet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -750,35 +743,6 @@ for (const mod of Base.MODULES) {
 Base.setupRendererBang();
 
 ActionController.Base = Base;
-
-/** @noRailsEquivalent PERMANENT */
-export function registerController(controller: typeof Metal): void;
-export function registerController(name: string, controller: typeof Metal): void;
-export function registerController(controllers: (typeof Metal)[]): void;
-export function registerController(
-  nameOrController: string | typeof Metal | (typeof Metal)[],
-  controller?: typeof Metal,
-): void {
-  if (Array.isArray(nameOrController)) {
-    for (const k of nameOrController) registerController(k);
-    return;
-  }
-  if (typeof nameOrController === "string") {
-    if (!controller)
-      throw new ArgumentError("registerController(name, controller) requires a controller class");
-  } else {
-    controller = nameOrController;
-  }
-  if (typeof controller !== "function" || rbClassInheritedP(controller, Metal) !== true) {
-    throw new ArgumentError(
-      `registerController expects an ActionController::Metal subclass, got ${String(controller?.name ?? controller)}`,
-    );
-  }
-  if (typeof nameOrController === "string") return registerConstant(nameOrController, controller);
-  registerConstant(controller.name, controller);
-  const qualified = rbModName(controller)!;
-  if (qualified !== controller.name) registerConstant(qualified, controller);
-}
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);

@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -7,7 +8,6 @@ import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
-import { registerController } from "@blazetrails/actionpack";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 afterEach(() => {
@@ -26,7 +26,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     routes.draw(function () {
       this.resources("posts");
     });
-    registerController("PostsController", PostsController as never);
+    constSet(TopLevel, "PostsController", PostsController);
 
     const [status, , body] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/posts/new" });
 
@@ -51,7 +51,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       this.resources("posts");
     });
     include(PostsController, routes.urlHelpers());
-    registerController("PostsController", PostsController as never);
+    constSet(TopLevel, "PostsController", PostsController);
 
     const [status, headers] = await routes.call({
       REQUEST_METHOD: "DELETE",

@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
@@ -31,6 +32,8 @@ import {
   rbFSend,
   isRegisteredConstant,
   rbModRemoveConst,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
@@ -48,7 +51,6 @@ import {
   UnfilteredParameters,
 } from "../../action-controller/metal/strong-parameters.js";
 import { Redirection } from "../routing/redirection.js";
-import { registerController } from "../../action-controller/base.js";
 
 class StubController extends Base {
   static actionEncodingTemplate(): null {
@@ -131,7 +133,7 @@ beforeEach(() => {
     "transport/taxis",
     "users",
   ]) {
-    registerController(`${camelize(name)}Controller`, StubController);
+    constSetPath(`${camelize(name)}Controller`, StubController);
   }
 });
 
@@ -422,7 +424,7 @@ describe("TestRoutingMapper", () => {
     routes.draw(function () {
       this.get("/posts/:id", { to: "posts#show" });
     });
-    registerController("PostsController", EchoParamsController);
+    constSet(TopLevel, "PostsController", EchoParamsController);
     const [status, , body] = await routes.call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/7",
@@ -4594,7 +4596,7 @@ describe("TestDefaultScope", () => {
   });
 
   beforeEach(() => {
-    registerController("Blog::PostsController", PostsController);
+    constSetPath("Blog::PostsController", PostsController);
   });
   afterEach(() => {
     if (isRegisteredConstant("Blog::PostsController"))
@@ -4864,7 +4866,7 @@ describe("TestNamespaceWithControllerOption", () => {
 
   let t: TestNamespaceWithControllerOption;
   beforeEach(({ testCase }) => {
-    registerController("Admin::StorageFilesController", StorageFilesController);
+    constSetPath("Admin::StorageFilesController", StorageFilesController);
     t = testCase as TestNamespaceWithControllerOption;
   });
   afterEach(() => {
@@ -5125,8 +5127,8 @@ describe("TestNamedRouteUrlHelpers", () => {
 
   let t: TestNamedRouteUrlHelpers;
   beforeEach(({ testCase }) => {
-    registerController("TestNamedRouteUrlHelpers::CategoriesController", CategoriesController);
-    registerController("TestNamedRouteUrlHelpers::ProductsController", ProductsController);
+    constSetPath("TestNamedRouteUrlHelpers::CategoriesController", CategoriesController);
+    constSetPath("TestNamedRouteUrlHelpers::ProductsController", ProductsController);
     t = testCase as TestNamedRouteUrlHelpers;
   });
 
@@ -5240,7 +5242,7 @@ describe("TestInvalidUrls", () => {
 
   let t: TestInvalidUrls;
   beforeEach(({ testCase }) => {
-    registerController("TestInvalidUrls::FooController", FooController);
+    constSetPath("TestInvalidUrls::FooController", FooController);
     t = testCase as TestInvalidUrls;
   });
   afterEach(() => {
@@ -5646,7 +5648,7 @@ describe("TestErrorsInController", () => {
 
   let t: TestErrorsInController;
   beforeEach(({ testCase }) => {
-    registerController("PostsController", PostsController);
+    constSet(TopLevel, "PostsController", PostsController);
     t = testCase as TestErrorsInController;
   });
   afterEach(() => {
@@ -5775,7 +5777,7 @@ describe("TestOptionalScopesWithOrWithoutParams", () => {
 
   let t: TestOptionalScopesWithOrWithoutParams;
   beforeEach(({ testCase }) => {
-    registerController("TestOptionalScopesWithOrWithoutParams::HomeController", HomeController);
+    constSetPath("TestOptionalScopesWithOrWithoutParams::HomeController", HomeController);
     t = testCase as TestOptionalScopesWithOrWithoutParams;
   });
 
@@ -5832,8 +5834,8 @@ describe("TestPathParameters", () => {
 
   let t: TestPathParameters;
   beforeEach(({ testCase }) => {
-    registerController("TestPathParameters::HomeController", HomeController);
-    registerController("TestPathParameters::PagesController", PagesController);
+    constSetPath("TestPathParameters::HomeController", HomeController);
+    constSetPath("TestPathParameters::PagesController", PagesController);
     t = testCase as TestPathParameters;
   });
 
@@ -5854,7 +5856,7 @@ describe("TestInternalRoutingParams", () => {
       this.head("ok");
     }
   }
-  registerController("InternalController", InternalController);
+  constSet(TopLevel, "InternalController", InternalController);
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestInternalRoutingParams extends IntegrationTest {
@@ -5941,7 +5943,7 @@ describe("FlashRedirectTest", () => {
 
   let t: FlashRedirectTest;
   beforeEach(({ testCase }) => {
-    registerController("FlashRedirectTest::FooController", FooController);
+    constSetPath("FlashRedirectTest::FooController", FooController);
     t = testCase as FlashRedirectTest;
   });
 
@@ -6136,7 +6138,7 @@ describe("TestMultipleNestedController", () => {
 
   let t: TestMultipleNestedController;
   beforeEach(({ testCase }) => {
-    registerController("Foo::Bar::BazController", BazController);
+    constSetPath("Foo::Bar::BazController", BazController);
     t = testCase as TestMultipleNestedController;
   });
   afterEach(() => {
@@ -6258,7 +6260,7 @@ describe("TestDefaultUrlOptions", () => {
 
   let t: TestDefaultUrlOptions;
   beforeEach(({ testCase }) => {
-    registerController("PostsController", PostsController);
+    constSet(TopLevel, "PostsController", PostsController);
     t = testCase as TestDefaultUrlOptions;
   });
 

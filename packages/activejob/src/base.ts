@@ -10,10 +10,6 @@ import {
   Hash,
   include,
   rbHashSRuby2KeywordsHash,
-  ArgumentError,
-  rbClassInheritedP,
-  registerConstant,
-  rbModName,
   rbObjClass,
   rbObjIsKindOf,
   SecureRandom,
@@ -141,33 +137,5 @@ include(Base, Logging);
 include(Base, Timezones);
 include(Base, Translation);
 ActiveJob.Base = Base;
-
-/** @noRailsEquivalent PERMANENT */
-export function registerJob(job: typeof Base): void;
-export function registerJob(name: string, job: typeof Base): void;
-export function registerJob(jobs: (typeof Base)[]): void;
-export function registerJob(
-  nameOrJob: string | typeof Base | (typeof Base)[],
-  job?: typeof Base,
-): void {
-  if (Array.isArray(nameOrJob)) {
-    for (const k of nameOrJob) registerJob(k);
-    return;
-  }
-  if (typeof nameOrJob === "string") {
-    if (!job) throw new ArgumentError("registerJob(name, job) requires a job class");
-  } else {
-    job = nameOrJob;
-  }
-  if (typeof job !== "function" || rbClassInheritedP(job, Base) !== true) {
-    throw new ArgumentError(
-      `registerJob expects a ActiveJob::Base subclass, got ${String(job?.name ?? job)}`,
-    );
-  }
-  if (typeof nameOrJob === "string") return registerConstant(nameOrJob, job);
-  registerConstant(job.name, job);
-  const qualified = rbModName(job)!;
-  if (qualified !== job.name) registerConstant(qualified, job);
-}
 
 runLoadHooks("active_job", Base);

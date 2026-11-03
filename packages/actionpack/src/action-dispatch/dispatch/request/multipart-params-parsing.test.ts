@@ -1,3 +1,4 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { describe, it, afterEach, beforeEach } from "vitest";
 import {
   Encoding,
@@ -12,7 +13,6 @@ import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../../action-controller/base.js";
 
 interface UploadedFile {
   originalFilename: string;
@@ -61,7 +61,7 @@ describe("MultipartParamsParsingTest", () => {
       });
     }
   }
-  registerController("MultipartParamsParsingTest::TestController", TestController);
+  constSetPath("MultipartParamsParsingTest::TestController", TestController);
 
   const FIXTURE_PATH = File.expandPath(
     "../../../test-helpers/fixtures/multipart",

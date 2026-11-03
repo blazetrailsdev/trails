@@ -1,8 +1,8 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { File, Pathname, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
 registerConstant("RenderFile", { name: "RenderFile" });
 
@@ -34,7 +34,7 @@ class BasicController extends Base {
   }
 }
 
-registerController("RenderFile::BasicController", BasicController);
+constSetPath("RenderFile::BasicController", BasicController);
 
 class TestBasic extends Rack.TestCase {
   static {
