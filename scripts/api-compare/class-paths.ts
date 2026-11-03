@@ -2,16 +2,19 @@
  * The framework constant table (RFC 0213 § "Framework constants"): one
  * checked-in module per package, `src/constants.generated.ts`, mapping each
  * exported TS class or module that `parity:api` pairs with a Ruby class or
- * module to its `fqn` in `output/rails-api.json`. ruby-compat's `rbModName`
+ * module to its Ruby path. ruby-compat's `rbModName`
  * reads it after the `classpaths` a `const_set` or a module-eval seat wrote,
  * and before `klass.name`.
  *
- *   pnpm parity:class-paths           # rewrite the tables
- *   pnpm parity:class-paths --check   # red on a stale table, or on a generated
- *                                     # path that disagrees with a seated one
+ *   pnpm parity:class-paths           # rewrite the tables from the walk
+ *   pnpm parity:class-paths --check   # red on a stale table or record, or on a
+ *                                     # generated path that disagrees with a seated one
+ *   ... --check --record              # rewrite constant-residue.json from the pairing
  *   ... --check --package <pkg>       # one api-compare package, for the scoped CI driver
  *
- * The pairing is compare.ts's own: `rubyFileToTs` for the file and
+ * The rows are written from `walkConstants` and `constant-residue.json`
+ * alone. `rails-api.json` is read only under `--check`, whose pairing is
+ * compare.ts's own: `rubyFileToTs` for the file and
  * `resolveTsClassForRuby` for the class, so a class gets a path exactly where
  * the inheritance check finds its counterpart.
  */
@@ -165,6 +168,87 @@ const unexported: string[] = [];
 /** Paired Ruby modules with no exported binding; reported, not gated. */
 const unexportedModules: string[] = [];
 
+/**
+ * Which table holds a row in `file`, or null where no table may: the file is
+ * built out of the package, or sits outside every entry graph. `lazyOk` is
+ * false for a module the pairing fell back to, which a lazy file never seats.
+ */
+async function placement(dir: string) {
+  const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
+  const excluded = await tsconfigExcludes(dir);
+  const reachable = await entryGraph(dir);
+  const subpath = SUBPATH_ENTRIES[dir];
+  const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
+  const separate = SEPARATE_SUBPATH_ENTRIES[dir];
+  const separateGraph = separate ? await entryGraph(dir, separate) : new Set<string>();
+  const sources = new Map<string, string>();
+  const read = async (file: string) =>
+    sources.get(file) ??
+    sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
+  const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
+    const rel = path.join("src", file);
+    const separated = !reachable.has(file) && separateGraph.has(file);
+    const lazy = lazyOk && !reachable.has(file) && file.startsWith(LAZY_DIRS[dir] ?? "\0");
+    const ownTable =
+      excluded.includes(rel) ||
+      separated ||
+      lazy ||
+      (!reachable.has(file) && subpathGraph.has(file));
+    if (
+      !ownTable &&
+      excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))
+    ) {
+      return null;
+    }
+    if (!ownTable && !reachable.has(file)) return null;
+    return {
+      excluded: ownTable,
+      ...(separated ? { table: separateTable(separate) } : {}),
+      ...(lazy ? { table: separateTable(file) } : {}),
+    };
+  };
+  return { read, at };
+}
+
+/**
+ * The tables' rows as the walk writes them (RFC 0213 § "Framework
+ * constants"): every exported class `walkConstants` derives, less the
+ * `excluded` ones no Ruby constant answers, with the record's `residue` paths
+ * over the derived ones and its `unwalked` members at their derived path.
+ */
+export function splitKey(key: string): [string, string] {
+  const at = key.lastIndexOf("::");
+  if (at === -1) throw new globalThis.Error(`${key} is not a file::name key`);
+  return [key.slice(0, at), key.slice(at + 2)];
+}
+
+export async function walkedClassPaths(
+  dir: string,
+  record: ConstantResidue,
+): Promise<ClassPathEntry[]> {
+  const rows = await walkConstants(dir);
+  for (const key of record.excluded) rows.delete(key);
+  for (const key of record.unwalked) {
+    const [file, tsName] = splitKey(key);
+    const fqn = await derivedConstantPath(dir, file, tsName);
+    if (fqn === null) throw new globalThis.Error(`${dir}: ${key} has no derived path`);
+    rows.set(key, fqn);
+  }
+  for (const [key, fqn] of Object.entries(record.residue)) rows.set(key, fqn);
+  const place = await placement(dir);
+  const entries: ClassPathEntry[] = [];
+  for (const [key, fqn] of rows) {
+    const [file, tsName] = splitKey(key);
+    const placed = place.at(file);
+    if (placed === null) continue;
+    const source = await place.read(file);
+    const namespace =
+      !tsName.includes(".") && !isExported(source, tsName) && isSelfNamespace(source, file, tsName);
+    entries.push(namespace ? { file, tsName, fqn, namespace } : { file, tsName, fqn, ...placed });
+  }
+  return entries;
+}
+
 export async function collectClassPaths(only?: string): Promise<Map<string, ClassPathEntry[]>> {
   const ruby = await readJson<Manifest>("rails-api.json");
   const ts = await readJson<Manifest>("ts-api.json");
@@ -217,18 +301,10 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       }
     }
 
-    const excluded = await tsconfigExcludes(dir);
-    const reachable = await entryGraph(dir);
-    const subpath = SUBPATH_ENTRIES[dir];
-    const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
-    const separate = SEPARATE_SUBPATH_ENTRIES[dir];
-    const separateGraph = separate ? await entryGraph(dir, separate) : new Set<string>();
+    const place = await placement(dir);
     const entries = byDir.get(dir) ?? [];
     const byFqn = new Map([...paired.values()].map((e) => [`${e.file}::${e.fqn}`, e]));
-    const sources = new Map<string, string>();
-    const read = async (file: string) =>
-      sources.get(file) ??
-      sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
+    const read = place.read;
     const tsPath = async (entry: ClassPathEntry): Promise<string | null> => {
       const source = await read(entry.file);
       if (isExported(source, entry.tsName)) return entry.tsName;
@@ -246,34 +322,12 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     };
     for (const [key, entry] of paired) {
       if (ambiguous.has(key)) continue;
-      const rel = path.join("src", entry.file);
-      const separated = !reachable.has(entry.file) && separateGraph.has(entry.file);
-      const lazy =
-        !fallbackModules.has(key) &&
-        !reachable.has(entry.file) &&
-        entry.file.startsWith(LAZY_DIRS[dir] ?? "\0");
-      const ownTable =
-        excluded.includes(rel) ||
-        separated ||
-        lazy ||
-        (!reachable.has(entry.file) && subpathGraph.has(entry.file));
-      if (
-        !ownTable &&
-        excluded.some((glob) => path.matchesGlob(rel, glob) || rel.startsWith(`${glob}/`))
-      ) {
-        continue;
-      }
-      if (!ownTable && !reachable.has(entry.file)) continue;
+      const placed = place.at(entry.file, !fallbackModules.has(key));
+      if (placed === null) continue;
       const source = await read(entry.file);
       const reached = await tsPath(entry);
       if (reached !== null) {
-        entries.push({
-          ...entry,
-          tsName: reached,
-          excluded: ownTable,
-          ...(separated ? { table: separateTable(separate) } : {}),
-          ...(lazy ? { table: separateTable(entry.file) } : {}),
-        });
+        entries.push({ ...entry, tsName: reached, ...placed });
       } else if (modules.has(key) && isSelfNamespace(source, entry.file, entry.tsName)) {
         entries.push({ ...entry, namespace: true });
       } else if (fallbackModules.has(key)) continue;
@@ -462,10 +516,16 @@ async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Pr
   return [...missing];
 }
 
-/** One package's derivation: table rows, walked exports no table names, and the rows the path misses. */
+/**
+ * One package's record: its row count; the walked exports no Ruby constant
+ * answers, so no table names them and `rbModName` gives them no path; the
+ * rows the walk does not reach (a static member, a module object) but whose
+ * path it derives; and the rows whose path the derivation misses.
+ */
 export interface ConstantResidue {
   rows: number;
-  unpaired: number;
+  excluded: string[];
+  unwalked: string[];
   residue: Record<string, string>;
 }
 
@@ -473,42 +533,145 @@ export async function constantResidue(
   dir: string,
   entries: readonly ClassPathEntry[],
 ): Promise<ConstantResidue> {
+  const walked = await walkConstants(dir);
   const residue: Record<string, string> = {};
-  const sorted = [...entries].sort((a, b) =>
-    `${a.file}::${a.tsName}`.localeCompare(`${b.file}::${b.tsName}`),
-  );
-  const named = new Set(sorted.map((e) => `${e.file}::${e.tsName}`));
-  for (const { file, tsName, fqn } of sorted) {
-    if ((await derivedConstantPath(dir, file, tsName)) !== fqn) residue[`${file}::${tsName}`] = fqn;
+  const unwalked: string[] = [];
+  const keys = entries.map((e) => `${e.file}::${e.tsName}`).sort();
+  const fqns = new Map(entries.map((e) => [`${e.file}::${e.tsName}`, e.fqn]));
+  for (const key of keys) {
+    const fqn = fqns.get(key)!;
+    if (walked.get(key) === fqn) continue;
+    const [file, tsName] = splitKey(key);
+    if (!walked.has(key) && (await derivedConstantPath(dir, file, tsName)) === fqn) {
+      unwalked.push(key);
+    } else residue[key] = fqn;
   }
-  const unpaired = [...(await walkConstants(dir)).keys()].filter((key) => !named.has(key)).length;
-  return { rows: entries.length, unpaired, residue };
+  const excluded = [...walked.keys()].filter((key) => !fqns.has(key)).sort();
+  return { rows: entries.length, excluded, unwalked, residue };
 }
 
-async function syncConstantResidue(
+const RECORD = path.join(ROOT_DIR, "scripts/api-compare/constant-residue.json");
+
+async function readRecord(): Promise<Record<string, ConstantResidue>> {
+  return JSON.parse(await fs.readFile(RECORD, "utf8").catch(() => "{}")) as Record<
+    string,
+    ConstantResidue
+  >;
+}
+
+/** The record at the merge-base with `origin/main`, against which `excluded` only shrinks. */
+async function baseRecord(): Promise<Record<string, ConstantResidue>> {
+  try {
+    const { stdout: sha } = await run("git", ["merge-base", "HEAD", "origin/main"], {
+      cwd: ROOT_DIR,
+    });
+    const { stdout } = await run(
+      "git",
+      ["show", `${sha.trim()}:${path.relative(ROOT_DIR, RECORD)}`],
+      { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
+    );
+    return JSON.parse(stdout) as Record<string, ConstantResidue>;
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * A class excluded by its receipt: the JSDoc directly above its declaration
+ * carries `@noRailsEquivalent PERMANENT` or `@noRailsEquivalent CONVERGEABLE <story-id>`.
+ * An `excluded` key is a walked top-level class, so `tsName` is never dotted.
+ */
+export function isReceipted(source: string, tsName: string): boolean {
+  const decl = new RegExp(
+    `^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${tsName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+    "m",
+  ).exec(source);
+  if (decl === null) return false;
+  const jsdoc = /\/\*\*((?:(?!\*\/)[^])*)\*\/\s*$/.exec(source.slice(0, decl.index));
+  return /@noRailsEquivalent\s+(?:PERMANENT\b|CONVERGEABLE\s+[a-z0-9][a-z0-9-]*)/.test(
+    jsdoc?.[1] ?? "",
+  );
+}
+
+/**
+ * The keys `record` adds to `excluded` over `base` with no receipt. Before
+ * any base record carries `excluded` there is nothing to shrink from; after,
+ * a package new to the record starts from an empty list.
+ */
+export async function unreceiptedExclusions(
+  dir: string,
+  record: ConstantResidue,
+  base: Record<string, ConstantResidue>,
+): Promise<string[]> {
+  if (!Object.values(base).some((r) => Array.isArray(r.excluded))) return [];
+  const before = new Set(base[dir]?.excluded ?? []);
+  const out: string[] = [];
+  for (const key of record.excluded) {
+    if (before.has(key)) continue;
+    const [file, tsName] = splitKey(key);
+    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    if (!isReceipted(source, tsName)) out.push(key);
+  }
+  return out;
+}
+
+/** The tables the walk writes, from `constant-residue.json`. */
+async function walkedTables(only?: string): Promise<Map<string, ClassPathEntry[]>> {
+  const dir = only === undefined ? undefined : (PACKAGE_DIR_OVERRIDES[only] ?? only);
+  const tables = new Map<string, ClassPathEntry[]>();
+  for (const [name, record] of Object.entries(await readRecord())) {
+    if (dir === undefined || name === dir) tables.set(name, await walkedClassPaths(name, record));
+  }
+  return tables;
+}
+
+const entryKey = (e: ClassPathEntry) =>
+  JSON.stringify([e.file, e.tsName, e.fqn, !!e.excluded, e.table ?? null, !!e.namespace]);
+
+/**
+ * The cross-check: the `rails-api.json` pairing's record against the one on
+ * disk (rewritten under `--record`), and its rows against the walk's.
+ */
+async function checkConstantResidue(
   tables: Map<string, ClassPathEntry[]>,
-  check: boolean,
+  write: boolean,
   stale: string[],
   only?: string,
 ): Promise<void> {
-  const target = path.join(ROOT_DIR, "scripts/api-compare/constant-residue.json");
-  const current = await fs.readFile(target, "utf8").catch(() => "{}");
+  const current = await fs.readFile(RECORD, "utf8").catch(() => "{}");
   const record = JSON.parse(current) as Record<string, ConstantResidue>;
+  const base = await baseRecord();
   for (const [dir, entries] of tables) {
-    if (entries.length > 0) record[dir] = await constantResidue(dir, entries);
-    else delete record[dir];
+    if (entries.length === 0) {
+      delete record[dir];
+      continue;
+    }
+    record[dir] = await constantResidue(dir, entries);
+    for (const key of await unreceiptedExclusions(dir, record[dir], base)) {
+      console.error(
+        `${dir}: ${key} is a new walked export with no Ruby counterpart: receipt it with @noRailsEquivalent, or remove it`,
+      );
+      process.exitCode = 1;
+    }
+    const walked = new Set((await walkedClassPaths(dir, record[dir])).map(entryKey));
+    const paired = new Set(entries.map(entryKey));
+    const misses = [...paired].filter((row) => !walked.has(row));
+    const invents = [...walked].filter((row) => !paired.has(row));
+    for (const row of misses) console.error(`${dir}: walk misses ${row}`);
+    for (const row of invents) console.error(`${dir}: walk invents ${row}`);
+    if (misses.length + invents.length > 0) process.exitCode = 1;
   }
   if (only === undefined) {
     for (const dir of Object.keys(record)) if (!tables.has(dir)) delete record[dir];
   }
   const sorted = Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   const next = await prettier.format(JSON.stringify(sorted), {
-    ...(await prettier.resolveConfig(target)),
-    filepath: target,
+    ...(await prettier.resolveConfig(RECORD)),
+    filepath: RECORD,
   });
   if (current === next) return;
-  if (check) stale.push(path.relative(ROOT_DIR, target));
-  else await fs.writeFile(target, next);
+  if (write) await fs.writeFile(RECORD, next);
+  else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
 async function main(): Promise<void> {
@@ -516,7 +679,8 @@ async function main(): Promise<void> {
   const at = process.argv.indexOf("--package");
   const only = at === -1 ? undefined : process.argv[at + 1];
   const stale: string[] = [];
-  const tables = await collectClassPaths(only);
+  const tables = check ? await collectClassPaths(only) : await walkedTables(only);
+  if (check) await checkConstantResidue(tables, process.argv.includes("--record"), stale, only);
   const targets = (
     await Promise.all(
       [...tables].map(async ([dir, entries]) => [
@@ -579,7 +743,6 @@ async function main(): Promise<void> {
     if (check) stale.push(path.relative(ROOT_DIR, target));
     else await fs.writeFile(target, next);
   }
-  await syncConstantResidue(tables, check, stale, only);
   if (check && unexportedModules.length > 0) {
     console.warn(
       `Modules paired with a Ruby module but with no exported binding (not gated):\n  ${unexportedModules.join("\n  ")}`,
