@@ -404,16 +404,15 @@ export class Server {
 
     if (options.pid != null) await this.writePid();
 
-    const server = await this.server();
     onSignal("SIGINT", () => {
-      if (typeof server.shutdown === "function") {
-        server.shutdown();
+      if (typeof this._server!.shutdown === "function") {
+        this._server!.shutdown();
       } else {
         exit();
       }
     });
 
-    return server.run(await this.wrappedApp(), options, block);
+    return (await this.server()).run(await this.wrappedApp(), options, block);
   }
 
   async server(): Promise<HandlerLike> {
