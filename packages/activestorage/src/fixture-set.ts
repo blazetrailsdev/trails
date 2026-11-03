@@ -3,7 +3,7 @@ import { FileFixtures } from "@blazetrails/activesupport/testing/file-fixtures";
 import { Base } from "@blazetrails/activerecord";
 import { include, type Included, type Pathname } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
-import { Blob } from "./blob.js";
+import type { Blob } from "./blob.js";
 
 type Attributes = { [k: string]: unknown };
 
@@ -23,7 +23,7 @@ export class FixtureSet {
     ...attributes
   }: { filename: string } & Attributes): Promise<string> {
     return await new this().prepare(
-      new Blob({ filename: filename, key: this.generateUniqueSecureToken() }),
+      new ActiveStorage.Blob!({ filename: filename, key: this.generateUniqueSecureToken() }),
       attributes,
     );
   }

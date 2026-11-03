@@ -13,7 +13,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Attachment } from "../../attachment.js";
 import { Attached, type AssociationWriter, type AttachedRecord } from "../../attached.js";
-import { Blob } from "../../blob.js";
+import { ActiveStorage } from "../../active-storage.js";
+import type { Blob } from "../../blob.js";
 import { Changes } from "../changes.js";
 
 type BlobIo = Parameters<typeof Blob.buildAfterUnfurling>[0]["io"];
@@ -62,7 +63,7 @@ export class CreateOne {
       await this.blob.uploadWithoutUnfurling(attachable as unknown as BlobIo);
     } else if (attachable instanceof Pathname) {
       await this.blob.uploadWithoutUnfurling(attachable.open() as BlobIo);
-    } else if (!(attachable instanceof Blob) && typeof attachable !== "string") {
+    } else if (!(attachable instanceof ActiveStorage.Blob!) && typeof attachable !== "string") {
       throw new ArgumentError(
         `Could not upload: expected attachable, got ${rbInspect(attachable)}`,
       );
@@ -100,10 +101,10 @@ export class CreateOne {
   /** @internal */
   private async findOrBuildBlob(): Promise<Blob> {
     const attachable = this.attachable;
-    if (attachable instanceof Blob) {
+    if (attachable instanceof ActiveStorage.Blob!) {
       return attachable;
     } else if (attachable instanceof UploadedFile) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable.open() as unknown as BlobIo,
         filename: attachable.originalFilename!,
         contentType: attachable.contentType,
@@ -111,7 +112,7 @@ export class CreateOne {
         serviceName: this.attachmentServiceName(),
       });
     } else if (attachable instanceof RackTestUploadedFile) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: (rbObjRespondTo(attachable, "open")
           ? (attachable as unknown as { open(): BlobIo }).open()
           : attachable) as unknown as BlobIo,
@@ -121,22 +122,22 @@ export class CreateOne {
         serviceName: this.attachmentServiceName(),
       });
     } else if (isPlainHash(attachable)) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         record: this.record,
         serviceName: this.attachmentServiceName(),
         ...(attachable as Parameters<typeof Blob.buildAfterUnfurling>[0]),
       });
     } else if (typeof attachable === "string") {
-      return await Blob.findSignedBang(attachable, { record: this.record });
+      return await ActiveStorage.Blob!.findSignedBang(attachable, { record: this.record });
     } else if (attachable instanceof File) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable as unknown as BlobIo,
         filename: File.basename(attachable.path()!),
         record: this.record,
         serviceName: this.attachmentServiceName(),
       });
     } else if (attachable instanceof Pathname) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable.open() as BlobIo,
         filename: File.basename(attachable.toString()),
         record: this.record,

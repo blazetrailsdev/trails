@@ -1,7 +1,6 @@
 import { Tryable } from "@blazetrails/activesupport";
 import { ActiveStorage } from "./active-storage.js";
 import { BaseJob } from "./base-job.js";
-import { Blob } from "./blob.js";
 import { FileNotFoundError, IntegrityError } from "./errors.js";
 
 export class MirrorJob extends BaseJob {
@@ -14,6 +13,6 @@ export class MirrorJob extends BaseJob {
 
   /** @missingRailsArgs try — PERMANENT */
   async perform(key: string, { checksum }: { checksum: string | null }): Promise<void> {
-    await Tryable.try(Blob.service, "mirror", key, { checksum: checksum });
+    await Tryable.try(ActiveStorage.Blob!.service, "mirror", key, { checksum: checksum });
   }
 }
