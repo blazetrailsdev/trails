@@ -4,6 +4,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack";
 import "../../test-helpers/database/setup.js";
 import { ActiveStorage } from "../../active-storage.js";
+import type { Attachment } from "../../attachment.js";
 import type { Blob } from "../../blob.js";
 import { Variation } from "../../variation.js";
 import {
@@ -29,9 +30,12 @@ function integrationTest(name: string): Session {
   return t;
 }
 
-type Readable = Parameters<typeof readImage>[0];
 type Variable = Blob & {
-  previewImage: { load(): Promise<unknown>; isAttached(): boolean; variant(t: unknown): unknown };
+  previewImage: {
+    load(): Promise<unknown>;
+    isAttached(): boolean;
+    variant(t: unknown): ReturnType<Attachment["variant"]>;
+  };
 };
 
 function getRepresentation(t: Session, blob: Blob, signedBlobId: string, variationKey: string) {
@@ -63,7 +67,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithVariantsTest", (
     await t.followRedirectBang();
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
 
-    const image = await readImage(blob.variant(resizeToLimit) as unknown as Readable);
+    const image = await readImage(blob.variant(resizeToLimit));
     expect(await image.width()).toBe(100);
     expect(await image.height()).toBe(67);
   });
@@ -100,7 +104,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithVariantsWithStri
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
 
     await blob.reload();
-    const image = await readImage(blob.variant(resizeToLimit) as unknown as Readable);
+    const image = await readImage(blob.variant(resizeToLimit));
     expect(await image.width()).toBe(100);
     expect(await image.height()).toBe(67);
   });
@@ -128,7 +132,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsTest", (
     await t.followRedirectBang();
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
 
-    const image = await readImage((await blob.previewImage.variant(resizeToLimit)) as Readable);
+    const image = await readImage(await blob.previewImage.variant(resizeToLimit));
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
   });
@@ -176,7 +180,7 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsWithStri
 
     await blob.reload();
     await blob.previewImage.load();
-    const image = await readImage((await blob.previewImage.variant(resizeToLimit)) as Readable);
+    const image = await readImage(await blob.previewImage.variant(resizeToLimit));
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
   });
