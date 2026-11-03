@@ -82,6 +82,7 @@ function packageJson(appName: string, driver: Driver): string {
 
 const GITIGNORE = `node_modules/
 dist/
+.trails/
 *.sqlite3
 `;
 

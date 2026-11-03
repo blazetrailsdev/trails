@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
-import { renderManifest } from "./generate-manifest.js";
+import { generateManifest } from "./generate-manifest.js";
 import { FRESH_TSCONFIG, mergeTsconfig, TsconfigMergeResult } from "./tsconfig-merge.js";
 
 const SQLITE_ADAPTER: Record<string, string> = {
@@ -27,11 +27,9 @@ export default config;
 
 const CONFIG_DATABASE = configDatabase("sqlite3");
 
-const MODELS_INDEX = renderManifest([]);
-
 const DB_GLUE = `import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
-import { models } from "./app/models/index.js";
+import { models } from "./.trails/models/index.js";
 
 let connected = false;
 
@@ -52,7 +50,7 @@ export async function connect(): Promise<void> {
 
 const DB_SEEDS = `/**
  * Idempotent seed data — the analog of Rails' \`db/seeds.rb\`, run by
- * \`ar db:seed\`. Import models from "../app/models/index.js" and create here.
+ * \`ar db:seed\`. Import models from "../.trails/models/index.js" and create here.
  */
 export async function seed(): Promise<void> {
   // Add seed data here, e.g. \`await User.findOrCreateBy({ ... });\`.
@@ -63,7 +61,7 @@ const SCAFFOLD: ReadonlyArray<readonly [string, string]> = [
   ["config/database.ts", CONFIG_DATABASE],
   ["db/migrate/.gitkeep", ""],
   ["db/seeds.ts", DB_SEEDS],
-  ["app/models/index.ts", MODELS_INDEX],
+  ["app/models/.gitkeep", ""],
   ["db.ts", DB_GLUE],
 ];
 
@@ -300,5 +298,6 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
       skipped.push(rel);
     }
   }
+  await generateManifest(join(root, "app", "models"), root);
   return { created, skipped, packageJsonUpdated, tsconfigMerged };
 }

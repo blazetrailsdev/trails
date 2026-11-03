@@ -3,7 +3,7 @@ import { join } from "path";
 import { camelize, pluralize } from "@blazetrails/activesupport";
 import { normalizeSnakeName, renderMigration } from "./generate-migration.js";
 import { renderModel } from "./generate-model.js";
-import { generateManifest } from "./generate-manifest.js";
+import { generateManifest, MANIFEST_PATH } from "./generate-manifest.js";
 import type { FieldSpec } from "./generate-migration.js";
 
 export interface DestroyOptions {
@@ -150,9 +150,9 @@ export async function destroyModel(
     if (modelPresent) await safeUnlink(modelPath);
     if (migrationPath !== undefined) await safeUnlink(migrationPath);
     const modelsDir = join(root, "app", "models");
-    const manifestExists = (await readIfPresent(join(modelsDir, "index.ts"))) !== undefined;
+    const manifestExists = (await readIfPresent(join(root, MANIFEST_PATH))) !== undefined;
     if (modelPresent || manifestExists) {
-      await generateManifest(modelsDir);
+      await generateManifest(modelsDir, root);
     }
   }
 

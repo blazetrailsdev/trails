@@ -46,12 +46,12 @@ describe("ArConsoleTest", () => {
     expect(stub.context["Base"]).toBeDefined();
   });
 
-  it("loads models into REPL context when app/models/index.ts is present", async () => {
+  it("loads models into REPL context when .trails/models/index.ts is present", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-console-models-"));
     await scaffoldProject(dir);
-    await mkdir(join(dir, "app", "models"), { recursive: true });
+    await mkdir(join(dir, ".trails", "models"), { recursive: true });
     await writeFile(
-      join(dir, "app", "models", "index.ts"),
+      join(dir, ".trails", "models", "index.ts"),
       `export const Sentinel = "sentinel-value";\n`,
       "utf8",
     );
