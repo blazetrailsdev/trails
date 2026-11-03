@@ -22,6 +22,7 @@ import {
   rbModName,
   registerConstant,
   rbCallSuper,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
@@ -119,6 +120,16 @@ export function registerModel(
     if (qualified !== model.name) registerConstant(model.name, model);
   }
   if (model === ActiveRecord.Base) return;
+  DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function seatModel(model: typeof Base): void {
+  const cpath = (rbModName(model) ?? model.name).split("::");
+  const cname = cpath.pop()!;
+  let mod = TopLevel as unknown as Record<string, object>;
+  for (const segment of cpath) mod = (mod[segment] ??= {}) as Record<string, object>;
+  mod[cname] = model;
   DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 

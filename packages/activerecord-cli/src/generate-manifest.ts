@@ -218,8 +218,8 @@ export function renderManifest(entries: ModelEntry[]): string {
   let out = HEADER;
   out +=
     names.length > 0
-      ? `import { registerModel } from "@blazetrails/activerecord";\n`
-      : `import { registerModel, type Base } from "@blazetrails/activerecord";\n`;
+      ? `import { seatModel } from "@blazetrails/activerecord";\n`
+      : `import { seatModel, type Base } from "@blazetrails/activerecord";\n`;
   for (const e of entries) {
     const binding = e.isDefault ? e.className : `{ ${e.className} }`;
     out += `import ${binding} from "${e.importPath}";\n`;
@@ -228,7 +228,7 @@ export function renderManifest(entries: ModelEntry[]): string {
     names.length > 0
       ? `\nexport const models = [${names.join(", ")}] as const;\n`
       : `\nexport const models: ReadonlyArray<typeof Base> = [];\n`;
-  out += `for (const m of models) registerModel(m);\n`;
+  out += `for (const m of models) seatModel(m);\n`;
   if (names.length > 0) out += `\nexport { ${names.join(", ")} };\n`;
   return out;
 }
