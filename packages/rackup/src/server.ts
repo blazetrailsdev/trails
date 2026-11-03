@@ -23,6 +23,11 @@ import {
   OptionParser,
   Process,
   rbFRequire,
+  rbFRequireFile,
+  rbGvSet,
+  rbInspect,
+  LOAD_PATH,
+  PP,
   rbProgname,
   setEnv,
   STDERR,
@@ -252,9 +257,7 @@ export class Server {
   static Options = Options;
 
   static async start(options: ServerOptions | null = null): Promise<unknown> {
-    const server = new this(options);
-    await server._ready;
-    return server.start();
+    return new this(options).start();
   }
 
   /** @internal */
@@ -355,21 +358,31 @@ export class Server {
 
   async start(block: unknown = null): Promise<unknown> {
     await this._ready;
+    await this.server();
     const options = this.options;
 
-    if (options.require != null) {
-      for (const library of options.require) {
-        await import(library);
-      }
+    if (options.warn) {
+      rbGvSet("$-w", true);
+    }
+
+    const includes = options.include;
+    if (includes != null) {
+      LOAD_PATH.unshift(...includes);
+    }
+
+    for (const library of options.require ?? []) {
+      await rbFRequireFile(library);
     }
 
     if (options.debug) {
-      STDERR.puts(String(options.server));
+      rbGvSet("$DEBUG", true);
+      STDOUT.puts(rbInspect(options.server));
+      await PP.pp(this.wrappedApp());
+      await PP.pp(this.app());
     }
 
     if (options.pid != null) await this.checkPidBang();
 
-    await this.server();
     await this.handleProfiling(options.heapfile, options.profileMode, options.profileFile, () =>
       this.wrappedApp(),
     );
@@ -420,7 +433,6 @@ export class Server {
       return exit();
     }
 
-    void filename;
     return block();
   }
 
