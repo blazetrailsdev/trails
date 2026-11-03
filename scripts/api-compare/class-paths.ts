@@ -599,7 +599,7 @@ function renamedKey(key: string): string {
     .split("/")
     .map((segment) => {
       const [stem, ...ext] = segment.split(".");
-      return [TOKEN_RENAMES[stem] ?? stem, ...ext].join(".");
+      return [Object.hasOwn(TOKEN_RENAMES, stem) ? TOKEN_RENAMES[stem] : stem, ...ext].join(".");
     })
     .join("/");
   return `${renamed}::${tsName}`;
