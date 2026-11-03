@@ -126,6 +126,16 @@ describe("unreceiptedExclusions", () => {
     expect(await unreceiptedExclusions("globalid", record, base)).toEqual(record.excluded);
   });
 
+  it("keeps a base key moved by a token rename", async () => {
+    const key = "generators/trails/app/app-generator.ts::AppGenerator";
+    const base = {
+      trailties: { ...empty, excluded: ["generators/rails/app/app-generator.ts::AppGenerator"] },
+    };
+    expect(await unreceiptedExclusions("trailties", { ...empty, excluded: [key] }, base)).toEqual(
+      [],
+    );
+  });
+
   it("has nothing to shrink from before any base record carries excluded", async () => {
     expect(await unreceiptedExclusions("globalid", record, {})).toEqual([]);
   });

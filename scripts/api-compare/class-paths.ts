@@ -593,10 +593,6 @@ export function isReceipted(source: string, tsName: string): boolean {
   );
 }
 
-/**
- * A base key with each `TOKEN_RENAMES` path segment applied, so a file moved
- * by a token rename (`generators/rails/` → `generators/trails/`) keeps its row.
- */
 function renamedKey(key: string): string {
   const [file, tsName] = splitKey(key);
   const renamed = file
