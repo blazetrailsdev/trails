@@ -19,7 +19,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Attached, type AttachedRecord } from "../attached.js";
-import { Blob } from "../blob.js";
 import { CreateMany } from "./changes/create-many.js";
 import type { CreateOneOfMany } from "./changes/create-one-of-many.js";
 import { CreateOne } from "./changes/create-one.js";
@@ -233,7 +232,7 @@ function validateServiceConfiguration(
   associationName: string,
 ): void {
   if (serviceName != null && serviceName !== (false as unknown)) {
-    Blob.services.fetch(
+    ActiveStorage.Blob!.services.fetch(
       serviceName,
       block(() => {
         throw new ArgumentError(
@@ -256,7 +255,9 @@ function validateGlobalServiceConfiguration(modelClass: typeof Base): void {
     | undefined;
   if (
     modelClass.isConnected() &&
-    Blob.connectionPool().schemaCache.getCachedDataSourceExists(Blob.tableName!) === true &&
+    ActiveStorage.Blob!.connectionPool().schemaCache.getCachedDataSourceExists(
+      ActiveStorage.Blob!.tableName!,
+    ) === true &&
     trails!.configuration.activeStorage?.service == null
   ) {
     throw new RuntimeError(

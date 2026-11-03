@@ -15,6 +15,7 @@ import {
   include,
   prepend,
   rbObjSingletonClass,
+  RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import { setMultipleFileFieldIncludeHidden } from "@blazetrails/actionview/helpers/form-helper";
@@ -71,10 +72,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/**
- * @missingRailsCall parse — PERMANENT
- * @inventedArm if — PERMANENT
- */
+/** @missingRailsCall parse — PERMANENT */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
@@ -212,14 +210,14 @@ export class Engine extends TrailsEngine {
             );
             if (!(await File.isExistAsync(configFile)))
               configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
-            if (!(await File.isExistAsync(configFile))) return undefined;
+            if (!(await File.isExistAsync(configFile)))
+              throw new RuntimeError(`Couldn't find Active Storage configuration in ${configFile}`);
 
             const mod: { default?: Record<string, Record<string, unknown>> } = await import(
               getPath().pathToFileURL!(configFile).href
             );
             return mod.default ?? {};
           })());
-          if (configs == null) return;
 
           const blob = ActiveStorage.Blob as typeof Blob;
           blob.services = new Registry(configs);
