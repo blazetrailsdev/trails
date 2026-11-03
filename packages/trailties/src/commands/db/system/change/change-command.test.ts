@@ -69,7 +69,7 @@ describe("Trails::Command::DbSystemChangeTest", { timeout: 30_000 }, () => {
     const output = await changeDatabase({ to: "sqlite3" });
 
     expect(output).toMatch("identical  config/database.ts");
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("identical  package.json");
   });
 
   it("change to invalid database", async () => {
@@ -84,14 +84,14 @@ describe("Trails::Command::DbSystemChangeTest", { timeout: 30_000 }, () => {
     const output = await changeDatabase({ to: "postgresql" });
 
     expect(output).toMatch("force  config/database.ts");
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("update  package.json");
   });
 
   it("change to mysql", async () => {
     const output = await changeDatabase({ to: "mysql" });
 
     expect(output).toMatch("force  config/database.ts");
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("update  package.json");
   });
 
   it("change to sqlite3", async () => {
@@ -99,14 +99,14 @@ describe("Trails::Command::DbSystemChangeTest", { timeout: 30_000 }, () => {
     const output = await changeDatabase({ to: "sqlite3" });
 
     expect(output).toMatch("force  config/database.ts");
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("update  package.json");
   });
 
   it("change can be forced", async () => {
     const output = await trails("db:system:change", ["--to=postgresql", "--force"]);
 
     expect(output).toMatch("force  config/database.ts");
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("update  package.json");
   });
 
   it("change works with no Dockerfile", async () => {
@@ -114,6 +114,6 @@ describe("Trails::Command::DbSystemChangeTest", { timeout: 30_000 }, () => {
 
     const output = await changeDatabase({ to: "sqlite3" });
 
-    expect(output).toMatch("  package.json");
+    expect(output).toMatch("identical  package.json");
   });
 });
