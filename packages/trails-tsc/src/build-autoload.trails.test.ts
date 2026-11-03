@@ -13,35 +13,52 @@ describe("buildAutoload", () => {
     Registry.loaders.length = 0;
   });
 
-  it("boots up to setup_main_autoloader and writes each loader's manifest", async () => {
+  it("boots through setup_main_autoloader and writes the walk it set up", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
     try {
       FileUtils.mkdirP("app");
-      File.write("app/widget.ts", "");
+      File.write("app/widget.ts", 'throw new Error("imported at build time");');
+      const main = new Loader();
+      main.tag = "main";
       const ran: string[] = [];
-      const initializer = (name: string) => ({
+      const initializer = (name: string, run: () => unknown = () => {}) => ({
         name,
         belongsTo: () => true,
-        run: () => ran.push(name),
+        run: async () => {
+          ran.push(name);
+          await run();
+        },
       });
       seats.Trails = {
         application: {
           config: { root: File.dirname(Dir.pwd()) },
+          autoloaders: { main },
           initializers: {
-            tsort: () => [initializer("first"), initializer("setup_main_autoloader")],
+            tsort: () => [
+              initializer("first"),
+              initializer("setup_main_autoloader", async () => {
+                await main.pushDir("app");
+                await main.setup();
+                await main.eagerLoad();
+              }),
+              initializer("after"),
+            ],
           },
         },
       };
-      const loader = new Loader();
-      loader.tag = "main";
-      await loader.pushDir("app");
 
       const [dir] = await buildAutoload();
 
-      expect(ran).toEqual(["first"]);
-      expect(loader.manifestRoot).toEqual(File.dirname(Dir.pwd()));
-      expect(File.isExist(File.join(dir, "manifest.json"))).toBe(true);
+      expect(ran).toEqual(["first", "setup_main_autoloader"]);
+      expect(main.manifestRoot).toEqual(File.dirname(Dir.pwd()));
+      const manifest = JSON.parse(File.read(File.join(dir, "manifest.json")));
+      expect(Object.keys(manifest.constants)).toEqual(["Widget"]);
+      expect(File.read(File.join(dir, "imports.generated.js"))).toContain(
+        '"Widget": () => import(',
+      );
+      expect(Object.hasOwn(main, "setup")).toBe(false);
+      expect(Object.hasOwn(main, "eagerLoad")).toBe(false);
     } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
