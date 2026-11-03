@@ -34,6 +34,7 @@
     { "path": "packages/rack" },
     { "path": "packages/rack-session" },
     { "path": "packages/rack-test" },
+    { "path": "packages/rackup" },
     { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
     { "path": "packages/actionview/tsconfig.test-case.json" },

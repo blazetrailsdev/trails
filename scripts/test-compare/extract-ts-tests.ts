@@ -27,6 +27,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "rack",
     "rack-session",
     "rack-test",
+    "rackup",
     "bcrypt",
     "msgpack",
     "marcel",

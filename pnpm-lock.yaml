@@ -799,6 +799,15 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/rackup:
+    dependencies:
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/rake:
     dependencies:
       '@blazetrails/did-you-mean':

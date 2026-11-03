@@ -61,7 +61,10 @@ export {
   RACK_SESSION,
   QUERY_STRING,
   RACK_SESSION_OPTIONS,
+  REQUEST_METHOD,
 } from "./constants.js";
+export { CommonLogger } from "./common-logger.js";
+export { ShowExceptions } from "./show-exceptions.js";
 export { BadRequest } from "./bad-request.js";
 export { Runtime } from "./runtime.js";
 export { Files } from "./files.js";

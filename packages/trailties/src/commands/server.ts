@@ -113,7 +113,7 @@ export class Server {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE port-rackup-server-for-rails-server */
+  /** @noRailsEquivalent CONVERGEABLE rails-server-extends-rackup-server */
   server(): typeof Handler.Node {
     const { server } = this.options;
     if (server == null || server === "node") return Handler.Node;

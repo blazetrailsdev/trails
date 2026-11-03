@@ -216,7 +216,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return base.replace(/_/g, "-") + ".test.ts";
   }
 
-  if (pkg === "rack" || pkg === "rack-session") {
+  if (pkg === "rack" || pkg === "rack-session" || pkg === "rackup") {
     const dir = path.dirname(rubyFile);
     // rack-session's lib root is `lib/rack/session` while its test root is
     // `test`, so every spec repeats that root as a leading `session_` segment
@@ -1721,6 +1721,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   rack: "packages/rack/src/",
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
+  rackup: "packages/rackup/src/",
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
