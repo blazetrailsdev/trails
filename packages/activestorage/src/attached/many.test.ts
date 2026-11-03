@@ -16,13 +16,17 @@ import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import type { Attachment } from "../attachment.js";
 import { Blob } from "../blob.js";
+import type { Preview } from "../preview.js";
+import { PreviewImageJob } from "../preview-image-job.js";
 import { PurgeJob } from "../purge-job.js";
+import { TransformJob } from "../transform-job.js";
 import { DiskService } from "../service/disk-service.js";
 import { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
   createFileBlob,
   fixtureFileUpload,
+  readImage,
   withService,
   User,
 } from "../test-helpers/test-helper.js";
@@ -33,14 +37,12 @@ import type { ClassMethods } from "./model.js";
 Object.assign(Blob.prototype, {
   isAnalyzed: () => false,
   analyzeLater: async () => {},
-  isPreviewImageNeededBeforeProcessingVariants: () => false,
 });
 
 afterAll(() => {
   const blob = Blob.prototype as unknown as { [k: string]: unknown };
   delete blob.isAnalyzed;
   delete blob.analyzeLater;
-  delete blob.isPreviewImageNeededBeforeProcessingVariants;
 });
 
 type Attachable = Extended<typeof ClassMethods>;
@@ -127,8 +129,11 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     expect(await existAt(user.highlights, 2)).toBe(true);
   };
 
+  const variableContentTypesWas = ActiveStorage.variableContentTypes;
+
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
+    ActiveStorage.variableContentTypes = ["image/png", "image/jpeg"];
     t = new ManyAttachedTest("manyAttached") as unknown as TestHelper;
     await t.beforeSetup();
     user = await User.createBang({ name: "Josh" });
@@ -136,6 +141,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   afterEach(async () => {
     await t.afterTeardown();
+    ActiveStorage.variableContentTypes = variableContentTypesWas;
     for (const blob of await Blob.all().toArray()) await blob.delete();
   });
 
@@ -917,16 +923,43 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   // BLOCKED: activestorage-variation-and-variants
   it.skip("creating variation by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate variant", () => {});
-  // BLOCKED: activestorage-attached-preview-tests
-  it.skip("creating preview by variation name", () => {});
-  it.skip("raises error when unknown variant name is used to generate preview", () => {});
+  it("creating preview by variation name", async () => {
+    await user.highlightsWithVariants.attach(fixtureFileUpload("report.pdf"));
+    const preview = await (
+      (await (await attachmentAt(user.highlightsWithVariants, 0)).preview("thumb")) as Preview
+    ).processed();
+
+    const image = await readImage(await preview["variant"]());
+    expect(await image.type()).toBe("PNG");
+    expect(await image.width()).toBe(77);
+    expect(await image.height()).toBe(100);
+  });
+
+  it("raises error when unknown variant name is used to generate preview", async () => {
+    await user.highlightsWithVariants.attach(fixtureFileUpload("report.pdf"));
+
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await (
+        (await (await attachmentAt(user.highlightsWithVariants, 0)).preview("unknown")) as Preview
+      ).processed();
+    });
+
+    expect(error.message).toMatch(/Cannot find variant :unknown for User#highlightsWithVariants/);
+  });
   // BLOCKED: activestorage-variation-and-variants
   it.skip("creating representation by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate representation", () => {});
   it.skip("transforms variants later", () => {});
   it.skip("transforms variants later conditionally via proc", () => {});
   it.skip("transforms variants later conditionally via method", () => {});
-  it.skip("avoids enqueuing transform later and create preview job job when blob is not representable", () => {});
+
+  it("avoids enqueuing transform later and create preview job job when blob is not representable", async () => {
+    const unrepresentableBlob = await createBlob({ filename: "hello.txt" });
+
+    await t.assertNoEnqueuedJobs({ only: [TransformJob, PreviewImageJob] }, () =>
+      user.highlightsWithPreprocessed.attach(unrepresentableBlob),
+    );
+  });
 
   it("successfully attaches new blobs and destroys attachments marked for destruction via nested attributes", async () => {
     const townBlob = await createBlob({ filename: "town.jpg" });

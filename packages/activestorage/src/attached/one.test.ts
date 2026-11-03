@@ -14,23 +14,26 @@ import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat"
 import "../test-helpers/database/setup.js";
 import { ActiveStorage } from "../active-storage.js";
 import { Blob } from "../blob.js";
+import type { Preview } from "../preview.js";
+import { PreviewImageJob } from "../preview-image-job.js";
 import { PurgeJob } from "../purge-job.js";
+import { TransformJob } from "../transform-job.js";
 import { DiskService } from "../service/disk-service.js";
 import { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
+  createFileBlob,
   directlyUploadFileBlob,
   fileFixture,
   fixtureFileUpload,
+  readImage,
   withService,
   Group,
   User,
 } from "../test-helpers/test-helper.js";
 import type { ClassMethods } from "./model.js";
+import type { Attachment } from "../attachment.js";
 import type { One } from "./one.js";
-
-// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-Object.assign(Blob.prototype, { isPreviewImageNeededBeforeProcessingVariants: () => false });
 
 type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;
@@ -63,8 +66,11 @@ describe("ActiveStorage::OneAttachedTest", () => {
   const assertPurgeEnqueued = (blob: Blob, block: () => unknown) =>
     t.assertEnqueuedWith({ job: PurgeJob, args: [blob] }, block);
 
+  const variableContentTypesWas = ActiveStorage.variableContentTypes;
+
   beforeEach(async () => {
     ActiveStorage.verifier = new MessageVerifier("Testing");
+    ActiveStorage.variableContentTypes = ["image/png", "image/jpeg"];
     t = new OneAttachedTest("oneAttached") as unknown as TestHelper;
     await t.beforeSetup();
     user = await User.createBang({ name: "Josh" });
@@ -72,6 +78,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   afterEach(async () => {
     await t.afterTeardown();
+    ActiveStorage.variableContentTypes = variableContentTypesWas;
     for (const blob of await Blob.all().toArray()) await blob.delete();
   });
 
@@ -854,16 +861,63 @@ describe("ActiveStorage::OneAttachedTest", () => {
   // BLOCKED: activestorage-variation-and-variants
   it.skip("creating variation by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate variant", () => {});
-  // BLOCKED: activestorage-attached-preview-tests
-  it.skip("creating preview by variation name", () => {});
-  it.skip("raises error when unknown variant name is used to generate preview", () => {});
+  it("creating preview by variation name", async () => {
+    await t.assertNoEnqueuedJobs({ only: TransformJob }, () =>
+      user.avatarWithVariants.attach(fixtureFileUpload("report.pdf")),
+    );
+    const preview = await (
+      (await (user.avatarWithVariants as unknown as Attachment).preview("thumb")) as Preview
+    ).processed();
+
+    const image = await readImage(await preview["variant"]());
+    expect(await image.type()).toBe("PNG");
+    expect(await image.width()).toBe(77);
+    expect(await image.height()).toBe(100);
+  });
+
+  it("raises error when unknown variant name is used to generate preview", async () => {
+    await user.avatarWithVariants.attach(fixtureFileUpload("report.pdf"));
+
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await (
+        (await (user.avatarWithVariants as unknown as Attachment).preview("unknown")) as Preview
+      ).processed();
+    });
+
+    expect(error.message).toMatch(/Cannot find variant :unknown for User#avatarWithVariants/);
+  });
   // BLOCKED: activestorage-variation-and-variants
   it.skip("creating representation by variation name", () => {});
   it.skip("raises error when unknown variant name is used to generate representation", () => {});
   it.skip("transforms variants later", () => {});
   it.skip("transforms variants later conditionally via proc", () => {});
   it.skip("transforms variants later conditionally via method", () => {});
-  it.skip("avoids enqueuing transform later job or preview image job when blob is not representable", () => {});
-  it.skip("avoids enqueuing transform later job or preview later job if there aren't any variants to preprocess", () => {});
-  it.skip("creates preview later without transforming variants if required and there are variants to preprocess", () => {});
+
+  it("avoids enqueuing transform later job or preview image job when blob is not representable", async () => {
+    const unrepresentableBlob = await createBlob({ filename: "hello.txt" });
+
+    await t.assertNoEnqueuedJobs({ only: [TransformJob, PreviewImageJob] }, () =>
+      user.avatarWithPreprocessed.attach(unrepresentableBlob),
+    );
+  });
+
+  it("avoids enqueuing transform later job or preview later job if there aren't any variants to preprocess", async () => {
+    const blob = await createFileBlob({ filename: "report.pdf" });
+
+    await t.assertNoEnqueuedJobs({ only: [TransformJob, PreviewImageJob] }, () =>
+      user.resume.attach(blob),
+    );
+  });
+
+  it("creates preview later without transforming variants if required and there are variants to preprocess", async () => {
+    const blob = await createFileBlob({ filename: "report.pdf" });
+
+    await t.assertEnqueuedWith(
+      { job: PreviewImageJob, args: [blob, [{ resizeToFill: [400, 400] }]] },
+      () =>
+        t.assertNoEnqueuedJobs({ only: TransformJob }, () =>
+          user.resumeWithPreprocessing.attach(blob),
+        ),
+    );
+  });
 });
