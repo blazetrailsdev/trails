@@ -186,6 +186,13 @@ export const Util = {
  */
 export class URI {
   /**
+   * `URI::InvalidURIError` (`vendor/ruby/v3.3.11/lib/uri/common.rb:144`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  declare static InvalidURIError: typeof InvalidURIError;
+
+  /**
    * `URI::Generic` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`).
    *
    * @noRailsEquivalent PERMANENT

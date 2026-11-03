@@ -135,6 +135,8 @@ export function rbSetClassPathString(
 /** @noRailsEquivalent PERMANENT */
 export interface TopLevelConstants {
   Object?: ObjectConstructor;
+  Psych?: typeof import("./psych.js").Psych;
+  URI?: typeof import("./uri/common.js").URI;
 }
 
 /** @noRailsEquivalent PERMANENT */
