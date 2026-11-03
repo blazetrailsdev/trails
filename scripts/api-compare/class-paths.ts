@@ -464,7 +464,6 @@ export async function constantResidue(
   return { rows: entries.length, unpaired, residue };
 }
 
-/** `constant-residue.json`, refreshed from the manifest; `--check` reds a miss it does not record. */
 async function syncConstantResidue(
   tables: Map<string, ClassPathEntry[]>,
   check: boolean,

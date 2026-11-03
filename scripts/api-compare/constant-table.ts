@@ -84,11 +84,6 @@ function srcRoot(dir: string): string {
   return File.join(ROOT_DIR, "packages", dir, "src");
 }
 
-/**
- * `tse-tracker.ts` is `ruby_tracker.rb` renamed, so its `cname` is
- * `RubyTracker`. A fold of several Ruby files onto one TS file, or a move to
- * another directory, says where methods are measured and names no file.
- */
 function fileInflections(dir: string): Record<string, string> {
   const plain = new Inflector();
   const rows = (DIR_TO_PACKAGES[dir] ?? [dir]).flatMap((pkg) =>
@@ -141,7 +136,6 @@ function loaderFor(dir: string): Promise<Loader> {
   return loader;
 }
 
-/** The Ruby `cname` of a TS class: `ModelName` is `Name`, and `Trailtie` stays. */
 function rubyCname(short: string): string {
   const renamed = Object.entries(TS_CLASS_RENAMES).find(
     ([ruby, ts]) => ts === short && !BRAND_RENAMES.includes(ruby),
