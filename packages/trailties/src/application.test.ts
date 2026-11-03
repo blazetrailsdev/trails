@@ -50,7 +50,7 @@ import {
 import { Engine } from "./engine.js";
 import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
 
 const posixPath: PathAdapter = {
@@ -123,7 +123,7 @@ describe("Application", () => {
 
   it("Application is abstract and cannot be instantiated directly", () => {
     expect(() => new Application()).toThrow(
-      "Rails::Application is abstract, you cannot instantiate it directly.",
+      "Trails::Application is abstract, you cannot instantiate it directly.",
     );
   });
 
@@ -633,7 +633,7 @@ describe("Application::Configuration", () => {
     expect(c.debugExceptionResponseFormat).toBe("default");
   });
 
-  it("defaults match Rails::Application::Configuration#initialize", () => {
+  it("defaults match Trails::Application::Configuration#initialize", () => {
     const c = new Configuration();
     expect(c.considerAllRequestsLocal).toBe(false);
     expect(c.apiOnly).toBe(false);
@@ -971,7 +971,7 @@ describe("Application key/message/credentials wiring", () => {
     expect([f.contentPath, f.keyPath, f.envKey]).toEqual([
       "/o/config/credentials.yml.enc",
       "/o/config/master.key",
-      "RAILS_MASTER_KEY",
+      "TRAILS_MASTER_KEY",
     ]);
   });
 
@@ -991,7 +991,7 @@ describe("Application key/message/credentials wiring", () => {
     const f = await A.instance().credentials();
     expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
     expect(() => A.instance().secretKeyBase()).toThrow(
-      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/rails credentials:edit`",
+      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/trails credentials:edit`",
     );
   });
 });

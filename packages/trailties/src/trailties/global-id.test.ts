@@ -38,7 +38,7 @@ function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
     keyGenerator: () => {
       if (secretKeyBase === null) {
         throw new ArgumentError(
-          "Missing `secret_key_base` for 'test' environment, set this string with `bin/rails credentials:edit`",
+          "Missing `secret_key_base` for 'test' environment, set this string with `bin/trails credentials:edit`",
         );
       }
       return new KeyGenerator(secretKeyBase, { iterations: 1000 });

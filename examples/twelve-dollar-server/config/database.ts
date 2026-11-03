@@ -1,6 +1,6 @@
 const defaults = {
   adapter: "sqlite3",
-  maxConnections: Number(process.env.RAILS_MAX_THREADS ?? 5),
+  maxConnections: Number(process.env.TRAILS_MAX_THREADS ?? 5),
   timeout: 5000,
 };
 

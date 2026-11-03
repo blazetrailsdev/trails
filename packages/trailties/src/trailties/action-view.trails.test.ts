@@ -23,7 +23,7 @@ import {
   type UrlHelperHost,
 } from "@blazetrails/actionview";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import {
   applyStylesheetMediaDefault,
   computeAssetPath,

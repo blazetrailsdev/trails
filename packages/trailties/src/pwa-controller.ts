@@ -5,7 +5,7 @@ type PWARenderOptions = ActionController.RenderOptions & { template?: string };
 
 export class PwaController extends ApplicationController {
   static override controllerPath(): string {
-    return "rails/pwa";
+    return "trails/pwa";
   }
 
   async serviceWorker(): Promise<void> {

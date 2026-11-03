@@ -8,9 +8,9 @@ import { Base } from "@blazetrails/activejob";
 import { Base as RecordBase } from "@blazetrails/activerecord";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
-describe("rails/all", () => {
+describe("trails/all", () => {
   useInMemoryDatabaseUrl();
 
   const root = fileURLToPath(new URL("..", import.meta.url));

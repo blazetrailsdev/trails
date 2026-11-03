@@ -1,7 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { expect, it } from "vitest";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../test-unit/trailtie.js";
 
 class ParentApp extends Application {}
@@ -9,7 +9,7 @@ class ParentApp extends Application {}
 it("aliases a namespaced parent to the constant its file exports", async () => {
   await ParentApp.instance().loadGenerators();
   Trails.application = ParentApp.instance();
-  const { JobGenerator } = await import("./rails/job/job-generator.js");
+  const { JobGenerator } = await import("./trails/job/job-generator.js");
   const root = Dir.mktmpdir();
   File.write(File.join(root, "tsconfig.json"), "{}");
   await JobGenerator.start(["sync", "--parent", "Admin::Base"], { destinationRoot: root });

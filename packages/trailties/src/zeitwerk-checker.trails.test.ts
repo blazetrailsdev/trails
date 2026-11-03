@@ -3,7 +3,7 @@ import { Dependencies } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { ZeitwerkChecker } from "./zeitwerk-checker.js";
 
-describe("Rails::ZeitwerkChecker", () => {
+describe("Trails::ZeitwerkChecker", () => {
   afterEach(() => {
     Dependencies.autoloadPaths = [];
     Dependencies.autoloadOncePaths = [];

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base, ConnectionNotEstablished, SchemaReflection } from "@blazetrails/activerecord";
 import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails, _resetTrailsEnv } from "./rails.js";
+import { Trails, _resetTrailsEnv } from "./trails.js";
 
 describe("a booted app against an unhealthy database", () => {
   let savedEnv: string | undefined;

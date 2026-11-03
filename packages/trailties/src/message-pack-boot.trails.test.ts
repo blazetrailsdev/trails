@@ -6,7 +6,7 @@ import { SerializerWithFallback } from "@blazetrails/activesupport/messages/seri
 import { LoadError, verbose } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./application/bootstrap.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { runTrailtieInitializers } from "./support/trailtie-initializers.js";
 import { Trailtie as ActionDispatchTrailtie } from "./trailties/action-dispatch.js";
 import { Trailtie as ActiveSupportTrailtie } from "./trailties/active-support.js";

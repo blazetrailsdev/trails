@@ -46,7 +46,7 @@ describe("ConnectionHandlerTest", () => {
     );
   };
 
-  it("default env fall back to default env when rails env or rack env is empty string", async () => {
+  it("default env fall back to default env when trails env or rack env is empty string", async () => {
     vi.stubEnv("TRAILS_ENV", "");
     vi.stubEnv("NODE_ENV", "");
     try {

@@ -374,8 +374,8 @@ const ImageLinkToTag: [() => unknown, string][] = [
   [() => img(gif, { alt: null }), `<img src="${gif}" />`],
   [() => img(""), `<img src="" />`],
   [
-    () => img("gold.png", { data: { title: "Rails Application" } }),
-    `<img data-title="Rails Application" src="/images/gold.png" />`,
+    () => img("gold.png", { data: { title: "Trails Application" } }),
+    `<img data-title="Trails Application" src="/images/gold.png" />`,
   ],
   [
     () => img("rss.gif", { srcset: "/assets/pic_640.jpg 640w, /assets/pic_1024.jpg 1024w" }),

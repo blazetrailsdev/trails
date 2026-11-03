@@ -52,9 +52,9 @@ describe("MessagePackCacheSerializerTest", () => {
     registerConstant("DefinesFromMsgpackExt", DefinesFromMsgpackExt);
   });
 
-  it("works with ENV['RAILS_MAX_THREADS']", () => {
+  it("works with ENV['TRAILS_MAX_THREADS']", () => {
     const originalEnv = { ...ENV };
-    setEnv("RAILS_MAX_THREADS", "1");
+    setEnv("TRAILS_MAX_THREADS", "1");
     try {
       const serialized = dump("value");
       expect(serialized).toBeInstanceOf(Uint8Array);

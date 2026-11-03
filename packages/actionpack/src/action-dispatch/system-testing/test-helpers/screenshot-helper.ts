@@ -64,7 +64,7 @@ export async function takeFailedScreenshot(this: ScreenshotHelperHost): Promise<
 
 /** @internal */
 function htmlFromEnv(): boolean {
-  return env("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1";
+  return env("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML") === "1";
 }
 
 /** @internal */
@@ -148,7 +148,7 @@ export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | un
 
 /** @internal */
 export function outputType(): string {
-  return env("RAILS_SYSTEM_TESTING_SCREENSHOT") || "simple";
+  return env("TRAILS_SYSTEM_TESTING_SCREENSHOT") || "simple";
 }
 
 /**

@@ -142,7 +142,7 @@ describe("Trailtie", () => {
     const Anon = class extends AnonSealed {};
     class Grand extends Anon {}
     expect(() => Trailtie.register(Grand)).toThrow(
-      "You cannot inherit from a Rails::Railtie child",
+      "You cannot inherit from a Trails::Railtie child",
     );
   });
 
@@ -153,9 +153,11 @@ describe("Trailtie", () => {
     class Mid extends SealedTie {}
     class Deep extends Mid {}
     expect(() => Trailtie.register(Direct)).toThrow(
-      "You cannot inherit from a Rails::Railtie child",
+      "You cannot inherit from a Trails::Railtie child",
     );
-    expect(() => Trailtie.register(Deep)).toThrow("You cannot inherit from a Rails::Railtie child");
+    expect(() => Trailtie.register(Deep)).toThrow(
+      "You cannot inherit from a Trails::Railtie child",
+    );
   });
 
   it("returns registered subclasses sorted by load order, excluding abstract entries", () => {

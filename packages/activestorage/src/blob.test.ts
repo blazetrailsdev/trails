@@ -78,7 +78,7 @@ function expectedUrlFor(
     service_name: serviceName,
   };
 
-  return `https://example.com/rails/active_storage/disk/${ActiveStorage.verifier.generate(keyParams, { expiresIn: Duration.minutes(5), purpose: "blob_key" })}/${filename}`;
+  return `https://example.com/trails/active_storage/disk/${ActiveStorage.verifier.generate(keyParams, { expiresIn: Duration.minutes(5), purpose: "blob_key" })}/${filename}`;
 }
 
 describe("ActiveStorage::BlobTest", () => {

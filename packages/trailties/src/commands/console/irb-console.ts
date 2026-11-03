@@ -1,6 +1,6 @@
 import "../../constants.irb-console.generated.js";
 import { Dir, STDERR, getFs, getPath, getReplAsync } from "@blazetrails/ruby-compat";
-import { Trails } from "../../rails.js";
+import { Trails } from "../../trails.js";
 
 const BLUE = "\u001b[34m";
 const RED = "\u001b[31m";

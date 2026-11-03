@@ -2,7 +2,7 @@ import { File, Dir } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../test-unit/trailtie.js";
 import { TestCase } from "./test-case.js";
 
@@ -14,7 +14,7 @@ let t: TestCase;
 
 beforeAll(async () => {
   await JobGeneratorApp.instance().loadGenerators();
-  const { JobGenerator } = await import("./rails/job/job-generator.js");
+  const { JobGenerator } = await import("./trails/job/job-generator.js");
   JobGeneratorTest.tests(JobGenerator);
 });
 

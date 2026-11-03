@@ -12,9 +12,9 @@ vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
 
 describe("TestCommand", () => {
   it("is found under the test namespace with the reporter's executable", () => {
-    expect(TestCommand.namespace()).toBe("rails:test");
+    expect(TestCommand.namespace()).toBe("trails:test");
     expect(TestCommand.executable()).toBe(TestUnitReporter.executable);
-    expect(TestCommand.executable("models")).toBe("bin/rails test:models");
+    expect(TestCommand.executable("models")).toBe("bin/trails test:models");
   });
 
   it("passes a folder command's path to the runner", async () => {

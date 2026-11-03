@@ -27,7 +27,7 @@ import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Annotation } from "../source-annotation-extractor.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
 
 export interface PublicFileServer {
@@ -491,7 +491,7 @@ export class Configuration extends EngineConfiguration {
       );
     } else {
       throw new ArgumentError(
-        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/rails credentials:edit\``,
+        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/trails credentials:edit\``,
       );
     }
   }

@@ -2,7 +2,7 @@ import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import { Dir, env, setEnv, StringIO } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rack";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Application } from "../application.js";
 import { assertOutput } from "../support/console-helpers.js";
 

@@ -121,7 +121,11 @@ async function buildLoader(dir: string): Promise<Loader> {
   const inflector = new Inflector();
   inflector.inflect({
     gem_version: "VERSION",
-    ...Object.fromEntries(Object.values(TOKEN_RENAMES).map((to) => [to, to.toUpperCase()])),
+    ...Object.fromEntries(
+      Object.values(TOKEN_RENAMES)
+        .filter((to) => to.toLowerCase() !== "trails")
+        .map((to) => [to, to.toUpperCase()]),
+    ),
     ...fileInflections(dir),
   });
   loader.inflector = inflector;

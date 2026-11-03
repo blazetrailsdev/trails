@@ -8,9 +8,9 @@ import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
 import { Editor } from "../command/helpers/editor.js";
-import { EncryptedFileGenerator } from "../generators/rails/encrypted-file/encrypted-file-generator.js";
-import { EncryptionKeyFileGenerator } from "../generators/rails/encryption-key-file/encryption-key-file-generator.js";
-import { Trails } from "../rails.js";
+import { EncryptedFileGenerator } from "../generators/trails/encrypted-file/encrypted-file-generator.js";
+import { EncryptionKeyFileGenerator } from "../generators/trails/encryption-key-file/encryption-key-file-generator.js";
+import { Trails } from "../trails.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type */
 export interface EncryptedCommand extends Included<typeof Editor> {}
@@ -32,7 +32,7 @@ export class EncryptedCommand extends Base {
       aliases: "-k",
       type: "string",
       default: "config/master.key",
-      desc: "The Rails.root relative path to the encryption key",
+      desc: "The Trails.root relative path to the encryption key",
     });
 
     klass.desc("edit", "Open the decrypted file in `$VISUAL` or `$EDITOR` for editing");

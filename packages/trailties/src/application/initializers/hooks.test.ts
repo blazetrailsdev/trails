@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { resetLoadHooks } from "@blazetrails/activesupport";
 import { Application } from "../../application.js";
-import { Trails } from "../../rails.js";
+import { Trails } from "../../trails.js";
 
 describe("HooksTest", () => {
   afterEach(() => {

@@ -5,7 +5,7 @@ import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { abort, rbCallSuper, rbModDefineMethod } from "@blazetrails/ruby-compat";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- `include ActiveRecord::TestFixtures` in the `on_load(:active_support_test_case)` block below (`railties/lib/rails/test_help.rb:19`) extends `TestFixtures::ClassMethods` onto `ActiveSupport::TestCase`; a namespace merged onto the class is how the added statics surface on the type side.
@@ -24,7 +24,7 @@ interface FixtureHost {
 }
 
 if (Trails.env["production?"]()) {
-  abort("Abort testing: Your Rails environment is running in production mode!");
+  abort("Abort testing: Your Trails environment is running in production mode!");
 }
 
 await import("./testing/maintain-test-schema.js");

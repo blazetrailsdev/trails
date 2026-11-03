@@ -22,7 +22,7 @@ import {
   Mock,
 } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 import { GeneratorBase } from "./base.js";
@@ -218,16 +218,16 @@ describe("ActionsTest", () => {
     });
   });
 
-  it("rails_command with inline option", async () => {
+  it("trails_command with inline option", async () => {
     await assertNotCalled(testAdapter, "system", null, async () => {
-      await makeGen().railsCommand("generate model MyModel", { inline: true });
+      await makeGen().trailsCommand("generate model MyModel", { inline: true });
     });
     await assertFile("app/models/my-model.js", /MyModel/);
   });
 
-  it("rails_command with inline option should raise on failure", async () => {
+  it("trails_command with inline option should raise on failure", async () => {
     const error = await assertRaises([StandardError], {}, () =>
-      makeGen().railsCommand("generate model 1234567890", { inline: true }),
+      makeGen().trailsCommand("generate model 1234567890", { inline: true }),
     );
     assertMatch(/1234567890/, error.message);
   });

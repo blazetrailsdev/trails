@@ -2,7 +2,7 @@ import { File, FileUtils, Dir, setEnv, env, getFs } from "@blazetrails/ruby-comp
 import { EncryptedConfiguration } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "../command.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { EncryptedCommand } from "./encrypted.js";
 
 const encryptedFile = "config/tokens.yml.enc";
@@ -15,7 +15,7 @@ function assertNoFile(relative: string): void {
   expect(File.isExist(relative)).toBeFalsy();
 }
 
-describe("Rails::Command::EncryptedTest", () => {
+describe("Trails::Command::EncryptedTest", () => {
   let appPath: string, cwd: string, output: string[];
   const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR };
 
@@ -44,7 +44,7 @@ describe("Rails::Command::EncryptedTest", () => {
         new EncryptedConfiguration({
           configPath: `${appPath}/${path}`,
           keyPath: `${appPath}/${opts.keyPath}`,
-          envKey: "RAILS_MASTER_KEY",
+          envKey: "TRAILS_MASTER_KEY",
           raiseIfMissingKey: false,
         }),
     } as never);
@@ -64,7 +64,7 @@ describe("Rails::Command::EncryptedTest", () => {
   it("edit without visual or editor gives hint", async () => {
     const out = await edit(undefined, "", "");
     expect(out).toMatch("No $VISUAL or $EDITOR to open file in");
-    expect(out).toMatch("rails encrypted:edit");
+    expect(out).toMatch("trails encrypted:edit");
   });
 
   it("edit with visual but not editor does not give hint", async () => {

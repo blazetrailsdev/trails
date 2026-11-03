@@ -5,7 +5,7 @@
 // is uncomparable.
 
 import type { LiteralValue, ParamInfo } from "@blazetrails/parity/types";
-import { snakeToCamel } from "@blazetrails/parity/conventions";
+import { TOKEN_RENAMES, snakeToCamel } from "@blazetrails/parity/conventions";
 
 // ESC is one of the characters being canonicalized, so it belongs in the class.
 // eslint-disable-next-line no-control-regex
@@ -106,7 +106,10 @@ export function normalizeLiteral(lit: LiteralValue): string | null {
       return `num:${Number(String(lit.value).replace(/_/g, ""))}`;
     case "string":
     case "symbol":
-      return `str:${canonString(String(lit.value ?? ""))}`;
+      return `str:${canonString(String(lit.value ?? ""))
+        .replace(/(?<![A-Za-z])(?:rails|Rails|RAILS)(?![A-Za-z])/g, (tok) => TOKEN_RENAMES[tok])
+        .replace(/\.railsrc\b/g, ".trailsrc")
+        .replace("Ruby on Trails", "Trails")}`;
     case "bool":
       return `bool:${lit.value}`;
     case "nil":

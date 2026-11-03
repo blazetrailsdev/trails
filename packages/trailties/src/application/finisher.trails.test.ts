@@ -35,7 +35,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import { ActionController } from "@blazetrails/actionpack";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
 import { ActiveModel, ValidationError } from "@blazetrails/activemodel";
@@ -221,15 +221,15 @@ describe("Finisher", () => {
     expect(app.calls).toEqual(["prepare!"]);
   });
 
-  it("add_internal_routes prepends rails/info routes in development", async () => {
+  it("add_internal_routes prepends trails/info routes in development", async () => {
     Trails.env = "development";
     const app = new TestApp();
     await run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([
-      "get /rails/info/properties -> rails/info#properties (internal)",
-      "get /rails/info/routes -> rails/info#routes (internal)",
-      "get /rails/info/notes -> rails/info#notes (internal)",
-      "get /rails/info -> rails/info#index (internal)",
+      "get /trails/info/properties -> trails/info#properties (internal)",
+      "get /trails/info/routes -> trails/info#routes (internal)",
+      "get /trails/info/notes -> trails/info#notes (internal)",
+      "get /trails/info -> trails/info#index (internal)",
     ]);
   });
 
@@ -239,7 +239,7 @@ describe("Finisher", () => {
     await run(app, "add_internal_routes");
     app.internalRoutes.length = 0;
     await app.routesReloader().runAfterLoadPaths();
-    expect(app.internalRoutes).toEqual(["get / -> rails/welcome#index (internal)"]);
+    expect(app.internalRoutes).toEqual(["get / -> trails/welcome#index (internal)"]);
   });
 
   it("add_internal_routes is a no-op outside development", async () => {
@@ -306,7 +306,7 @@ describe("Finisher", () => {
       seen.push("eager_load_all");
     });
     const trails = vi.spyOn(Trails, "eagerLoadBang").mockImplementation(async () => {
-      seen.push("rails");
+      seen.push("trails");
     });
     onTestFinished(() => {
       all.mockRestore();
@@ -315,7 +315,7 @@ describe("Finisher", () => {
     app.config.eagerLoad = true;
     app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
     await run(app, "eager_load!");
-    expect(seen).toEqual(["eager_load_all", "rails", "namespace"]);
+    expect(seen).toEqual(["eager_load_all", "trails", "namespace"]);
   });
 
   it("eager_load! reloads the main autoloader after class unload when reloading is enabled", async () => {

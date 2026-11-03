@@ -39,7 +39,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
           contentLength: data.length,
           checksum: checksum,
         }),
-      ).toMatch(/^https:\/\/example.com\/rails\/active_storage\/disk\/.*$/);
+      ).toMatch(/^https:\/\/example.com\/trails\/active_storage\/disk\/.*$/);
     } finally {
       ctx.routes.defaultUrlOptions = originalUrlOptions;
     }
@@ -60,7 +60,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
           filename: new Filename("avatar.png"),
           contentType: "image/png",
         }),
-      ).toMatch(/^https:\/\/example.com\/rails\/active_storage\/disk\/.*\/avatar\.png$/);
+      ).toMatch(/^https:\/\/example.com\/trails\/active_storage\/disk\/.*\/avatar\.png$/);
     } finally {
       ctx.routes.defaultUrlOptions = originalUrlOptions;
     }
@@ -106,7 +106,7 @@ describe("ActiveStorage::Service::DiskServiceTest", () => {
           filename: new Filename("avatar.png"),
           contentType: "image/png",
         }),
-      ).toMatch(/^http:\/\/example.com:3001\/rails\/active_storage\/disk\/.*\/avatar\.png$/);
+      ).toMatch(/^http:\/\/example.com:3001\/trails\/active_storage\/disk\/.*\/avatar\.png$/);
     } finally {
       ctx.routes.defaultUrlOptions = originalUrlOptions;
     }

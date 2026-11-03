@@ -1,4 +1,4 @@
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import {
@@ -159,7 +159,7 @@ export async function findByNamespace(
   namespace = namespace.replaceAll("_", "-");
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName.replaceAll("_", "-")}`);
-  lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
+  lookups.push(...lookups.map((lookup) => `trails:${lookup}`));
 
   await lookup(lookups);
 

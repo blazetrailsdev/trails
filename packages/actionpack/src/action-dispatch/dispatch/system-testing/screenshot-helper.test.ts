@@ -42,8 +42,8 @@ describe("ScreenshotHelperTest", () => {
   beforeEach(() => {
     host = new DrivenBySeleniumWithChrome("x");
     host._screenshotCounter = undefined;
-    vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
-    vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
     trails = TopLevel.Trails;
     TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
   });
@@ -144,8 +144,8 @@ describe("ScreenshotHelperTest", () => {
     });
   });
 
-  it("take_screenshot saves HTML and shows link to it when using RAILS_SYSTEM_TESTING_SCREENSHOT_HTML env", () => {
-    vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "1");
+  it("take_screenshot saves HTML and shows link to it when using TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML env", () => {
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "1");
     const msgs: string[] = [];
     let calledSaveHtml = false;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
@@ -165,8 +165,8 @@ describe("ScreenshotHelperTest", () => {
     });
   });
 
-  it("take_screenshot allows changing screenshot display format via RAILS_SYSTEM_TESTING_SCREENSHOT env", () => {
-    vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "artifact");
+  it("take_screenshot allows changing screenshot display format via TRAILS_SYSTEM_TESTING_SCREENSHOT env", () => {
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "artifact");
     const msgs: string[] = [];
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
     const page = {

@@ -29,7 +29,7 @@ import { requireApplicationBang } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import type { ActionViewConfig } from "../trailties/action-view.js";
 import type { WatchHandle } from "@blazetrails/trails-tsc";
 
@@ -85,15 +85,15 @@ export class Server {
       await app.loadServer();
       const root = Dir.pwd();
       await watchViews(app, root);
-      const railsApp = (env: RackEnv) => app.call(env);
+      const trailsApp = (env: RackEnv) => app.call(env);
       const { Port: port, Host: host } = this.options;
       if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
-        const server = await Handler.Node.run(railsApp, { Port: port, Host: host });
+        const server = await Handler.Node.run(trailsApp, { Port: port, Host: host });
         if (afterStopCallback != null) server.on("close", afterStopCallback);
         return;
       }
       const { DevServer } = await import("../server/dev-server.js");
-      await new DevServer({ port: port!, host: host!, cwd: root, app: railsApp }).start();
+      await new DevServer({ port: port!, host: host!, cwd: root, app: trailsApp }).start();
     } catch (error) {
       afterStopCallback?.();
       throw error;
@@ -200,13 +200,13 @@ export class ServerCommand extends Base {
     klass.classOption("port", {
       aliases: "-p",
       type: "numeric",
-      desc: "Run Rails on the specified port - defaults to 3000.",
+      desc: "Run Trails on the specified port - defaults to 3000.",
       banner: "port",
     });
     klass.classOption("binding", {
       aliases: "-b",
       type: "string",
-      desc: "Bind Rails to the specified IP - defaults to 'localhost' in development and '0.0.0.0' in other environments'.",
+      desc: "Bind Trails to the specified IP - defaults to 'localhost' in development and '0.0.0.0' in other environments'.",
       banner: "IP",
     });
     klass.classOption("config", {
@@ -252,7 +252,7 @@ export class ServerCommand extends Base {
       desc: "Whether to log to stdout. Enabled by default in development when not daemonized.",
     });
 
-    klass.desc("server", "Start the Rails server");
+    klass.desc("server", "Start the Trails server");
     klass.methodAdded("perform");
     klass.noCommands(() => {
       klass.methodAdded("serverOptions");

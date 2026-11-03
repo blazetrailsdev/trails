@@ -21,7 +21,7 @@ afterEach(() => {
   CodeStatistics.testTypes = [...TEST_TYPES];
 });
 
-async function rails(): Promise<string> {
+async function trails(): Promise<string> {
   const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
   await invoke("stats");
   const output = write.mock.calls.map((args) => String(args[0])).join("");
@@ -29,17 +29,17 @@ async function rails(): Promise<string> {
   return output;
 }
 
-describe("Rails::Command::StatsTest", { timeout: 30_000 }, () => {
-  it("`bin/rails stats` handles directories added by third parties", async () => {
+describe("Trails::Command::StatsTest", { timeout: 30_000 }, () => {
+  it("`bin/trails stats` handles directories added by third parties", async () => {
     FileUtils.mkdirP("custom/dir");
     CodeStatistics.registerDirectory("Custom dir", "custom/dir");
 
-    expect(await rails()).toMatch("Custom dir");
+    expect(await trails()).toMatch("Custom dir");
   });
 
-  it("`bin/rails stats` handles non-existing directories added by third parties", async () => {
+  it("`bin/trails stats` handles non-existing directories added by third parties", async () => {
     CodeStatistics.registerDirectory("Non Existing", "app/non_existing");
 
-    expect(await rails()).not.toMatch("Non Existing");
+    expect(await trails()).not.toMatch("Non Existing");
   });
 });

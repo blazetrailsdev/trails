@@ -69,7 +69,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
         const logger = TaggedLogging.new(new Logger(STDERR));
         logger.level = Logger.WARN;
         logger.warn(
-          `Rails Error: Unable to access log file. Please ensure that ${path} exists and is writable ` +
+          `Trails Error: Unable to access log file. Please ensure that ${path} exists and is writable ` +
             `(i.e. make it writable for user and group: chmod 0664 ${path}). ` +
             "The log level has been raised to WARN and the output directed to STDERR until the problem is fixed.",
         );

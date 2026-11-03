@@ -16,8 +16,8 @@ import {
 import { Dependencies } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { Application } from "../../application.js";
-import { AppGenerator } from "../../generators/rails/app/app-generator.js";
-import { Trails } from "../../rails.js";
+import { AppGenerator } from "../../generators/trails/app/app-generator.js";
+import { Trails } from "../../trails.js";
 
 export const TRAILS_FRAMEWORK_ROOT = File.expandPath(
   decodeURIComponent(new URL("../../../../..", import.meta.url).pathname),
@@ -324,7 +324,7 @@ export default { development: env("development"), test: env("test"), production:
 
     if (!allowFailure && !Process.lastStatus!.isSuccess()) {
       throw new RuntimeError(
-        `rails command failed (${Process.lastStatus!.exitstatus()}): ${command}\n${output}`,
+        `trails command failed (${Process.lastStatus!.exitstatus()}): ${command}\n${output}`,
       );
     }
 

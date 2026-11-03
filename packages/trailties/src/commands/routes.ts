@@ -10,7 +10,7 @@ import type { ThorClass } from "@blazetrails/thor";
 import type { Command } from "@blazetrails/thor/command";
 import { invoke } from "../command.js";
 import { Base } from "../command/base.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 interface RoutesOptions {
   controller?: string;

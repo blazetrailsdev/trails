@@ -7,7 +7,7 @@ import type { Task, TaskArguments } from "@blazetrails/rake";
 
 DSL.namespace("time", () => {
   DSL.desc(
-    "List all time zones, list by two-letter country code (`bin/rails time:zones[US]`), or list by UTC offset (`bin/rails time:zones[-8]`)",
+    "List all time zones, list by two-letter country code (`bin/trails time:zones[US]`), or list by UTC offset (`bin/trails time:zones[-8]`)",
   );
   DSL.task(
     "zones",

@@ -12,7 +12,7 @@ import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 interface ViewPathRoot {
   path: string;

@@ -333,17 +333,17 @@ describe("Mapper::Mapping#build_conditions", () => {
   });
 });
 
-describe("Mapper#rails_app?", () => {
-  it("answers app < Rails::Railtie (mapper.rb:657-659)", () => {
+describe("Mapper#trails_app?", () => {
+  it("answers app < Trails::Railtie (mapper.rb:657-659)", () => {
     class App extends Trailtie {}
     const trails = TopLevel.Trails;
     TopLevel.Trails = { Trailtie } as never;
     try {
       const mapper = new Mapper(new RouteSet());
-      expect(mapper.isRailsApp(App as unknown as MountableApp)).toBe(true);
-      expect(mapper.isRailsApp(Trailtie as unknown as MountableApp)).toBe(false);
-      expect(mapper.isRailsApp(new App() as unknown as MountableApp)).toBe(false);
-      expect(mapper.isRailsApp(() => [200, {}, []] as never)).toBe(false);
+      expect(mapper.isTrailsApp(App as unknown as MountableApp)).toBe(true);
+      expect(mapper.isTrailsApp(Trailtie as unknown as MountableApp)).toBe(false);
+      expect(mapper.isTrailsApp(new App() as unknown as MountableApp)).toBe(false);
+      expect(mapper.isTrailsApp(() => [200, {}, []] as never)).toBe(false);
     } finally {
       TopLevel.Trails = trails;
     }

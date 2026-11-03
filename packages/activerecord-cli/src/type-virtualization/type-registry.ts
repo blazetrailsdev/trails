@@ -29,11 +29,11 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   value: "unknown",
 };
 
-export function tsTypeFor(railsType: string, timeZoneAware?: boolean): string {
-  if ((railsType === "datetime" || railsType === "time") && timeZoneAware !== undefined) {
+export function tsTypeFor(trailsType: string, timeZoneAware?: boolean): string {
+  if ((trailsType === "datetime" || trailsType === "time") && timeZoneAware !== undefined) {
     return timeZoneAware ? TWZ : TIME;
   }
-  return ATTRIBUTE_TYPE_MAP[railsType] ?? "unknown";
+  return ATTRIBUTE_TYPE_MAP[trailsType] ?? "unknown";
 }
 
 export const ATTRIBUTE_CAST_INPUT_MAP: Record<string, string> = {
@@ -62,8 +62,8 @@ export const ATTRIBUTE_CAST_INPUT_MAP: Record<string, string> = {
   value: "",
 };
 
-export function writerTsTypeFor(railsType: string, readerType: string): string {
-  if (!Object.hasOwn(ATTRIBUTE_TYPE_MAP, railsType) || readerType === "unknown") return "unknown";
-  const extra = ATTRIBUTE_CAST_INPUT_MAP[railsType];
+export function writerTsTypeFor(trailsType: string, readerType: string): string {
+  if (!Object.hasOwn(ATTRIBUTE_TYPE_MAP, trailsType) || readerType === "unknown") return "unknown";
+  const extra = ATTRIBUTE_CAST_INPUT_MAP[trailsType];
   return extra ? `${readerType} | ${extra}` : readerType;
 }

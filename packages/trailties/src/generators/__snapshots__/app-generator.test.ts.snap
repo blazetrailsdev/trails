@@ -124,11 +124,11 @@ Trails.application.routes().draw(function () {
 
   // Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   // Can be used by load balancers and uptime monitors to verify that the app is live.
-  this.get("up", { to: "rails/health#show", as: "rails_health_check" });
+  this.get("up", { to: "trails/health#show", as: "trails_health_check" });
 
   // Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.tse)
-  // this.get("manifest", { to: "rails/pwa#manifest", as: "pwa_manifest" });
-  // this.get("service-worker", { to: "rails/pwa#service_worker", as: "pwa_service_worker" });
+  // this.get("manifest", { to: "trails/pwa#manifest", as: "pwa_manifest" });
+  // this.get("service-worker", { to: "trails/pwa#service_worker", as: "pwa_service_worker" });
 
   // Defines the root path route ("/")
   // this.root("posts#index");
@@ -271,7 +271,7 @@ Trails.application.configure(function () {
   this.config.logger = TaggedLogging.logger(process.stdout);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = process.env.RAILS_LOG_LEVEL ?? "info";
+  this.config.logLevel = process.env.TRAILS_LOG_LEVEL ?? "info";
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";

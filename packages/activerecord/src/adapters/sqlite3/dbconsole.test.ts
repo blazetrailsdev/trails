@@ -55,7 +55,7 @@ describeIfSqlite("SQLite3DbConsoleTest", () => {
     );
   });
 
-  it("sqlite3 db with defined rails root", () => {
+  it("sqlite3 db with defined trails root", () => {
     const config = makeDbConfig({ adapter: "sqlite3", database: "config/db.sqlite3" });
 
     const original = trailsRoot();

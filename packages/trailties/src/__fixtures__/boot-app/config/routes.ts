@@ -1,4 +1,4 @@
-import { Trails } from "../../../rails.js";
+import { Trails } from "../../../trails.js";
 
 Trails.application!.routes().draw(function () {
   this.get("/posts", { to: "posts#index", as: "posts" });
@@ -10,7 +10,7 @@ Trails.application!.routes().draw(function () {
   this.get("/posts/url", { to: "posts#url" });
   this.get("/posts/canonical", { to: "posts#canonical" });
   this.get("/boom", { to: "posts#boom" });
-  this.get("up", { to: "rails/health#show", as: "rails_health_check" });
+  this.get("up", { to: "trails/health#show", as: "trails_health_check" });
   this.get("/legacy", { to: "legacy#index", as: "legacy" });
   this.get("/ping", { to: "pings#show" });
   this.get("/posts/likes", { to: "posts/likes#show" });

@@ -2,8 +2,8 @@ import "../../../constants.diffing.generated.js";
 import { root } from "../../../command.js";
 import { Dir, File, Pathname, defineModule, rbFSystem } from "@blazetrails/ruby-compat";
 
-export const GITATTRIBUTES_ENTRY = `config/credentials/*.yml.enc diff=rails_credentials
-config/credentials.yml.enc diff=rails_credentials
+export const GITATTRIBUTES_ENTRY = `config/credentials/*.yml.enc diff=trails_credentials
+config/credentials.yml.enc diff=trails_credentials
 `;
 
 interface DiffingHost {
@@ -28,7 +28,7 @@ export const Diffing = defineModule(
         this.say("Enrolled project in credentials file diffing!");
         this.say("");
         this.say(
-          `Rails will configure the Git diff driver for credentials when running \`${this.executable("edit")}\`. See \`${this.executable("help")}\` for more information.`,
+          `Trails will configure the Git diff driver for credentials when running \`${this.executable("edit")}\`. See \`${this.executable("help")}\` for more information.`,
         );
       }
     },
@@ -64,11 +64,11 @@ export const Diffing = defineModule(
     },
 
     async isDiffingDriverConfigured(): Promise<boolean | null> {
-      return rbFSystem("git config --get diff.rails_credentials.textconv", { out: File.NULL });
+      return rbFSystem("git config --get diff.trails_credentials.textconv", { out: File.NULL });
     },
 
     async configureDiffingDriver(this: DiffingHost): Promise<void> {
-      await rbFSystem(`git config diff.rails_credentials.textconv '${this.executable("diff")}'`);
+      await rbFSystem(`git config diff.trails_credentials.textconv '${this.executable("diff")}'`);
       this.say("Configured Git diff driver for credentials.");
     },
 

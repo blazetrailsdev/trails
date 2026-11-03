@@ -2,7 +2,7 @@ import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("a generated app renders its own views", () => {
   afterEach(() => {

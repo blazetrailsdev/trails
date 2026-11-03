@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Console, ConsoleCommand } from "./console.js";
 import { IRBConsole } from "./console/irb-console.js";
 
@@ -28,7 +28,7 @@ function parseArguments(args: string[]) {
   return new ConsoleCommand([], args).options;
 }
 
-describe("Rails::ConsoleTest", () => {
+describe("Trails::ConsoleTest", () => {
   const prevEnv = Trails.env;
   let app: ReturnType<typeof buildApp>;
   let output: string;
@@ -49,8 +49,8 @@ describe("Rails::ConsoleTest", () => {
   });
 
   async function start(argv: string[] = []) {
-    const railsConsole = new Console(app, parseArguments(argv));
-    output = await capture(":stdout", () => railsConsole.start());
+    const trailsConsole = new Console(app, parseArguments(argv));
+    output = await capture(":stdout", () => trailsConsole.start());
   }
 
   async function withEnv(
@@ -117,14 +117,14 @@ describe("Rails::ConsoleTest", () => {
     expect(irbConsole.colorizedEnv()).toBe("custom_env");
   });
 
-  it("default environment with no rails env", async () => {
+  it("default environment with no trails env", async () => {
     await withEnv("TRAILS_ENV", undefined, async () => {
       await start();
       expect(output).toMatch(/\sdevelopment\s/);
     });
   });
 
-  it("default environment with rails env", async () => {
+  it("default environment with trails env", async () => {
     await withEnv("TRAILS_ENV", "special-production", async () => {
       await start();
       expect(output).toMatch(/\sspecial-production\s/);
@@ -153,7 +153,7 @@ describe("Rails::ConsoleTest", () => {
     expect(output).toMatch(/\sspecial-production\s/);
   });
 
-  it("rails env is dev when environment option is dev and dev env is present", () => {
+  it("trails env is dev when environment option is dev and dev env is present", () => {
     vi.spyOn(
       ConsoleCommand.prototype as unknown as { availableEnvironments(): string[] },
       "availableEnvironments",

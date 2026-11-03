@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
-import { ScaffoldControllerGenerator } from "./rails/scaffold-controller/scaffold-controller-generator.js";
+import { ScaffoldControllerGenerator } from "./trails/scaffold-controller/scaffold-controller-generator.js";
 
 class ORMWithGeneratorsActiveModel {
   constructor(_name: string) {}
@@ -29,7 +29,7 @@ describe("ScaffoldOrmTest", () => {
     expect(g.ormClass()).toBe(ORMWithGeneratorsActiveModel);
   });
 
-  it("orm class returns rails generator if unsupported custom orm set", () => {
+  it("orm class returns trails generator if unsupported custom orm set", () => {
     const g = generator("Foo", { orm: "ORMWithoutGenerators" });
     expect(g.ormClass()).toBe(ActiveModel);
   });

@@ -1,7 +1,7 @@
 <% const names = Object.keys(traces) %>
 <% var errorIndex = localAssigns.errorIndex ?? 0 %>
 
-<p><code>Rails.root: <%= TopLevel.Trails != null && typeof TopLevel.Trails.root === "function" ? TopLevel.Trails.root() : "unset" %></code></p>
+<p><code>Trails.root: <%= TopLevel.Trails != null && typeof TopLevel.Trails.root === "function" ? TopLevel.Trails.root() : "unset" %></code></p>
 
 <div id="traces-<%= errorIndex %>">
   <% for (const name of names) { %>

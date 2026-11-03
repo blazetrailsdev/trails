@@ -34,8 +34,8 @@ describe("CacheKeyTest", () => {
     expect(expandCacheKey([1, "2", true], "name")).toBe("name/1/2/true");
   });
 
-  it("expand cache key with rails cache id", () => {
-    withEnv({ RAILS_CACHE_ID: "c99" }, () => {
+  it("expand cache key with trails cache id", () => {
+    withEnv({ TRAILS_CACHE_ID: "c99" }, () => {
       expect(expandCacheKey("foo")).toBe("c99/foo");
       expect(expandCacheKey(["foo"])).toBe("c99/foo");
       expect(expandCacheKey(["foo", "bar"])).toBe("c99/foo/bar");
@@ -45,14 +45,14 @@ describe("CacheKeyTest", () => {
     });
   });
 
-  it("expand cache key with rails app version", () => {
-    withEnv({ RAILS_APP_VERSION: "rails3" }, () => {
+  it("expand cache key with trails app version", () => {
+    withEnv({ TRAILS_APP_VERSION: "rails3" }, () => {
       expect(expandCacheKey("foo")).toBe("rails3/foo");
     });
   });
 
-  it("expand cache key rails cache id should win over rails app version", () => {
-    withEnv({ RAILS_CACHE_ID: "c99", RAILS_APP_VERSION: "rails3" }, () => {
+  it("expand cache key trails cache id should win over trails app version", () => {
+    withEnv({ TRAILS_CACHE_ID: "c99", TRAILS_APP_VERSION: "rails3" }, () => {
       expect(expandCacheKey("foo")).toBe("c99/foo");
     });
   });

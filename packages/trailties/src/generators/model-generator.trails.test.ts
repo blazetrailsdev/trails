@@ -4,16 +4,16 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { capture } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 
 class ModelGeneratorApp extends Application {}
-let ModelGenerator: typeof import("./rails/model/model-generator.js").ModelGenerator;
+let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGenerator;
 
 beforeAll(async () => {
   await ModelGeneratorApp.instance().loadGenerators();
-  ({ ModelGenerator } = await import("./rails/model/model-generator.js"));
+  ({ ModelGenerator } = await import("./trails/model/model-generator.js"));
 });
 
 beforeEach(async () => {

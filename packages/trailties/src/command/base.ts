@@ -47,7 +47,7 @@ export class Base extends Thor {
   private _currentSubcommand: string | null | undefined;
 
   static {
-    classAttribute.call(this, "bin", { instanceAccessor: false, default: "bin/rails" });
+    classAttribute.call(this, "bin", { instanceAccessor: false, default: "bin/trails" });
     const klass = this as unknown as ThorClass;
     klass.noCommands(() => {
       this.methodAdded("executable");
@@ -227,7 +227,7 @@ export class Base extends Thor {
   /** @internal */
   private static namespacedName(name: string): string {
     const prefix = this.namespace()
-      .replace(/^rails:/, "")
+      .replace(/^trails:/, "")
       .split(":");
     const basename = prefix.pop()!;
     return [...prefix, ...new Set([basename, String(name)])].join(":");
@@ -238,7 +238,7 @@ export class Base extends Thor {
     path = File.join(
       "../commands",
       ...this.namespace()
-        .replace(/^rails:/, "")
+        .replace(/^trails:/, "")
         .split(":"),
       path,
     );

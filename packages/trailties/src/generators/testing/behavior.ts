@@ -50,7 +50,7 @@ export async function runGenerator(
   if (!(args.includes("--no-skip-bootsnap") || args.includes("--skip-bootsnap")))
     args = [...args, "--skip-bootsnap"];
 
-  if (env["RAILS_LOG_TO_STDOUT"] === "true") {
+  if (env["TRAILS_LOG_TO_STDOUT"] === "true") {
     return this.generatorClass!.start(args, { destinationRoot: this.destinationRoot, ...config });
   } else {
     return capture("stdout", () =>
@@ -83,7 +83,7 @@ export function createGeneratedAttribute(
 export function isDestinationRootIsSet(this: BehaviorHost): void {
   if (this.destinationRoot == null) {
     throw new RuntimeError(
-      "You need to configure your Rails::Generators::TestCase destination root.",
+      "You need to configure your Trails::Generators::TestCase destination root.",
     );
   }
 }

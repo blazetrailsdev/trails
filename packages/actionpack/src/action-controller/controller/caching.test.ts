@@ -819,8 +819,8 @@ describe("FragmentCacheKeyTest", () => {
   });
 
   afterEach(() => {
-    setEnv("RAILS_CACHE_ID", undefined);
-    setEnv("RAILS_APP_VERSION", undefined);
+    setEnv("TRAILS_CACHE_ID", undefined);
+    setEnv("TRAILS_APP_VERSION", undefined);
   });
 
   it("combined fragment cache key", () => {
@@ -835,13 +835,13 @@ describe("FragmentCacheKeyTest", () => {
   });
 
   it("combined fragment cache key with envs", () => {
-    setEnv("RAILS_APP_VERSION", "55");
+    setEnv("TRAILS_APP_VERSION", "55");
     assertEqual(
       ["views", "55", "v1", "what a key"],
       controller.combinedFragmentCacheKey("what a key"),
     );
 
-    setEnv("RAILS_CACHE_ID", "66");
+    setEnv("TRAILS_CACHE_ID", "66");
     assertEqual(
       ["views", "66", "v1", "what a key"],
       controller.combinedFragmentCacheKey("what a key"),

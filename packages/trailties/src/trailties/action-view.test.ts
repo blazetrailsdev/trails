@@ -1,5 +1,5 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import "../rails.js";
+import "../trails.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Base } from "@blazetrails/actionview";
 import { Trailtie, type ActionViewConfig } from "./action-view.js";

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base, Migration } from "@blazetrails/activerecord";
 import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails, _resetTrailsEnv } from "./rails.js";
+import { Trails, _resetTrailsEnv } from "./trails.js";
 
 describe("a generated app's vitest globalSetup", () => {
   let savedEnv: string | undefined;

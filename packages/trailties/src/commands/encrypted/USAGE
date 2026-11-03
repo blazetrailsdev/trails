@@ -3,7 +3,7 @@ Description:
     See the `Trails.application.encrypted` documentation for using them in your app.
 
 Encryption Keys:
-    By default, Trails looks for the encryption key in `ENV["RAILS_MASTER_KEY"]` or
+    By default, Trails looks for the encryption key in `ENV["TRAILS_MASTER_KEY"]` or
     `config/master.key`, but that lookup can be overridden with `--key`:
 
         <%= executable("edit") %> config/encrypted_file.yml.enc --key config/encrypted_file.key

@@ -5,10 +5,10 @@ import { File } from "@blazetrails/ruby-compat";
 const distTemplates = decodeURIComponent(new URL("../dist/templates", import.meta.url).pathname);
 
 describe("WelcomeController shipped template", () => {
-  it("renders rails/welcome/index from the module trailties' build emitted", async () => {
+  it("renders trails/welcome/index from the module trailties' build emitted", async () => {
     const template = new LookupContext([distTemplates]).findTemplate(
       "index",
-      ["rails/welcome"],
+      ["trails/welcome"],
       false,
       [],
       {},
@@ -16,9 +16,9 @@ describe("WelcomeController shipped template", () => {
     expect(await File.isExist(`${template.identifier}.js`)).toBe(true);
     const html = String(
       await template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {
-        railsVersion: "8.0.2",
+        trailsVersion: "8.0.2",
       }),
     );
-    expect(html).toContain("<title>Ruby on Rails 8.0.2</title>");
+    expect(html).toContain("<title>Trails 8.0.2</title>");
   });
 });

@@ -10,7 +10,7 @@ import {
   type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
-import { AppGenerator } from "./rails/app/app-generator.js";
+import { AppGenerator } from "./trails/app/app-generator.js";
 
 class T extends AppBase {
   static {
@@ -157,7 +157,7 @@ describe("AppBase run tasks", () => {
   const commandsFor = async (options: Record<string, unknown>, method: string) => {
     const generator = new T(["app"], options) as unknown as Record<string, any>;
     const commands: string[] = [];
-    generator.railsCommand = async (command: string) => commands.push(command);
+    generator.trailsCommand = async (command: string) => commands.push(command);
     await generator[method]();
     return commands;
   };

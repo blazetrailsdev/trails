@@ -1,7 +1,7 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
 import { Errno, STDERR, block, exit, rbFSystem } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 DSL.namespace("pnpm", () => {
   DSL.desc("Install all JavaScript dependencies as specified via pnpm");

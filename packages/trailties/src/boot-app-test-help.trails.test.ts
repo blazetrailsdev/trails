@@ -22,7 +22,7 @@ import {
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 class BootAppIntegrationTest extends ActionController.IntegrationTest {
   declare "@post": { title: string };

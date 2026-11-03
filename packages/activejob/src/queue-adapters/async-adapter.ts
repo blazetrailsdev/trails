@@ -78,7 +78,7 @@ export class Scheduler {
 
   static readonly DEFAULT_EXECUTOR_OPTIONS = Object.freeze({
     minThreads: 0,
-    maxThreads: Number(toI(getEnv("RAILS_MAX_THREADS", "5"))),
+    maxThreads: Number(toI(getEnv("TRAILS_MAX_THREADS", "5"))),
     autoTerminate: true,
     idletime: 60,
     maxQueue: 0,

@@ -15,7 +15,7 @@ describe("NotesCommand", { timeout: 30_000 }, () => {
     await invoke("notes", ["--help"]);
     const output = write.mock.calls.map((call) => String(call[0])).join("");
     write.mockRestore();
-    expect(output).toContain("bin/rails notes");
+    expect(output).toContain("bin/trails notes");
     expect(output).toContain("--annotations");
   });
 });

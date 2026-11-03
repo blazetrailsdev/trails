@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("BacktraceCleanerTest", () => {
   let cleaner: BacktraceCleaner;
@@ -14,7 +14,7 @@ describe("BacktraceCleanerTest", () => {
     const backtrace = [
       "(irb):1",
       "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",
-      "bin/rails:4:in `<main>'",
+      "bin/trails:4:in `<main>'",
     ];
     const result = cleaner.clean(backtrace);
     expect(result[0]).toBe("(irb):1");
@@ -25,7 +25,7 @@ describe("BacktraceCleanerTest", () => {
     const backtrace = [
       "./test/backtrace_cleaner_test.rb:123",
       "/Path/to/rails/activesupport/some_testing_file.rb:42:in `test'",
-      "bin/rails:4:in `<main>'",
+      "bin/trails:4:in `<main>'",
     ];
     const result = cleaner.clean(backtrace);
     expect(result[0]).toBe("./test/backtrace_cleaner_test.rb:123");
@@ -36,19 +36,19 @@ describe("BacktraceCleanerTest", () => {
     const backtrace = [
       "(irb):1",
       "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",
-      "bin/rails:4:in `<main>'",
+      "bin/trails:4:in `<main>'",
     ];
     const result = cleaner.clean(backtrace, "noise");
     expect(result[0]).toBe("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'");
-    expect(result[1]).toBe("bin/rails:4:in `<main>'");
+    expect(result[1]).toBe("bin/trails:4:in `<main>'");
     expect(result.length).toBe(2);
   });
 
-  test("#clean should consider traces that include dasherized Rails application name", () => {
+  test("#clean should consider traces that include dasherized Trails application name", () => {
     const backtrace = [
       "(my-app):1",
       "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",
-      "bin/rails:4:in `<main>'",
+      "bin/trails:4:in `<main>'",
     ];
     const result = cleaner.clean(backtrace);
     expect(result[0]).toBe("(my-app):1");
@@ -76,7 +76,7 @@ describe("BacktraceCleanerTest", () => {
     expect(
       cleaner.cleanFrame("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'"),
     ).toBeUndefined();
-    expect(cleaner.cleanFrame("bin/rails:4:in `<main>'")).toBeUndefined();
+    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeUndefined();
   });
 
   test("#clean_frame should show relative paths", () => {
@@ -86,7 +86,7 @@ describe("BacktraceCleanerTest", () => {
     expect(
       cleaner.cleanFrame("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'"),
     ).toBeUndefined();
-    expect(cleaner.cleanFrame("bin/rails:4:in `<main>'")).toBeUndefined();
+    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'")).toBeUndefined();
   });
 
   test("#clean_frame can filter for noise", () => {
@@ -97,7 +97,9 @@ describe("BacktraceCleanerTest", () => {
         "noise",
       ),
     ).toBe("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'");
-    expect(cleaner.cleanFrame("bin/rails:4:in `<main>'", "noise")).toBe("bin/rails:4:in `<main>'");
+    expect(cleaner.cleanFrame("bin/trails:4:in `<main>'", "noise")).toBe(
+      "bin/trails:4:in `<main>'",
+    );
   });
 
   test("#clean_frame should omit ActionView template methods names", () => {

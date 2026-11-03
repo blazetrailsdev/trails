@@ -8,7 +8,7 @@ import { CredentialsCommand } from "../commands/credentials.js";
 import { GenerateCommand } from "../commands/generate.js";
 import { NotesCommand } from "../commands/notes.js";
 
-describe("Rails::Command::BaseTest", () => {
+describe("Trails::Command::BaseTest", () => {
   it("printing commands returns command and description if present", async () => {
     expect((await GenerateCommand.printingCommands())[0]).toEqual(["generate", ""]);
     expect((await NotesCommand.printingCommands())[0]).toEqual([
@@ -27,7 +27,7 @@ describe("Rails::Command::BaseTest", () => {
       perform(): void {}
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command::Db::System" }, "ChangeCommand");
+        rbSetClassPathString(this, { name: "Trails::Command::Db::System" }, "ChangeCommand");
         (this as unknown as ThorClass).methodAdded("perform");
       }
     }
@@ -41,7 +41,7 @@ describe("Rails::Command::BaseTest", () => {
       command(): void {}
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command" }, "HiddenCommand");
+        rbSetClassPathString(this, { name: "Trails::Command" }, "HiddenCommand");
         const klass = this as unknown as ThorClass;
         klass.desc("command", "Hidden command", { hide: true });
         klass.methodAdded("command");
@@ -56,7 +56,7 @@ describe("Rails::Command::BaseTest", () => {
       bar(..._paths: string[]): void {}
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command" }, "HelpfulCommand");
+        rbSetClassPathString(this, { name: "Trails::Command" }, "HelpfulCommand");
         const klass = this as unknown as ThorClass;
         klass.desc("foo PATH", "description of foo");
         klass.methodAdded("foo");
@@ -66,18 +66,18 @@ describe("Rails::Command::BaseTest", () => {
     }
 
     const overview = await capture(":stdout", () => HelpfulCommand.perform("help", [], {}));
-    expect(overview).toMatch("bin/rails helpful:foo PATH");
+    expect(overview).toMatch("bin/trails helpful:foo PATH");
     expect(overview).toMatch("description of foo");
-    expect(overview).toMatch("bin/rails helpful:bar [paths...]");
+    expect(overview).toMatch("bin/trails helpful:bar [paths...]");
     expect(overview).toMatch("description of bar");
 
     const fooHelp = await capture(":stdout", () => HelpfulCommand.perform("foo", ["--help"], {}));
-    expect(fooHelp).toMatch("bin/rails helpful:foo PATH");
+    expect(fooHelp).toMatch("bin/trails helpful:foo PATH");
     expect(fooHelp).toMatch("description of foo");
     expect(fooHelp).not.toMatch("helpful:bar");
 
     const barHelp = await capture(":stdout", () => HelpfulCommand.perform("bar", ["--help"], {}));
-    expect(barHelp).toMatch("bin/rails helpful:bar [paths...]");
+    expect(barHelp).toMatch("bin/trails helpful:bar [paths...]");
     expect(barHelp).toMatch("description of bar");
     expect(barHelp).not.toMatch("helpful:foo");
   });
@@ -88,7 +88,7 @@ describe("Rails::Command::BaseTest", () => {
       foo(..._args: unknown[]): void {}
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command::Nesting" }, "NestedCommand");
+        rbSetClassPathString(this, { name: "Trails::Command::Nesting" }, "NestedCommand");
         const klass = this as unknown as ThorClass;
         klass.methodAdded("perform");
         klass.methodAdded("foo");
@@ -98,18 +98,18 @@ describe("Rails::Command::BaseTest", () => {
     const mainHelp = await capture(":stdout", () =>
       NestedCommand.perform("nested", ["--help"], {}),
     );
-    expect(mainHelp).toMatch(/Usage:\s+bin\/rails nesting:nested$/m);
+    expect(mainHelp).toMatch(/Usage:\s+bin\/trails nesting:nested$/m);
 
     const fooHelp = await capture(":stdout", () => NestedCommand.perform("foo", ["--help"], {}));
-    expect(fooHelp).toMatch(/Usage:\s+bin\/rails nesting:nested:foo$/m);
+    expect(fooHelp).toMatch(/Usage:\s+bin\/trails nesting:nested:foo$/m);
   });
 
   it("::executable returns bin and command name", () => {
-    expect(GenerateCommand.executable()).toEqual("bin/rails generate");
+    expect(GenerateCommand.executable()).toEqual("bin/trails generate");
   });
 
   it("::executable integrates subcommand when given", () => {
-    expect(GenerateCommand.executable("help")).toEqual("bin/rails generate:help");
+    expect(GenerateCommand.executable("help")).toEqual("bin/trails generate:help");
   });
 
   it("::executable integrates ::bin", () => {
@@ -134,7 +134,7 @@ describe("Rails::Command::BaseTest", () => {
       declare bar: () => void;
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command" }, "LastSubcommandCommand");
+        rbSetClassPathString(this, { name: "Trails::Command" }, "LastSubcommandCommand");
         this.prototype.foo = this.prototype.setLastSubcommand;
         this.prototype.bar = this.prototype.setLastSubcommand;
         const klass = this as unknown as ThorClass;
@@ -159,7 +159,7 @@ describe("Rails::Command::BaseTest", () => {
       }
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command" }, "ArgvCommand");
+        rbSetClassPathString(this, { name: "Trails::Command" }, "ArgvCommand");
         (this as unknown as ThorClass).methodAdded("checkPopulated");
       }
     }
@@ -175,7 +175,7 @@ describe("Rails::Command::BaseTest", () => {
       }
 
       static {
-        rbSetClassPathString(this, { name: "Rails::Command" }, "ArgvCommand");
+        rbSetClassPathString(this, { name: "Trails::Command" }, "ArgvCommand");
         (this as unknown as ThorClass).methodAdded("checkIsolated");
       }
     }

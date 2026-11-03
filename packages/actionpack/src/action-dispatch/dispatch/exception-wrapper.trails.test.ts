@@ -176,7 +176,7 @@ describe("ExceptionWrapper#clean_backtrace", () => {
 });
 
 describe("ExceptionWrapper#sourceFragment", () => {
-  it("reads an absolute backtrace path as is, ignoring Rails.root", () => {
+  it("reads an absolute backtrace path as is, ignoring Trails.root", () => {
     const trails = TopLevel.Trails;
     TopLevel.Trails = { root: () => "/nonexistent-root" } as unknown as typeof trails;
     try {

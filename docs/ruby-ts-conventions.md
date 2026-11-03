@@ -149,6 +149,9 @@ trails:
 | `Capybara` | `Vitest`     |
 | `yarn`     | `pnpm`       |
 | `Yarn`     | `Pnpm`       |
+| `rails`    | `trails`     |
+| `Rails`    | `Trails`     |
+| `RAILS`    | `TRAILS`     |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`

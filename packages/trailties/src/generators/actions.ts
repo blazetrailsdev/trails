@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { chomp, extractOptionsBang, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
@@ -142,14 +142,14 @@ export async function initializer(
 export function generate(
   this: ActionsHost,
   what: string,
-  ...args: Array<string | RailsCommandOptions>
+  ...args: Array<string | TrailsCommandOptions>
 ): Promise<unknown> {
   log.call(this, "generate", what);
 
-  const options = extractOptionsBang(args) as RailsCommandOptions;
+  const options = extractOptionsBang(args) as TrailsCommandOptions;
   options.abortOnFailure = !options.inline;
 
-  return railsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
+  return trailsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
 }
 
 export function afterInstall(
@@ -176,24 +176,24 @@ export function rake(
 
 const commandModule = "../command.js";
 const loadPath: Record<string, () => Promise<unknown>> = {
-  "rails/command": () => import(commandModule),
+  "trails/command": () => import(commandModule),
 };
 
-export interface RailsCommandOptions extends RakeOptions {
+export interface TrailsCommandOptions extends RakeOptions {
   inline?: boolean;
 }
 
 /** @inventedArm rbFRequire — PERMANENT */
-export async function railsCommand(
+export async function trailsCommand(
   this: ActionsHost,
   command: string,
-  options: RailsCommandOptions = {},
+  options: TrailsCommandOptions = {},
 ): Promise<unknown> {
   if (options.inline) {
-    log.call(this, "rails", command);
+    log.call(this, "trails", command);
     let args: string[];
     [command, ...args] = Shellwords.shellwords(command);
-    await rbFRequire(loadPath, "rails/command");
+    await rbFRequire(loadPath, "trails/command");
     return await this.inRoot(() =>
       silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
     );

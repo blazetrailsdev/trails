@@ -10,9 +10,9 @@ import { environment } from "../command.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { Editor } from "../command/helpers/editor.js";
-import { CredentialsGenerator } from "../generators/rails/credentials/credentials-generator.js";
-import { EncryptionKeyFileGenerator } from "../generators/rails/encryption-key-file/encryption-key-file-generator.js";
-import { Trails } from "../rails.js";
+import { CredentialsGenerator } from "../generators/trails/credentials/credentials-generator.js";
+import { EncryptionKeyFileGenerator } from "../generators/trails/encryption-key-file/encryption-key-file-generator.js";
+import { Trails } from "../trails.js";
 import { Diffing } from "./credentials/credentials-command/diffing.js";
 
 interface CredentialsOptions {

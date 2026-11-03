@@ -3,7 +3,7 @@ import path from "node:path";
 import { buildViews } from "@blazetrails/trails-tsc";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 describe("trails-tsc build views inside a booted app", () => {
   const root = new URL("./__fixtures__/boot-app", import.meta.url).pathname;

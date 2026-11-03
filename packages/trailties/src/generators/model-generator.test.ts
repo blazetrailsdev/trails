@@ -6,7 +6,7 @@ import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "@blazetrails/activerecord";
 import { ModelHelpers } from "./model-helpers.js";
 import { Application } from "../application.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 import { copyRoutes } from "./generators-test-helper.js";
@@ -17,13 +17,13 @@ class ModelGeneratorTest extends TestCase {}
 ModelGeneratorTest.destination(Dir.mktmpdir());
 ModelGeneratorTest.arguments(["Account", "name:string", "age:integer"]);
 registerSpecType(/^ModelGeneratorTest$/, ModelGeneratorTest);
-let ModelGenerator: typeof import("./rails/model/model-generator.js").ModelGenerator;
+let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGenerator;
 let t: TestCase & { generatorClass?: typeof ModelGenerator };
 let oldBelongsToRequiredByDefault: boolean | undefined;
 
 beforeAll(async () => {
   await ModelGeneratorApp.instance().loadGenerators();
-  ({ ModelGenerator } = await import("./rails/model/model-generator.js"));
+  ({ ModelGenerator } = await import("./trails/model/model-generator.js"));
   ModelGeneratorTest.tests(ModelGenerator);
 });
 
@@ -105,20 +105,20 @@ describe("ModelGeneratorTest", () => {
   it("unknown inflection rule are warned", async () => {
     const content = String(await t.runGenerator(["porsche"]));
     assertMatch(
-      /\[WARNING\] Rails cannot recover singular form from its plural form 'porsches'\.\nPlease setup custom inflection rules for this noun before running the generator in config\/initializers\/inflections\.rb\./,
+      /\[WARNING\] Trails cannot recover singular form from its plural form 'porsches'\.\nPlease setup custom inflection rules for this noun before running the generator in config\/initializers\/inflections\.rb\./,
       content,
     );
     await t.assertFile("app/models/porsche.ts", /class Porsche extends ApplicationRecord/);
 
     const uncountableContent = String(await t.runGenerator(["sheep"]));
     assertNoMatch(
-      /\[WARNING\] Rails cannot recover singular form from its plural form/,
+      /\[WARNING\] Trails cannot recover singular form from its plural form/,
       uncountableContent,
     );
 
     const regularContent = String(await t.runGenerator(["account"]));
     assertNoMatch(
-      /\[WARNING\] Rails cannot recover singular form from its plural form/,
+      /\[WARNING\] Trails cannot recover singular form from its plural form/,
       regularContent,
     );
   });
@@ -126,7 +126,7 @@ describe("ModelGeneratorTest", () => {
   it("impossible inflection rules raises an error", async () => {
     const content = await capture("stderr", () => t.runGenerator(["BFF"]));
     assertMatch(
-      /Rails cannot recover the underscored form from its camelcase form 'BFF'\./,
+      /Trails cannot recover the underscored form from its camelcase form 'BFF'\./,
       content,
     );
   });

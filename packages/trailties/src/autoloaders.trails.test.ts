@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Autoloaders } from "./autoloaders.js";
 import { Inflector } from "./autoloaders/inflector.js";
 
-describe("Rails::Autoloaders", () => {
-  it("main and once are distinct loaders tagged rails.main and rails.once with the Rails inflector", () => {
+describe("Trails::Autoloaders", () => {
+  it("main and once are distinct loaders tagged trails.main and trails.once with the Rails inflector", () => {
     const autoloaders = new Autoloaders();
-    expect(autoloaders.main.tag).toBe("rails.main");
-    expect(autoloaders.once.tag).toBe("rails.once");
+    expect(autoloaders.main.tag).toBe("trails.main");
+    expect(autoloaders.once.tag).toBe("trails.once");
     expect(autoloaders.main.inflector).toBe(Inflector);
     expect(autoloaders.once.inflector).toBe(Inflector);
     expect(autoloaders.isZeitwerkEnabled()).toBe(true);

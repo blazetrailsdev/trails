@@ -5,7 +5,7 @@ import type { TestCase } from "./test-case.js";
 
 export async function copyRoutes(this: TestCase): Promise<void> {
   const routes = await evaluateTemplate(
-    File.expandPath("rails/app/templates/config/routes.ts.tt", import.meta.dirname),
+    File.expandPath("trails/app/templates/config/routes.ts.tt", import.meta.dirname),
     { options: new OrderedOptions() },
   );
   const destination = File.join(this.destinationRoot, "config");

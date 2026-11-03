@@ -41,7 +41,7 @@ import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import "./assets/trailtie.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import { Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp, RackAppObject, Request } from "@blazetrails/actionpack";
@@ -494,7 +494,7 @@ export class Application extends Engine {
     return new EncryptedConfiguration({
       configPath: p.resolve(root, path),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
-      envKey: opts.envKey ?? "RAILS_MASTER_KEY",
+      envKey: opts.envKey ?? "TRAILS_MASTER_KEY",
       raiseIfMissingKey: this.config.requireMasterKey,
     });
   }
@@ -554,4 +554,4 @@ export class Application extends Engine {
   }
 }
 
-Object.defineProperty(Application, "name", { value: "Rails::Application" });
+Object.defineProperty(Application, "name", { value: "Trails::Application" });

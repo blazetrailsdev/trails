@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Dir, File, FileUtils, SecureRandom, getProcessAdapter } from "@blazetrails/ruby-compat";
-import { AppBuilder, AppGenerator } from "./rails/app/app-generator.js";
+import { AppBuilder, AppGenerator } from "./trails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
 
@@ -24,7 +24,7 @@ describe("AppGenerator (trails-only)", () => {
 
   it("sourceRoot names the existing templates directory", async () => {
     const root = (await AppGenerator.sourceRoot()) as string;
-    expect(root.endsWith("/generators/rails/app/templates")).toBe(true);
+    expect(root.endsWith("/generators/trails/app/templates")).toBe(true);
     expect(await File.isDirectory(root)).toBe(true);
   });
 
@@ -128,7 +128,7 @@ describe("AppGenerator (trails-only)", () => {
       { destinationRoot: tmpDir },
     ).invokeAll();
 
-    const trailties = File.join(Generators.RAILS_DEV_PATH, "packages", "trailties");
+    const trailties = File.join(Generators.TRAILS_DEV_PATH, "packages", "trailties");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`link:${trailties}`);
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^link:.*trails-tsc$/);

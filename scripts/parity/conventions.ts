@@ -70,6 +70,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Capybara: "Vitest",
   yarn: "pnpm",
   Yarn: "Pnpm",
+  rails: "trails",
+  Rails: "Trails",
+  RAILS: "TRAILS",
 };
 
 /**
@@ -89,7 +92,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
  *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
- *   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
+ *   maps to the `Trails` global in `packages/trailties/src/trails.ts`.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -130,7 +133,10 @@ const TOKEN_RENAME_PATTERN = new RegExp(`(^|_)(${tokenRenameAlternation()})(?=_|
  * `TOKEN_RENAMES` used to reach method names and silently not file paths,
  * which is exactly how the `rb` entry sat dead between #6017 and #6043.
  */
-const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\b`, "g");
+const FILE_TOKEN_RENAME_PATTERN = new RegExp(
+  `\\b(${tokenRenameAlternation()})\\b(?!-(?:dom-testing|html-sanitizer|api))`,
+  "g",
+);
 
 /**
  * Multi-word renames, for a word that is only renamed in these phrases. trails

@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { capture, isPlainObject } from "@blazetrails/activesupport";
 import { Dir, rbArgv, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
 import { invoke } from "../command.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Console, ConsoleCommand } from "./console.js";
 
 const io = vi.hoisted(() => ({ server: null as REPLServer | null, output: "", piped: "" }));
@@ -59,7 +59,7 @@ describe("ConsoleCommand (trails)", () => {
     expect(rbArgv()).toEqual(["x"]);
   });
 
-  it("--help reaches Thor's help through Rails::Command.invoke", async () => {
+  it("--help reaches Thor's help through Trails::Command.invoke", async () => {
     const printed = await capture(":stdout", () => invoke("console", ["--help"]));
     expect(printed).toContain("--sandbox");
   });

@@ -22,7 +22,7 @@ export class CacheStore extends AbstractSecureStore {
     const cache = options.cache;
     if (!cache) {
       throw new Error(
-        "ActionDispatch::Session::CacheStore requires a `cache` option until Rails.cache is wired.",
+        "ActionDispatch::Session::CacheStore requires a `cache` option until Trails.cache is wired.",
       );
     }
     this.cache = cache;

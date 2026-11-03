@@ -133,7 +133,7 @@ export class DiskService extends Service {
         { expiresIn: expiresIn as Duration | null, purpose: "blob_token" },
       );
 
-      const generatedUrl = this.urlHelpers().updateRailsDiskServiceUrl(
+      const generatedUrl = this.urlHelpers().updateTrailsDiskServiceUrl(
         verifiedTokenWithExpiration,
         this.urlOptions(),
       );
@@ -249,7 +249,7 @@ export class DiskService extends Service {
       );
     }
 
-    return this.urlHelpers().railsDiskServiceUrl(verifiedKeyWithExpiration, {
+    return this.urlHelpers().trailsDiskServiceUrl(verifiedKeyWithExpiration, {
       filename: filename,
       ...this.urlOptions(),
     });

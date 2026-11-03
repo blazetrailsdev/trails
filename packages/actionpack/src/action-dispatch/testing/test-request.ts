@@ -6,7 +6,7 @@ import { Request } from "../http/request.js";
 const DEFAULT_ENV: RackEnv = MockRequest.envFor("/", {
   HTTP_HOST: "test.host",
   REMOTE_ADDR: "0.0.0.0",
-  HTTP_USER_AGENT: "Rails Testing",
+  HTTP_USER_AGENT: "Trails Testing",
 });
 
 export class TestRequest extends Request {

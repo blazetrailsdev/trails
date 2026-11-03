@@ -1,4 +1,4 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
 import * as m0 from "./commands/rake.js";
 
-defineConstants([[() => m0.RakeCommand, "Rails::Command::RakeCommand"]]);
+defineConstants([[() => m0.RakeCommand, "Trails::Command::RakeCommand"]]);

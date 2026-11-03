@@ -1,6 +1,6 @@
 import { defineModule, getPath } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH } from "../app-path.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 export async function requireApplicationBang(): Promise<void> {
   const p = getPath();

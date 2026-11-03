@@ -13,7 +13,7 @@ import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
 
-const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Application"];
+const ABSTRACT_RAILTIES = ["Trails::Railtie", "Trails::Engine", "Trails::Application"];
 
 let loadCounter = 0;
 
@@ -203,7 +203,7 @@ export function resetTrailtieRegistry(): () => void {
   };
 }
 
-Object.defineProperty(Trailtie, "name", { value: "Rails::Railtie" });
+Object.defineProperty(Trailtie, "name", { value: "Trails::Railtie" });
 
 Object.setPrototypeOf(
   Trailtie,

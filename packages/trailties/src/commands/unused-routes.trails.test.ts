@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { invoke } from "../command.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { RouteInfo } from "./unused-routes.js";
 import { lookupBang } from "../command/behavior.js";
 
@@ -138,10 +138,10 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(true);
   });
 
-  it("RouteInfo resolves the framework rails/pwa controller by its Rails constant", async () => {
+  it("RouteInfo resolves the framework trails/pwa controller by its Rails constant", async () => {
     await import("../pwa-controller.js");
 
-    const info = new RouteInfo(route({ controller: "rails/pwa", action: "manifest" }));
+    const info = new RouteInfo(route({ controller: "trails/pwa", action: "manifest" }));
 
     expect(await info.unused()).toBe(false);
   });

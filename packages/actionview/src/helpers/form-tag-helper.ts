@@ -647,19 +647,19 @@ export function convertDirectUploadOptionToUrl(
   const directUpload = hashDelete(options, "directUpload");
   if (directUpload == null || directUpload === false) return options;
 
-  if (rbObjRespondTo(this, "railsDirectUploadsUrl")) {
+  if (rbObjRespondTo(this, "trailsDirectUploadsUrl")) {
     options["data-direct-upload-url"] = (
-      this as unknown as { railsDirectUploadsUrl(): unknown }
-    ).railsDirectUploadsUrl();
+      this as unknown as { trailsDirectUploadsUrl(): unknown }
+    ).trailsDirectUploadsUrl();
   } else if (
     rbObjRespondTo(this, "mainApp") &&
-    rbObjRespondTo((this as unknown as { mainApp(): unknown }).mainApp(), "railsDirectUploadsUrl")
+    rbObjRespondTo((this as unknown as { mainApp(): unknown }).mainApp(), "trailsDirectUploadsUrl")
   ) {
     options["data-direct-upload-url"] = (
-      this as unknown as { mainApp(): { railsDirectUploadsUrl(): unknown } }
+      this as unknown as { mainApp(): { trailsDirectUploadsUrl(): unknown } }
     )
       .mainApp()
-      .railsDirectUploadsUrl();
+      .trailsDirectUploadsUrl();
   }
   return options;
 }

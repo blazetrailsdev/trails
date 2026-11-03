@@ -300,7 +300,7 @@ describe("ACLogSubscriberTest", () => {
   it("process action headers", async () => {
     await tc.get("show");
     tc.wait();
-    assertEqual("Rails Testing", (tc.controller.lastPayload.headers as Headers).get("User-Agent"));
+    assertEqual("Trails Testing", (tc.controller.lastPayload.headers as Headers).get("User-Agent"));
   });
 
   it("process action with filter parameters", async () => {

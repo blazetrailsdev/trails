@@ -4,7 +4,7 @@
  * In a `*.test.ts` whose Rails counterpart exists in the test-compare
  * manifest, every non-skipped `it()` / `test()` must carry the name of a Rails
  * test in that counterpart, under the same normalization `pnpm parity:test`
- * applies (lowercase, whitespace-collapsed, `erb` → `tse`). A TS-only test in
+ * applies (lowercase, whitespace-collapsed, `erb` → `tse`, `rails` → `trails`). A TS-only test in
  * a Rails-named file is what the comparer reports as "extra (TS only)"; its
  * home is the file's `.trails.test.ts` twin, which this rule exempts.
  *
@@ -57,7 +57,12 @@ export function repoRel(filename) {
 
 /** Mirrors compare.ts `normalize` + `normalizeErb`. */
 export function normalizeTestName(s) {
-  return s.toLowerCase().replace(/\s+/g, " ").trim().replace(/erb/g, "tse");
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/erb/g, "tse")
+    .replace(/(?<![a-z])rails/g, "trails");
 }
 
 /** `visitors/to-sql.test.ts` → `visitors/to-sql.trails.test.ts`. */

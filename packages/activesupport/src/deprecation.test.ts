@@ -457,7 +457,7 @@ describe("DeprecationTest", () => {
     expect(output.join("")).toMatch("call stack!");
   });
 
-  it(":log behavior without Rails.logger", () => {
+  it(":log behavior without Trails.logger", () => {
     deprecator.behavior = "log";
 
     const output = capture(":stderr", () => {
@@ -827,11 +827,11 @@ describe("DeprecationTest", () => {
     expect(deprecator.messages[deprecator.messages.length - 1]).toMatch("foo");
   });
 
-  it("default deprecation_horizon is greater than the current Rails version", () => {
+  it("default deprecation_horizon is greater than the current Trails version", () => {
     expect(new Deprecation().deprecationHorizon.localeCompare(VERSION.STRING)).toBeGreaterThan(0);
   });
 
-  it("default gem_name is Rails", () => {
+  it("default gem_name is Trails", () => {
     const deprecator = new Deprecation();
 
     const message = callDeprecatedMethodWarning(
@@ -839,7 +839,7 @@ describe("DeprecationTest", () => {
       "deprecated_method",
       "You are calling deprecated method",
     );
-    expect(message).toMatch(/is deprecated and will be removed from Rails/);
+    expect(message).toMatch(/is deprecated and will be removed from Trails/);
   });
 
   it("custom gem_name", () => {
