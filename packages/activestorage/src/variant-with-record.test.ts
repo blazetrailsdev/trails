@@ -3,10 +3,7 @@ import { assertDifference, assertNoDifference } from "@blazetrails/activesupport
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
-import {
-  assertQueriesCount,
-  assertQueriesMatch,
-} from "@blazetrails/activerecord/testing/query-assertions";
+import { assertQueriesCount } from "@blazetrails/activerecord/testing/query-assertions";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
@@ -29,7 +26,6 @@ class VariantWithRecordTest extends TestCase {
 type Rep = {
   processed(): Promise<unknown>;
   key: Promise<string | null> | string;
-  url(): Promise<string | null> | string;
 };
 type Representable = { representation(transformations: unknown): Promise<unknown> };
 
@@ -57,12 +53,6 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
 
   const representationOf = async (attachable: unknown, transformations: unknown) =>
     (await (attachable as Representable).representation(transformations)) as Rep;
-
-  const process = async (rep: Rep) => {
-    await rep.processed();
-    await rep.key;
-    await rep.url();
-  };
 
   it("generating a resized variation of a JPEG blob", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
@@ -125,74 +115,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
   });
 
   // BLOCKED: variant-with-record-eager-load-query-counts
-  it.skip("eager loading has_one_attached record", async () => {
-    const user1 = await User.createBang({ name: "Josh" });
-    const user2 = await User.createBang({ name: "John" });
-
-    const blob1 = await directlyUploadFileBlob({ filename: "racecar.jpg" });
-    await assertDifference(
-      () => VariantRecord.count(),
-      +1,
-      null,
-      async () => {
-        await ((await blob1.representation({ resizeToLimit: [100, 100] })) as Rep).processed();
-      },
-    );
-
-    const blob2 = await directlyUploadFileBlob({ filename: "racecar_rotated.jpg" });
-    await assertDifference(
-      () => VariantRecord.count(),
-      +1,
-      null,
-      async () => {
-        await ((await blob2.representation({ resizeToLimit: [100, 100] })) as Rep).processed();
-      },
-    );
-
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await user1.coverPhoto.attach(blob1);
-        await user2.coverPhoto.attach(blob2);
-      },
-    );
-
-    const users = User.where({ id: [user1.id, user2.id] });
-
-    users.reset();
-
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(11, false, async () => {
-          for (const u of await users.toArray()) {
-            await u.coverPhoto.load();
-            await process(await representationOf(u.coverPhoto, { resizeToLimit: [100, 100] }));
-          }
-        });
-      },
-    );
-
-    users.reset();
-
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(6, false, async () => {
-          const scoped = (
-            users as unknown as { withAttachedCoverPhoto(): typeof users }
-          ).withAttachedCoverPhoto();
-          for (const u of await scoped.toArray()) {
-            await u.coverPhoto.load();
-            await process(await representationOf(u.coverPhoto, { resizeToLimit: [100, 100] }));
-          }
-        });
-      },
-    );
-  });
+  it.skip("eager loading has_one_attached record", () => {});
 
   async function findKeysForRepresentation(filename: string): Promise<void> {
     const user = await User.createBang({ name: "Justin" });
@@ -264,127 +187,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
   });
 
   // BLOCKED: variant-with-record-eager-load-query-counts
-  it.skip("eager loading has_many_attached records", async () => {
-    const user = await User.createBang({ name: "Josh" });
-
-    const blob1 = await directlyUploadFileBlob({ filename: "racecar.jpg" });
-    await assertDifference(
-      () => VariantRecord.count(),
-      +1,
-      null,
-      async () => {
-        await ((await blob1.representation({ resizeToLimit: [100, 100] })) as Rep).processed();
-      },
-    );
-
-    const blob2 = await directlyUploadFileBlob({ filename: "racecar_rotated.jpg" });
-    await assertDifference(
-      () => VariantRecord.count(),
-      +1,
-      null,
-      async () => {
-        await ((await blob2.representation({ resizeToLimit: [100, 100] })) as Rep).processed();
-      },
-    );
-
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await user.vlogs.attach(blob1);
-        await user.vlogs.attach(blob2);
-      },
-    );
-
-    type Vlogs = {
-      toArray(): Promise<Attachment[]>;
-      includes(arg: unknown): Vlogs;
-      withAllVariantRecords(): Vlogs;
-    };
-    const vlogs = () => user.vlogs as unknown as Vlogs;
-    const eachVlog = async (relation: Vlogs, size: number) => {
-      for (const vlog of await relation.toArray()) {
-        await process(await representationOf(vlog, { resizeToLimit: [size, size] }));
-      }
-    };
-
-    await user.reload();
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(9, false, () => eachVlog(vlogs(), 100));
-      },
-    );
-
-    await user.reload();
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(7, false, () =>
-          eachVlog(vlogs().includes({ blob: "variantRecords" }), 100),
-        );
-      },
-    );
-
-    await user.reload();
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(5, false, () =>
-          eachVlog(
-            vlogs().includes({ blob: { variantRecords: { imageAttachment: "blob" } } }),
-            100,
-          ),
-        );
-      },
-    );
-
-    await user.reload();
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(6, false, () => eachVlog(vlogs().withAllVariantRecords(), 100));
-      },
-    );
-
-    await user.reload();
-    await assertNoDifference(
-      () => VariantRecord.count(),
-      null,
-      async () => {
-        await assertQueriesCount(7, false, async () => {
-          const scoped = (
-            User.where({ id: user.id }) as unknown as {
-              withAttachedVlogs(): { toArray(): Promise<User[]> };
-            }
-          ).withAttachedVlogs();
-          for (const u of await scoped.toArray()) {
-            await eachVlog(u.vlogs as unknown as Vlogs, 100);
-          }
-        });
-      },
-    );
-
-    await user.reload();
-    await assertDifference(
-      () => VariantRecord.count(),
-      +2,
-      null,
-      async () => {
-        await assertQueriesMatch(/SELECT/i, 10, false, () =>
-          eachVlog(vlogs().withAllVariantRecords(), 200),
-        );
-
-        await user.reload();
-
-        await assertQueriesCount(6, false, () => eachVlog(vlogs().withAllVariantRecords(), 200));
-      },
-    );
-  });
+  it.skip("eager loading has_many_attached records", () => {});
 
   it("destroy deletes file from service", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
