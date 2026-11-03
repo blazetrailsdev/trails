@@ -4,6 +4,6 @@ export class <%= this.abstractClassName() %> extends ApplicationRecord {
   static {
     this.abstractClass = true;
 
-    this.connectsTo({ database: { <%= ActiveRecord.writingRole() %>: "<%= this.database() %>" } });
+    this.connectsTo({ database: { <%= ActiveRecord.writingRole %>: "<%= this.database() %>" } });
   }
 }
