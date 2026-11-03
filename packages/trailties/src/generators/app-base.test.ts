@@ -7,6 +7,7 @@ import {
   env,
   registerChildProcessAdapter,
   setEnv,
+  type ChildProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { AppGenerator } from "./rails/app/app-generator.js";
@@ -111,12 +112,44 @@ describe("AppBase dockerfilePnpmVersion", () => {
     expect(AppGenerator.classOptions()["packageManager"].default).toBe("pnpm");
   });
 
-  it("answers the installed pnpm version", async () => {
-    const generator = build({ javascript: "esbuild" });
-    const version = (
-      generator as unknown as { dockerfilePnpmVersion(): Promise<unknown> }
-    ).dockerfilePnpmVersion();
-    expect(await version).toMatch(/^\d+\.\d+\.\d+$/);
+  async function withPnpm<T>(capture3: ChildProcessAdapter["capture3"], body: () => Promise<T>) {
+    const previous = childProcessAdapterConfig.adapter;
+    registerChildProcessAdapter("pnpm-version-test", {
+      spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
+      capture3,
+    });
+    childProcessAdapterConfig.adapter = "pnpm-version-test";
+    try {
+      return await body();
+    } finally {
+      childProcessAdapterConfig.adapter = previous;
+    }
+  }
+
+  type Versions = {
+    dockerfilePnpmVersion(): Promise<unknown>;
+    isPnpmThroughCorepack(): Promise<boolean>;
+  };
+  const versions = () => build({ javascript: "esbuild" }) as unknown as Versions;
+
+  it("reads the version out of pnpm --version", async () => {
+    const commands: unknown[] = [];
+    const capture3 = (async (prog: unknown, _env: unknown, args: unknown) => {
+      commands.push([prog, args]);
+      return ["pnpm 1.22.4\n", "", { status: 0 }];
+    }) as unknown as ChildProcessAdapter["capture3"];
+    await withPnpm(capture3, async () => {
+      expect(await versions().dockerfilePnpmVersion()).toBe("1.22.4");
+      expect(await versions().isPnpmThroughCorepack()).toBe(false);
+    });
+    expect(JSON.stringify(commands)).toContain("pnpm");
+  });
+
+  it("answers latest when pnpm cannot run", async () => {
+    await withPnpm(undefined, async () => {
+      expect(await versions().dockerfilePnpmVersion()).toBe("latest");
+      expect(await versions().isPnpmThroughCorepack()).toBe(true);
+    });
   });
 });
 

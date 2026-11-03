@@ -556,6 +556,11 @@ ${requireStatements.join("\n")}`;
   }
 
   /** @internal */
+  protected async isPnpmThroughCorepack(): Promise<boolean> {
+    return ((await this.dockerfilePnpmVersion()) as string) >= "2";
+  }
+
+  /** @internal */
   protected async dockerfileBunVersion(): Promise<string | false | undefined> {
     try {
       return this.usingBun() && (await rbFBackquote("bun --version")).match(/\d+\.\d+\.\d+/)?.[0];
