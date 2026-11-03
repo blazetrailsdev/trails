@@ -731,8 +731,8 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    * @inventedArm throw — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
     const pinned = this._pinnedConnection;

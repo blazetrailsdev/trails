@@ -37,12 +37,11 @@
     }
   },
   "actionpack": {
-    "rows": 320,
+    "rows": 321,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
-      "action-dispatch/middleware/cookies.ts::CookieOverflow",
-      "action-dispatch/request/session.ts::DisabledSessionError"
+      "action-dispatch/middleware/cookies.ts::CookieOverflow"
     ],
     "unwalked": [
       "abstract-controller/caching.ts::Caching",
@@ -241,12 +240,8 @@
     }
   },
   "actionview": {
-    "rows": 165,
-    "excluded": [
-      "helpers/form-helper.ts::FormBuilder",
-      "template/handlers/builder.ts::Builder",
-      "template/handlers/tse.ts::LocationParsingError"
-    ],
+    "rows": 166,
+    "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
     "unwalked": [
       "context.ts::Context",
       "gem-version.ts::VERSION",
@@ -402,11 +397,10 @@
     }
   },
   "activerecord": {
-    "rows": 459,
+    "rows": 460,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
-      "future-result.ts::Canceled",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredIdsNotIn",
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck"
@@ -540,6 +534,7 @@
       "encryption/extended-deterministic-uniqueness-validator.ts::EncryptedUniquenessValidator": "ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator::EncryptedUniquenessValidator",
       "enum.ts::EnumMethods": "ActiveRecord::Enum::EnumMethods",
       "enum.ts::EnumType": "ActiveRecord::Enum::EnumType",
+      "future-result.ts::Canceled": "ActiveRecord::FutureResult::Canceled",
       "future-result.ts::Complete": "ActiveRecord::FutureResult::Complete",
       "future-result.ts::EventBuffer": "ActiveRecord::FutureResult::EventBuffer",
       "future-result.ts::SelectAll": "ActiveRecord::FutureResult::SelectAll",
@@ -660,7 +655,7 @@
     }
   },
   "activesupport": {
-    "rows": 180,
+    "rows": 182,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -707,7 +702,6 @@
       "testing/assertions.ts::Skip",
       "testing/assertions.ts::Test",
       "testing/assertions.ts::UnexpectedError",
-      "testing/isolation.ts::SubprocessCrashed",
       "testing/method-call-assertions.ts::Mock",
       "testing/method-call-assertions.ts::MockExpectationError",
       "thread-local-var.ts::ThreadLocalVar",
@@ -731,6 +725,7 @@
       "delegation.ts::Delegation",
       "dependencies.ts::Dependencies",
       "descendants-tracker.ts::ReloadedClassesFiltering",
+      "error-reporter.ts::ErrorReporter.UnexpectedError",
       "execution-context.ts::ExecutionContext",
       "gem-version.ts::VERSION",
       "gzip.ts::Gzip",
@@ -808,8 +803,8 @@
     }
   },
   "arel": {
-    "rows": 147,
-    "excluded": ["nodes/nary.ts::And", "nodes/nary.ts::Or"],
+    "rows": 149,
+    "excluded": [],
     "unwalked": [
       "alias-predication.ts::AliasPredication",
       "crud.ts::Crud",
@@ -917,12 +912,8 @@
   },
   "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
   "mini-magick": {
-    "rows": 7,
-    "excluded": [
-      "mini-magick.ts::Error",
-      "mini-magick.ts::Invalid",
-      "mini-magick.ts::TimeoutError"
-    ],
+    "rows": 10,
+    "excluded": [],
     "unwalked": ["utilities.ts::Utilities"],
     "residue": {}
   },
@@ -1017,8 +1008,8 @@
     "residue": {}
   },
   "rake": {
-    "rows": 32,
-    "excluded": ["application.ts::CommandLineOptionError", "promise.ts::Promise"],
+    "rows": 33,
+    "excluded": ["promise.ts::Promise"],
     "unwalked": [
       "backtrace.ts::Backtrace",
       "cloneable.ts::Cloneable",
