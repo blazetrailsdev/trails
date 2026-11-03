@@ -83,6 +83,11 @@ declare module "@blazetrails/ruby-compat" {
         envConfig(): Record<string, unknown>;
         executor: { wrap<T>(block: () => T): T; runBang(): unknown };
         configFor(name: string): Promise<unknown>;
+        migrationRailties(): Array<{
+          railtieName: string;
+          root(): string | null;
+          paths?(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
+        }>;
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
       } | null;
       Application: abstract new (...args: never[]) => unknown;

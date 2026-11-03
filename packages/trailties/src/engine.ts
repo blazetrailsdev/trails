@@ -16,7 +16,10 @@ import {
   rbFLoad,
   rbObjRespondTo,
   rbProcCall,
+  block,
+  setEnv,
 } from "@blazetrails/ruby-compat";
+import { DSL, Task } from "@blazetrails/rake";
 import {
   AbstractController,
   MiddlewareStack,
@@ -283,6 +286,11 @@ export class Engine extends Trailtie {
     for (const ext of (await this.paths().get("lib/tasks")!.existent()).sort()) await rbFLoad(ext);
   }
 
+  /** @internal */
+  private async hasMigrations(): Promise<boolean> {
+    return (await this.paths().get("db/migrate")!.existent()).length > 0;
+  }
+
   async loadServer(app: unknown = this): Promise<this> {
     await this.runServerBlocks(app);
     return this;
@@ -504,6 +512,28 @@ Engine.initializer("wrap_reloader_around_load_seed", function (this: Engine, ...
 });
 
 Engine.initializer("engines_blank_point", function () {});
+
+Engine.rakeTasks(async function (this: Trailtie) {
+  if (this instanceof TopLevel.Trails!.Application) return;
+  if (!(await (this as Engine)["hasMigrations"]())) return;
+
+  DSL.namespace(this.railtieName, () => {
+    DSL.namespace("install", () => {
+      DSL.desc(`Copy migrations from ${this.railtieName} to application`);
+      DSL.task(
+        "migrations",
+        block(async () => {
+          setEnv("FROM", this.railtieName);
+          if (Task.isTaskDefined("railties:install:migrations")) {
+            await (await Task.get("railties:install:migrations")).invoke();
+          } else {
+            await (await Task.get("app:railties:install:migrations")).invoke();
+          }
+        }),
+      );
+    });
+  });
+});
 
 /** @internal */
 interface EngineReloaderApp {

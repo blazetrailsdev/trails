@@ -83,6 +83,14 @@ export class Engine extends TrailsEngine {
       with: File.join(import.meta.dirname, "config", `routes${File.extname(import.meta.filename)}`),
     });
 
+    this.config.paths().add("db/migrate", {
+      with: File.join(import.meta.dirname, "db", "migrate"),
+    });
+    this.config.paths().add("lib/tasks", {
+      with: File.join(import.meta.dirname, "tasks"),
+      glob: `*${File.extname(import.meta.filename)}`,
+    });
+
     this.config.set("activeStorage", new OrderedOptions());
     this.config.activeStorage.previewers = [PopplerPDFPreviewer, MuPDFPreviewer, VideoPreviewer];
     this.config.activeStorage.analyzers = [Vips, ImageMagick, VideoAnalyzer, AudioAnalyzer];

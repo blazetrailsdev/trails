@@ -363,6 +363,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -452,6 +455,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

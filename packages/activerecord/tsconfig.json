@@ -8,6 +8,7 @@
   "include": ["src"],
   "exclude": ["src/test-helpers/fixtures/all/admin/**"],
   "references": [
+    { "path": "../rake" },
     { "path": "../ruby-compat" },
     { "path": "../arel" },
     { "path": "../date" },

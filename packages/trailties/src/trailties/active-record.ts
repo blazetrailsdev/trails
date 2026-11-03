@@ -1,7 +1,8 @@
 import "./active-model.js";
 import "./action-controller.js";
 import { include, isPresent, onLoad, TopLevel, upcaseFirst } from "@blazetrails/activesupport";
-import { except, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { DSL } from "@blazetrails/rake";
+import { except, Process, block, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
@@ -35,6 +36,8 @@ import {
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { databaseConfiguration } from "../database.js";
+import { ENGINE_ROOT } from "../app-path.js";
+import { Engine } from "../engine.js";
 
 export type ActiveRecordEncryptionConfig = Parameters<typeof Encryption.configure>[0];
 
@@ -139,6 +142,30 @@ export class Trailtie extends BaseTrailtie {
         { migration: true, timestamps: true },
       ),
     );
+
+    this.rakeTasks(async () => {
+      DSL.namespace("db", () => {
+        DSL.task(
+          "load_config",
+          block(async () => {
+            let engine: Engine | undefined;
+            if (ENGINE_ROOT !== undefined && (engine = await Engine.find(ENGINE_ROOT))) {
+              const paths = engine.paths().get("db/migrate")!;
+              if (await paths.existent()) {
+                ActiveRecord.DatabaseTasks.migrationsPaths = [
+                  ...ActiveRecord.DatabaseTasks.migrationsPaths,
+                  ...(await paths.toA()),
+                ];
+              }
+            }
+          }),
+        );
+      });
+
+      await rbFLoad(
+        new URL(import.meta.resolve("@blazetrails/activerecord/trailties/databases")).pathname,
+      );
+    });
 
     Object.assign(this.config.actionDispatch.rescueResponses, {
       "ActiveRecord::RecordNotFound": ":not_found",

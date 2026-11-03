@@ -3,10 +3,12 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
+    "declarationDir": "dist/types",
     "rootDir": "src"
   },
   "include": ["src"],
   "references": [
+    { "path": "../rake" },
     { "path": "../actionpack" },
     { "path": "../actionview" },
     { "path": "../activejob" },
