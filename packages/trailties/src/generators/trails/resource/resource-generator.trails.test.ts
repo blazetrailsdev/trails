@@ -25,3 +25,12 @@ describe("ResourceGenerator (--actions)", () => {
     expect(routes).toContain('this.resources("accounts");');
   });
 });
+
+describe("ResourceGenerator namespace", () => {
+  it("strips the generators segment and the generator suffix, as Rails::Generators::Base.namespace does", () => {
+    expect(ResourceGenerator.namespace()).toBe("trails:resource");
+    expect((ResourceGenerator as unknown as { banner(): string }).banner()).toBe(
+      "bin/trails generate resource NAME [field[:type][:index] field[:type][:index]] [options]",
+    );
+  });
+});

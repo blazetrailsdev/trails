@@ -45,6 +45,9 @@ beforeAll(async () => {
   NamespacedControllerGeneratorTest.tests(ControllerGenerator);
   NamespacedModelGeneratorTest.tests(ModelGenerator);
   NamespacedScaffoldGeneratorTest.tests(ScaffoldGenerator);
+  const { ApplicationRecordGenerator } =
+    await import("./trails/application-record/application-record-generator.js");
+  NamespacedApplicationRecordGeneratorTest.tests(ApplicationRecordGenerator);
 });
 
 beforeEach(async (context) => {
@@ -481,12 +484,12 @@ describe("NamespacedScaffoldGeneratorTest", () => {
 });
 
 describe("NamespacedApplicationRecordGeneratorTest", () => {
-  it.skip("adds namespace to application record", async () => {
+  it("adds namespace to application record", async () => {
     await t.runGenerator();
     await t.assertFile(
       "app/models/test_app/application-record.ts",
       /namespace TestApp/,
-      / {2}class ApplicationRecord extends Base/,
+      / {2}export class ApplicationRecord extends Base/,
     );
   });
 });

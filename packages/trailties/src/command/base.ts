@@ -80,10 +80,17 @@ export class Base extends Thor {
     }
   }
 
-  /** @inventedArm replaceAll — PERMANENT */
+  /**
+   * @inventedArm replaceAll — PERMANENT
+   * @inventedArm push — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   static namespace(name: string | null = null): string {
     const thor = Thor as unknown as ThorClass;
     if (name != null) {
+      if (this.name && !this.name.endsWith("Base") && !subclasses().includes(this)) {
+        subclasses().push(this);
+      }
       return thor.namespace.call(this as unknown as ThorClass, name);
     } else {
       if (!Object.hasOwn(this, "_namespace") || this._namespace == null) {

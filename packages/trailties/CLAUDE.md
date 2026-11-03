@@ -204,9 +204,13 @@ against this section.
 `Rails::Command.subclasses`
 (`vendor/rails/v8.0.2/railties/lib/rails/command/base.rb:59-65`). JS has no hook
 at `extends` (CLAUDE.md § "`inherited` is deferred to own-property memo guards"),
-so `Base.methodAdded` seats the class the first time it adds a command, with
-`inherited`'s guard. A subclass with no command is never seated, which loses
-nothing: `find_by_namespace` needs a command to dispatch.
+so `Base.methodAdded` seats the class the first time it adds a command, and
+`Base.namespace(name)` seats it when it names its namespace, both with
+`inherited`'s guard. That second seat registers a class that defines no command
+of its own (`RakeCommand` calls `namespace "rake"`,
+`vendor/rails/v8.0.2/railties/lib/rails/commands/rake/rake_command.rb`) and
+answers through `printing_commands` / `perform`. A subclass that does neither is
+never seated, which loses nothing: `find_by_namespace` has nothing to dispatch.
 
 ## `TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)
 

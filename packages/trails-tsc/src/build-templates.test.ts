@@ -27,6 +27,10 @@ describe("buildTemplates", () => {
     expect(await render('<%= "<%%" %>', {})).toBe("<%%");
   });
 
+  it("turns a %%> inside a tag into a literal %>, as ERB does", async () => {
+    expect(await render('<%= "%%>" %>', {})).toBe("%>");
+  });
+
   it("resolves a free name when its line runs, not at render start", async () => {
     expect(await render("<% if (false) { %><%= missing %><% } %>ok", {})).toBe("ok");
   });
