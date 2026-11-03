@@ -37,7 +37,7 @@
     }
   },
   "actionpack": {
-    "rows": 321,
+    "rows": 323,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -103,6 +103,7 @@
       "action-controller/metal/rendering.ts::ClassMethods",
       "action-controller/metal/rendering.ts::Rendering",
       "action-controller/metal/request-forgery-protection.ts::RequestForgeryProtection.ClassMethods",
+      "action-controller/metal/request-forgery-protection.ts::RequestForgeryProtection.ProtectionMethods",
       "action-controller/metal/rescue.ts::Rescue",
       "action-controller/metal/streaming.ts::Streaming",
       "action-controller/metal/testing.ts::Functional",
@@ -112,6 +113,7 @@
       "action-controller/test-case.ts::Behavior",
       "action-dispatch/journey/route.ts::VerbMatchers",
       "action-dispatch/routing/mapper.ts::Mapper.BacktraceCleaner",
+      "action-dispatch/routing/mapper.ts::Mapper.Resources",
       "action-dispatch/routing/polymorphic-routes.ts::PolymorphicRoutes",
       "action-dispatch/routing/redirection.ts::Redirection",
       "action-dispatch/routing/route-set.ts::MountedHelpers",
@@ -240,9 +242,10 @@
     }
   },
   "actionview": {
-    "rows": 166,
+    "rows": 168,
     "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
     "unwalked": [
+      "cache-expiry.ts::CacheExpiry",
       "context.ts::Context",
       "gem-version.ts::VERSION",
       "helpers.ts::Helpers",
@@ -280,6 +283,7 @@
       "rendering.ts::ClassMethods",
       "rendering.ts::Rendering",
       "routing-url-for.ts::RoutingUrlFor",
+      "template/sources.ts::Sources",
       "test-case.ts::Behavior"
     ],
     "residue": {
@@ -340,7 +344,7 @@
     }
   },
   "activemodel": {
-    "rows": 96,
+    "rows": 98,
     "excluded": [],
     "unwalked": [
       "attribute-methods.ts::AttributeMethods",
@@ -348,7 +352,9 @@
       "conversion.ts::Conversion",
       "forbidden-attributes-protection.ts::ForbiddenAttributesProtection",
       "gem-version.ts::VERSION",
+      "lint.ts::Lint",
       "naming.ts::Naming",
+      "type.ts::Type",
       "type/helpers/mutable.ts::Mutable",
       "type/helpers/time-value.ts::TimeValue",
       "type/serialize-cast-value.ts::SerializeCastValue",
@@ -397,7 +403,7 @@
     }
   },
   "activerecord": {
-    "rows": 460,
+    "rows": 465,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -439,6 +445,7 @@
       "legacy-yaml-adapter.ts::LegacyYamlAdapter",
       "locking/optimistic.ts::Optimistic",
       "locking/pessimistic.ts::Pessimistic",
+      "marshalling.ts::Marshalling",
       "migration/compatibility.ts::Compatibility",
       "model-schema.ts::ModelSchema",
       "nested-attributes.ts::NestedAttributes",
@@ -453,14 +460,18 @@
       "relation/finder-methods.ts::FinderMethods",
       "relation/query-methods.ts::QueryMethods",
       "relation/spawn-methods.ts::SpawnMethods",
+      "sanitization.ts::Sanitization",
       "scoping/named.ts::Named",
+      "secure-token.ts::SecureToken",
       "signed-id.ts::SignedId",
+      "store.ts::Store",
       "timestamp.ts::Timestamp",
       "token-for.ts::TokenFor",
       "touch-later.ts::TouchLater",
       "trailties/job-runtime.ts::JobRuntime",
       "transactions.ts::Transactions",
       "translation.ts::Translation",
+      "type.ts::Type",
       "validations.ts::Validations",
       "validations/absence.ts::ClassMethods"
     ],
@@ -655,7 +666,7 @@
     }
   },
   "activesupport": {
-    "rows": 182,
+    "rows": 184,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -749,10 +760,12 @@
       "testing/isolation.ts::Subprocess",
       "testing/method-call-assertions.ts::MethodCallAssertions",
       "testing/setup-and-teardown.ts::ClassMethods",
+      "testing/setup-and-teardown.ts::SetupAndTeardown",
       "testing/stream.ts::Stream",
       "testing/tagged-logging.ts::TaggedLogging",
       "testing/time-helpers.ts::TimeHelpers",
-      "xml-mini.ts::FileLike"
+      "xml-mini.ts::FileLike",
+      "xml-mini.ts::XmlMini"
     ],
     "residue": {
       "callbacks.ts::After": "ActiveSupport::Callbacks::Filters::After",
@@ -866,9 +879,9 @@
     }
   },
   "i18n": {
-    "rows": 26,
+    "rows": 27,
     "excluded": [],
-    "unwalked": [],
+    "unwalked": ["locale.ts::Locale"],
     "residue": {
       "backend/key-value.ts::SubtreeProxy": "I18n::Backend::KeyValue::SubtreeProxy",
       "backend/transliterator.ts::HashTransliterator": "I18n::Backend::Transliterator::HashTransliterator",
@@ -1002,10 +1015,10 @@
     }
   },
   "rack-test": {
-    "rows": 7,
+    "rows": 8,
     "excluded": [],
     "unwalked": ["methods.ts::Methods", "utils.ts::Utils"],
-    "residue": {}
+    "residue": { "test.ts::Test": "Rack::Test" }
   },
   "rackup": {
     "rows": 3,
