@@ -1651,15 +1651,10 @@ export class MigrationContext<
     return sortBy(migrations, (migration) => migration.version);
   }
 
-  /**
-   * @internal
-   * @inventedArm filter — PERMANENT
-   */
+  /** @internal */
   protected migrationFiles(): string[] {
     const paths = wrap(this.migrationsPaths);
-    return paths.flatMap((path) =>
-      Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`).filter((file) => !file.endsWith(".d.ts")),
-    );
+    return paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
   }
 
   /** @internal */

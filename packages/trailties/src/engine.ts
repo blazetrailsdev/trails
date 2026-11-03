@@ -287,7 +287,7 @@ export class Engine extends Trailtie {
   }
 
   /** @internal */
-  async hasMigrations(): Promise<boolean> {
+  private async hasMigrations(): Promise<boolean> {
     return (await this.paths().get("db/migrate")!.existent()).length > 0;
   }
 
@@ -515,7 +515,7 @@ Engine.initializer("engines_blank_point", function () {});
 
 Engine.rakeTasks(async function (this: Trailtie) {
   if (this instanceof TopLevel.Trails!.Application) return;
-  if (!(await (this as Engine).hasMigrations())) return;
+  if (!(await (this as Engine)["hasMigrations"]())) return;
 
   DSL.namespace(this.railtieName, () => {
     DSL.namespace("install", () => {

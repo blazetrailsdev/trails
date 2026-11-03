@@ -1,6 +1,14 @@
 import { DSL } from "@blazetrails/rake";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
-import { File, RuntimeError, STDOUT, TopLevel, block, env as ENV } from "@blazetrails/ruby-compat";
+import {
+  File,
+  RuntimeError,
+  STDOUT,
+  TopLevel,
+  block,
+  env as ENV,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Migration, Migrator, type MigrationProxy } from "../migration.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
@@ -39,8 +47,8 @@ DSL.namespace("railties", () => {
 
           let path: string | undefined;
           if (
-            typeof railtie.paths === "function" &&
-            (path = await railtie.paths().get("db/migrate")!.first()) != null
+            rbObjRespondTo(railtie, "paths") &&
+            (path = await railtie.paths!().get("db/migrate")!.first()) != null
           ) {
             railties[railtie.railtieName] = path;
           }
