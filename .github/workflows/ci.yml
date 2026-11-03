@@ -2245,10 +2245,11 @@ jobs:
         # in MISSING_TAG_PACKAGES (lint-inlined-from.ts), an only-grow set.
         run: pnpm exec tsx scripts/api-compare/lint-inlined-from.ts
       - name: Class-path table gate
-        # RFC 0205. Each package's src/constants.generated.ts is generated from
-        # rails-api.json by `pnpm parity:class-paths`; a stale table, a paired
-        # class no table can import, or a generated path that disagrees with a
-        # const_set-bound one is red.
+        # RFC 0213. Each package's src/constants.generated.ts is written from
+        # the walk and constant-residue.json by `pnpm parity:class-paths`; this
+        # cross-checks both against the rails-api.json pairing. A stale table or
+        # record, a paired class no table can import, or a generated path that
+        # disagrees with a const_set-bound one is red.
         run: pnpm exec tsx scripts/api-compare/class-paths.ts --check
       - name: Ambiguous-parent ratchet
         # RFC 0126. An inheritance edge whose parent name resolves to several
