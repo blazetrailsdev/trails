@@ -1,0 +1,12 @@
+<%% contentFor("title", "Editing <%= this.humanName().toLowerCase() %>") %>
+
+<h1>Editing <%= this.humanName().toLowerCase() %></h1>
+
+<%%= render("form", { <%= this.singularTableName() %>: this.<%= this.singularTableName() %> }) %>
+
+<br>
+
+<div>
+  <%%= linkTo("Show this <%= this.humanName().toLowerCase() %>", <%= this.modelResourceName(undefined, { prefix: "this." }) %>) %> |
+  <%%= linkTo("Back to <%= ActiveSupport.Inflector.pluralize(this.humanName()).toLowerCase() %>", <%= this.indexHelper({ type: "path" }) %>()) %>
+</div>

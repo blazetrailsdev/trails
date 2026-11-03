@@ -1,0 +1,11 @@
+<%% contentFor("title", "New <%= this.humanName().toLowerCase() %>") %>
+
+<h1>New <%= this.humanName().toLowerCase() %></h1>
+
+<%%= render("form", { <%= this.singularTableName() %>: this.<%= this.singularTableName() %> }) %>
+
+<br>
+
+<div>
+  <%%= linkTo("Back to <%= ActiveSupport.Inflector.pluralize(this.humanName()).toLowerCase() %>", <%= this.indexHelper({ type: "path" }) %>()) %>
+</div>

@@ -1,0 +1,3 @@
+<%= this.className() %>#<%= this._action %>
+
+<%%= this.greeting %>, find me in <%= this._path %>

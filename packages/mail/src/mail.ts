@@ -28,7 +28,8 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   RANDOM_TAG: "%x%x_%x%x%d%x",
 
   new(...args: unknown[]) {
-    return new Mail.Message(args);
+    const block = typeof args.at(-1) === "function" ? args.pop() : undefined;
+    return new Mail.Message(args, block);
   },
 
   randomTag(): string {

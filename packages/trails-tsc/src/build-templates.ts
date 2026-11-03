@@ -30,6 +30,7 @@ async function templatesIn(path: string): Promise<string[]> {
 }
 
 function compileTemplate(source: string): string {
+  source = source.replace(/<%%|<%[\s\S]*?%>/g, (tag) => (tag === "<%%" ? '<%= "<%" %>' : tag));
   const options = {
     trim: true,
     bufvar: "this.outputBuffer",
