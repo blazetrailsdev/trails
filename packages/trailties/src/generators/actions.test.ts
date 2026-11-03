@@ -9,6 +9,8 @@ import {
   setEnv,
   StandardError,
   type ChildProcessAdapter,
+  stderr,
+  SystemExit,
 } from "@blazetrails/ruby-compat";
 import {
   assertEqual,
@@ -304,9 +306,15 @@ describe("ActionsTest", () => {
 
   it("generate should raise on failure", async () => {
     const { system } = testAdapter;
-    testAdapter.system = async () => ({ pid: 1, status: 1, signal: null });
+    testAdapter.system = async (command, _env, args) => {
+      stderr.write(`${[command, ...(args ?? [])].join(" ")}\n`);
+      return { pid: 1, status: 1, signal: null };
+    };
     try {
-      await expect(makeGen().generate("model", "1234567890")).rejects.toThrow();
+      const message = await capture("stderr", () =>
+        assertRaises([SystemExit], {}, () => makeGen().generate("model", "1234567890")),
+      );
+      assertMatch(/1234567890/, message);
     } finally {
       testAdapter.system = system;
     }
