@@ -2609,7 +2609,7 @@ describe("EagerAssociationTest", () => {
     await import("../test-helpers/models/sharded/comment.js");
     await import("../test-helpers/models/sharded/tag.js");
     await import("../test-helpers/models/sharded/blog-post-tag.js");
-    const cpk = await import("../test-helpers/models/cpk.js");
+    await import("../test-helpers/models/cpk.js");
   });
 
   it("preloading belongs_to association associated by a composite query_constraints", async () => {
