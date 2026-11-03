@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -186,4 +187,12 @@ function pickExpiration(
 export function _resetSignedGlobalIDClassConfig(): void {
   _classVerifier = undefined;
   _classExpiresIn = undefined;
+}
+
+TopLevel.SignedGlobalID = SignedGlobalID;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    SignedGlobalID?: typeof SignedGlobalID;
+  }
 }

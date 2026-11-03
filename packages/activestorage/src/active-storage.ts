@@ -26,7 +26,12 @@ export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {};
 
-export const ActiveStorage = { name: "ActiveStorage", loadPath } as AutoloadModule & {
+export const ActiveStorage = {
+  name: "ActiveStorage",
+  loadPath,
+  Reflection: { name: "ActiveStorage::Reflection" },
+} as AutoloadModule & {
+  Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
   FixtureSet: unknown;

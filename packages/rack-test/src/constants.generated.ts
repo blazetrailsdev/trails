@@ -6,6 +6,7 @@ import * as m3 from "./uploaded-file.js";
 import * as m4 from "./utils.js";
 
 defineConstants([
+  [() => m2.Test, "Rack::Test"],
   [() => m0.Cookie, "Rack::Test::Cookie"],
   [() => m0.CookieJar, "Rack::Test::CookieJar"],
   [() => m2.Error, "Rack::Test::Error"],

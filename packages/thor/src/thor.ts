@@ -29,6 +29,7 @@ import {
   Hash,
   hashDelete,
   isModuleIncluded,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import type { Invocation } from "./invocation.js";
@@ -44,6 +45,7 @@ import { Option, type OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
+import * as LineEditor from "./line-editor.js";
 
 type Mappings = Record<string, string> | Map<unknown, string>;
 
@@ -71,6 +73,8 @@ export class Thor {
   }
 
   static Group = Group;
+
+  static LineEditor = LineEditor;
 
   /** @internal */
   static _packageName?: string | null;
@@ -846,3 +850,11 @@ include(Thor, Base);
 (Thor as ThorClass).methodAdded("help");
 
 import "./constants.generated.js";
+
+TopLevel.Thor = Thor;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Thor?: typeof Thor;
+  }
+}

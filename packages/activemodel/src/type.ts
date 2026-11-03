@@ -1,3 +1,5 @@
+import { ActiveModel } from "./namespaces.js";
+import * as Type from "./type.js";
 import { TypeRegistry, type TypeClass, type TypeFactory } from "./type/registry.js";
 import { ValueType } from "./type/value.js";
 import { BigIntegerType } from "./type/big-integer.js";
@@ -53,3 +55,7 @@ register("immutable_string", ImmutableStringType);
 register("integer", IntegerType);
 register("string", StringType);
 register("time", TimeType);
+
+export const Helpers = { name: "ActiveModel::Type::Helpers" };
+
+ActiveModel.Type = Type;

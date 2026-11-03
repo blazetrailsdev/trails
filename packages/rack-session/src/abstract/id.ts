@@ -13,7 +13,7 @@ import {
   rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
+import { RACK_ERRORS, Rack, Request, Raw } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS } from "../constants.js";
 
 export class SessionId {
@@ -694,3 +694,6 @@ Object.defineProperty(PersistedSecure, "name", {
   value: "Rack::Session::Abstract::PersistedSecure",
 });
 Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });
+
+export const Session = { name: "Rack::Session", Abstract: { name: "Rack::Session::Abstract" } };
+Rack.Session = Session;

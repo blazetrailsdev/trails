@@ -221,7 +221,26 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
-export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+export const ActiveRecord = {
+  name: "ActiveRecord",
+  loadPath,
+  Enum: { name: "ActiveRecord::Enum" },
+  Marshalling: { name: "ActiveRecord::Marshalling" },
+  Middleware: { name: "ActiveRecord::Middleware" },
+  Sanitization: { name: "ActiveRecord::Sanitization" },
+  SecureToken: { name: "ActiveRecord::SecureToken" },
+  Store: { name: "ActiveRecord::Store" },
+  Trailties: { name: "ActiveRecord::Trailties" },
+  Type: { name: "ActiveRecord::Type", Internal: { name: "ActiveRecord::Type::Internal" } },
+} as AutoloadModule & {
+  Enum: { name: string };
+  Marshalling: { name: string };
+  Middleware: { name: string };
+  Sanitization: { name: string };
+  SecureToken: { name: string };
+  Store: { name: string };
+  Trailties: { name: string };
+  Type: { name: string; Internal: { name: string } };
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
@@ -291,7 +310,12 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("Result");
 });
 
-export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
+export const Associations = {
+  name: "ActiveRecord::Associations",
+  loadPath,
+  Builder: { name: "ActiveRecord::Associations::Builder" },
+} as AutoloadModule & {
+  Builder: { name: string };
   CollectionProxy: typeof CollectionProxy;
   BelongsToAssociation: typeof BelongsToAssociation;
   BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;

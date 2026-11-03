@@ -16,7 +16,7 @@ import {
   type Extended,
   underscore,
 } from "@blazetrails/activesupport";
-import { ArgumentError, block, fetch, rbHash } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, fetch, rbHash, TopLevel } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -210,3 +210,11 @@ Object.defineProperty(GlobalID, "eagerLoadBang", {
   writable: true,
   configurable: true,
 });
+
+TopLevel.GlobalID = GlobalID;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    GlobalID?: typeof GlobalID;
+  }
+}

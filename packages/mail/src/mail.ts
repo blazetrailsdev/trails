@@ -16,6 +16,7 @@ import type { CommonField } from "./fields/common-field.js";
 interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
+  Parsers: { name: string };
   "new"(...args: unknown[]): Message;
   RANDOM_TAG: string;
   randomTag(): string;
@@ -26,6 +27,8 @@ interface MailConstants {
 type FieldConstant = new (...args: never[]) => CommonField;
 
 export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
+  Parsers: { name: "Mail::Parsers" },
+
   RANDOM_TAG: "%x%x_%x%x%d%x",
 
   new(...args: unknown[]) {

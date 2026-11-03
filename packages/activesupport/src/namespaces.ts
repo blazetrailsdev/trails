@@ -34,7 +34,25 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   },
 };
 
-export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
+export const ActiveSupport = {
+  name: "ActiveSupport",
+  loadPath,
+  Cache: { name: "ActiveSupport::Cache" },
+  Concurrency: { name: "ActiveSupport::Concurrency" },
+  JSON: { name: "ActiveSupport::JSON" },
+  Messages: { name: "ActiveSupport::Messages" },
+  Testing: {
+    name: "ActiveSupport::Testing",
+    SetupAndTeardown: { name: "ActiveSupport::Testing::SetupAndTeardown" },
+  },
+  XmlMini: { name: "ActiveSupport::XmlMini" },
+} as AutoloadModule & {
+  Cache: { name: string };
+  Concurrency: { name: string };
+  JSON: { name: string };
+  Messages: { name: string };
+  Testing: { name: string; SetupAndTeardown: { name: string } };
+  XmlMini: { name: string };
   BroadcastLogger: typeof BroadcastLogger;
   Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;

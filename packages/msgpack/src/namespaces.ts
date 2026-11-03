@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import type { Bigint } from "./bigint.js";
 import type { Buffer } from "./buffer.js";
 import type { CoreExt } from "./core-ext.js";
@@ -42,3 +43,11 @@ export const MessagePack = { name: "MessagePack" } as {
   Time: typeof Time;
   Timestamp: typeof Timestamp;
 };
+
+TopLevel.MessagePack = MessagePack;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    MessagePack?: typeof MessagePack;
+  }
+}

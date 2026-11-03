@@ -560,3 +560,8 @@ export abstract class Base {
     return key;
   }
 }
+
+export const Backend = {
+  name: "I18n::Backend",
+  Transliterator: { name: "I18n::Backend::Transliterator" },
+};

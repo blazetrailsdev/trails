@@ -1077,6 +1077,8 @@ export class Mapper {
 
   static Scope = Scope;
 
+  static Resources = { name: "ActionDispatch::Routing::Mapper::Resources" };
+
   /** @internal */
   _concerns: Map<string, ConcernCallable> = new Map();
   /** @internal */

@@ -217,6 +217,10 @@ export interface RequestForgeryProtectionHost extends ActionCallbackHost, Helper
 export class RequestForgeryProtection {
   static readonly AUTHENTICITY_TOKEN_LENGTH = 32;
 
+  static ProtectionMethods = {
+    name: "ActionController::RequestForgeryProtection::ProtectionMethods",
+  };
+
   static ClassMethods = {
     protectFromForgery,
     skipForgeryProtection,

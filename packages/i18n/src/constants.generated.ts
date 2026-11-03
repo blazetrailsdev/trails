@@ -8,9 +8,10 @@ import * as m4 from "./backend/simple.js";
 import * as m5 from "./backend/transliterator.js";
 import * as m6 from "./config.js";
 import * as m7 from "./exceptions.js";
-import * as m8 from "./locale/fallbacks.js";
-import * as m9 from "./locale/tag/rfc4646.js";
-import * as m10 from "./locale/tag/simple.js";
+import * as m8 from "./locale.js";
+import * as m9 from "./locale/fallbacks.js";
+import * as m10 from "./locale/tag/rfc4646.js";
+import * as m11 from "./locale/tag/simple.js";
 
 defineConstants([
   [() => m7.ArgumentError, "I18n::ArgumentError"],
@@ -28,10 +29,11 @@ defineConstants([
   [() => m7.InvalidLocale, "I18n::InvalidLocale"],
   [() => m7.InvalidLocaleData, "I18n::InvalidLocaleData"],
   [() => m7.InvalidPluralizationData, "I18n::InvalidPluralizationData"],
-  [() => m8.Fallbacks, "I18n::Locale::Fallbacks"],
-  [() => m9.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
-  [() => m9.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
-  [() => m10.Simple, "I18n::Locale::Tag::Simple"],
+  [() => m8.Locale, "I18n::Locale"],
+  [() => m9.Fallbacks, "I18n::Locale::Fallbacks"],
+  [() => m10.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
+  [() => m10.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
+  [() => m11.Simple, "I18n::Locale::Tag::Simple"],
   [() => m7.MissingInterpolationArgument, "I18n::MissingInterpolationArgument"],
   [() => m7.MissingTranslation, "I18n::MissingTranslation"],
   [() => m7.Base, "I18n::MissingTranslation::Base"],

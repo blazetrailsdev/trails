@@ -232,6 +232,10 @@ defineConstants([
     "ActionController::RequestForgeryProtection::ClassMethods",
   ],
   [() => m45.CookieStore, "ActionController::RequestForgeryProtection::CookieStore"],
+  [
+    () => m45.RequestForgeryProtection.ProtectionMethods,
+    "ActionController::RequestForgeryProtection::ProtectionMethods",
+  ],
   [() => m45.Exception, "ActionController::RequestForgeryProtection::ProtectionMethods::Exception"],
   [
     () => m45.NullSession,
@@ -413,6 +417,7 @@ defineConstants([
   [() => m110.Mapper.BacktraceCleaner, "ActionDispatch::Routing::Mapper::BacktraceCleaner"],
   [() => m110.Constraints, "ActionDispatch::Routing::Mapper::Constraints"],
   [() => m110.Mapping, "ActionDispatch::Routing::Mapper::Mapping"],
+  [() => m110.Mapper.Resources, "ActionDispatch::Routing::Mapper::Resources"],
   [() => m110.Resource, "ActionDispatch::Routing::Mapper::Resources::Resource"],
   [() => m110.SingletonResource, "ActionDispatch::Routing::Mapper::Resources::SingletonResource"],
   [() => m110.Scope, "ActionDispatch::Routing::Mapper::Scope"],
