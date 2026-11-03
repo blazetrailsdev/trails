@@ -1,5 +1,11 @@
 import { camelize } from "@blazetrails/activesupport";
-import { constSet, constDefined, rbModRemoveConst, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  constSet,
+  constDefined,
+  constGet,
+  rbModRemoveConst,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
 import { X_CASCADE } from "../constants.js";
@@ -51,9 +57,15 @@ describe("RouteDispatcher", () => {
   }
 
   afterEach(() => {
-    for (const controller of registered.splice(0))
-      if (constDefined(Object, `${camelize(controller)}Controller`, false))
-        rbModRemoveConst(Object, `${camelize(controller)}Controller`);
+    for (const controller of registered.splice(0)) {
+      const path = `${camelize(controller)}Controller`;
+      if (!constDefined(Object, path, false)) continue;
+      const i = path.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, path.slice(0, i)) as object),
+        i < 0 ? path : path.slice(i + 2),
+      );
+    }
   });
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {

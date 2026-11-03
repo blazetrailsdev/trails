@@ -1,6 +1,6 @@
 import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import { constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constDefined, constGet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -420,9 +420,15 @@ describe("Mapper block receivers", () => {
   });
 
   afterAll(() => {
-    for (const name of names)
-      if (constDefined(Object, `${camelize(name)}Controller`, false))
-        rbModRemoveConst(Object, `${camelize(name)}Controller`);
+    for (const name of names) {
+      const path = `${camelize(name)}Controller`;
+      if (!constDefined(Object, path, false)) continue;
+      const i = path.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, path.slice(0, i)) as object),
+        i < 0 ? path : path.slice(i + 2),
+      );
+    }
   });
 
   it("binds a nested constraints block to the mapper, as draw binds its own", () => {
