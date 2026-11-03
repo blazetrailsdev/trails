@@ -237,13 +237,13 @@ export function renderManifest(entries: ModelEntry[], modelsImportDir = "."): st
   return out;
 }
 
-function modelsImportDir(modelsDir: string, manifestDir: string): string {
+function relativeModelsDir(modelsDir: string, manifestDir: string): string {
   const rel = new Pathname(File.expandPath(modelsDir)).relativePathFrom(manifestDir).toString();
   return rel.startsWith(".") ? rel : `./${rel}`;
 }
 
 export async function buildManifest(modelsDir: string, manifestDir = modelsDir): Promise<string> {
-  return renderManifest(await scanModels(modelsDir), modelsImportDir(modelsDir, manifestDir));
+  return renderManifest(await scanModels(modelsDir), relativeModelsDir(modelsDir, manifestDir));
 }
 
 export interface ManifestResult {
