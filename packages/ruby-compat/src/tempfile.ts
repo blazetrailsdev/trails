@@ -53,14 +53,21 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
   private unlinked = false;
   /** `@opts` (`vendor/ruby/v3.3.11/lib/tempfile.rb:152`). */
   private readonly opts: TempfileOptions;
-  /** `@finalizer_obj` (`vendor/ruby/v3.3.11/lib/tempfile.rb:155`). */
-  private readonly finalizerObj = {};
 
   private constructor(tmpfile: File, opts: TempfileOptions = {}) {
     super(tmpfile);
     this.opts = opts;
-    const remover = new Remover(tmpfile.path()!);
-    ObjectSpace.defineFinalizer(this.finalizerObj, () => remover.call());
+    const [pid, path] = [Process.pid, tmpfile.path()!];
+    // `Tempfile::Remover#call` (`vendor/ruby/v3.3.11/lib/tempfile.rb:313-324`).
+    ObjectSpace.defineFinalizer(this, () => {
+      if (pid !== Process.pid) return;
+
+      try {
+        File.delete(path);
+      } catch (error) {
+        if ((error as { code?: string }).code !== "ENOENT") throw error;
+      }
+    });
   }
 
   /**
@@ -285,7 +292,7 @@ export class Tempfile extends DelegateClass(File as unknown as new () => File) {
       if (code === "EACCES") return null;
       if (code !== "ENOENT") throw error;
     }
-    ObjectSpace.undefineFinalizer(this.finalizerObj);
+    ObjectSpace.undefineFinalizer(this);
     return (this.unlinked = true);
   }
 
@@ -335,30 +342,4 @@ function ensure<T>(body: () => T, cleanup: () => void): T {
   if (value instanceof Promise) return value.finally(cleanup) as T;
   cleanup();
   return value;
-}
-
-/**
- * `Tempfile::Remover` (`vendor/ruby/v3.3.11/lib/tempfile.rb:307-325`), the
- * finalizer that unlinks the path at GC or at exit.
- *
- * @internal
- */
-class Remover {
-  private readonly pid: number;
-  private readonly path: string;
-
-  constructor(path: string) {
-    this.pid = Process.pid;
-    this.path = path;
-  }
-
-  call(): void {
-    if (this.pid !== Process.pid) return;
-
-    try {
-      File.delete(this.path);
-    } catch (error) {
-      if ((error as { code?: string }).code !== "ENOENT") throw error;
-    }
-  }
 }
