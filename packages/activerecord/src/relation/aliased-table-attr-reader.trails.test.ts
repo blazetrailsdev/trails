@@ -3,11 +3,10 @@ import { Relation } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import { registerModel } from "../associations.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 let aliasQ: string;
 let baseQ: string;

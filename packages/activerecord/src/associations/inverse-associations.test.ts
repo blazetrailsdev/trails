@@ -1,9 +1,9 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
   Base,
-  registerModel,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
   RecordNotFound,
@@ -77,7 +77,7 @@ describe("AutomaticInverseFindingTests", () => {
       Subscriber,
       CpkCar,
       CpkCarReview,
-    ].forEach((m) => registerModel(m));
+    ].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("has one and belongs to should find inverse automatically on multiple word name", () => {
@@ -296,10 +296,10 @@ describe("InverseAssociationTests", () => {
 
   beforeAll(() => {
     [Human, Face, Interest, Club, Sponsor, Company, Firm, Developer, Project, AuditLog].forEach(
-      (m) => registerModel(m),
+      (m) => constSet(TopLevel, m.name, m),
     );
     Company.inheritanceColumn = "type";
-    registerModel(Firm);
+    constSet(TopLevel, "Firm", Firm);
   });
 
   it("should allow for inverse of options in associations", () => {
@@ -369,8 +369,8 @@ describe("InverseAssociationTests", () => {
 describe("InverseHasOneTests", () => {
   const { humans } = fixtures(["humans", "faces"]);
   beforeAll(() => {
-    registerModel(Human);
-    registerModel(Face);
+    constSet(TopLevel, "Human", Human);
+    constSet(TopLevel, "Face", Face);
   });
 
   it("parent instance should be shared with child on find", async () => {
@@ -488,7 +488,7 @@ describe("InverseHasManyTests", () => {
   ]);
   beforeAll(async () => {
     [Human, Interest, Post, SpecialPost, Author, Comment, CpkAuthor, CpkBook, CpkOrder].forEach(
-      (m) => registerModel(m),
+      (m) => constSet(TopLevel, m.name, m),
     );
     await (CpkAuthor as any).loadSchema();
     await (CpkBook as any).loadSchema();
@@ -836,7 +836,7 @@ describe("InverseHasManyTests", () => {
 describe("InverseBelongsToTests", () => {
   const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
-    [Human, Face, Interest].forEach((m) => registerModel(m));
+    [Human, Face, Interest].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("child instance should be shared with parent on find", async () => {
@@ -1033,7 +1033,7 @@ describe("InverseBelongsToTests", () => {
 describe("InversePolymorphicBelongsToTests", () => {
   const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
-    [Human, Face, Interest].forEach((m) => registerModel(m));
+    [Human, Face, Interest].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("child instance should be shared with parent on find", async () => {
@@ -1178,7 +1178,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 describe("InverseMultipleHasManyInversesForSameModel", () => {
   fixtures(["humans", "interests", "zines"]);
   beforeAll(() => {
-    [Human, Interest, Zine].forEach((m) => registerModel(m));
+    [Human, Interest, Zine].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("that we can load associations that have the same reciprocal name from different models", async () => {
@@ -1202,7 +1202,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 describe("InverseBelongsToTests", () => {
   const { self } = fixtures({});
   beforeAll(() => {
-    [Branch, BrokenBranch].forEach((m) => registerModel(m));
+    [Branch, BrokenBranch].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("recursive model has many inversing", async () => {

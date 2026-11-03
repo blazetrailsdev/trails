@@ -1,12 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Post } from "../test-helpers/models/post.js";
 
-registerModel([Author, Comment, Post]);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Post", Post);
 
 describe("RelationMergingTest", () => {
   fixtures([]);

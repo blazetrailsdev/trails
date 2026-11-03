@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Movie extends Base {
   declare movieid: number;
@@ -10,4 +11,5 @@ export class Movie extends Base {
     this.validates("name", { presence: true });
   }
 }
-registerModel(Movie);
+constSet(TopLevel, "Movie", Movie);
+DescendantsTracker.registerSubclass(Base, Movie);

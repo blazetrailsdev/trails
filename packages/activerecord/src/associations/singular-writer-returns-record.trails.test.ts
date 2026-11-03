@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel, type Base } from "../index.js";
+import { type Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
@@ -19,14 +20,14 @@ describe("SingularAssociation#writer", () => {
     "memberships",
   ]);
 
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Account);
-  registerModel(Member);
-  registerModel(Club);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Account", Account);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Club", Club);
   Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
 
   it("returns the record a belongs_to was assigned", () => {
     const account = accounts("signals37");

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType, ValueType } from "@blazetrails/activemodel";
@@ -11,14 +12,14 @@ import {
   CpkChapter,
   CpkOrderWithSingularBookChapters,
 } from "../test-helpers/models/cpk.js";
-import { registerModel } from "../associations.js";
 import { Base } from "../index.js";
 import { quoteColumnName } from "../support/quote-regex.js";
 import {
   Range,
   regexpEscape,
-  registeredConstant,
-  unregisterConstant,
+  constSet,
+  TopLevel,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
@@ -107,7 +108,7 @@ describe("association hash expansion grouping shape", () => {
 
   beforeAll(() => {
     [CpkOrderWithSingularBookChapters, CpkBook, CpkChapter].forEach((m) =>
-      registerModel(m as unknown as typeof Base),
+      constSet(TopLevel, m.name, m),
     );
   });
 
@@ -379,13 +380,14 @@ describe("PredicateBuilder hash building and bind handling", () => {
     }
 
     beforeAll(() => {
-      registerModel("Author", Author);
-      registerModel("Post", PbTestPost);
+      constSet(TopLevel, "Author", Author);
+      constSet(TopLevel, "Post", PbTestPost);
+      DescendantsTracker.registerSubclass(Base, PbTestPost);
     });
 
     afterAll(() => {
-      unregisterConstant("Author", registeredConstant("Author"));
-      unregisterConstant("Post", registeredConstant("Post"));
+      rbModRemoveConst(TopLevel, "Author");
+      rbModRemoveConst(TopLevel, "Post");
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
@@ -424,7 +426,7 @@ describe("PredicateBuilder hash building and bind handling", () => {
       class PbTestProduct extends Base {
         static {
           this.tableName = "products";
-          registerModel("PbTestProduct", this);
+          constSet(TopLevel, "PbTestProduct", this);
         }
       }
       try {
@@ -435,7 +437,7 @@ describe("PredicateBuilder hash building and bind handling", () => {
         expect(sql).toContain('"products"."price"');
         expect(sql).not.toContain('"price"."foo"');
       } finally {
-        unregisterConstant("PbTestProduct", registeredConstant("PbTestProduct"));
+        rbModRemoveConst(TopLevel, "PbTestProduct");
       }
     });
   });

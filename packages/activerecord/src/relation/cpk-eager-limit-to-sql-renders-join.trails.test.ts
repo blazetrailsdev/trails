@@ -1,14 +1,13 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkOrder, CpkBook } from "../test-helpers/models/cpk.js";
-import type { Base } from "../index.js";
 
 describe("Relation#to_sql composite-PK eager load with limit", () => {
   fixtures(["cpkOrders", "cpkBooks"]);
 
   beforeAll(() => {
-    [CpkOrder, CpkBook].forEach((m) => registerModel(m as unknown as typeof Base));
+    [CpkOrder, CpkBook].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   it("renders the eager JOIN and a per-column primary-key restriction", () => {

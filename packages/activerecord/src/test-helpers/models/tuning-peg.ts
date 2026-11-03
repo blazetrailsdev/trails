@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Guitar } from "./guitar.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TuningPeg extends Base {
@@ -12,7 +13,8 @@ export class TuningPeg extends Base {
     this.validatesNumericalityOf("pitch");
   }
 }
-registerModel(TuningPeg);
+constSet(TopLevel, "TuningPeg", TuningPeg);
+DescendantsTracker.registerSubclass(Base, TuningPeg);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TuningPeg {
   get guitar(): Guitar | null | Promise<Guitar | null>;

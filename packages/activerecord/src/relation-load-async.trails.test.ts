@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { FutureResult } from "./future-result.js";
 import { setAsyncQueryExecutor } from "./active-record.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -11,8 +12,8 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 fixtures({ topics: [Topic, {}] });
 
 describe("Relation#load_async", () => {
-  registerModel("Topic", Topic);
-  registerModel("Reply", Reply);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Reply", Reply);
 
   afterEach(() => {
     setAsyncQueryExecutor("global_thread_pool");

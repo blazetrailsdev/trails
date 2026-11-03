@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Wheel extends Base {
@@ -15,7 +16,8 @@ export class Wheel extends Base {
     });
   }
 }
-registerModel(Wheel);
+constSet(TopLevel, "Wheel", Wheel);
+DescendantsTracker.registerSubclass(Base, Wheel);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Wheel {
   get wheelable(): Base | null | Promise<Base | null>;
@@ -32,7 +34,8 @@ export class WheelPolymorphicTouch extends Base {
     this.belongsTo("wheelable", { polymorphic: true, touch: true });
   }
 }
-registerModel(WheelPolymorphicTouch);
+constSet(TopLevel, "WheelPolymorphicTouch", WheelPolymorphicTouch);
+DescendantsTracker.registerSubclass(Base, WheelPolymorphicTouch);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface WheelPolymorphicTouch {
   get wheelable(): Base | null | Promise<Base | null>;

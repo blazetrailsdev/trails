@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Family } from "./family.js";
@@ -7,7 +9,6 @@ import type { Room } from "./room.js";
 import { Base } from "../../base.js";
 import { hasSecurePassword } from "../../secure-password.js";
 import { Notification } from "./notification.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class User extends Base {
@@ -44,7 +45,8 @@ export class User extends Base {
     this.hasOne("rentedRoom", { className: "Room", foreignKey: "tenant_id", dependent: "destroy" });
   }
 }
-registerModel(User);
+constSet(TopLevel, "User", User);
+DescendantsTracker.registerSubclass(Base, User);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface User {
   get room(): Room | null | Promise<Room | null>;
@@ -73,14 +75,16 @@ export class UserWithNotification extends User {
     });
   }
 }
-registerModel(UserWithNotification);
+constSet(TopLevel, "UserWithNotification", UserWithNotification);
+DescendantsTracker.registerSubclass(User, UserWithNotification);
 
 export class NestedUser extends Base {
   static {
     this.tableName = "users";
   }
 }
-registerModel(NestedUser);
+constSet(TopLevel, "NestedUser", NestedUser);
+DescendantsTracker.registerSubclass(Base, NestedUser);
 
 export class NestedNestedUser extends Base {
   declare nestedUsers: AssociationProxy<NestedUser>;
@@ -89,4 +93,5 @@ export class NestedNestedUser extends Base {
     this.hasMany("nestedUsers");
   }
 }
-registerModel(NestedNestedUser);
+constSet(TopLevel, "NestedNestedUser", NestedNestedUser);
+DescendantsTracker.registerSubclass(Base, NestedNestedUser);

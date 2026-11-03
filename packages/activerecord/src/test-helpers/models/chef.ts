@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Chef extends Base {
@@ -20,7 +21,8 @@ export class Chef extends Base {
     this.hasMany("recipes");
   }
 }
-registerModel(Chef);
+constSet(TopLevel, "Chef", Chef);
+DescendantsTracker.registerSubclass(Base, Chef);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Chef {
   get employable(): Base | null | Promise<Base | null>;
@@ -33,7 +35,8 @@ export class ChefList extends Chef {
     this.belongsTo("employableList", { polymorphic: true });
   }
 }
-registerModel(ChefList);
+constSet(TopLevel, "ChefList", ChefList);
+DescendantsTracker.registerSubclass(Chef, ChefList);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefList {
   get employableList(): Base | null | Promise<Base | null>;
@@ -79,7 +82,8 @@ export class ChefWithPolymorphicInverseOf extends Chef {
     });
   }
 }
-registerModel(ChefWithPolymorphicInverseOf);
+constSet(TopLevel, "ChefWithPolymorphicInverseOf", ChefWithPolymorphicInverseOf);
+DescendantsTracker.registerSubclass(Chef, ChefWithPolymorphicInverseOf);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefWithPolymorphicInverseOf {
   get employable(): Base | null | Promise<Base | null>;

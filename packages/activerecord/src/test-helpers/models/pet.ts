@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Owner } from "./owner.js";
@@ -6,7 +8,6 @@ import type { PetTreasure } from "./pet-treasure.js";
 import type { Toy } from "./toy.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Pet extends Base {
@@ -38,7 +39,8 @@ export class Pet extends Base {
     });
   }
 }
-registerModel(Pet);
+constSet(TopLevel, "Pet", Pet);
+DescendantsTracker.registerSubclass(Base, Pet);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pet {
   get owner(): Owner | null | Promise<Owner | null>;
@@ -56,7 +58,8 @@ export class PetTouchHappyAt extends Base {
     this.belongsTo("owner", { touch: "happy_at" });
   }
 }
-registerModel(PetTouchHappyAt);
+constSet(TopLevel, "PetTouchHappyAt", PetTouchHappyAt);
+DescendantsTracker.registerSubclass(Base, PetTouchHappyAt);
 
 export class PetCounterCacheTouch extends Base {
   declare name: string;
@@ -69,4 +72,5 @@ export class PetCounterCacheTouch extends Base {
     this.belongsTo("owner", { counterCache: "use_count", touch: true });
   }
 }
-registerModel(PetCounterCacheTouch);
+constSet(TopLevel, "PetCounterCacheTouch", PetCounterCacheTouch);
+DescendantsTracker.registerSubclass(Base, PetCounterCacheTouch);

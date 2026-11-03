@@ -1,6 +1,14 @@
-import { basicObjRespondTo, Module, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import {
+  basicObjRespondTo,
+  Module,
+  rbInspect,
+  rbObjRespondTo,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
-import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
+import { Base, DangerousAttributeError, ReadonlyAttributeError } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
 import {
   attributesForCreate,
@@ -13,9 +21,7 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
-registerModel(Minivan);
-registerModel(CpkBook);
-registerModel(CpkOrder);
+constSet(TopLevel, "Minivan", Minivan);
 
 interface Generatable {
   defineAttributeMethods(): boolean;
@@ -217,7 +223,8 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     class ImportantTopic extends Topic {
       static {
-        registerModel(this);
+        constSet(TopLevel, "ImportantTopic", this);
+        DescendantsTracker.registerSubclass(Topic, this);
       }
     }
     await Topic.loadSchema();

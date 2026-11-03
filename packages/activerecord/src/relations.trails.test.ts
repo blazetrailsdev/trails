@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -9,8 +9,8 @@ describe("RelationTest", () => {
   fixtures(["posts"]);
 
   beforeAll(() => {
-    registerModel(Post);
-    registerModel(Comment);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Comment", Comment);
   });
 
   it("eager from() subquery projects the table star, not column aliases", () => {

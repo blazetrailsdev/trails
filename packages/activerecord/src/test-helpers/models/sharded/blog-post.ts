@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Sharded } from "./namespace.js";
 import { rbModName } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
-import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
@@ -23,7 +25,8 @@ export class ShardedBlogPost extends Base {
 
   static _tableName = "sharded_blog_posts";
   static {
-    registerModel("Sharded::BlogPost", this);
+    constSet(Sharded, "BlogPost", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

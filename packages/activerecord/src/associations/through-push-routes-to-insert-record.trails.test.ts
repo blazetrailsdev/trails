@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
@@ -37,10 +37,10 @@ describe("through-collection writes route onto the association's insertRecord", 
   const { authors, categories } = fixtures(["authors", "posts", "categories", "categorizations"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Category);
-    registerModel(Categorization);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Category", Category);
+    constSet(TopLevel, "Categorization", Categorization);
   });
 
   it("push reaches HasManyThroughAssociation#insertRecord", async () => {

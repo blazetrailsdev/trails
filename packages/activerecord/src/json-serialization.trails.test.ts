@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "./index.js";
 
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -11,11 +11,11 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Comment);
-registerModel(Tag);
-registerModel(Tagging);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
 
 describe("JSON serialization with an include: is sync or awaited", () => {
   fixtures(["authors", "authorAddresses", "posts", "comments", "tags", "taggings"]);

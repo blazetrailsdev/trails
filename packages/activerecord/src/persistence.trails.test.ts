@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { ActiveRecordError, RecordInvalid, registerModel } from "./index.js";
+import { ActiveRecordError, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -235,7 +237,8 @@ describe("PersistenceTest (trails)", () => {
         this.attribute("wingspan", "integer");
       }
     }
-    registerModel(MinimalisticAircraft);
+    constSet(TopLevel, "MinimalisticAircraft", MinimalisticAircraft);
+    DescendantsTracker.registerSubclass(Minimalistic, MinimalisticAircraft);
 
     void Aircraft.resetColumnInformation();
 
@@ -286,7 +289,11 @@ describe("PersistenceTest (trails)", () => {
         return "654321" as unknown as number;
       }
     }
-    registerModel(PostWithStringSequence as never);
+    constSet(TopLevel, "PostWithStringSequence", PostWithStringSequence);
+    DescendantsTracker.registerSubclass(
+      CanonicalPost as unknown as typeof Base,
+      PostWithStringSequence,
+    );
 
     let insertSql: string | null = null;
     let insertBinds: unknown[] = [];

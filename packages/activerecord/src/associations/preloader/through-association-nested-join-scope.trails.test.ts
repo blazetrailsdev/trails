@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { ThroughAssociation } from "./through-association.js";
@@ -8,16 +7,16 @@ import { Club } from "../../test-helpers/models/club.js";
 import { Membership, CurrentMembership } from "../../test-helpers/models/membership.js";
 import { Category } from "../../test-helpers/models/category.js";
 import { Categorization } from "../../test-helpers/models/categorization.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
-registerModel(Member);
-registerModel(Club);
+constSet(TopLevel, "Member", Member);
+constSet(TopLevel, "Club", Club);
 Membership.inheritanceColumn = "type";
-registerModel(Membership);
-registerModel(CurrentMembership);
+constSet(TopLevel, "Membership", Membership);
+constSet(TopLevel, "CurrentMembership", CurrentMembership);
 Category.inheritanceColumn = "type";
-registerModel(Category);
-registerModel(Categorization);
+constSet(TopLevel, "Category", Category);
+constSet(TopLevel, "Categorization", Categorization);
 
 type NestedRel = {
   leftJoins: (spec: Record<string, unknown>) => NestedRel;

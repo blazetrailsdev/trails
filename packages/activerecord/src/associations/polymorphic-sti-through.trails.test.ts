@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Hotel } from "../test-helpers/models/hotel.js";
 import { Department } from "../test-helpers/models/department.js";
@@ -7,11 +7,11 @@ import { Chef } from "../test-helpers/models/chef.js";
 import { CakeDesigner } from "../test-helpers/models/cake-designer.js";
 import { DrinkDesigner } from "../test-helpers/models/drink-designer.js";
 
-registerModel(Hotel);
-registerModel(Department);
-registerModel(Chef);
-registerModel(CakeDesigner);
-registerModel(DrinkDesigner);
+constSet(TopLevel, "Hotel", Hotel);
+constSet(TopLevel, "Department", Department);
+constSet(TopLevel, "Chef", Chef);
+constSet(TopLevel, "CakeDesigner", CakeDesigner);
+constSet(TopLevel, "DrinkDesigner", DrinkDesigner);
 
 describe("HABTM Slot E — polymorphic + STI through", () => {
   fixtures([]);

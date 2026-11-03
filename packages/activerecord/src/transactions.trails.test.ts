@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
+import { Fiber, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import {
   IsolatedExecutionState,
@@ -7,7 +7,7 @@ import {
   NullLock,
   ThreadLoadInterlockAwareMonitor,
 } from "@blazetrails/activesupport";
-import { Base, transaction, registerModel } from "./index.js";
+import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -40,7 +40,7 @@ interface AdapterTxView {
 }
 
 for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
-  registerModel(klass as unknown as typeof Base);
+  constSet(TopLevel, klass.name, klass);
 }
 
 const openAdapters: SQLite3Adapter[] = [];

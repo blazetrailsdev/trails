@@ -1,4 +1,4 @@
-import { Enumerable } from "@blazetrails/ruby-compat";
+import { Enumerable, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -9,7 +9,6 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport";
 import "../index.js";
-import { registerModel } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { adapterType } from "../test-adapter.js";
@@ -21,14 +20,14 @@ import { Comment, SpecialComment, OopsError } from "../test-helpers/models/comme
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 
-registerModel(Topic);
-registerModel(Reply);
-registerModel(Post);
-registerModel(SpecialPost);
-registerModel(Comment);
-registerModel(SpecialComment);
-registerModel(Author);
-registerModel(Developer);
+constSet(TopLevel, "Topic", Topic);
+constSet(TopLevel, "Reply", Reply);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "SpecialPost", SpecialPost);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Developer", Developer);
 
 const ids = (rows: any[]) => rows.map((r) => r.id);
 const sortedIds = (rows: any[]) => ids(rows).sort((a, b) => Number(a) - Number(b));

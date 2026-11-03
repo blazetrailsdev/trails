@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError, I18n } from "@blazetrails/activemodel";
@@ -6,7 +7,6 @@ import {
   SubclassNotFound,
   Base,
   CollectionProxy,
-  registerModel,
   RecordNotFound,
   RecordNotSaved,
   RecordNotDestroyed,
@@ -275,8 +275,10 @@ describe("HasManyAssociationsTest", () => {
         this.belongsTo("developer", { className: "AnonDeveloper" });
       }
     }
-    registerModel(AnonDeveloper);
-    registerModel(AnonDeveloperProject);
+    constSet(TopLevel, "AnonDeveloper", AnonDeveloper);
+    DescendantsTracker.registerSubclass(Base, AnonDeveloper);
+    constSet(TopLevel, "AnonDeveloperProject", AnonDeveloperProject);
+    DescendantsTracker.registerSubclass(Base, AnonDeveloperProject);
     const dev = (await AnonDeveloper.first()) as any;
     const named = (await Developer.find(dev.id)) as any;
     expect(await dev.developerProjects.count()).toBeGreaterThan(0);
@@ -310,8 +312,10 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DefaultScopeCounterComment);
-    registerModel(DefaultScopeCounterPost);
+    constSet(TopLevel, "DefaultScopeCounterComment", DefaultScopeCounterComment);
+    DescendantsTracker.registerSubclass(Base, DefaultScopeCounterComment);
+    constSet(TopLevel, "DefaultScopeCounterPost", DefaultScopeCounterPost);
+    DescendantsTracker.registerSubclass(Base, DefaultScopeCounterPost);
     await DefaultScopeCounterPost.create({ title: "Welcome", body: "body" });
     expect(counter).toBe(0);
     const post = (await DefaultScopeCounterPost.first()) as any;
@@ -353,8 +357,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("clear collection should not change updated at", async () => {
-    registerModel(HmShip);
-    registerModel(HmShipPart);
+    constSet(TopLevel, "Ship", HmShip);
+    constSet(TopLevel, "ShipPart", HmShipPart);
     const ship = await HmShip.create({ name: "dauntless" });
     const part = await HmShipPart.create({ name: "cockpit", ship_id: ship.id });
 
@@ -494,8 +498,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(DelAllAuthor);
-    registerModel(DelAllPost);
+    constSet(TopLevel, "DelAllAuthor", DelAllAuthor);
+    DescendantsTracker.registerSubclass(Base, DelAllAuthor);
+    constSet(TopLevel, "DelAllPost", DelAllPost);
+    DescendantsTracker.registerSubclass(Base, DelAllPost);
     const author = await DelAllAuthor.create({ name: "Alice" });
     await DelAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllPost.create({ author_id: author.id, title: "B", body: "body" });
@@ -543,9 +549,11 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany.inheritanceColumn = "type";
     class StiFirm extends StiCompany {}
-    registerModel(StiFirm);
+    constSet(TopLevel, "StiFirm", StiFirm);
+    DescendantsTracker.registerSubclass(StiCompany, StiFirm);
     class StiClient extends StiCompany {}
-    registerModel(StiClient);
+    constSet(TopLevel, "StiClient", StiClient);
+    DescendantsTracker.registerSubclass(StiCompany, StiClient);
     class StiAccount extends Base {
       declare name: string | null;
 
@@ -553,10 +561,14 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel(StiCompany);
-    registerModel(StiFirm);
-    registerModel(StiClient);
-    registerModel(StiAccount);
+    constSet(TopLevel, "StiCompany", StiCompany);
+    DescendantsTracker.registerSubclass(Base, StiCompany);
+    constSet(TopLevel, "StiFirm", StiFirm);
+    DescendantsTracker.registerSubclass(StiCompany, StiFirm);
+    constSet(TopLevel, "StiClient", StiClient);
+    DescendantsTracker.registerSubclass(StiCompany, StiClient);
+    constSet(TopLevel, "StiAccount", StiAccount);
+    DescendantsTracker.registerSubclass(Base, StiAccount);
 
     class DepFirm extends Base {
       declare name: string | null;
@@ -570,7 +582,8 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DepFirm);
+    constSet(TopLevel, "DepFirm", DepFirm);
+    DescendantsTracker.registerSubclass(Base, DepFirm);
 
     const firm = new DepFirm({ name: "Test" });
     const proxy = CollectionProxy._create(
@@ -596,9 +609,12 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany2.inheritanceColumn = "type";
     class StiClient2 extends StiCompany2 {}
-    registerModel(StiClient2);
-    registerModel(StiCompany2);
-    registerModel(StiClient2);
+    constSet(TopLevel, "StiClient2", StiClient2);
+    DescendantsTracker.registerSubclass(StiCompany2, StiClient2);
+    constSet(TopLevel, "StiCompany2", StiCompany2);
+    DescendantsTracker.registerSubclass(Base, StiCompany2);
+    constSet(TopLevel, "StiClient2", StiClient2);
+    DescendantsTracker.registerSubclass(StiCompany2, StiClient2);
 
     class DepFirm2 extends Base {
       declare name: string | null;
@@ -612,7 +628,8 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DepFirm2);
+    constSet(TopLevel, "DepFirm2", DepFirm2);
+    DescendantsTracker.registerSubclass(Base, DepFirm2);
 
     const firm = new DepFirm2({ name: "Test" });
     const proxy = CollectionProxy._create(
@@ -638,9 +655,12 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany3.inheritanceColumn = "type";
     class StiClient3 extends StiCompany3 {}
-    registerModel(StiClient3);
-    registerModel(StiCompany3);
-    registerModel(StiClient3);
+    constSet(TopLevel, "StiClient3", StiClient3);
+    DescendantsTracker.registerSubclass(StiCompany3, StiClient3);
+    constSet(TopLevel, "StiCompany3", StiCompany3);
+    DescendantsTracker.registerSubclass(Base, StiCompany3);
+    constSet(TopLevel, "StiClient3", StiClient3);
+    DescendantsTracker.registerSubclass(StiCompany3, StiClient3);
 
     class DepFirm3 extends Base {
       declare name: string | null;
@@ -654,7 +674,8 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DepFirm3);
+    constSet(TopLevel, "DepFirm3", DepFirm3);
+    DescendantsTracker.registerSubclass(Base, DepFirm3);
 
     const firm = new DepFirm3({ name: "Test" });
     const proxy = CollectionProxy._create(
@@ -679,7 +700,8 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     StiCompany4.inheritanceColumn = "type";
-    registerModel(StiCompany4);
+    constSet(TopLevel, "StiCompany4", StiCompany4);
+    DescendantsTracker.registerSubclass(Base, StiCompany4);
 
     class DepFirm4 extends Base {
       declare name: string | null;
@@ -693,7 +715,8 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DepFirm4);
+    constSet(TopLevel, "DepFirm4", DepFirm4);
+    DescendantsTracker.registerSubclass(Base, DepFirm4);
 
     const firm = new DepFirm4({ name: "Test" });
     const proxy = CollectionProxy._create(
@@ -724,8 +747,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel(StiCompany5);
-    registerModel(UnrelatedModel);
+    constSet(TopLevel, "StiCompany5", StiCompany5);
+    DescendantsTracker.registerSubclass(Base, StiCompany5);
+    constSet(TopLevel, "UnrelatedModel", UnrelatedModel);
+    DescendantsTracker.registerSubclass(Base, UnrelatedModel);
 
     class DepFirm5 extends Base {
       declare name: string | null;
@@ -739,7 +764,8 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(DepFirm5);
+    constSet(TopLevel, "DepFirm5", DepFirm5);
+    DescendantsTracker.registerSubclass(Base, DepFirm5);
 
     const firm = new DepFirm5({ name: "Test" });
     const proxy = CollectionProxy._create(
@@ -870,8 +896,10 @@ describe("HasManyAssociationsTest", () => {
         this.enum("last_read", { unread: 0, reading: 2, read: 3, forgotten: null });
       }
     }
-    registerModel(SpecialAuthor);
-    registerModel(SpecialBook);
+    constSet(TopLevel, "SpecialAuthor", SpecialAuthor);
+    DescendantsTracker.registerSubclass(Base, SpecialAuthor);
+    constSet(TopLevel, "SpecialBook", SpecialBook);
+    DescendantsTracker.registerSubclass(Base, SpecialBook);
 
     const author = await SpecialAuthor.createBang({ name: "Test" });
     const book = await SpecialBook.createBang({ last_read: "reading" });
@@ -1004,8 +1032,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("update all respects association scope", async () => {
-    registerModel(HmPerson);
-    registerModel(HmReference);
+    constSet(TopLevel, "Person", HmPerson);
+    constSet(TopLevel, "Reference", HmReference);
     const person = new HmPerson() as any;
     person.first_name = "Naruto";
     await person.references.push(new HmReference());
@@ -1014,8 +1042,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("exists respects association scope", async () => {
-    registerModel(HmPerson);
-    registerModel(HmReference);
+    constSet(TopLevel, "Person", HmPerson);
+    constSet(TopLevel, "Reference", HmReference);
     const person = new HmPerson() as any;
     person.first_name = "Sasuke";
     await person.references.push(new HmReference());
@@ -1112,7 +1140,8 @@ describe("HasManyAssociationsTest", () => {
         );
       }
     }
-    registerModel(TakingNumberAuthor);
+    constSet(TopLevel, "TakingNumberAuthor", TakingNumberAuthor);
+    DescendantsTracker.registerSubclass(HmAuthor, TakingNumberAuthor);
 
     const idsOf = (records: any[]) => records.map((r: any) => r.id);
     const bob = (await TakingNumberAuthor.find(authors("bob").id!)) as any;
@@ -1212,8 +1241,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(UpdAllAuthor);
-    registerModel(UpdAllPost);
+    constSet(TopLevel, "UpdAllAuthor", UpdAllAuthor);
+    DescendantsTracker.registerSubclass(Base, UpdAllAuthor);
+    constSet(TopLevel, "UpdAllPost", UpdAllPost);
+    DescendantsTracker.registerSubclass(Base, UpdAllPost);
     const author = await UpdAllAuthor.create({ name: "Alice" });
     const post = await UpdAllPost.create({ author_id: author.id, title: "Old", body: "body" });
     post.title = "New";
@@ -1246,8 +1277,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(UpdAllFkAuthor);
-    registerModel(UpdAllFkPost);
+    constSet(TopLevel, "UpdAllFkAuthor", UpdAllFkAuthor);
+    DescendantsTracker.registerSubclass(Base, UpdAllFkAuthor);
+    constSet(TopLevel, "UpdAllFkPost", UpdAllFkPost);
+    DescendantsTracker.registerSubclass(Base, UpdAllFkPost);
     const author = await UpdAllFkAuthor.create({ name: "Alice" });
     const post = await UpdAllFkPost.create({ author_id: author.id, title: "Old", body: "body" });
     post.title = "Updated";
@@ -1464,8 +1497,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("find all with include and conditions", async () => {
-    registerModel(Developer);
-    registerModel(AuditLog);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "AuditLog", AuditLog);
     await Developer.create({ name: "Smith" });
     await expect(
       Developer.all()
@@ -3366,8 +3399,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(ProtAuthor);
-    registerModel(ProtPost);
+    constSet(TopLevel, "ProtAuthor", ProtAuthor);
+    DescendantsTracker.registerSubclass(Base, ProtAuthor);
+    constSet(TopLevel, "ProtPost", ProtPost);
+    DescendantsTracker.registerSubclass(Base, ProtPost);
     const author = await ProtAuthor.create({ name: "Alice" });
     await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
     const posts = await author.prot_posts;
@@ -3401,8 +3436,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(MergeAuthor);
-    registerModel(MergePost);
+    constSet(TopLevel, "MergeAuthor", MergeAuthor);
+    DescendantsTracker.registerSubclass(Base, MergeAuthor);
+    constSet(TopLevel, "MergePost", MergePost);
+    DescendantsTracker.registerSubclass(Base, MergePost);
     const author = await MergeAuthor.create({ name: "Alice" });
     const post = new MergePost({ author_id: author.id });
     post.title = "Merged";
@@ -3469,8 +3506,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("attributes are set when initialized from has many null relationship", async () => {
-    registerModel(HmCar);
-    registerModel(HmBulb);
+    constSet(TopLevel, "Car", HmCar);
+    constSet(TopLevel, "Bulb", HmBulb);
     const car = new HmCar({ name: "honda" }) as any;
     const bulb = await car.bulbs.where({ name: "headlight" }).firstOrInitialize();
     expect(bulb.name).toBe("headlight");
@@ -3556,8 +3593,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel(FoiAuthor);
-    registerModel(FoiPost);
+    constSet(TopLevel, "FoiAuthor", FoiAuthor);
+    DescendantsTracker.registerSubclass(Base, FoiAuthor);
+    constSet(TopLevel, "FoiPost", FoiPost);
+    DescendantsTracker.registerSubclass(Base, FoiPost);
     const author = await FoiAuthor.create({ name: "Alice" });
     const posts = await author.foi_posts;
     expect(posts.length).toBe(0);
@@ -4012,8 +4051,10 @@ describe("HasManyAssociationsTest", () => {
       });
     }
   }
-  registerModel(AuthorWithErrorDestroyingAssociation);
-  registerModel(PostWithErrorDestroying);
+  constSet(TopLevel, "AuthorWithErrorDestroyingAssociation", AuthorWithErrorDestroyingAssociation);
+  DescendantsTracker.registerSubclass(Base, AuthorWithErrorDestroyingAssociation);
+  constSet(TopLevel, "PostWithErrorDestroying", PostWithErrorDestroying);
+  DescendantsTracker.registerSubclass(Base, PostWithErrorDestroying);
 
   it("destroy does not raise when association errors on destroy", async () => {
     await assertNoDifference(

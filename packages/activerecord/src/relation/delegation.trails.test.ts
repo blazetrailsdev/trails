@@ -5,12 +5,11 @@ import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { registerModel } from "../index.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { Relation } from "../relation.js";
 import { AssociationRelation } from "../association-relation.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 const defineClassMethod = (model: object, name: string, fn: (...args: never[]) => unknown) =>
   Object.defineProperty(model, name, { value: fn, writable: true, configurable: true });
@@ -226,8 +225,8 @@ describe("delegated records operators without an Array.prototype counterpart", (
 describe("respond_to_missing? — `in` on the dispatch proxies", () => {
   fixtures(["posts", "comments"]);
 
-  registerModel(Post);
-  registerModel(Comment);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
 
   it("answers a named scope, a class method and a delegated array method on a Relation", () => {
     const rel = Comment.all();

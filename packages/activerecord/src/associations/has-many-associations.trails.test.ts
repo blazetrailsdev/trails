@@ -1,6 +1,7 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
-import { Base, RecordNotDestroyed, registerModel } from "../index.js";
+import { Base, RecordNotDestroyed } from "../index.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Client, Firm } from "../test-helpers/models/company.js";
@@ -41,7 +42,6 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting composite-key records scopes by tuple, not cartesian product", async () => {
-    registerModel([CpkOrder, CpkBook]);
     const order = await CpkOrder.create({ shop_id: 1, status: "open" });
     const orderId = order.readAttribute("id");
     const mk = (authorId: number, id: number) =>
@@ -91,8 +91,10 @@ describe("HasManyAssociationsTest", () => {
         this.attribute("cache_author_id", "integer");
       }
     }
-    registerModel(CacheAuthor);
-    registerModel(CachePost);
+    constSet(TopLevel, "CacheAuthor", CacheAuthor);
+    DescendantsTracker.registerSubclass(Base, CacheAuthor);
+    constSet(TopLevel, "CachePost", CachePost);
+    DescendantsTracker.registerSubclass(Base, CachePost);
     const author = await CacheAuthor.create({ name: "Alice" });
 
     expect(author.isAssociationCached("cache_posts")).toBe(false);
@@ -130,8 +132,10 @@ describe("HasManyAssociationsTest", () => {
         });
       }
     }
-    registerModel(PostWithHaltingComments);
-    registerModel(HaltingComment);
+    constSet(TopLevel, "PostWithHaltingComments", PostWithHaltingComments);
+    DescendantsTracker.registerSubclass(Base, PostWithHaltingComments);
+    constSet(TopLevel, "HaltingComment", HaltingComment);
+    DescendantsTracker.registerSubclass(Base, HaltingComment);
     const post = await PostWithHaltingComments.create({ title: "T", body: "b" });
     const first = await HaltingComment.create({ post_id: post.id, body: "removable" });
     const second = await HaltingComment.create({ post_id: post.id, body: "keep" });

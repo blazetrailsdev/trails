@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { registerModel, Range } from "../index.js";
+import { Range } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -18,17 +18,23 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { Project } from "../test-helpers/models/project.js";
 import "../test-helpers/models/categorization.js";
 
-registerModel([
-  Author,
-  Developer,
-  Comment,
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "Comment", Comment);
+constSet(
+  TopLevel,
+  "CommentThatAutomaticallyAltersPostBody",
   CommentThatAutomaticallyAltersPostBody,
-  Post,
+);
+constSet(TopLevel, "Post", Post);
+constSet(
+  TopLevel,
+  "PostThatLoadsCommentsInAnAfterSaveHook",
   PostThatLoadsCommentsInAnAfterSaveHook,
-  Rating,
-  Computer,
-  Project,
-]);
+);
+constSet(TopLevel, "Rating", Rating);
+constSet(TopLevel, "Computer", Computer);
+constSet(TopLevel, "Project", Project);
 
 const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((r: any) => r.id);
 

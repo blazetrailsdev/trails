@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -13,12 +13,12 @@ describe("BelongsToAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
 
   beforeAll(async () => {
-    registerModel(Company);
-    registerModel(Firm);
-    registerModel(Client);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
     Company.inheritanceColumn = "type";
-    registerModel(Firm);
-    registerModel(Client);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
     await Company.loadSchema();
   });
 

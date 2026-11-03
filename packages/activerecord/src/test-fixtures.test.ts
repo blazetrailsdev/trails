@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Dir, FileUtils, File as RubyFile, include } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  FileUtils,
+  File as RubyFile,
+  include,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Minitest, Notifications, onLoad } from "@blazetrails/activesupport";
-import { registerModel } from "./associations.js";
 import { Base } from "./base.js";
 import "./relation.js";
 import { TestFixtures } from "./test-fixtures.js";
@@ -10,7 +16,7 @@ import { ConnectionHandler } from "./connection-adapters/abstract/connection-han
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { Zine } from "./test-helpers/models/zine.js";
 
-registerModel(Zine);
+constSet(TopLevel, "Zine", Zine);
 
 describe("TestFixturesTest", () => {
   const { self } = fixtures([], { useTransactionalTests: false });

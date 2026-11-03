@@ -1,10 +1,12 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../test-helpers/models/admin.js";
 import {
   kernelThrow,
   constDefined,
   constSet,
   registeredConstant,
-  unregisterConstant,
+  TopLevel,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
@@ -15,7 +17,6 @@ import {
   Base,
   ReadOnlyRecord,
   RecordInvalid,
-  registerModel,
   AssociationTypeMismatch,
 } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
@@ -210,7 +211,7 @@ for (const m of [
   DestroyableBook,
   UndestroyableAuthor,
 ]) {
-  registerModel(m as any);
+  constSet(TopLevel, m.name, m);
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
@@ -601,8 +602,10 @@ describe("BelongsToAssociationsTest", () => {
       constSet(Admin, "RegionalUser", AdminRegionalUser);
       class AdminRegion extends Base {}
       constSet(Admin, "Region", AdminRegion);
-      registerModel(AdminRegion as any);
-      registerModel(AdminRegionalUser as any);
+      constSet(TopLevel, "AdminRegion", AdminRegion);
+      DescendantsTracker.registerSubclass(Base, AdminRegion);
+      constSet(TopLevel, "AdminRegionalUser", AdminRegionalUser);
+      DescendantsTracker.registerSubclass(AdminUser, AdminRegionalUser);
 
       const e = await assertRaises([AssociationTypeMismatch], {}, () => {
         new AdminRegionalUser({ region: "wrong value" });
@@ -613,8 +616,8 @@ describe("BelongsToAssociationsTest", () => {
     } finally {
       if (constDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
       if (constDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
-      unregisterConstant("AdminRegion", registeredConstant("AdminRegion"));
-      unregisterConstant("AdminRegionalUser", registeredConstant("AdminRegionalUser"));
+      rbModRemoveConst(TopLevel, "AdminRegion");
+      rbModRemoveConst(TopLevel, "AdminRegionalUser");
 
       if (await connection.columnExists("admin_users", "region_id")) {
         await connection.removeColumn("admin_users", "region_id");
@@ -1987,7 +1990,8 @@ describe("BelongsToAssociationsTest", () => {
         this.belongsTo("sponsorable", { polymorphic: true, inverseOf: "sponsors", touch: true });
       }
     }
-    registerModel(SponsorWithTouchInverse as any);
+    constSet(TopLevel, "SponsorWithTouchInverse", SponsorWithTouchInverse);
+    DescendantsTracker.registerSubclass(Sponsor, SponsorWithTouchInverse);
 
     try {
       await self().withHasManyInversing(undefined, async () => {
@@ -2004,7 +2008,7 @@ describe("BelongsToAssociationsTest", () => {
         );
       });
     } finally {
-      unregisterConstant("SponsorWithTouchInverse", registeredConstant("SponsorWithTouchInverse"));
+      rbModRemoveConst(TopLevel, "SponsorWithTouchInverse");
     }
   });
 

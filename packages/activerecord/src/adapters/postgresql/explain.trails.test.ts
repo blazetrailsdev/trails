@@ -1,7 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { it, expect, beforeAll, afterAll } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { Base, registerModel } from "../../index.js";
+import { Base } from "../../index.js";
 
 fixtures([]);
 
@@ -45,8 +47,10 @@ describeIfPg("PostgresqlExplainTest (trails)", () => {
       }
     }
     ExAuthor.hasMany("exBooks", { className: "ExBook" });
-    registerModel(ExAuthor);
-    registerModel(ExBook);
+    constSet(TopLevel, "ExAuthor", ExAuthor);
+    DescendantsTracker.registerSubclass(Base, ExAuthor);
+    constSet(TopLevel, "ExBook", ExBook);
+    DescendantsTracker.registerSubclass(Base, ExBook);
     await adapter.execute(`CREATE TABLE "ex_authors" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
     await adapter.execute(
       `CREATE TABLE "ex_books" ("id" SERIAL PRIMARY KEY, "title" TEXT, "ex_author_id" INTEGER)`,

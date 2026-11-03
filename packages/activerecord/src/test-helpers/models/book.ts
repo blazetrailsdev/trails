@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { ScopeOn } from "../../scoping/named.js";
@@ -9,7 +11,6 @@ import type { Reference } from "./reference.js";
 import type { Subscriber } from "./subscriber.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -184,7 +185,8 @@ export class Book extends Base {
     this.enum("boolean_status", { enabled: true, disabled: false });
   }
 }
-registerModel(Book);
+constSet(TopLevel, "Book", Book);
+DescendantsTracker.registerSubclass(Base, Book);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Book {
   get author(): Author | null | Promise<Author | null>;
@@ -209,4 +211,5 @@ export class PublishedBook extends Base {
     this.validates("isbn", { uniqueness: true });
   }
 }
-registerModel(PublishedBook);
+constSet(TopLevel, "PublishedBook", PublishedBook);
+DescendantsTracker.registerSubclass(Base, PublishedBook);

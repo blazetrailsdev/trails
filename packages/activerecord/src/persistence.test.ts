@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 function epochMs(v: unknown): number {
@@ -26,7 +27,6 @@ import {
   RecordNotSaved,
   RecordNotDestroyed,
   ActiveRecordError,
-  registerModel,
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
@@ -102,7 +102,7 @@ for (const klass of [
   AuditLog,
   Ship,
 ]) {
-  registerModel(klass);
+  constSet(TopLevel, klass.name, klass);
 }
 
 describe("PersistenceTest", () => {
@@ -1741,8 +1741,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(ChatMessage);
-  registerModel(ChatMessageCustomPk);
+  constSet(TopLevel, "ChatMessage", ChatMessage);
+  constSet(TopLevel, "ChatMessageCustomPk", ChatMessageCustomPk);
   fixtures([]);
 
   it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {
@@ -1887,7 +1887,7 @@ describe("QueryConstraintsTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(Default);
+  constSet(TopLevel, "Default", Default);
   fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
@@ -1996,7 +1996,8 @@ describe("PersistenceTest", () => {
         class IdentityTable extends Base {
           static _tableName = "postgresql_identity_table";
         }
-        registerModel(IdentityTable);
+        constSet(TopLevel, "IdentityTable", IdentityTable);
+        DescendantsTracker.registerSubclass(Base, IdentityTable);
         await (IdentityTable as unknown as { loadSchema(): Promise<void> }).loadSchema();
         const identityRecord = (await IdentityTable.createBang()) as any;
         expect(identityRecord.id).not.toBeNull();
@@ -2034,7 +2035,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(PkAutopopulatedByATriggerRecord);
+  constSet(TopLevel, "PkAutopopulatedByATriggerRecord", PkAutopopulatedByATriggerRecord);
   fixtures([]);
 
   const supportsTrigger = adapterSupports("insert_returning") && adapterType !== "sqlite";
@@ -2080,7 +2081,8 @@ describe("PersistenceTest", () => {
         });
       }
     }
-    registerModel(TrackingTopic);
+    constSet(TopLevel, "TrackingTopic", TrackingTopic);
+    DescendantsTracker.registerSubclass(Topic, TrackingTopic);
 
     await TrackingTopic.create({ title: "New Topic", author_name: "Not David" });
 
@@ -2093,7 +2095,8 @@ describe("PersistenceTest", () => {
         this.tableName = "aircraft";
       }
     }
-    registerModel(MinimalisticAircraft);
+    constSet(TopLevel, "MinimalisticAircraft", MinimalisticAircraft);
+    DescendantsTracker.registerSubclass(Minimalistic, MinimalisticAircraft);
 
     await assertDifference(
       () => Aircraft.count(),

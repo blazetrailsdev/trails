@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -13,7 +13,7 @@ describe("Relation#where — composite-key form", () => {
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment, Customer, Company, Contract].forEach(
-      (m) => registerModel(m),
+      (m) => constSet(TopLevel, m.name, m),
     );
   });
 

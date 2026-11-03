@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel, RecordInvalid } from "../index.js";
+import { Base, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import {
@@ -147,7 +149,8 @@ describe("HasManyThroughAssociationsTest", () => {
         this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
       }
     }
-    registerModel("IrpvTagging", IrpvTagging);
+    constSet(TopLevel, "IrpvTagging", IrpvTagging);
+    DescendantsTracker.registerSubclass(Base, IrpvTagging);
 
     const post = await Post.create({ title: "Test", body: "" });
     const tag = await Tag.create({ name: "testjoin" });
@@ -161,7 +164,8 @@ describe("HasManyThroughAssociationsTest", () => {
         this.hasMany("irpvTags", { through: "irpvTaggings", source: "tag", className: "Tag" });
       }
     }
-    registerModel("IrpvPost", IrpvPost);
+    constSet(TopLevel, "IrpvPost", IrpvPost);
+    DescendantsTracker.registerSubclass(Base, IrpvPost);
 
     const irpvPost = await IrpvPost.find(post.id);
     const assoc = irpvPost.association("irpvTags") as CollectionAssociation;

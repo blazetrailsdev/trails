@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -38,27 +38,27 @@ describe("CascadedEagerLoadingTest", () => {
   ]);
 
   Topic.inheritanceColumn = "type";
-  registerModel(Person);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(SpecialPost);
-  registerModel(FirstPost);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "SpecialPost", SpecialPost);
+  constSet(TopLevel, "FirstPost", FirstPost);
   Comment.inheritanceColumn = "type";
-  registerModel(Comment);
-  registerModel(SpecialComment);
-  registerModel(SubSpecialComment);
-  registerModel(VerySpecialComment);
-  registerModel(Categorization);
-  registerModel(Category);
-  registerModel(Topic);
-  registerModel(Reply);
-  registerModel(SillyReply);
-  registerModel(Vertex);
-  registerModel(Edge);
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Client);
-  registerModel(Account);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Reply", Reply);
+  constSet(TopLevel, "SillyReply", SillyReply);
+  constSet(TopLevel, "Vertex", Vertex);
+  constSet(TopLevel, "Edge", Edge);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Client", Client);
+  constSet(TopLevel, "Account", Account);
 
   const targetArr = (rec: Base, name: string): Base[] =>
     (rec.association(name).target as Base[]) ?? [];

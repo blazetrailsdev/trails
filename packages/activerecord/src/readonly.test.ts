@@ -1,8 +1,8 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { assertNotEmpty } from "@blazetrails/activesupport";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { registerModel } from "./associations.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";
 
 import { Developer } from "./test-helpers/models/developer.js";
@@ -15,9 +15,9 @@ import "./test-helpers/models/ship.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
-registerModel(Post);
-registerModel(Comment);
-registerModel(Project);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Project", Project);
 
 describe("ReadOnlyTest", () => {
   const { developers, people, posts } = fixtures([

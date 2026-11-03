@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -5,7 +7,6 @@ import type { Person } from "./person.js";
 import type { Pet } from "./pet.js";
 import type { Toy } from "./toy.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Owner extends Base {
@@ -62,7 +63,8 @@ export class Owner extends Base {
     this._blocks = [];
   }
 }
-registerModel(Owner);
+constSet(TopLevel, "Owner", Owner);
+DescendantsTracker.registerSubclass(Base, Owner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Owner {
   get lastPet(): Pet | null | Promise<Pet | null>;
@@ -76,4 +78,5 @@ export class InvalidOwner extends Owner {
     });
   }
 }
-registerModel(InvalidOwner);
+constSet(TopLevel, "InvalidOwner", InvalidOwner);
+DescendantsTracker.registerSubclass(Owner, InvalidOwner);

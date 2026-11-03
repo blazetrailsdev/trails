@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
@@ -6,7 +7,6 @@ import { Nodes } from "@blazetrails/arel";
 import { LogSubscriber } from "./log-subscriber.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import { Base, RecordNotFound } from "./index.js";
-import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -74,8 +74,8 @@ describe("BindParameterTest", () => {
   fixtures(["topics", "authors", "authorAddresses", "posts"]);
 
   beforeAll(async () => {
-    registerModel(Author);
-    registerModel(Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
   });
 
   afterEach(() => {

@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Electron } from "./electron.js";
 import type { Liquid } from "./liquid.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Molecule extends Base {
@@ -16,7 +17,8 @@ export class Molecule extends Base {
     this.acceptsNestedAttributesFor("electrons");
   }
 }
-registerModel(Molecule);
+constSet(TopLevel, "Molecule", Molecule);
+DescendantsTracker.registerSubclass(Base, Molecule);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Molecule {
   get liquid(): Liquid | null | Promise<Liquid | null>;

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, StrictLoadingViolationError } from "./index.js";
+import { StrictLoadingViolationError } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -8,8 +9,8 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
   const { developers, ships } = fixtures(["developers", "ships"]);
 
   beforeAll(() => {
-    registerModel(Developer);
-    registerModel(Ship);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Ship", Ship);
   });
 
   it("sync belongsTo access throws when strict loading is enabled and not loaded", async () => {

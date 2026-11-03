@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries } from "../testing/query-assertions.js";
@@ -95,14 +97,22 @@ class NonPolyTwo extends Base {
   }
 }
 
-registerModel("ShapeExpression", ShapeExpression);
-registerModel("Circle", Circle);
-registerModel("Square", Square);
-registerModel("Triangle", Triangle);
-registerModel("PaintColor", PaintColor);
-registerModel("PaintTexture", PaintTexture);
-registerModel("NonPolyOne", NonPolyOne);
-registerModel("NonPolyTwo", NonPolyTwo);
+constSet(TopLevel, "ShapeExpression", ShapeExpression);
+DescendantsTracker.registerSubclass(Base, ShapeExpression);
+constSet(TopLevel, "Circle", Circle);
+DescendantsTracker.registerSubclass(Base, Circle);
+constSet(TopLevel, "Square", Square);
+DescendantsTracker.registerSubclass(Base, Square);
+constSet(TopLevel, "Triangle", Triangle);
+DescendantsTracker.registerSubclass(Base, Triangle);
+constSet(TopLevel, "PaintColor", PaintColor);
+DescendantsTracker.registerSubclass(Base, PaintColor);
+constSet(TopLevel, "PaintTexture", PaintTexture);
+DescendantsTracker.registerSubclass(Base, PaintTexture);
+constSet(TopLevel, "NonPolyOne", NonPolyOne);
+DescendantsTracker.registerSubclass(Base, NonPolyOne);
+constSet(TopLevel, "NonPolyTwo", NonPolyTwo);
+DescendantsTracker.registerSubclass(Base, NonPolyTwo);
 
 const NUM_SIMPLE_OBJS = 50;
 const NUM_SHAPE_EXPRESSIONS = 100;
@@ -163,12 +173,12 @@ describe("EagerLoadPolyAssocsTest", () => {
 
 describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
   fixtures(["categories"]);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(Category);
-  registerModel(Categorization);
-  registerModel(AuthorFavorite);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
 
   it("missing data in a nested include should not cause errors when constructing objects", async () => {
     const daveyMcdave = await Author.create({ name: "Davey McDave" });

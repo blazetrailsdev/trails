@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Content,
@@ -10,9 +10,9 @@ import {
 describe("BidirectionalDestroyDependenciesTest", () => {
   fixtures(["content", "contentPositions"]);
 
-  registerModel(Content);
-  registerModel(ContentPosition);
-  registerModel(ContentWhichRequiresTwoDestroyCalls);
+  constSet(TopLevel, "Content", Content);
+  constSet(TopLevel, "ContentPosition", ContentPosition);
+  constSet(TopLevel, "ContentWhichRequiresTwoDestroyCalls", ContentWhichRequiresTwoDestroyCalls);
 
   beforeEach(() => {
     Content.destroyedIds.length = 0;

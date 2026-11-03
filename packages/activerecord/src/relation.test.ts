@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeAll, type TestContext } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { assert, assertNot, assertNotRespondTo, assertRaises } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Relation } from "./index.js";
 import { WhereClause } from "./relation/where-clause.js";
 import { Base } from "./base.js";
-import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
@@ -81,12 +80,12 @@ describe("RelationTest", () => {
   ]);
 
   beforeAll(() => {
-    registerModel(CanonAuthor);
-    registerModel(CanonPost);
-    registerModel(CanonComment);
-    registerModel(CanonSpecialComment);
-    registerModel(CanonRating);
-    registerModel(CanonCategorization);
+    constSet(TopLevel, "Author", CanonAuthor);
+    constSet(TopLevel, "Post", CanonPost);
+    constSet(TopLevel, "Comment", CanonComment);
+    constSet(TopLevel, "SpecialComment", CanonSpecialComment);
+    constSet(TopLevel, "Rating", CanonRating);
+    constSet(TopLevel, "Categorization", CanonCategorization);
   });
 
   it("select quotes when using from clause", async (ctx) => {
@@ -471,12 +470,12 @@ describe("RelationTest", () => {
   ]);
 
   beforeAll(() => {
-    registerModel(CanonAuthor);
-    registerModel(CanonPost);
-    registerModel(CanonComment);
-    registerModel(CanonSpecialComment);
-    registerModel(CanonRating);
-    registerModel(CanonCategorization);
+    constSet(TopLevel, "Author", CanonAuthor);
+    constSet(TopLevel, "Post", CanonPost);
+    constSet(TopLevel, "Comment", CanonComment);
+    constSet(TopLevel, "SpecialComment", CanonSpecialComment);
+    constSet(TopLevel, "Rating", CanonRating);
+    constSet(TopLevel, "Categorization", CanonCategorization);
   });
 
   it("relation merging with merged joins as strings", async () => {

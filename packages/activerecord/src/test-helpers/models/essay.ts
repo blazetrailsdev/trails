@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
 import type { Owner } from "./owner.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Essay extends Base {
@@ -21,7 +22,8 @@ export class Essay extends Base {
     this.hasOne("owner", { primaryKey: "name" });
   }
 }
-registerModel(Essay);
+constSet(TopLevel, "Essay", Essay);
+DescendantsTracker.registerSubclass(Base, Essay);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Essay {
   get author(): Author | null | Promise<Author | null>;
@@ -35,7 +37,9 @@ export interface Essay {
 }
 
 export class EssaySpecial extends Essay {}
-registerModel(EssaySpecial);
+constSet(TopLevel, "EssaySpecial", EssaySpecial);
+DescendantsTracker.registerSubclass(Essay, EssaySpecial);
 
 export class TypedEssay extends Essay {}
-registerModel(TypedEssay);
+constSet(TopLevel, "TypedEssay", TypedEssay);
+DescendantsTracker.registerSubclass(Essay, TypedEssay);

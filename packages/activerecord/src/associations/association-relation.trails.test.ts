@@ -1,11 +1,12 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel, AssociationRelation } from "../index.js";
+import { AssociationRelation } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
 
-registerModel(Ship);
-registerModel(ShipPart);
+constSet(TopLevel, "Ship", Ship);
+constSet(TopLevel, "ShipPart", ShipPart);
 
 describe("AssociationRelation", () => {
   fixtures(["ships"]);

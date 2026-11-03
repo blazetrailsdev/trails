@@ -1,10 +1,11 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
 import {
   assertNotRespondTo,
   assertRespondTo,
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
-import { Base, Relation, registerModel } from "../index.js";
+import { Base, Relation } from "../index.js";
 import * as Querying from "../querying.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";
 import { Batches } from "./batches.js";
@@ -81,8 +82,8 @@ function DelegationTests(target: () => object): void {
 }
 
 describe("DelegationAssociationTest", () => {
-  registerModel(Post);
-  registerModel(Comment);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
 
   DelegationTests(() => new Post().comments);
 });
@@ -166,8 +167,8 @@ describe("QueryingMethodsDelegationTest", () => {
 describe("DelegationCachingTest", () => {
   const { projects } = fixtures(["projects", "developers", "developersProjects"]);
 
-  registerModel(Project);
-  registerModel(Developer);
+  constSet(TopLevel, "Project", Project);
+  constSet(TopLevel, "Developer", Developer);
 
   it("delegation doesn't override methods defined in other relation subclasses", async () => {
     expect("target" in Relation.prototype).toEqual(false);

@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
@@ -9,9 +9,9 @@ describe("ThroughAssociation#build_record seeds the source inverse foreign key",
   const { memberDetails, organizations } = fixtures(["members", "memberDetails", "organizations"]);
 
   beforeAll(() => {
-    registerModel(Member);
-    registerModel(MemberDetail);
-    registerModel(Organization);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "MemberDetail", MemberDetail);
+    constSet(TopLevel, "Organization", Organization);
   });
 
   it("assigns the through target's id under the source inverse foreign key", async () => {

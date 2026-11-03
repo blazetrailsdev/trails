@@ -1,15 +1,16 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "./collection-association.js";
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import type { Base as BaseRecord } from "../base.js";
 
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 
-registerModel(Author);
-registerModel(Post);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
 
 describe("association callbacks — object callbacks (trails)", () => {
   fixtures({});
@@ -37,7 +38,8 @@ describe("association callbacks — object callbacks (trails)", () => {
         });
       }
     }
-    registerModel("ObjectCbAuthor", ObjectCbAuthor);
+    constSet(TopLevel, "ObjectCbAuthor", ObjectCbAuthor);
+    DescendantsTracker.registerSubclass(Base, ObjectCbAuthor);
 
     const author = await ObjectCbAuthor.create({ name: "David" });
     const proxy = (author.association("posts") as CollectionAssociation).reader;
@@ -64,7 +66,8 @@ function makeAuthorWithCallbacks(
       });
     }
   }
-  registerModel(`TrailsAuthorWithCallbacks${idx}`, CbAuthor);
+  constSet(TopLevel, `TrailsAuthorWithCallbacks${idx}`, CbAuthor);
+  DescendantsTracker.registerSubclass(Base, CbAuthor);
   return { Author: CbAuthor, Post };
 }
 

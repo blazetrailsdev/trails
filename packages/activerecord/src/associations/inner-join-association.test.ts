@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertNothingRaised,
@@ -54,36 +54,30 @@ describe("InnerJoinAssociationTest", () => {
   ]);
 
   Category.inheritanceColumn = "type";
-  registerModel(Author);
-  registerModel(AuthorAddress);
-  registerModel(Post);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Post", Post);
   Comment.inheritanceColumn = "type";
-  registerModel(Comment);
-  registerModel(SpecialComment);
-  registerModel(SubSpecialComment);
-  registerModel(VerySpecialComment);
-  registerModel(Essay);
-  registerModel(Categorization);
-  registerModel(SpecialCategorization);
-  registerModel(Category);
-  registerModel(SpecialCategory);
-  registerModel(CategoryPost);
-  registerModel(Person);
-  registerModel(Tagging);
-  registerModel(Tag);
-  registerModel(Friendship);
-  registerModel(Reference);
-  registerModel(Job);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "Essay", Essay);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "SpecialCategory", SpecialCategory);
+  constSet(TopLevel, "CategoryPost", CategoryPost);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "Tagging", Tagging);
+  constSet(TopLevel, "Tag", Tag);
+  constSet(TopLevel, "Friendship", Friendship);
+  constSet(TopLevel, "Reference", Reference);
+  constSet(TopLevel, "Job", Job);
 
   beforeAll(async () => {
-    registerModel(
-      "ShardedBlogPost",
-      (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
-    );
-    registerModel(
-      "ShardedComment",
-      (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
-    );
+    await import("../test-helpers/models/sharded/blog-post.js");
+    await import("../test-helpers/models/sharded/comment.js");
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {

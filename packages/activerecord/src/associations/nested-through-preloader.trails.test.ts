@@ -1,17 +1,17 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment, SpecialComment, SubSpecialComment } from "../test-helpers/models/comment.js";
 import { Rating } from "../test-helpers/models/rating.js";
 import { Post } from "../test-helpers/models/post.js";
 
-registerModel(Author);
-registerModel(Comment);
-registerModel(SpecialComment);
-registerModel(SubSpecialComment);
-registerModel(Rating);
-registerModel(Post);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+constSet(TopLevel, "Rating", Rating);
+constSet(TopLevel, "Post", Post);
 
 describe("HMT Slot D — nested-through preloader / STI / joins+includes", () => {
   const {

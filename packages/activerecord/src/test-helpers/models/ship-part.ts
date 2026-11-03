@@ -1,9 +1,10 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShipPart extends Base {
@@ -21,7 +22,8 @@ export class ShipPart extends Base {
     this.validates("name", { presence: true });
   }
 }
-registerModel(ShipPart);
+constSet(TopLevel, "ShipPart", ShipPart);
+DescendantsTracker.registerSubclass(Base, ShipPart);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShipPart {
   get ship(): Ship | null | Promise<Ship | null>;

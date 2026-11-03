@@ -1,4 +1,5 @@
-import { Hash, kernelThrow, constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { Hash, kernelThrow, constSet, registerConstant, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -9,7 +10,6 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { registerModel } from "../../associations.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -19,7 +19,8 @@ export class AbstractCompany extends Base {
     this.abstractClass = true;
   }
 }
-registerModel(AbstractCompany);
+constSet(TopLevel, "AbstractCompany", AbstractCompany);
+DescendantsTracker.registerSubclass(Base, AbstractCompany);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Company extends AbstractCompany {
@@ -81,7 +82,8 @@ export class Company extends AbstractCompany {
     return "I am Jack's innermost fears and aspirations";
   }
 }
-registerModel(Company);
+constSet(TopLevel, "Company", Company);
+DescendantsTracker.registerSubclass(AbstractCompany, Company);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Company {
   get account(): Account | null | Promise<Account | null>;
@@ -91,14 +93,16 @@ export interface Company {
 }
 
 export class SpecialCo extends Company {}
-registerModel(SpecialCo);
+constSet(TopLevel, "SpecialCo", SpecialCo);
+DescendantsTracker.registerSubclass(Company, SpecialCo);
 
 export const Namespaced = {};
 registerConstant("Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {
   static {
-    registerModel(constSet(Namespaced, "Company", this));
+    constSet(Namespaced, "Company", this);
+    DescendantsTracker.registerSubclass(Company, this);
   }
 }
 
@@ -106,7 +110,8 @@ export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
 
   static {
-    registerModel(constSet(Namespaced, "Firm", this));
+    constSet(Namespaced, "Firm", this);
+    DescendantsTracker.registerSubclass(Company, this);
   }
 
   static {
@@ -116,7 +121,8 @@ export class NamespacedFirm extends Company {
 
 export class NamespacedClient extends Company {
   static {
-    registerModel(constSet(Namespaced, "Client", this));
+    constSet(Namespaced, "Client", this);
+    DescendantsTracker.registerSubclass(Company, this);
   }
 }
 
@@ -388,7 +394,8 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
-registerModel(Firm);
+constSet(TopLevel, "Firm", Firm);
+DescendantsTracker.registerSubclass(Company, Firm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Firm {
   get account(): Account | null | Promise<Account | null>;
@@ -436,7 +443,8 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
-registerModel(DependentFirm);
+constSet(TopLevel, "DependentFirm", DependentFirm);
+DescendantsTracker.registerSubclass(Company, DependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -472,7 +480,8 @@ export class RestrictedWithExceptionFirm extends Company {
     );
   }
 }
-registerModel(RestrictedWithExceptionFirm);
+constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+DescendantsTracker.registerSubclass(Company, RestrictedWithExceptionFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithExceptionFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -506,7 +515,8 @@ export class RestrictedWithErrorFirm extends Company {
     );
   }
 }
-registerModel(RestrictedWithErrorFirm);
+constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+DescendantsTracker.registerSubclass(Company, RestrictedWithErrorFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithErrorFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -519,7 +529,8 @@ export class Agency extends Firm {
     this.acceptsNestedAttributesFor("projects");
   }
 }
-registerModel(Agency);
+constSet(TopLevel, "Agency", Agency);
+DescendantsTracker.registerSubclass(Firm, Agency);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
@@ -640,7 +651,8 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
-registerModel(Client);
+constSet(TopLevel, "Client", Client);
+DescendantsTracker.registerSubclass(Company, Client);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Client {
   get firm(): Firm | null | Promise<Firm | null>;
@@ -696,7 +708,8 @@ export class ExclusivelyDependentFirm extends Company {
     );
   }
 }
-registerModel(ExclusivelyDependentFirm);
+constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+DescendantsTracker.registerSubclass(Company, ExclusivelyDependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ExclusivelyDependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -717,13 +730,16 @@ export class LargeClient extends Client {
     this["extraSize"] = 50;
   }
 }
-registerModel(LargeClient);
+constSet(TopLevel, "LargeClient", LargeClient);
+DescendantsTracker.registerSubclass(Client, LargeClient);
 
 export class SpecialClient extends Client {}
-registerModel(SpecialClient);
+constSet(TopLevel, "SpecialClient", SpecialClient);
+DescendantsTracker.registerSubclass(Client, SpecialClient);
 
 export class VerySpecialClient extends SpecialClient {}
-registerModel(VerySpecialClient);
+constSet(TopLevel, "VerySpecialClient", VerySpecialClient);
+DescendantsTracker.registerSubclass(SpecialClient, VerySpecialClient);
 
 export class NewlyContractedCompany extends Company {
   declare newContracts: AssociationProxy<NewContract>;
@@ -737,6 +753,7 @@ export class NewlyContractedCompany extends Company {
     });
   }
 }
-registerModel(NewlyContractedCompany);
+constSet(TopLevel, "NewlyContractedCompany", NewlyContractedCompany);
+DescendantsTracker.registerSubclass(Company, NewlyContractedCompany);
 
 Company.inheritanceColumn = "type";

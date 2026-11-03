@@ -1,10 +1,10 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
-registerModel(Topic);
+constSet(TopLevel, "Topic", Topic);
 
 describe("string limit_value / offset_value read sites", () => {
   fixtures(["topics"]);

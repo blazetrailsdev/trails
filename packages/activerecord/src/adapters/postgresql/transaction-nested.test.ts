@@ -1,10 +1,10 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport";
 import { describeIfPg, leasePgAdapter } from "./test-helper.js";
 import type { PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { SerializationFailure, Deadlocked } from "../../errors.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
@@ -23,7 +23,10 @@ class Bit extends Base {
     this.tableName = "bits";
   }
 }
-registerModel([Sample, Bit]);
+constSet(TopLevel, "Sample", Sample);
+DescendantsTracker.registerSubclass(Base, Sample);
+constSet(TopLevel, "Bit", Bit);
+DescendantsTracker.registerSubclass(Base, Bit);
 
 function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   let count = 0;

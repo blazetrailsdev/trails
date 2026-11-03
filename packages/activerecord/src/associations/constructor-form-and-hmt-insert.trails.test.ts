@@ -1,16 +1,16 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { assigningSynchronously } from "@blazetrails/activemodel";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Tag);
-registerModel(Tagging);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
 
 const { posts } = fixtures(["posts"]);
 

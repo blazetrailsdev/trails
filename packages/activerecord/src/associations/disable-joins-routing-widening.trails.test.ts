@@ -1,7 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -58,10 +60,14 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     ).createTable("rw_other_origins", { force: true }, (t: any) => {
       t.string("label");
     });
-    registerModel("RwAuthor", RwAuthor);
-    registerModel("RwComment", RwComment);
-    registerModel("RwMember", RwMember);
-    registerModel("RwOtherOrigin", RwOtherOrigin);
+    constSet(TopLevel, "RwAuthor", RwAuthor);
+    DescendantsTracker.registerSubclass(Base, RwAuthor);
+    constSet(TopLevel, "RwComment", RwComment);
+    DescendantsTracker.registerSubclass(Base, RwComment);
+    constSet(TopLevel, "RwMember", RwMember);
+    DescendantsTracker.registerSubclass(Base, RwMember);
+    constSet(TopLevel, "RwOtherOrigin", RwOtherOrigin);
+    DescendantsTracker.registerSubclass(Base, RwOtherOrigin);
     (RwAuthor as any)._reflections = {};
     (RwComment as any)._reflections = {};
 

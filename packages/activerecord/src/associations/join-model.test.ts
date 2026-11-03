@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { Base } from "../base.js";
 import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
@@ -38,7 +39,6 @@ import { Rating } from "../test-helpers/models/rating.js";
 import { Aircraft } from "../test-helpers/models/aircraft.js";
 import { Engine } from "../test-helpers/models/engine.js";
 import { Car } from "../test-helpers/models/car.js";
-import { CpkOrder } from "../test-helpers/models/cpk.js";
 
 class PostWithHasManyDeleteAll extends Base {
   static {
@@ -92,36 +92,40 @@ describe("AssociationsJoinModelTest", () => {
       "cpkOrders",
     ],
   );
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Tag);
-  registerModel(Tagging);
-  registerModel(Category);
-  registerModel(Categorization);
-  registerModel(Comment);
-  registerModel(SpecialComment);
-  registerModel(VerySpecialComment);
-  registerModel(AuthorAddress);
-  registerModel(Item);
-  registerModel(SpecialPost);
-  registerModel(SubAbstractStiPost);
-  registerModel(StiPost);
-  registerModel(SubStiPost);
-  registerModel(AuthorFavorite);
-  registerModel(Book);
-  registerModel(Citation);
-  registerModel(Vertex);
-  registerModel(Edge);
-  registerModel(Rating);
-  registerModel(Aircraft);
-  registerModel(Engine);
-  registerModel(Car);
-  registerModel(CpkOrder);
-  registerModel(PostWithHasManyDeleteAll);
-  registerModel(PostWithHasManyDestroy);
-  registerModel(PostWithHasManyNullify);
-  registerModel(PostWithHasOneDestroy);
-  registerModel(PostWithHasOneNullify);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Tag", Tag);
+  constSet(TopLevel, "Tagging", Tagging);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Item", Item);
+  constSet(TopLevel, "SpecialPost", SpecialPost);
+  constSet(TopLevel, "SubAbstractStiPost", SubAbstractStiPost);
+  constSet(TopLevel, "StiPost", StiPost);
+  constSet(TopLevel, "SubStiPost", SubStiPost);
+  constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+  constSet(TopLevel, "Book", Book);
+  constSet(TopLevel, "Citation", Citation);
+  constSet(TopLevel, "Vertex", Vertex);
+  constSet(TopLevel, "Edge", Edge);
+  constSet(TopLevel, "Rating", Rating);
+  constSet(TopLevel, "Aircraft", Aircraft);
+  constSet(TopLevel, "Engine", Engine);
+  constSet(TopLevel, "Car", Car);
+  constSet(TopLevel, "PostWithHasManyDeleteAll", PostWithHasManyDeleteAll);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyDeleteAll);
+  constSet(TopLevel, "PostWithHasManyDestroy", PostWithHasManyDestroy);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyDestroy);
+  constSet(TopLevel, "PostWithHasManyNullify", PostWithHasManyNullify);
+  DescendantsTracker.registerSubclass(Base, PostWithHasManyNullify);
+  constSet(TopLevel, "PostWithHasOneDestroy", PostWithHasOneDestroy);
+  DescendantsTracker.registerSubclass(Base, PostWithHasOneDestroy);
+  constSet(TopLevel, "PostWithHasOneNullify", PostWithHasOneNullify);
+  DescendantsTracker.registerSubclass(Base, PostWithHasOneNullify);
 
   async function findPostWithDependency(postId: number, klass: typeof Base): Promise<Base> {
     const post = await Post.find(postId);

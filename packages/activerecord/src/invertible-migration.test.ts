@@ -1,4 +1,4 @@
-import { block as rbBlock } from "@blazetrails/ruby-compat";
+import { block as rbBlock, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
@@ -6,14 +6,13 @@ import { Migration, IrreversibleMigration, type MigrationClass } from "./migrati
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
-import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 class Horse extends Base {
   static {
     this.tableName = "horses";
-    registerModel(this);
+    constSet(TopLevel, "Horse", this);
   }
 }
 

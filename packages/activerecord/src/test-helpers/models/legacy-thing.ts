@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class LegacyThing extends Base {
   declare tps_report_number: number;
@@ -9,4 +10,5 @@ export class LegacyThing extends Base {
     this.lockingColumn = "version";
   }
 }
-registerModel(LegacyThing);
+constSet(TopLevel, "LegacyThing", LegacyThing);
+DescendantsTracker.registerSubclass(Base, LegacyThing);

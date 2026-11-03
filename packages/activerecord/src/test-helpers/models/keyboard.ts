@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Keyboard extends Base {
   declare key_number: number;
@@ -9,4 +10,5 @@ export class Keyboard extends Base {
     this.primaryKey = "key_number";
   }
 }
-registerModel(Keyboard);
+constSet(TopLevel, "Keyboard", Keyboard);
+DescendantsTracker.registerSubclass(Base, Keyboard);

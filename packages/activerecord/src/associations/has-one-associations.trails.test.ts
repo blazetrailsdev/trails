@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
-import { registerModel, RecordNotFound } from "../index.js";
+import { RecordNotFound } from "../index.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -12,9 +13,9 @@ type AccountBuilders = {
 
 describe("HasOneAssociationsTest", () => {
   const { self, companies } = fixtures(["companies", "accounts"]);
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Account);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Account", Account);
 
   async function findCompany(id: unknown): Promise<Company & AccountBuilders> {
     return (await Company.find(id)) as Company & AccountBuilders;

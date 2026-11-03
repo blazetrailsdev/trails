@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNot, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { ActiveRecordError } from "../errors.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -21,7 +22,6 @@ import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Categorization } from "../test-helpers/models/categorization.js";
 import { StaleObjectError } from "../errors.js";
-import { registerModel } from "../associations.js";
 
 for (const klass of [
   Author,
@@ -39,7 +39,7 @@ for (const klass of [
   CpkOrder,
   CpkOrderAgreement,
 ]) {
-  registerModel(klass as any);
+  constSet(TopLevel, klass.name, klass);
 }
 
 function epochMs(v: unknown): number {
@@ -278,7 +278,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({
@@ -311,7 +312,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({
@@ -353,7 +355,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({

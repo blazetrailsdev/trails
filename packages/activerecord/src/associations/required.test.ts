@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -32,8 +34,10 @@ describe("RequiredAssociationsTest", () => {
         inverseOf: false,
         className: "Parent",
       });
-      registerModel("Parent", Parent);
-      registerModel("Child", Child);
+      constSet(TopLevel, "Parent", Parent);
+      DescendantsTracker.registerSubclass(Base, Parent);
+      constSet(TopLevel, "Child", Child);
+      DescendantsTracker.registerSubclass(Base, Child);
 
       expect(await new Child().save()).toBeTruthy();
       expect(await new Child({ parent: new Parent() }).save()).toBeTruthy();
@@ -59,8 +63,10 @@ describe("RequiredAssociationsTest", () => {
       inverseOf: false,
       className: "Parent",
     });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const record = new Child();
     expect(await record.save()).toBeFalsy();
@@ -85,8 +91,10 @@ describe("RequiredAssociationsTest", () => {
         inverseOf: false,
         className: "Parent",
       });
-      registerModel("Parent", Parent);
-      registerModel("Child", Child);
+      constSet(TopLevel, "Parent", Parent);
+      DescendantsTracker.registerSubclass(Base, Parent);
+      constSet(TopLevel, "Child", Child);
+      DescendantsTracker.registerSubclass(Base, Child);
 
       const record = new Child();
       expect(await record.save()).toBeFalsy();
@@ -116,8 +124,10 @@ describe("RequiredAssociationsTest", () => {
       className: "Child",
       foreignKey: "parent_id",
     });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     expect(await new Parent().save()).toBeTruthy();
     expect(await new Parent({ child: new Child() }).save()).toBeTruthy();
@@ -137,8 +147,10 @@ describe("RequiredAssociationsTest", () => {
       className: "Child",
       foreignKey: "parent_id",
     });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const record = new Parent();
     expect(await record.save()).toBeFalsy();
@@ -162,8 +174,10 @@ describe("RequiredAssociationsTest", () => {
       className: "Child",
       foreignKey: "parent_id",
     });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const record = new Parent();
     await record.save();
@@ -183,8 +197,10 @@ describe("RequiredAssociationsTest", () => {
       inverseOf: false,
       className: "Parent",
     });
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const record = new Child();
     await record.save();
