@@ -29,7 +29,7 @@ node "$ROOT/packages/trailties/bin/trails.js" new "$APP" \
   --skip-install --skip-git --skip-docker --skip-system-test --skip-ci >/dev/null
 
 cd "$APP"
-printf 'packages: []\noverrides:\n%sonlyBuiltDependencies:\n  - better-sqlite3\n' "$OVERRIDES" \
+printf 'packages: []\noverrides:\n%sallowBuilds:\n  better-sqlite3: true\n  esbuild: true\n' "$OVERRIDES" \
   > pnpm-workspace.yaml
 pnpm install --no-frozen-lockfile
 
