@@ -22,6 +22,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
