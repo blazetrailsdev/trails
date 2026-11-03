@@ -97,6 +97,8 @@ constSet(TopLevel, "CoolTopic", CoolTopic);
 DescendantsTracker.registerSubclass(Topic, CoolTopic);
 constSet(TopLevel, "TopicWithAfterCreate", TopicWithAfterCreate);
 DescendantsTracker.registerSubclass(Topic, TopicWithAfterCreate);
+constSet(TopLevel, "Wizard", Wizard);
+DescendantsTracker.registerSubclass(Base, Wizard);
 constSet(TopLevel, "IneptWizard", IneptWizard);
 DescendantsTracker.registerSubclass(Wizard, IneptWizard);
 constSet(TopLevel, "Conjurer", Conjurer);
