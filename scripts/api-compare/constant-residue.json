@@ -965,7 +965,7 @@
   },
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
   "rack": {
-    "rows": 56,
+    "rows": 59,
     "excluded": ["handler/node.ts::Node"],
     "unwalked": ["bad-request.ts::BadRequest", "multipart.ts::Multipart"],
     "residue": {
@@ -1006,6 +1006,12 @@
     "excluded": [],
     "unwalked": ["methods.ts::Methods", "utils.ts::Utils"],
     "residue": {}
+  },
+  "rackup": {
+    "rows": 3,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "server.ts::Options": "Rackup::Server::Options" }
   },
   "rake": {
     "rows": 33,

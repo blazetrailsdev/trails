@@ -73,6 +73,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   rack: { root: "Rack" },
   "rack-session": { root: "Rack::Session", siblings: true },
   "rack-test": { root: "Rack::Test", siblings: true },
+  rackup: { root: "Rackup", siblings: true },
   rake: { root: "Rake", siblings: true },
   "solid-cable": { root: "SolidCable", siblings: true },
   "solid-queue": { root: "SolidQueue" },
