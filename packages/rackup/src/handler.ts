@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 export class Handler {
+  /** @noRailsEquivalent PERMANENT */
   declare static Node: typeof import("./handler/node.js").Node;
 
   /** @noRailsEquivalent PERMANENT */
