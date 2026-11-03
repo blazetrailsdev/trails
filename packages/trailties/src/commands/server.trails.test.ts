@@ -90,6 +90,10 @@ describe("trails server environment (trails)", () => {
       return { on() {} };
     }) as never);
     vi.spyOn(Trails, "root").mockReturnValue(tmpDir);
+    vi.spyOn(Trails, "application", "get").mockReturnValue({
+      root: () => tmpDir,
+      config: { root: tmpDir },
+    } as never);
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(ServerCommand.prototype, "say").mockImplementation(((message: string) => {
       said.push(message);
@@ -192,6 +196,8 @@ describe("trails server environment (trails)", () => {
 
     beforeEach(() => {
       vi.spyOn(Trails, "initialize").mockResolvedValue(app);
+      vi.spyOn(Trails, "application", "get").mockReturnValue(app as never);
+      vi.spyOn(app, "root").mockReturnValue(tmpDir);
     });
 
     afterAll(() => {
