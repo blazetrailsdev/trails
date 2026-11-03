@@ -82,16 +82,17 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  /** @inventedArm if — PERMANENT */
+  /** @inventedArm if — CONVERGEABLE attachment-variant-single-return-shape */
   variant(
     transformations: Transformations,
   ): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
-    const byName = this.transformationsByName(transformations);
-    const blob = this.blob;
-    if (byName instanceof Promise || blob instanceof Promise) {
-      return Promise.all([byName, blob]).then(([t, b]) => b!.variant(t));
+    transformations = this.transformationsByName(transformations) as Transformations;
+    if (transformations instanceof Promise || this.blob instanceof Promise) {
+      return Promise.all([transformations, this.blob]).then(([transformations, blob]) =>
+        blob!.variant(transformations),
+      );
     }
-    return blob!.variant(byName);
+    return this.blob!.variant(transformations);
   }
 
   async preview(transformations: Transformations): Promise<unknown> {

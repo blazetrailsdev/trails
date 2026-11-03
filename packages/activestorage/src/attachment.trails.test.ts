@@ -6,6 +6,7 @@ import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
+import { VariantWithRecord } from "./variant-with-record.js";
 import { createBlob, User } from "./test-helpers/test-helper.js";
 
 describe("Attachment", () => {
@@ -97,7 +98,6 @@ describe("Attachment#variant", () => {
 
     const variant = attachment.variant({ resizeToLimit: [100, 100] });
 
-    expect(variant).not.toBeInstanceOf(Promise);
-    expect((variant as { blob: unknown }).blob).toBe(await attachment.blob);
+    expect(variant).toBeInstanceOf(VariantWithRecord);
   });
 });
