@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { classPathMismatches, defineConstants } from "./classpath.js";
 import { TopLevel, rbModName, rbModToS } from "./object.js";
-import { rbPathToClass } from "./variable.js";
+import { rbPathToClass, registerConstant } from "./variable.js";
 import { constSet } from "./include.js";
 import { constGet } from "./index.js";
 import { NameError } from "./name-error.js";
@@ -33,13 +33,17 @@ describe("rbModName over the generated class-path table", () => {
   });
 
   it("constGet reads the receiver's own constant ahead of a top-level one of the same name", () => {
-    const Own = { name: "ConstGetShadowed" };
+    const OwnTool = { name: "ConstGetHost::ConstGetShadowed::Tool" };
+    const Own = { name: "ConstGetShadowed", Tool: OwnTool };
     const Outer = { name: "ConstGetHost", ConstGetShadowed: Own };
     (TopLevel as Record<string, unknown>).ConstGetShadowed = { name: "top" };
     try {
       expect(constGet(Outer, "ConstGetShadowed")).toBe(Own);
+      registerConstant("ConstGetShadowed::Tool", { name: "top tool" });
+      expect(constGet(Outer, "ConstGetShadowed::Tool")).toBe(OwnTool);
     } finally {
       delete (TopLevel as Record<string, unknown>).ConstGetShadowed;
+      delete (TopLevel as Record<string, unknown>)["ConstGetShadowed::Tool"];
     }
   });
 
