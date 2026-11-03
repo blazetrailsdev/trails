@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { ThroughAssociation } from "./through-association.js";
@@ -7,9 +7,9 @@ import { Member } from "../../test-helpers/models/member.js";
 import { MemberDetail } from "../../test-helpers/models/member-detail.js";
 import { Organization } from "../../test-helpers/models/organization.js";
 
-registerModel(Member);
-registerModel(MemberDetail);
-registerModel(Organization);
+constSet(TopLevel, "Member", Member);
+constSet(TopLevel, "MemberDetail", MemberDetail);
+constSet(TopLevel, "Organization", Organization);
 
 describe("Preloader::ThroughAssociation#records_by_owner child forcing", () => {
   const { members, memberDetails } = fixtures(["members", "organizations", "memberDetails"]);

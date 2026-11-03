@@ -26,6 +26,8 @@ import {
   basicObjRespondTo,
   NoMethodError,
   hashAref,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
@@ -34,7 +36,6 @@ import { inTimeZone } from "./cases/helper.js";
 import { deprecator } from "./deprecator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
-import { registerModel } from "./associations.js";
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { Category } from "./test-helpers/models/category.js";
@@ -46,7 +47,9 @@ import { Boolean as BooleanModel } from "./test-helpers/models/boolean.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 
-registerModel([Developer, AuditLog, AuditLogRequired]);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "AuditLog", AuditLog);
+constSet(TopLevel, "AuditLogRequired", AuditLogRequired);
 
 class ToBeLoadedFirst extends Base {
   static {

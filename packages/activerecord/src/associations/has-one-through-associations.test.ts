@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbFSend } from "@blazetrails/ruby-compat";
-import { Base, registerModel } from "../index.js";
+import { rbFSend, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import {
@@ -92,40 +92,40 @@ describe("HasOneThroughAssociationsTest", () => {
     "owners",
   ]);
 
-  registerModel(Member);
-  registerModel(Club);
-  registerModel(Membership);
-  registerModel(CurrentMembership);
-  registerModel(SuperMembership);
-  registerModel(SelectedMembership);
-  registerModel(TenantMembership);
-  registerModel(Sponsor);
-  registerModel(Organization);
-  registerModel(MemberDetail);
-  registerModel(MemberType);
-  registerModel(Minivan);
-  registerModel(Dashboard);
-  registerModel(Speedometer);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Club", Club);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
+  constSet(TopLevel, "SuperMembership", SuperMembership);
+  constSet(TopLevel, "SelectedMembership", SelectedMembership);
+  constSet(TopLevel, "TenantMembership", TenantMembership);
+  constSet(TopLevel, "Sponsor", Sponsor);
+  constSet(TopLevel, "Organization", Organization);
+  constSet(TopLevel, "MemberDetail", MemberDetail);
+  constSet(TopLevel, "MemberType", MemberType);
+  constSet(TopLevel, "Minivan", Minivan);
+  constSet(TopLevel, "Dashboard", Dashboard);
+  constSet(TopLevel, "Speedometer", Speedometer);
   Category.inheritanceColumn = "type";
-  registerModel(Category);
-  registerModel(SpecialCategory);
-  registerModel(Author);
-  registerModel(AuthorAddress);
-  registerModel(Essay);
-  registerModel(Owner);
-  registerModel(Post);
-  registerModel(FirstPost);
-  registerModel(Comment);
-  registerModel(SpecialComment);
-  registerModel(Categorization);
-  registerModel(Customer);
-  registerModel(Carrier);
-  registerModel(CustomerCarrier);
-  registerModel(ShopAccount);
-  registerModel(CpkBook);
-  registerModel(CpkOrder);
-  registerModel(CpkBookWithOrderAgreements);
-  registerModel(CpkOrderAgreement);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "SpecialCategory", SpecialCategory);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Essay", Essay);
+  constSet(TopLevel, "Owner", Owner);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "FirstPost", FirstPost);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Customer", Customer);
+  constSet(TopLevel, "Carrier", Carrier);
+  constSet(TopLevel, "CustomerCarrier", CustomerCarrier);
+  constSet(TopLevel, "ShopAccount", ShopAccount);
+  constSet(TopLevel, "CpkBook", CpkBook);
+  constSet(TopLevel, "CpkOrder", CpkOrder);
+  constSet(TopLevel, "CpkBookWithOrderAgreements", CpkBookWithOrderAgreements);
+  constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
 
   it("has one through with has one", async () => {
     const member = members("groucho");
@@ -643,7 +643,7 @@ describe("HasOneThroughAssociationsTest", () => {
         get thing(): Base | null | Promise<Base | null>;
         set thing(value: Base | null);
       }
-      registerModel(Thing);
+      constSet(TopLevel, "Thing", Thing);
       void Thing;
     }).toThrow(ArgumentError);
   });

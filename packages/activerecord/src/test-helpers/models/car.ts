@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Bulb } from "./bulb.js";
@@ -10,7 +12,6 @@ import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Car extends Base {
@@ -112,7 +113,8 @@ export class Car extends Base {
     this.attribute("wheels_owned_at", "datetime", { default: () => RubyTime.now() });
   }
 }
-registerModel(Car);
+constSet(TopLevel, "Car", Car);
+DescendantsTracker.registerSubclass(Base, Car);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Car {
   get person(): Person | null | Promise<Person | null>;
@@ -128,7 +130,8 @@ export class CoolCar extends Car {
     });
   }
 }
-registerModel(CoolCar);
+constSet(TopLevel, "CoolCar", CoolCar);
+DescendantsTracker.registerSubclass(Car, CoolCar);
 
 export class FastCar extends Car {
   static {
@@ -137,4 +140,5 @@ export class FastCar extends Car {
     });
   }
 }
-registerModel(FastCar);
+constSet(TopLevel, "FastCar", FastCar);
+DescendantsTracker.registerSubclass(Car, FastCar);

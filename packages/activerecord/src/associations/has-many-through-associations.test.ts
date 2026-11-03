@@ -1,8 +1,8 @@
 import type { CollectionAssociation } from "./collection-association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Marshal } from "@blazetrails/ruby-compat";
-import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
+import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   assertDeprecated,
@@ -164,82 +164,84 @@ describe("HasManyThroughAssociationsTest", () => {
     "organizations",
   ]);
 
-  registerModel([
-    Tag,
-    OrderedTag,
-    Tagging,
-    IndestructibleTagging,
-    Comment,
-    VerySpecialComment,
-    Category,
-    SpecialCategory,
-    Categorization,
-    Post,
-    FirstPost,
-    TaggedPost,
-    CategoryPost,
-    Author,
-    AuthorFavorite,
-    AuthorFavoriteWithScope,
-    AuthorAddress,
-    Person,
-    PersonWithDependentDestroyJobs,
-    PersonWithDependentDeleteAllJobs,
-    PersonWithDependentNullifyJobs,
-    PersonalLegacyThing,
-    Reader,
-    LazyReader,
-    SecureReader,
-    Book,
-    PublishedBook,
-    Subscriber,
-    Subscription,
-    Company,
-    Firm,
-    Developer,
-    SpecialDeveloper,
+  constSet(TopLevel, "Tag", Tag);
+  constSet(TopLevel, "OrderedTag", OrderedTag);
+  constSet(TopLevel, "Tagging", Tagging);
+  constSet(TopLevel, "IndestructibleTagging", IndestructibleTagging);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "SpecialCategory", SpecialCategory);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "FirstPost", FirstPost);
+  constSet(TopLevel, "TaggedPost", TaggedPost);
+  constSet(TopLevel, "CategoryPost", CategoryPost);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+  constSet(TopLevel, "AuthorFavoriteWithScope", AuthorFavoriteWithScope);
+  constSet(TopLevel, "AuthorAddress", AuthorAddress);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "PersonWithDependentDestroyJobs", PersonWithDependentDestroyJobs);
+  constSet(TopLevel, "PersonWithDependentDeleteAllJobs", PersonWithDependentDeleteAllJobs);
+  constSet(TopLevel, "PersonWithDependentNullifyJobs", PersonWithDependentNullifyJobs);
+  constSet(TopLevel, "PersonalLegacyThing", PersonalLegacyThing);
+  constSet(TopLevel, "Reader", Reader);
+  constSet(TopLevel, "LazyReader", LazyReader);
+  constSet(TopLevel, "SecureReader", SecureReader);
+  constSet(TopLevel, "Book", Book);
+  constSet(TopLevel, "PublishedBook", PublishedBook);
+  constSet(TopLevel, "Subscriber", Subscriber);
+  constSet(TopLevel, "Subscription", Subscription);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Developer", Developer);
+  constSet(TopLevel, "SpecialDeveloper", SpecialDeveloper);
+  constSet(
+    TopLevel,
+    "DeveloperWithIncorrectlyOrderedHasManyThrough",
     DeveloperWithIncorrectlyOrderedHasManyThrough,
-    AuditLog,
-    AuditLogRequired,
-    Human,
-    Contract,
-    SpecialContract,
-    Member,
-    Membership,
-    CurrentMembership,
-    SuperMembership,
-    TenantMembership,
-    Club,
-    SuperClub,
-    Organization,
-    Owner,
-    Pet,
-    Toy,
-    PetTreasure,
-    Treasure,
-    Job,
-    Reference,
-    Essay,
-    Zine,
-    Interest,
-    Seminar,
-    Session,
-    Section,
-    User,
-    Family,
-    FamilyTree,
-    ShardedBlogPost,
-    ShardedTag,
-    ShardedBlogPostTag,
-    CpkTag,
-    CpkOrder,
-    CpkOrderTag,
-    CpkBook,
-    CpkBookWithOrderAgreements,
-    CpkOrderAgreement,
-    CpkChapter,
-    SpecialCategorization,
-  ]);
+  );
+  constSet(TopLevel, "AuditLog", AuditLog);
+  constSet(TopLevel, "AuditLogRequired", AuditLogRequired);
+  constSet(TopLevel, "Human", Human);
+  constSet(TopLevel, "Contract", Contract);
+  constSet(TopLevel, "SpecialContract", SpecialContract);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
+  constSet(TopLevel, "SuperMembership", SuperMembership);
+  constSet(TopLevel, "TenantMembership", TenantMembership);
+  constSet(TopLevel, "Club", Club);
+  constSet(TopLevel, "SuperClub", SuperClub);
+  constSet(TopLevel, "Organization", Organization);
+  constSet(TopLevel, "Owner", Owner);
+  constSet(TopLevel, "Pet", Pet);
+  constSet(TopLevel, "Toy", Toy);
+  constSet(TopLevel, "PetTreasure", PetTreasure);
+  constSet(TopLevel, "Treasure", Treasure);
+  constSet(TopLevel, "Job", Job);
+  constSet(TopLevel, "Reference", Reference);
+  constSet(TopLevel, "Essay", Essay);
+  constSet(TopLevel, "Zine", Zine);
+  constSet(TopLevel, "Interest", Interest);
+  constSet(TopLevel, "Seminar", Seminar);
+  constSet(TopLevel, "Session", Session);
+  constSet(TopLevel, "Section", Section);
+  constSet(TopLevel, "User", User);
+  constSet(TopLevel, "Family", Family);
+  constSet(TopLevel, "FamilyTree", FamilyTree);
+  constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
+  constSet(TopLevel, "ShardedTag", ShardedTag);
+  constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTag);
+  constSet(TopLevel, "CpkTag", CpkTag);
+  constSet(TopLevel, "CpkOrder", CpkOrder);
+  constSet(TopLevel, "CpkOrderTag", CpkOrderTag);
+  constSet(TopLevel, "CpkBook", CpkBook);
+  constSet(TopLevel, "CpkBookWithOrderAgreements", CpkBookWithOrderAgreements);
+  constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
+  constSet(TopLevel, "CpkChapter", CpkChapter);
+  constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
 
   beforeEach(async () => {
     await Person.create({ first_name: "gummy" });
@@ -355,7 +357,7 @@ describe("HasManyThroughAssociationsTest", () => {
         );
       }
     }
-    registerModel("PersonPrime", PersonPrime);
+    constSet(TopLevel, "PersonPrime", PersonPrime);
 
     const posts = await (PersonPrime as any)
       .includes(":posts")
@@ -420,9 +422,9 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NoPkLesson", NoPkLesson);
-    registerModel("NoPkLessonStudent", NoPkLessonStudent);
-    registerModel("NoPkStudent", NoPkStudent);
+    constSet(TopLevel, "NoPkLesson", NoPkLesson);
+    constSet(TopLevel, "NoPkLessonStudent", NoPkLessonStudent);
+    constSet(TopLevel, "NoPkStudent", NoPkStudent);
 
     const sicp = new NoPkLesson({ name: "SICP" });
     const ben = new NoPkStudent({ name: "Ben Bitdiddle" });
@@ -471,9 +473,9 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NoPkDelLesson", NoPkDelLesson);
-    registerModel("NoPkDelLessonStudent", NoPkDelLessonStudent);
-    registerModel("NoPkDelStudent", NoPkDelStudent);
+    constSet(TopLevel, "NoPkDelLesson", NoPkDelLesson);
+    constSet(TopLevel, "NoPkDelLessonStudent", NoPkDelLessonStudent);
+    constSet(TopLevel, "NoPkDelStudent", NoPkDelStudent);
 
     const sicp = new NoPkDelLesson({ name: "SICP" });
     const ben = new NoPkDelStudent({ name: "Ben Bitdiddle" });
@@ -545,9 +547,9 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NoPkCbLesson", NoPkCbLesson);
-    registerModel("NoPkCbLessonStudent", NoPkCbLessonStudent);
-    registerModel("NoPkCbStudent", NoPkCbStudent);
+    constSet(TopLevel, "NoPkCbLesson", NoPkCbLesson);
+    constSet(TopLevel, "NoPkCbLessonStudent", NoPkCbLessonStudent);
+    constSet(TopLevel, "NoPkCbStudent", NoPkCbStudent);
 
     const sicp = new NoPkCbLesson({ name: "SICP" });
     const ben = new NoPkCbStudent({ name: "Ben Bitdiddle" });
@@ -2476,7 +2478,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.hasMany("subscriptions", { through: "author" });
       }
     }
-    registerModel("PostWithSingleHasManyThrough", PostWithSingleHasManyThrough);
+    constSet(TopLevel, "PostWithSingleHasManyThrough", PostWithSingleHasManyThrough);
 
     const post = new PostWithSingleHasManyThrough();
     const mary = await Author.find(authors("mary").id);
@@ -2505,7 +2507,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.hasMany("subscriptions", { through: "books" });
       }
     }
-    registerModel("PostWithNestedHasManyThrough", PostWithNestedHasManyThrough);
+    constSet(TopLevel, "PostWithNestedHasManyThrough", PostWithNestedHasManyThrough);
 
     const post = new PostWithNestedHasManyThrough();
     const mary = await Author.find(authors("mary").id);
@@ -2541,7 +2543,7 @@ describe("HasManyThroughAssociationsTest", () => {
           this.hasMany("pets", { through: "petTreasures" });
         }
       }
-      registerModel("SentientTreasure", SentientTreasure);
+      constSet(TopLevel, "SentientTreasure", SentientTreasure);
 
       const treasure = new SentientTreasure();
       const mochi = await Pet.find(pets("mochi").id);

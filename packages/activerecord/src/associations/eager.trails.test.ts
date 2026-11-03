@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -15,10 +15,10 @@ describe("EagerAssociationTest", () => {
     "categories",
     "categoriesPosts",
   ]);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(Category);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Category", Category);
 
   it("eager association loading with explicit join belongs to", async () => {
     const welcome = posts("welcome");

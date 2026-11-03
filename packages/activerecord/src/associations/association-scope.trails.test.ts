@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
@@ -20,18 +22,18 @@ import { MemberDetail } from "../test-helpers/models/member-detail.js";
 
 describe("AssociationScope", () => {
   fixtures([]);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(Category);
-  registerModel(Categorization);
-  registerModel(Tag);
-  registerModel(Tagging);
-  registerModel(Member);
-  registerModel(Membership);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Tag", Tag);
+  constSet(TopLevel, "Tagging", Tagging);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Membership", Membership);
   void CurrentMembership;
-  registerModel(Club);
-  registerModel(MemberDetail);
+  constSet(TopLevel, "Club", Club);
+  constSet(TopLevel, "MemberDetail", MemberDetail);
 
   function makeModels() {
     class AsAuthor extends Base {
@@ -67,8 +69,8 @@ describe("AssociationScope", () => {
       get as_author(): AsAuthor | null | Promise<AsAuthor | null>;
       set as_author(value: AsAuthor | null);
     }
-    registerModel(AsAuthor);
-    registerModel(AsPost);
+    constSet(TopLevel, "AsAuthor", AsAuthor);
+    constSet(TopLevel, "AsPost", AsPost);
     return { AsAuthor, AsPost };
   }
 
@@ -155,8 +157,8 @@ describe("AssociationScope", () => {
         this.attribute("published", "boolean");
       }
     }
-    registerModel(CountAuthor);
-    registerModel(CountPost);
+    constSet(TopLevel, "CountAuthor", CountAuthor);
+    constSet(TopLevel, "CountPost", CountPost);
     Associations.hasMany.call(
       CountAuthor,
       "count_posts",
@@ -195,7 +197,7 @@ describe("AssociationScope", () => {
         });
       }
     }
-    registerModel(StiOwner);
+    constSet(TopLevel, "StiOwner", StiOwner);
 
     const owner = new StiOwner({ owner_id: 3 });
     const reflection = (StiOwner as any)._reflectOnAssociation("very_special_clients");
@@ -232,8 +234,8 @@ describe("AssociationScope", () => {
         });
       }
     }
-    registerModel(DsAuthor);
-    registerModel(DsPost);
+    constSet(TopLevel, "DsAuthor", DsAuthor);
+    constSet(TopLevel, "DsPost", DsPost);
 
     const author = new DsAuthor({ id: 1 });
     const reflection = (DsAuthor as any)._reflectOnAssociation("ds_posts");
@@ -285,8 +287,8 @@ describe("AssociationScope", () => {
         this.attribute("active", "boolean");
       }
     }
-    registerModel(ZeroArityAuthor);
-    registerModel(ZeroArityPost);
+    constSet(TopLevel, "ZeroArityAuthor", ZeroArityAuthor);
+    constSet(TopLevel, "ZeroArityPost", ZeroArityPost);
 
     const owner = new ZeroArityAuthor({ id: 1 });
     const reflection = (ZeroArityAuthor as any)._reflectOnAssociation("zero_arity_posts");
@@ -317,8 +319,8 @@ describe("AssociationScope", () => {
         this.attribute("commentable_type", "string");
       }
     }
-    registerModel(AsOwner);
-    registerModel(AsComment);
+    constSet(TopLevel, "AsOwner", AsOwner);
+    constSet(TopLevel, "AsComment", AsComment);
     const owner = new AsOwner({ id: 7 });
     const reflection = (AsOwner as any)._reflectOnAssociation("as_comments");
     const sql = (
@@ -339,7 +341,8 @@ describe("AssociationScope", () => {
     }
     class StiAsSubOwner extends StiAsOwner {}
     StiAsOwner.inheritanceColumn = "type";
-    registerModel(StiAsSubOwner);
+    constSet(TopLevel, "StiAsSubOwner", StiAsSubOwner);
+    DescendantsTracker.registerSubclass(StiAsOwner, StiAsSubOwner);
     class StiAsComment extends Base {
       declare commentable_id: number | null;
       declare commentable_type: string | null;
@@ -349,9 +352,10 @@ describe("AssociationScope", () => {
         this.attribute("commentable_type", "string");
       }
     }
-    registerModel(StiAsOwner);
-    registerModel(StiAsSubOwner);
-    registerModel(StiAsComment);
+    constSet(TopLevel, "StiAsOwner", StiAsOwner);
+    constSet(TopLevel, "StiAsSubOwner", StiAsSubOwner);
+    DescendantsTracker.registerSubclass(StiAsOwner, StiAsSubOwner);
+    constSet(TopLevel, "StiAsComment", StiAsComment);
     Associations.hasMany.call(StiAsSubOwner, "as_comments", {
       className: "StiAsComment",
       as: "commentable",
@@ -389,8 +393,8 @@ describe("AssociationScope", () => {
         this.attribute("imageable_type", "string");
       }
     }
-    registerModel(AsOneOwner);
-    registerModel(AsOneImage);
+    constSet(TopLevel, "AsOneOwner", AsOneOwner);
+    constSet(TopLevel, "AsOneImage", AsOneImage);
     const owner = new AsOneOwner({ id: 3 });
     const reflection = (AsOneOwner as any)._reflectOnAssociation("as_one_image");
     const sql = (
@@ -423,8 +427,8 @@ describe("AssociationScope", () => {
       get commentable(): Base | null | Promise<Base | null>;
       set commentable(value: Base | null);
     }
-    registerModel(PolyTarget);
-    registerModel(PolyComment);
+    constSet(TopLevel, "PolyTarget", PolyTarget);
+    constSet(TopLevel, "PolyComment", PolyComment);
     const comment = new PolyComment({ commentable_id: 99, commentable_type: "PolyTarget" });
     const reflection = (PolyComment as any)._reflectOnAssociation("commentable");
     const sql = (
@@ -456,8 +460,8 @@ describe("AssociationScope", () => {
         this.hasMany("books", { className: "AscCpkBook", foreignKey: "broken_order_id" });
       }
     }
-    registerModel(AscCpkBook);
-    registerModel(AscCpkBrokenOrder);
+    constSet(TopLevel, "AscCpkBook", AscCpkBook);
+    constSet(TopLevel, "AscCpkBrokenOrder", AscCpkBrokenOrder);
     const owner = new AscCpkBrokenOrder({ shop_id: 1, status: "active" });
     let error: Error | undefined;
     try {
@@ -496,8 +500,8 @@ describe("AssociationScope", () => {
       get commentable(): Base | null | Promise<Base | null>;
       set commentable(value: Base | null);
     }
-    registerModel(UuidTarget);
-    registerModel(UuidComment);
+    constSet(TopLevel, "UuidTarget", UuidTarget);
+    constSet(TopLevel, "UuidComment", UuidComment);
     const comment = new UuidComment({
       commentable_id: "abc-123",
       commentable_type: "UuidTarget",
@@ -560,9 +564,9 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
       }
     }
-    registerModel(CcAuthor);
-    registerModel(CcMembership);
-    registerModel(CcTag);
+    constSet(TopLevel, "CcAuthor", CcAuthor);
+    constSet(TopLevel, "CcMembership", CcMembership);
+    constSet(TopLevel, "CcTag", CcTag);
 
     const author = new CcAuthor({ id: 1 });
     const reflection = (CcAuthor as any)._reflectOnAssociation("cc_tags");
@@ -724,9 +728,9 @@ describe("AssociationScope", () => {
         this.attribute("id", "integer");
       }
     }
-    registerModel(ThroughAuthor);
-    registerModel(ThroughMembership);
-    registerModel(ThroughPost);
+    constSet(TopLevel, "ThroughAuthor", ThroughAuthor);
+    constSet(TopLevel, "ThroughMembership", ThroughMembership);
+    constSet(TopLevel, "ThroughPost", ThroughPost);
 
     const author = new ThroughAuthor({ id: 1 });
     const reflection = (ThroughAuthor as any)._reflectOnAssociation("through_posts");
@@ -778,7 +782,7 @@ describe("AssociationScope", () => {
       get imageable(): Base | null | Promise<Base | null>;
       set imageable(value: Base | null);
     }
-    registerModel("PstGallery", PstGallery);
+    constSet(TopLevel, "PstGallery", PstGallery);
 
     const owner = new PstGallery({});
     (owner as any).id = 5;

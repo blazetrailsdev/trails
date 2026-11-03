@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Tag } from "../test-helpers/models/tag.js";
@@ -11,15 +11,15 @@ import { Chef } from "../test-helpers/models/chef.js";
 import { CakeDesigner } from "../test-helpers/models/cake-designer.js";
 import { DrinkDesigner } from "../test-helpers/models/drink-designer.js";
 
-registerModel(Author);
-registerModel(Tag);
-registerModel(Tagging);
-registerModel(Post);
-registerModel(Hotel);
-registerModel(Department);
-registerModel(Chef);
-registerModel(CakeDesigner);
-registerModel(DrinkDesigner);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Hotel", Hotel);
+constSet(TopLevel, "Department", Department);
+constSet(TopLevel, "Chef", Chef);
+constSet(TopLevel, "CakeDesigner", CakeDesigner);
+constSet(TopLevel, "DrinkDesigner", DrinkDesigner);
 
 describe("HMT Slot E — nested-through advanced", () => {
   const { authors, tags, taggings } = fixtures([

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 interface CollectionAssociationLike {
@@ -38,8 +39,8 @@ describe("BuildRecordBlockOrdering", () => {
   fixtures(["authors", "posts"]);
 
   beforeAll(() => {
-    registerModel("BlockOrderingAuthor", BlockOrderingAuthor);
-    registerModel("BlockOrderingPost", BlockOrderingPost);
+    constSet(TopLevel, "BlockOrderingAuthor", BlockOrderingAuthor);
+    constSet(TopLevel, "BlockOrderingPost", BlockOrderingPost);
   });
 
   it("yields the build block after initialize_attributes has set the owner key", async () => {

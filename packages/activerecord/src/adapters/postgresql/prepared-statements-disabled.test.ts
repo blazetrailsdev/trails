@@ -1,15 +1,15 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNot } from "@blazetrails/activesupport";
 import "../../index.js";
 import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Developer } from "../../test-helpers/models/developer.js";
 import { Computer } from "../../test-helpers/models/computer.js";
 import { developerFixtureData } from "../../test-helpers/fixtures/developers.js";
 
-registerModel(Computer);
+constSet(TopLevel, "Computer", Computer);
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("PreparedStatementsDisabledTest", () => {

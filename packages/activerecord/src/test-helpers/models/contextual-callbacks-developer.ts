@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class ContextualCallbacksDeveloper extends Base {
   declare name: string;
@@ -41,4 +42,5 @@ export class ContextualCallbacksDeveloper extends Base {
     return (this._history ??= []);
   }
 }
-registerModel(ContextualCallbacksDeveloper);
+constSet(TopLevel, "ContextualCallbacksDeveloper", ContextualCallbacksDeveloper);
+DescendantsTracker.registerSubclass(Base, ContextualCallbacksDeveloper);

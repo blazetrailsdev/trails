@@ -1,18 +1,18 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
-import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
-registerModel(Developer);
-registerModel(Comment);
-registerModel(Post);
-registerModel(Topic);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Topic", Topic);
 
 describe("NullRelationTest", () => {
   fixtures(["posts", "comments"]);

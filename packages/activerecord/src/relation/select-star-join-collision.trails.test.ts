@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Friendship } from "../test-helpers/models/friendship.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
-registerModel(Friendship);
+constSet(TopLevel, "Friendship", Friendship);
 
 describe("SELECT * column collision in joined relations", () => {
   const { self, people } = fixtures(["people", "friendships"]);

@@ -1,11 +1,10 @@
-import { Marshal, kernelThrow, rbFSend } from "@blazetrails/ruby-compat";
+import { Marshal, kernelThrow, rbFSend, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import {
   Base,
-  registerModel,
   SubclassNotFound,
   AssociationTypeMismatch,
   RecordNotFound,
@@ -73,21 +72,21 @@ async function readHasOne(owner: any, name: string): Promise<any> {
 }
 
 function registerCompanyModels(): void {
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(DependentFirm);
-  registerModel(ExclusivelyDependentFirm);
-  registerModel(RestrictedWithExceptionFirm);
-  registerModel(RestrictedWithErrorFirm);
-  registerModel(Client);
-  registerModel(Account);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "DependentFirm", DependentFirm);
+  constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+  constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+  constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+  constSet(TopLevel, "Client", Client);
+  constSet(TopLevel, "Account", Account);
   Company.inheritanceColumn = "type";
-  registerModel(Firm);
-  registerModel(DependentFirm);
-  registerModel(ExclusivelyDependentFirm);
-  registerModel(RestrictedWithExceptionFirm);
-  registerModel(RestrictedWithErrorFirm);
-  registerModel(Client);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "DependentFirm", DependentFirm);
+  constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+  constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+  constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+  constSet(TopLevel, "Client", Client);
 }
 
 class SpecialBook extends Base {
@@ -147,35 +146,43 @@ describe("HasOneAssociationsTest", () => {
 
   beforeAll(async () => {
     registerCompanyModels();
-    registerModel(Car);
-    registerModel(Bulb);
-    registerModel(Pirate);
-    registerModel(DestructivePirate);
-    registerModel(Ship);
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Developer);
-    registerModel(AuditLog);
-    registerModel(Room);
-    registerModel(User);
-    registerModel("SpecialBook", SpecialBook);
-    registerModel("SpecialAuthor", SpecialAuthor);
-    registerModel("SpecialSubscription", SpecialSubscription);
-    registerModel(Image);
-    registerModel(Department);
-    registerModel(Chef);
-    registerModel(DrinkDesignerWithPolymorphicDependentNullifyChef);
-    registerModel(CpkBook);
-    registerModel(CpkOrder);
-    registerModel(CpkOrderWithNullifiedBook);
-    registerModel(CpkBrokenOrder);
-    registerModel(CpkBrokenOrderWithNonCpkBooks);
-    registerModel(CpkNonCpkBook);
-    registerModel("SpecialCar", SpecialCar);
-    registerModel("SpecialBulb", SpecialBulb);
-    registerModel(Club);
-    registerModel(Membership);
-    registerModel(DrinkDesignerWithPolymorphicTouchChef);
+    constSet(TopLevel, "Car", Car);
+    constSet(TopLevel, "Bulb", Bulb);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "DestructivePirate", DestructivePirate);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "AuditLog", AuditLog);
+    constSet(TopLevel, "Room", Room);
+    constSet(TopLevel, "User", User);
+    constSet(TopLevel, "SpecialBook", SpecialBook);
+    constSet(TopLevel, "SpecialAuthor", SpecialAuthor);
+    constSet(TopLevel, "SpecialSubscription", SpecialSubscription);
+    constSet(TopLevel, "Image", Image);
+    constSet(TopLevel, "Department", Department);
+    constSet(TopLevel, "Chef", Chef);
+    constSet(
+      TopLevel,
+      "DrinkDesignerWithPolymorphicDependentNullifyChef",
+      DrinkDesignerWithPolymorphicDependentNullifyChef,
+    );
+    constSet(TopLevel, "CpkBook", CpkBook);
+    constSet(TopLevel, "CpkOrder", CpkOrder);
+    constSet(TopLevel, "CpkOrderWithNullifiedBook", CpkOrderWithNullifiedBook);
+    constSet(TopLevel, "CpkBrokenOrder", CpkBrokenOrder);
+    constSet(TopLevel, "CpkBrokenOrderWithNonCpkBooks", CpkBrokenOrderWithNonCpkBooks);
+    constSet(TopLevel, "CpkNonCpkBook", CpkNonCpkBook);
+    constSet(TopLevel, "SpecialCar", SpecialCar);
+    constSet(TopLevel, "SpecialBulb", SpecialBulb);
+    constSet(TopLevel, "Club", Club);
+    constSet(TopLevel, "Membership", Membership);
+    constSet(
+      TopLevel,
+      "DrinkDesignerWithPolymorphicTouchChef",
+      DrinkDesignerWithPolymorphicTouchChef,
+    );
     await Company.loadSchema();
     await Account.loadSchema();
     await Car.loadSchema();
@@ -1104,8 +1111,8 @@ describe("HasOneAssociationsTest", () => {
         });
       }
     }
-    registerModel("DestroyByParentBook", DestroyByParentBook);
-    registerModel("DestroyByParentAuthor", DestroyByParentAuthor);
+    constSet(TopLevel, "DestroyByParentBook", DestroyByParentBook);
+    constSet(TopLevel, "DestroyByParentAuthor", DestroyByParentAuthor);
     const author = await DestroyByParentAuthor.create({ name: "Test" });
     const book = await (DestroyByParentBook as any).create({ author });
     await author.destroy();
@@ -1133,8 +1140,8 @@ describe("HasOneAssociationsTest", () => {
         });
       }
     }
-    registerModel("DbaReplBook", DbaReplBook);
-    registerModel("DbaReplAuthor", DbaReplAuthor);
+    constSet(TopLevel, "DbaReplBook", DbaReplBook);
+    constSet(TopLevel, "DbaReplAuthor", DbaReplAuthor);
     const author = await DbaReplAuthor.create({ name: "Test" });
     const book = await (DbaReplBook as any).create({ author });
     await (author.association("book") as any).loadTarget();
@@ -1164,8 +1171,8 @@ describe("HasOneAssociationsTest", () => {
         });
       }
     }
-    registerModel("UndestroyableBook", UndestroyableBook);
-    registerModel("DestroyableAuthor", DestroyableAuthor);
+    constSet(TopLevel, "UndestroyableBook", UndestroyableBook);
+    constSet(TopLevel, "DestroyableAuthor", DestroyableAuthor);
     const author = await DestroyableAuthor.create({ name: "Test" });
     await (UndestroyableBook as any).create({ author });
     await assertNoDifference(
@@ -1178,7 +1185,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("composite primary key malformed association class", async () => {
-    registerModel(CpkBook);
+    constSet(TopLevel, "CpkBook", CpkBook);
     const order = new CpkBrokenOrder();
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");
@@ -1190,7 +1197,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("composite primary key malformed association owner class", async () => {
-    registerModel(CpkNonCpkBook);
+    constSet(TopLevel, "CpkNonCpkBook", CpkNonCpkBook);
     const order = new CpkBrokenOrderWithNonCpkBooks();
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, () => {
       order.association("book");

@@ -7,7 +7,6 @@ import {
   ThroughReflection,
   AssociationReflection,
   AggregateReflection,
-  registerModel,
 } from "./index.js";
 import { Associations } from "./associations.js";
 import {
@@ -36,7 +35,7 @@ import { ShardedComment } from "./test-helpers/models/sharded/comment.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { HasManyThroughSourceAssociationNotFoundError } from "./associations/errors.js";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assert,
@@ -96,9 +95,9 @@ describe("ReflectionTest", () => {
         this.attribute("book_id", "integer");
       }
     }
-    registerModel(RfAuthor);
-    registerModel(RfBook);
-    registerModel(RfChapter);
+    constSet(TopLevel, "RfAuthor", RfAuthor);
+    constSet(TopLevel, "RfBook", RfBook);
+    constSet(TopLevel, "RfChapter", RfChapter);
     return { Author: RfAuthor, Book: RfBook, Chapter: RfChapter };
   }
 
@@ -291,8 +290,8 @@ describe("ReflectionTest", () => {
         this.attribute("street", "string");
       }
     }
-    registerModel("RfPerson", RfPerson);
-    registerModel("RfAddress", RfAddress);
+    constSet(TopLevel, "RfPerson", RfPerson);
+    constSet(TopLevel, "RfAddress", RfAddress);
     const ref = reflectOnAssociation(RfPerson, "addresses");
     expect(ref!.klass).toBe(RfAddress);
   });
@@ -318,8 +317,8 @@ describe("ReflectionTest", () => {
       get user(): RfNestedUser | null | Promise<RfNestedUser | null>;
       set user(value: RfNestedUser | null);
     }
-    registerModel("RfNested::User", RfNestedUser);
-    registerModel("RfAdmin::User", RfAdminUser);
+    constSet(constSet(TopLevel, "RfNested", {}), "User", RfNestedUser);
+    constSet(constSet(TopLevel, "RfAdmin", {}), "User", RfAdminUser);
     const ref = reflectOnAssociation(RfAdminUser, "user");
     expect(ref!.klass).toBe(RfNestedUser);
   });
@@ -333,7 +332,7 @@ describe("ReflectionTest", () => {
         this.hasMany("nestedUsers", { className: "RfNestedNestedUser" });
       }
     }
-    registerModel("RfNestedNestedUser", RfNestedNestedUser);
+    constSet(TopLevel, "RfNestedNestedUser", RfNestedNestedUser);
     const ref = reflectOnAssociation(RfNestedNestedUser, "nestedUsers");
     expect(ref!.klass).toBe(RfNestedNestedUser);
   });
@@ -811,8 +810,8 @@ describe("ReflectionTest", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel("RfProject", RfProject);
-    registerModel("RfTask", RfTask);
+    constSet(TopLevel, "RfProject", RfProject);
+    constSet(TopLevel, "RfTask", RfTask);
     const ref = reflectOnAssociation(RfProject, "tasks");
     expect(ref!.klass).toBe(RfTask);
   });
@@ -933,8 +932,8 @@ describe("ReflectionTest", () => {
         this.hasMany("categories", { className: "DjtCategory" });
       }
     }
-    registerModel("DjtCategory", DjtCategory);
-    registerModel("DjtProduct", DjtProduct);
+    constSet(TopLevel, "DjtCategory", DjtCategory);
+    constSet(TopLevel, "DjtProduct", DjtProduct);
     const ref1 = reflectOnAssociation(DjtProduct, "categories");
     expect(ref1!.joinTable).toBe("categories_products");
 

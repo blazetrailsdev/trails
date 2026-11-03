@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   assertNoDifference,
@@ -5,7 +6,7 @@ import {
   assertRaises,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
-import { registerModel, Rollback } from "./index.js";
+import { Rollback } from "./index.js";
 import "./support/canonical-model-index.js";
 import { Lesson, LessonError } from "./test-helpers/models/lesson.js";
 import { Student } from "./test-helpers/models/student.js";
@@ -14,7 +15,8 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 const { self } = fixtures([]);
 
 describe("HabtmDestroyOrderTest", () => {
-  registerModel([Lesson, Student]);
+  constSet(TopLevel, "Lesson", Lesson);
+  constSet(TopLevel, "Student", Student);
 
   it("may not delete a lesson with students", async () => {
     const sicp = await Lesson.create({ name: "SICP" });

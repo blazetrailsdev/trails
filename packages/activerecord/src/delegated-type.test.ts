@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { registerModel } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -22,12 +22,12 @@ afterAll(() => {
 describe("DelegatedTypeTest", () => {
   const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"]);
 
-  registerModel("Entry", Entry);
-  registerModel("Message", Message);
-  registerModel("Comment", Comment);
-  registerModel("Account", Account);
-  registerModel("Post", Post);
-  registerModel("Recipient", Recipient);
+  constSet(TopLevel, "Entry", Entry);
+  constSet(TopLevel, "Message", Message);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Account", Account);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Recipient", Recipient);
 
   let entryWithMessage: Base;
   let entryWithComment: Base;

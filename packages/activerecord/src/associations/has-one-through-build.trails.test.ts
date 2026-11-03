@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Notifications, NotificationEvent } from "@blazetrails/activesupport";
 import { SQLCounter, type SqlPayload } from "../testing/query-assertions.js";
@@ -10,11 +10,11 @@ import { Membership, CurrentMembership } from "../test-helpers/models/membership
 describe("HasOneThroughBuildTrails", () => {
   const { members } = fixtures(["members", "clubs", "memberships"]);
 
-  registerModel(Member);
-  registerModel(Club);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Club", Club);
   Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
 
   it("buildClub on an unloaded through loads the through proxy, not the target join", async () => {
     const member = members("groucho");

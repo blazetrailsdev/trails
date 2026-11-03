@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { registerModel } from "./associations.js";
 import { resetColumnInformation } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -195,7 +196,8 @@ describe("sync loadSchema / columnsHash", () => {
     Circle.columnsHash();
     expect(Object.hasOwn(Circle, "_schemaLoaded")).toBe(true);
 
-    registerModel(Circle);
+    constSet(TopLevel, "Circle", Circle);
+    DescendantsTracker.registerSubclass(Shape, Circle);
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
@@ -229,7 +231,8 @@ describe("sync loadSchema / columnsHash", () => {
     }
     class Circle extends Shape {
       static {
-        registerModel(this);
+        constSet(TopLevel, "Circle", this);
+        DescendantsTracker.registerSubclass(Shape, this);
       }
     }
 
@@ -263,7 +266,8 @@ describe("sync loadSchema / columnsHash", () => {
     class SpecialPost extends Post {
       static override tableName = "special_posts";
       static {
-        registerModel(this);
+        constSet(TopLevel, "SpecialPost", this);
+        DescendantsTracker.registerSubclass(Post, this);
       }
     }
 

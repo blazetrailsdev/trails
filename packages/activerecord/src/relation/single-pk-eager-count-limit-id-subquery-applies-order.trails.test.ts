@@ -1,15 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import type { Base } from "../index.js";
 
 describe("Post single-PK eager count limit id subquery applies order", () => {
   const { self } = fixtures([]);
 
   beforeAll(() => {
-    [Post, Comment].forEach((m) => registerModel(m as unknown as typeof Base));
+    [Post, Comment].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   async function seedPosts(): Promise<void> {

@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Human } from "./human.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Face extends Base {
@@ -53,4 +54,5 @@ export interface Face {
   get puzzledPolymorphicHuman(): Base | null | Promise<Base | null>;
   set puzzledPolymorphicHuman(value: Base | null);
 }
-registerModel(Face);
+constSet(TopLevel, "Face", Face);
+DescendantsTracker.registerSubclass(Base, Face);

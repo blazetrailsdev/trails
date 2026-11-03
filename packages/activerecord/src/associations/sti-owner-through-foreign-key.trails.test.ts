@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -11,7 +11,7 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
 
   beforeAll(() => {
     for (const klass of [Post, SpecialPost, Person, Reader]) {
-      registerModel(klass);
+      constSet(TopLevel, klass.name, klass);
     }
   });
 
@@ -47,7 +47,7 @@ describe("STI owner has_one — declaring-class owner FK", () => {
 
   beforeAll(() => {
     for (const klass of [Post, SpecialPost, Comment, VerySpecialComment]) {
-      registerModel(klass);
+      constSet(TopLevel, klass.name, klass);
     }
   });
 

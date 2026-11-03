@@ -1,10 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  Base,
-  registerModel,
-  AssociationNotFoundError,
-  EagerLoadPolymorphicError,
-} from "../index.js";
+import { Base, AssociationNotFoundError, EagerLoadPolymorphicError } from "../index.js";
 import {
   Notifications,
   assertIncludes,
@@ -140,28 +136,40 @@ describe("EagerAssociationTest", () => {
     "taggings",
   ]);
   beforeAll(async () => {
-    registerModel("PostWithDefaultScope", PostWithDefaultScope);
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    registerModel(CpkOrderAgreement);
-    registerModel(Mentor);
-    registerModel(Contract);
-    registerModel(AuditLog);
-    registerModel(SpecialPost);
-    registerModel(StiPost);
-    registerModel(SubSpecialComment);
-    registerModel(PostWithDefaultInclude);
-    registerModel(SpecialComment);
-    registerModel(VerySpecialComment);
-    registerModel(LazyReader);
-    registerModel(SpecialCategory);
-    registerModel(Firm);
-    registerModel(Client);
-    registerModel(EagerDeveloperWithDefaultScope);
-    registerModel(EagerDeveloperWithClassMethodDefaultScope);
-    registerModel(EagerDeveloperWithLambdaDefaultScope);
-    registerModel(EagerDeveloperWithBlockDefaultScope);
-    registerModel(EagerDeveloperWithCallableDefaultScope);
+    constSet(TopLevel, "PostWithDefaultScope", PostWithDefaultScope);
+    constSet(TopLevel, "CpkOrder", CpkOrder);
+    constSet(TopLevel, "CpkBook", CpkBook);
+    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
+    constSet(TopLevel, "Mentor", Mentor);
+    constSet(TopLevel, "Contract", Contract);
+    constSet(TopLevel, "AuditLog", AuditLog);
+    constSet(TopLevel, "SpecialPost", SpecialPost);
+    constSet(TopLevel, "StiPost", StiPost);
+    constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+    constSet(TopLevel, "PostWithDefaultInclude", PostWithDefaultInclude);
+    constSet(TopLevel, "SpecialComment", SpecialComment);
+    constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+    constSet(TopLevel, "LazyReader", LazyReader);
+    constSet(TopLevel, "SpecialCategory", SpecialCategory);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "EagerDeveloperWithDefaultScope", EagerDeveloperWithDefaultScope);
+    constSet(
+      TopLevel,
+      "EagerDeveloperWithClassMethodDefaultScope",
+      EagerDeveloperWithClassMethodDefaultScope,
+    );
+    constSet(
+      TopLevel,
+      "EagerDeveloperWithLambdaDefaultScope",
+      EagerDeveloperWithLambdaDefaultScope,
+    );
+    constSet(TopLevel, "EagerDeveloperWithBlockDefaultScope", EagerDeveloperWithBlockDefaultScope);
+    constSet(
+      TopLevel,
+      "EagerDeveloperWithCallableDefaultScope",
+      EagerDeveloperWithCallableDefaultScope,
+    );
   });
   it("should work inverse of with eager load", async () => {
     const author = authors("david");
@@ -930,7 +938,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("circular preload does not modify unscoped", async () => {
-    registerModel("FirstPost", FirstPost);
+    constSet(TopLevel, "FirstPost", FirstPost);
     const post2 = await Post.create({ title: "P2", body: "b" });
     await Comment.create({ post_id: 1, body: "c1" });
 
@@ -2194,9 +2202,9 @@ describe("EagerAssociationTest", () => {
 
   Post.inheritanceColumn = "type";
   Comment.inheritanceColumn = "type";
-  registerModel(SpecialPost);
-  registerModel(StiPost);
-  registerModel(SpecialComment);
+  constSet(TopLevel, "SpecialPost", SpecialPost);
+  constSet(TopLevel, "StiPost", StiPost);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
 
   it("preloading with has one through an sti with after initialize", async () => {
     const authorA = await Author.create({ name: "A" });
@@ -2239,11 +2247,11 @@ describe("EagerAssociationTest", () => {
   });
 
   Post.inheritanceColumn = "type";
-  registerModel(SpecialPost);
+  constSet(TopLevel, "SpecialPost", SpecialPost);
   Comment.inheritanceColumn = "type";
-  registerModel(SpecialComment);
-  registerModel(SubSpecialComment);
-  registerModel(VerySpecialComment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
 
   it("eager with inheritance", async () => {
     const loaded = await SpecialPost.all().includes(":comments");
@@ -2265,8 +2273,8 @@ describe("EagerAssociationTest", () => {
   });
 
   Post.inheritanceColumn = "type";
-  registerModel(SpecialPost);
-  registerModel(StiPost);
+  constSet(TopLevel, "SpecialPost", SpecialPost);
+  constSet(TopLevel, "StiPost", StiPost);
 
   it("eager with has many through", async () => {
     const michael = people("michael") as any;
@@ -2376,8 +2384,8 @@ describe("EagerAssociationTest", () => {
   });
 
   Company.inheritanceColumn = "type";
-  registerModel(Firm);
-  registerModel(Client);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Client", Client);
 
   it("eager with has one dependent does not destroy dependent", async () => {
     const firstFirm = companies("first_firm") as Firm;
@@ -2541,8 +2549,8 @@ describe("EagerLoadingTooManyIdsTest", () => {
   fixtures({}, { useTransactionalTests: false });
   const TOTAL = 65536;
   beforeAll(async () => {
-    registerModel(Citation);
-    registerModel(Book);
+    constSet(TopLevel, "Citation", Citation);
+    constSet(TopLevel, "Book", Book);
     const rows: { id: number; book2_id: number }[] = [];
     for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
     for (let i = 0; i < rows.length; i += 10_000) {
@@ -2567,9 +2575,9 @@ describe("EagerLoadingTooManyIdsTest", () => {
 
 describe("EagerAssociationTest", () => {
   const { self, shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
-  registerModel("ShardedBlog", ShardedBlog);
-  registerModel("ShardedBlogPost", ShardedBlogPost);
-  registerModel("ShardedComment", ShardedComment);
+  constSet(TopLevel, "ShardedBlog", ShardedBlog);
+  constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
+  constSet(TopLevel, "ShardedComment", ShardedComment);
 
   it("preloading belongs_to association SQL", async () => {
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
@@ -2604,26 +2612,34 @@ describe("EagerAssociationTest", () => {
   ]);
 
   beforeAll(async () => {
-    registerModel(
+    constSet(
+      TopLevel,
       "ShardedBlog",
       (await import("../test-helpers/models/sharded/blog.js")).ShardedBlog,
     );
-    registerModel(
+    constSet(
+      TopLevel,
       "ShardedBlogPost",
       (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
     );
-    registerModel(
+    constSet(
+      TopLevel,
       "ShardedComment",
       (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
     );
-    registerModel("ShardedTag", (await import("../test-helpers/models/sharded/tag.js")).ShardedTag);
-    registerModel(
+    constSet(
+      TopLevel,
+      "ShardedTag",
+      (await import("../test-helpers/models/sharded/tag.js")).ShardedTag,
+    );
+    constSet(
+      TopLevel,
       "ShardedBlogPostTag",
       (await import("../test-helpers/models/sharded/blog-post-tag.js")).ShardedBlogPostTag,
     );
     const cpk = await import("../test-helpers/models/cpk.js");
-    registerModel("CpkPost", cpk.CpkPost);
-    registerModel("CpkComment", cpk.CpkComment);
+    constSet(TopLevel, "CpkPost", cpk.CpkPost);
+    constSet(TopLevel, "CpkComment", cpk.CpkComment);
   });
 
   it("preloading belongs_to association associated by a composite query_constraints", async () => {

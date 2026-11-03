@@ -1,13 +1,13 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("OrderTest", () => {
   const { authors } = fixtures(["authors", "authorAddresses"]);
-  registerModel(Author);
-  registerModel(Book);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Book", Book);
 
   beforeEach(async () => {
     await Book.deleteAll();

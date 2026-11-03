@@ -1,12 +1,12 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 
-registerModel(Author);
-registerModel(Post);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
 
 describe("Preloader::Association#preloaded_records forcing", () => {
   const { authors } = fixtures(["authors", "posts"]);

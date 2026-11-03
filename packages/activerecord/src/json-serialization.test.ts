@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ActiveSupportJSON, assertNotRespondTo } from "@blazetrails/activesupport";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 
 import { Contact, ContactSti } from "./test-helpers/models/contact.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -15,11 +16,11 @@ import "./association-relation.js";
 
 fixtures({}, { useTransactionalTests: false });
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Comment);
-registerModel(Tag);
-registerModel(Tagging);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
 
 function setIncludeRootInJson(value: boolean, fn: () => void): void {
   const original = Base.includeRootInJson;

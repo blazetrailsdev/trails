@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { DestroyAsyncParent } from "./destroy-async-parent.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DlKeyedJoin extends Base {
@@ -18,7 +19,8 @@ export class DlKeyedJoin extends Base {
     this.belongsTo("dlKeyedHasManyThrough", { primaryKey: "through_key" });
   }
 }
-registerModel(DlKeyedJoin);
+constSet(TopLevel, "DlKeyedJoin", DlKeyedJoin);
+DescendantsTracker.registerSubclass(Base, DlKeyedJoin);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DlKeyedJoin {
   get dlKeyedHasManyThrough(): DlKeyedHasManyThrough | null | Promise<DlKeyedHasManyThrough | null>;

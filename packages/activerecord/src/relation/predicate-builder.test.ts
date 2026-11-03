@@ -2,11 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
-import { regexpEscape, registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 
 describe("PredicateBuilderTest", () => {
   class RegexFilter {
@@ -20,13 +19,13 @@ describe("PredicateBuilderTest", () => {
   const { self } = fixtures(["topics", "posts", "authors", "products"]);
 
   beforeAll(() => {
-    registerModel("Topic", Topic);
-    registerModel("Reply", Reply);
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Reply", Reply);
   });
 
   afterAll(() => {
-    unregisterConstant("Topic", registeredConstant("Topic"));
-    unregisterConstant("Reply", registeredConstant("Reply"));
+    rbModRemoveConst(TopLevel, "Topic");
+    rbModRemoveConst(TopLevel, "Reply");
   });
 
   it("registering new handlers", () => {
@@ -70,7 +69,7 @@ describe("PredicateBuilderTest", () => {
         );
       }
     }
-    registerModel("RegexpReply", RegexpReply);
+    constSet(TopLevel, "RegexpReply", RegexpReply);
     Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);
     try {
       const sql = RegexpReply.joins(":regexp_topic")
@@ -80,7 +79,7 @@ describe("PredicateBuilderTest", () => {
         new RegExp(`${regexpEscape(self().quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      unregisterConstant("RegexpReply", registeredConstant("RegexpReply"));
+      rbModRemoveConst(TopLevel, "RegexpReply");
       (Topic as any)._predicateBuilder = null;
     }
   });

@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
-import { StrictLoadingViolationError, registerModel } from "./index.js";
+import { StrictLoadingViolationError } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -24,12 +25,18 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     "memberships",
     "clubs",
   ]);
-  registerModel(Developer);
-  registerModel(AuditLog);
-  registerModel(Ship);
-  registerModel(Project);
-  registerModel(Firm);
-  registerModel([Author, Post, Comment, Member, Membership, CurrentMembership, Club]);
+  constSet(TopLevel, "Developer", Developer);
+  constSet(TopLevel, "AuditLog", AuditLog);
+  constSet(TopLevel, "Ship", Ship);
+  constSet(TopLevel, "Project", Project);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
+  constSet(TopLevel, "Club", Club);
 
   it("does not raise on lazy loading a has_many on a new strict-loading owner without the foreign key", async () => {
     const developer = new Developer({ name: "New Dev" });

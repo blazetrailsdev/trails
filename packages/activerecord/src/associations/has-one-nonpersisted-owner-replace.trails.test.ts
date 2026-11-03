@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import type { HasOneAssociation } from "./has-one-association.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { DestructivePirate, Pirate } from "../test-helpers/models/pirate.js";
@@ -11,10 +11,10 @@ describe("has_one replace on a non-persisted owner", () => {
   fixtures(["ships", "pirates", "developers"]);
 
   beforeAll(async () => {
-    registerModel(Pirate);
-    registerModel(DestructivePirate);
-    registerModel(Ship);
-    registerModel(Developer);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "DestructivePirate", DestructivePirate);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "Developer", Developer);
     await Pirate.loadSchema();
     await Ship.loadSchema();
   });

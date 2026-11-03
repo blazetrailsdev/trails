@@ -1,7 +1,8 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
-import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
+import { Base, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import {
   assert,
@@ -245,7 +246,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
       Source,
       PriceEstimate,
     ]) {
-      registerModel(m as any);
+      constSet(TopLevel, m.name, m);
     }
     await Country.loadSchema();
     await Treaty.loadSchema();

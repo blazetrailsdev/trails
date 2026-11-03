@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -23,7 +23,6 @@ import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import { Base } from "../base.js";
-import { registerModel } from "../associations.js";
 import type { CollectionProxy } from "../associations/collection-proxy.js";
 import { Migration } from "../migration.js";
 import { SchemaDumper } from "../schema-dumper.js";
@@ -78,7 +77,8 @@ class Astronaut extends Base {
   }
 }
 
-registerModel([Rocket, Astronaut]);
+constSet(TopLevel, "Rocket", Rocket);
+constSet(TopLevel, "Astronaut", Astronaut);
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {

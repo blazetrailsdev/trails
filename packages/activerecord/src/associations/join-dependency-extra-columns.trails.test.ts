@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -29,7 +30,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   beforeEach(() => {
     for (const m of [Post, Comment]) {
       m._reflections = {};
-      registerModel(m);
+      constSet(TopLevel, m.name, m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
   });

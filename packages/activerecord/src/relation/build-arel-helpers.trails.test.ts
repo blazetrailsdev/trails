@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { TypeError } from "@blazetrails/ruby-compat";
-import { Base, Relation, UnmodifiableRelation, registerModel } from "../index.js";
+import { TypeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, Relation, UnmodifiableRelation } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 fixtures({});
@@ -209,8 +209,8 @@ describe("where-hash key resolves to the referenced join alias", () => {
   HaToy.attribute("id", "integer");
   HaToy.attribute("name", "string");
   HaToy.attribute("pet_id", "integer");
-  registerModel(HaPet);
-  registerModel(HaToy);
+  constSet(TopLevel, "HaPet", HaPet);
+  constSet(TopLevel, "HaToy", HaToy);
 
   it("aliases the JOIN to the reference name and binds the WHERE to it", () => {
     const sql = (HaPet as any)

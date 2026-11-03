@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -41,8 +43,8 @@ describe("JoinDependency Arel node construction", () => {
   beforeEach(() => {
     (Owner as any)._reflections = {};
     (Asset as any)._reflections = {};
-    registerModel(Owner);
-    registerModel(Asset);
+    constSet(TopLevel, "Owner", Owner);
+    constSet(TopLevel, "Asset", Asset);
   });
 
   it("emits OuterJoin with polymorphic :as type predicate as Nodes.And", () => {
@@ -83,11 +85,13 @@ describe("JoinDependency Arel node construction", () => {
     }
     class StiSubOwner extends StiOwner {}
     StiOwner.inheritanceColumn = "type";
-    registerModel(StiSubOwner);
+    constSet(TopLevel, "StiSubOwner", StiSubOwner);
+    DescendantsTracker.registerSubclass(StiOwner, StiSubOwner);
     (StiOwner as any)._reflections = {};
     (StiSubOwner as any)._reflections = {};
-    registerModel(StiOwner);
-    registerModel(StiSubOwner);
+    constSet(TopLevel, "StiOwner", StiOwner);
+    constSet(TopLevel, "StiSubOwner", StiSubOwner);
+    DescendantsTracker.registerSubclass(StiOwner, StiSubOwner);
 
     Associations.hasMany.call(StiSubOwner, "assets", { className: "Asset", as: "owner" });
 
@@ -116,7 +120,7 @@ describe("JoinDependency Arel node construction", () => {
         this.hasMany("clients", { className: "Client", foreignKey: "owner_id" });
       }
     }
-    registerModel(ClientOwner);
+    constSet(TopLevel, "ClientOwner", ClientOwner);
 
     const jd = new JoinDependency(ClientOwner, ClientOwner.arelTable, "clients", Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
@@ -199,7 +203,7 @@ describe("JoinDependency Arel node construction", () => {
       }
     }
     (Comment as any)._reflections = {};
-    registerModel(Comment);
+    constSet(TopLevel, "Comment", Comment);
 
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     Associations.hasMany.call(Asset, "comments", { className: "Comment", foreignKey: "asset_id" });

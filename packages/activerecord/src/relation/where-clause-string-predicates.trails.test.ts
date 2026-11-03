@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { WhereClause } from "./where-clause.js";
 import "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 
-registerModel(Topic);
+constSet(TopLevel, "Topic", Topic);
 
 function table(): Table {
   return new Table("table");

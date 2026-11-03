@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -8,11 +7,11 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Customer } from "../test-helpers/models/customer.js";
 import { Company } from "../test-helpers/models/company.js";
 import "../test-helpers/models/categorization.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
-registerModel(Post);
-registerModel(Author);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Comment", Comment);
 
 const ids = (records: unknown[]): unknown[] => records.map((r) => (r as { id: unknown }).id).sort();
 

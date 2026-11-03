@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Subscriber extends Base {
   declare subscriptions: AssociationProxy<Subscription>;
@@ -21,7 +22,9 @@ export class Subscriber extends Base {
     this.hasMany("books", { through: "subscriptions" });
   }
 }
-registerModel(Subscriber);
+constSet(TopLevel, "Subscriber", Subscriber);
+DescendantsTracker.registerSubclass(Base, Subscriber);
 
 export class SpecialSubscriber extends Subscriber {}
-registerModel(SpecialSubscriber);
+constSet(TopLevel, "SpecialSubscriber", SpecialSubscriber);
+DescendantsTracker.registerSubclass(Subscriber, SpecialSubscriber);

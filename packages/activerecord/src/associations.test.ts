@@ -2,14 +2,7 @@ import type { CollectionAssociation } from "./associations/collection-associatio
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
-import {
-  Base,
-  ConfigurationError,
-  reflectOnAssociation,
-  registerModel,
-  NameError,
-  Relation,
-} from "./index.js";
+import { Base, ConfigurationError, reflectOnAssociation, NameError, Relation } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertEmpty,
@@ -38,8 +31,8 @@ import { Post, FirstPost, Postesque } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Computer } from "./test-helpers/models/computer.js";
 import { OtherDog } from "./test-helpers/models/other-dog.js";
-registerModel(Comment);
-registerModel(Computer);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Computer", Computer);
 import { Project } from "./test-helpers/models/project.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
@@ -53,15 +46,23 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { NoMethodError, PP, regexpEscape, StandardError, StringIO } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  PP,
+  regexpEscape,
+  StandardError,
+  StringIO,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
 
 describe("AssociationsTest", () => {
   fixtures([]);
   beforeAll(() => {
-    registerModel("CpkOrder", CpkOrder);
-    registerModel("CpkBook", CpkBook);
+    constSet(TopLevel, "CpkOrder", CpkOrder);
+    constSet(TopLevel, "CpkBook", CpkBook);
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
@@ -75,20 +76,18 @@ describe("AssociationsTest", () => {
 });
 
 describe("AssociationProxyTest", () => {
-  registerModel([
-    Author,
-    Post,
-    FirstPost,
-    Developer,
-    Project,
-    AuditLog,
-    Category,
-    Categorization,
-    Member,
-    Membership,
-    Human,
-    Interest,
-  ]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "FirstPost", FirstPost);
+  constSet(TopLevel, "Developer", Developer);
+  constSet(TopLevel, "Project", Project);
+  constSet(TopLevel, "AuditLog", AuditLog);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "Human", Human);
+  constSet(TopLevel, "Interest", Interest);
   const { authors, developers, members, posts, categories } = fixtures([
     "authorAddresses",
     "authors",
@@ -418,35 +417,35 @@ describe("PreloaderTest", () => {
   });
 
   beforeEach(() => {
-    registerModel("Author", Author);
-    registerModel("AuthorFavorite", AuthorFavorite);
-    registerModel("Post", Post);
-    registerModel("CategoryPost", CategoryPost);
-    registerModel("Comment", Comment);
-    registerModel("Book", Book);
-    registerModel("Category", Category);
-    registerModel("SpecialCategory", SpecialCategory);
-    registerModel("Tag", Tag);
-    registerModel("Tagging", Tagging);
-    registerModel("Essay", Essay);
-    registerModel("Invoice", Invoice);
-    registerModel("LineItem", LineItem);
-    registerModel("LineItemDiscountApplication", LineItemDiscountApplication);
-    registerModel("ShippingLine", ShippingLine);
-    registerModel("ShippingLineDiscountApplication", ShippingLineDiscountApplication);
-    registerModel("Discount", Discount);
-    registerModel("ShardedBlog", ShardedBlogPL);
-    registerModel("ShardedBlogPost", ShardedBlogPostPL);
-    registerModel("ShardedComment", ShardedCommentPL);
-    registerModel("ShardedTag", ShardedTagPL);
-    registerModel("ShardedBlogPostTag", ShardedBlogPostTagPL);
-    registerModel("CpkOrder", CpkOrderPL);
-    registerModel("CpkOrderAgreement", CpkOrderAgreementPL);
-    registerModel("Dog", Dog);
-    registerModel("OtherDog", OtherDog);
-    registerModel("EssaySpecial", EssaySpecial);
-    registerModel("Postesque", PostesquePL);
-    registerModel("AuthorAddress", AuthorAddress);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "CategoryPost", CategoryPost);
+    constSet(TopLevel, "Comment", Comment);
+    constSet(TopLevel, "Book", Book);
+    constSet(TopLevel, "Category", Category);
+    constSet(TopLevel, "SpecialCategory", SpecialCategory);
+    constSet(TopLevel, "Tag", Tag);
+    constSet(TopLevel, "Tagging", Tagging);
+    constSet(TopLevel, "Essay", Essay);
+    constSet(TopLevel, "Invoice", Invoice);
+    constSet(TopLevel, "LineItem", LineItem);
+    constSet(TopLevel, "LineItemDiscountApplication", LineItemDiscountApplication);
+    constSet(TopLevel, "ShippingLine", ShippingLine);
+    constSet(TopLevel, "ShippingLineDiscountApplication", ShippingLineDiscountApplication);
+    constSet(TopLevel, "Discount", Discount);
+    constSet(TopLevel, "ShardedBlog", ShardedBlogPL);
+    constSet(TopLevel, "ShardedBlogPost", ShardedBlogPostPL);
+    constSet(TopLevel, "ShardedComment", ShardedCommentPL);
+    constSet(TopLevel, "ShardedTag", ShardedTagPL);
+    constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTagPL);
+    constSet(TopLevel, "CpkOrder", CpkOrderPL);
+    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreementPL);
+    constSet(TopLevel, "Dog", Dog);
+    constSet(TopLevel, "OtherDog", OtherDog);
+    constSet(TopLevel, "EssaySpecial", EssaySpecial);
+    constSet(TopLevel, "Postesque", PostesquePL);
+    constSet(TopLevel, "AuthorAddress", AuthorAddress);
   });
 
   it("preload with scope", async () => {
@@ -1326,7 +1325,7 @@ describe("OverridingAssociationsTest", () => {
   fixtures([]);
 
   class DifferentPerson extends Base {}
-  registerModel("DifferentPerson", DifferentPerson);
+  constSet(TopLevel, "DifferentPerson", DifferentPerson);
 
   class PeopleList extends Base {
     static {
@@ -1663,36 +1662,40 @@ describe("AssociationsTest", () => {
   });
 
   beforeEach(() => {
-    registerModel("Author", Author);
-    registerModel("AuthorFavorite", AuthorFavorite);
-    registerModel("Firm", Firm);
-    registerModel("Client", Client);
-    registerModel("Tag", Tag);
-    registerModel("Tagging", Tagging);
-    registerModel("Developer", Developer);
-    registerModel("Project", Project);
-    registerModel("ShardedBlog", ShardedBlog);
-    registerModel("ShardedBlogPost", ShardedBlogPost);
-    registerModel("ShardedBlogPostWithRevision", ShardedBlogPostWithRevision);
-    registerModel("ShardedComment", ShardedComment);
-    registerModel("ShardedTag", ShardedTag);
-    registerModel("ShardedBlogPostTag", ShardedBlogPostTag);
-    registerModel("Company", Company);
-    registerModel("Account", Account);
-    registerModel("Liquid", Liquid);
-    registerModel("Molecule", Molecule);
-    registerModel("Electron", Electron);
-    registerModel("Ship", Ship);
-    registerModel("ShipPart", ShipPart);
-    registerModel("CpkOrder", CpkOrder);
-    registerModel("CpkBook", CpkBook);
-    registerModel("CpkOrderAgreement", CpkOrderAgreement);
-    registerModel("CpkOrderWithPrimaryKeyAssociatedBook", CpkOrderWithPrimaryKeyAssociatedBook);
-    registerModel("CpkCar", CpkCar);
-    registerModel("CpkCarReview", CpkCarReview);
-    registerModel("Person", Person);
-    registerModel("Reader", Reader);
-    registerModel("Post", Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "Tag", Tag);
+    constSet(TopLevel, "Tagging", Tagging);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Project", Project);
+    constSet(TopLevel, "ShardedBlog", ShardedBlog);
+    constSet(TopLevel, "ShardedBlogPost", ShardedBlogPost);
+    constSet(TopLevel, "ShardedBlogPostWithRevision", ShardedBlogPostWithRevision);
+    constSet(TopLevel, "ShardedComment", ShardedComment);
+    constSet(TopLevel, "ShardedTag", ShardedTag);
+    constSet(TopLevel, "ShardedBlogPostTag", ShardedBlogPostTag);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Liquid", Liquid);
+    constSet(TopLevel, "Molecule", Molecule);
+    constSet(TopLevel, "Electron", Electron);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "CpkOrder", CpkOrder);
+    constSet(TopLevel, "CpkBook", CpkBook);
+    constSet(TopLevel, "CpkOrderAgreement", CpkOrderAgreement);
+    constSet(
+      TopLevel,
+      "CpkOrderWithPrimaryKeyAssociatedBook",
+      CpkOrderWithPrimaryKeyAssociatedBook,
+    );
+    constSet(TopLevel, "CpkCar", CpkCar);
+    constSet(TopLevel, "CpkCarReview", CpkCarReview);
+    constSet(TopLevel, "Person", Person);
+    constSet(TopLevel, "Reader", Reader);
+    constSet(TopLevel, "Post", Post);
   });
 
   it("eager loading should not change count of children", async () => {

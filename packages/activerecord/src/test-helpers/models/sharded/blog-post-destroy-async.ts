@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Sharded } from "../sharded.js";
 import "../../../destroy-association-async-job.js";
-import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
 import { queryConstraints } from "../../../persistence.js";
@@ -10,7 +12,8 @@ export class ShardedBlogPostDestroyAsync extends Base {
 
   static _tableName = "sharded_blog_posts";
   static {
-    registerModel("Sharded::BlogPostDestroyAsync", this);
+    constSet(Sharded, "BlogPostDestroyAsync", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

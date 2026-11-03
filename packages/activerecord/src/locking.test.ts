@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import {
   Base,
-  registerModel,
   StaleObjectError,
   ReadonlyAttributeError,
   RecordNotUnique,
@@ -53,22 +52,22 @@ describe("OptimisticLockingTest", () => {
     "peoplesTreasures",
   ]);
   beforeAll(async () => {
-    registerModel("Car", Car);
-    registerModel("Wheel", Wheel);
-    registerModel("Bulb", Bulb);
-    registerModel("CustomBulb", CustomBulb);
-    registerModel("FunkyBulb", FunkyBulb);
-    registerModel("FailedBulb", FailedBulb);
-    registerModel("Engine", Engine);
+    constSet(TopLevel, "Car", Car);
+    constSet(TopLevel, "Wheel", Wheel);
+    constSet(TopLevel, "Bulb", Bulb);
+    constSet(TopLevel, "CustomBulb", CustomBulb);
+    constSet(TopLevel, "FunkyBulb", FunkyBulb);
+    constSet(TopLevel, "FailedBulb", FailedBulb);
+    constSet(TopLevel, "Engine", Engine);
     void Car.resetColumnInformation();
     void Wheel.resetColumnInformation();
     await Car.loadSchema();
     await Wheel.loadSchema();
-    registerModel(Treasure);
-    registerModel(Reference);
-    registerModel(Job);
-    registerModel(Comment);
-    registerModel(PersonalLegacyThing);
+    constSet(TopLevel, "Treasure", Treasure);
+    constSet(TopLevel, "Reference", Reference);
+    constSet(TopLevel, "Job", Job);
+    constSet(TopLevel, "Comment", Comment);
+    constSet(TopLevel, "PersonalLegacyThing", PersonalLegacyThing);
   });
 
   it("quote value passed lock col", async () => {
@@ -710,7 +709,7 @@ describe("PessimisticLockingTest", () => {
   });
 
   beforeAll(() => {
-    registerModel("Reader", Reader);
+    constSet(TopLevel, "Reader", Reader);
   });
 
   it("typical find with lock", async () => {

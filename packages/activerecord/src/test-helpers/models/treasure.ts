@@ -1,10 +1,11 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Parrot } from "./parrot.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { RichPerson } from "./person.js";
 import type { Ship } from "./ship.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Treasure extends Base {
@@ -35,5 +36,7 @@ export interface Treasure {
 
 export class HiddenTreasure extends Treasure {}
 
-registerModel(Treasure);
-registerModel(HiddenTreasure);
+constSet(TopLevel, "Treasure", Treasure);
+DescendantsTracker.registerSubclass(Base, Treasure);
+constSet(TopLevel, "HiddenTreasure", HiddenTreasure);
+DescendantsTracker.registerSubclass(Treasure, HiddenTreasure);

@@ -1,10 +1,10 @@
-import { constSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, registerConstant, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { Base, Migration, Migrator, registerModel } from "../../index.js";
+import { Base, Migration, Migrator } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
@@ -456,8 +456,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.belongsTo("uuidPost", { className: "UuidPostInverse" });
       }
     }
-    registerModel("UuidPostInverse", UuidPost);
-    registerModel("UuidCommentInverse", UuidComment);
+    constSet(TopLevel, "UuidPostInverse", UuidPost);
+    constSet(TopLevel, "UuidCommentInverse", UuidComment);
 
     beforeEach(async () => {
       await adapter.transaction(async () => {

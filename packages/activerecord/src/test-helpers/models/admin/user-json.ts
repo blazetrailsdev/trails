@@ -1,7 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../admin.js";
 import { constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
-import { registerModel } from "../../../associations.js";
 
 class Coder {
   #default: Record<string, unknown>;
@@ -21,7 +21,8 @@ class Coder {
 
 export class AdminUserJson extends Base {
   static {
-    registerModel(constSet(Admin, "UserJSON", this));
+    constSet(Admin, "UserJSON", this);
+    DescendantsTracker.registerSubclass(Base, this);
     constSet(this, "Coder", Coder);
   }
 

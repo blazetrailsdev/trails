@@ -1,4 +1,5 @@
-import { hashDelete, isEmpty, kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { hashDelete, isEmpty, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -12,7 +13,6 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
@@ -182,7 +182,8 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
-registerModel(Pirate);
+constSet(TopLevel, "Pirate", Pirate);
+DescendantsTracker.registerSubclass(Base, Pirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
@@ -211,7 +212,8 @@ export class DestructivePirate extends Pirate {
     });
   }
 }
-registerModel(DestructivePirate);
+constSet(TopLevel, "DestructivePirate", DestructivePirate);
+DescendantsTracker.registerSubclass(Pirate, DestructivePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestructivePirate {
   get dependentShip(): Ship | null | Promise<Ship | null>;
@@ -227,7 +229,8 @@ export class FamousPirate extends Base {
     this.validates("catchphrase", { presence: true, on: "conference" });
   }
 }
-registerModel(FamousPirate);
+constSet(TopLevel, "FamousPirate", FamousPirate);
+DescendantsTracker.registerSubclass(Base, FamousPirate);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpacePirate extends Base {
@@ -297,7 +300,8 @@ export class SpacePirate extends Base {
     );
   }
 }
-registerModel(SpacePirate);
+constSet(TopLevel, "SpacePirate", SpacePirate);
+DescendantsTracker.registerSubclass(Base, SpacePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpacePirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;

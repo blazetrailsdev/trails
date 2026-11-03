@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { LoaderRecords } from "./association.js";
@@ -8,9 +8,9 @@ import type { Base } from "../../base.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
 
-registerModel(Author);
-registerModel(CpkOrder);
-registerModel(CpkBook);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "CpkOrder", CpkOrder);
+constSet(TopLevel, "CpkBook", CpkBook);
 
 describe("Preloader::Association::LoaderRecords", () => {
   const { authors, cpkOrders } = fixtures(["authors", "posts", "cpkOrders", "cpkBooks"]);

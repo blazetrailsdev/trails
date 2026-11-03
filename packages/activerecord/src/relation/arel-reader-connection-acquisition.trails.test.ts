@@ -1,10 +1,10 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { ConnectionNotEstablished } from "../errors.js";
 
-registerModel(Post);
+constSet(TopLevel, "Post", Post);
 
 describe("Relation#arel connection acquisition", () => {
   fixtures(["posts"]);

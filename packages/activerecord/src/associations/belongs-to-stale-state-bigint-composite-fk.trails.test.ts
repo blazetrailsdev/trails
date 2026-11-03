@@ -1,7 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 
 import { Base } from "../base.js";
-import { registerModel } from "../associations.js";
 
 class BigIntCpkBlogPost extends Base {
   static _tableName = "bigint_cpk_blog_posts";
@@ -26,8 +26,8 @@ class BigIntCpkComment extends Base {
 }
 
 describe("belongs_to composite-FK staleState with a BigInt component", () => {
-  registerModel(BigIntCpkBlogPost);
-  registerModel(BigIntCpkComment);
+  constSet(TopLevel, "BigIntCpkBlogPost", BigIntCpkBlogPost);
+  constSet(TopLevel, "BigIntCpkComment", BigIntCpkComment);
 
   it("serializes a BigInt FK component without throwing", () => {
     const comment = new BigIntCpkComment({ blog_id: 1, blog_post_id: 9007199254740993n });

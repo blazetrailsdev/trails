@@ -1,6 +1,6 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Content extends Base {
@@ -15,7 +15,8 @@ export class Content extends Base {
     });
   }
 }
-registerModel(Content);
+constSet(TopLevel, "Content", Content);
+DescendantsTracker.registerSubclass(Base, Content);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Content {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
@@ -41,7 +42,8 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
   }
 }
-registerModel(ContentWhichRequiresTwoDestroyCalls);
+constSet(TopLevel, "ContentWhichRequiresTwoDestroyCalls", ContentWhichRequiresTwoDestroyCalls);
+DescendantsTracker.registerSubclass(Base, ContentWhichRequiresTwoDestroyCalls);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentWhichRequiresTwoDestroyCalls {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
@@ -61,7 +63,8 @@ export class ContentPosition extends Base {
     });
   }
 }
-registerModel(ContentPosition);
+constSet(TopLevel, "ContentPosition", ContentPosition);
+DescendantsTracker.registerSubclass(Base, ContentPosition);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentPosition {
   get content(): Content | null | Promise<Content | null>;

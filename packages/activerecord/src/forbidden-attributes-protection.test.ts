@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
@@ -7,13 +8,12 @@ import { Company, Client } from "./test-helpers/models/company.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
-import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 
-registerModel(ShipPart);
-registerModel(Ship);
-registerModel(Treasure);
+constSet(TopLevel, "ShipPart", ShipPart);
+constSet(TopLevel, "Ship", Ship);
+constSet(TopLevel, "Treasure", Treasure);
 
 describe("ForbiddenAttributesProtectionTest", () => {
   fixtures(["people", "companies"]);

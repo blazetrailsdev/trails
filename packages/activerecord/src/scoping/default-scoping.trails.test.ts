@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { HasManyAssociation } from "../associations/has-many-association.js";
 import type { HasOneAssociation } from "../associations/has-one-association.js";
@@ -14,12 +14,12 @@ import {
   ClassMethodDeveloperCalledDavid,
 } from "../test-helpers/models/developer.js";
 
-registerModel(Developer);
-registerModel(Comment);
-registerModel(SpecialComment);
-registerModel(VerySpecialComment);
-registerModel(Post);
-registerModel(SpecialPost);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "SpecialPost", SpecialPost);
 
 describe("DefaultScopingTest", () => {
   const { posts } = fixtures(["developers", "posts", "comments"]);

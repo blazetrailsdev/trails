@@ -6,10 +6,9 @@ import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { Time } from "@blazetrails/date";
-import { rbObjClassname, keys } from "@blazetrails/ruby-compat";
+import { rbObjClassname, keys, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
-import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -24,7 +23,7 @@ class OverloadedType extends Base {
     this.attribute("overloaded_string_with_limit", "string", { limit: 50 });
     this.attribute("non_existent_decimal", "decimal");
     this.attribute("string_with_default", "string", { default: "the overloaded default" });
-    registerModel(this);
+    constSet(TopLevel, "OverloadedType", this);
   }
 }
 
@@ -47,7 +46,7 @@ class GrandchildOfOverloadedType extends ChildOfOverloadedType {
 class UnoverloadedType extends Base {
   static {
     this.tableName = "overloaded_types";
-    registerModel(this);
+    constSet(TopLevel, "UnoverloadedType", this);
   }
 }
 
@@ -362,7 +361,7 @@ describe("CustomPropertiesTest", () => {
     class Parent extends Base {
       static {
         this.tableName = "topics";
-        registerModel(this);
+        constSet(TopLevel, "Parent", this);
       }
     }
 
@@ -417,7 +416,7 @@ describe("CustomPropertiesTest", () => {
       static {
         this.tableName = "topics";
         this.attribute("foo", "string", { default: "lol" });
-        registerModel(this);
+        constSet(TopLevel, "Child", this);
       }
     }
     await Child.create();

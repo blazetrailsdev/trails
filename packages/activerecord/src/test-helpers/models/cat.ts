@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Cat extends Base {
   declare isFemale: () => boolean;
@@ -20,10 +21,12 @@ export class Cat extends Base {
     });
   }
 }
-registerModel(Cat);
+constSet(TopLevel, "Cat", Cat);
+DescendantsTracker.registerSubclass(Base, Cat);
 
 export class Lion extends Cat {
   declare gender: "female" | "male" | null;
   declare is_vegetarian: boolean | null;
 }
-registerModel(Lion);
+constSet(TopLevel, "Lion", Lion);
+DescendantsTracker.registerSubclass(Cat, Lion);

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -19,8 +20,8 @@ describe("Relation#unscope — full Rails key coverage", () => {
   }
 
   beforeEach(() => {
-    registerModel("UscAuthor", UscAuthor);
-    registerModel("UscPost", UscPost);
+    constSet(TopLevel, "UscAuthor", UscAuthor);
+    constSet(TopLevel, "UscPost", UscPost);
     (UscAuthor as any)._reflections = {};
     (UscPost as any)._reflections = {};
     Associations.hasMany.call(UscAuthor, "uscPosts", {

@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import "../../destroy-association-async-job.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
@@ -6,7 +8,6 @@ import type { EssayDestroyAsync } from "./essay-destroy-async.js";
 import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BookDestroyAsync extends Base {
@@ -40,7 +41,8 @@ export class BookDestroyAsync extends Base {
     this.enum("status", ["proposed", "written", "published"]);
   }
 }
-registerModel(BookDestroyAsync);
+constSet(TopLevel, "BookDestroyAsync", BookDestroyAsync);
+DescendantsTracker.registerSubclass(Base, BookDestroyAsync);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface BookDestroyAsync {
   get content(): Content | null | Promise<Content | null>;
@@ -65,4 +67,5 @@ export class BookDestroyAsyncWithScopedTags extends Base {
     );
   }
 }
-registerModel(BookDestroyAsyncWithScopedTags);
+constSet(TopLevel, "BookDestroyAsyncWithScopedTags", BookDestroyAsyncWithScopedTags);
+DescendantsTracker.registerSubclass(Base, BookDestroyAsyncWithScopedTags);

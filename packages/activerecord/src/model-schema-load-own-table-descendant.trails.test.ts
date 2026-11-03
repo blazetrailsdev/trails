@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { registerModel } from "./associations.js";
 import { loadSchema } from "./model-schema.js";
 import { defaultValue } from "./type.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -43,13 +44,16 @@ async function buildHierarchy(asked: string[]) {
     }
   }
   class Circle extends Shape {}
-  registerModel(Circle);
+  constSet(TopLevel, "Circle", Circle);
+  DescendantsTracker.registerSubclass(Shape, Circle);
   class Ticket extends Circle {
     static override tableName = "tickets";
   }
-  registerModel(Ticket);
+  constSet(TopLevel, "Ticket", Ticket);
+  DescendantsTracker.registerSubclass(Circle, Ticket);
   class VipTicket extends Ticket {}
-  registerModel(VipTicket);
+  constSet(TopLevel, "VipTicket", VipTicket);
+  DescendantsTracker.registerSubclass(Ticket, VipTicket);
 
   for (const klass of [Shape, Circle, Ticket, VipTicket]) {
     await establishConnectionTo(klass, makeAdapter(tables, asked) as never);

@@ -1,7 +1,8 @@
+import { Admin } from "./test-helpers/models/admin.js";
 import { describe, it, expect } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { DelegationError } from "@blazetrails/activesupport";
-import { Base, reflectOnAssociation, registerModel } from "./index.js";
+import { Base, reflectOnAssociation } from "./index.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
@@ -32,8 +33,8 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NsTagB", NsTagB);
-    registerModel("NsPostB", NsPostB);
+    constSet(TopLevel, "NsTagB", NsTagB);
+    constSet(TopLevel, "NsPostB", NsPostB);
     const fn = function namedFactory() {
       return "NsPostB";
     };
@@ -58,8 +59,8 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("HostA", HostA);
-    registerModel("TargetA", TargetA);
+    constSet(TopLevel, "HostA", HostA);
+    constSet(TopLevel, "TargetA", TargetA);
     const fn = function namedFactory() {
       return "TargetA";
     };
@@ -82,8 +83,8 @@ describe("ReflectionTest", () => {
         this.hasOne("adminUser", { className: "Admin::User" });
       }
     }
-    registerModel("User", TopUser);
-    registerModel("Admin::User", NsAdminUser);
+    constSet(TopLevel, "User", TopUser);
+    constSet(Admin, "User", NsAdminUser);
     const ref = reflectOnAssociation(NsAdminUser, "user");
     expect(ref!.klass).toBe(TopUser);
     const nsRef = reflectOnAssociation(NsAdminUser, "adminUser");
@@ -102,12 +103,12 @@ describe("ReflectionTest", () => {
         this.hasMany("shStableTargets", { className: "ShStableTarget" });
       }
     }
-    registerModel("ShStableOwner", ShStableOwner);
-    registerModel("ShStableTarget", ShStableTarget);
+    constSet(TopLevel, "ShStableOwner", ShStableOwner);
+    constSet(TopLevel, "ShStableTarget", ShStableTarget);
 
     const ref = reflectOnAssociation(ShStableOwner, "shStableTargets")!;
     expect(ref.klass).toBe(ShStableTarget);
-    registerModel("ShStableTarget", ShStableTarget);
+    constSet(TopLevel, "ShStableTarget", ShStableTarget);
     expect(ref.klass).toBe(ShStableTarget);
   });
 
@@ -129,7 +130,7 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NilNameOwner", NilNameOwner);
+    constSet(TopLevel, "NilNameOwner", NilNameOwner);
     const reflection = create("hasMany", null, null, {}, NilNameOwner);
     expect(reflection.name).toBeNull();
     expect(reflection.pluralName).toBe("");
@@ -141,7 +142,7 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NilDerivOwner", NilDerivOwner);
+    constSet(TopLevel, "NilDerivOwner", NilDerivOwner);
 
     const hasMany = create("hasMany", null, null, {}, NilDerivOwner);
     expect(hasMany.className).toBe("");
@@ -160,7 +161,7 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("NilThroughOwner", NilThroughOwner);
+    constSet(TopLevel, "NilThroughOwner", NilThroughOwner);
 
     const through = create(
       "hasMany",
@@ -184,8 +185,8 @@ describe("ReflectionTest", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("PluralOwner", PluralOwner);
-    registerModel("SingularOwner", SingularOwner);
+    constSet(TopLevel, "PluralOwner", PluralOwner);
+    constSet(TopLevel, "SingularOwner", SingularOwner);
     expect(create("hasMany", "comment", null, {}, PluralOwner).pluralName).toBe("comments");
     expect(create("hasMany", "comment", null, {}, SingularOwner).pluralName).toBe("comment");
   });
@@ -215,7 +216,7 @@ describe("ReflectionTest", () => {
         this.hasMany("neClubs", { through: "neMemberships" });
       }
     }
-    registerModel("NeMember", NeMember);
+    constSet(TopLevel, "NeMember", NeMember);
 
     const ref = reflectOnAssociation(NeMember, "neClubs") as ThroughReflection;
     expect(() => ref.sourceReflectionName()).toThrow(
@@ -240,7 +241,7 @@ describe("ReflectionTest", () => {
 describe("Reflection.create", () => {
   it("raises Unsupported Macro for a macro reflection_class_for has no case for", () => {
     class Widget extends Base {}
-    registerModel(Widget);
+    constSet(TopLevel, "Widget", Widget);
 
     expect(() => create("hasAndBelongsToMany" as never, "gadgets", null, {}, Widget)).toThrow(
       new RuntimeError("Unsupported Macro: hasAndBelongsToMany"),
@@ -256,7 +257,7 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
         this.hasMany("nsrTags", { through: "nsrTaggings" });
       }
     }
-    registerModel("NsrPost", NsrPost);
+    constSet(TopLevel, "NsrPost", NsrPost);
     const ref = reflectOnAssociation(NsrPost, "nsrTags") as ThroughReflection;
     Object.defineProperty(ref, "sourceReflection", { value: null });
 
@@ -278,7 +279,7 @@ describe("ThroughReflection delegation to a nil source_reflection", () => {
         this.hasMany("nsrComments", { through: "nsrPosts" });
       }
     }
-    registerModel("NsrAuthor", NsrAuthor);
+    constSet(TopLevel, "NsrAuthor", NsrAuthor);
     const ref = reflectOnAssociation(NsrAuthor, "nsrComments") as ThroughReflection;
     Object.defineProperty(ref, "sourceReflection", { value: null });
 

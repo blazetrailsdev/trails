@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShippingLine extends Base {
@@ -15,7 +16,8 @@ export class ShippingLine extends Base {
     this.hasMany("discountApplications", { className: "ShippingLineDiscountApplication" });
   }
 }
-registerModel(ShippingLine);
+constSet(TopLevel, "ShippingLine", ShippingLine);
+DescendantsTracker.registerSubclass(Base, ShippingLine);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShippingLine {
   get invoice(): Invoice | null | Promise<Invoice | null>;
@@ -32,7 +34,8 @@ export class ShippingLineDiscountApplication extends Base {
     this.belongsTo("discount");
   }
 }
-registerModel(ShippingLineDiscountApplication);
+constSet(TopLevel, "ShippingLineDiscountApplication", ShippingLineDiscountApplication);
+DescendantsTracker.registerSubclass(Base, ShippingLineDiscountApplication);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShippingLineDiscountApplication {
   get shippingLine(): ShippingLine | null | Promise<ShippingLine | null>;

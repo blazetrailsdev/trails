@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
   return Promise.resolve(
@@ -61,7 +62,8 @@ export class Eye extends Base {
     });
   }
 }
-registerModel(Eye);
+constSet(TopLevel, "Eye", Eye);
+DescendantsTracker.registerSubclass(Base, Eye);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Eye {
   get irisWithReadOnlyForeignKey():
@@ -117,7 +119,8 @@ export class Iris extends Base {
     });
   }
 }
-registerModel(Iris);
+constSet(TopLevel, "Iris", Iris);
+DescendantsTracker.registerSubclass(Base, Iris);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Iris {
   get eye(): Eye | null | Promise<Eye | null>;
@@ -129,4 +132,5 @@ export class IrisWithReadOnlyForeignKey extends Iris {
     this.attrReadonly("eye_id");
   }
 }
-registerModel(IrisWithReadOnlyForeignKey);
+constSet(TopLevel, "IrisWithReadOnlyForeignKey", IrisWithReadOnlyForeignKey);
+DescendantsTracker.registerSubclass(Iris, IrisWithReadOnlyForeignKey);

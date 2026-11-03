@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CustomerCarrier extends Base {
@@ -22,7 +23,8 @@ export class CustomerCarrier extends Base {
     });
   }
 }
-registerModel(CustomerCarrier);
+constSet(TopLevel, "CustomerCarrier", CustomerCarrier);
+DescendantsTracker.registerSubclass(Base, CustomerCarrier);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CustomerCarrier {
   get customer(): Customer | null | Promise<Customer | null>;

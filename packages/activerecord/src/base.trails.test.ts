@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
+import { Base, SubclassNotFound, UnknownPrimaryKey } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { loadSchema } from "./model-schema.js";
@@ -123,8 +125,9 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
     }
     ScopeStiVehicle.inheritanceColumn = "type";
     class ScopeStiCar extends ScopeStiVehicle {}
-    registerModel(ScopeStiVehicle);
-    registerModel(ScopeStiCar);
+    constSet(TopLevel, "ScopeStiVehicle", ScopeStiVehicle);
+    constSet(TopLevel, "ScopeStiCar", ScopeStiCar);
+    DescendantsTracker.registerSubclass(ScopeStiVehicle, ScopeStiCar);
 
     const rel = ScopeStiVehicle.where({ type: "ScopeStiVehicle" });
     await rel.scoping(async () => {
@@ -339,7 +342,8 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     class Firm extends Company {
       static {
-        registerModel(this);
+        constSet(TopLevel, "Firm", this);
+        DescendantsTracker.registerSubclass(Company, this);
         this.ignoredColumns = ["rating"];
       }
     }
@@ -383,7 +387,8 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     class Firm extends Company {
       static {
-        registerModel(this);
+        constSet(TopLevel, "Firm", this);
+        DescendantsTracker.registerSubclass(Company, this);
         this.ignoredColumns = ["rating"];
       }
     }

@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Book } from "./book.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Paragraph extends Base {
@@ -10,7 +11,8 @@ export class Paragraph extends Base {
     this.belongsTo("book");
   }
 }
-registerModel(Paragraph);
+constSet(TopLevel, "Paragraph", Paragraph);
+DescendantsTracker.registerSubclass(Base, Paragraph);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Paragraph {
   get book(): Book | null | Promise<Book | null>;

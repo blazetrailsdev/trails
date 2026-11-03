@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { NoMethodError, include } from "@blazetrails/ruby-compat";
+import { NoMethodError, include, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
 import { TestCase } from "./cases/test-case.js";
@@ -14,7 +14,6 @@ import {
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { Visitors } from "@blazetrails/arel";
 import { Base } from "./base.js";
-import { registerModel } from "./associations.js";
 import { Fixture, FixtureSet } from "./fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
@@ -304,7 +303,7 @@ async function resolvePrimaryModel(entry: {
 }): Promise<typeof Base> {
   const resolved = await entry.model();
   const models = (Array.isArray(resolved) ? resolved : [resolved]) as (typeof Base)[];
-  registerModel(models);
+  for (const model of models) constSet(TopLevel, model.name, model);
   return models[0];
 }
 

@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Club } from "./club.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
@@ -10,7 +12,6 @@ import type { Human } from "./human.js";
 import type { Post } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -114,8 +115,10 @@ export class Category extends Base {
     return "a category...";
   }
 }
-registerModel(Category);
+constSet(TopLevel, "Category", Category);
+DescendantsTracker.registerSubclass(Base, Category);
 
 export class SpecialCategory extends Category {}
 
-registerModel(SpecialCategory);
+constSet(TopLevel, "SpecialCategory", SpecialCategory);
+DescendantsTracker.registerSubclass(Category, SpecialCategory);

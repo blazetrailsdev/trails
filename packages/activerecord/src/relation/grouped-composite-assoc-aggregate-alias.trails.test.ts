@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../test-helpers/models/cpk.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -10,7 +10,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
   const { self } = fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
+    [CpkBook, CpkOrder, CpkAuthor].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   async function seedOrders(): Promise<void> {

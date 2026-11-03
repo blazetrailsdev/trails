@@ -1,13 +1,13 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
-import { Base, transaction, Rollback, registerModel } from "./index.js";
+import { Base, transaction, Rollback } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { ArgumentError, assertEmpty, assertRaise } from "@blazetrails/activesupport";
 
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { setRunAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
@@ -89,7 +89,7 @@ class TopicWithCallbacks extends Base {
     for (const b of this._afterRollback[String(on)] ?? []) await b(this);
   }
 }
-registerModel(TopicWithCallbacks);
+constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
 
 fixtures(["topics", "owners", "pets"]);
 
@@ -261,8 +261,8 @@ describe("TransactionCallbacksTest", () => {
         });
       }
     }
-    registerModel(ReplyForAssoc);
-    registerModel(TopicForAssoc);
+    constSet(TopLevel, "ReplyForAssoc", ReplyForAssoc);
+    constSet(TopLevel, "TopicForAssoc", TopicForAssoc);
 
     const topic = (await TopicForAssoc.create({ title: "Parent" })) as any;
     await topic.assocReplies.create({});
@@ -711,8 +711,8 @@ describe("TransactionCallbacksTest", () => {
   });
 
   it("saving a record with a belongs to that specifies touching the parent should call callbacks on the parent object", async () => {
-    registerModel(Owner);
-    registerModel(Pet);
+    constSet(TopLevel, "Owner", Owner);
+    constSet(TopLevel, "Pet", Pet);
     const pet = (await Pet.first()) as Pet;
     const owner = (await pet.owner) as Owner;
     let flag = false;

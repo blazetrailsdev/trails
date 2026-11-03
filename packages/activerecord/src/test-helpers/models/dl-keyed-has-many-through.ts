@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class DlKeyedHasManyThrough extends Base {
   declare through_key: number;
@@ -8,4 +9,5 @@ export class DlKeyedHasManyThrough extends Base {
     this.primaryKey = "through_key";
   }
 }
-registerModel(DlKeyedHasManyThrough);
+constSet(TopLevel, "DlKeyedHasManyThrough", DlKeyedHasManyThrough);
+DescendantsTracker.registerSubclass(Base, DlKeyedHasManyThrough);

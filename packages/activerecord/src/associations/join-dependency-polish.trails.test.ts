@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -18,7 +19,7 @@ describe("JoinBase.table", () => {
 
   beforeEach(() => {
     (Post as any)._reflections = {};
-    registerModel(Post);
+    constSet(TopLevel, "Post", Post);
   });
 
   it("returns the Arel Table passed at construction", () => {
@@ -53,7 +54,7 @@ describe("joinType propagation in joinConstraints", () => {
   beforeEach(() => {
     for (const m of [Post, Comment]) {
       (m as any)._reflections = {};
-      registerModel(m);
+      constSet(TopLevel, m.name, m);
     }
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
   });

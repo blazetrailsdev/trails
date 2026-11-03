@@ -1,14 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Firm, Company, Client } from "../test-helpers/models/company.js";
-import { registerModel } from "../index.js";
 
 describe("getModelColumns virtual-attribute eager projection", () => {
   const { companies } = fixtures(["companies"]);
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Client);
+  constSet(TopLevel, "Company", Company);
+  constSet(TopLevel, "Firm", Firm);
+  constSet(TopLevel, "Client", Client);
 
   it("excludes the virtual metadata column from the eager SELECT and succeeds", async () => {
     const sqls: string[] = [];

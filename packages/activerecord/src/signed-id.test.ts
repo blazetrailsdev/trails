@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { assertRaises, travel, travelBack } from "@blazetrails/activesupport";
-import { Base, RecordNotFound, registerModel } from "./index.js";
+import { Base, RecordNotFound } from "./index.js";
 import { UnknownPrimaryKey } from "./errors.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Toy } from "./test-helpers/models/toy.js";
@@ -30,9 +30,9 @@ describe("SignedIdTest", () => {
   fixtures(["accounts", "companies", "toys"]);
 
   beforeAll(async () => {
-    registerModel(Account);
-    registerModel(Company);
-    registerModel(Toy);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Toy", Toy);
   });
 
   let account: Account;

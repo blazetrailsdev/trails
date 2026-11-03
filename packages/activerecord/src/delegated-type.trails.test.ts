@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
-import { registerModel } from "./index.js";
-import { registerConstant, constSet } from "@blazetrails/ruby-compat";
+import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Entry } from "./test-helpers/models/entry.js";
@@ -51,7 +50,7 @@ describe("DelegatedTypeTest (trails)", () => {
         constSet(Access, "NoticeMessage", this);
       }
     }
-    registerModel(NoticeMessage);
+    constSet(TopLevel, "NoticeMessage", NoticeMessage);
     Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     expect(
       typeof (Entry3 as unknown as { accessNoticeMessages: unknown }).accessNoticeMessages,
@@ -79,7 +78,7 @@ describe("DelegatedTypeTest (trails)", () => {
         this.attribute("body", "string");
       }
     }
-    registerModel(NoticeMessage);
+    constSet(TopLevel, "NoticeMessage", NoticeMessage);
     class Entry4 extends Base {
       declare entryable_type: string;
       static {

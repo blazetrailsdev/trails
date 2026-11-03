@@ -1,10 +1,10 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { Range } from "../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isBlank as blank } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -15,14 +15,14 @@ import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import "../support/canonical-model-index.js";
 
-registerModel(Post);
-registerModel(Comment);
-registerModel(Author);
-registerModel(Book);
-registerModel(Human);
-registerModel(Essay);
-registerModel(CpkAuthor);
-registerModel(CpkBook);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Book", Book);
+constSet(TopLevel, "Human", Human);
+constSet(TopLevel, "Essay", Essay);
+constSet(TopLevel, "CpkAuthor", CpkAuthor);
+constSet(TopLevel, "CpkBook", CpkBook);
 
 const ids = (records: unknown[]): unknown[] => records.map((r) => (r as any).id);
 

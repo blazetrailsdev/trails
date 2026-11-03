@@ -1,5 +1,5 @@
 import { assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { StatementInvalid } from "../index.js";
@@ -7,7 +7,6 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import { registerModel } from "../associations.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 
 function assertNonSelectColumnsWontBeLoaded(post: { title: string; body: unknown }) {
@@ -15,8 +14,8 @@ function assertNonSelectColumnsWontBeLoaded(post: { title: string; body: unknown
   expect(() => post.body).toThrow(MissingAttributeError);
 }
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 describe("SelectTest", () => {
   const { self } = fixtures(["posts", "comments"]);

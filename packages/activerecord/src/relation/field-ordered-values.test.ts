@@ -1,7 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Book } from "../test-helpers/models/book.js";
@@ -9,8 +9,8 @@ import { Author } from "../test-helpers/models/author.js";
 
 describe("FieldOrderedValuesTest", () => {
   fixtures(["posts"]);
-  registerModel(Author);
-  registerModel(Book);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Book", Book);
 
   it("in order of", async () => {
     const order = [3, 4, 1];

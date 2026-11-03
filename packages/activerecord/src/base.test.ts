@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
@@ -9,7 +10,6 @@ import {
 
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import {
   Logger,
@@ -65,6 +65,7 @@ import {
   constSet,
   registerConstant,
   unregisterConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
@@ -103,7 +104,7 @@ class ThirdAbstractClass extends SecondAbstractClass {
 class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
-registerModel(CreditCard);
+constSet(TopLevel, "CreditCard", CreditCard);
 class PinNumber extends Base {
   static {
     constSet(CreditCard, "PinNumber", this);
@@ -125,7 +126,7 @@ class Brand extends Category {
   }
 }
 class MasterCreditCard extends Base {}
-registerModel("CreditCard::PinNumber", PinNumber);
+constSet(CreditCard, "PinNumber", PinNumber);
 class NonExistentTable extends Base {}
 
 class ReadonlyTitlePost extends Post {
@@ -164,7 +165,12 @@ class ReadonlyAuthorPost extends Post {
   }
 }
 
-registerModel([ReadonlyTitlePost, NonRaisingPost, ReadonlyAuthorPost]);
+constSet(TopLevel, "ReadonlyTitlePost", ReadonlyTitlePost);
+DescendantsTracker.registerSubclass(Post, ReadonlyTitlePost);
+constSet(TopLevel, "NonRaisingPost", NonRaisingPost);
+DescendantsTracker.registerSubclass(Post, NonRaisingPost);
+constSet(TopLevel, "ReadonlyAuthorPost", ReadonlyAuthorPost);
+DescendantsTracker.registerSubclass(Post, ReadonlyAuthorPost);
 
 class Weird extends Base {}
 

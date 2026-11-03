@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
@@ -30,7 +30,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 
-for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
+for (const m of [Task, Topic, Category, Post]) constSet(TopLevel, m.name, m);
 
 function middleware(
   app: (env?: unknown) => unknown | Promise<unknown>,
@@ -797,7 +797,7 @@ describe("QueryCacheMutableParamTest", () => {
       this.attribute("payload", "json");
     }
   }
-  registerModel(JsonObj);
+  constSet(TopLevel, "JsonObj", JsonObj);
 
   beforeEach(async () => {
     const columnType =

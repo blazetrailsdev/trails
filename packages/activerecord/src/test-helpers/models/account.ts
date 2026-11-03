@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Reply } from "./reply.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { Relation } from "../../relation.js";
@@ -5,7 +7,6 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -77,7 +78,8 @@ export class Account extends Base {
     return "Sir, yes sir!";
   }
 }
-registerModel(Account);
+constSet(TopLevel, "Account", Account);
+DescendantsTracker.registerSubclass(Base, Account);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Account {
   get firm(): Company | null | Promise<Company | null>;
@@ -87,4 +89,5 @@ export interface Account {
 }
 
 export class SubAccount extends Account {}
-registerModel(SubAccount);
+constSet(TopLevel, "SubAccount", SubAccount);
+DescendantsTracker.registerSubclass(Account, SubAccount);

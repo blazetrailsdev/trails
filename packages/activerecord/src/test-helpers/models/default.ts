@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import type { BigDecimal } from "@blazetrails/activesupport";
-import { registerModel } from "../../associations.js";
 
 export class Default extends Base {
   declare text_col: string;
@@ -8,4 +9,5 @@ export class Default extends Base {
   declare decimal_col: BigDecimal;
   declare bpchar_col: string;
 }
-registerModel(Default);
+constSet(TopLevel, "Default", Default);
+DescendantsTracker.registerSubclass(Base, Default);

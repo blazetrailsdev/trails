@@ -1,8 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
-import type { Base } from "../index.js";
 
 const RAISE = 'Expected corresponding value for ["shop_id", "id"] to be an Array';
 
@@ -10,9 +9,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   const { self } = fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) =>
-      registerModel(m as unknown as typeof Base),
-    );
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => constSet(TopLevel, m.name, m));
   });
 
   async function seedBooksWithChapters(): Promise<void> {

@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -26,10 +27,10 @@ class StvMember extends Base {
   }
 }
 
-registerModel("StvAuthor", StvAuthor);
-registerModel("StvComment", StvComment);
-registerModel("StvPost", StvPost);
-registerModel("StvMember", StvMember);
+constSet(TopLevel, "StvAuthor", StvAuthor);
+constSet(TopLevel, "StvComment", StvComment);
+constSet(TopLevel, "StvPost", StvPost);
+constSet(TopLevel, "StvMember", StvMember);
 
 function freshAssociations() {
   (StvAuthor as any)._reflections = {};

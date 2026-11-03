@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { registerModel, RecordNotSaved, RecordNotFound, type Base } from "../index.js";
+import { RecordNotSaved, RecordNotFound, type Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import {
   Company,
@@ -33,23 +34,23 @@ describe("has_one set#{Name} awaitable accessor", () => {
   const { companies, pirates } = fixtures(["companies", "accounts", "pirates", "ships"]);
 
   beforeAll(() => {
-    registerModel(Company);
-    registerModel(Firm);
-    registerModel(DependentFirm);
-    registerModel(ExclusivelyDependentFirm);
-    registerModel(RestrictedWithExceptionFirm);
-    registerModel(RestrictedWithErrorFirm);
-    registerModel(Client);
-    registerModel(Account);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "DependentFirm", DependentFirm);
+    constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+    constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+    constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "Account", Account);
     Company.inheritanceColumn = "type";
-    registerModel(Firm);
-    registerModel(DependentFirm);
-    registerModel(ExclusivelyDependentFirm);
-    registerModel(RestrictedWithExceptionFirm);
-    registerModel(RestrictedWithErrorFirm);
-    registerModel(Client);
-    registerModel(Pirate);
-    registerModel(Ship);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "DependentFirm", DependentFirm);
+    constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
+    constSet(TopLevel, "RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
+    constSet(TopLevel, "RestrictedWithErrorFirm", RestrictedWithErrorFirm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "Ship", Ship);
   });
 
   it("persists the replacement immediately on a persisted owner", async () => {
@@ -118,11 +119,11 @@ describe("has_one :through set#{Name} awaitable accessor", () => {
   const { members } = fixtures(["members", "clubs", "memberships"]);
 
   beforeAll(() => {
-    registerModel(Member);
-    registerModel(Club);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "Club", Club);
     Membership.inheritanceColumn = "type";
-    registerModel(Membership);
-    registerModel(CurrentMembership);
+    constSet(TopLevel, "Membership", Membership);
+    constSet(TopLevel, "CurrentMembership", CurrentMembership);
   });
 
   it("replaces the through target immediately on a persisted owner", async () => {
@@ -140,8 +141,8 @@ describe("polymorphic has_one set#{Name} awaitable accessor", () => {
   const { members } = fixtures(["members", "sponsors"]);
 
   beforeAll(() => {
-    registerModel(Member);
-    registerModel(Sponsor);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "Sponsor", Sponsor);
   });
 
   it("persists the replacement, setting the polymorphic foreign key and type", async () => {
@@ -160,8 +161,8 @@ describe("has_one replace with no loaded target and no record", () => {
   fixtures(["companies", "accounts"]);
 
   beforeAll(() => {
-    registerModel(Firm);
-    registerModel(Account);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
   });
 
   it("returns before reaching replace, leaving the association empty", async () => {

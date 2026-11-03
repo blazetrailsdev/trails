@@ -1,8 +1,7 @@
 import { Namespaced } from "../test-helpers/models/company.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
-import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -24,9 +23,9 @@ class NamespacedPost extends Base {
   }
 }
 
-registerModel(Tagging);
-registerModel(NamespacedPost);
-registerModel(Post);
+constSet(TopLevel, "Tagging", Tagging);
+constSet(TopLevel, "NamespacedPost", NamespacedPost);
+constSet(TopLevel, "Post", Post);
 
 type FindByTitle = { findByTitle(title: string): Promise<NamespacedPost | null> };
 

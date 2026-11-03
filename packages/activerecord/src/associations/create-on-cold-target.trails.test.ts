@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, vi } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -42,10 +43,10 @@ describe("association create on a target whose schema is not reflected yet", () 
         this.belongsTo("author", { className: "ColdAuthor" });
       }
     }
-    registerModel(ColdComment);
-    registerModel(ColdPost);
-    registerModel(ColdAuthor);
-    registerModel(ColdAuthoredPost);
+    constSet(TopLevel, "ColdComment", ColdComment);
+    constSet(TopLevel, "ColdPost", ColdPost);
+    constSet(TopLevel, "ColdAuthor", ColdAuthor);
+    constSet(TopLevel, "ColdAuthoredPost", ColdAuthoredPost);
     return { ColdComment, ColdPost, ColdAuthoredPost };
   }
 

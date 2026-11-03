@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { registerConstant, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Address {
   street: string;
@@ -151,4 +151,5 @@ export class Customer extends Base {
     });
   }
 }
-registerModel(Customer);
+constSet(TopLevel, "Customer", Customer);
+DescendantsTracker.registerSubclass(Base, Customer);

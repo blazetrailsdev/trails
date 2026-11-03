@@ -1,6 +1,12 @@
 import { describe } from "@blazetrails/activesupport/testing/autorun";
 import { getCurrentSuite } from "vitest/suite";
-import { RuntimeError, StandardError, rbClassInheritedP } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  StandardError,
+  rbClassInheritedP,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 import { File as FixtureFile } from "../fixture-set/file.js";
 import {
@@ -16,7 +22,6 @@ export type { FixtureName } from "./fixtures-registry.js";
 import { Base } from "../base.js";
 import type { TestCase as ActiveRecordTestCase } from "../cases/test-case.js";
 import { ActiveRecord } from "../namespaces.js";
-import { registerModel } from "../associations.js";
 import type { WithTransactionalFixturesOptions } from "../test-fixtures/with-transactional-fixtures.js";
 import { eagerWarmSchemaCache } from "../support/schema-cache-dump.js";
 
@@ -140,13 +145,13 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
     if ("addOn" in entry) await entry.addOn?.();
     const resolved = await entry.model();
     const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
-    registerModel(models);
+    for (const model of models) constSet(TopLevel, model.name, model);
     classNames[fsName] = models[0];
   }
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
     if (typeof model === "function" && rbClassInheritedP(model, Base) === true) {
-      registerModel(model);
+      constSet(TopLevel, model.name, model);
     }
   }
 }

@@ -1,14 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("FieldOrderedValuesTest (trails)", () => {
   fixtures([]);
-  registerModel(Author);
-  registerModel(Book);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Book", Book);
 
   it("in order of with enums values through an arel literal column", async () => {
     await Book.destroyAll();

@@ -1,12 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
 import { CpkOrder, CpkOrderTag, CpkTag } from "../test-helpers/models/cpk.js";
 import type { Relation } from "../relation.js";
 
-registerModel([CpkOrder, CpkOrderTag, CpkTag]);
+constSet(TopLevel, "CpkOrder", CpkOrder);
+constSet(TopLevel, "CpkOrderTag", CpkOrderTag);
+constSet(TopLevel, "CpkTag", CpkTag);
 
 CpkOrder.hasMany(
   "tagsWithMixedCondition",

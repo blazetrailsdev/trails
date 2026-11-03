@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { Contact } from "./test-helpers/models/contact.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -8,8 +9,8 @@ import { bookFixtureData } from "./test-helpers/fixtures/books.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 beforeAll(() => {
-  registerModel(Author);
-  registerModel(SerializedPost);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "SerializedPost", SerializedPost);
 });
 
 const { books } = fixtures({ books: [Book, bookFixtureData] });

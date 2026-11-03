@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
@@ -8,11 +8,11 @@ import { Interest } from "../test-helpers/models/interest.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Citation } from "../test-helpers/models/citation.js";
 
-registerModel(Human);
-registerModel(Face);
-registerModel(Interest);
-registerModel(Book);
-registerModel(Citation);
+constSet(TopLevel, "Human", Human);
+constSet(TopLevel, "Face", Face);
+constSet(TopLevel, "Interest", Interest);
+constSet(TopLevel, "Book", Book);
+constSet(TopLevel, "Citation", Citation);
 
 const unquoted = (sql: string): string => sql.replace(/["`]/g, "");
 

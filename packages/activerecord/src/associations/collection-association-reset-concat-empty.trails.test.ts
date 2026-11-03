@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Car } from "../test-helpers/models/car.js";
@@ -33,11 +33,11 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
   const { self, authors } = fixtures(["authors", "posts", "cars"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Car);
-    registerModel(Tyre);
-    registerModel(Person);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Car", Car);
+    constSet(TopLevel, "Tyre", Tyre);
+    constSet(TopLevel, "Person", Person);
   });
 
   it("reset clears replaced_or_added_targets", async () => {

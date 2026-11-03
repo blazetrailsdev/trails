@@ -1,6 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
 import { Person } from "./test-helpers/models/person.js";
@@ -20,7 +19,7 @@ import { Subscription } from "./test-helpers/models/subscription.js";
 import { Book } from "./test-helpers/models/book.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
@@ -51,7 +50,7 @@ for (const model of [
   CpkOrder,
   CpkBook,
 ]) {
-  registerModel(model);
+  constSet(TopLevel, model.name, model);
 }
 
 export class SpecialTopic extends Topic {
@@ -80,8 +79,8 @@ export class SpecialReply extends Reply {
 }
 
 for (const klass of [SpecialTopic, SpecialReply]) {
-  registerModel(klass);
-  registerModel(klass);
+  constSet(TopLevel, klass.name, klass);
+  constSet(TopLevel, klass.name, klass);
 }
 
 function epochMs(v: unknown): number {

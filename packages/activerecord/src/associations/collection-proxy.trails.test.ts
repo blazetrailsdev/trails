@@ -1,9 +1,9 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { CollectionAssociation } from "./collection-association.js";
-import { Enumerable, Range, kernelThrow } from "@blazetrails/ruby-compat";
+import { Enumerable, Range, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel, RecordNotFound } from "../index.js";
+import { Base, RecordNotFound } from "../index.js";
 import { Relation } from "../relation.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
@@ -383,7 +383,7 @@ describe("CollectionProxy#delete — nullify transaction rollback", () => {
       });
     }
   }
-  registerModel("AuthorWithRaisingAfterRemove", AuthorWithRaisingAfterRemove);
+  constSet(TopLevel, "AuthorWithRaisingAfterRemove", AuthorWithRaisingAfterRemove);
 
   it("rolls back the nullify update_all when after_remove raises", async () => {
     const author = await AuthorWithRaisingAfterRemove.create({ name: "Owner" });
@@ -435,7 +435,7 @@ describe("CollectionProxy#delete / #destroy — nil return on empty or abort", (
       });
     }
   }
-  registerModel("AuthorWithAbortingBeforeRemove", AuthorWithAbortingBeforeRemove);
+  constSet(TopLevel, "AuthorWithAbortingBeforeRemove", AuthorWithAbortingBeforeRemove);
 
   it("returns nil when delete is called with no records", async () => {
     const author = await Author.create({ name: "Owner" });
@@ -480,7 +480,7 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
       this.hasMany("tags", { through: "taggings", beforeRemove: () => kernelThrow(":abort") });
     }
   }
-  registerModel("PostWithAbortingTagRemove", PostWithAbortingTagRemove);
+  constSet(TopLevel, "PostWithAbortingTagRemove", PostWithAbortingTagRemove);
 
   it("returns nil when a through delete is called with no records", async () => {
     const post = await Post.create({ title: "p", body: "p" });

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { RuntimeReflection } from "../reflection.js";
@@ -25,7 +26,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
   }
 
   beforeAll(() => {
-    registerModel("AtComment", AtComment);
+    constSet(TopLevel, "AtComment", AtComment);
   });
 
   it("AliasTracker: bare table on first visit, aliased on repeat, thunk only invoked on repeat", () => {

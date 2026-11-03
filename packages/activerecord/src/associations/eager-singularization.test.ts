@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { assertNothingRaised } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -230,16 +231,16 @@ describe("EagerSingularizationTest", () => {
     set dress(value: Dress | null);
   }
 
-  registerModel("Virus", Virus);
-  registerModel("Octopus", Octopus);
-  registerModel("Pass", Pass);
-  registerModel("Bus", Bus);
-  registerModel("Mess", Mess);
-  registerModel("Crisis", Crisis);
-  registerModel("Success", Success);
-  registerModel("Analysis", Analysis);
-  registerModel("Dress", Dress);
-  registerModel("Compress", Compress);
+  constSet(TopLevel, "Virus", Virus);
+  constSet(TopLevel, "Octopus", Octopus);
+  constSet(TopLevel, "Pass", Pass);
+  constSet(TopLevel, "Bus", Bus);
+  constSet(TopLevel, "Mess", Mess);
+  constSet(TopLevel, "Crisis", Crisis);
+  constSet(TopLevel, "Success", Success);
+  constSet(TopLevel, "Analysis", Analysis);
+  constSet(TopLevel, "Dress", Dress);
+  constSet(TopLevel, "Compress", Compress);
 
   it("eager no extra singularization belongs to", async () => {
     await assertNothingRaised(() => Virus.all().includes(":octopus").toArray());
