@@ -10,14 +10,13 @@ import {
 } from "@blazetrails/activesupport";
 import {
   File,
-  RuntimeError,
+  getPath,
   env,
   include,
   prepend,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
-import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 import { setMultipleFileFieldIncludeHidden } from "@blazetrails/actionview/helpers/form-helper";
 import type { TestCase } from "@blazetrails/activesupport/test-case";
 import "@blazetrails/trailties/trailties/action-controller";
@@ -72,6 +71,10 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
+/**
+ * @missingRailsCall parse — PERMANENT
+ * @inventedArm if — PERMANENT
+ */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
@@ -195,33 +198,39 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    this.initializer("active_storage.services", () => {
+    this.initializer("active_storage.services", async () => {
+      let hook: Promise<void> | undefined;
       onLoad("active_storage_blob", () => {
-        const activeStorage = (
-          TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig }
-        ).activeStorage;
-        const configs = (activeStorage.serviceConfigurations ||= (() => {
-          let configFile = File.join(
-            TopLevel.Trails!.root()!,
-            `config/storage/${TopLevel.Trails!.env}.yml`,
-          );
-          if (!File.isExist(configFile))
-            configFile = File.join(TopLevel.Trails!.root()!, "config/storage.yml");
-          if (!File.isExist(configFile)) {
-            throw new RuntimeError(`Couldn't find Active Storage configuration in ${configFile}`);
+        hook = (async () => {
+          const activeStorage = (
+            TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig }
+          ).activeStorage;
+          const configs = (activeStorage.serviceConfigurations ||= await (async () => {
+            let configFile = File.join(
+              TopLevel.Trails!.root()!,
+              `config/storage/${TopLevel.Trails!.env}.ts`,
+            );
+            if (!(await File.isExistAsync(configFile)))
+              configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
+            if (!(await File.isExistAsync(configFile))) return undefined;
+
+            const mod: { default?: Record<string, Record<string, unknown>> } = await import(
+              getPath().pathToFileURL!(configFile).href
+            );
+            return mod.default ?? {};
+          })());
+          if (configs == null) return;
+
+          const blob = ActiveStorage.Blob as typeof Blob;
+          blob.services = new Registry(configs);
+
+          const configChoice = activeStorage.service;
+          if (configChoice != null) {
+            blob.service = blob.services.fetch(configChoice);
           }
-
-          return ConfigurationFile.parse(configFile) as Record<string, Record<string, unknown>>;
-        })());
-
-        const blob = ActiveStorage.Blob as typeof Blob;
-        blob.services = new Registry(configs);
-
-        const configChoice = activeStorage.service;
-        if (configChoice != null) {
-          blob.service = blob.services.fetch(configChoice);
-        }
+        })();
       });
+      await hook;
     });
 
     this.initializer("active_storage.queues", () => {
