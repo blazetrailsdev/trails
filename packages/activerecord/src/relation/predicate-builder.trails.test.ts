@@ -7,11 +7,7 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Author } from "../test-helpers/models/author.js";
 import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
-import {
-  CpkBook,
-  CpkChapter,
-  CpkOrderWithSingularBookChapters,
-} from "../test-helpers/models/cpk.js";
+import { CpkOrderWithSingularBookChapters } from "../test-helpers/models/cpk.js";
 import { Base } from "../index.js";
 import { quoteColumnName } from "../support/quote-regex.js";
 import {
@@ -104,12 +100,6 @@ describe("association hash expansion grouping shape", () => {
     expect(or).toBeInstanceOf(Nodes.Or);
     expect(or.children).toHaveLength(2);
     for (const child of or.children) expect(child).toBeInstanceOf(Nodes.And);
-  });
-
-  beforeAll(() => {
-    [CpkOrderWithSingularBookChapters, CpkBook, CpkChapter].forEach((m) =>
-      constSet(TopLevel, m.name, m),
-    );
   });
 
   it("through-association composite primary key routes tuples like Rails' array-key branch", () => {

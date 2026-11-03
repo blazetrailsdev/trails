@@ -1,19 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { assertDifference, assertRaise } from "@blazetrails/activesupport";
-import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { Author, AuthorAddress } from "../test-helpers/models/author.js";
-import { Comment } from "../test-helpers/models/comment.js";
+import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Pet } from "../test-helpers/models/pet.js";
-import { Toy } from "../test-helpers/models/toy.js";
-import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
+import { CpkOrder } from "../test-helpers/models/cpk.js";
 import { RecordNotFound } from "../errors.js";
-
-for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, CpkOrderAgreement]) {
-  constSet(TopLevel, klass.name, klass);
-}
+import "../test-helpers/models/comment.js";
+import "../test-helpers/models/toy.js";
 
 describe("DeleteAllTest", () => {
   const { self, authors, posts, cpkOrderAgreements } = fixtures([

@@ -384,6 +384,10 @@ export function constGet(mod: object, name: string): unknown {
   }
   if (qualified) mod = Object;
   if (Object.hasOwn(tbl, cpath)) return tbl[cpath];
+  if (mod === Object) {
+    const generated = generatedClass(cpath);
+    if (generated !== undefined) return generated;
+  }
   let path = "";
   let c: unknown = mod;
   for (const [i, part] of parts.entries()) {

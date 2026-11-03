@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { NoMethodError, include, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport";
 import "./relation.js";
 import { TestCase } from "./cases/test-case.js";
@@ -303,7 +303,6 @@ async function resolvePrimaryModel(entry: {
 }): Promise<typeof Base> {
   const resolved = await entry.model();
   const models = (Array.isArray(resolved) ? resolved : [resolved]) as (typeof Base)[];
-  for (const model of models) constSet(TopLevel, model.name, model);
   return models[0];
 }
 

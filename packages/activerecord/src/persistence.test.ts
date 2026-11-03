@@ -41,18 +41,10 @@ import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/mo
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { PostWithPrefetchedPk } from "./test-helpers/models/post-with-prefetched-pk.js";
 import { Account } from "./test-helpers/models/account.js";
-import {
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  WrongReply,
-} from "./test-helpers/models/reply.js";
-import { Item as CanonicalItem } from "./test-helpers/models/item.js";
+import { Reply, WrongReply } from "./test-helpers/models/reply.js";
 import {
   Developer as CanonicalDeveloper,
   DeveloperCalledDavid,
-  AuditLog,
 } from "./test-helpers/models/developer.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
@@ -66,44 +58,11 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Person } from "./test-helpers/models/person.js";
-import { Car } from "./test-helpers/models/car.js";
-import { Ship } from "./test-helpers/models/ship.js";
 import { sql as arelSql } from "@blazetrails/arel";
-
-for (const klass of [
-  CanonicalTopic,
-  Minimalistic,
-  Account,
-  ClothingItem,
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  CanonicalItem,
-  CanonicalDeveloper,
-  Parrot,
-  CanonicalPost,
-  CpkBook,
-  CpkOrder,
-  Minivan,
-  Company,
-  Firm,
-  LargeClient,
-  Client,
-  AdminUser,
-  AutoId,
-  Person,
-  Car,
-  WrongReply,
-  DeveloperCalledDavid,
-  Dashboard,
-  CpkBestSeller,
-  ClothingItemSized,
-  AuditLog,
-  Ship,
-]) {
-  constSet(TopLevel, klass.name, klass);
-}
+import "./test-helpers/models/item.js";
+import "./test-helpers/models/car.js";
+import "./test-helpers/models/ship.js";
+import "./test-helpers/models/dashboard.js";
 
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;

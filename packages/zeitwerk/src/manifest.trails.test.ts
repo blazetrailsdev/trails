@@ -364,6 +364,33 @@ describe("autoload artifacts", () => {
     });
   });
 
+  it("answers a path under an ignored directory as ignored on an fs adapter that raises on every read", async () => {
+    const files: [string, string][] = [
+      ["x.js", "export class X {}\n"],
+      ["ignored_dir/x.js", "export class X {}\n"],
+    ];
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.ignore("ignored_dir");
+      const manifest = await buildManifest(loader);
+      Registry.unregisterLoader(loader);
+
+      const previous = raiseOnEveryRead();
+      try {
+        const reader = await newLoader({ setup: false, enableReloading: false });
+        reader.manifest = manifest;
+        await reader.pushDir(".");
+        await reader.ignore("ignored_dir");
+        await reader.setup();
+
+        await expect(reader.loadFile("ignored_dir/x.js")).rejects.toThrow(/is ignored/);
+        expect(await reader.cpathExpectedAt("ignored_dir/x.js")).toBeNull();
+      } finally {
+        fsAdapterConfig.adapter = previous;
+      }
+    });
+  });
+
   it("reads rows under a namespace root and a namespace the manifest does not hold", async () => {
     const seats = TopLevel as Record<string, unknown>;
     await withFiles([["y.ts"]], async () => {

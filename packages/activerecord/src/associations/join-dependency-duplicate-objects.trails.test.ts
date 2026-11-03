@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -39,8 +40,13 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   beforeEach(() => {
     for (const m of [Comment, Post, Reader]) {
       m._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Reader", Reader);
+    DescendantsTracker.registerSubclass(Base, Reader);
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
     Associations.belongsTo.call(Reader, "post", { className: "Post" });
   });

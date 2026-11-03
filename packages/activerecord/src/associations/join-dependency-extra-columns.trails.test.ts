@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -30,8 +31,11 @@ describe("JoinDependency extra columns in instantiate", () => {
   beforeEach(() => {
     for (const m of [Post, Comment]) {
       m._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
   });
 

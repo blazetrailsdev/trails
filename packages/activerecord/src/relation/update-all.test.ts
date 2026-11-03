@@ -13,34 +13,15 @@ import { Developer } from "../test-helpers/models/developer.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Tag } from "../test-helpers/models/tag.js";
-import { Tagging } from "../test-helpers/models/tagging.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { Toy } from "../test-helpers/models/toy.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";
-import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
-import { Category } from "../test-helpers/models/category.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
+import { CpkOrder } from "../test-helpers/models/cpk.js";
 import { StaleObjectError } from "../errors.js";
-
-for (const klass of [
-  Author,
-  Post,
-  Pet,
-  Toy,
-  Tag,
-  Tagging,
-  Comment,
-  Developer,
-  Person,
-  Topic,
-  Category,
-  Categorization,
-  CpkOrder,
-  CpkOrderAgreement,
-]) {
-  constSet(TopLevel, klass.name, klass);
-}
+import "../test-helpers/models/tag.js";
+import "../test-helpers/models/tagging.js";
+import "../test-helpers/models/toy.js";
+import "../test-helpers/models/category.js";
+import "../test-helpers/models/categorization.js";
 
 function epochMs(v: unknown): number {
   if (v instanceof RubyTime) return v.toF() * 1000;

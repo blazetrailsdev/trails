@@ -1,16 +1,11 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Base } from "../index.js";
 import { Project } from "../test-helpers/models/project.js";
-import { AuditLog, Developer } from "../test-helpers/models/developer.js";
+import { Developer } from "../test-helpers/models/developer.js";
 
 describe("HABTM join row built against a new owner", () => {
   fixtures(["developers", "projects", "developersProjects"]);
-
-  beforeAll(async () => {
-    for (const model of [Developer, AuditLog, Project]) await constSet(TopLevel, model.name, model);
-  });
 
   it("writes the owner foreign key on the join row once the owner is saved", async () => {
     const developer = new Developer({ name: "Aredridel", salary: 50000 });

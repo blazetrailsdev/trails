@@ -1,19 +1,14 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { Post, SpecialPost } from "../test-helpers/models/post.js";
+import { SpecialPost } from "../test-helpers/models/post.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Reader } from "../test-helpers/models/reader.js";
-import { Comment, VerySpecialComment } from "../test-helpers/models/comment.js";
+import { VerySpecialComment } from "../test-helpers/models/comment.js";
+import "../test-helpers/models/person.js";
+import "../test-helpers/models/comment.js";
 
 describe("STI owner has_many :through — declaring-class owner FK", () => {
   fixtures({});
-
-  beforeAll(() => {
-    for (const klass of [Post, SpecialPost, Person, Reader]) {
-      constSet(TopLevel, klass.name, klass);
-    }
-  });
 
   it("creates the join row with the base-class owner FK (post_id, not special_post_id)", async () => {
     const post = await SpecialPost.create({ title: "sti", body: "b", type: "SpecialPost" });
@@ -44,12 +39,6 @@ describe("STI owner has_many :through — declaring-class owner FK", () => {
 
 describe("STI owner has_one — declaring-class owner FK", () => {
   fixtures({});
-
-  beforeAll(() => {
-    for (const klass of [Post, SpecialPost, Comment, VerySpecialComment]) {
-      constSet(TopLevel, klass.name, klass);
-    }
-  });
 
   it("builds the target with the base-class owner FK (post_id, not special_post_id)", async () => {
     const post = await SpecialPost.create({ title: "sti", body: "b", type: "SpecialPost" });

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
@@ -30,8 +31,13 @@ describe("JoinDependency nested hydration", () => {
   beforeEach(() => {
     for (const m of [Author, Comment, Post]) {
       m._reflections = {};
-      constSet(TopLevel, m.name, m);
     }
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
     Associations.belongsTo.call(Comment, "author", { className: "Author" });
   });

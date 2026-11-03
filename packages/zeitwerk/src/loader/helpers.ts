@@ -104,7 +104,12 @@ export const Helpers = {
   /** @internal */
   _isExist(this: Loader, path: string): Promise<boolean> {
     if (this._manifestChildren != null) {
-      return Promise.resolve(Object.hasOwn(this._manifestChildren, path));
+      if (Object.hasOwn(this._manifestChildren, path)) return Promise.resolve(true);
+      for (const dir of this.walkUp(File.dirname(path))) {
+        if (this.isIgnoredPath(dir)) return Promise.resolve(true);
+        if (Object.hasOwn(this.roots, dir)) break;
+      }
+      return Promise.resolve(false);
     }
     return File.isExistAsync(path);
   },
