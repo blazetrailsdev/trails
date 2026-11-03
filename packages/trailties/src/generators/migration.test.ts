@@ -8,8 +8,7 @@ import {
   currentMigrationNumber,
   migrationExists,
   migrationLookupAt,
-  createMigration,
-  migrationTemplate,
+  Migration,
   nextMigrationNumber,
   NotImplementedError,
 } from "./migration.js";
@@ -56,10 +55,9 @@ describe("migration", () => {
       relativeToOriginalDestinationRoot: (p: string) => p,
       constructor: { nextMigrationNumber: () => "20260101000000" },
       action,
-      createMigration,
+      ...Migration,
     };
-    const dest = await migrationTemplate.call(
-      host as never,
+    const dest = await host.migrationTemplate(
       () => `class ${host.migrationClassName} {}`,
       "db/migrate/create_articles.rb",
     );

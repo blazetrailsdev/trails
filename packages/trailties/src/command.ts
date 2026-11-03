@@ -68,17 +68,8 @@ export function root(): Pathname | undefined {
   }
 }
 
-/**
- * @inventedArm endsWith — CONVERGEABLE app-path-expands-to-the-application-root
- * @inventedArm dirname — CONVERGEABLE app-path-expands-to-the-application-root
- */
 export function applicationRoot(): Pathname | undefined {
-  if (APP_PATH != null) {
-    const path = File.expandPath("../..", APP_PATH);
-    return new Pathname(
-      APP_PATH.endsWith("/dist/config/application.js") ? File.dirname(path) : path,
-    );
-  }
+  if (APP_PATH != null) return new Pathname(File.expandPath("../..", APP_PATH));
   return undefined;
 }
 

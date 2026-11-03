@@ -930,7 +930,10 @@ describe("Application key/message/credentials wiring", () => {
   };
 
   it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
-    expect(new Configuration().credentials).toEqual({ contentPath: null, keyPath: null });
+    expect(new Configuration().credentials.toH()).toEqual({
+      contentPath: "config/credentials.yml.enc",
+      keyPath: "config/master.key",
+    });
     class A extends Application {}
     Application.register(A);
     const app = A.instance();

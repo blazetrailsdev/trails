@@ -129,9 +129,7 @@ describe("Trails::Command.root", () => {
   it("expands the application root from APP_PATH, source or built", () => {
     setAppPath("/app/config/application.ts");
     expect(root()?.toString()).toBe("/app");
-    setAppPath("/app/dist/config/application.js");
-    expect(root()?.toString()).toBe("/app");
-    setAppPath("/srv/dist/config/application.ts");
+    setAppPath("/srv/dist/config/application.js");
     expect(root()?.toString()).toBe("/srv/dist");
   });
 

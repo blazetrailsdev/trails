@@ -1,5 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
+import { Dir } from "./dir.js";
 import { File } from "./file.js";
+import { getFs } from "./fs-adapter.js";
 import { rbBlockGivenP } from "./hash.js";
 import { rbInspect } from "./object.js";
 import { stringValue } from "./string/support.js";
@@ -59,6 +61,43 @@ export class Pathname {
     } else {
       return file.open(this.toPath(), ...args);
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:356` `path_read` */
+  async read(): Promise<string> {
+    return File.readAsync(this._path);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:397` `path_write` */
+  async write(
+    string: string | Uint8Array,
+    options: { perm?: number; mode?: string } = {},
+  ): Promise<number> {
+    return File.writeAsync(this._path, string, options);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1288` `path_unlink` */
+  async delete(): Promise<number> {
+    return File.deleteAsync(this._path);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1055` `path_empty_p` */
+  async isEmpty(): Promise<boolean> {
+    if (await File.isDirectoryAsync(this._path)) {
+      return (await Dir.childrenAsync(this._path)).length === 0;
+    } else {
+      const fs = getFs();
+      try {
+        return (await fs.stat!(this._path)).size === 0;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:900` `path_file_p` */
+  async isFile(): Promise<boolean> {
+    return File.isFileAsync(this._path);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:981` `path_size` */
