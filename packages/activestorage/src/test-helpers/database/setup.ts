@@ -71,6 +71,7 @@ TopLevel.Trails = {
 class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
+app.config.loadDefaults("8.0");
 for (const railtie of [GlobalIDRailtie, ActionViewRailtie, ActionControllerRailtie, Engine]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
