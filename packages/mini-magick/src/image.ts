@@ -114,6 +114,7 @@ export class Image {
     return new this(tempfile.path()!, tempfile);
   }
 
+  /** @inventedArm finally — PERMANENT */
   static attribute(name: string, key: string = name) {
     return rbModDefineMethod(
       this,
@@ -122,7 +123,8 @@ export class Image {
         if (args.some((x) => x != null && x !== false) && name !== "resolution") {
           return this.mogrify(undefined, (b) => rbFSend(b, name, ...args));
         } else {
-          return this._info.get(key, ...args);
+          const value = this._info.get(key, ...args);
+          return value instanceof Promise ? value.finally(() => this._tempfile) : value;
         }
       },
     );
