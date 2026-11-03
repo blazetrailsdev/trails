@@ -7,6 +7,8 @@ import {
   hashDelete,
   isSymbol,
   rbFSend,
+  rbModName,
+  rbObjClass,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
@@ -178,9 +180,7 @@ export function polymorphicMapping(
   if (isToModel(record)) {
     return mappings.get(record.toModel().modelName.name);
   }
-  const ctor = (record as { constructor?: { name?: string } })?.constructor;
-  const key = ctor?.name ?? "";
-  return mappings.get(key);
+  return mappings.get(rbModName(rbObjClass(record)) ?? "");
 }
 
 type KeyStrategy = (name: ModelName) => string;
