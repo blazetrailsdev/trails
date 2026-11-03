@@ -9,6 +9,8 @@ import {
 } from "@blazetrails/ruby-compat/include";
 import { Assertion, UnexpectedError } from "./assertions.js";
 import type { Test } from "./assertions.js";
+import { ActiveSupport } from "../namespaces.js";
+import * as SetupAndTeardown from "./setup-and-teardown.js";
 
 interface CallbacksInstance {
   runCallbacks: Included<typeof Callbacks>["runCallbacks"];
@@ -61,3 +63,5 @@ export function afterTeardown(this: Test & CallbacksInstance): unknown {
 
   return rbCallSuper(this, afterTeardown);
 }
+
+ActiveSupport.Testing.SetupAndTeardown = SetupAndTeardown;

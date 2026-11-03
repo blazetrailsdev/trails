@@ -39,20 +39,18 @@ export const ActiveSupport = {
   loadPath,
   Cache: { name: "ActiveSupport::Cache" },
   Concurrency: { name: "ActiveSupport::Concurrency" },
-  JSON: { name: "ActiveSupport::JSON" },
   Messages: { name: "ActiveSupport::Messages" },
-  Testing: {
-    name: "ActiveSupport::Testing",
-    SetupAndTeardown: { name: "ActiveSupport::Testing::SetupAndTeardown" },
-  },
-  XmlMini: { name: "ActiveSupport::XmlMini" },
+  Testing: { name: "ActiveSupport::Testing" },
 } as AutoloadModule & {
-  Cache: { name: string };
+  Cache: { name: string } & Partial<typeof import("./cache.js")>;
   Concurrency: { name: string };
-  JSON: { name: string };
+  JSON: typeof import("./json.js");
   Messages: { name: string };
-  Testing: { name: string; SetupAndTeardown: { name: string } };
-  XmlMini: { name: string };
+  Testing: {
+    name: string;
+    SetupAndTeardown?: typeof import("./testing/setup-and-teardown.js");
+  };
+  XmlMini: typeof import("./xml-mini.js");
   BroadcastLogger: typeof BroadcastLogger;
   Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;

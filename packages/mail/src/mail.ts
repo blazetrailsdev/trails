@@ -9,6 +9,7 @@ import {
   Thread,
   TopLevel,
 } from "@blazetrails/ruby-compat";
+import * as Parsers from "./parsers.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
 import type { CommonField } from "./fields/common-field.js";
@@ -16,7 +17,7 @@ import type { CommonField } from "./fields/common-field.js";
 interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
-  Parsers: { name: string };
+  Parsers: typeof Parsers;
   "new"(...args: unknown[]): Message;
   RANDOM_TAG: string;
   randomTag(): string;
@@ -27,7 +28,7 @@ interface MailConstants {
 type FieldConstant = new (...args: never[]) => CommonField;
 
 export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
-  Parsers: { name: "Mail::Parsers" },
+  Parsers,
 
   RANDOM_TAG: "%x%x_%x%x%d%x",
 

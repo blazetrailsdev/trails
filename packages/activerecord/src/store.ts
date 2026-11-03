@@ -17,6 +17,8 @@ import {
   rtest,
   update,
 } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "./namespaces.js";
+import * as Store from "./store.js";
 
 interface CoderLike {
   dump(v: unknown): unknown;
@@ -305,3 +307,5 @@ export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unkno
   }
   return new HashWithIndifferentAccess();
 }
+
+ActiveRecord.Store = Store;

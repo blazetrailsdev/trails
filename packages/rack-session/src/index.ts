@@ -20,3 +20,4 @@ export {
 } from "./constants.js";
 
 import "./constants.generated.js";
+import "./session.js";

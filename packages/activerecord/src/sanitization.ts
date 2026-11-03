@@ -11,6 +11,8 @@ import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 import { Relation } from "./relation.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as Sanitization from "./sanitization.js";
 
 /** @internal */
 export type Quoter = Pick<
@@ -240,3 +242,5 @@ function raiseIfBindArityMismatch(statement: string, expected: number, provided:
     );
   }
 }
+
+ActiveRecord.Sanitization = Sanitization;

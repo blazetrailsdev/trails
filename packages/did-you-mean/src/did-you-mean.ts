@@ -1,5 +1,6 @@
-import { Hash, rbClassInheritedP, toS, warn } from "@blazetrails/ruby-compat";
+import { Hash, rbClassInheritedP, toS, warn, TopLevel } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
+import * as DidYouMean from "./did-you-mean.js";
 import { Correctable } from "./core-ext/name-error.js";
 import { Formatter } from "./formatter.js";
 import { NullChecker } from "./spell-checkers/null-checker.js";
@@ -60,4 +61,12 @@ export function formatter(): typeof Formatter | FormatterLike {
 
 export function setFormatter<T extends FormatterLike | null>(formatter: T): T {
   return (ractorFormatter = formatter) as T;
+}
+
+TopLevel.DidYouMean = DidYouMean;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    DidYouMean?: typeof DidYouMean;
+  }
 }

@@ -76,7 +76,7 @@ export { FLATTEN_SEPARATOR, Flatten, SEPARATOR_ESCAPE_CHAR } from "./backend/fla
 export { KeyValue, SubtreeProxy } from "./backend/key-value.js";
 export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
-export { Backend } from "./backend/base.js";
+export * as Backend from "./backend.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
 export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";

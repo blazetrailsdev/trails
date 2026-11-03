@@ -5,7 +5,6 @@ import * as m2 from "./encryptor.js";
 import * as m3 from "./pool.js";
 
 defineConstants([
-  [() => m0.Session, "Rack::Session"],
   [() => m0.ID, "Rack::Session::Abstract::ID"],
   [() => m0.Persisted, "Rack::Session::Abstract::Persisted"],
   [() => m0.PersistedSecure, "Rack::Session::Abstract::PersistedSecure"],

@@ -29,6 +29,7 @@ import {
 } from "./attribute-methods.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
 import { Relation } from "./relation.js";
+import { ActiveRecord } from "./namespaces.js";
 
 type EnumValue = number | string | boolean | null;
 
@@ -447,3 +448,5 @@ export const Enum = {
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
 };
+
+ActiveRecord.Enum = Enum;

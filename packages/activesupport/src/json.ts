@@ -3,6 +3,8 @@ import { JSON as RbJSON } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding, type EncodeOptions } from "./json/encoding.js";
 import { zone } from "./time-zone-config.js";
+import { ActiveSupport } from "./namespaces.js";
+import * as JSON from "./json.js";
 
 export let parseJsonTimes: boolean | undefined = undefined;
 
@@ -72,3 +74,5 @@ export namespace ActiveSupportJSON {
     return SyntaxError;
   }
 }
+
+ActiveSupport.JSON = JSON;

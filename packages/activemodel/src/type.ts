@@ -56,6 +56,6 @@ register("integer", IntegerType);
 register("string", StringType);
 register("time", TimeType);
 
-export const Helpers = { name: "ActiveModel::Type::Helpers" };
+export * as Helpers from "./type/helpers.js";
 
 ActiveModel.Type = Type;

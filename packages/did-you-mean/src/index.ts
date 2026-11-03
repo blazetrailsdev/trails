@@ -1,5 +1,3 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
-import * as DidYouMean from "./index.js";
 import { Formatter, PlainFormatter } from "./formatter.js";
 
 export { Levenshtein } from "./levenshtein.js";
@@ -13,11 +11,3 @@ export { correctError, formatter, setFormatter, spellCheckers } from "./did-you-
 export { NullChecker } from "./spell-checkers/null-checker.js";
 
 import "./constants.generated.js";
-
-TopLevel.DidYouMean = DidYouMean;
-
-declare module "@blazetrails/ruby-compat" {
-  interface TopLevelConstants {
-    DidYouMean?: typeof DidYouMean;
-  }
-}

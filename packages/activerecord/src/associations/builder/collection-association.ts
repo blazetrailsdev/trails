@@ -6,6 +6,7 @@ import {
   type AssociationInstanceHost,
   type AssociationProxyLike,
 } from "./association.js";
+import { Builder } from "../../namespaces.js";
 
 /** @noRailsEquivalent CONVERGEABLE retire-ids-name-helper-constructor-dispatch */
 export function idsName(name: string): string {
@@ -121,3 +122,5 @@ export class CollectionAssociation extends Association {
     });
   }
 }
+
+Builder.CollectionAssociation = CollectionAssociation;
