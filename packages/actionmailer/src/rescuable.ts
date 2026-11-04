@@ -1,5 +1,5 @@
 import { Concern, Rescuable as ASRescuable, extend, include } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, rtest } from "@blazetrails/ruby-compat";
 import { ActionMailer } from "./namespaces.js";
 
 interface RescuableClassHost {
@@ -20,8 +20,6 @@ export async function handleException(
   throw exception;
 }
 
-export const ClassMethods = { handleException };
-
 /** @internal */
 export async function handleExceptions<T>(
   this: RescuableHost,
@@ -30,14 +28,20 @@ export async function handleExceptions<T>(
   try {
     return await block();
   } catch (exception) {
+    if (exception instanceof Exception && !(exception instanceof StandardError)) throw exception;
     const handled = await this.rescueWithHandler(exception);
     if (rtest(handled)) return handled;
     throw exception;
   }
 }
 
-export const Rescuable = { ClassMethods, handleExceptions };
+export const Rescuable = { handleExceptions };
 extend(Rescuable, Concern);
+(
+  Rescuable as unknown as { classMethods(def: (mod: Record<string, unknown>) => void): void }
+).classMethods((mod) => {
+  mod.handleException = handleException;
+});
 include(Rescuable, ASRescuable);
 
 ActionMailer.Rescuable = Rescuable;
