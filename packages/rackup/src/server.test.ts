@@ -189,12 +189,12 @@ describe("Rackup::Server", () => {
     const server = await newServer();
     let error: unknown;
     await withStderr(async () => {
-      try {
-        await server.app();
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(SystemExit);
+      await expect(
+        server.app().catch((e: unknown) => {
+          error = e;
+          throw e;
+        }),
+      ).rejects.toThrow(SystemExit);
     });
     expect((error as Error).message).toMatch(/^configuration .* not found$/);
   });

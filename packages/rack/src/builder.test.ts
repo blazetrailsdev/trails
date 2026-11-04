@@ -282,12 +282,12 @@ describe("Rack::Builder", () => {
 
     it("raises if parses commented options", async () => {
       let error: unknown;
-      try {
-        await Builder.parseFile(configFile("options.ru"));
-      } catch (e) {
-        error = e;
-      }
-      expect(error).toBeInstanceOf(RuntimeError);
+      await expect(
+        Builder.parseFile(configFile("options.ru")).catch((e: unknown) => {
+          error = e;
+          throw e;
+        }),
+      ).rejects.toThrow(RuntimeError);
       expect((error as Error).message).toContain(
         "Parsing options from the first comment line is no longer supported",
       );
