@@ -69,7 +69,10 @@ export class ThreadLoadInterlockAwareMonitor {
     return (this.count += 1);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs current — PERMANENT
+   */
   protected async monEnter(): Promise<number> {
     if (this.owner !== Fiber.current()) await this.mutex.lock();
     this.owner = Fiber.current();
