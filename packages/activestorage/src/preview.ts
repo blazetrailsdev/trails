@@ -37,14 +37,12 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  get filename(): Filename {
-    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    return presentation.filename;
+  get filename(): Promise<Filename> {
+    return this.presentation().then((presentation) => presentation.filename);
   }
 
-  get contentType(): string | null {
-    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    return presentation.contentType;
+  get contentType(): Promise<string | null> {
+    return this.presentation().then((presentation) => presentation.contentType);
   }
 
   async processed(): Promise<this> {
