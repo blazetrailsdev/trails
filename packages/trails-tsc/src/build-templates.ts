@@ -30,11 +30,9 @@ async function templatesIn(path: string): Promise<string[]> {
 }
 
 function compileTemplate(source: string): string {
-  source = source.replace(/<%%|<%(?:%%>|[\s\S])*?%>/g, (tag) =>
-    tag === "<%%" ? '<%= "<%" %>' : tag.replaceAll("%%>", "%\\x3E"),
-  );
   const options = {
     trim: true,
+    erb: true,
     bufvar: "this.outputBuffer",
     putCmd: "this.outputBuffer.append",
     insertCmd: "((value) => this.outputBuffer.append(rbObjAsString(value)))",

@@ -8,6 +8,7 @@ import { Trails } from "../../../trails.js";
 import { GeneratorError } from "../../generated-attribute.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
+import { VERSION } from "../../../gem-version.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -1601,6 +1602,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteActionMailerFilesSkippingActionMailer");
     this.methodAdded("deleteNonApiInitializersIfApiOption");
     this.methodAdded("deleteApiInitializers");
+    this.methodAdded("deleteNewFrameworkDefaults");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
   }
@@ -1800,6 +1802,14 @@ export class AppGenerator extends AppBase {
   async deleteApiInitializers(): Promise<void> {
     if (!this.options.api) {
       await this.removeFile("config/initializers/cors.ts");
+    }
+  }
+
+  async deleteNewFrameworkDefaults(): Promise<void> {
+    if (!this.options.update) {
+      await this.removeFile(
+        `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
+      );
     }
   }
 
