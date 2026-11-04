@@ -348,6 +348,8 @@ const alias = {
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
+  "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/src") + "/",
+  "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/src/index.ts"),
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/src") + "/",

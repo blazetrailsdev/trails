@@ -43,6 +43,7 @@
     { "path": "packages/actionpack/tsconfig.test.json" },
     { "path": "packages/globalid" },
     { "path": "packages/activejob" },
+    { "path": "packages/actionmailer" },
     { "path": "packages/actioncable" },
     { "path": "packages/solid-queue" },
     { "path": "packages/solid-cable" },

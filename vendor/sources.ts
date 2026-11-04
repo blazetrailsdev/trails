@@ -162,6 +162,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "activejob/test",
       },
       {
+        name: "actionmailer",
+        libPath: "actionmailer/lib/action_mailer",
+        libEntryFile: "actionmailer/lib/action_mailer.rb",
+        testPath: "actionmailer/test",
+      },
+      {
         name: "activestorage",
         libPath: "activestorage/lib/active_storage",
         libEntryFile: "activestorage/lib/active_storage.rb",

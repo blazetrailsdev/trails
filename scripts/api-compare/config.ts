@@ -195,6 +195,7 @@ export const MANIFEST_PACKAGES = [
   "actionview",
   "actioncable",
   "activejob",
+  "actionmailer",
   "activestorage",
   "trailties",
   "rack",
