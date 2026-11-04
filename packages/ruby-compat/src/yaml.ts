@@ -5,6 +5,6 @@ import { Psych } from "./psych.js";
  *
  * @noRailsEquivalent PERMANENT
  */
-export import YAML = Psych;
+export { Psych as YAML };
 
 export { toYaml } from "./psych/core-ext.js";
