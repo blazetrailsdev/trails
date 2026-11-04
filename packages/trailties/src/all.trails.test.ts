@@ -68,6 +68,9 @@ export function read(config: InstanceType<typeof Application>["config"]) {
     class AllBootApp extends Application {}
     Application.register(AllBootApp);
     const app = AllBootApp.instance();
+    (
+      app.config as unknown as { activeStorage: { serviceConfigurations?: unknown } }
+    ).activeStorage.serviceConfigurations = {};
     await app.initializeBang();
 
     for (const framework of [
