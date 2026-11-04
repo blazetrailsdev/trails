@@ -4,6 +4,7 @@ import type { Method } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, HEAD as HEAD_METHOD } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
+import { Rack } from "./namespaces.js";
 
 export class Head {
   private app: RackApp | Method;
@@ -25,3 +26,5 @@ export class Head {
     return response;
   }
 }
+
+Rack.Head = Head;

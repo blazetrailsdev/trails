@@ -14,6 +14,7 @@ import {
   SCRIPT_NAME,
 } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class ForwardRequest extends Error {
   url: Generic;
@@ -81,3 +82,7 @@ export class Recursive {
     return rbProcCall(this.app, newEnv) as ReturnType<RackApp>;
   }
 }
+
+Rack.ForwardRequest = ForwardRequest;
+
+Rack.Recursive = Recursive;

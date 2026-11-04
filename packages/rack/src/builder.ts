@@ -8,6 +8,7 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
+import { Rack } from "./namespaces.js";
 
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
@@ -168,3 +169,5 @@ export class Builder {
     return new URLMap(mapped);
   }
 }
+
+Rack.Builder = Builder;

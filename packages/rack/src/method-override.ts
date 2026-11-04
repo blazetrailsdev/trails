@@ -5,6 +5,7 @@ import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./query-parser.js";
 import { EmptyContentError } from "./multipart/parser.js";
+import { Rack } from "./namespaces.js";
 
 const METHOD_OVERRIDE_PARAM_KEY = "_method";
 const HTTP_METHOD_OVERRIDE_HEADER = "HTTP_X_HTTP_METHOD_OVERRIDE";
@@ -69,3 +70,5 @@ export class MethodOverride {
     }
   }
 }
+
+Rack.MethodOverride = MethodOverride;

@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
+import { Rack } from "./namespaces.js";
 
 interface Mutex {
   lock(): void;
@@ -45,3 +46,5 @@ export class Lock {
     this.mutex.unlock();
   }
 }
+
+Rack.Lock = Lock;

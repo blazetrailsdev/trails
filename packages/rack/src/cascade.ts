@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class Cascade {
   apps: (RackApp | { call: RackApp })[];
@@ -39,3 +40,5 @@ export class Cascade {
     return this.apps.includes(app);
   }
 }
+
+Rack.Cascade = Cascade;

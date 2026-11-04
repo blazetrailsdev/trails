@@ -7,6 +7,7 @@ import {
   Hash,
   isPlainHash,
 } from "@blazetrails/ruby-compat";
+import { Rack } from "./namespaces.js";
 
 type PairBlock = (key: string, value: string) => unknown;
 
@@ -263,3 +264,5 @@ export class Headers extends Hash<string, string> {
       : key;
   }
 }
+
+Rack.Headers = Headers;

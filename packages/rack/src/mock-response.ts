@@ -9,6 +9,7 @@ import { Time } from "@blazetrails/date";
 import { CGI, fetch, rbFArray, rbObjRespondTo, rbStrToI } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
+import { Rack } from "./namespaces.js";
 
 type Cookie = InstanceType<typeof CGI.Cookie>;
 
@@ -123,3 +124,5 @@ export class MockResponse extends Response {
     return cookieAttributes;
   }
 }
+
+Rack.MockResponse = MockResponse;

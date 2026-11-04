@@ -4,6 +4,7 @@ import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";
 import { Head } from "./head.js";
 import * as Utils from "./utils.js";
+import { Rack } from "./namespaces.js";
 
 const ALLOWED_VERBS = ["GET", "HEAD", "OPTIONS"];
 const ALLOW_HEADER = ALLOWED_VERBS.join(", ");
@@ -219,3 +220,5 @@ export class Files {
     return File.isSize(path) ?? Buffer.byteLength(File.read(path));
   }
 }
+
+Rack.Files = Files;

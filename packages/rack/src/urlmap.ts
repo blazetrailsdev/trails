@@ -9,6 +9,7 @@ import {
 } from "./constants.js";
 import { ArgumentError, regexpEscape, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 type Mapping = [string | null, string, RegExp, RackApp | { call: RackApp }];
 
@@ -104,3 +105,5 @@ export class URLMap {
     return v1.toLowerCase() === v2.toLowerCase();
   }
 }
+
+Rack.URLMap = URLMap;

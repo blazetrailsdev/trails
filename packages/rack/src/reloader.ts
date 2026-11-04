@@ -13,6 +13,7 @@ import {
   stderr as $stderr,
   type FsStatResult,
 } from "@blazetrails/ruby-compat";
+import { Rack } from "./namespaces.js";
 
 interface StatHost {
   cache: Record<string, string>;
@@ -153,3 +154,5 @@ export class Reloader {
     }
   }
 }
+
+Rack.Reloader = Reloader;

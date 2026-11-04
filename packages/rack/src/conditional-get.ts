@@ -4,6 +4,7 @@ import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class ConditionalGet {
   private app: RackApp | { call: RackApp };
@@ -65,3 +66,5 @@ export class ConditionalGet {
     return null;
   }
 }
+
+Rack.ConditionalGet = ConditionalGet;

@@ -20,6 +20,7 @@ import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import { MediaType } from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
 import { include } from "@blazetrails/ruby-compat";
+import { Rack } from "./namespaces.js";
 
 function downcaseKey(key: string): string {
   return key.toLowerCase();
@@ -440,3 +441,5 @@ export interface Raw extends Omit<
   | "setHeader"
   | "deleteHeader"
 > {}
+
+Rack.Response = Response;

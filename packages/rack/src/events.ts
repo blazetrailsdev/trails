@@ -3,6 +3,7 @@ import type { RackApp, RackEnv, RackHeaders, RackResponse, RackBody } from "./in
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
 import { Raw } from "./response.js";
+import { Rack } from "./namespaces.js";
 
 export const Abstract = {
   onStart(_req: Request, _res: BufferedResponse | null): void {},
@@ -126,3 +127,5 @@ export class Events {
     return new BufferedResponse(status, headers, body);
   }
 }
+
+Rack.Events = Events;
