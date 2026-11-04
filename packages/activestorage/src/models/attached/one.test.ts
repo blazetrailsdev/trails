@@ -31,9 +31,9 @@ import {
   Group,
   User,
 } from "../../test-helpers/test-helper.js";
-import type { ClassMethods } from "../model.js";
+import type { ClassMethods } from "../../attached/model.js";
 import type { Attachment } from "../../attachment.js";
-import type { One } from "../one.js";
+import type { One } from "../../attached/one.js";
 
 type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;

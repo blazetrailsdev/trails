@@ -80,7 +80,7 @@ class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
 app.config.loadDefaults("8.0");
-setTrailsRoot(TopLevel.Trails!.root);
+setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();
 
 for (const railtie of [
@@ -96,7 +96,7 @@ for (const railtie of [
   }
 }
 
-DatabaseTasks.root = TopLevel.Trails!.root();
+DatabaseTasks.root = TopLevel.Trails!.root()!;
 await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "primary" })!);
 
 await import("../../config/routes.js");

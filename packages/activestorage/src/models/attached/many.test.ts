@@ -30,8 +30,8 @@ import {
   withService,
   User,
 } from "../../test-helpers/test-helper.js";
-import type { Many } from "../many.js";
-import type { ClassMethods } from "../model.js";
+import type { Many } from "../../attached/many.js";
+import type { ClassMethods } from "../../attached/model.js";
 
 // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, {
