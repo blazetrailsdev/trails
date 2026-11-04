@@ -4382,7 +4382,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       update: ["options"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#used"]).toEqual({
-      delete: ["?"],
+      delete: ["?", "tail:options"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#void"]).toEqual({
       delete: ["options"],
@@ -4391,13 +4391,13 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       delete: ["options"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#modified_last"]).toEqual({
-      delete: ["?"],
+      delete: ["tail:options"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched"]).toEqual({
       delete: ["first", "last"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#branched_last"]).toEqual({
-      delete: ["?"],
+      delete: ["tail:options"],
     });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#memoized"]).toEqual({
       "merge!": ["?", "@assigns"],

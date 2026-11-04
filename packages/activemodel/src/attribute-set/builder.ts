@@ -16,7 +16,6 @@ import {
   rbEqual,
   rbObjDup,
   transformValues,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -326,7 +325,3 @@ export class LazyAttributeHash {
 }
 
 rbDeclareIvar(LazyAttributeHash, "@delegate_hash", "_delegateHash");
-
-registerConstant("ActiveModel::AttributeSet::Builder", Builder);
-registerConstant("ActiveModel::LazyAttributeSet", LazyAttributeSet);
-registerConstant("ActiveModel::LazyAttributeHash", LazyAttributeHash);

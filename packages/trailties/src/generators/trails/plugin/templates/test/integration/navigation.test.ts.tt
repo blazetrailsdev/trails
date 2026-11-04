@@ -1,0 +1,6 @@
+import { describe } from "vitest";
+import "../test_helper.js";
+
+describe("Navigation", () => {
+  // it("the truth", () => {});
+});

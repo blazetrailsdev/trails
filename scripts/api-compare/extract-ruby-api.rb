@@ -723,12 +723,15 @@ class ApiExtractor
         @namespace_stack.pop
       elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
             lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
-            (body = class_new_body(rhs))
+            (call = class_new_call(rhs))
+        superclass = class_new_superclass(call)
+        body = class_new_body(rhs)
         @namespace_stack.push(lhs[1][1])
         @visibility_stack.push(:public)
         fqn = current_fqn
         @classes[fqn] ||= new_class_info(lhs[1][1], fqn)
-        walk_body(body)
+        @classes[fqn][:superclass] = superclass if superclass
+        walk_body(body) if body
         @visibility_stack.pop
         @namespace_stack.pop
       else
@@ -803,6 +806,26 @@ class ApiExtractor
     return nil unless call.is_a?(Array) &&
                       (call[0] == :method_add_arg || call[0] == :command_call)
     const_name(call[1]) == "Struct" ? call : nil
+  end
+
+  def class_new_call(rhs)
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :call && rhs[3].is_a?(Array) && rhs[3][1] == "new" &&
+                    rhs[1].is_a?(Array) && rhs[1][0] == :method_add_block
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :method_add_block
+    call = rhs.is_a?(Array) && rhs[0] == :method_add_arg ? rhs : nil
+    head = call ? call[1] : rhs
+    return nil unless head.is_a?(Array) && head[0] == :call &&
+                      const_name(head[1]) == "Class" && head[3].is_a?(Array) && head[3][1] == "new"
+    call || head
+  end
+
+  def class_new_superclass(call)
+    return nil unless call[0] == :method_add_arg
+    paren = call[2]
+    args = paren.is_a?(Array) && paren[0] == :arg_paren ? paren[1] : nil
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    first = args.is_a?(Array) ? args[0] : nil
+    first.is_a?(Array) ? qualified_const_name(first) : nil
   end
 
   def class_new_body(rhs)
@@ -1097,6 +1120,21 @@ class ApiExtractor
     return if @scanning_umbrella
 
     return if node[0] == :command_call && record_boot_mixin(node[1], cmd_name, args)
+
+    # Zeitwerk's `internal def foo` (zeitwerk/internal.rb:6-11) is `private`
+    # plus a public `__foo` alias.
+    if cmd_name == "internal" && args.is_a?(Array) && args.flatten.include?(:def)
+      prev_vis = @visibility_stack[-1]
+      @visibility_stack[-1] = :private
+      walk(args)
+      @visibility_stack[-1] = prev_vis
+      return
+    end
+
+    if cmd_name == "internal"
+      apply_visibility_to_named(extract_symbol_args(args), :private)
+      return
+    end
 
     case cmd_name
     when "private", "protected", "public"
@@ -3152,13 +3190,19 @@ class ApiExtractor
     [calls.uniq, weak_calls, receivers, receiver_names, string_evals]
   end
 
+  def method_tail_statements(body_node)
+    Set.new.compare_by_identity.tap { |found| void_block_tail(body_node, found) }
+  end
+
   def with_call_receivers(body_node, params_node)
     outer_receivers = @call_receivers
     outer_receiver_names = @call_receiver_names
     outer_string_evals = @string_eval_calls
     outer_hash_locals = @hash_locals
     outer_void_statements = @void_statements
+    outer_tail_statements = @method_tail_statements
     @void_statements = void_statements(body_node)
+    @method_tail_statements = method_tail_statements(body_node)
     @call_receivers = {}
     @call_receiver_names = {}
     @string_eval_calls = Set.new
@@ -3170,6 +3214,7 @@ class ApiExtractor
     @string_eval_calls = outer_string_evals
     @hash_locals = outer_hash_locals
     @void_statements = outer_void_statements
+    @method_tail_statements = outer_tail_statements
   end
 
   # call name => its sites' receiver kinds, SORTED. A name whose every
@@ -4525,7 +4570,8 @@ class ApiExtractor
     when :method_add_arg, :fcall, :vcall, :call, :command, :command_call
       callee, args = split_call_node(node)
       walk_call_in_order(callee, args, calls, weak, node.equal?(@block_call),
-                         value_used: !@void_statements&.include?(node))
+                         value_used: !@void_statements&.include?(node),
+                         method_tail: @method_tail_statements&.include?(node))
       return
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
@@ -4579,7 +4625,8 @@ class ApiExtractor
   # That is the port's order too — Rails' `xs.each do … end` is normally a
   # `for` loop, whose body follows the iterated expression — and the TS side
   # defers function-expression arguments for exactly this reason.
-  def walk_call_in_order(callee, args, calls, weak, has_block = false, value_used: true)
+  def walk_call_in_order(callee, args, calls, weak, has_block = false, value_used: true,
+                         method_tail: false)
     name = nil
     recv = nil
     case callee[0]
@@ -4617,10 +4664,12 @@ class ApiExtractor
       calls << name unless kind == "literal-new"
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
+        tail_delete = name == "delete" && value_used && method_tail
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
-                   (value_used && name == "delete") ||
+                   (value_used && name == "delete" && !tail_delete) ||
                    (name == "fetch" && positional_arg_count(args) != 2)
         recv_name = name == "merge" ? merge_receiver_name(recv) : receiver_tail_name(recv)
+        recv_name = "tail:#{recv_name}" if tail_delete && recv_name
         (@call_receiver_names[name] ||= Set.new) << ((!formless && recv_name) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)

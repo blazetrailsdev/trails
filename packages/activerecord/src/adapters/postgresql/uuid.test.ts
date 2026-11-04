@@ -1,10 +1,11 @@
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { Base, Migration, Migrator, registerModel } from "../../index.js";
+import { Base, Migration, Migrator } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
@@ -456,8 +457,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.belongsTo("uuidPost", { className: "UuidPostInverse" });
       }
     }
-    registerModel("UuidPostInverse", UuidPost);
-    registerModel("UuidCommentInverse", UuidComment);
+    constSet(TopLevel, "UuidPostInverse", UuidPost);
+    DescendantsTracker.registerSubclass(Base, UuidPost);
+    constSet(TopLevel, "UuidCommentInverse", UuidComment);
+    DescendantsTracker.registerSubclass(Base, UuidComment);
 
     beforeEach(async () => {
       await adapter.transaction(async () => {
@@ -501,14 +504,15 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
     const PostgresqlUUIDHasManyThroughDisableJoinsTest = {};
-    registerConstant(
+    constSet(
+      TopLevel,
       "PostgresqlUUIDHasManyThroughDisableJoinsTest",
       PostgresqlUUIDHasManyThroughDisableJoinsTest,
     );
 
     class UuidForum extends Base {
       static {
-        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidForum", this);
+        constSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidForum", this);
         this.tableName = "pg_uuid_forums";
         this.hasMany("uuidPosts", function (this: any) {
           return this.order("title DESC");
@@ -523,7 +527,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     class UuidPost extends Base {
       static {
-        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidPost", this);
+        constSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidPost", this);
         this.tableName = "pg_uuid_posts";
         this.belongsTo("uuidForum");
         this.hasMany("uuidComments");
@@ -531,7 +535,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     }
     class UuidComment extends Base {
       static {
-        rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidComment", this);
+        constSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidComment", this);
         this.tableName = "pg_uuid_comments";
         this.belongsTo("uuidPost");
         this.hasOne("uuidForum", { through: "uuidPost" });

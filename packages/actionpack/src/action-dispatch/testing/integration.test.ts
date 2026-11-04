@@ -1,3 +1,5 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
@@ -9,7 +11,6 @@ import type { MiddlewareFactory, MiddlewareStack } from "../middleware/stack.js"
 import { CookieStore } from "../middleware/session/cookie-store.js";
 import { assertEqual, HashWithIndifferentAccess, include } from "@blazetrails/activesupport";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
-import { registerController } from "../../action-controller/base.js";
 
 const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });
 const Rotations = new RotationConfiguration();
@@ -198,10 +199,10 @@ describe("ActionDispatch::IntegrationTest", () => {
       this.resource("session");
     });
     app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
-    registerController("PostsController", PostsController);
-    registerController("CommentsController", CommentsController);
-    registerController("Admin::PostsController", AdminPostsController);
-    registerController("SessionsController", SessionsController);
+    constSet(TopLevel, "PostsController", PostsController);
+    constSet(TopLevel, "CommentsController", CommentsController);
+    constSetPath("Admin::PostsController", AdminPostsController);
+    constSet(TopLevel, "SessionsController", SessionsController);
   });
 
   describe("basic requests", () => {
@@ -661,7 +662,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      registerController("RedirectorController", RedirectToMissingController);
+      constSet(TopLevel, "RedirectorController", RedirectToMissingController);
 
       await redirectApp.get("/redirect-to-missing");
       redirectApp.assertResponse("redirect");
@@ -683,7 +684,7 @@ describe("ActionDispatch::IntegrationTest", () => {
         this.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
-      registerController("Redirector2Controller", RedirectToMissing2Controller);
+      constSet(TopLevel, "Redirector2Controller", RedirectToMissing2Controller);
 
       await redirectApp.get("/redirect-to-missing2");
       redirectApp.assertResponse("redirect");

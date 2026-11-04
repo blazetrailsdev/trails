@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
 import { Digest, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";
 
@@ -68,3 +69,5 @@ export class ETag {
     return hasContent ? sha.hexdigest().substring(0, 32) : null;
   }
 }
+
+Rack.ETag = ETag;

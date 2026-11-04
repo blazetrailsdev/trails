@@ -1,5 +1,5 @@
 import { ArgumentError } from "../argument-error.js";
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 /**
@@ -36,4 +36,4 @@ export class AtomicFixnum {
   }
 }
 
-rbModConstSet(Concurrent, "AtomicFixnum", AtomicFixnum);
+constSet(Concurrent, "AtomicFixnum", AtomicFixnum);

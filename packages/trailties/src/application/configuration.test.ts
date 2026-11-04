@@ -19,7 +19,7 @@ import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 
 function switchEnv(key: string, value: string | undefined, block: () => void): void {
   const old = env[key];
@@ -31,9 +31,9 @@ function switchEnv(key: string, value: string | undefined, block: () => void): v
   }
 }
 
-function withRailsEnv(railsEnv: string | undefined, block: () => void): void {
+function withTrailsEnv(trailsEnv: string | undefined, block: () => void): void {
   _resetTrailsEnv();
-  switchEnv("TRAILS_ENV", railsEnv, () => switchEnv("NODE_ENV", undefined, block));
+  switchEnv("TRAILS_ENV", trailsEnv, () => switchEnv("NODE_ENV", undefined, block));
 }
 
 function withRackEnv(rackEnv: string | undefined, block: () => void): void {
@@ -47,16 +47,13 @@ async function setCustomConfig(contents: string): Promise<void> {
   await writeFile(join(appPath, "config", "custom.ts"), contents);
 }
 
-async function app(railsEnv: string): Promise<Application> {
-  setEnv("TRAILS_ENV", railsEnv);
+async function app(trailsEnv: string): Promise<Application> {
+  setEnv("TRAILS_ENV", trailsEnv);
   _resetTrailsEnv();
   class A extends Application {}
   Application.register(A, appPath);
   const application = A.instance();
   await application.root();
-  if (env.SECRET_KEY_BASE_DUMMY != null || Trails.env["local?"]()) {
-    await application.config.loadLocalSecret();
-  }
   return application;
 }
 
@@ -80,13 +77,13 @@ describe("ConfigurationTest", () => {
     await rm(appPath, { recursive: true, force: true });
   });
 
-  it("Rails.env falls back to development if RAILS_ENV is blank and RACK_ENV is nil", () => {
-    withRailsEnv("", () => {
+  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", () => {
+    withTrailsEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
 
-  it("Rails.env falls back to development if RACK_ENV is blank and RAILS_ENV is nil", () => {
+  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", () => {
     withRackEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
@@ -196,7 +193,7 @@ describe("ConfigurationTest", () => {
   it("config.action_view.cache_template_loading with config.enable_reloading default", async () => {
     const application = await app("development");
     application.config.enableReloading = false;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(true);
@@ -205,7 +202,7 @@ describe("ConfigurationTest", () => {
   it("config.action_view.cache_template_loading without config.enable_reloading default", async () => {
     const application = await app("development");
     application.config.enableReloading = true;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(false);
@@ -215,7 +212,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.enableReloading = false;
     application.config.actionView.cacheTemplateLoading = false;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(false);
@@ -225,7 +222,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.enableReloading = true;
     application.config.actionView.cacheTemplateLoading = true;
-    await application.initialize();
+    await application.initializeBang();
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(true);
@@ -279,7 +276,7 @@ describe("ConfigurationTest", () => {
   it("sanitizer_vendor is set to best supported vendor in new apps", async () => {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(HTML.Sanitizer.bestSupportedVendor());
   });
@@ -287,7 +284,7 @@ describe("ConfigurationTest", () => {
   it("sanitizer_vendor is set to HTML4 in upgraded apps", async () => {
     const application = await app("development");
     application.config.loadDefaults("7.0");
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(HTML4.Sanitizer);
   });
@@ -301,7 +298,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
     application.config.actionView.sanitizerVendor = MySanitizerVendor;
-    await application.initialize();
+    await application.initializeBang();
 
     expect(SanitizeHelper.sanitizerVendor).toBe(MySanitizerVendor);
   });
@@ -337,7 +334,7 @@ describe("ConfigurationTest", () => {
   it("ActionCable.server.config.cable is set when missing configuration for the current environment", async () => {
     await writeFile(join(appPath, "config", "cable.ts"), "export default { test: {} };\n");
     const application = await app("missing");
-    await application.initialize();
+    await application.initializeBang();
 
     expect((ActionCable.server() as CableServer).config.cable).toBeInstanceOf(Object);
   });

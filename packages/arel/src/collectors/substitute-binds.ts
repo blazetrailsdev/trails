@@ -1,4 +1,4 @@
-import { rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 export class SubstituteBinds {
@@ -39,4 +39,4 @@ export class SubstituteBinds {
   }
 }
 
-rbModConstSet(Collectors, "SubstituteBinds", SubstituteBinds);
+constSet(Collectors, "SubstituteBinds", SubstituteBinds);

@@ -1,23 +1,19 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { include, Module, rbModConstSet } from "./include.js";
+import { include, Module, constSet, constDefined } from "./include.js";
 import { NameError } from "./name-error.js";
-import { TopLevel, rbCSymbol, rbModName, rbModToS, rbSetClassPathString } from "./object.js";
+import { TopLevel, rbCSymbol, rbModName } from "./object.js";
 import { TypeError } from "./type-error.js";
 import { Exception } from "./exception.js";
 import { Range } from "./range.js";
 import {
-  isRegisteredConstant,
   rbConstGet,
-  rbModConstGet,
+  constGet,
   rbModConstMissing,
   rbModConstants,
   rbPathToClass,
-  registerConstant,
   rbModRemoveConst,
-  registeredConstant,
   resetConstants,
-  unregisterConstant,
 } from "./variable.js";
 import { Hash } from "./hash.js";
 
@@ -29,28 +25,18 @@ describe("rb_path_to_class", () => {
   class Gadget extends Widget {}
   const Shop = new Module();
 
-  const seated: [string, unknown][] = [
-    ["PathShop", Shop],
-    ["PathShop::Widget", Widget],
-    ["PathShop::Gadget", Gadget],
-    ["PathLimit", 5],
-    ["PathDepot::Aisle::Shelf", Gadget],
-  ];
-  for (const [name, value] of seated) registerConstant(name, value);
-  afterEach(() => {
-    for (const [name, value] of seated) registerConstant(name, value);
-  });
+  const seat = (): void => {
+    constSet(TopLevel, "PathShop", Shop);
+    constSet(Shop, "Widget", Widget);
+    constSet(Shop, "Gadget", Gadget);
+    constSet(TopLevel, "PathLimit", 5);
+  };
+  seat();
+  afterEach(seat);
 
   it("walks each :: segment from the Object table", () => {
     expect(rbPathToClass("PathShop")).toBe(Shop);
     expect(rbPathToClass("PathShop::Widget")).toBe(Widget);
-  });
-
-  it("reads a full path the table seats before walking its prefixes", () => {
-    expect(rbPathToClass("PathDepot::Aisle::Shelf")).toBe(Gadget);
-    expect(() => rbPathToClass("PathDepot::Aisle")).toThrow(
-      new ArgumentError("undefined class/module PathDepot::"),
-    );
   });
 
   it("reads a segment the table does not hold as a constant of the namespace before it", () => {
@@ -110,49 +96,13 @@ describe("rb_path_to_class", () => {
   });
 });
 
-describe("the Object constant table", () => {
-  class Seat {}
-  class Pathed {}
-  rbSetClassPathString(Pathed, { name: "Outer" }, "Pathed");
-  const Hall = new Module();
-
-  it("names a class or module that has no permanent classpath, as const_set does", () => {
-    registerConstant("Table::Seat", Seat);
-    registerConstant("Table::Hall", Hall);
-    expect(isRegisteredConstant("Table::Seat")).toBe(true);
-    expect(registeredConstant("Table::Seat")).toBe(Seat);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-    expect(rbModToS(Seat)).toBe("Table::Seat");
-    expect(Hall.name).toBe("Table::Hall");
-    const Lobby = {};
-    registerConstant("Table::Lobby", Lobby);
-    expect(rbModName(Lobby as never)).toBe("Table::Lobby");
-  });
-
-  it("keeps the permanent classpath a class already has", () => {
-    registerConstant("Table::Alias", Seat);
-    registerConstant("Table::Pathed", Pathed);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-    expect(rbModName(Pathed)).toBe("Outer::Pathed");
-    expect(rbPathToClass("Table::Alias")).toBe(Seat);
-  });
-
-  it("unregisters only the value it was handed, and the class keeps its name", () => {
-    unregisterConstant("Table::Seat", class Seat {});
-    expect(isRegisteredConstant("Table::Seat")).toBe(true);
-    unregisterConstant("Table::Seat", Seat);
-    expect(isRegisteredConstant("Table::Seat")).toBe(false);
-    expect(rbModName(Seat)).toBe("Table::Seat");
-  });
-});
-
 describe("rb_const_get", () => {
   class Checks {}
   class LocalCheck {}
   class IncludedCheck {}
   class TopCheck {}
-  rbModConstSet(Checks, "IncludedCheck", IncludedCheck);
-  rbModConstSet(Checks, "LocalCheck", IncludedCheck);
+  constSet(Checks, "IncludedCheck", IncludedCheck);
+  constSet(Checks, "LocalCheck", IncludedCheck);
 
   class Host {
     static LocalCheck = LocalCheck;
@@ -161,8 +111,8 @@ describe("rb_const_get", () => {
   class Sub extends Host {}
 
   afterEach(() => {
-    unregisterConstant("ConstGetTopCheck", TopCheck);
-    unregisterConstant("ConstGetSpace::TopCheck", TopCheck);
+    if (constDefined(Object, "ConstGetTopCheck", false))
+      rbModRemoveConst(Object, "ConstGetTopCheck");
   });
 
   it("reads a constant off the class before its included modules", () => {
@@ -175,7 +125,7 @@ describe("rb_const_get", () => {
   });
 
   it("falls through to the top-level table", () => {
-    registerConstant("ConstGetTopCheck", TopCheck);
+    constSet(TopLevel, "ConstGetTopCheck", TopCheck);
     expect(rbConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
   });
 
@@ -207,31 +157,26 @@ describe("rb_const_get", () => {
     }
 
     afterEach(() => {
-      unregisterConstant("ConstGetOuter", Outer);
-    });
-
-    it("reads a seated path whole", () => {
-      registerConstant("ConstGetSpace::TopCheck", TopCheck);
-      expect(rbModConstGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
+      if (constDefined(Object, "ConstGetOuter", false)) rbModRemoveConst(Object, "ConstGetOuter");
     });
 
     it("reads each later segment from the namespace before it", () => {
-      registerConstant("ConstGetOuter", Outer);
-      expect(rbModConstGet(Sub, "ConstGetOuter::Inner")).toBe(Outer.Inner);
-      expect(rbModConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
+      constSet(TopLevel, "ConstGetOuter", Outer);
+      expect(constGet(Sub, "ConstGetOuter::Inner")).toBe(Outer.Inner);
+      expect(constGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
     });
 
     it("names the missing segment, not the path", () => {
-      registerConstant("ConstGetOuter", Outer);
+      constSet(TopLevel, "ConstGetOuter", Outer);
       let error: unknown;
       try {
-        rbModConstGet(Sub, "ConstGetAbsent::Inner");
+        constGet(Sub, "ConstGetAbsent::Inner");
       } catch (e) {
         error = e;
       }
       expect(error).toBeInstanceOf(NameError);
       expect((error as NameError).constantName).toBe("ConstGetAbsent");
-      expect(() => rbModConstGet(Sub, "ConstGetOuter::Absent")).toThrow(
+      expect(() => constGet(Sub, "ConstGetOuter::Absent")).toThrow(
         "uninitialized constant ConstGetOuter::Absent",
       );
     });
@@ -245,14 +190,14 @@ describe("rb_mod_constants", () => {
     static helper() {}
   }
   class Nested {}
-  rbModConstSet(Outer, "Nested", Nested);
+  constSet(Outer, "Nested", Nested);
   class Child extends Outer {
     static Own = 3;
   }
 
   it("names a class seated on Object by the bare constant name (variable.c:3652-3654)", () => {
     const klass = class {};
-    rbModConstSet(Object, "ConstSetTopLevel", klass);
+    constSet(Object, "ConstSetTopLevel", klass);
     try {
       expect(rbModName(klass)).toBe("ConstSetTopLevel");
     } finally {
@@ -271,7 +216,7 @@ describe("rb_mod_constants", () => {
 
   it("includes the constants of an included module", () => {
     const Mixin = new Module();
-    rbModConstSet(Mixin, "Mixed", class Mixed {});
+    constSet(Mixin, "Mixed", class Mixed {});
     class Host extends Outer {}
     include(Host, Mixin);
     expect(rbModConstants(Host)).toEqual(["Mixed", "LIMIT", "Nested"]);
@@ -283,9 +228,7 @@ describe("rb_mod_constants", () => {
         return "loud";
       }
     }
-    expect(rbModConstSet({ name: "ConstSpace" }, "Loud", new Loud()).toS()).toBe(
-      "ConstSpace::Loud",
-    );
+    expect(constSet({ name: "ConstSpace" }, "Loud", new Loud()).toS()).toBe("ConstSpace::Loud");
   });
 
   it("keeps inspect on the aliased to_s when to_s is redefined", () => {
@@ -294,12 +237,12 @@ describe("rb_mod_constants", () => {
         return "quiet";
       }
     }
-    const mod = rbModConstSet({ name: "ConstSpace" }, "Quiet", new Quiet());
+    const mod = constSet({ name: "ConstSpace" }, "Quiet", new Quiet());
     expect(mod.inspect()).toBe("ConstSpace::Quiet");
   });
 
   it("renders a seated Module through to_s", () => {
-    const mod = rbModConstSet({ name: "ConstSpace" }, "Seated", new Module());
+    const mod = constSet({ name: "ConstSpace" }, "Seated", new Module());
     expect(mod.toS()).toBe("ConstSpace::Seated");
     expect(mod.toS()).toBe(mod.inspect());
   });
@@ -315,11 +258,11 @@ describe("rbModDeprecateConstant", () => {
   let v: typeof import("./variable.js");
   let inc: typeof import("./include.js");
   let rbConstGet: typeof v.rbConstGet;
-  let rbModConstGet: typeof v.rbModConstGet;
+  let constGet: typeof v.constGet;
   let rbModDeprecateConstant: typeof v.rbModDeprecateConstant;
   let include: typeof inc.include;
   let Module: typeof inc.Module;
-  let rbModConstSet: typeof inc.rbModConstSet;
+  let constSet: typeof inc.constSet;
   let NameError: typeof import("./name-error.js").NameError;
 
   beforeAll(async () => {
@@ -327,8 +270,8 @@ describe("rbModDeprecateConstant", () => {
     vi.doMock("./kernel-warn.js", () => ({ warn }));
     v = await import("./variable.js");
     inc = await import("./include.js");
-    ({ rbConstGet, rbModConstGet, rbModDeprecateConstant } = v);
-    ({ include, Module, rbModConstSet } = inc);
+    ({ rbConstGet, constGet, rbModDeprecateConstant } = v);
+    ({ include, Module, constSet } = inc);
     ({ NameError } = await import("./name-error.js"));
     vi.doUnmock("./kernel-warn.js");
   });
@@ -340,7 +283,7 @@ describe("rbModDeprecateConstant", () => {
     warn.mockClear();
     expect(rbModDeprecateConstant(Http, "NOT_FOUND")).toBe(Http);
     expect(rbConstGet(Http, "NOT_FOUND")).toBe(404);
-    expect(rbModConstGet(Http, "NOT_FOUND")).toBe(404);
+    expect(constGet(Http, "NOT_FOUND")).toBe(404);
     expect(warn.mock.calls).toEqual([
       ["constant Http::NOT_FOUND is deprecated", { category: ":deprecated" }],
       ["constant Http::NOT_FOUND is deprecated", { category: ":deprecated" }],
@@ -349,7 +292,7 @@ describe("rbModDeprecateConstant", () => {
 
   it("warns naming the module for a constant read through an includer", () => {
     const Mixin = new Module();
-    rbModConstSet(Mixin, "Old", 1);
+    constSet(Mixin, "Old", 1);
     rbModDeprecateConstant(Mixin, "Old");
     class Host {}
     include(Host, Mixin);
@@ -384,16 +327,16 @@ describe("rbModDeprecateConstant", () => {
 });
 
 describe("TopLevel", () => {
-  it("is the table registerConstant writes and the readers read", () => {
+  it("is the table constSet writes and the readers read", () => {
     const klass = class Seated {};
     const tbl = TopLevel as Record<string, unknown>;
     try {
-      registerConstant("Seated", klass);
+      constSet(TopLevel, "Seated", klass);
       expect(tbl.Seated).toBe(klass);
       delete tbl.Seated;
-      expect(isRegisteredConstant("Seated")).toBe(false);
+      expect(constDefined(Object, "Seated")).toBe(false);
       tbl.Seated = klass;
-      expect(registeredConstant("Seated")).toBe(klass);
+      expect(constGet(Object, "Seated")).toBe(klass);
       expect(rbModRemoveConst(Object, "Seated")).toBe(klass);
       expect("Seated" in tbl).toBe(false);
     } finally {
@@ -414,8 +357,8 @@ describe("TopLevel", () => {
   });
 
   it("does not answer an Object.prototype member as a constant", () => {
-    expect(isRegisteredConstant("constructor")).toBe(false);
-    expect(registeredConstant("toString")).toBeUndefined();
+    expect(constDefined(Object, "Constructor")).toBe(false);
+    expect(() => constDefined(Object, "toString")).toThrow(NameError);
   });
 });
 
@@ -429,9 +372,25 @@ describe("resetConstants", () => {
       ["Symbol", rbCSymbol],
     ] as const;
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
-    registerConstant("Table::Reset", class Reset {});
+    constSet(TopLevel, "TableReset", class TableReset {});
     resetConstants();
-    expect(isRegisteredConstant("Table::Reset")).toBe(false);
+    expect(constDefined(Object, "TableReset")).toBe(false);
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
+  });
+});
+
+describe("a constant under an owner no table names", () => {
+  it("keeps a temporary path that a later named seat replaces", () => {
+    class TemporaryOwner {}
+    class TemporaryInner {}
+    constSet(TemporaryOwner, "TemporaryInner", TemporaryInner);
+    expect(rbModName(TemporaryInner)).toBe("TemporaryOwner::TemporaryInner");
+    constSet(TopLevel, "TemporaryRenamed", TemporaryInner);
+    try {
+      expect(rbModName(TemporaryInner)).toBe("TemporaryRenamed");
+    } finally {
+      if (constDefined(Object, "TemporaryRenamed", false))
+        rbModRemoveConst(Object, "TemporaryRenamed");
+    }
   });
 });

@@ -8,9 +8,10 @@ import {
   format,
   rbEqual,
   rbModRemoveConst,
-  registerConstant,
-  registeredConstant,
+  constGet,
   setEnv,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { EtOrbi } from "../et-orbi.js";
 
@@ -22,7 +23,7 @@ declare module "@blazetrails/date" {
 
 setEnv("_TZ", env["TZ"]);
 
-registerConstant("Khronic", registeredConstant("Chronic"));
+constSet(TopLevel, "Khronic", constGet(Object, "Chronic"));
 rbModRemoveConst(Object, "Chronic");
 
 EtOrbi._makeInfo();
@@ -97,7 +98,7 @@ export function selectZoneNames(zs: string[]): string[] {
 }
 
 export function requireChronic(): void {
-  registerConstant("Chronic", registeredConstant("Khronic"));
+  constSet(TopLevel, "Chronic", constGet(Object, "Khronic"));
 }
 
 export function unrequireChronic(): void {

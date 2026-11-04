@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ArgumentError,
-  Mutex,
-  extend,
-  rbModConstSet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, Mutex, extend, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
 import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
@@ -17,20 +11,20 @@ class StubOneAdapter {
   enqueue(..._args: unknown[]): void {}
   enqueueAt(..._args: unknown[]): void {}
 }
-rbModConstSet(QueueAdapters, "StubOneAdapter", StubOneAdapter);
+constSet(QueueAdapters, "StubOneAdapter", StubOneAdapter);
 
 class StubTwoAdapter {
   enqueue(..._args: unknown[]): void {}
   enqueueAt(..._args: unknown[]): void {}
 }
-rbModConstSet(QueueAdapters, "StubTwoAdapter", StubTwoAdapter);
+constSet(QueueAdapters, "StubTwoAdapter", StubTwoAdapter);
 
 class QueueAdapterTest extends TestCase {
   static override toString(): string {
     return "QueueAdapterTest";
   }
 }
-registerConstant("QueueAdapterTest", QueueAdapterTest);
+constSet(TopLevel, "QueueAdapterTest", QueueAdapterTest);
 
 describe("QueueAdapterTest", () => {
   it("should forbid nonsense arguments", () => {
@@ -91,7 +85,7 @@ describe("QueueAdapterTest", () => {
     enqueue(..._args: unknown[]): void {},
     enqueueAt(..._args: unknown[]): void {},
   });
-  rbModConstSet(QueueAdapterTest, "StubThreeAdapter", StubThreeAdapter);
+  constSet(QueueAdapterTest, "StubThreeAdapter", StubThreeAdapter);
 
   it("should extract a reasonable name from a class or module", () => {
     const childJob = class extends Base {};

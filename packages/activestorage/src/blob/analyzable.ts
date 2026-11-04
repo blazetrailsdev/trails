@@ -1,3 +1,4 @@
+import "../constants.analyzable.generated.js";
 import { ActiveStorage } from "../active-storage.js";
 import { NullAnalyzer } from "../analyzer/null-analyzer.js";
 import { AnalyzeJob } from "../analyze-job.js";

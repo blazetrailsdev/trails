@@ -3,9 +3,15 @@ import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walk
 import { pluralize, underscore } from "@blazetrails/activesupport";
 import { synthesizeDeclares } from "./synthesize.js";
 import { tsApi } from "./ts-api.js";
+import { classKey, classKeyName } from "./transitive-extends-walker.js";
 
 const INCLUDED_ALIAS = "__TrailsIncluded";
 const INCLUDED_IMPORT_LINE = `import type { Included as ${INCLUDED_ALIAS} } from "@blazetrails/activesupport";`;
+
+export type SchemaScopes = ReadonlyMap<
+  string,
+  Readonly<Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>>
+>;
 
 export interface LineDelta {
   insertedAtLine: number;
@@ -22,6 +28,8 @@ export interface VirtualizeOptions extends WalkOptions {
   schemaColumnsByTable?: Readonly<
     Record<string, Readonly<Record<string, import("./synthesize.js").SchemaColumnValue>>>
   >;
+  schemaScopes?: SchemaScopes;
+  modelSuperKeys?: ReadonlyMap<string, string>;
   classNameAliases?: ReadonlyMap<string, string>;
   attributesNullable?: boolean;
   associationTargets?: ReadonlyMap<string, string>;
@@ -35,6 +43,7 @@ export interface VirtualizeOptions extends WalkOptions {
 export interface ModelTable {
   className: string;
   superName?: string;
+  superKey?: string;
   tableName?: string;
   dynamicTableName: boolean;
   abstract: boolean;
@@ -52,40 +61,67 @@ export function missingTables(
   models: readonly ModelTable[],
   schema: Readonly<Record<string, unknown>>,
   rootNames: ReadonlySet<string> = new Set(["Base"]),
+  scopes?: SchemaScopes,
 ): MissingTable[] {
   const byName = new Map<string, ModelTable>();
-  for (const m of models) if (!byName.has(m.className)) byName.set(m.className, m);
+  const byKey = new Map<string, ModelTable>();
+  for (const m of models) {
+    if (!byName.has(m.className)) byName.set(m.className, m);
+    byKey.set(classKey(m.fileName, m.className), m);
+  }
+  const parentOf = (m: ModelTable): ModelTable | undefined =>
+    m.superKey !== undefined
+      ? byKey.get(m.superKey)
+      : m.superName === undefined
+        ? undefined
+        : byName.get(m.superName);
   const out: MissingTable[] = [];
   for (const m of models) {
     if (m.abstract || m.optedOut) continue;
-    const base = baseClassOf(m, byName);
-    if (base.superName && !byName.has(base.superName) && !rootNames.has(base.superName)) continue;
+    const base = baseClassOf(m, parentOf);
+    if (base.superName && !parentOf(base) && !rootNames.has(base.superName)) continue;
     if (base !== m && base.optedOut) continue;
     if (m.dynamicTableName || base.dynamicTableName) continue;
     const tableName = m.tableName ?? base.tableName ?? pluralize(underscore(base.className));
-    if (Object.hasOwn(schema, tableName)) continue;
+    const scope = scopeFor(scopes, function* () {
+      const seen = new Set<ModelTable>();
+      let cur: ModelTable | undefined = m;
+      for (; cur && !seen.has(cur); cur = parentOf(cur)) {
+        seen.add(cur);
+        yield cur.className;
+        if (!parentOf(cur) && cur.superName) yield cur.superName;
+      }
+    });
+    if (Object.hasOwn(scope ?? schema, tableName)) continue;
     out.push({ className: m.className, tableName, fileName: m.fileName });
   }
   return out;
 }
 
-function baseClassOf(m: ModelTable, byName: ReadonlyMap<string, ModelTable>): ModelTable {
-  const seen = new Set<string>([m.className]);
+function scopeFor<T>(
+  scopes: ReadonlyMap<string, T> | undefined,
+  ancestors: () => Iterable<string>,
+): T | undefined {
+  if (!scopes?.size) return undefined;
+  for (const name of ancestors()) {
+    const scope = scopes.get(name);
+    if (scope) return scope;
+  }
+  return undefined;
+}
+
+function baseClassOf(
+  m: ModelTable,
+  parentOf: (m: ModelTable) => ModelTable | undefined,
+): ModelTable {
+  const seen = new Set<ModelTable>([m]);
   let base = m;
-  for (
-    let parent = lookup(base.superName);
-    parent && !parent.abstract;
-    parent = lookup(base.superName)
-  ) {
-    if (seen.has(parent.className)) break;
-    seen.add(parent.className);
+  for (let parent = parentOf(base); parent && !parent.abstract; parent = parentOf(base)) {
+    if (seen.has(parent)) break;
+    seen.add(parent);
     base = parent;
   }
   return base;
-
-  function lookup(name: string | undefined): ModelTable | undefined {
-    return name === undefined ? undefined : byName.get(name);
-  }
 }
 
 export function virtualize(
@@ -121,10 +157,33 @@ export function virtualize(
       ),
   );
 
+  const inFileNames = new Set(classes.map((c) => c.name));
+  function* ancestorKeys(name: string): Generator<string> {
+    const seen = new Set<string>();
+    for (let key: string | undefined = classKey(fileName, name); key && !seen.has(key); ) {
+      seen.add(key);
+      const own = classKeyName(key);
+      yield own;
+      const resolved: string | undefined = options.modelSuperKeys?.get(key);
+      if (resolved) {
+        key = resolved;
+        continue;
+      }
+      const sup = key.startsWith(fileName + "#") ? inFileSuperNameOf.get(own) : undefined;
+      if (sup === undefined) return;
+      if (inFileNames.has(sup)) key = classKey(fileName, sup);
+      else {
+        yield sup;
+        return;
+      }
+    }
+  }
+
   for (const info of options.onModel ? classes : []) {
     options.onModel!({
       className: info.name,
       superName: inFileSuperNameOf.get(info.name),
+      superKey: options.modelSuperKeys?.get(classKey(fileName, info.name)),
       tableName: info.tableName,
       dynamicTableName: info.dynamicTableName,
       abstract: info.abstract,
@@ -139,7 +198,9 @@ export function virtualize(
     const mergeAttributeInterface = canMergeInterface(info.classDecl);
     const synthesized = synthesizeDeclares(info, {
       mergeAttributeInterface,
-      schemaColumnsByTable: options.schemaColumnsByTable,
+      schemaColumnsByTable:
+        scopeFor(options.schemaScopes, () => ancestorKeys(info.name)) ??
+        options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
       timeZoneAwareAttributes: options.timeZoneAwareAttributes,

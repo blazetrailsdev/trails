@@ -11,7 +11,7 @@ vi.mock("../database.js", async (importOriginal) => ({
   databaseConfiguration: async () => database.results,
 }));
 
-describe("Rails::DBConsoleTest", () => {
+describe("Trails::DBConsoleTest", () => {
   let aborted = false;
   let output = "";
 
@@ -71,7 +71,7 @@ describe("Rails::DBConsoleTest", () => {
     });
   });
 
-  it("rails env is development when environment option is dev", () => {
+  it("trails env is development when environment option is dev", () => {
     vi.spyOn(
       DbconsoleCommand.prototype as unknown as { availableEnvironments(): string[] },
       "availableEnvironments",

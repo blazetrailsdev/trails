@@ -40,17 +40,17 @@ describe("DebugLocks", () => {
 
   it("passes non-GET requests to the inner app", async () => {
     const mw = new DebugLocks(passthrough);
-    const res = await mw.call({ REQUEST_METHOD: "POST", PATH_INFO: "/rails/locks" });
+    const res = await mw.call({ REQUEST_METHOD: "POST", PATH_INFO: "/trails/locks" });
     expect([...(res[2] as Iterable<string>)].join("")).toBe("ok");
   });
 
-  it("renders thread details at /rails/locks", async () => {
+  it("renders thread details at /trails/locks", async () => {
     setInterlock([
       [thread(0x1a, "sleep", ["a.rb:1", "b.rb:2"]), { exclusive: true, sharing: 0 }],
       [thread(0x2b, "run"), { exclusive: false, sharing: 2 }],
     ]);
     const mw = new DebugLocks(passthrough);
-    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" });
+    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/trails/locks" });
     expect(res[0]).toBe(200);
     expect(res[1]["content-type"]).toBe("text/plain; charset=utf-8");
     const body = [...(res[2] as Iterable<string>)].join("");
@@ -61,7 +61,7 @@ describe("DebugLocks", () => {
 
   it("strips a trailing slash from the request path", async () => {
     const mw = new DebugLocks(passthrough);
-    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks/" });
+    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/trails/locks/" });
     expect(res[0]).toBe(200);
     expect(res[1]["content-type"]).toBe("text/plain; charset=utf-8");
   });
@@ -72,7 +72,7 @@ describe("DebugLocks", () => {
       [thread(2), { exclusive: true, sharing: 0 }],
     ]);
     const mw = new DebugLocks(passthrough);
-    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" });
+    const res = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/trails/locks" });
     const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toContain("Waiting in start_exclusive");
     expect(body).toContain("blocked by: 1");
@@ -93,7 +93,7 @@ describe("DebugLocks", () => {
     ]);
     const res = await new DebugLocks(passthrough).call({
       REQUEST_METHOD: "GET",
-      PATH_INFO: "/rails/locks",
+      PATH_INFO: "/trails/locks",
     });
     const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 1/);
@@ -107,7 +107,7 @@ describe("DebugLocks", () => {
     ]);
     const res = await new DebugLocks(passthrough).call({
       REQUEST_METHOD: "GET",
-      PATH_INFO: "/rails/locks",
+      PATH_INFO: "/trails/locks",
     });
     const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 2\n/);
@@ -120,7 +120,7 @@ describe("DebugLocks", () => {
     ]);
     const res = await new DebugLocks(passthrough).call({
       REQUEST_METHOD: "GET",
-      PATH_INFO: "/rails/locks",
+      PATH_INFO: "/trails/locks",
     });
     const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toMatch(/Thread 0[\s\S]*?blocked by: 1/);
@@ -130,7 +130,7 @@ describe("DebugLocks", () => {
     setInterlock([[{ id: 0x5, status: false, backtrace: () => null }, { sharing: 0 }]]);
     const res = await new DebugLocks(passthrough).call({
       REQUEST_METHOD: "GET",
-      PATH_INFO: "/rails/locks",
+      PATH_INFO: "/trails/locks",
     });
     const body = [...(res[2] as Iterable<string>)].join("");
     expect(body).toContain("Thread 0 [0x5 dead]");
@@ -143,7 +143,7 @@ describe("DebugLocks", () => {
       Response.defaultCharset = "iso-8859-1";
       const res = await new DebugLocks(passthrough).call({
         REQUEST_METHOD: "GET",
-        PATH_INFO: "/rails/locks",
+        PATH_INFO: "/trails/locks",
       });
       expect(res[1]["content-type"]).toBe("text/plain; charset=iso-8859-1");
     } finally {

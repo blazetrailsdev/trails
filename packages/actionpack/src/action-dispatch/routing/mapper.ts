@@ -71,7 +71,7 @@ export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
-type RailsApp = MountableApp & { railtieName(): string; routes(): RouteSet };
+type TrailsApp = MountableApp & { railtieName(): string; routes(): RouteSet };
 
 export type CallableConstraint =
   | ((...args: never[]) => unknown)
@@ -1077,6 +1077,8 @@ export class Mapper {
 
   static Scope = Scope;
 
+  static Resources = { name: "ActionDispatch::Routing::Mapper::Resources" };
+
   /** @internal */
   _concerns: Map<string, ConcernCallable> = new Map();
   /** @internal */
@@ -1585,8 +1587,8 @@ export class Mapper {
       );
     }
 
-    const railsApp = this.isRailsApp(app);
-    if (!rtest(hashAref(options!, "as"))) hashAset(options!, "as", this.appName(app, railsApp));
+    const trailsApp = this.isTrailsApp(app);
+    if (!rtest(hashAref(options!, "as"))) hashAset(options!, "as", this.appName(app, trailsApp));
 
     const targetAs = this.nameForAction(hashAref(options!, "as") as string | null, path);
     if (!rtest(hashAref(options!, "via"))) hashAset(options!, "via", ":all");
@@ -1597,12 +1599,12 @@ export class Mapper {
       merge({ to: app as MountableApp, anchor: false, format: false }, options as RouteOptions),
     );
 
-    if (railsApp) this.defineGeneratePrefix(app as RailsApp, targetAs!);
+    if (trailsApp) this.defineGeneratePrefix(app as TrailsApp, targetAs!);
     return this;
   }
 
   /** @internal */
-  isRailsApp(app: unknown): app is RailsApp {
+  isTrailsApp(app: unknown): app is TrailsApp {
     return (
       typeof app === "function" &&
       Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false &&
@@ -1611,9 +1613,9 @@ export class Mapper {
   }
 
   /** @internal */
-  appName(app: unknown, railsApp: boolean): string | undefined {
-    if (railsApp) {
-      return (app as RailsApp).railtieName();
+  appName(app: unknown, trailsApp: boolean): string | undefined {
+    if (trailsApp) {
+      return (app as TrailsApp).railtieName();
     } else if (
       typeof app === "function" &&
       Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false
@@ -1625,7 +1627,7 @@ export class Mapper {
   }
 
   /** @internal */
-  defineGeneratePrefix(app: RailsApp, name: string): void {
+  defineGeneratePrefix(app: TrailsApp, name: string): void {
     const _route = this._set.namedRoutes.get(name) as JourneyRoute;
     const _routes = this._set;
     const _urlHelpers = this._set.urlHelpers();

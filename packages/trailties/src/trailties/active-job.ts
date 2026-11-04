@@ -22,7 +22,7 @@ import { LogSubscriber } from "@blazetrails/activejob/log-subscriber";
 import { Callbacks } from "@blazetrails/activejob/callbacks";
 import { TestHelper } from "@blazetrails/activejob/test-helper";
 import { QueryLogs } from "@blazetrails/activerecord";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActiveJobConfig extends OrderedOptions {

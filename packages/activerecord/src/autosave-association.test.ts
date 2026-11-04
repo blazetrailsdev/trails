@@ -1,10 +1,12 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "./associations/collection-association.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
-import { Base, registerModel, RecordInvalid } from "./index.js";
+import { Base, RecordInvalid } from "./index.js";
 import { Associations } from "./associations.js";
 
 import {
@@ -48,7 +50,6 @@ import { Squeak } from "./test-helpers/models/squeak.js";
 import {
   CpkBook,
   CpkOrder,
-  CpkOrderAgreement,
   CpkOrderWithPrimaryKeyAssociatedBook,
 } from "./test-helpers/models/cpk.js";
 import { ShipPart } from "./test-helpers/models/ship-part.js";
@@ -107,16 +108,14 @@ fixtures([], { useTransactionalTests: false });
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   fixtures([], { useTransactionalTests: false });
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    registerModel(Developer);
-    registerModel(CanonicalBird);
-    registerModel(ShipPart);
-    registerModel(CanonicalParrot);
-    registerModel(Treasure);
-    registerModel(PriceEstimate);
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
+    constSet(TopLevel, "Treasure", Treasure);
+    constSet(TopLevel, "PriceEstimate", PriceEstimate);
   });
 
   let pirate: any;
@@ -692,20 +691,16 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     { useTransactionalTests: true },
   );
   beforeAll(() => {
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
-    registerModel(CpkOrderAgreement);
-    registerModel(CpkOrderWithPrimaryKeyAssociatedBook);
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Client);
-    registerModel(NewlyContractedCompany);
-    registerModel(NewContract);
-    registerModel(Contract);
-    registerModel(Developer);
-    registerModel(Topic);
-    registerModel(Reply);
-    registerModel(SillyUniqueReply);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "NewlyContractedCompany", NewlyContractedCompany);
+    constSet(TopLevel, "NewContract", NewContract);
+    constSet(TopLevel, "Contract", Contract);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Reply", Reply);
+    constSet(TopLevel, "SillyUniqueReply", SillyUniqueReply);
   });
 
   it("invalid adding", async () => {
@@ -1053,15 +1048,15 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   }
   const { companies } = fixtures(["companies", "accounts"], { useTransactionalTests: true });
   beforeAll(() => {
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Account);
-    registerModel(DrinkDesigner);
-    registerModel(Chef);
-    registerModel(ChefWithPolymorphicInverseOf);
-    registerModel(Eye);
-    registerModel(Iris);
-    registerModel(IrisWithReadOnlyForeignKey);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "DrinkDesigner", DrinkDesigner);
+    constSet(TopLevel, "Chef", Chef);
+    constSet(TopLevel, "ChefWithPolymorphicInverseOf", ChefWithPolymorphicInverseOf);
+    constSet(TopLevel, "Eye", Eye);
+    constSet(TopLevel, "Iris", Iris);
+    constSet(TopLevel, "IrisWithReadOnlyForeignKey", IrisWithReadOnlyForeignKey);
   });
 
   function makeModels() {
@@ -1296,15 +1291,15 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   );
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    registerModel(ShipWithoutNestedAttributes);
-    registerModel(CanonicalParrot);
-    registerModel(Chef);
-    registerModel(CakeDesigner);
-    registerModel(DrinkDesigner);
-    registerModel(Developer);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "ShipWithoutNestedAttributes", ShipWithoutNestedAttributes);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
+    constSet(TopLevel, "Chef", Chef);
+    constSet(TopLevel, "CakeDesigner", CakeDesigner);
+    constSet(TopLevel, "DrinkDesigner", DrinkDesigner);
+    constSet(TopLevel, "Developer", Developer);
   });
 
   let pirate: any;
@@ -1504,20 +1499,18 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     useTransactionalTests: true,
   });
   beforeAll(() => {
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Client);
-    registerModel(AuditLog);
-    registerModel(Developer);
-    registerModel(CanonicalOrder);
-    registerModel(CanonicalCustomer);
-    registerModel(Tag);
-    registerModel(Tagging);
-    registerModel(CanonicalPost);
-    registerModel(Mouse);
-    registerModel(Squeak);
-    registerModel(CpkOrder);
-    registerModel(CpkBook);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+    constSet(TopLevel, "AuditLog", AuditLog);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Order", CanonicalOrder);
+    constSet(TopLevel, "Customer", CanonicalCustomer);
+    constSet(TopLevel, "Tag", Tag);
+    constSet(TopLevel, "Tagging", Tagging);
+    constSet(TopLevel, "Post", CanonicalPost);
+    constSet(TopLevel, "Mouse", Mouse);
+    constSet(TopLevel, "Squeak", Squeak);
   });
 
   function makeModels() {
@@ -1540,8 +1533,10 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("BelongsToAutosaveAuthor", Author);
-    registerModel("BelongsToAutosavePost", Post);
+    constSet(TopLevel, "BelongsToAutosaveAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "BelongsToAutosavePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       autosave: true,
       className: "BelongsToAutosaveAuthor",
@@ -1550,8 +1545,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   }
 
   function makeOrderModels() {
-    registerModel(CanonicalCustomer);
-    registerModel(CanonicalOrder);
+    constSet(TopLevel, "Customer", CanonicalCustomer);
+    constSet(TopLevel, "Order", CanonicalOrder);
     return { Customer: CanonicalCustomer, Order: CanonicalOrder };
   }
 
@@ -1761,13 +1756,14 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    registerModel(ShipPart);
-    registerModel(Developer);
-    registerModel(CanonicalPost);
-    registerModel(CanonicalComment);
-    registerModel(Author);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "Post", CanonicalPost);
+    constSet(TopLevel, "Comment", CanonicalComment);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
   });
 
   let ship: any;
@@ -1892,15 +1888,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   }
   fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
-    registerModel(Molecule);
-    registerModel(Electron);
-    registerModel(Guitar);
-    registerModel(TuningPeg);
+    constSet(TopLevel, "Molecule", Molecule);
+    constSet(TopLevel, "Electron", Electron);
+    constSet(TopLevel, "Guitar", Guitar);
+    constSet(TopLevel, "TuningPeg", TuningPeg);
   });
 
   function makeModels() {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
     return { Pirate: CanonicalPirate, Bird: CanonicalBird };
   }
 
@@ -1984,8 +1980,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         this.validates("name", { presence: true });
       }
     }
-    registerModel(`${seed}Parent`, Parent);
-    registerModel(`${seed}Child`, Child);
+    constSet(TopLevel, `${seed}Parent`, Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, `${seed}Child`, Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {
@@ -2187,12 +2185,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 describe("TestAutosaveAssociationsInGeneral", () => {
   fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
-    registerModel(CanonicalShip);
-    registerModel(CanonicalPirate);
-    registerModel(ShipPart);
-    registerModel(Prisoner);
-    registerModel(CanonicalBird);
-    registerModel(CanonicalParrot);
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "ShipPart", ShipPart);
+    constSet(TopLevel, "Prisoner", Prisoner);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
   });
 
   it("autosave works even when other callbacks update the parent model", async () => {
@@ -2360,7 +2358,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
   });
 
   let pirate: any;
@@ -2397,14 +2395,15 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
   fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Account);
-    registerModel(CanonicalPost);
-    registerModel(PostWithAfterCreateCallback);
-    registerModel(CanonicalComment);
-    registerModel(Author);
-    registerModel(CanonicalCategory);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Post", CanonicalPost);
+    constSet(TopLevel, "PostWithAfterCreateCallback", PostWithAfterCreateCallback);
+    constSet(TopLevel, "Comment", CanonicalComment);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Category", CanonicalCategory);
   });
   it("autosave new record on belongs to can be disabled per relationship", async () => {
     let newAccount = new Account({ credit_limit: 1000 }) as any;
@@ -2490,13 +2489,14 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    registerModel(Author);
-    registerModel(Book);
-    registerModel(PublishedBook);
-    registerModel(FamousPirate);
-    registerModel(FamousShip);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Book", Book);
+    constSet(TopLevel, "PublishedBook", PublishedBook);
+    constSet(TopLevel, "FamousPirate", FamousPirate);
+    constSet(TopLevel, "FamousShip", FamousShip);
   });
 
   let pirate: any;
@@ -2583,9 +2583,9 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalShip);
-    registerModel(Developer);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", CanonicalShip);
+    constSet(TopLevel, "Developer", Developer);
   });
 
   let pirate: any;
@@ -2614,11 +2614,11 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalParrot);
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Account);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
   });
 
   let pirate: any;
@@ -2656,13 +2656,14 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(Organization);
-    registerModel(Member);
-    registerModel(MemberDetail);
-    registerModel(Author);
-    registerModel(CanonicalPost);
-    registerModel(CanonicalComment);
-    registerModel(FirstPost);
+    constSet(TopLevel, "Organization", Organization);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "MemberDetail", MemberDetail);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Post", CanonicalPost);
+    constSet(TopLevel, "Comment", CanonicalComment);
+    constSet(TopLevel, "FirstPost", FirstPost);
   });
 
   async function createMemberWithOrganization() {
@@ -2711,8 +2712,8 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalParrot);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
   });
 
   let pirate: any;
@@ -2775,8 +2776,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
       get post(): Post | null | Promise<Post | null>;
       set post(value: Post | null);
     }
-    registerModel("AscbInversePost", Post);
-    registerModel("AscbPostComment", Comment);
+    constSet(TopLevel, "AscbInversePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "AscbPostComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     return { Post, Comment };
   }
 
@@ -2795,9 +2798,10 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(Translation);
-    registerModel(Attachment);
-    registerModel(Author);
+    constSet(TopLevel, "Translation", Translation);
+    constSet(TopLevel, "Attachment", Attachment);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
   });
 
   it("should not raise error", async () => {
@@ -2815,8 +2819,8 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 describe("TestAutosaveAssociationWithTouch", () => {
   fixtures([], { useTransactionalTests: true });
   beforeAll(() => {
-    registerModel(Invoice);
-    registerModel(LineItem);
+    constSet(TopLevel, "Invoice", Invoice);
+    constSet(TopLevel, "LineItem", LineItem);
   });
 
   it("autosave with touch should not raise system stack error", async () => {
@@ -2828,10 +2832,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel("Company", CanonicalCompany);
-    registerModel("Firm", Firm);
-    registerModel("Agency", Agency);
-    registerModel("Project", Project);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Agency", Agency);
+    constSet(TopLevel, "Project", Project);
   });
 
   it("should update children when association redefined in subclass", async () => {
@@ -2855,10 +2859,10 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
   fixtures([], { useTransactionalTests: true });
 
   beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-    registerModel(CanonicalParrot);
-    registerModel(CanonicalShip);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    constSet(TopLevel, "Parrot", CanonicalParrot);
+    constSet(TopLevel, "Ship", CanonicalShip);
   });
 
   const associationName = "birds";

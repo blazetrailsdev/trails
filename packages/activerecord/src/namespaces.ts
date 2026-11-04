@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -28,6 +28,7 @@ import type { ConnectionPool } from "./connection-adapters/abstract/connection-p
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
+import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import type { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import type { LibSQLAdapter } from "./connection-adapters/libsql-adapter.js";
 import type { LibSQLRemoteAdapter } from "./connection-adapters/libsql-remote-adapter.js";
@@ -51,10 +52,39 @@ import type {
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
+import type { TypeMetadata as MySQLTypeMetadata } from "./connection-adapters/mysql/type-metadata.js";
+import type { Column as PostgreSQLColumn } from "./connection-adapters/postgresql/column.js";
+import type { TypeMetadata as PostgreSQLTypeMetadata } from "./connection-adapters/postgresql/type-metadata.js";
+import type { Array as OIDArray } from "./connection-adapters/postgresql/oid/array.js";
+import type { BitVarying as OIDBitVarying } from "./connection-adapters/postgresql/oid/bit-varying.js";
+import type { Bit as OIDBit } from "./connection-adapters/postgresql/oid/bit.js";
+import type { Bytea as OIDBytea } from "./connection-adapters/postgresql/oid/bytea.js";
+import type { Cidr as OIDCidr } from "./connection-adapters/postgresql/oid/cidr.js";
+import type { DateTime as OIDDateTime } from "./connection-adapters/postgresql/oid/date-time.js";
+import type { Date as OIDDate } from "./connection-adapters/postgresql/oid/date.js";
+import type { Decimal as OIDDecimal } from "./connection-adapters/postgresql/oid/decimal.js";
+import type { Enum as OIDEnum } from "./connection-adapters/postgresql/oid/enum.js";
+import type { Hstore as OIDHstore } from "./connection-adapters/postgresql/oid/hstore.js";
+import type { Inet as OIDInet } from "./connection-adapters/postgresql/oid/inet.js";
+import type { Interval as OIDInterval } from "./connection-adapters/postgresql/oid/interval.js";
+import type { Jsonb as OIDJsonb } from "./connection-adapters/postgresql/oid/jsonb.js";
+import type { LegacyPoint as OIDLegacyPoint } from "./connection-adapters/postgresql/oid/legacy-point.js";
+import type { Macaddr as OIDMacaddr } from "./connection-adapters/postgresql/oid/macaddr.js";
+import type { Money as OIDMoney } from "./connection-adapters/postgresql/oid/money.js";
+import type { Oid as OIDOid } from "./connection-adapters/postgresql/oid/oid.js";
+import type { Point as OIDPoint } from "./connection-adapters/postgresql/oid/point.js";
+import type { SpecializedString as OIDSpecializedString } from "./connection-adapters/postgresql/oid/specialized-string.js";
+import type { TimestampWithTimeZone as OIDTimestampWithTimeZone } from "./connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
+import type { Timestamp as OIDTimestamp } from "./connection-adapters/postgresql/oid/timestamp.js";
+import type { Uuid as OIDUuid } from "./connection-adapters/postgresql/oid/uuid.js";
+import type { Vector as OIDVector } from "./connection-adapters/postgresql/oid/vector.js";
+import type { Xml as OIDXml } from "./connection-adapters/postgresql/oid/xml.js";
+import type { Column as SQLite3Column } from "./connection-adapters/sqlite3/column.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
+import type { DestroyAssociationAsyncJob } from "./destroy-association-async-job.js";
 import type { Cipher } from "./encryption/cipher.js";
 import type { Configurable, DeclarationListener } from "./encryption/configurable.js";
 import type { Contexts } from "./encryption/contexts.js";
@@ -63,6 +93,10 @@ import type { Config } from "./encryption/config.js";
 import type { Context } from "./encryption/context.js";
 import type { DerivedSecretKeyProvider } from "./encryption/derived-secret-key-provider.js";
 import type { EncryptableRecord } from "./encryption/encryptable-record.js";
+import type { ColumnSerializer } from "./coders/column-serializer.js";
+import type { JSON as JSONCoder } from "./coders/json.js";
+import type { YAMLColumn } from "./coders/yaml-column.js";
+import type * as TypeModule from "./type.js";
 import type { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import type { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import type { EncryptingOnlyEncryptor } from "./encryption/encrypting-only-encryptor.js";
@@ -100,6 +134,20 @@ import type { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_record/middleware/database_selector": () => import("./middleware/database-selector.js"),
+  "active_record/middleware/shard_selector": () => import("./middleware/shard-selector.js"),
+  "active_record/associations/builder/association": () =>
+    import("./associations/builder/association.js"),
+  "active_record/associations/builder/singular_association": () =>
+    import("./associations/builder/singular-association.js"),
+  "active_record/associations/builder/collection_association": () =>
+    import("./associations/builder/collection-association.js"),
+  "active_record/associations/builder/belongs_to": () =>
+    import("./associations/builder/belongs-to.js"),
+  "active_record/associations/builder/has_one": () => import("./associations/builder/has-one.js"),
+  "active_record/associations/builder/has_many": () => import("./associations/builder/has-many.js"),
+  "active_record/associations/builder/has_and_belongs_to_many": () =>
+    import("./associations/builder/has-and-belongs-to-many.js"),
   "active_record/base": () => import("./base.js"),
   "active_record/associations": () => import("./associations.js"),
   "active_record/attribute_methods": () => import("./attribute-methods.js"),
@@ -213,10 +261,22 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/abstract/connection-pool.js"),
 };
 
-export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+export const ActiveRecord = {
+  name: "ActiveRecord",
+  loadPath,
+  Trailties: { name: "ActiveRecord::Trailties" },
+} as AutoloadModule & {
+  Enum: typeof import("./enum.js").Enum;
+  Marshalling: typeof import("./marshalling.js");
+  Middleware: typeof Middleware;
+  Sanitization: typeof import("./sanitization.js");
+  SecureToken: typeof import("./secure-token.js");
+  Store: typeof import("./store.js");
+  Trailties: { name: string };
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
+  DestroyAssociationAsyncJob: typeof DestroyAssociationAsyncJob;
   Encryption: typeof Encryption;
   Fixture: typeof Fixture;
   FixtureSet: typeof FixtureSet;
@@ -227,6 +287,12 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   AssociationRelation: typeof AssociationRelationClass;
   Associations: typeof Associations;
   AttributeMethods: typeof AttributeMethods;
+  Coders: {
+    name: string;
+    ColumnSerializer: typeof ColumnSerializer;
+    JSON: typeof JSONCoder;
+    YAMLColumn: typeof YAMLColumn;
+  };
   ConnectionAdapters: typeof ConnectionAdapters;
   DisableJoinsAssociationRelation: typeof DisableJoinsAssociationRelation;
   Locking: typeof Locking;
@@ -234,6 +300,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Result: typeof Result;
   Scoping: typeof Scoping;
   Tasks: typeof Tasks;
+  Type: typeof TypeModule;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;
@@ -254,7 +321,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   HasOneThroughNestedAssociationsAreReadonly: typeof HasOneThroughNestedAssociationsAreReadonly;
   afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
-registerConstant("ActiveRecord", ActiveRecord);
+constSet(TopLevel, "ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
@@ -275,7 +342,17 @@ ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("Result");
 });
 
+export const Middleware = { name: "ActiveRecord::Middleware", loadPath } as AutoloadModule & {
+  DatabaseSelector: typeof import("./middleware/database-selector.js").DatabaseSelector;
+  ShardSelector: typeof import("./middleware/shard-selector.js").ShardSelector;
+};
+extend(Middleware, Autoload);
+Middleware.autoload("DatabaseSelector");
+Middleware.autoload("ShardSelector");
+ActiveRecord.Middleware = Middleware;
+
 export const Associations = { name: "ActiveRecord::Associations", loadPath } as AutoloadModule & {
+  Builder: typeof Builder;
   CollectionProxy: typeof CollectionProxy;
   BelongsToAssociation: typeof BelongsToAssociation;
   BelongsToPolymorphicAssociation: typeof BelongsToPolymorphicAssociation;
@@ -289,7 +366,35 @@ export const Associations = { name: "ActiveRecord::Associations", loadPath } as 
   DisableJoinsAssociationScope: typeof DisableJoinsAssociationScope;
   AliasTracker: typeof AliasTracker;
 };
-rbModConstSet(ActiveRecord, "Associations", Associations);
+constSet(ActiveRecord, "Associations", Associations);
+
+export const Builder = {
+  name: "ActiveRecord::Associations::Builder",
+  loadPath,
+} as AutoloadModule & {
+  Association: typeof import("./associations/builder/association.js").Association;
+  SingularAssociation: typeof import("./associations/builder/singular-association.js").SingularAssociation;
+  CollectionAssociation: typeof import("./associations/builder/collection-association.js").CollectionAssociation;
+  BelongsTo: typeof import("./associations/builder/belongs-to.js").BelongsTo;
+  HasOne: typeof import("./associations/builder/has-one.js").HasOne;
+  HasMany: typeof import("./associations/builder/has-many.js").HasMany;
+  HasAndBelongsToMany: typeof import("./associations/builder/has-and-belongs-to-many.js").HasAndBelongsToMany;
+};
+extend(Builder, Autoload);
+Builder.autoload("Association", "active_record/associations/builder/association");
+Builder.autoload("SingularAssociation", "active_record/associations/builder/singular_association");
+Builder.autoload(
+  "CollectionAssociation",
+  "active_record/associations/builder/collection_association",
+);
+Builder.autoload("BelongsTo", "active_record/associations/builder/belongs_to");
+Builder.autoload("HasOne", "active_record/associations/builder/has_one");
+Builder.autoload("HasMany", "active_record/associations/builder/has_many");
+Builder.autoload(
+  "HasAndBelongsToMany",
+  "active_record/associations/builder/has_and_belongs_to_many",
+);
+Associations.Builder = Builder;
 extend(Associations, Autoload);
 Associations.autoload("CollectionProxy");
 Associations.eagerAutoload(() => {
@@ -356,7 +461,7 @@ Scoping.eagerAutoload(() => {
 });
 
 export const TypeCaster = { name: "ActiveRecord::TypeCaster" };
-rbModConstSet(ActiveRecord, "TypeCaster", TypeCaster);
+constSet(ActiveRecord, "TypeCaster", TypeCaster);
 
 export const Tasks = { name: "ActiveRecord::Tasks", loadPath } as AutoloadModule & {
   DatabaseTasks: typeof DatabaseTasks;
@@ -370,6 +475,7 @@ Tasks.autoload("MySQLDatabaseTasks", "active_record/tasks/mysql_database_tasks")
 Tasks.autoload("PostgreSQLDatabaseTasks", "active_record/tasks/postgresql_database_tasks");
 Tasks.autoload("SQLiteDatabaseTasks", "active_record/tasks/sqlite_database_tasks");
 ActiveRecord.Tasks = Tasks;
+ActiveRecord.Coders = { name: "ActiveRecord::Coders" } as typeof ActiveRecord.Coders;
 
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",
@@ -378,9 +484,43 @@ export const ConnectionAdapters = {
 } as AutoloadModule & {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
-  MySQL: { name: string; Column: typeof MySQLColumn };
+  MySQL: { name: string; Column: typeof MySQLColumn; TypeMetadata: typeof MySQLTypeMetadata };
+  PostgreSQL: {
+    name: string;
+    Column: typeof PostgreSQLColumn;
+    TypeMetadata: typeof PostgreSQLTypeMetadata;
+    OID: {
+      name: string;
+      Array: typeof OIDArray;
+      BitVarying: typeof OIDBitVarying;
+      Bit: typeof OIDBit;
+      Bytea: typeof OIDBytea;
+      Cidr: typeof OIDCidr;
+      DateTime: typeof OIDDateTime;
+      Date: typeof OIDDate;
+      Decimal: typeof OIDDecimal;
+      Enum: typeof OIDEnum;
+      Hstore: typeof OIDHstore;
+      Inet: typeof OIDInet;
+      Interval: typeof OIDInterval;
+      Jsonb: typeof OIDJsonb;
+      LegacyPoint: typeof OIDLegacyPoint;
+      Macaddr: typeof OIDMacaddr;
+      Money: typeof OIDMoney;
+      Oid: typeof OIDOid;
+      Point: typeof OIDPoint;
+      SpecializedString: typeof OIDSpecializedString;
+      TimestampWithTimeZone: typeof OIDTimestampWithTimeZone;
+      Timestamp: typeof OIDTimestamp;
+      Uuid: typeof OIDUuid;
+      Vector: typeof OIDVector;
+      Xml: typeof OIDXml;
+    };
+  };
+  SQLite3: { name: string; Column: typeof SQLite3Column };
   AbstractAdapter: typeof AbstractAdapter;
   BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
+  SQLite3Adapter: typeof SQLite3Adapter;
   ExpoSQLiteAdapter: typeof ExpoSQLiteAdapter;
   LibSQLAdapter: typeof LibSQLAdapter;
   LibSQLRemoteAdapter: typeof LibSQLRemoteAdapter;
@@ -399,6 +539,13 @@ ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connec
 ConnectionAdapters.MySQL = {
   name: "ActiveRecord::ConnectionAdapters::MySQL",
 } as typeof ConnectionAdapters.MySQL;
+ConnectionAdapters.PostgreSQL = {
+  name: "ActiveRecord::ConnectionAdapters::PostgreSQL",
+  OID: { name: "ActiveRecord::ConnectionAdapters::PostgreSQL::OID" },
+} as typeof ConnectionAdapters.PostgreSQL;
+ConnectionAdapters.SQLite3 = {
+  name: "ActiveRecord::ConnectionAdapters::SQLite3",
+} as typeof ConnectionAdapters.SQLite3;
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   AutoFilteredParameters: typeof AutoFilteredParameters;

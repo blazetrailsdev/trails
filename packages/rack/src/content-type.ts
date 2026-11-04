@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class ContentType {
   private app: RackApp | { call: RackApp };
@@ -23,3 +24,5 @@ export class ContentType {
     return response;
   }
 }
+
+Rack.ContentType = ContentType;

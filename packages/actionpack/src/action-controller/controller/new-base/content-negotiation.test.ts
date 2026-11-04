@@ -1,11 +1,11 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
-import { rbInspect, registerConstant } from "@blazetrails/ruby-compat";
+import { rbInspect, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
-registerConstant("ContentNegotiation", { name: "ContentNegotiation" });
+constSet(TopLevel, "ContentNegotiation", { name: "ContentNegotiation" });
 
 class BasicController extends Base {
   static {
@@ -23,7 +23,7 @@ class BasicController extends Base {
 }
 
 Object.defineProperty(BasicController, "name", { value: "ContentNegotiation::BasicController" });
-registerController("ContentNegotiation::BasicController", BasicController);
+constSetPath("ContentNegotiation::BasicController", BasicController);
 
 class TestContentNegotiation extends Rack.TestCase {}
 

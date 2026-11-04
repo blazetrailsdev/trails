@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, TimeWithZone } from "@blazetrails/activesupport";
@@ -6,7 +7,7 @@ import { describeIfPg, PostgreSQLAdapter, withNativeDatabaseTypeOverrides } from
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Topic } from "../../test-helpers/models/topic.js";
 import { Developer, AuditLog, AuditLogRequired } from "../../test-helpers/models/developer.js";
-import { Base, registerModel } from "../../index.js";
+import { Base } from "../../index.js";
 
 function infinite(value: unknown): number | null {
   if (value === Infinity) return 1;
@@ -14,7 +15,9 @@ function infinite(value: unknown): number | null {
   return null;
 }
 
-registerModel([Developer, AuditLog, AuditLogRequired]);
+constSet(TopLevel, "Developer", Developer);
+constSet(TopLevel, "AuditLog", AuditLog);
+constSet(TopLevel, "AuditLogRequired", AuditLogRequired);
 
 const { self } = fixtures(["topics"], { useTransactionalTests: false });
 
@@ -25,7 +28,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampTest", () => {
-    it("timestamp with zone values with rails time zone support and no time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and no time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -48,7 +51,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("timestamp with zone values without rails time zone support", async () => {
+    it("timestamp with zone values without trails time zone support", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -74,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampWithAwareTypesTest", () => {
-    it("timestamp with zone values with rails time zone support and time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -109,7 +112,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampWithTimeZoneTest", () => {
-    it("timestamp with zone values with rails time zone support and timestamptz and no time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and timestamptz and no time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );
@@ -140,7 +143,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`DELETE FROM postgresql_timestamp_with_zones`);
       }
     });
-    it("timestamp with zone values with rails time zone support and timestamptz and time zone set", async () => {
+    it("timestamp with zone values with trails time zone support and timestamptz and time zone set", async () => {
       await adapter.execute(
         `INSERT INTO postgresql_timestamp_with_zones (id, "time") VALUES (1, '2010-01-01 10:00:00-1')`,
       );

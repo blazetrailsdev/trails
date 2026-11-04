@@ -140,56 +140,41 @@ the direct call in `commands/server.ts` goes, or blocks run twice.
 This is a genuine language shortcoming, ratified here: JS has no synchronous
 await. A server-block runner returning a promise is the designed shape.
 
-## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
+## The application loader is Zeitwerk (`Rails.autoloaders`)
 
-`Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of
-`Zeitwerk::Loader` instances whose entire mechanism is Ruby constant resolution
-at reference time. ESM resolves nothing from a constant name and offers no hook
-for an unresolved identifier, so there is no loader graph for a
-`Trails.autoloaders` to hold, and **Zeitwerk is not vendored under `vendor/`**,
-so a port would be invented surface with no Ruby source to mirror.
+RFC 0213 reversed the "no autoloader" ruling: Zeitwerk is vendored and ported,
+and `Trails.autoloaders` holds `main` and `once`
+(`railties/lib/rails/autoloaders.rb`). The directory scan is gone.
 
-**Trails has no autoloader.** Application constants come from explicit imports
-and trails' eager directory scan in `trailties/src/application/finisher.ts`:
-`loadAppClasses` / `collectAppClasses` walk every existent `app/<root>`
-directory, dynamically `import()` every `.ts`/`.js` file whatever it is named,
-and keep each exported subclass of the framework base. A subdirectory is a
-namespace: it is seated as a plain-object module when nothing holds the name
-(Zeitwerk's implicit namespace), and its classes are prefixed `Admin::`. That
-scan is the port.
+**Boot order.** Lookup is synchronous and a load is not, so `setup_main_autoloader`
+and `setup_once_autoloader` each end with an awaited `eagerLoad`, whatever
+`config.eager_load` says. `config.eager_load` keeps its Rails meaning for the
+`eager_load!` initializer (`railties/lib/rails/application/finisher.rb:76-90`).
+Reading a constant under a `do_not_eager_load` path raises `NameError` until
+`await loader.loadFile(path)` runs. For the same reason, `eager_load!`'s
+`after_class_unload` hook sits outside Rails' `config.eager_load` guard
+(`finisher.rb:83-87`), so a reload eager loads whatever that setting says
+(RFC 0213 § "Reload").
 
-**A scanned app class registers through its package's `registerX`.** Every
-framework base an app subclasses has one, beside the base class:
-`registerModel` (`activerecord/src/associations.ts`), `registerController`
-(`actionpack/src/action-controller/base.ts`), `registerJob`
-(`activejob/src/base.ts`), `registerChannel`
-(`actioncable/src/channel/base.ts`) and `registerConnection`
-(`actioncable/src/connection/base.ts`). Each takes `(klass)`, `(name, klass)`
-or `(klasses[])`, checks the base with `rbClassInheritedP` and raises
-`ArgumentError` on a mismatch, and seats the class under `klass.name` plus
-`rbModName`. A directory prefix goes through `(name, klass)`. A new scanned
-directory (mailers, an engine's `app/` dirs) adds a `registerX` in the package
-that owns the base, tagged `@noRailsEquivalent PERMANENT` citing this section,
-and never a bare `registerConstant` or a `mod[camelize(filename)]` lookup in the
-finisher. Ruled by the repo owner on 2026-10-26 (trails#9319). The last
-exception, `loadControllers`' file-name selection and its `controllerConstants`
-map, converged under `load-controllers-shares-collect-constants`. A reader
-reaches a registered class by asking its `registerX` registry, not through
-`constantize`; route dispatch's `controller_class_for` `constantize` is debt
-under root CLAUDE.md § "Constant lookup is an import or a registry"
-(2026-10-28).
+**File layout is a contract.** A file's path names its constant, and the file
+exports that constant by name: `app/models/admin/user.ts` exports `User`, seated
+as `Admin::User`. A default export has no constant name to check, and a file that
+does not define its constant raises Zeitwerk's "expected file … to define
+constant …". Two classes in one file, or a class under another name, fail at boot.
 
-As a consequence:
+**`on_load` does what `inherited` did.** The loader seats the constant. The
+finisher's `_registerAutoloaded` registers a loaded model with
+`DescendantsTracker` and runs `ActionController::Railties::Helpers.inherited`
+for a controller, superclass first, since JS has no hook at `extends`. No
+own-property guard can stand in: nothing runs on an empty subclass, and
+`Helpers.inherited` is async where `_helpers` is a sync read. Ruled by the repo
+owner on 2026-11-02.
 
-- The finisher's `eager_load!` initializer runs only its portable arms. The three
-  Zeitwerk calls carry `@missingRailsCall … — PERMANENT`.
-- `Configuration#autoloadLib` pushes its paths and has no loader to hand
-  `ignore` to.
-- There is no `Trails.autoloaders`, `autoloadLibOnce`, class-unload
-  re-eager-load, or `autoload_lib` line emitted by `trails new`.
+**`autoload_lib` follows `Application.register`.** It is async (`Loader#ignore`
+is) and a `static {}` block cannot await, so `trails new` emits it as a top-level
+`await` in `config/application.ts`.
 
-This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
-about the application loader only: framework-internal call-time constant
+It is about the application loader only: framework-internal call-time constant
 resolution is root § "Call-time constant resolution".
 
 ## A package-shipped engine's root is its package root (`Engine.find_root`)
@@ -219,6 +204,59 @@ against this section.
 `Rails::Command.subclasses`
 (`vendor/rails/v8.0.2/railties/lib/rails/command/base.rb:59-65`). JS has no hook
 at `extends` (CLAUDE.md § "`inherited` is deferred to own-property memo guards"),
-so `Base.methodAdded` seats the class the first time it adds a command, with
-`inherited`'s guard. A subclass with no command is never seated, which loses
-nothing: `find_by_namespace` needs a command to dispatch.
+so `Base.methodAdded` seats the class the first time it adds a command, and
+`Base.namespace(name)` seats it when it names its namespace, both with
+`inherited`'s guard. That second seat registers a class that defines no command
+of its own (`RakeCommand` calls `namespace "rake"`,
+`vendor/rails/v8.0.2/railties/lib/rails/commands/rake/rake_command.rb`) and
+answers through `printing_commands` / `perform`. A subclass that does neither is
+never seated, which loses nothing: `find_by_namespace` has nothing to dispatch.
+
+## `TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)
+
+`trails test` hands off to Vitest (RFC 0212 open question 1, trails#9567), so
+`Rails::TestUnitReporter < Minitest::StatisticsReporter`
+(`vendor/rails/v8.0.2/railties/lib/rails/test_unit/reporter.rb:7`) has no
+superclass here, and its `super` calls have nothing to reach.
+`test-unit/vitest-reporter.ts` is the sole reporter of a `trails test` run. Its
+`VitestReporter` stands in for Minitest's reporter calls, and carries the
+`@noRailsEquivalent PERMANENT` receipt against this section.
+
+Vitest reports no assertion count or Minitest timing, so the adapter's closing
+`N runs, N failures, N errors, N skips` line is `Minitest::SummaryReporter`'s
+summary as far as Vitest allows, built from the results it recorded. The
+`executable` default is `bin/trails test`, where `reporter.rb:9` says
+`bin/trails test`, because generated applications ship `bin/trails`.
+
+## `SourceAnnotationExtractor.enumerate` is async (`begin require "prism"`)
+
+`source_annotation_extractor.rb:3-9` requires Prism at load, rescuing
+`LoadError`. ESM has no synchronous `require` for an optional peer, and a
+top-level `await` is barred from a package's root import graph
+(`scripts/test-deps/yaml-optional-dependency.test.ts`), so `enumerate` awaits
+the `typescript` import, the shape of § "An adapter file is loaded by an awaited
+step" in the root `CLAUDE.md`.
+
+## `runner` evaluates its code argument (`RunnerCommand#perform`'s `eval`)
+
+`RunnerCommand#perform` evals a code string or stdin at `TOPLEVEL_BINDING`
+(`vendor/rails/v8.0.2/railties/lib/rails/commands/runner/runner_command.rb:37,48`).
+JS has no such binding, so `evalToplevel` in `commands/runner.ts` builds a
+sloppy-mode async function with `with (TopLevel)`, where constants resolve.
+Root § "Templates are precompiled" keeps eval out of what serves production; a
+CLI command evaluating the string its own operator passed is not that. Ruled by
+the repo owner on 2026-11-02 (trails#9630).
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
+  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
+  `include()` copies a module's methods into each includer and a Proxy on the
+  module itself would reach no includer. That row is not converged: the reload
+  is async, so `respondToMissing` starts it and answers `super`, the in-line
+  re-send is unported, and test_help's integration `before_setup` awaits the
+  reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.

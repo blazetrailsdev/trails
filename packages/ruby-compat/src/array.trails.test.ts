@@ -729,3 +729,29 @@ describe("Array#product", () => {
     expect(product([], [1])).toEqual([]);
   });
 });
+
+describe("each", () => {
+  it("yields a Set's members and the [key, value] pairs of a Map or plain Hash", () => {
+    const seen: unknown[] = [];
+    const hash = { a: 1 };
+    expect(each(hash, (i) => seen.push(i))).toBe(hash);
+    each(new Map([["b", 2]]), (i) => seen.push(i));
+    each(new Set(["c"]), (i) => seen.push(i));
+    expect(seen).toEqual([["a", 1], ["b", 2], "c"]);
+  });
+
+  it("calls a receiver's own each", () => {
+    const seen: unknown[] = [];
+    class Own {
+      each(block: (i: unknown) => void): string {
+        block("own");
+        return "answer";
+      }
+    }
+    expect(each(new Own(), (i) => seen.push(i))).toBe("answer");
+    expect(seen).toEqual(["own"]);
+    const hash = { each: "data" };
+    each(hash, (i) => seen.push(i));
+    expect(seen.at(-1)).toEqual(["each", "data"]);
+  });
+});

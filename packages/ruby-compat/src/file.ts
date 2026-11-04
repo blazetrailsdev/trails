@@ -1,3 +1,6 @@
+import { constSet } from "./include.js";
+import { TopLevel } from "./object.js";
+import { getProcessAdapter } from "./process-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { getFs, getPath } from "./fs-adapter.js";
@@ -5,7 +8,6 @@ import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { stringValue } from "./string/support.js";
-import { registerConstant } from "./variable.js";
 
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
@@ -770,6 +772,16 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:3279` `rb_file_s_umask`, reading only. A backend
+   * with no permission bits answers 0, as `chmod` below is a no-op there.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static umask(): number {
+    return getProcessAdapter().umask?.() ?? 0;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2575` `rb_file_s_chmod`, which answers the number of
    * files whose mode was set. A backend with no permission bits has no
    * `chmodSync`, and there the call is a no-op.
@@ -1103,7 +1115,7 @@ export class File extends IO {
   }
 }
 
-registerConstant("File", File);
+constSet(TopLevel, "File", File);
 
 /**
  * `Inc(p, e, enc)` (`vendor/ruby/v3.3.11/dir.c:237`) — the cursor advance MRI spells

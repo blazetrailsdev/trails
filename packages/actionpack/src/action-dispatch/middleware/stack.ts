@@ -78,6 +78,8 @@ export class InstrumentationProxy {
   }
 }
 
+type MiddlewareClass = abstract new (...args: never[]) => unknown;
+
 export class MiddlewareStack implements Iterable<Middleware> {
   private entries: Middleware[] = [];
 
@@ -151,7 +153,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.middlewares.splice(index + 1, 1);
   }
 
-  delete(target: MiddlewareFactory): Middleware[] | null {
+  delete(target: MiddlewareClass): Middleware[] | null {
     let rejected = false;
     for (let i = this.entries.length - 1; i >= 0; i--) {
       if (this.entries[i].name === target.name) {
@@ -162,7 +164,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return rejected ? this.entries : null;
   }
 
-  deleteBang(target: MiddlewareFactory): Middleware[] {
+  deleteBang(target: MiddlewareClass): Middleware[] {
     const rejected = this.delete(target);
     if (rejected === null) {
       throw new RuntimeError(`No such middleware to remove: ${rbInspect(target)}`);

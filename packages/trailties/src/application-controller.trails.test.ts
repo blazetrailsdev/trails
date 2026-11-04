@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
 class ApplicationControllerTestApp extends Application {}
 
-describe("Rails::ApplicationController", () => {
+describe("Trails::ApplicationController", () => {
   beforeEach(() => {
     Trails.application = ApplicationControllerTestApp.instance();
     Trails.application.config.secretKeyBase = "secret_key_base".repeat(4);
@@ -24,7 +24,7 @@ describe("Rails::ApplicationController", () => {
     await tc.beforeSetup();
     tc.routes = new RouteSet();
     tc.routes.draw(function () {
-      this.get("/rails/info/properties", { to: "rails/info#properties" });
+      this.get("/trails/info/properties", { to: "trails/info#properties" });
     });
     tc.request.env["REMOTE_ADDR"] = "127.0.0.1";
     await tc.get("properties");

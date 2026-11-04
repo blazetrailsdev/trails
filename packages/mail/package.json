@@ -10,6 +10,9 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./field": null,
+    "./field-list": null,
+    "./header": null,
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
@@ -25,12 +28,16 @@
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
+    "@blazetrails/mini-mime": "workspace:*",
+    "@blazetrails/net-smtp": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "@types/smtp-server": "^3.5.13",
+    "smtp-server": "^3.21.2"
   }
 }

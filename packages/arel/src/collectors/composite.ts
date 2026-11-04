@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 type CollectorLike = {
@@ -62,4 +62,4 @@ export class Composite {
   private right: CollectorLike;
 }
 
-rbModConstSet(Collectors, "Composite", Composite);
+constSet(Collectors, "Composite", Composite);

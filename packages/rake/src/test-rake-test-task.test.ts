@@ -122,8 +122,10 @@ describe("TestRakeTestTask", () => {
       t.loader = "direct";
     });
 
-    expect(testTask.runCode()).toBe(
-      `-e "process.argv.slice(1).forEach((f) => require(require('path').resolve(f)))"`,
+    expect(testTask.runCode()!.replace(/\{ paths: \[.*?\] \}/, "PATHS")).toBe(
+      `-e "import(require('url').pathToFileURL(require.resolve('@blazetrails/ruby-compat', PATHS)).href)` +
+        `.then(({ LOAD_PATH }) => { LOAD_PATH.unshift(\\"${File.expandPath("lib")}\\"); ` +
+        `process.argv.slice(1).forEach((f) => require(require('path').resolve(f))); })"`,
     );
     expect(await testTask.fileList()).toEqual(globbed);
   });

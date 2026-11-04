@@ -1,6 +1,6 @@
 import { ActiveSupportJSON, Mock, stub } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { Thread, hashAref, rbModConstSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
+import { Thread, hashAref, constSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../test-helpers/test-helper.js";
 import { ActionCable } from "../namespaces.js";
@@ -18,7 +18,7 @@ import { Base } from "./base.js";
 type Handler = (message: unknown) => unknown;
 
 const StreamTests = { name: "ActionCable::StreamTests" };
-rbModConstSet(ActionCable, "StreamTests", StreamTests);
+constSet(ActionCable, "StreamTests", StreamTests);
 
 class Connection extends ConnectionBase {
   override get websocket(): WebSocket {
@@ -29,7 +29,7 @@ class Connection extends ConnectionBase {
     return (this as unknown as Record<string, (...a: unknown[]) => unknown>)[method](...args);
   }
 }
-rbModConstSet(StreamTests, "Connection", Connection);
+constSet(StreamTests, "Connection", Connection);
 
 class ChatChannel extends Base {
   declare _room?: Room;
@@ -61,7 +61,7 @@ class ChatChannel extends Base {
     return null;
   }
 }
-rbModConstSet(StreamTests, "ChatChannel", ChatChannel);
+constSet(StreamTests, "ChatChannel", ChatChannel);
 
 const DummyEncoder = {
   encode(..._args: unknown[]): string {
@@ -71,7 +71,7 @@ const DummyEncoder = {
     return { foo: "decoded" };
   },
 };
-rbModConstSet(StreamTests, "DummyEncoder", DummyEncoder);
+constSet(StreamTests, "DummyEncoder", DummyEncoder);
 
 class SymbolChannel extends Base {
   override subscribed(): unknown {
@@ -79,7 +79,7 @@ class SymbolChannel extends Base {
     return null;
   }
 }
-rbModConstSet(StreamTests, "SymbolChannel", SymbolChannel);
+constSet(StreamTests, "SymbolChannel", SymbolChannel);
 
 function mockPubsub(): [{ subscribe: Handler; unsubscribe: Handler }, Mock, Mock] {
   const subscribe = new Mock();
@@ -348,7 +348,7 @@ class UserCallbackChannel extends Base {
     return null;
   }
 }
-rbModConstSet(StreamTests, "UserCallbackChannel", UserCallbackChannel);
+constSet(StreamTests, "UserCallbackChannel", UserCallbackChannel);
 
 class MultiChatChannel extends Base {
   override subscribed(): unknown {
@@ -357,7 +357,7 @@ class MultiChatChannel extends Base {
     return null;
   }
 }
-rbModConstSet(StreamTests, "MultiChatChannel", MultiChatChannel);
+constSet(StreamTests, "MultiChatChannel", MultiChatChannel);
 
 describe("StreamFromTest", () => {
   let tc: TestCase;

@@ -2,11 +2,11 @@ import {
   ArgumentError,
   block,
   NotImplementedError,
-  rbModConstSet,
+  constSet,
   rbModName,
   rbObjClass,
-  registerConstant,
   StandardError,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { DeserializationError } from "../../arguments.js";
 import { Base } from "../../base.js";
@@ -34,8 +34,8 @@ export class RescueJob extends Base {
     }
   }
 }
-registerConstant("RescueJob", RescueJob);
-rbModConstSet(RescueJob, "OtherError", OtherError);
+constSet(TopLevel, "RescueJob", RescueJob);
+constSet(RescueJob, "OtherError", OtherError);
 
 RescueJob.rescueFrom(
   ArgumentError,

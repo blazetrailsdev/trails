@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, RecordNotSaved, type Base } from "../index.js";
+import { RecordNotSaved, type Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
@@ -9,9 +10,9 @@ describe("has_one displacement via the synchronous build path", () => {
   fixtures(["pirates", "ships", "companies", "accounts"]);
 
   beforeAll(() => {
-    registerModel(Pirate);
-    registerModel(Ship);
-    registerModel(ExclusivelyDependentFirm);
+    constSet(TopLevel, "Pirate", Pirate);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "ExclusivelyDependentFirm", ExclusivelyDependentFirm);
   });
 
   it("nullifies the displaced row when nested attributes replace a loaded child", async () => {

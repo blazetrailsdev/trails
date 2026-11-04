@@ -1,7 +1,7 @@
 import { describe, expect, it, type TestContext } from "vitest";
 import "./queue-adapters/test-adapter.js";
 import type { TestAdapter } from "./queue-adapters/test-adapter.js";
-import { ArgumentError, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { TestCase } from "./test-case.js";
 import type { TestHelper } from "./test-helper.js";
 import { isAdapterIs } from "./test-helpers/helper.js";
@@ -13,7 +13,7 @@ class TestHelperPerformedJobsTest extends TestCase {
     return "TestHelperPerformedJobsTest";
   }
 }
-registerConstant("TestHelperPerformedJobsTest", TestHelperPerformedJobsTest);
+constSet(TopLevel, "TestHelperPerformedJobsTest", TestHelperPerformedJobsTest);
 
 describe.skipIf(!isAdapterIs("test"))("TestHelperPerformedJobsTest", () => {
   it("restores the adapter settings only after the block settles", async ({

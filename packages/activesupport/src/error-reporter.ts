@@ -170,7 +170,7 @@ export class ErrorReporter {
       source?: string;
     } = {},
   ): null {
-    if ((error as unknown as Record<symbol, unknown>)?.[RAILS_ERROR_REPORTED] !== undefined)
+    if ((error as unknown as Record<symbol, unknown>)?.[TRAILS_ERROR_REPORTED] !== undefined)
       return null;
     this.ensureBacktrace(error);
 
@@ -203,7 +203,7 @@ export class ErrorReporter {
     let marked: unknown = error;
     while (marked != null) {
       if (!Object.isFrozen(marked)) {
-        (marked as Record<symbol, unknown>)[RAILS_ERROR_REPORTED] = true;
+        (marked as Record<symbol, unknown>)[TRAILS_ERROR_REPORTED] = true;
       }
       marked = (marked as { cause?: unknown }).cause;
     }
@@ -233,7 +233,7 @@ export interface RecordOptions {
   source?: string;
 }
 
-const RAILS_ERROR_REPORTED = Symbol.for("__rails_error_reported");
+const TRAILS_ERROR_REPORTED = Symbol.for("__trails_error_reported");
 
 function caseEquals(subscriber: unknown, s: unknown): boolean {
   if (typeof subscriber === "function") return s instanceof (subscriber as ErrorSubscriberClass);

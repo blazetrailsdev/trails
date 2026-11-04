@@ -1,8 +1,8 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 
 import { Face } from "../test-helpers/models/face.js";
 import { Human } from "../test-helpers/models/human.js";
-import { registerModel } from "../associations.js";
 import { PartialQuery, Substitute } from "../statement-cache.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import type { Base } from "../base.js";
@@ -18,8 +18,8 @@ describe("Association#find_target statement-cache execute block", () => {
   const { faces } = fixtures(["faces", "humans"]);
 
   it("sets the inverse instance and strict loading on each record it instantiates", async () => {
-    registerModel(Face);
-    registerModel(Human);
+    constSet(TopLevel, "Face", Face);
+    constSet(TopLevel, "Human", Human);
     const face = await Face.find(faces("trusting").id);
     face.strictLoadingBang(false, { mode: "n_plus_one_only" });
 
@@ -33,8 +33,8 @@ describe("Association#find_target statement-cache execute block", () => {
   });
 
   it("does not enter with_connection while association_scope_cache holds its own", async () => {
-    registerModel(Face);
-    registerModel(Human);
+    constSet(TopLevel, "Face", Face);
+    constSet(TopLevel, "Human", Human);
     const face = await Face.find(faces("trusting").id);
     const pool = (Human as unknown as typeof Base).connectionPool();
     pool.releaseConnection();
@@ -65,8 +65,8 @@ describe("Association#find_target statement-cache execute block", () => {
   });
 
   it("passes async: through to StatementCache#execute", async () => {
-    registerModel(Face);
-    registerModel(Human);
+    constSet(TopLevel, "Face", Face);
+    constSet(TopLevel, "Human", Human);
     const face = await Face.find(faces("trusting").id);
     const klass = Human as unknown as typeof Base;
     const findBySql = vi.spyOn(klass, "findBySql");

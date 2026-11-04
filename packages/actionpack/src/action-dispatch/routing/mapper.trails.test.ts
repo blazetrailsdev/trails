@@ -1,5 +1,6 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constDefined, constGet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -16,7 +17,7 @@ import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { deprecator } from "../deprecator.js";
-import { Base, registerController } from "../../action-controller/base.js";
+import { Base } from "../../action-controller/base.js";
 
 function fakeRequest(): ConstraintsRequest & Request {
   return {
@@ -333,17 +334,17 @@ describe("Mapper::Mapping#build_conditions", () => {
   });
 });
 
-describe("Mapper#rails_app?", () => {
-  it("answers app < Rails::Railtie (mapper.rb:657-659)", () => {
+describe("Mapper#trails_app?", () => {
+  it("answers app < Trails::Railtie (mapper.rb:657-659)", () => {
     class App extends Trailtie {}
     const trails = TopLevel.Trails;
     TopLevel.Trails = { Trailtie } as never;
     try {
       const mapper = new Mapper(new RouteSet());
-      expect(mapper.isRailsApp(App as unknown as MountableApp)).toBe(true);
-      expect(mapper.isRailsApp(Trailtie as unknown as MountableApp)).toBe(false);
-      expect(mapper.isRailsApp(new App() as unknown as MountableApp)).toBe(false);
-      expect(mapper.isRailsApp(() => [200, {}, []] as never)).toBe(false);
+      expect(mapper.isTrailsApp(App as unknown as MountableApp)).toBe(true);
+      expect(mapper.isTrailsApp(Trailtie as unknown as MountableApp)).toBe(false);
+      expect(mapper.isTrailsApp(new App() as unknown as MountableApp)).toBe(false);
+      expect(mapper.isTrailsApp(() => [200, {}, []] as never)).toBe(false);
     } finally {
       TopLevel.Trails = trails;
     }
@@ -414,14 +415,20 @@ describe("Mapper block receivers", () => {
 
   beforeAll(() => {
     for (const name of names) {
-      registerController(`${camelize(name)}Controller`, StubController);
+      constSetPath(`${camelize(name)}Controller`, StubController);
     }
   });
 
   afterAll(() => {
-    for (const name of names)
-      if (isRegisteredConstant(`${camelize(name)}Controller`))
-        rbModRemoveConst(Object, `${camelize(name)}Controller`);
+    for (const name of names) {
+      const path = `${camelize(name)}Controller`;
+      if (!constDefined(Object, path, false)) continue;
+      const i = path.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, path.slice(0, i)) as object),
+        i < 0 ? path : path.slice(i + 2),
+      );
+    }
   });
 
   it("binds a nested constraints block to the mapper, as draw binds its own", () => {

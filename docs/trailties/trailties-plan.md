@@ -58,7 +58,7 @@ think one is wrong.
 | YAML config, `yaml` dep                                                                                                                                                                 | TS/JS config modules                          |
 | `bin/rails test` + entire `test_unit/` subsystem                                                                                                                                        | Vitest + other test libs; separate plan       |
 | `Engine#isolate_namespace`                                                                                                                                                              | Replaced by explicit `tableNamePrefix` config |
-| `Rails::Plugin` builder + `generators/rails/plugin/*`                                                                                                                                   | Rails-internal back-compat                    |
+| `Rails::Plugin` builder + `generators/trails/plugin/*`                                                                                                                                  | Rails-internal back-compat                    |
 | `Rails::Secrets` / `Rails.application.secrets`                                                                                                                                          | Pre-credentials Rails back-compat             |
 | `:set_load_path`, `:set_autoload_paths`, `:initialize_dependency_mechanism`, `:load_environment_hook`, `:ensure_autoload_once_paths_as_subset_of_autoload_paths`, `_all_autoload_paths` | Autoload/eager-load-only / pre-Rails-4        |
 | `Rails::Command` framework rewrite                                                                                                                                                      | `commander` is sufficient                     |
@@ -415,7 +415,7 @@ Non-blocking; bundle into boot-chain PRs when ceiling permits.
 - **Primary signal:** `bash scripts/api-compare/run.sh --package trailties`.
   Target: all boot-chain files at 100%.
 - **Final acceptance:** integration test passes — hello-world fixture imports
-  `Trails`, calls `await Trails.application.initialize()`, serves a route
+  `Trails`, calls `await Trails.application.initializeBang()`, serves a route
   through `actionpack`.
 
 ## Conventions for amending this doc

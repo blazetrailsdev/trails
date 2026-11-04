@@ -1,12 +1,19 @@
-import { underscore } from "@blazetrails/activesupport";
-import { NoMethodError, RuntimeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { moduleParents, underscore } from "@blazetrails/activesupport";
+import { DSL } from "@blazetrails/rake";
+import {
+  NoMethodError,
+  RuntimeError,
+  extend,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
 
-const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Application"];
+const ABSTRACT_RAILTIES = ["Trails::Railtie", "Trails::Engine", "Trails::Application"];
 
 let loadCounter = 0;
 
@@ -23,6 +30,7 @@ export class Trailtie extends Initializable {
   static readonly _registry: Array<typeof Trailtie> = [];
 
   protected _config?: Configuration;
+  private _trailtieNamespace?: { readonly name: string };
 
   constructor() {
     super();
@@ -128,6 +136,12 @@ export class Trailtie extends Initializable {
     block.call(this);
   }
 
+  trailtieNamespace(): { readonly name: string } | undefined {
+    return (this._trailtieNamespace ??= moduleParents(this.constructor).find((n) =>
+      rbObjRespondTo(n, "trailtieNamespace"),
+    ) as { readonly name: string } | undefined);
+  }
+
   inspect(): string {
     return `#<${this.constructor.name}>`;
   }
@@ -141,8 +155,11 @@ export class Trailtie extends Initializable {
   runRunnerBlocks(app: unknown): void {
     eachRegisteredBlock(this, "runner", (b) => b.call(this, app));
   }
-  runTasksBlocks(app: unknown): void {
-    eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
+  async runTasksBlocks(app: unknown): Promise<void> {
+    extend(this, DSL);
+    const blocks: TrailtieBlock[] = [];
+    eachRegisteredBlock(this, "rakeTasks", (b) => blocks.push(b));
+    for (const b of blocks) await b.call(this, app);
   }
   async runServerBlocks(app: unknown): Promise<void> {
     const blocks: TrailtieBlock[] = [];
@@ -193,7 +210,7 @@ export function resetTrailtieRegistry(): () => void {
   };
 }
 
-Object.defineProperty(Trailtie, "name", { value: "Rails::Railtie" });
+Object.defineProperty(Trailtie, "name", { value: "Trails::Railtie" });
 
 Object.setPrototypeOf(
   Trailtie,

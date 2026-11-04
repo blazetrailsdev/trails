@@ -1,6 +1,7 @@
 import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class Config {
   private app: RackApp | { call: RackApp };
@@ -16,3 +17,5 @@ export class Config {
     return rbProcCall(this.app, env) as ReturnType<RackApp>;
   }
 }
+
+Rack.Config = Config;

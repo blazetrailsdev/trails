@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class StringKeyObject extends Base {
   declare lock_version: number;
@@ -9,4 +10,5 @@ export class StringKeyObject extends Base {
     this.primaryKey = "id";
   }
 }
-registerModel(StringKeyObject);
+constSet(TopLevel, "StringKeyObject", StringKeyObject);
+DescendantsTracker.registerSubclass(Base, StringKeyObject);

@@ -6,7 +6,7 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ActionCable } from "./namespaces.js";
 import { TestCase } from "./test-helpers/test-helper.js";
 import { TestHelper } from "./test-helper.js";
@@ -18,13 +18,13 @@ const server = (): { broadcast(stream: string, data: unknown): Promise<unknown> 
   ActionCable.server() as never;
 
 class BroadcastChannel extends ChannelBase {}
-registerConstant("BroadcastChannel", BroadcastChannel);
+constSet(TopLevel, "BroadcastChannel", BroadcastChannel);
 
 class TransmissionsTest extends TestCase {}
-registerConstant("TransmissionsTest", TransmissionsTest);
+constSet(TopLevel, "TransmissionsTest", TransmissionsTest);
 
 class TransmittedDataTest extends TestCase {}
-registerConstant("TransmittedDataTest", TransmittedDataTest);
+constSet(TopLevel, "TransmittedDataTest", TransmittedDataTest);
 include(TransmittedDataTest, TestHelper);
 
 describe("TransmissionsTest", () => {

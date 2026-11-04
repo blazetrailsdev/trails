@@ -68,7 +68,6 @@ Creating new trails application: blog
       create  app/models/application-record.ts
       create  app/views/layouts/application.html.tse
       ...
-  Done! cd blog && trails server
 ```
 
 The generated `package.json` asks for `@blazetrails/*` packages from the npm

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "../test-helpers/helper.js";
 import { chomp, env, setEnv, stdout as $stdout } from "@blazetrails/ruby-compat";
 import { Color } from "./color.js";
 

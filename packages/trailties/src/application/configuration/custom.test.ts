@@ -10,7 +10,7 @@ import { Configuration } from "../configuration.js";
 
 describe("CustomTest", () => {
   it("access custom configuration point", async () => {
-    const config = new Configuration();
+    const config = new Configuration("/app");
     config.x.paymentProcessing.schedule = ":daily";
     config.x.paymentProcessing.retries = 3;
     config.x.superDebugger = true;

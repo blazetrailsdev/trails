@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
 import type { Template } from "./template.js";
@@ -53,6 +53,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
+  CacheExpiry: typeof import("./cache-expiry.js");
   Base: typeof Base;
   FileSystemResolver: typeof FileSystemResolver;
   Template: typeof Template;
@@ -63,7 +64,7 @@ export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   MissingTemplate: typeof MissingTemplate;
   SyntaxErrorInTemplate: typeof SyntaxErrorInTemplate;
 };
-registerConstant("ActionView", ActionView);
+constSet(TopLevel, "ActionView", ActionView);
 extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {
   ActionView.autoload("Base");

@@ -1,7 +1,8 @@
 import { rbFArray, rbFSend } from "@blazetrails/ruby-compat";
 import type { Attachment } from "../../attachment.js";
 import type { AssociationWriter, AttachedRecord } from "../../attached.js";
-import { Blob } from "../../blob.js";
+import { ActiveStorage } from "../../active-storage.js";
+import type { Blob } from "../../blob.js";
 import type { Relation } from "@blazetrails/activerecord";
 import { Changes } from "../changes.js";
 import { CreateOneOfMany } from "./create-one-of-many.js";
@@ -32,12 +33,18 @@ export class CreateMany {
 
   /** @noRailsEquivalent PERMANENT */
   async unfurl(): Promise<void> {
-    for (const subchange of this.subchanges) await subchange.unfurl();
-    void this.attachments;
+    const attachments: Attachment[] = [];
+    for (const subchange of this.subchanges) {
+      await subchange.unfurl();
+      attachments.push(await subchange.attachment);
+    }
+    this._attachments = attachments;
   }
 
   get attachments(): Attachment[] {
-    return (this._attachments ??= this.subchanges.map((subchange) => subchange.attachment));
+    return (this._attachments ??= this.subchanges.map(
+      (subchange) => subchange.attachment as Attachment,
+    ));
   }
 
   get blobs(): Blob[] {
@@ -67,7 +74,9 @@ export class CreateMany {
 
   /** @internal */
   private subchangesWithoutBlobs(): CreateOneOfMany[] {
-    return this.subchanges.filter((subchange) => !(subchange.attachable instanceof Blob));
+    return this.subchanges.filter(
+      (subchange) => !(subchange.attachable instanceof ActiveStorage.Blob!),
+    );
   }
 
   /**

@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Binary, NodeOrValue } from "./binary.js";
 import { buildQuoted } from "./casted.js";
 import type { ArelNode } from "../arel.js";
@@ -21,5 +21,5 @@ export class Matches extends Binary {
 
 export class DoesNotMatch extends Matches {}
 
-rbModConstSet(Nodes, "Matches", Matches);
-rbModConstSet(Nodes, "DoesNotMatch", DoesNotMatch);
+constSet(Nodes, "Matches", Matches);
+constSet(Nodes, "DoesNotMatch", DoesNotMatch);

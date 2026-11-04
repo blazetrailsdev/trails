@@ -1,10 +1,11 @@
+import { constSet } from "./include.js";
+import { TopLevel } from "./object.js";
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
 import { StandardError } from "./standard-error.js";
-import { registerConstant } from "./variable.js";
 
 class ZError extends StandardError {}
 
@@ -165,9 +166,11 @@ class Inflate {
 
   constructor(private readonly windowBits = 15) {}
 
-  static inflate(src: string): Uint8Array {
+  static inflate(src: string | Uint8Array): Uint8Array {
     try {
-      return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
+      return getZlib().inflate(
+        typeof src === "string" ? Uint8Array.from(src, (c) => c.charCodeAt(0)) : src,
+      );
     } catch (error) {
       throw new ZError((error as Error).message);
     }
@@ -331,4 +334,5 @@ export const Zlib = {
   },
 };
 
-registerConstant("Zlib::Error", ZError);
+constSet(TopLevel, "Zlib", Zlib);
+constSet(Zlib, "Error", ZError);

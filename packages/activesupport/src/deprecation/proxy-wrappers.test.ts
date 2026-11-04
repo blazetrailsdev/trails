@@ -6,7 +6,7 @@ import {
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
 import { extend, include, prepend } from "@blazetrails/ruby-compat/include";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { assertPredicate } from "../testing/assertions.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 
@@ -19,7 +19,7 @@ describe("ProxyWrappersTest", () => {
       return true;
     },
   };
-  registerConstant("WaffleModule", WaffleModule);
+  constSet(TopLevel, "WaffleModule", WaffleModule);
 
   let deprecator: Deprecation;
 

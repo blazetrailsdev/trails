@@ -1,3 +1,4 @@
+import type { Duration } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -62,7 +63,7 @@ export function signedId(
     expiresIn,
     expiresAt,
     purpose,
-  }: { expiresIn?: number; expiresAt?: Temporal.Instant; purpose?: string } = {},
+  }: { expiresIn?: number | Duration; expiresAt?: Temporal.Instant; purpose?: string } = {},
 ): string {
   if (instance.isNewRecord()) throw new ArgumentError("Cannot get a signed_id for a new record");
 

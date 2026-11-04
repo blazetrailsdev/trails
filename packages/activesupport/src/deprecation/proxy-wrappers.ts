@@ -3,7 +3,7 @@ import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/inclu
 import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import {
-  rbConstGet,
+  constGet,
   rbEqual,
   rbMethodName,
   rbObjRespondTo,
@@ -234,7 +234,7 @@ export class DeprecatedConstantProxy extends Module {
 
   private constMissing(name: string): unknown {
     this._deprecator.warn(this._message, callerLocations());
-    return rbConstGet(this.target as object, name);
+    return constGet(this.target as object, name);
   }
 
   private methodMissing(called: string, args: unknown[]): unknown {

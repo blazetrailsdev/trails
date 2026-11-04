@@ -1,7 +1,8 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { Associations } from "./associations.js";
 import { queryConstraints } from "./persistence.js";
 import type { CallbackChain } from "@blazetrails/activesupport";
@@ -30,9 +31,9 @@ function cacheAssoc(record: Base, name: string, value: unknown) {
 describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   fixtures([]);
   beforeAll(() => {
-    registerModel(Eye);
-    registerModel(Iris);
-    registerModel(IrisWithReadOnlyForeignKey);
+    constSet(TopLevel, "Eye", Eye);
+    constSet(TopLevel, "Iris", Iris);
+    constSet(TopLevel, "IrisWithReadOnlyForeignKey", IrisWithReadOnlyForeignKey);
   });
 
   it("callbacks read a cold has_one cache", async () => {
@@ -58,7 +59,8 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
-    registerModel("CancellingFace", CancellingFace);
+    constSet(TopLevel, "CancellingFace", CancellingFace);
+    DescendantsTracker.registerSubclass(Base, CancellingFace);
 
     class HumanWithCancellingFace extends Base {
       declare name: string | null;
@@ -73,7 +75,8 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
         });
       }
     }
-    registerModel("HumanWithCancellingFace", HumanWithCancellingFace);
+    constSet(TopLevel, "HumanWithCancellingFace", HumanWithCancellingFace);
+    DescendantsTracker.registerSubclass(Base, HumanWithCancellingFace);
 
     const human = new HumanWithCancellingFace({ name: "Steve" });
     cacheAssoc(human, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
@@ -91,9 +94,9 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   fixtures(["companies"]);
   beforeAll(() => {
-    registerModel(CanonicalCompany);
-    registerModel(Firm);
-    registerModel(Client);
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
   });
 
   it("collection-proxy build without load autosaves built children (Slot B)", async () => {
@@ -131,8 +134,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.hasMany("widgets", { autosave: true, foreignKey: "author_id" });
       }
     }
-    registerModel("Widget", Widget);
-    registerModel("WidgetOwner", WidgetOwner);
+    constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
+    constSet(TopLevel, "WidgetOwner", WidgetOwner);
+    DescendantsTracker.registerSubclass(Base, WidgetOwner);
 
     const owner = await WidgetOwner.create({ name: "Alice" });
     const widget = await Widget.create({ name: "", author_id: owner.id });
@@ -164,8 +169,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("DefaultBelongsToAuthor", Author);
-    registerModel("DefaultBelongsToPost", Post);
+    constSet(TopLevel, "DefaultBelongsToAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "DefaultBelongsToPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
       className: "DefaultBelongsToAuthor",
@@ -200,8 +207,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("title", "string");
       }
     }
-    registerModel("ZipParent", Parent);
-    registerModel("ZipChild", Child);
+    constSet(TopLevel, "ZipParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "ZipChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: "id",
       foreignKey: ["parent_id", "group"],
@@ -239,8 +248,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("DefaultAutosaveAuthor", Author);
-    registerModel("DefaultAutosavePost", Post);
+    constSet(TopLevel, "DefaultAutosaveAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "DefaultAutosavePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
       className: "DefaultAutosaveAuthor",
@@ -274,8 +285,10 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("LongPkParent", Parent);
-    registerModel("LongPkChild", Child);
+    constSet(TopLevel, "LongPkParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "LongPkChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
     Associations.belongsTo.call(Child, "parent", {
       primaryKey: ["id", "name"],
       foreignKey: "author_id",
@@ -330,8 +343,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   fixtures([]);
 
   function makeModels() {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
     return { Pirate: CanonicalPirate, Bird: CanonicalBird };
   }
 
@@ -368,7 +381,8 @@ describe("TestAutosaveAssociationsInGeneral changed_for_autosave?", () => {
 
       override markedForDestruction = (): boolean => true;
     }
-    registerModel("ChangedForAutosaveGadget", Gadget);
+    constSet(TopLevel, "ChangedForAutosaveGadget", Gadget);
+    DescendantsTracker.registerSubclass(Base, Gadget);
 
     const gadget = await Gadget.create({ name: "widget" });
 
@@ -380,12 +394,12 @@ describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
   fixtures([]);
 
   it("association_valid? dispatches through marked_for_destruction?", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
     class DoomedBird extends CanonicalBird {
       override markedForDestruction = (): boolean => true;
     }
-    registerModel("AssociationValidDoomedBird", DoomedBird);
+    constSet(TopLevel, "AssociationValidDoomedBird", DoomedBird);
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
     const doomed = new DoomedBird({ name: "" });
@@ -399,13 +413,13 @@ describe("TestAutosaveAssociationOnAHasManyAssociation marked_for_destruction?",
   fixtures([]);
 
   it("save_collection_association selects the records to destroy through marked_for_destruction?", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
     let doomed = false;
     class DoomedBird extends CanonicalBird {
       override markedForDestruction = (): boolean => doomed;
     }
-    registerModel("CollectionDoomedBird", DoomedBird);
+    constSet(TopLevel, "CollectionDoomedBird", DoomedBird);
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
     const bird = new DoomedBird({ name: "polly", pirate_id: pirate.id });
@@ -422,14 +436,14 @@ describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", 
   fixtures([]);
 
   it("save_has_one_association destroys the record through marked_for_destruction?", async () => {
-    registerModel(CanonicalPirate);
-    registerModel(Ship);
-    registerModel(Developer);
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "Developer", Developer);
     let doomed = false;
     class DoomedShip extends Ship {
       override markedForDestruction = (): boolean => doomed;
     }
-    registerModel("HasOneDoomedShip", DoomedShip);
+    constSet(TopLevel, "HasOneDoomedShip", DoomedShip);
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
     const ship = new DoomedShip({ name: "Black Pearl", pirate_id: pirate.id });
@@ -525,8 +539,10 @@ describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("QcOwner", QcOwner);
-    registerModel("QcChild", QcChild);
+    constSet(TopLevel, "QcOwner", QcOwner);
+    DescendantsTracker.registerSubclass(Base, QcOwner);
+    constSet(TopLevel, "QcChild", QcChild);
+    DescendantsTracker.registerSubclass(Base, QcChild);
     const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
     const child = new QcChild({ name: "Doc" });
     owner.association("qcChild").setTarget(child);

@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { clockTime } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class Runtime {
   private app: RackApp | { call: RackApp };
@@ -26,3 +27,5 @@ export class Runtime {
     return response;
   }
 }
+
+Rack.Runtime = Runtime;

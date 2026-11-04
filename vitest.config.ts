@@ -118,6 +118,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/core-ext/numeric/bytes.ts",
   ),
+  "@blazetrails/activesupport/testing/isolation": path.resolve(
+    __dirname,
+    "packages/activesupport/src/testing/isolation.ts",
+  ),
   "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
     __dirname,
     "packages/activesupport/src/testing/file-fixtures.ts",
@@ -325,6 +329,8 @@ const alias = {
   "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/src/index.ts"),
   "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
   "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
+  "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/src") + "/",
+  "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
   "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
@@ -342,6 +348,8 @@ const alias = {
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
+  "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/src") + "/",
+  "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/src/index.ts"),
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/src") + "/",
@@ -376,6 +384,7 @@ const alias = {
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
+  "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/src/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/src/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/src/smtp.ts"),
@@ -386,6 +395,7 @@ const alias = {
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
+  "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/src/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
@@ -481,6 +491,15 @@ const aliasEntries = [
 const otherResolve = {
   alias: [
     ...aliasEntries,
+    // A generated app under tmp/ must share the suite's source Trails, not dist's.
+    {
+      find: /^@blazetrails\/trailties\/(trails|test-unit\/trailtie)$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",
+    },
+    {
+      find: /^@blazetrails\/trailties$/,
+      replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+    },
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
 };
@@ -560,6 +579,7 @@ export default defineConfig({
             ...ADAPTER_SPECIFIC_EXCLUDE,
             ...SQLITE_DRIVER_TESTS,
             "packages/solid-cable/src/generators/**",
+            "packages/solid-queue/src/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -648,6 +668,7 @@ export default defineConfig({
             "packages/thor/**",
             "packages/et-orbi/**",
             "packages/raabro/**",
+            "packages/zeitwerk/**",
             "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
@@ -685,11 +706,14 @@ export default defineConfig({
           include: [
             "packages/trailties/src/**/*.test.ts",
             "packages/solid-cable/src/generators/**/*.test.ts",
+            "packages/solid-queue/src/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/src/test-helpers/build-templates.ts",
+            "./packages/trailties/src/test-helpers/isolation/global-setup.ts",
             "./packages/solid-cable/src/test-helpers/build-templates.ts",
+            "./packages/solid-queue/src/test-helpers/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },
@@ -701,7 +725,7 @@ export default defineConfig({
           globals: true,
           include: ["packages/thor/src/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          globalSetup: ["./packages/thor/src/test-helpers/build-templates.ts"],
+          globalSetup: ["./scripts/thor-build-templates.ts"],
           setupFiles: [...otherSetupFiles, "./packages/thor/src/test-helpers/setup.ts"],
         },
       },
@@ -716,6 +740,16 @@ export default defineConfig({
             "./packages/vitest-matchers/src/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
           ],
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "zeitwerk",
+          globals: true,
+          include: ["packages/zeitwerk/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
       },
       {

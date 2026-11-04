@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Time as RubyTime } from "@blazetrails/date";
 import type * as ChronicModule from "./chronic.js";
 import type * as DateModule from "./date.js";
@@ -115,4 +115,4 @@ export const Chronic = { name: "Chronic" } as {
   TimeZone: typeof TimeZoneModule.TimeZone;
   Token: typeof TokenModule.Token;
 };
-registerConstant("Chronic", Chronic);
+constSet(TopLevel, "Chronic", Chronic);

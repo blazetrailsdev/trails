@@ -1,10 +1,29 @@
 import * as ts from "typescript/unstable/ast";
 import type { Project, Symbol } from "typescript/unstable/sync";
 import { tsApi } from "./ts-api.js";
+import { isNonModelFrameworkFile } from "./walker.js";
 
 export interface WalkerResult {
   baseNames: Set<string>;
   modelRegistry: Map<string, string>;
+  superKeys: Map<string, string>;
+}
+
+export function classKey(fileName: string, className: string): string {
+  return `${fileName}#${className}`;
+}
+
+export function classKeyName(key: string): string {
+  return key.slice(key.lastIndexOf("#") + 1);
+}
+
+function symKey(sym: Symbol, project: Project): string {
+  for (const handle of sym.declarations) {
+    const decl = handle.resolve(project);
+    if (decl && ts.isClassDeclaration(decl))
+      return classKey(decl.getSourceFile().fileName, sym.name);
+  }
+  return classKey("", sym.name);
 }
 
 export function collectBaseDescendants(
@@ -17,6 +36,7 @@ export function collectBaseDescendants(
     const { program, checker } = project;
     const baseNames = new Set<string>(rootNames);
     const modelRegistry = new Map<string, string>();
+    const superKeys = new Map<string, string>();
     const memo = new Map<Symbol, boolean>();
 
     for (const fileName of program.getSourceFileNames()) {
@@ -25,7 +45,7 @@ export function collectBaseDescendants(
       sf.forEachChild((node) => {
         if (ts.isClassDeclaration(node) && node.name) {
           const sym = checker.getSymbolAtLocation(node.name);
-          if (sym && walkClass(sym, project, rootNames, baseNames, memo)) {
+          if (sym && walkClass(sym, project, rootNames, baseNames, memo, superKeys)) {
             const existing = modelRegistry.get(sym.name);
             if (
               !existing ||
@@ -39,7 +59,7 @@ export function collectBaseDescendants(
       });
     }
 
-    return { baseNames, modelRegistry };
+    return { baseNames, modelRegistry, superKeys };
   } finally {
     snapshot.dispose();
   }
@@ -51,11 +71,18 @@ function walkClass(
   rootNames: ReadonlySet<string>,
   result: Set<string>,
   memo: Map<Symbol, boolean>,
+  superKeys: Map<string, string>,
 ): boolean {
   const cached = memo.get(sym);
   if (cached !== undefined) return cached;
 
   memo.set(sym, false);
+
+  const framework = sym.declarations.some((handle) => {
+    const decl = handle.resolve(project);
+    return decl !== undefined && isNonModelFrameworkFile(decl.getSourceFile().fileName);
+  });
+  if (framework) return false;
 
   if (rootNames.has(sym.name)) {
     result.add(sym.name);
@@ -73,8 +100,9 @@ function walkClass(
         const parentType = project.checker.getTypeAtLocation(typeNode.expression);
         const parentSym = parentType.getSymbol();
         if (!parentSym) continue;
-        if (walkClass(parentSym, project, rootNames, result, memo)) {
+        if (walkClass(parentSym, project, rootNames, result, memo, superKeys)) {
           result.add(sym.name);
+          superKeys.set(symKey(sym, project), symKey(parentSym, project));
           memo.set(sym, true);
           return true;
         }

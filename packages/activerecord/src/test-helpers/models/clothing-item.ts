@@ -1,7 +1,7 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
-import { registerModel } from "../../associations.js";
 
 export class ClothingItem extends Base {
   declare clothing_type: string;
@@ -15,17 +15,20 @@ export class ClothingItem extends Base {
   }
 }
 
-registerModel(ClothingItem);
+constSet(TopLevel, "ClothingItem", ClothingItem);
+DescendantsTracker.registerSubclass(Base, ClothingItem);
 
 export class ClothingItemUsed extends ClothingItem {
   static {
-    registerModel(rbModConstSet(ClothingItem, "Used", this));
+    constSet(ClothingItem, "Used", this);
+    DescendantsTracker.registerSubclass(ClothingItem, this);
   }
 }
 
 export class ClothingItemSized extends ClothingItem {
   static {
-    registerModel(rbModConstSet(ClothingItem, "Sized", this));
+    constSet(ClothingItem, "Sized", this);
+    DescendantsTracker.registerSubclass(ClothingItem, this);
   }
 
   static {

@@ -1,6 +1,8 @@
+import "../../../constants.postgresql-oid-interval.generated.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
-import { rbInspect, registerConstant } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 export class Interval extends ValueType<Duration> {
   override type(): string {
@@ -37,4 +39,4 @@ export class Interval extends ValueType<Duration> {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval", Interval);
+ConnectionAdapters.PostgreSQL.OID.Interval = Interval;

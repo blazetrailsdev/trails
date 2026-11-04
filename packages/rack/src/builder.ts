@@ -1,12 +1,17 @@
 import {
   ArgumentError,
+  capitalize,
+  constGet,
   File,
   RuntimeError,
   rbBlockGivenP,
   rbFBinding,
+  rbFLoad,
   rbProcCall,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
+import { Rack } from "./namespaces.js";
 
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
@@ -32,9 +37,20 @@ export class Builder {
     if (block) block(this);
   }
 
-  /** @missingRailsCall map — CONVERGEABLE rack-builder-parse-file-ru-guard-and-require-arm */
-  static parseFile(path: string, options: Record<string, unknown> = {}): RackApp {
-    return this.loadFile(path, options);
+  /** @missingRailsArgs basename — PERMANENT */
+  static async parseFile(path: string, options: Record<string, unknown> = {}): Promise<RackApp> {
+    if (path.endsWith(".ru")) {
+      return this.loadFile(path, options);
+    } else {
+      await rbFLoad(path);
+      return constGet(
+        TopLevel,
+        File.basename(path, ".*")
+          .split("_")
+          .map((s) => capitalize(s, []))
+          .join(""),
+      ) as RackApp;
+    }
   }
 
   static loadFile(path: string, options: Record<string, unknown> = {}): RackApp {
@@ -65,23 +81,9 @@ export class Builder {
     const builder = new this(null, options);
     const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Builder;
     const source =
-      `(function (builder) { "use strict"; ${builderScript}\n})` +
+      `(function (builder, topLevel) { with (topLevel) { return (function () { "use strict"; ${builderScript}\n})(); } })` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    let configFn: (b: Builder) => void;
-    try {
-      configFn = (0, eval)(source) as (b: Builder) => void;
-    } catch (err) {
-      throw new Error(`Error parsing config from ${path}: ${(err as Error).message}`, {
-        cause: err,
-      });
-    }
-    try {
-      configFn(binding);
-    } catch (err) {
-      throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
-        cause: err,
-      });
-    }
+    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(binding, TopLevel);
     return builder.toApp();
   }
 
@@ -166,3 +168,5 @@ export class Builder {
     return new URLMap(mapped);
   }
 }
+
+Rack.Builder = Builder;

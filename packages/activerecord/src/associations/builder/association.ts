@@ -9,6 +9,7 @@ import {
 import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError } from "../../errors.js";
 import * as Reflection from "../../reflection.js";
+import { Builder } from "../../namespaces.js";
 
 /** @internal */
 export interface AssociationInstanceHost {
@@ -224,3 +225,5 @@ export class Association {
     }
   }
 }
+
+Builder.Association = Association;

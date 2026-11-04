@@ -1,0 +1,1 @@
+<%= this.wrapInModules(`export const ApplicationHelper = {};`) %>

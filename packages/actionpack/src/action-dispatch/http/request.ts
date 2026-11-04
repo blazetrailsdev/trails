@@ -17,7 +17,7 @@ import {
   toI,
   excSetupMessage,
   rbObjDup,
-  rbModConstSet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -940,6 +940,6 @@ Request.prototype.isParamsReadable = _isParamsReadable;
 
 ActionDispatch.Request = Request;
 Request.Utils = Utils;
-rbModConstSet(ActionDispatch, "MissingController", MissingController);
+constSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);

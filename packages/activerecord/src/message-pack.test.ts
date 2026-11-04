@@ -5,9 +5,9 @@ import {
   MissingClassError,
 } from "@blazetrails/activesupport/message-pack";
 import { Factory } from "@blazetrails/msgpack";
-import { Marshal } from "@blazetrails/ruby-compat";
+import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { Extensions } from "./message-pack.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
@@ -16,7 +16,7 @@ import { Binary } from "./test-helpers/models/binary.js";
 import type { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";
 
-registerModel(Binary);
+constSet(TopLevel, "Binary", Binary);
 
 describe("ActiveRecordMessagePackTest", () => {
   fixtures(["posts", "comments", "authors", "authorAddresses"]);

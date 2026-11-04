@@ -4,7 +4,7 @@ import {
   isNil,
   NotImplementedError,
   rbObjClone,
-  rbModConstSet,
+  constSet,
   rbObjRespondTo,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -1244,5 +1244,5 @@ export class ToSql extends Visitor {
   }
 }
 
-rbModConstSet(Visitors, "UnsupportedVisitError", UnsupportedVisitError);
-rbModConstSet(Visitors, "ToSql", ToSql);
+constSet(Visitors, "UnsupportedVisitError", UnsupportedVisitError);
+constSet(Visitors, "ToSql", ToSql);

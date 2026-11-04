@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Company } from "./company.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Vegetable extends Base {
   declare custom_type: string;
@@ -15,19 +16,24 @@ export class Vegetable extends Base {
     return "custom_type";
   }
 }
-registerModel(Vegetable);
+constSet(TopLevel, "Vegetable", Vegetable);
+DescendantsTracker.registerSubclass(Base, Vegetable);
 
 export class Cucumber extends Vegetable {}
-registerModel(Cucumber);
+constSet(TopLevel, "Cucumber", Cucumber);
+DescendantsTracker.registerSubclass(Vegetable, Cucumber);
 
 export class Cabbage extends Vegetable {}
-registerModel(Cabbage);
+constSet(TopLevel, "Cabbage", Cabbage);
+DescendantsTracker.registerSubclass(Vegetable, Cabbage);
 
 export class GreenCabbage extends Cabbage {}
-registerModel(GreenCabbage);
+constSet(TopLevel, "GreenCabbage", GreenCabbage);
+DescendantsTracker.registerSubclass(Cabbage, GreenCabbage);
 
 export class KingCole extends GreenCabbage {}
-registerModel(KingCole);
+constSet(TopLevel, "KingCole", KingCole);
+DescendantsTracker.registerSubclass(GreenCabbage, KingCole);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RedCabbage extends Cabbage {
@@ -35,7 +41,8 @@ export class RedCabbage extends Cabbage {
     this.belongsTo("seller", { className: "Company" });
   }
 }
-registerModel(RedCabbage);
+constSet(TopLevel, "RedCabbage", RedCabbage);
+DescendantsTracker.registerSubclass(Cabbage, RedCabbage);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RedCabbage {
   get seller(): Company | null | Promise<Company | null>;
@@ -54,4 +61,5 @@ export class YellingVegetable extends Vegetable {
     this.writeAttribute("name", name?.toUpperCase() ?? null);
   }
 }
-registerModel(YellingVegetable);
+constSet(TopLevel, "YellingVegetable", YellingVegetable);
+DescendantsTracker.registerSubclass(Vegetable, YellingVegetable);

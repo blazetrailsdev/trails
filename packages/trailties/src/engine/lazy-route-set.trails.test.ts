@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LazyRouteSet } from "./lazy-route-set.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 describe("LazyRouteSet method_missing_module", () => {
   let reload: ReturnType<typeof vi.fn>;

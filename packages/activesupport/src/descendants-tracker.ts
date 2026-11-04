@@ -1,6 +1,6 @@
 import { classModule } from "@blazetrails/ruby-compat";
 
-export type AnyClass = abstract new (...args: unknown[]) => unknown;
+export type AnyClass = abstract new (...args: never) => unknown;
 
 const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
 let _excludedDescendants: globalThis.WeakSet<AnyClass> | null = new globalThis.WeakSet<AnyClass>();
@@ -88,7 +88,7 @@ export function disableClearBang(): void {
   }
 }
 
-export function clear(classes: AnyClass[]): void {
+export function clear(classes: Iterable<AnyClass>): void {
   if (_clearDisabled) {
     throw new Error(
       "DescendantsTracker.clear was disabled because config.enable_reloading is false",

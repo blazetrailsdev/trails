@@ -887,12 +887,15 @@ export class IO {
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
   static async copyStreamAsync(
-    src: { read(length?: number): string | Uint8Array | null },
-    dst: string,
+    src: { read(length?: number): string | Uint8Array | null } | IO,
+    dst: string | IO,
   ): Promise<number> {
     const chunks: Uint8Array[] = [];
     let data: string | Uint8Array | null;
-    while ((data = src.read(16384)) != null && data.length > 0) {
+    while (
+      (data = await (src instanceof IO ? src.readAsync(16384) : src.read(16384))) != null &&
+      data.length > 0
+    ) {
       chunks.push(typeof data === "string" ? new TextEncoder().encode(data) : data);
     }
     const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
@@ -900,6 +903,9 @@ export class IO {
     for (const chunk of chunks) {
       bytes.set(chunk, offset);
       offset += chunk.length;
+    }
+    if (dst instanceof IO) {
+      return await dst.writeAsync(bytes);
     }
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(dst, bytes);
@@ -934,6 +940,9 @@ export class IO {
    * then the pipe is closed and `$?` set (`popen_finish`, `io.c:8020-8022`;
    * `pipe_finalize`, `io.c:7302`), readable as {@link Process.lastStatus}.
    * With no block the IO itself is answered (`popen_finish`, `io.c:8024`).
+   * A `"w"` mode's block writes stdin, `err: "out"` is `:err => :out`, and a
+   * String `pname` runs under `/bin/sh -c` as `rb_exec_fillarg`
+   * (`vendor/ruby/v3.3.11/process.c:2425`) decides.
    * The child's stdout is read whole before the block runs, so the IO is a
    * binary `StringIO`, and `$?` is set once that read ends rather than at
    * `close`.
@@ -948,38 +957,68 @@ export class IO {
    * (`vendor/ruby/v3.3.11/io.c:7946`).
    */
   static async popen(
-    pname: readonly unknown[],
-    opt?: { err?: IO | null },
+    pname: string | readonly unknown[],
+    opt?: { err?: IO | "out" | null },
   ): Promise<StringIO<Uint8Array>>;
   static async popen<R>(
-    pname: readonly unknown[],
+    pname: string | readonly unknown[],
     block: (port: StringIO<Uint8Array>) => R | Promise<R>,
   ): Promise<R>;
   static async popen<R>(
-    pname: readonly unknown[],
-    opt: { err?: IO | null },
+    pname: string | readonly unknown[],
+    opt: { err?: IO | "out" | null },
     block: (port: StringIO<Uint8Array>) => R | Promise<R>,
   ): Promise<R>;
   static async popen<R>(
-    pname: readonly unknown[],
-    opt: { err?: IO | null } | ((port: StringIO<Uint8Array>) => R | Promise<R>) = {},
-    block?: (port: StringIO<Uint8Array>) => R | Promise<R>,
+    pname: string | readonly unknown[],
+    mode: string,
+    opt: { err?: IO | "out" | null },
+    block: (port: StringIO<Uint8Array>) => R | Promise<R>,
+  ): Promise<R>;
+  static async popen<R>(
+    pname: string | readonly unknown[],
+    ...rest: unknown[]
   ): Promise<R | StringIO<Uint8Array>> {
+    const mode = typeof rest[0] === "string" ? (rest.shift() as string) : "r";
+    let opt = (rest[0] ?? {}) as { err?: IO | "out" | null };
+    let block = rest[1] as ((port: StringIO<Uint8Array>) => R | Promise<R>) | undefined;
     if (typeof opt === "function") {
       block = opt;
       opt = {};
     }
-    const [command, env, args] = rbExecargNew(pname);
+    const execarg = rbExecargNew(typeof pname === "string" ? [pname] : pname);
+    const env = execarg[1];
+    let [command, , args] = execarg;
+    if (typeof pname === "string" && args === null) {
+      [command, args] = ["/bin/sh", ["-c", pname]];
+    }
     const { getChildProcess } = await import("./child-process-adapter.js");
     const adapter = getChildProcess();
     if (adapter.popen === undefined) {
       throw new NotImplementedError("fork() function is unimplemented on this machine");
     }
 
-    const [out, status] = await adapter.popen(command, args ?? [], env, opt.err?.fileno() ?? null);
+    const err = opt.err === "out" ? "out" : (opt.err?.fileno() ?? null);
+    let input: StringIO<Uint8Array> | undefined;
+    let value: R | undefined;
+    if (mode.includes("w")) {
+      input = new StringIO(new Uint8Array(0));
+      if (block !== undefined) value = await block(input);
+    }
+    const [out, status] = await adapter.popen(
+      command,
+      args ?? [],
+      env,
+      err,
+      input === undefined ? undefined : input.string(),
+    );
     if (status.error !== undefined) {
       rbLastStatusSet(new Process.Status({ pid: status.pid, status: 127, signal: null }));
       throw status.error;
+    }
+    if (input !== undefined && block !== undefined) {
+      rbLastStatusSet(new Process.Status(status));
+      return value as R;
     }
     const port = new StringIO(out);
     if (block === undefined) {
@@ -1190,6 +1229,25 @@ export class IO {
     }
     this._pos += n;
     if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
+    return buffer.slice(0, n);
+  }
+
+  /**
+   * {@link read}'s length form over the backend's async read.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
+   * (`vendor/ruby/v3.3.11/io.c:3774`).
+   */
+  async readAsync(length: number): Promise<Uint8Array | null> {
+    const buffer = new Uint8Array(length);
+    let n = 0;
+    while (n < length) {
+      const read = await getFs().readAsync(this.fd, buffer, n, length - n, this._pos + n);
+      if (read === 0) break;
+      n += read;
+    }
+    if (n === 0) return length === 0 ? new Uint8Array(0) : null;
+    this._pos += n;
     return buffer.slice(0, n);
   }
 
@@ -1531,6 +1589,26 @@ export class IO {
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this._pos + n);
+    }
+    this._pos += n;
+    return n;
+  }
+
+  /**
+   * {@link write} over the backend's async write.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
+   * (`vendor/ruby/v3.3.11/io.c:2263`).
+   */
+  async writeAsync(string: string | Uint8Array): Promise<number> {
+    const buffer = typeof string === "string" ? doWriteconv(string, this.enc) : string;
+    if (this.stdioFile != null) {
+      this.stdioFile.write(new TextDecoder().decode(buffer));
+      return buffer.length;
+    }
+    let n = 0;
+    while (n < buffer.length) {
+      n += await getFs().writeAsync(this.fd, buffer, n, buffer.length - n, this._pos + n);
     }
     this._pos += n;
     return n;

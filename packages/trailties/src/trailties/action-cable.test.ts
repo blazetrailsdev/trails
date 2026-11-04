@@ -2,11 +2,11 @@ import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
 import { Worker } from "@blazetrails/actioncable/server/worker";
 import { OrderedOptions } from "@blazetrails/activesupport";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../application.js";
-import { _resetTrailsEnv } from "../rails.js";
+import { _resetTrailsEnv } from "../trails.js";
 import { Engine } from "./action-cable.js";
 
 let appPath: string;
@@ -65,7 +65,7 @@ describe("ActionCable::Engine", () => {
     (application.config.get("actionCable") as Record<string, unknown>)[
       "disableRequestForgeryProtection"
     ] = true;
-    await application.initialize();
+    await application.initializeBang();
 
     const server = (ActionCable.server() as Server).config;
     expect(server.cable).toEqual({ adapter: "async" });
@@ -84,7 +84,7 @@ describe("ActionCable::Engine", () => {
   it("does not mount the server when mount_path is nil", async () => {
     const application = await app();
     (application.config.get("actionCable") as Record<string, unknown>).mountPath = null;
-    await application.initialize();
+    await application.initializeBang();
 
     const http = await Handler.Node.run(application as never, { Host: "127.0.0.1", Port: 0 });
     try {
@@ -97,7 +97,7 @@ describe("ActionCable::Engine", () => {
 
   it("runs the executor's complete hook after async work finishes", async () => {
     const application = await app();
-    await application.initialize();
+    await application.initializeBang();
 
     const events: string[] = [];
     application.executor.registerHook({

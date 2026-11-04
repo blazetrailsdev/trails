@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "../test-helpers/helper.js";
 import { Dir, File, FileUtils, include, SystemExit } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
 import { Shell } from "../shell.js";
@@ -25,6 +25,15 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
   let root: string;
   const host = (options: object = {}, config: object = {}): Host =>
     new Script([], options, { destinationRoot: root, ...config }) as unknown as Host;
+
+  it("writes render's bytes and reads them back as identical", async () => {
+    const content = "a\udcffb";
+    await capture(":stdout", () => host().createFile("binary", content));
+    const written = await File.binreadAsync(`${root}/binary`);
+    expect([...written!]).toEqual([0x61, 0xff, 0x62]);
+    const out = await capture(":stdout", () => host().createFile("binary", content));
+    expect(out).toContain("identical");
+  });
 
   beforeEach(() => {
     root = Dir.mktmpdir("thor-create-file-");

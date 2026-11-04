@@ -1,4 +1,4 @@
-import { registerModel, type Relation } from "@blazetrails/activerecord";
+import { type Relation } from "@blazetrails/activerecord";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Arguments as ActiveJobArguments } from "@blazetrails/activejob";
 import {
@@ -11,6 +11,7 @@ import {
 import { Time } from "@blazetrails/date";
 import { Cron, Fugit } from "@blazetrails/fugit";
 import {
+  constSet,
   rbHashSRuby2KeywordsHash,
   rbInspect,
   rbObjClass,
@@ -45,7 +46,7 @@ export class RecurringTask extends Record {
   static Arguments = Arguments;
 
   static {
-    registerModel("SolidQueue::RecurringTask", this);
+    constSet(SolidQueue, "RecurringTask", this);
 
     this.serialize("arguments", { coder: Arguments, default: [] });
 

@@ -1,4 +1,4 @@
-import { NoMethodError, RuntimeError, registerConstant, toI } from "@blazetrails/ruby-compat";
+import { NoMethodError, RuntimeError, toI, constSet } from "@blazetrails/ruby-compat";
 import {
   TopLevel,
   days,
@@ -113,4 +113,4 @@ function parseDuration(duration: unknown, { default: default_ }: { default: Dura
   }
 }
 
-registerConstant("SolidCable", SolidCable);
+constSet(TopLevel, "SolidCable", SolidCable);

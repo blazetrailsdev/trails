@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { CategoryPost, Post } from "../test-helpers/models/post.js";
@@ -68,38 +68,38 @@ function uniqRecords(records: any[]): any[] {
   return result;
 }
 
-registerModel(Author);
-registerModel(Post);
-registerModel(CategoryPost);
-registerModel(Tag);
-registerModel(OrderedTag);
-registerModel(Tagging);
-registerModel(Member);
-registerModel(MemberDetail);
-registerModel(MemberType);
-registerModel(Membership);
-registerModel(Categorization);
-registerModel(Category);
-registerModel(Club);
-registerModel(Organization);
-registerModel(Essay);
-registerModel(Comment);
-registerModel(SpecialComment);
-registerModel(SubSpecialComment);
-registerModel(Rating);
-registerModel(Subscriber);
-registerModel(Subscription);
-registerModel(Book);
-registerModel(Sponsor);
-registerModel(Hotel);
-registerModel(Department);
-registerModel(Chef);
-registerModel(CakeDesigner);
-registerModel(DrinkDesigner);
-registerModel(Person);
-registerModel(Reference);
-registerModel(Job);
-registerModel(Reader);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "CategoryPost", CategoryPost);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "OrderedTag", OrderedTag);
+constSet(TopLevel, "Tagging", Tagging);
+constSet(TopLevel, "Member", Member);
+constSet(TopLevel, "MemberDetail", MemberDetail);
+constSet(TopLevel, "MemberType", MemberType);
+constSet(TopLevel, "Membership", Membership);
+constSet(TopLevel, "Categorization", Categorization);
+constSet(TopLevel, "Category", Category);
+constSet(TopLevel, "Club", Club);
+constSet(TopLevel, "Organization", Organization);
+constSet(TopLevel, "Essay", Essay);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+constSet(TopLevel, "Rating", Rating);
+constSet(TopLevel, "Subscriber", Subscriber);
+constSet(TopLevel, "Subscription", Subscription);
+constSet(TopLevel, "Book", Book);
+constSet(TopLevel, "Sponsor", Sponsor);
+constSet(TopLevel, "Hotel", Hotel);
+constSet(TopLevel, "Department", Department);
+constSet(TopLevel, "Chef", Chef);
+constSet(TopLevel, "CakeDesigner", CakeDesigner);
+constSet(TopLevel, "DrinkDesigner", DrinkDesigner);
+constSet(TopLevel, "Person", Person);
+constSet(TopLevel, "Reference", Reference);
+constSet(TopLevel, "Job", Job);
+constSet(TopLevel, "Reader", Reader);
 
 describe("NestedThroughAssociationsTest", () => {
   const {

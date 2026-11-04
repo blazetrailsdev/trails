@@ -1,4 +1,5 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { StringIO, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from "vitest";
 import {
   HashWithIndifferentAccess,
@@ -13,7 +14,7 @@ import {
   EnumType,
 } from "./enum.js";
 import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -544,7 +545,8 @@ describe("Enum declared on an attribute with no column type", () => {
         this.aliasAttribute("aliased_status", "status");
       }
     }
-    registerModel(Klass);
+    constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     await expect(Klass.create({ status: "written" })).rejects.toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
@@ -566,7 +568,8 @@ describe("Enum declared on an attribute with no column type", () => {
         this.aliasAttribute("nullable_status", "status");
       }
     }
-    registerModel(Klass);
+    constSet(TopLevel, "Klass", Klass);
+    DescendantsTracker.registerSubclass(Base, Klass);
 
     expect(() => Klass.typeForAttribute("nullable_status")).not.toThrow();
     expect(() => new Klass().isSingle()).not.toThrow();
@@ -582,7 +585,8 @@ describe("Enum declared on an attribute with no column type", () => {
     class Concrete extends AbstractParent {
       static _tableName = "books";
     }
-    registerModel(Concrete);
+    constSet(TopLevel, "Concrete", Concrete);
+    DescendantsTracker.registerSubclass(AbstractParent, Concrete);
 
     expect(() => Concrete.typeForAttribute("typeless_genre")).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,
@@ -599,7 +603,8 @@ describe("Enum declared on an attribute with no column type", () => {
     class Concrete extends AbstractParent {
       static _tableName = "books";
     }
-    registerModel(Concrete);
+    constSet(TopLevel, "Concrete", Concrete);
+    DescendantsTracker.registerSubclass(AbstractParent, Concrete);
 
     expect(() => Concrete._defaultAttributes()).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in AbstractParent/,

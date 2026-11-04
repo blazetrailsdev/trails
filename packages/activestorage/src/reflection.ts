@@ -6,7 +6,10 @@ import { NamedVariant } from "./named-variant.js";
 export class HasAttachedReflection extends MacroReflection {
   private _namedVariants?: { [k: string]: NamedVariant };
 
-  variant(name: string, transformations: { [k: string]: unknown }): NamedVariant {
+  variant(
+    name: string,
+    transformations: { [k: string]: NonNullable<unknown> | null },
+  ): NamedVariant {
     return (this.namedVariants[name] = new NamedVariant(transformations));
   }
 

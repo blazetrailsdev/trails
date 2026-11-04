@@ -1,6 +1,7 @@
 import { ArgumentError } from "../argument-error.js";
 import { kernelFloat } from "../kernel-float.js";
 import { kernelInteger } from "../kernel-integer.js";
+import { rbDbl2num } from "../numeric.js";
 import { rational, type Rational } from "../rational.js";
 import { rbStrToF, rbStrToI } from "../string/convert.js";
 import { stringDelete } from "../string/delete.js";
@@ -141,7 +142,9 @@ export class ScalarScanner {
       if (/^[-+]?\.\n?$/.test(string)) {
         return string;
       } else {
-        return kernelFloat(stringDelete(string, ",_").replace(/\.([Ee]|(?![^\n]))/g, "$1"));
+        return rbDbl2num(
+          kernelFloat(stringDelete(string, ",_").replace(/\.([Ee]|(?![^\n]))/g, "$1")),
+        );
       }
     } else if (integerRegex.test(string)) {
       return this.parseInt(string);

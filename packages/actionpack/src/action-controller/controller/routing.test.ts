@@ -15,8 +15,10 @@ import {
   RFC2396_PARSER,
   URI,
   first,
-  rbModConstDefined,
+  constDefined,
   type Module,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
@@ -26,7 +28,6 @@ import { RoutingError, UnknownHttpMethod, UrlGenerationError } from "../metal/ex
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
 import "../../test-helpers/lib/controller/fake-controllers.js";
-import { registerController } from "../base.js";
 
 type NamedRoutes = Record<string, (...args: unknown[]) => string>;
 
@@ -41,8 +42,8 @@ class MilestonesController extends Base {
     this.prototype.show = this.prototype.index;
   }
 }
-registerController("MilestonesController", MilestonesController);
-registerController("MilestonesController", MilestonesController);
+constSet(TopLevel, "MilestonesController", MilestonesController);
+constSet(TopLevel, "MilestonesController", MilestonesController);
 
 class UriReservedCharactersRoutingTest {
   set!: RouteSet;
@@ -1715,14 +1716,14 @@ describe("RouteSetTest", () => {
   });
 
   it("routing traversal does not load extra classes", async () => {
-    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
+    assertNot(constDefined(Object, "Profiler__"), "Profiler should not be loaded");
     set.draw(function () {
       this.get({ "/profile": "profile#index" });
     });
 
     await tc.requestPathParams("/profile").catch(() => null);
 
-    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
+    assertNot(constDefined(Object, "Profiler__"), "Profiler should not be loaded");
   });
 
   it("recognize with conditions and format", async () => {

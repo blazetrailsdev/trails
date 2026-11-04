@@ -1,6 +1,6 @@
 import type { AttrNameArg } from "@blazetrails/activemodel";
 import { I18n, Model } from "@blazetrails/activemodel";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -48,13 +48,13 @@ export const Validations = {
   customValidationContext,
 };
 
-rbModConstSet(ActiveRecord, "Validations", Validations);
-rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
-rbModConstSet(Validations, "AssociatedValidator", AssociatedValidator);
-rbModConstSet(Validations, "LengthValidator", LengthValidator);
-rbModConstSet(Validations, "NumericalityValidator", NumericalityValidator);
-rbModConstSet(Validations, "PresenceValidator", PresenceValidator);
-rbModConstSet(Validations, "UniquenessValidator", UniquenessValidator);
+constSet(ActiveRecord, "Validations", Validations);
+constSet(Validations, "AbsenceValidator", AbsenceValidator);
+constSet(Validations, "AssociatedValidator", AssociatedValidator);
+constSet(Validations, "LengthValidator", LengthValidator);
+constSet(Validations, "NumericalityValidator", NumericalityValidator);
+constSet(Validations, "PresenceValidator", PresenceValidator);
+constSet(Validations, "UniquenessValidator", UniquenessValidator);
 
 export interface Validations {
   validate(context?: ValidationContextArg): Promise<boolean>;

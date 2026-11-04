@@ -6,7 +6,6 @@ import {
   rbFSend,
   rbInspect,
   rbObjRespondTo,
-  registerConstant,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 
@@ -139,5 +138,3 @@ export class RangeType extends ValueType<Range<unknown>> {
     return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   }
 }
-
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range", RangeType);

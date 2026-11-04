@@ -6,9 +6,9 @@ import type { NamedBase } from "./named-base.js";
 // prettier-ignore
 const PLURAL_MODEL_NAME_WARN_MESSAGE = "[WARNING] The model name '%s' was recognized as a plural, using the singular '%s' instead. Override with --force-plural or setup custom inflection rules for this noun before running the generator.";
 // prettier-ignore
-const IRREGULAR_MODEL_NAME_WARN_MESSAGE = "[WARNING] Rails cannot recover singular form from its plural form '%s'.\nPlease setup custom inflection rules for this noun before running the generator in config/initializers/inflections.rb.\n";
+const IRREGULAR_MODEL_NAME_WARN_MESSAGE = "[WARNING] Trails cannot recover singular form from its plural form '%s'.\nPlease setup custom inflection rules for this noun before running the generator in config/initializers/inflections.rb.\n";
 // prettier-ignore
-const INFLECTION_IMPOSSIBLE_ERROR_MESSAGE = "Rails cannot recover the underscored form from its camelcase form '%s'.\nPlease use an underscored name instead, either '%s' or '%s'.\nOr setup custom inflection rules for this noun before running the generator in config/initializers/inflections.rb.\n";
+const INFLECTION_IMPOSSIBLE_ERROR_MESSAGE = "Trails cannot recover the underscored form from its camelcase form '%s'.\nPlease use an underscored name instead, either '%s' or '%s'.\nOr setup custom inflection rules for this noun before running the generator in config/initializers/inflections.rb.\n";
 
 export interface ModelHelpersOptions {
   forcePlural?: boolean;

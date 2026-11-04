@@ -76,7 +76,6 @@ export function eagerAutoload(this: Autoload, block: () => void): void {
   }
 }
 
-/** @missingRailsCall const_get — PERMANENT */
 export async function eagerLoadBang(this: Autoload): Promise<void> {
   if (this._eagerloadedConstants) {
     for (const constName of this._eagerloadedConstants) {

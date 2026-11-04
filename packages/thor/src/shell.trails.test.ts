@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "./test-helpers/helper.js";
 import {
   childProcessAdapterConfig,
   include,

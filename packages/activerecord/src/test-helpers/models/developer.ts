@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
@@ -15,8 +16,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
-import { registerModel } from "../../associations.js";
+import { Range, RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -207,7 +207,8 @@ export class Developer extends Base {
     this.auditLogs.build({ message });
   }
 }
-registerModel(Developer);
+constSet(TopLevel, "Developer", Developer);
+DescendantsTracker.registerSubclass(Base, Developer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Developer {
   get mentor(): Mentor | null | Promise<Mentor | null>;
@@ -225,7 +226,8 @@ export interface Developer {
 }
 
 export class SubDeveloper extends Developer {}
-registerModel(SubDeveloper);
+constSet(TopLevel, "SubDeveloper", SubDeveloper);
+DescendantsTracker.registerSubclass(Developer, SubDeveloper);
 
 export class SpecialDeveloper extends Base {
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -235,7 +237,8 @@ export class SpecialDeveloper extends Base {
     this.hasMany("specialContracts", { foreignKey: "developer_id" });
   }
 }
-registerModel(SpecialDeveloper);
+constSet(TopLevel, "SpecialDeveloper", SpecialDeveloper);
+DescendantsTracker.registerSubclass(Base, SpecialDeveloper);
 
 export class SymbolIgnoredDeveloper extends Base {
   declare last_name: unknown;
@@ -246,7 +249,8 @@ export class SymbolIgnoredDeveloper extends Base {
     this.attribute("last_name");
   }
 }
-registerModel(SymbolIgnoredDeveloper);
+constSet(TopLevel, "SymbolIgnoredDeveloper", SymbolIgnoredDeveloper);
+DescendantsTracker.registerSubclass(Base, SymbolIgnoredDeveloper);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLog extends Base {
@@ -259,7 +263,8 @@ export class AuditLog extends Base {
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
   }
 }
-registerModel(AuditLog);
+constSet(TopLevel, "AuditLog", AuditLog);
+DescendantsTracker.registerSubclass(Base, AuditLog);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLog {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -275,7 +280,8 @@ export class AuditLogRequired extends Base {
     this.belongsTo("developer", { required: true });
   }
 }
-registerModel(AuditLogRequired);
+constSet(TopLevel, "AuditLogRequired", AuditLogRequired);
+DescendantsTracker.registerSubclass(Base, AuditLogRequired);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLogRequired {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -297,7 +303,8 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
     });
   }
 }
-registerModel(DeveloperWithBeforeDestroyRaise);
+constSet(TopLevel, "DeveloperWithBeforeDestroyRaise", DeveloperWithBeforeDestroyRaise);
+DescendantsTracker.registerSubclass(Base, DeveloperWithBeforeDestroyRaise);
 
 export class DeveloperWithSelect extends Base {
   static {
@@ -307,7 +314,8 @@ export class DeveloperWithSelect extends Base {
     });
   }
 }
-registerModel(DeveloperWithSelect);
+constSet(TopLevel, "DeveloperWithSelect", DeveloperWithSelect);
+DescendantsTracker.registerSubclass(Base, DeveloperWithSelect);
 
 export class DeveloperwithDefaultMentorScopeNot extends Base {
   static {
@@ -317,7 +325,8 @@ export class DeveloperwithDefaultMentorScopeNot extends Base {
     });
   }
 }
-registerModel(DeveloperwithDefaultMentorScopeNot);
+constSet(TopLevel, "DeveloperwithDefaultMentorScopeNot", DeveloperwithDefaultMentorScopeNot);
+DescendantsTracker.registerSubclass(Base, DeveloperwithDefaultMentorScopeNot);
 
 export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
   static {
@@ -330,7 +339,12 @@ export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
     );
   }
 }
-registerModel(DeveloperWithDefaultMentorScopeAllQueries);
+constSet(
+  TopLevel,
+  "DeveloperWithDefaultMentorScopeAllQueries",
+  DeveloperWithDefaultMentorScopeAllQueries,
+);
+DescendantsTracker.registerSubclass(Base, DeveloperWithDefaultMentorScopeAllQueries);
 
 export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
   static {
@@ -344,7 +358,12 @@ export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
     );
   }
 }
-registerModel(DeveloperWithDefaultNilableFirmScopeAllQueries);
+constSet(
+  TopLevel,
+  "DeveloperWithDefaultNilableFirmScopeAllQueries",
+  DeveloperWithDefaultNilableFirmScopeAllQueries,
+);
+DescendantsTracker.registerSubclass(Base, DeveloperWithDefaultNilableFirmScopeAllQueries);
 
 export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries extends Base {
   static {
@@ -361,7 +380,13 @@ export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScope
     );
   }
 }
-registerModel(
+constSet(
+  TopLevel,
+  "DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries",
+  DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries,
+);
+DescendantsTracker.registerSubclass(
+  Base,
   DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries,
 );
 
@@ -376,7 +401,8 @@ export class DeveloperWithIncludes extends Base {
     });
   }
 }
-registerModel(DeveloperWithIncludes);
+constSet(TopLevel, "DeveloperWithIncludes", DeveloperWithIncludes);
+DescendantsTracker.registerSubclass(Base, DeveloperWithIncludes);
 
 export class DeveloperFilteredOnJoins extends Base {
   declare projects: AssociationProxy<Project>;
@@ -398,7 +424,8 @@ export class DeveloperFilteredOnJoins extends Base {
     });
   }
 }
-registerModel(DeveloperFilteredOnJoins);
+constSet(TopLevel, "DeveloperFilteredOnJoins", DeveloperFilteredOnJoins);
+DescendantsTracker.registerSubclass(Base, DeveloperFilteredOnJoins);
 
 export class DeveloperOrderedBySalary extends Base {
   declare static byName: () => Relation<DeveloperOrderedBySalary>;
@@ -417,7 +444,8 @@ export class DeveloperOrderedBySalary extends Base {
     });
   }
 }
-registerModel(DeveloperOrderedBySalary);
+constSet(TopLevel, "DeveloperOrderedBySalary", DeveloperOrderedBySalary);
+DescendantsTracker.registerSubclass(Base, DeveloperOrderedBySalary);
 
 export class DeveloperCalledDavid extends Base {
   static {
@@ -427,7 +455,8 @@ export class DeveloperCalledDavid extends Base {
     });
   }
 }
-registerModel(DeveloperCalledDavid);
+constSet(TopLevel, "DeveloperCalledDavid", DeveloperCalledDavid);
+DescendantsTracker.registerSubclass(Base, DeveloperCalledDavid);
 
 export class LazyLambdaDeveloperCalledDavid extends Base {
   static {
@@ -437,7 +466,8 @@ export class LazyLambdaDeveloperCalledDavid extends Base {
     });
   }
 }
-registerModel(LazyLambdaDeveloperCalledDavid);
+constSet(TopLevel, "LazyLambdaDeveloperCalledDavid", LazyLambdaDeveloperCalledDavid);
+DescendantsTracker.registerSubclass(Base, LazyLambdaDeveloperCalledDavid);
 
 export class LazyBlockDeveloperCalledDavid extends Base {
   static {
@@ -447,7 +477,8 @@ export class LazyBlockDeveloperCalledDavid extends Base {
     });
   }
 }
-registerModel(LazyBlockDeveloperCalledDavid);
+constSet(TopLevel, "LazyBlockDeveloperCalledDavid", LazyBlockDeveloperCalledDavid);
+DescendantsTracker.registerSubclass(Base, LazyBlockDeveloperCalledDavid);
 
 export class CallableDeveloperCalledDavid extends Base {
   static {
@@ -456,7 +487,8 @@ export class CallableDeveloperCalledDavid extends Base {
     this.defaultScope({ call: () => call });
   }
 }
-registerModel(CallableDeveloperCalledDavid);
+constSet(TopLevel, "CallableDeveloperCalledDavid", CallableDeveloperCalledDavid);
+DescendantsTracker.registerSubclass(Base, CallableDeveloperCalledDavid);
 
 export class ClassMethodDeveloperCalledDavid extends Base {
   static {
@@ -467,7 +499,8 @@ export class ClassMethodDeveloperCalledDavid extends Base {
     return this.where({ name: "David" });
   }
 }
-registerModel(ClassMethodDeveloperCalledDavid);
+constSet(TopLevel, "ClassMethodDeveloperCalledDavid", ClassMethodDeveloperCalledDavid);
+DescendantsTracker.registerSubclass(Base, ClassMethodDeveloperCalledDavid);
 
 export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<ClassMethodReferencingScopeDeveloperCalledDavid>;
@@ -483,7 +516,12 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
     return this.david();
   }
 }
-registerModel(ClassMethodReferencingScopeDeveloperCalledDavid);
+constSet(
+  TopLevel,
+  "ClassMethodReferencingScopeDeveloperCalledDavid",
+  ClassMethodReferencingScopeDeveloperCalledDavid,
+);
+DescendantsTracker.registerSubclass(Base, ClassMethodReferencingScopeDeveloperCalledDavid);
 
 export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<LazyBlockReferencingScopeDeveloperCalledDavid>;
@@ -498,7 +536,12 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
     });
   }
 }
-registerModel(LazyBlockReferencingScopeDeveloperCalledDavid);
+constSet(
+  TopLevel,
+  "LazyBlockReferencingScopeDeveloperCalledDavid",
+  LazyBlockReferencingScopeDeveloperCalledDavid,
+);
+DescendantsTracker.registerSubclass(Base, LazyBlockReferencingScopeDeveloperCalledDavid);
 
 export class DeveloperCalledJamis extends Base {
   declare legacy_updated_at: any;
@@ -526,7 +569,8 @@ export class DeveloperCalledJamis extends Base {
     });
   }
 }
-registerModel(DeveloperCalledJamis);
+constSet(TopLevel, "DeveloperCalledJamis", DeveloperCalledJamis);
+DescendantsTracker.registerSubclass(Base, DeveloperCalledJamis);
 
 export class PoorDeveloperCalledJamis extends Base {
   static {
@@ -536,7 +580,8 @@ export class PoorDeveloperCalledJamis extends Base {
     });
   }
 }
-registerModel(PoorDeveloperCalledJamis);
+constSet(TopLevel, "PoorDeveloperCalledJamis", PoorDeveloperCalledJamis);
+DescendantsTracker.registerSubclass(Base, PoorDeveloperCalledJamis);
 
 export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -546,7 +591,8 @@ export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
     });
   }
 }
-registerModel(InheritedPoorDeveloperCalledJamis);
+constSet(TopLevel, "InheritedPoorDeveloperCalledJamis", InheritedPoorDeveloperCalledJamis);
+DescendantsTracker.registerSubclass(DeveloperCalledJamis, InheritedPoorDeveloperCalledJamis);
 
 export class MultiplePoorDeveloperCalledJamis extends Base {
   static {
@@ -562,7 +608,8 @@ export class MultiplePoorDeveloperCalledJamis extends Base {
     });
   }
 }
-registerModel(MultiplePoorDeveloperCalledJamis);
+constSet(TopLevel, "MultiplePoorDeveloperCalledJamis", MultiplePoorDeveloperCalledJamis);
+DescendantsTracker.registerSubclass(Base, MultiplePoorDeveloperCalledJamis);
 
 export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -572,7 +619,12 @@ export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis
     });
   }
 }
-registerModel(ModuleIncludedPoorDeveloperCalledJamis);
+constSet(
+  TopLevel,
+  "ModuleIncludedPoorDeveloperCalledJamis",
+  ModuleIncludedPoorDeveloperCalledJamis,
+);
+DescendantsTracker.registerSubclass(DeveloperCalledJamis, ModuleIncludedPoorDeveloperCalledJamis);
 
 export class EagerDeveloperWithDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -594,7 +646,8 @@ export class EagerDeveloperWithDefaultScope extends Base {
     });
   }
 }
-registerModel(EagerDeveloperWithDefaultScope);
+constSet(TopLevel, "EagerDeveloperWithDefaultScope", EagerDeveloperWithDefaultScope);
+DescendantsTracker.registerSubclass(Base, EagerDeveloperWithDefaultScope);
 
 export class EagerDeveloperWithClassMethodDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -617,7 +670,12 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
     return this.includes(":projects");
   }
 }
-registerModel(EagerDeveloperWithClassMethodDefaultScope);
+constSet(
+  TopLevel,
+  "EagerDeveloperWithClassMethodDefaultScope",
+  EagerDeveloperWithClassMethodDefaultScope,
+);
+DescendantsTracker.registerSubclass(Base, EagerDeveloperWithClassMethodDefaultScope);
 
 export class EagerDeveloperWithLambdaDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -639,7 +697,8 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
     });
   }
 }
-registerModel(EagerDeveloperWithLambdaDefaultScope);
+constSet(TopLevel, "EagerDeveloperWithLambdaDefaultScope", EagerDeveloperWithLambdaDefaultScope);
+DescendantsTracker.registerSubclass(Base, EagerDeveloperWithLambdaDefaultScope);
 
 export class EagerDeveloperWithBlockDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -661,7 +720,8 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
     });
   }
 }
-registerModel(EagerDeveloperWithBlockDefaultScope);
+constSet(TopLevel, "EagerDeveloperWithBlockDefaultScope", EagerDeveloperWithBlockDefaultScope);
+DescendantsTracker.registerSubclass(Base, EagerDeveloperWithBlockDefaultScope);
 
 export class EagerDeveloperWithCallableDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -682,7 +742,12 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
     this.defaultScope({ call: () => call });
   }
 }
-registerModel(EagerDeveloperWithCallableDefaultScope);
+constSet(
+  TopLevel,
+  "EagerDeveloperWithCallableDefaultScope",
+  EagerDeveloperWithCallableDefaultScope,
+);
+DescendantsTracker.registerSubclass(Base, EagerDeveloperWithCallableDefaultScope);
 
 export class ThreadsafeDeveloper extends Base {
   static {
@@ -692,7 +757,8 @@ export class ThreadsafeDeveloper extends Base {
     });
   }
 }
-registerModel(ThreadsafeDeveloper);
+constSet(TopLevel, "ThreadsafeDeveloper", ThreadsafeDeveloper);
+DescendantsTracker.registerSubclass(Base, ThreadsafeDeveloper);
 
 export class CachedDeveloper extends Base {
   static {
@@ -704,7 +770,8 @@ export class CachedDeveloper extends Base {
     this.aliasAttribute("updated_on", "legacy_updated_on");
   }
 }
-registerModel(CachedDeveloper);
+constSet(TopLevel, "CachedDeveloper", CachedDeveloper);
+DescendantsTracker.registerSubclass(Base, CachedDeveloper);
 
 export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
   declare companies: AssociationProxy<Company>;
@@ -716,14 +783,19 @@ export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
     this.hasMany("contracts", { foreignKey: "developer_id" });
   }
 }
-registerModel(DeveloperWithIncorrectlyOrderedHasManyThrough);
+constSet(
+  TopLevel,
+  "DeveloperWithIncorrectlyOrderedHasManyThrough",
+  DeveloperWithIncorrectlyOrderedHasManyThrough,
+);
+DescendantsTracker.registerSubclass(Base, DeveloperWithIncorrectlyOrderedHasManyThrough);
 
 export class DeveloperName extends StringType {
   deserialize(value: unknown): string {
     return `Developer: ${value}`;
   }
 }
-registerConstant("DeveloperName", DeveloperName);
+constSet(TopLevel, "DeveloperName", DeveloperName);
 
 Type.register("developer_name", DeveloperName);
 
@@ -736,7 +808,8 @@ export class AttributedDeveloper extends Base {
     this.ignoredColumns = ["name"];
   }
 }
-registerModel(AttributedDeveloper);
+constSet(TopLevel, "AttributedDeveloper", AttributedDeveloper);
+DescendantsTracker.registerSubclass(Base, AttributedDeveloper);
 
 export class ColumnNamesCachedDeveloper extends Base {
   static {
@@ -744,7 +817,8 @@ export class ColumnNamesCachedDeveloper extends Base {
     if (this.columnNames().includes("name")) this.ignoredColumns = [...this.ignoredColumns, "name"];
   }
 }
-registerModel(ColumnNamesCachedDeveloper);
+constSet(TopLevel, "ColumnNamesCachedDeveloper", ColumnNamesCachedDeveloper);
+DescendantsTracker.registerSubclass(Base, ColumnNamesCachedDeveloper);
 
 export class AuditRequiredDeveloper extends Base {
   declare requiredAuditLogs: AssociationProxy<AuditLogRequired>;
@@ -754,7 +828,8 @@ export class AuditRequiredDeveloper extends Base {
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
   }
 }
-registerModel(AuditRequiredDeveloper);
+constSet(TopLevel, "AuditRequiredDeveloper", AuditRequiredDeveloper);
+DescendantsTracker.registerSubclass(Base, AuditRequiredDeveloper);
 
 export class DevWithAfterTouch extends Base {
   declare afterTouchCalled: boolean | undefined;
@@ -770,7 +845,8 @@ export class DevWithAfterTouch extends Base {
     });
   }
 }
-registerModel(DevWithAfterTouch);
+constSet(TopLevel, "DevWithAfterTouch", DevWithAfterTouch);
+DescendantsTracker.registerSubclass(Base, DevWithAfterTouch);
 
 export class MutatingSaveKlass extends Base {
   declare legacy_updated_at: any;
@@ -789,7 +865,8 @@ export class MutatingSaveKlass extends Base {
     });
   }
 }
-registerModel(MutatingSaveKlass);
+constSet(TopLevel, "MutatingSaveKlass", MutatingSaveKlass);
+DescendantsTracker.registerSubclass(Base, MutatingSaveKlass);
 
 export class MutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -808,7 +885,8 @@ export class MutatingUpdateKlass extends Base {
     });
   }
 }
-registerModel(MutatingUpdateKlass);
+constSet(TopLevel, "MutatingUpdateKlass", MutatingUpdateKlass);
+DescendantsTracker.registerSubclass(Base, MutatingUpdateKlass);
 
 export class NonMutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -821,4 +899,5 @@ export class NonMutatingUpdateKlass extends Base {
     this.beforeUpdate(function () {});
   }
 }
-registerModel(NonMutatingUpdateKlass);
+constSet(TopLevel, "NonMutatingUpdateKlass", NonMutatingUpdateKlass);
+DescendantsTracker.registerSubclass(Base, NonMutatingUpdateKlass);

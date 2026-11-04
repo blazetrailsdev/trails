@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Binary, type NodeOrValue } from "./binary.js";
 
 export class Over extends Binary {
@@ -12,4 +12,4 @@ export class Over extends Binary {
   }
 }
 
-rbModConstSet(Nodes, "Over", Over);
+constSet(Nodes, "Over", Over);

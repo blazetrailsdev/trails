@@ -1,11 +1,11 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Student } from "./student.js";
-import { Exception, registerConstant } from "@blazetrails/ruby-compat";
+import { Exception, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class LessonError extends Exception {}
-registerConstant("LessonError", LessonError);
+constSet(TopLevel, "LessonError", LessonError);
 
 export class Lesson extends Base {
   declare students: AssociationProxy<Student>;
@@ -22,4 +22,5 @@ export class Lesson extends Base {
     if (!(await this.students.isEmpty())) throw new LessonError();
   }
 }
-registerModel(Lesson);
+constSet(TopLevel, "Lesson", Lesson);
+DescendantsTracker.registerSubclass(Base, Lesson);

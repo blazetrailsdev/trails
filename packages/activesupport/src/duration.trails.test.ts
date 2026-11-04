@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import { Rational, rbCInteger, rbCNumeric } from "@blazetrails/ruby-compat";
+import { Rational, rbCInteger, rbCNumeric, rbFloatTypeP } from "@blazetrails/ruby-compat";
 import { Scalar, days, hours, seconds } from "./duration.js";
 
 describe("Scalar", () => {
@@ -141,5 +141,18 @@ describe("rb_obj_classname without a brand", () => {
     expect(rbObjClassname(days(1))).toBe("ActiveSupport::Duration");
     expect(rbObjClassname(new Scalar(1))).toBe("ActiveSupport::Duration::Scalar");
     expect(rbObjClassname(TimeZone.find("UTC")!.now())).toBe("ActiveSupport::TimeWithZone");
+  });
+});
+
+describe("Duration", () => {
+  it("<=> answers nil for a non-Numeric operand", () => {
+    expect(hours(2).compareTo("foo")).toBeNull();
+    expect(hours(2).compareTo(7200)).toBe(0);
+  });
+
+  it("to_f answers a Float for an Integer value", () => {
+    expect(rbFloatTypeP(hours(2).toF())).toBe(true);
+    expect(Number(hours(2).toF())).toBe(7200);
+    expect(rbFloatTypeP(new Scalar(3).toF())).toBe(true);
   });
 });

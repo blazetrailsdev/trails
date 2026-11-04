@@ -1,3 +1,4 @@
+import "./constants.excluded.generated.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecordError, StatementInvalid } from "./errors.js";
@@ -19,7 +20,7 @@ import {
   RuntimeError,
   StandardError,
   Zlib,
-  rbModConstSet,
+  constSet,
   rbObjRespondTo,
   slice,
   isModuleIncluded,
@@ -446,9 +447,9 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
-rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
-rbModConstSet(FixtureSet, "File", File);
+constSet(ActiveRecord, "FixtureSet", FixtureSet);
+constSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
 
-rbModConstSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);
+constSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);

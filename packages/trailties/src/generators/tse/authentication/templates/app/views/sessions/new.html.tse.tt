@@ -1,0 +1,11 @@
+<%%= flash().get("alert") != null ? tag.div(flash().get("alert"), { style: "color:red" }) : null %>
+<%%= flash().get("notice") != null ? tag.div(flash().get("notice"), { style: "color:green" }) : null %>
+
+<%%= formWith({ url: sessionPath() }, (form) => { %>
+  <%%= form.emailField("email_address", { required: true, autofocus: true, autocomplete: "username", placeholder: "Enter your email address", value: params().get("email_address") }) %><br>
+  <%%= form.passwordField("password", { required: true, autocomplete: "current-password", placeholder: "Enter your password", maxlength: 72 }) %><br>
+  <%%= form.submit("Sign in") %>
+<%% }) %>
+<br>
+
+<%%= linkTo("Forgot password?", newPasswordPath()) %>

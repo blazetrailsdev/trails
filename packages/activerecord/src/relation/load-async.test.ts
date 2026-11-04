@@ -4,10 +4,7 @@ import { Notifications, getEnv, type NotificationEvent } from "@blazetrails/acti
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../active-record.js";
 import { Rollback } from "../errors.js";
 import type { Relation } from "../relation.js";
-import { CategoryPost, Post } from "../test-helpers/models/post.js";
-import { Category } from "../test-helpers/models/category.js";
-import { Comment } from "../test-helpers/models/comment.js";
-import { registerModel } from "../associations.js";
+import { Post } from "../test-helpers/models/post.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { waitForAsyncQuery } from "../cases/helper.js";
@@ -15,13 +12,13 @@ import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { OtherDog } from "../test-helpers/models/other-dog.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
+import "../test-helpers/models/category.js";
+import "../test-helpers/models/comment.js";
 
 type Status = { executed?: boolean; async?: unknown };
 
 describe("LoadAsyncTest", () => {
   fixtures(["posts", "comments", "categories", "categoriesPosts"]);
-
-  for (const model of [Category, CategoryPost, Comment]) registerModel(model);
 
   it("scheduled?", async () => {
     const deferredPosts = Post.where({ author_id: 1 }).loadAsync();

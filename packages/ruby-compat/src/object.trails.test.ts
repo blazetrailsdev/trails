@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { nameErrMesgReceiver } from "./object.js";
+import { classModule } from "./class-module.js";
 import {
   defineModule,
   rbCModule,
@@ -77,7 +79,7 @@ import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 import { stringSuperclass } from "./string/method-table.js";
 
 describe("Object#inspect", () => {
@@ -1298,7 +1300,7 @@ describe("Exception#inspect", () => {
   it("names a namespaced class by its path", () => {
     class Outer {}
     class Inner extends Error {}
-    rbModConstSet(Outer, "Inner", Inner);
+    constSet(Outer, "Inner", Inner);
     expect(inspect(new Inner("boom"))).toBe("#<Outer::Inner: boom>");
   });
 });
@@ -1467,7 +1469,7 @@ describe("rbObjIsKindOf(obj, Module)", () => {
   it("answers a named plain-object module and a class, not a bare hash", () => {
     class Outer {}
     const mod = {};
-    rbModConstSet(Outer, "Inner", mod);
+    constSet(Outer, "Inner", mod);
     expect(rbObjIsKindOf(mod, Module)).toBe(true);
     expect(rbObjIsKindOf(Outer, Module)).toBe(true);
     expect(rbObjIsKindOf({ a: 1 }, Module)).toBe(false);
@@ -1548,5 +1550,49 @@ describe("a Hash subclass", () => {
     class Sub extends Hash<unknown, unknown> {}
     expect(rbObjIsKindOf(new Sub(), Hash)).toBe(true);
     expect(rbObjIsKindOf({}, Hash)).toBe(true);
+  });
+});
+
+describe("rb_obj_as_string on a class", () => {
+  it("dispatches to a class's own to_s", () => {
+    class Encoding64 {
+      static toString(): string {
+        return "base64";
+      }
+    }
+    expect(toS(Encoding64)).toBe("base64");
+  });
+
+  it("answers the module name for a class with no to_s of its own", () => {
+    class Plain {}
+    expect(toS(Plain)).toBe(rbModToS(Plain));
+  });
+});
+
+describe("respond_to? on a binary String", () => {
+  it("does not answer an Array-only name", () => {
+    expect(rbObjRespondTo(new Uint8Array([1, 2]), "join")).toBe(false);
+  });
+
+  it("still answers String and Object names", () => {
+    const str = new Uint8Array([1, 2]);
+    expect(rbObjRespondTo(str, "bytesize")).toBe(true);
+    expect(rbObjRespondTo(str, "toString")).toBe(true);
+  });
+});
+
+describe("nameErrMesgReceiver", () => {
+  it("phrases each receiver kind as name_err_mesg_to_str does", () => {
+    class Customer {}
+    class Nameable {
+      static readonly [classModule] = true;
+    }
+    expect(nameErrMesgReceiver(null)).toBe("nil");
+    expect(nameErrMesgReceiver(true)).toBe("true");
+    expect(nameErrMesgReceiver(false)).toBe("false");
+    expect(nameErrMesgReceiver(Customer)).toBe("class Customer");
+    expect(nameErrMesgReceiver(Nameable)).toBe("module Nameable");
+    expect(nameErrMesgReceiver(() => 1)).toBe("an instance of Proc");
+    expect(nameErrMesgReceiver(new Customer())).toBe("an instance of Customer");
   });
 });

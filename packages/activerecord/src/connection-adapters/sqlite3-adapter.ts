@@ -1,15 +1,18 @@
+import "../constants.sqlite3-adapter.generated.js";
+import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import {
   sortByBang,
   anybits,
   fetch,
   rbRegMatchP,
-  registerConstant,
   rbObjAsString,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
+import { retryBusy, setBusyHandlerTimeout } from "../sqlite/busy-wait.js";
 import { BusyException } from "../sqlite/errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -244,6 +247,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _connectionParameters: SQLite3ConnectionParameters;
   /** @internal */
   _lastAffectedRows = 0;
+
+  /** @internal */
+  _sharedLockHeld = false;
   /** @internal */
   _memoryDatabase: boolean;
   /** @internal */
@@ -1043,7 +1049,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall busy_handler — PERMANENT
+   * @inventedArm setBusyTimeout — PERMANENT
+   * @inventedArm retryBusy — PERMANENT
+   */
   override async configureConnection(): Promise<void> {
     if (rtest(this._config["timeout"]) && rtest(this._config["retries"])) {
       throw new ArgumentError("Cannot specify both timeout and retries arguments");
@@ -1052,13 +1063,15 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
-      this._rawConnection!.busyHandlerTimeout = timeout;
-      await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
+      setBusyHandlerTimeout(this._rawConnection!, timeout);
     } else if (rtest(this._config["retries"])) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
       );
+      const retries = SQLite3Adapter.typeCastConfigToInteger(this._config["retries"]) as number;
+      this._rawConnection!.busyHandler = (count) => count <= retries;
     }
+    await Pragmas.setBusyTimeout.call(this._rawConnection!, 0);
     await super.configureConnection();
 
     const pragmas = fetch<Record<string, string | number | boolean>>(this._config, "pragmas", {});
@@ -1068,9 +1081,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })) {
       const setter = `set${camelize(pragma)}`;
       if (Object.hasOwn(Pragmas, setter)) {
-        await (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
-          this._rawConnection!,
-          value,
+        await retryBusy(this._rawConnection!, () =>
+          (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
+            this._rawConnection!,
+            value,
+          ),
         );
       } else {
         console.warn(`Unknown SQLite pragma: ${pragma}`);
@@ -1378,7 +1393,5 @@ export interface SQLite3Adapter {
 
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
 
-registerConstant(
-  "ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer",
-  SQLite3Integer,
-);
+ConnectionAdapters.SQLite3Adapter = SQLite3Adapter;
+constSet(SQLite3Adapter, "SQLite3Integer", SQLite3Integer);

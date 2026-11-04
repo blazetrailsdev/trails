@@ -10,8 +10,10 @@ import { Model } from "@blazetrails/activemodel";
 import {
   extend,
   rbObjRespondTo,
-  registerConstant,
-  unregisterConstant,
+  TopLevel,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
@@ -125,12 +127,13 @@ describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)
 
   it("names a class expression a constant seat paths", () => {
     const seated = class extends Base {};
-    registerConstant("SeatedController", seated);
+    constSet(TopLevel, "SeatedController", seated);
     try {
       expect(() => new seated()).not.toThrow();
       expect(seated.controllerName()).toBe("seated");
     } finally {
-      unregisterConstant("SeatedController", seated);
+      if (constDefined(Object, "SeatedController", false))
+        rbModRemoveConst(Object, "SeatedController");
     }
   });
 });
@@ -375,7 +378,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
 
   it("fires the inherited hook for a subclass: default helper module", () => {
     const helper = { probe: () => "probed" };
-    registerConstant("ApiSubclassProbeHelper", helper);
+    constSet(TopLevel, "ApiSubclassProbeHelper", helper);
     const paths = ["app/helpers"];
     setHelpersPath(paths);
     try {
@@ -388,7 +391,8 @@ describe("ActionController::Helpers included into ActionController::API", () => 
       expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
     } finally {
       setHelpersPath([]);
-      unregisterConstant("ApiSubclassProbeHelper", helper);
+      if (constDefined(Object, "ApiSubclassProbeHelper", false))
+        rbModRemoveConst(Object, "ApiSubclassProbeHelper");
     }
   });
 });
@@ -397,7 +401,7 @@ type Probe = Record<string, () => unknown>;
 
 describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)", () => {
   it("includes the controller's default helper module with no helper call", () => {
-    registerConstant("DefaultHelperProbeHelper", { probe: () => "probed" });
+    constSet(TopLevel, "DefaultHelperProbeHelper", { probe: () => "probed" });
     class DefaultHelperProbeController extends Base {}
     new DefaultHelperProbeController();
     expect((extend({}, DefaultHelperProbeController._helpers) as Probe).probe()).toBe("probed");
@@ -420,7 +424,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
   });
 
   it("skips an anonymous controller class", () => {
-    registerConstant("KlassHelper", { leaked: () => "leaked" });
+    constSet(TopLevel, "KlassHelper", { leaked: () => "leaked" });
     const klass = (() => class extends Base {})();
     new klass();
     expect("leaked" in extend({}, klass._helpers)).toBe(false);

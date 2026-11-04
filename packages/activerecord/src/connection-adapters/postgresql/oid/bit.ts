@@ -1,4 +1,6 @@
-import { rbObjAsString, rbStrHex, registerConstant, rtest } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-bit.generated.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
+import { rbObjAsString, rbStrHex, rtest } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Bit extends ValueType<string> {
@@ -45,4 +47,4 @@ export class Data {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bit", Bit);
+ConnectionAdapters.PostgreSQL.OID.Bit = Bit;

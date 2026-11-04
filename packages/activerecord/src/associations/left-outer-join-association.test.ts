@@ -1,3 +1,4 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import {
   assertNothingRaised,
   assertEmpty,
@@ -5,7 +6,6 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Table } from "@blazetrails/arel";
 import { Author } from "../test-helpers/models/author.js";
@@ -37,21 +37,21 @@ describe("LeftOuterJoinAssociationTest", () => {
     "people",
   ]);
 
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(Comment);
-  registerModel(SpecialComment);
-  registerModel(SubSpecialComment);
-  registerModel(VerySpecialComment);
-  registerModel(Rating);
-  registerModel(Essay);
-  registerModel(Categorization);
-  registerModel(SpecialCategorization);
-  registerModel(Category);
-  registerModel(Person);
-  registerModel(Friendship);
-  registerModel(Reference);
-  registerModel(Job);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "Rating", Rating);
+  constSet(TopLevel, "Essay", Essay);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "Friendship", Friendship);
+  constSet(TopLevel, "Reference", Reference);
+  constSet(TopLevel, "Job", Job);
 
   it("merging multiple left joins from different associations", async () => {
     const count = await Author.joins(":posts")

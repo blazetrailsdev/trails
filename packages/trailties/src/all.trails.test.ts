@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import "./all.js";
@@ -5,16 +8,70 @@ import { Base } from "@blazetrails/activejob";
 import { Base as RecordBase } from "@blazetrails/activerecord";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 
-describe("rails/all", () => {
+describe("trails/all", () => {
   useInMemoryDatabaseUrl();
+
+  const root = fileURLToPath(new URL("..", import.meta.url));
+
+  it.skipIf(!existsSync(`${root}dist/all.d.ts`))(
+    "types every framework's Configuration for a consumer that only imports all",
+    () => {
+      const dir = mkdtempSync(`${root}.all-consumer-`);
+      try {
+        writeFileSync(
+          `${dir}/consumer.ts`,
+          `import "../dist/all.js";
+import { Application } from "../dist/index.js";
+export function read(config: InstanceType<typeof Application>["config"]) {
+  return [config.activeRecord, config.actionController, config.actionView, config.activeJob, config.i18n];
+}
+`,
+        );
+        writeFileSync(
+          `${dir}/tsconfig.json`,
+          JSON.stringify({
+            extends: "../tsconfig.json",
+            compilerOptions: {
+              noEmit: true,
+              composite: false,
+              incremental: false,
+              rootDir: "..",
+              skipLibCheck: true,
+            },
+            include: [],
+            files: ["consumer.ts"],
+            references: [],
+          }),
+        );
+        let output = "";
+        try {
+          execFileSync("pnpm", ["exec", "tsc", "-p", dir], { cwd: root, encoding: "utf8" });
+        } catch (e) {
+          const { status, stdout, stderr } = e as {
+            status: number;
+            stdout: string;
+            stderr: string;
+          };
+          output = `exit ${status}\n${stdout}${stderr}`;
+        }
+        expect(output).toBe("");
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
 
   it("boots every framework trailtie an app that only imports all.ts", async () => {
     class AllBootApp extends Application {}
     Application.register(AllBootApp);
     const app = AllBootApp.instance();
-    await app.initialize();
+    (
+      app.config as unknown as { activeStorage: { serviceConfigurations?: unknown } }
+    ).activeStorage.serviceConfigurations = {};
+    await app.initializeBang();
 
     for (const framework of [
       "activeSupport",

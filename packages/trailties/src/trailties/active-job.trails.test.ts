@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Deprecators, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import { ActiveJob, Base, Serializers } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
-import { isModuleIncluded, registerConstant } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Trailtie, type ActiveJobConfig } from "./active-job.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 
@@ -53,7 +53,7 @@ describe("ActiveJob::Railtie", () => {
         wrapped.push("perform");
       }
     }
-    registerConstant("ReloadedJob", ReloadedJob);
+    constSet(TopLevel, "ReloadedJob", ReloadedJob);
     await (Base as unknown as { execute(jobData: unknown): Promise<unknown> }).execute(
       new ReloadedJob().serialize(),
     );

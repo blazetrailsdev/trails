@@ -1748,7 +1748,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     });
   });
 
-  it("time zone setter with tzinfo timezone object wraps in rails time zone", () => {
+  it("time zone setter with tzinfo timezone object wraps in trails time zone", () => {
     const tzinfo = Timezone.get("America/New_York");
     setZone(tzinfo as unknown as string);
     expect(timeZone()).toBeInstanceOf(TimeZone);
@@ -1757,7 +1757,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     expect(timeZone()!.utcOffset).toEqual(-18_000);
   });
 
-  it("time zone setter with tzinfo timezone identifier does lookup and wraps in rails time zone", () => {
+  it("time zone setter with tzinfo timezone identifier does lookup and wraps in trails time zone", () => {
     setZone("America/New_York");
     expect(timeZone()).toBeInstanceOf(TimeZone);
     expect(timeZone()!.tzinfo.name).toEqual("America/New_York");

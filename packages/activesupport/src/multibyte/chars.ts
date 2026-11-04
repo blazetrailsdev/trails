@@ -3,6 +3,7 @@ import {
   equals as cmpEquals,
   KERNEL_METHODS,
   NoMethodError,
+  OBJECT_METHOD_TABLE,
   pack,
   PROTOCOL_PROBES,
   rbStrMatch,
@@ -31,6 +32,13 @@ export class Chars {
     return new Proxy(this, {
       get(target, prop, receiver) {
         if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
+        if (Object.hasOwn(OBJECT_METHOD_TABLE, prop)) {
+          const method = OBJECT_METHOD_TABLE[prop] as (
+            self: unknown,
+            ...args: unknown[]
+          ) => unknown;
+          return (...args: unknown[]) => method(receiver, ...args);
+        }
         if (KERNEL_METHODS.has(prop) || !target.respondToMissing(prop, false)) {
           if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return undefined;
           return () => {
@@ -49,6 +57,7 @@ export class Chars {
       has(target, prop) {
         if (prop in target) return true;
         if (typeof prop !== "string" || KERNEL_METHODS.has(prop)) return false;
+        if (Object.hasOwn(OBJECT_METHOD_TABLE, prop)) return true;
         return target.respondToMissing(prop, false);
       },
     });

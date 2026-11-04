@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Deprecation } from "../deprecation.js";
-import { NameError, rbEqual, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  NameError,
+  rbEqual,
+  constGet,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,
@@ -93,8 +101,14 @@ describe("DeprecatedConstantProxy#const_missing", () => {
   }
   Object.defineProperty(Target, "name", { value: "Undeprecated::Target" });
 
-  beforeAll(() => registerConstant("Undeprecated::Target", Target));
-  afterAll(() => unregisterConstant("Undeprecated::Target", Target));
+  beforeAll(() => {
+    constSet(TopLevel, "Undeprecated", {});
+    constSet(constGet(Object, "Undeprecated") as object, "Target", Target);
+  });
+  afterAll(() => {
+    if (constDefined(Object, "Undeprecated::Target", false))
+      rbModRemoveConst(constGet(Object, "Undeprecated") as object, "Target");
+  });
 
   it("resolves a child constant against the target itself, as target.const_get does", async () => {
     const proxy = new DeprecatedConstantProxy(

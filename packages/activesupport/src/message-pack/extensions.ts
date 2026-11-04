@@ -1,5 +1,5 @@
 import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
-import { extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { extend, constSet } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport } from "../namespaces.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
@@ -20,7 +20,7 @@ import {
   rbCDateTime,
   rbCInteger,
   rbCSymbol,
-  rbModConstGet,
+  constGet,
   rbObjMethod,
   rbRegInitStr,
   rbRegToS,
@@ -373,7 +373,7 @@ export const Extensions = {
 
   loadClass(name: string): ObjectClass {
     try {
-      return rbModConstGet(Object, name) as ObjectClass;
+      return constGet(Object, name) as ObjectClass;
     } catch (error) {
       if (!(error instanceof NameError)) throw error;
       if (String(error.constantName) === name) {
@@ -432,7 +432,7 @@ export const Extensions = {
 
 extend(Extensions, Extensions);
 
-rbModConstSet(ActiveSupport, "MessagePack", {});
-rbModConstSet(ActiveSupport.MessagePack!, "UnserializableObjectError", UnserializableObjectError);
-rbModConstSet(ActiveSupport.MessagePack!, "MissingClassError", MissingClassError);
-rbModConstSet(ActiveSupport.MessagePack!, "Extensions", Extensions);
+constSet(ActiveSupport, "MessagePack", {});
+constSet(ActiveSupport.MessagePack!, "UnserializableObjectError", UnserializableObjectError);
+constSet(ActiveSupport.MessagePack!, "MissingClassError", MissingClassError);
+constSet(ActiveSupport.MessagePack!, "Extensions", Extensions);

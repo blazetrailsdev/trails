@@ -11,9 +11,11 @@ export { File, type FileOpenOpt } from "./file.js";
 export { Base64 } from "./base64.js";
 export {
   classPathMismatches,
-  generatedClass,
-  generatedClassPath,
-  registerClassPaths,
+  rbClassPath,
+  rbConstTableGet,
+  isClassPathPending,
+  isModuleObject,
+  defineConstants,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";
 export { IO, PipeIO, STDERR, STDIN, STDOUT, print, printf, puts, rbOutputRs } from "./io.js";
@@ -101,6 +103,7 @@ export {
   rbClassAttachedObject,
   rbModToS,
   rbObjClassname,
+  nameErrMesgReceiver,
   rbObjRespondTo,
   rbObjSingletonClass,
   rbSetClassPathString,
@@ -121,6 +124,7 @@ export {
   TopLevel,
   type ConstantTable,
   type TopLevelConstants,
+  rbModUndefMethod,
 } from "./object.js";
 export {
   Hash,
@@ -252,8 +256,8 @@ export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs
 export {
   Module,
   rbCModule,
-  rbModConstDefined,
-  rbModConstSet,
+  constDefined,
+  constSet,
   defineModule,
   Kernel,
   type KernelModule,
@@ -286,12 +290,13 @@ export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
+export { kernelHash } from "./kernel-hash.js";
 export { format, sprintf } from "./kernel-format.js";
 export { camelized, kebabCase } from "./object.js";
 export { rbWarningSAref, rbWarningSAset, warn } from "./kernel-warn.js";
 export { kernelInteger, rbCheckToInt } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
-export { rbFSystem } from "./kernel-system.js";
+export { rbFBackquote, rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
 export { StopIteration } from "./stop-iteration.js";
 export { RangeError } from "./range-error.js";
@@ -346,10 +351,12 @@ export { NotImplementedError } from "./not-implemented-error.js";
 export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
+  ARGV,
   SystemExit,
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   abort,
   argv,
+  atExit,
   env,
   exec,
   exit,
@@ -388,21 +395,17 @@ export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
 export {
   resetConstants,
-  isRegisteredConstant,
   rbConstGet,
   rbGvGet,
   rbGvSet,
-  rbModConstGet,
+  constGet,
   rbModConstants,
   rbModDeprecateConstant,
   rbConstWarnIfDeprecated,
   rbConstMissing,
   rbModConstMissing,
   rbFBinding,
-  registerConstant,
-  registeredConstant,
   rbModRemoveConst,
-  unregisterConstant,
 } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
@@ -540,5 +543,5 @@ export {
 
 import { Kernel } from "./include.js";
 import { kernelRand } from "./kernel-rand.js";
-import "./class-paths.generated.js";
+import "./constants.generated.js";
 Kernel.rand = kernelRand;

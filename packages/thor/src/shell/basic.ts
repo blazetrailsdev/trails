@@ -9,7 +9,7 @@ import {
   Open3,
   print,
   puts,
-  rbConstGet,
+  constGet,
   rbEnsure,
   rbEqual,
   rbFSystem,
@@ -231,7 +231,7 @@ export class Basic {
   /** @internal */
   protected lookupColor(color: unknown): unknown {
     if (!isSymbol(color)) return color;
-    return rbConstGet(this.constructor, symbolToS(color).toUpperCase());
+    return constGet(this.constructor, symbolToS(color).toUpperCase());
   }
 
   /** @internal */
@@ -273,7 +273,7 @@ export class Basic {
 
   /** @internal */
   protected async showDiff(destination: string, content: unknown): Promise<void> {
-    const diffCmd = env["THOR_DIFF"] ?? env["RAILS_DIFF"] ?? "diff -u";
+    const diffCmd = env["THOR_DIFF"] ?? env["TRAILS_DIFF"] ?? "diff -u";
 
     await Tempfile.open(File.basename(destination), File.dirname(destination), async (temp) => {
       temp.write(content as string | Uint8Array);

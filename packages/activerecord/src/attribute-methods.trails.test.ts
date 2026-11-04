@@ -1,9 +1,18 @@
-import { basicObjRespondTo, Module, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import {
+  basicObjRespondTo,
+  Module,
+  rbInspect,
+  rbObjRespondTo,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
-import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
+import { Base, DangerousAttributeError, ReadonlyAttributeError } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
 import {
   attributesForCreate,
+  dangerousAttributeMethods,
   GeneratedAttributeMethods,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
@@ -13,9 +22,7 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 
-registerModel(Minivan);
-registerModel(CpkBook);
-registerModel(CpkOrder);
+constSet(TopLevel, "Minivan", Minivan);
 
 interface Generatable {
   defineAttributeMethods(): boolean;
@@ -217,7 +224,8 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     class ImportantTopic extends Topic {
       static {
-        registerModel(this);
+        constSet(TopLevel, "ImportantTopic", this);
+        DescendantsTracker.registerSubclass(Topic, this);
       }
     }
     await Topic.loadSchema();
@@ -283,6 +291,26 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(NonExistentTable.attributeNames()).toEqual(["name"]);
     await NonExistentTable.loadSchema();
     expect(NonExistentTable.attributeNames()).toEqual([]);
+  });
+
+  it("defining attribute methods raises DangerousAttributeError for Dirty methods", () => {
+    for (const name of [
+      "changes",
+      "changed",
+      "changedAttributes",
+      "previousChanges",
+      "changesToSave",
+      "savedChanges",
+      "changesApplied",
+    ]) {
+      class Report extends Base {
+        static {
+          this.attribute(name, "integer");
+        }
+      }
+
+      expect(() => Report.defineAttributeMethods()).toThrow(DangerousAttributeError);
+    }
   });
 
   it("aliasing an attribute onto an Active Record method raises DangerousAttributeError", () => {
@@ -672,5 +700,29 @@ describe("initialize_generated_modules", () => {
     expect(
       (Topic as unknown as { _generatedAssociationMethods: unknown })._generatedAssociationMethods,
     ).toBeInstanceOf(Module);
+  });
+});
+
+describe("dangerousAttributeMethods", () => {
+  it("derives the set from Base's prototype chain, covering every Base method", () => {
+    const names = dangerousAttributeMethods();
+    for (const name of [
+      "restoreAttributes",
+      "clearChangesInformation",
+      "savedChangeToAttribute",
+      "attributeInDatabase",
+      "save",
+      "dup",
+    ]) {
+      expect(names.has(name)).toBe(true);
+    }
+    expect(names.has("constructor")).toBe(false);
+    expect(names.has("hasOwnProperty")).toBe(false);
+  });
+
+  it("leaves the primary key's id methods to PrimaryKey's override", () => {
+    class Widget extends Base {}
+    expect(dangerousAttributeMethods().has("id")).toBe(true);
+    expect(() => Widget.isInstanceMethodAlreadyImplemented("id")).not.toThrow();
   });
 });

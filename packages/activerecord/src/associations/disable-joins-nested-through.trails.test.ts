@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -59,10 +61,14 @@ describe("DJAS routing widening — nested-through", () => {
       t.integer("nt_comment_id");
       t.integer("value");
     });
-    registerModel("NtAuthor", NtAuthor);
-    registerModel("NtPost", NtPost);
-    registerModel("NtComment", NtComment);
-    registerModel("NtRating", NtRating);
+    constSet(TopLevel, "NtAuthor", NtAuthor);
+    DescendantsTracker.registerSubclass(Base, NtAuthor);
+    constSet(TopLevel, "NtPost", NtPost);
+    DescendantsTracker.registerSubclass(Base, NtPost);
+    constSet(TopLevel, "NtComment", NtComment);
+    DescendantsTracker.registerSubclass(Base, NtComment);
+    constSet(TopLevel, "NtRating", NtRating);
+    DescendantsTracker.registerSubclass(Base, NtRating);
     (NtAuthor as any)._reflections = {};
     (NtPost as any)._reflections = {};
     (NtComment as any)._reflections = {};

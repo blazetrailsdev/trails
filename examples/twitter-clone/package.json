@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "express": "^4.21.2"

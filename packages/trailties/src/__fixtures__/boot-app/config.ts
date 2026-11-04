@@ -1,3 +1,3 @@
-import { Trails } from "../../rails.js";
+import { Trails } from "../../trails.js";
 import "./config/environment.js";
-export default Trails.application;
+export const Config = Trails.application;

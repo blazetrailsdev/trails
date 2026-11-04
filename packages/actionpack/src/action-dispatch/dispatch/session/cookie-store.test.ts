@@ -22,9 +22,10 @@ import {
   rbInspect,
   rbModToS,
   rbObjClass,
-  registerConstant,
   slice,
   type Included,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../../action-controller/base.js";
 import { deprecator } from "../../deprecator.js";
@@ -196,7 +197,7 @@ class CookieStoreTest extends IntegrationTest {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface CookieStoreTest extends Included<typeof CookieAssertions> {}
 include(CookieStoreTest, CookieAssertions);
-registerConstant("CookieStoreTest", CookieStoreTest);
+constSet(TopLevel, "CookieStoreTest", CookieStoreTest);
 
 describe("CookieStoreTest", () => {
   it("setting session value", async ({ testCase }) => {
@@ -292,10 +293,10 @@ describe("CookieStoreTest", () => {
     });
   });
 
-  // PERMANENT-SKIP: `with_autoload_path` pushes a Zeitwerk dir; CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)".
+  // PERMANENT-SKIP: `Marshal.load` names the class synchronously, and a JS read cannot run an awaited load; CLAUDE.md, "`Module#autoload` is a build step".
   it.skip("deserializes unloaded classes on get id", () => {});
 
-  // PERMANENT-SKIP: `with_autoload_path` pushes a Zeitwerk dir; CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)".
+  // PERMANENT-SKIP: `Marshal.load` names the class synchronously, and a JS read cannot run an awaited load; CLAUDE.md, "`Module#autoload` is a build step".
   it.skip("deserializes unloaded classes on get value", () => {});
 
   it("close raises when data overflows", async ({ testCase }) => {

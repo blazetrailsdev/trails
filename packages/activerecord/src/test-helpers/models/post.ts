@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { ScopeOn } from "../../scoping/named.js";
-import { kernelThrow, rbCallSuper, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbCallSuper, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -27,7 +28,6 @@ import { Base } from "../../base.js";
 import type { Column } from "../../connection-adapters/column.js";
 import { ScopeRegistry } from "../../scoping.js";
 import { DelegateCache } from "../../relation/delegation.js";
-import { registerModel } from "../../associations.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
@@ -47,7 +47,8 @@ export class CategoryPost extends Base {
     this.belongsTo("post");
   }
 }
-registerModel(CategoryPost);
+constSet(TopLevel, "CategoryPost", CategoryPost);
+DescendantsTracker.registerSubclass(Base, CategoryPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CategoryPost {
   get group(): Category | null | Promise<Category | null>;
@@ -681,7 +682,8 @@ export class Post extends Base {
     return this._log;
   }
 }
-registerModel(Post);
+constSet(TopLevel, "Post", Post);
+DescendantsTracker.registerSubclass(Base, Post);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Post {
   get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
@@ -723,7 +725,8 @@ export interface Post {
 }
 
 export class SpecialPost extends Post {}
-registerModel(SpecialPost);
+constSet(TopLevel, "SpecialPost", SpecialPost);
+DescendantsTracker.registerSubclass(Post, SpecialPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class StiPost extends Post {
@@ -731,7 +734,8 @@ export class StiPost extends Post {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
 }
-registerModel(StiPost);
+constSet(TopLevel, "StiPost", StiPost);
+DescendantsTracker.registerSubclass(Post, StiPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface StiPost {
   get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
@@ -743,21 +747,24 @@ export class AbstractStiPost extends Post {
     this.abstractClass = true;
   }
 }
-registerModel(AbstractStiPost);
+constSet(TopLevel, "AbstractStiPost", AbstractStiPost);
+DescendantsTracker.registerSubclass(Post, AbstractStiPost);
 
 export class SubStiPost extends StiPost {
   static {
     this._tableName = "posts";
   }
 }
-registerModel(SubStiPost);
+constSet(TopLevel, "SubStiPost", SubStiPost);
+DescendantsTracker.registerSubclass(StiPost, SubStiPost);
 
 export class SubAbstractStiPost extends AbstractStiPost {
   static {
     this._tableName = "posts";
   }
 }
-registerModel(SubAbstractStiPost);
+constSet(TopLevel, "SubAbstractStiPost", SubAbstractStiPost);
+DescendantsTracker.registerSubclass(AbstractStiPost, SubAbstractStiPost);
 
 export class NullPost extends Post {
   static {
@@ -766,7 +773,8 @@ export class NullPost extends Post {
     });
   }
 }
-registerModel(NullPost);
+constSet(TopLevel, "NullPost", NullPost);
+DescendantsTracker.registerSubclass(Post, NullPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FirstPost extends Base {
@@ -787,7 +795,8 @@ export class FirstPost extends Base {
     });
   }
 }
-registerModel(FirstPost);
+constSet(TopLevel, "FirstPost", FirstPost);
+DescendantsTracker.registerSubclass(Base, FirstPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FirstPost {
   get comment(): Comment | null | Promise<Comment | null>;
@@ -804,7 +813,8 @@ export class PostWithDefaultSelect extends Base {
     });
   }
 }
-registerModel(PostWithDefaultSelect);
+constSet(TopLevel, "PostWithDefaultSelect", PostWithDefaultSelect);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultSelect);
 
 export class TaggedPost extends Post {
   declare taggings: AssociationProxy<Tagging>;
@@ -823,7 +833,8 @@ export class TaggedPost extends Post {
     this.hasMany("tags", { through: "taggings" });
   }
 }
-registerModel(TaggedPost);
+constSet(TopLevel, "TaggedPost", TaggedPost);
+DescendantsTracker.registerSubclass(Post, TaggedPost);
 
 export class PostWithDefaultInclude extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -837,7 +848,8 @@ export class PostWithDefaultInclude extends Base {
     this.hasMany("comments", { foreignKey: "post_id" });
   }
 }
-registerModel(PostWithDefaultInclude);
+constSet(TopLevel, "PostWithDefaultInclude", PostWithDefaultInclude);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultInclude);
 
 export class PostWithSpecialCategorization extends Post {
   declare categorizations: AssociationProxy<Categorization>;
@@ -851,7 +863,8 @@ export class PostWithSpecialCategorization extends Post {
     });
   }
 }
-registerModel(PostWithSpecialCategorization);
+constSet(TopLevel, "PostWithSpecialCategorization", PostWithSpecialCategorization);
+DescendantsTracker.registerSubclass(Post, PostWithSpecialCategorization);
 
 export class PostWithDefaultScope extends Base {
   static {
@@ -862,7 +875,8 @@ export class PostWithDefaultScope extends Base {
     });
   }
 }
-registerModel(PostWithDefaultScope);
+constSet(TopLevel, "PostWithDefaultScope", PostWithDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultScope);
 
 export class PostWithPreloadDefaultScope extends Base {
   declare readers: AssociationProxy<Reader>;
@@ -875,7 +889,8 @@ export class PostWithPreloadDefaultScope extends Base {
     });
   }
 }
-registerModel(PostWithPreloadDefaultScope);
+constSet(TopLevel, "PostWithPreloadDefaultScope", PostWithPreloadDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithPreloadDefaultScope);
 
 export class PostWithIncludesDefaultScope extends Base {
   declare readers: AssociationProxy<Reader>;
@@ -888,7 +903,8 @@ export class PostWithIncludesDefaultScope extends Base {
     });
   }
 }
-registerModel(PostWithIncludesDefaultScope);
+constSet(TopLevel, "PostWithIncludesDefaultScope", PostWithIncludesDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithIncludesDefaultScope);
 
 export class SpecialPostWithDefaultScope extends Base {
   declare static unscopedAll: () => Relation<SpecialPostWithDefaultScope>;
@@ -908,7 +924,8 @@ export class SpecialPostWithDefaultScope extends Base {
     });
   }
 }
-registerModel(SpecialPostWithDefaultScope);
+constSet(TopLevel, "SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
+DescendantsTracker.registerSubclass(Base, SpecialPostWithDefaultScope);
 
 export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
   declare comments: AssociationProxy<CommentThatAutomaticallyAltersPostBody>;
@@ -925,7 +942,12 @@ export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
     });
   }
 }
-registerModel(PostThatLoadsCommentsInAnAfterSaveHook);
+constSet(
+  TopLevel,
+  "PostThatLoadsCommentsInAnAfterSaveHook",
+  PostThatLoadsCommentsInAnAfterSaveHook,
+);
+DescendantsTracker.registerSubclass(Base, PostThatLoadsCommentsInAnAfterSaveHook);
 
 export class PostWithAfterCreateCallback extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -942,7 +964,8 @@ export class PostWithAfterCreateCallback extends Base {
     });
   }
 }
-registerModel(PostWithAfterCreateCallback);
+constSet(TopLevel, "PostWithAfterCreateCallback", PostWithAfterCreateCallback);
+DescendantsTracker.registerSubclass(Base, PostWithAfterCreateCallback);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
@@ -958,7 +981,12 @@ export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
     });
   }
 }
-registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
+constSet(
+  TopLevel,
+  "PostWithCommentWithDefaultScopeReferencesAssociation",
+  PostWithCommentWithDefaultScopeReferencesAssociation,
+);
+DescendantsTracker.registerSubclass(Base, PostWithCommentWithDefaultScopeReferencesAssociation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PostWithCommentWithDefaultScopeReferencesAssociation {
   get firstComment():
@@ -976,7 +1004,8 @@ export class SerializedPost extends Base {
     this.serialize("title");
   }
 }
-registerModel(SerializedPost);
+constSet(TopLevel, "SerializedPost", SerializedPost);
+DescendantsTracker.registerSubclass(Base, SerializedPost);
 
 export class ConditionalStiPost extends Post {
   static {
@@ -985,10 +1014,12 @@ export class ConditionalStiPost extends Post {
     });
   }
 }
-registerModel(ConditionalStiPost);
+constSet(TopLevel, "ConditionalStiPost", ConditionalStiPost);
+DescendantsTracker.registerSubclass(Post, ConditionalStiPost);
 
 export class SubConditionalStiPost extends ConditionalStiPost {}
-registerModel(SubConditionalStiPost);
+constSet(TopLevel, "SubConditionalStiPost", SubConditionalStiPost);
+DescendantsTracker.registerSubclass(ConditionalStiPost, SubConditionalStiPost);
 
 export class PostWithDestroyCallback extends Base {
   static {
@@ -999,7 +1030,8 @@ export class PostWithDestroyCallback extends Base {
     });
   }
 }
-registerModel(PostWithDestroyCallback);
+constSet(TopLevel, "PostWithDestroyCallback", PostWithDestroyCallback);
+DescendantsTracker.registerSubclass(Base, PostWithDestroyCallback);
 
 export class FakeKlass {
   static relationDelegateClass = DelegateCache.relationDelegateClass;
@@ -1066,7 +1098,7 @@ export class FakeKlass {
     FakeKlass.initializeRelationDelegateCache.call(this as unknown as typeof Base);
   }
 }
-registerConstant("FakeKlass", FakeKlass);
+constSet(TopLevel, "FakeKlass", FakeKlass);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Postesque extends Base {
@@ -1089,7 +1121,8 @@ export class Postesque extends Base {
     });
   }
 }
-registerModel(Postesque);
+constSet(TopLevel, "Postesque", Postesque);
+DescendantsTracker.registerSubclass(Base, Postesque);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Postesque {
   get author(): Author | null | Promise<Author | null>;
@@ -1111,4 +1144,5 @@ export class PostRecord extends Base {
     this.hasMany("comments");
   }
 }
-registerModel(PostRecord);
+constSet(TopLevel, "PostRecord", PostRecord);
+DescendantsTracker.registerSubclass(Base, PostRecord);

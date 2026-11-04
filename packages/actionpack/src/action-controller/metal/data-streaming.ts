@@ -59,7 +59,7 @@ export function sendFile(
 /** @internal */
 export function sendData(
   this: DataStreamingHost,
-  data: string | Buffer,
+  data: string | Uint8Array,
   options: SendDataOptions = {},
 ): unknown {
   this.sendFileHeadersBang(options);
@@ -115,7 +115,13 @@ export function sendFileHeadersBang(
   this.headers.set("Content-Transfer-Encoding", "binary");
 }
 
-export const DataStreaming = { sendFile, sendData, sendFileHeadersBang };
+export const DataStreaming = {
+  DEFAULT_SEND_FILE_TYPE,
+  DEFAULT_SEND_FILE_DISPOSITION,
+  sendFile,
+  sendData,
+  sendFileHeadersBang,
+};
 extend(DataStreaming, Concern);
 
 ActionController.DataStreaming = DataStreaming;

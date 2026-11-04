@@ -1,9 +1,8 @@
-import { registerController } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 
 export class WelcomeController extends ApplicationController {
   static override controllerPath(): string {
-    return "rails/welcome";
+    return "trails/welcome";
   }
 
   static {
@@ -14,5 +13,3 @@ export class WelcomeController extends ApplicationController {
 }
 
 WelcomeController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
-
-registerController("Rails::WelcomeController", WelcomeController);

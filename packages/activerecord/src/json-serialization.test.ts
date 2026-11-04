@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ActiveSupportJSON, assertNotRespondTo } from "@blazetrails/activesupport";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 
 import { Contact, ContactSti } from "./test-helpers/models/contact.js";
 import { Author } from "./test-helpers/models/author.js";
@@ -15,11 +16,11 @@ import "./association-relation.js";
 
 fixtures({}, { useTransactionalTests: false });
 
-registerModel(Author);
-registerModel(Post);
-registerModel(Comment);
-registerModel(Tag);
-registerModel(Tagging);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Tag", Tag);
+constSet(TopLevel, "Tagging", Tagging);
 
 function setIncludeRootInJson(value: boolean, fn: () => void): void {
   const original = Base.includeRootInJson;
@@ -115,10 +116,10 @@ describe("JsonSerializationTest", () => {
     );
 
     const methodsJson = JSON.stringify(
-      contact.asJson({ only: "name", methods: ["label", "favoriteQuote"] }),
+      contact.asJson({ only: "name", methods: ["label", "favorite_quote"] }),
     );
     expect(methodsJson).toMatch(/"label":"Has cheezburger"/);
-    expect(methodsJson).toMatch(/"favoriteQuote":"Constraints are liberating"/);
+    expect(methodsJson).toMatch(/"favorite_quote":"Constraints are liberating"/);
   });
 
   it("uses serializable hash with frozen hash", () => {
@@ -297,12 +298,12 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     (david as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
       "Constraints are liberating";
     const json = JSON.stringify(
-      await david.asJson({ include: "posts", methods: ["favoriteQuote"] }),
+      await david.asJson({ include: "posts", methods: ["favorite_quote"] }),
     );
 
     assertNotRespondTo((await david.posts.first())!, "favoriteQuote");
-    expect(json).toMatch(/"favoriteQuote":"Constraints are liberating"/);
-    expect(json.match(/"favoriteQuote":/g)!.length).toBe(1);
+    expect(json).toMatch(/"favorite_quote":"Constraints are liberating"/);
+    expect(json.match(/"favorite_quote":/g)!.length).toBe(1);
   });
 
   it("should allow only option for list of authors", async () => {

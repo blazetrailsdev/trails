@@ -9,6 +9,8 @@
   "references": [
     { "path": "../activesupport" },
     { "path": "../date" },
+    { "path": "../mini-mime" },
+    { "path": "../net-smtp" },
     { "path": "../ruby-compat" },
     { "path": "../vitest-matchers" }
   ]

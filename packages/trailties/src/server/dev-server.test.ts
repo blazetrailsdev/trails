@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { RackApp } from "@blazetrails/actionpack";
 import type { TCPSocket } from "@blazetrails/ruby-compat";
 import { build } from "vite";
-import { AppGenerator } from "../generators/app-generator.js";
+import { AppGenerator } from "../generators/trails/app/app-generator.js";
 import { DevServer } from "./dev-server.js";
 
 const rackApp: RackApp = async (env) => {
@@ -41,10 +41,12 @@ function upgrade(origin: string, path: string, protocol?: string): Promise<strin
   });
 }
 
+const startDir = process.cwd();
 let tmpDir: string | undefined;
 let server: DevServer | undefined;
 
 afterEach(async () => {
+  process.chdir(startDir);
   await server?.stop();
   server = undefined;
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -57,9 +59,10 @@ async function generateApp(): Promise<string> {
   );
   await new AppGenerator(
     ["my-app"],
-    { database: "sqlite", skipDocker: true },
+    { skipInstall: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
+  process.chdir(startDir);
   return path.join(tmpDir, "my-app");
 }
 

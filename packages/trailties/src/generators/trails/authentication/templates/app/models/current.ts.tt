@@ -1,0 +1,11 @@
+import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
+import type { Session } from "./session.ts";
+
+export class Current extends CurrentAttributes {
+  declare static session: Session | null | undefined;
+
+  static {
+    this.attribute("session");
+    delegate.call(this.prototype, "user", { to: "session", allowNil: true });
+  }
+}

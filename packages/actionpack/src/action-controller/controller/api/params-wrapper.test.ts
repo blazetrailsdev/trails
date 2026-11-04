@@ -1,5 +1,5 @@
 import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, constGet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { API } from "../../api.js";
 import { TestCase } from "../../test-case.js";
@@ -22,7 +22,8 @@ describe("ParamsWrapperForApiTest", () => {
     value: "ParamsWrapperForApiTest::UsersController",
   });
 
-  registerConstant("ParamsWrapperForApiTest::Person", class Person {});
+  constSet(TopLevel, "ParamsWrapperForApiTest", {});
+  constSet(constGet(Object, "ParamsWrapperForApiTest") as object, "Person", class Person {});
 
   class ParamsWrapperForApiTest extends TestCase {
     static {

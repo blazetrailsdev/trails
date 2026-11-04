@@ -280,7 +280,7 @@ The guard is the port of `inherited`, not a deviation to retire. Where the arms
 report flags a guarded read or a first-read seed in one of these readers, it
 carries `@inventedArm … — PERMANENT` against this section.
 
-## A model is seated by `registerModel` (the `class` keyword's constant and its `inherited`)
+## A model is seated by the loader or `constSet` (the `class` keyword's constant and its `inherited`)
 
 A Ruby `class Foo < ActiveRecord::Base` does two things at the `class` keyword.
 It binds the constant `Foo`, which is what `compute_type`
@@ -290,46 +290,18 @@ it makes `Foo` a subclass of its parent as Ruby sees it: `inherited`
 (`inheritance.rb:287-294`) fires, and `Foo` is in the parent's
 `Class#subclasses`, which `DescendantsTracker` reads.
 
-A JS `class Foo extends Base {}` does neither. It binds a module-scope
-identifier, seats nothing a `rbConstGet` / `computeType` lookup can find, and
-fires no hook. trails has no autoloader to seat it either (root CLAUDE.md
-§ "Trails has no autoloader"), and no `inherited` (§ "`inherited` is deferred
-to own-property memo guards" above).
+A JS `class Foo extends Base {}` does neither, so each half has its own port
+(RFC 0213):
 
-**`registerModel` (`associations.ts`) is the port of that pair.** One call
-seats the constant and registers the subclass:
-
-- `registerModel(Foo)` seats `Foo` under its JS name, and under its `rbModName`
-  when a namespace gives it a different one. `registerModel("Name", Foo)` seats
-  it under the name given. `registerModel([Foo, Bar])` is one call per model.
-- Every form then registers the model with its `rbClassSuperclass` through
-  `DescendantsTracker.registerSubclass`, for every model, a direct child of
-  `Base` included, as Ruby does for every subclass. `Base` itself registers
-  nothing: Rails' `Base` has no model superclass
-  (`activerecord/lib/active_record/base.rb:282`), where trails' extends
-  ActiveModel's `Model`.
-
-`registerModel` is the interface application and test code uses to define a
-model, and its call sites in the test suite are correct as written. There is no
-separate one-argument `registerSubclass`: activesupport's two-argument
-`registerSubclass(parent, child)` is the port of
-`DescendantsTracker.register_subclass`, and the callers that have a parent and a
-child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
-calling it.
-
-A namespaced model is `registerModel((Sharded.Blog = this))`, a plain
-assignment, as `test-helpers/models/sharded/*.ts` do. `registerConstant` is not
-a seat for anything else: it is being deleted, and a reader that needs a model
-by name asks the `registerModel` registry, never `constantize` (root CLAUDE.md
-§ "Constant lookup is an import or a registry", 2026-10-28).
-
-This is a genuine language shortcoming, ratified here by the repo owner
-(2026-10-09). The ruling is recorded in the tasks-repo story
-`register-model-wrapper-is-deleted-tests-seat-constants` (RFC 0180), under
-"Direction change (Dean, 2026-10-09)" and "Register always, as `inherited`
-does". `registerModel` carries `@noRailsEquivalent PERMANENT` against
-this section; there is no story to delete it or to rewrite its callers to
-`registerConstant`.
+- **The constant.** An application model is seated by Zeitwerk (root
+  § "The application loader is Zeitwerk"). A framework class is seated on its namespace. A class no loader
+  manages is seated with `constSet(TopLevel, "Post", Post)`, the keyword's own
+  `rb_const_set`, or `constSet` on its namespace. A reader asks `constantize`.
+- **The subclass.** `_defaultAttributes` registers a model on its first read,
+  by own-property memo (`attributes.ts`). A parent's `descendants` cannot see a
+  child nothing has read, so trailties' `_registerAutoloaded` registers each
+  model the loader seats, and a test that needs it calls
+  `DescendantsTracker.registerSubclass`.
 
 ## A create path awaits its block before saving (`create`'s `&block`)
 
@@ -362,9 +334,9 @@ shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps th
 build in each create path, and the constructor's `assignAttributes` hands it
 the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
 nothing is parked on the record. `new` and `build` still raise.
-The block and any key after that writer run after `after_initialize`, which is
-not ratified here: `create-after-initialize-sees-awaited-attachment-writers`
-converges it.
+The constructor hands the block and `_runInitializeCallbacks` to
+`deferringToAssignment`, so they run after the writer and any key following it,
+in Rails' order.
 
 This is a genuine language shortcoming — JS has no synchronous await — ratified
 repo-wide here. This section is the wrapper's receipt: the wrapper raises no
@@ -558,7 +530,7 @@ A seat below is a plain `Owner.Name = Klass` assignment, and the inventory is
 of reads that happen **at module-eval time**. A read inside a function or
 method body is a plain ES import, correct even inside a cycle, so it is not
 listed here and does not need a namespace — see root CLAUDE.md
-§ "Call-time constant resolution". `rbModConstSet` appears only where the Rails
+§ "Call-time constant resolution". `constSet` appears only where the Rails
 body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
 
@@ -716,3 +688,157 @@ section at each builder: `exclusionConstraintsInCreate` and
 `uniqueConstraintsInCreate` in `postgresql/schema-dumper.ts`, and the base
 dumper's builders in `schema-dumper.ts`. It is the brace arm only. Any other
 extra branch in a builder is still a deviation to converge.
+
+## SQLite's busy handler runs between steps (`busy_handler`, `execute_batch2`)
+
+sqlite3-ruby's `busy_handler` runs inside the native step
+(`sqlite3 lib/sqlite3/database.rb:692-705`). A JS callback there could not
+await, so a wait would block the event loop holding the lock's other side.
+**`retryBusy` runs the handler between steps instead**, and the driver's own
+`busy_timeout` is always 0: `timeout` waits and yields, `retries` retries, and a
+config with neither raises at once. Statements and the configured pragmas go
+through `retryBusy`; a direct driver call elsewhere does not wait. `execBatch`
+splits a batch with `sqlite3_complete`'s state machine and steps each statement,
+so a retry resumes at the blocked one. SQLite skips the handler where waiting
+would deadlock, and no driver reports that case apart from an ordinary
+`SQLITE_BUSY`, so the adapter tracks it: a write that follows a `SELECT` or
+`WITH` in an open transaction raises at once, including a `SELECT` that took no
+lock. A SAVEPOINT after the read clears the tracking, and a `-- ` comment before
+the `SELECT` hides it, so those writes wait for the deadline. This is a genuine language shortcoming, ruled
+permanent by the repo owner on 2026-11-01 (trails#9582), and
+`@noRailsEquivalent PERMANENT` on those functions points at it.
+
+## Records are not Proxies (`method_missing`)
+
+Ruby reaches `NoMethodError` for an undefined name through
+`BasicObject#method_missing`, and ActiveRecord regenerates undefined attribute
+methods from the same hook. So `topic.mumbo` and `topic.mumbo = 5` raise at run
+time (`activerecord/test/cases/attribute_methods_test.rb:641-645`), and a read
+off an existing record after `undefine_attribute_methods` redefines the reader
+(`attribute_methods_test.rb:1098`).
+
+trails enforces both halves at **compile** time instead: `ActiveModel::Model`
+has no `[key: string]: unknown` index signature, so `topic.mumbo` does not
+type-check. An `as any` cast or a plain-JS caller still evades it, and there it
+reads `undefined` / creates an own property.
+
+The only JS read/write hook on an arbitrary name is a `Proxy` trap, and the
+converged shape would be a Proxy returned from the constructor standing in for
+`self`. **The blocker is cost**, measured on every ActiveModel instance: a
+`get` trap makes an attribute read 3.7× slower and an internal `_field` read
+64× slower, because a proxied object defeats the property-read inlining those
+reads get, and the internal-field number lands on every framework read, not
+only user code. **Records are not Proxies.** As a consequence:
+
+- An undefined name on a record is a type error, not a `NoMethodError`, and
+  untyped access reads `undefined` or silently creates an own property.
+- A generated reader removed by `undefineAttributeMethods` is not regenerated by
+  reading it off an existing record. It comes back through
+  `defineAttributeMethods`
+  (`activerecord/lib/active_record/attribute_methods.rb:104`), or through
+  construction.
+
+**The Migration half.** Rails' `Migration#method_missing`
+(`activerecord/lib/active_record/migration.rb:1044-1059`) wraps every DSL
+statement (`create_table`, `add_column`, …) in `say_with_time` and sends it to
+`execution_strategy`. trails has no such dispatch, so `migration.ts` declares
+typed forwarders, each a `this.methodMissing(name, ...args)` call. They
+**stay**. A Proxy would not buy back extra surface either: typing the proxied
+statements needs a declaration-merged `interface Migration` in the same file,
+whose members `parity:api:extra` counts exactly as it counts the class members.
+
+This is a genuine language shortcoming, ratified repo-wide here. Tests mirroring
+the Rails `NoMethodError` arms port the assertions that do not depend on the
+hook, and there is no story to proxy records or to replace the Migration
+forwarders. It does not rule out a `Proxy` on some other non-record object whose
+Rails counterpart dispatches through `method_missing`; that is decided per class
+(see § "Ruby protocol methods with a different JS mechanism").
+
+## A record is built with `new Klass` only (`Inheritance::ClassMethods#new`)
+
+Ruby has one way to build a record, `Klass.new(attributes, &block)`, and
+`Inheritance::ClassMethods#new`
+(`activerecord/lib/active_record/inheritance.rb:56-78`) overrides it: it raises
+`NotImplementedError` for an abstract class or `Base`, resolves an STI subclass
+through `subclass_from_attributes`, and calls `subclass.new` or `super`.
+
+JS builds an object with the `new` expression, and that is the only spelling
+trails has. **There is no static `Klass.new`.** `new Klass(attributes, block)`
+is Rails' `Klass.new(attributes, &block)`, so the body of
+`Inheritance::ClassMethods#new` runs in `Base`'s constructor
+(`packages/activerecord/src/base.ts`): the abstract raise, then the three
+`subclass_from_attributes` arms in Rails' order, then
+`new subclass(attributes, block)` or the rest of the constructor, which is
+`Class#new`. A static `new` beside the constructor was rejected by the repo
+owner (trails#8659): it leaves two spellings for one operation, and either the
+bare `new` silently skips the abstract check and the STI dispatch, or the
+constructor has to re-enter the static method through a marker and run twice.
+
+As a consequence:
+
+- A Rails `klass.new(attributes, &block)` ports as
+  `new klass(attributes, block)`, in source and in tests. Generated application
+  code says `new Post(params)` too (`trailties/src/generators/active-model.ts`).
+- `inheritance.rb`'s `new` has no member in `inheritance.ts`. Do not add one,
+  and do not file a story to move the body out of the constructor.
+- `Persistence#becomes` (`persistence.rb:487-500`) is `klass.allocate` +
+  `initialize`, which skips `Inheritance::ClassMethods#new`. It reaches the
+  constructor with `_suppressAbstractCheck` and `_suppressStiNewDispatch` set.
+- `Relation#new` and `CollectionProxy#new` are instance methods with no `new`
+  expression to stand in for them, and stay.
+- A record loaded from the database is built with `new` too. Rails'
+  `instantiate_instance_of` is `klass.allocate.init_with_attributes(attributes,
+&block)` (`persistence.rb:313`), which skips `initialize`. The JS spelling of
+  `allocate`, `Object.create`, also skips every class-field initializer, so a
+  model field such as `history = []` would be unset on a record `find`
+  returns. That was tried on trails#8661 and reddened
+  `TransactionCallbacksTest` on all three adapters. `Base.allocate` therefore
+  goes through the constructor and carries `@noRailsEquivalent PERMANENT`, and
+  the arm in `Core`'s constructor that recognises an allocation carries
+  `@inventedArm if — PERMANENT`.
+
+This is ratified repo-wide here by the repo owner.
+
+## A `ClassMethods#new` that runs after `super` (`Deduplicable`)
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+`Deduplicable::ClassMethods#new` is `super.deduplicate`
+(`activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15`),
+so it runs once, after the most-derived class's whole `initialize` chain.
+JS has no hook that runs after the most-derived constructor returns, and a
+static `Klass.new` is ruled out (§ "A record is built with `new Klass`
+only"). So each includer's or subclass's constructor ends with
+`if (new.target === X) return this.deduplicate();`, and a subclass with no
+Rails `initialize` (`MySQL::Column`) is named in its parent's guard rather
+than given a constructor. Each guard carries `@inventedArm if — PERMANENT`
+where the arm gate compares the declaration.
+Ruled by the repo owner on 2026-10-27.
+
+## SQLite's double-quoted-string setting
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+better-sqlite3 compiles with
+`SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
+`strict: false` cannot re-enable double-quoted string literals on that
+driver.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `relation/delegation.rb`'s Proxy sits once above `Relation.prototype`, so
+  only a lookup that missed the relation's class chain reaches it. Its `has`
+  trap has no receiver, so `in` answers neither a name the model's
+  `respond_to_missing?` claims before that relation method is generated nor
+  `Symbol.iterator`, which the `get` trap answers only once the records are
+  loaded synchronously. `rbObjRespondTo` answers `respond_to?`. The `set`
+  trap seats an `undefined` placeholder for each `_` field a relation first
+  writes on a private layer between `Relation.prototype` and the Proxy, so
+  later writes stop short of the Proxy and a member defined on
+  `Relation.prototype` later still shadows it.

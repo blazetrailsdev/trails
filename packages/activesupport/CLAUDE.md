@@ -33,7 +33,7 @@ A seat below is a plain `Owner.Name = Klass` assignment, and the inventory is
 of reads that happen **at module-eval time**. A read inside a function or
 method body is a plain ES import, correct even inside a cycle, so it is not
 listed here and does not need a namespace — see root CLAUDE.md
-§ "Call-time constant resolution". `rbModConstSet` appears only where the Rails
+§ "Call-time constant resolution". `constSet` appears only where the Rails
 body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
 
@@ -52,10 +52,15 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   with no `autoload` call: `ActiveSupport.BroadcastLogger` (`active_support.rb:30`,
   read at `logger.rb:21`) and `Attribute.UserProvidedDefault` on the class Rails
   nests it in (`attribute_registration.rb:5`).
+- A namespace object is seated on `TopLevel` with `constSet(TopLevel,
+"ActiveSupport", ActiveSupport)`, and a nested constant on its owner with
+  `constSet(Owner, "Name", Klass)`; there is no full-path `"A::B"` seat, so
+  `constantize` walks one segment at a time. A class the generated table names
+  needs no seat for its name.
 - `TopLevel` in `ruby-compat/src/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
-  (`trailties/src/rails.ts`), `TopLevel.ActionDispatch` /
+  (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /
   `TopLevel.ActionController` (`actionpack/src/namespaces.ts`), and
   `TopLevel.BCrypt` (`bcrypt/src/index.ts`; an unseated `BCrypt` is
   `has_secure_password`'s `LoadError` arm, `secure_password.rb:120-125`). A
@@ -117,3 +122,33 @@ before the synchronous reader.** As a consequence:
   raising load prints `message_pack.rb:3-10`'s warning and raises.
 - Code outside a booted application awaits the load itself, or imports
   `@blazetrails/activesupport/message-pack`.
+
+## A thread-owned lock is owned by the Fiber (`ThreadLoadInterlockAwareMonitor`)
+
+Rails' `ThreadLoadInterlockAwareMonitor` records `Thread.current` as its owner
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/concurrency/load_interlock_aware_monitor.rb:46-63`),
+and its `@mutex` is owned by the Fiber, as Ruby 3's `Mutex` is. Ruby runs one
+flow per Thread, so the Fiber that locks the mutex is the one whose exit
+unlocks it. JS can start two flows on one Thread, and `ExecutionWrapper.wrap`
+runs each on its own Fiber (story `executor-wrap-concurrent-flows-on-one-thread`).
+A Thread owner then shares one count between those Fibers, and the last exit
+unlocks the mutex from a Fiber that does not hold it.
+
+**`mon_try_enter`, `mon_enter` and `mon_exit` compare and record
+`Fiber.current`.** A Fiber nested under the owner waits for the lock where
+MRI's would re-enter. `ThreadError`'s message stays Rails' "current thread not
+owner". ruby-compat's `Monitor#enter` is owned by the Fiber as well, as MRI's
+is (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76-85`). Ruled by the repo
+owner on 2026-11-04 (trails#9706). Do not converge it back to `Thread`.
+
+## `Isolation::Subprocess#run_in_isolation`'s child
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+Rails' child ends with
+`exit!(0)` and answers `Minitest::Result.from(self)`
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/testing/isolation.rb:83-87`).
+A Vitest child hands its result back and lets the runner finish, so
+`isolation.ts` calls neither, and dumps the test itself. Both are `PERMANENT`
+receipts. Ruled by the repo owner on 2026-11-01 (trails#9561).

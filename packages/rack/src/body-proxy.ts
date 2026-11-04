@@ -1,4 +1,5 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Rack } from "./namespaces.js";
 
 export class BodyProxy {
   private body: any;
@@ -114,3 +115,5 @@ export class BodyProxy {
     throw new Error(`NoMethodError: undefined method '${methodName}'`);
   }
 }
+
+Rack.BodyProxy = BodyProxy;

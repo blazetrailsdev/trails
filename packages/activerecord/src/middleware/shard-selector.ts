@@ -1,6 +1,7 @@
 import { fetch, rbProcCall } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
+import { Middleware } from "../namespaces.js";
 
 export type ShardRequest = InstanceType<NonNullable<typeof TopLevel.ActionDispatch>["Request"]> & {
   method: string;
@@ -47,3 +48,5 @@ export class ShardSelector {
     ) as Promise<T>;
   }
 }
+
+Middleware.ShardSelector = ShardSelector;

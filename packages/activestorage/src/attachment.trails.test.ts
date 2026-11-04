@@ -1,23 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { DelegationError } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
+import { VariantWithRecord } from "./variant-with-record.js";
 import { createBlob, User } from "./test-helpers/test-helper.js";
-
-// BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
-Object.assign(Blob.prototype, {
-  isAnalyzed: () => false,
-  analyzeLater: async () => {},
-  isPreviewImageNeededBeforeProcessingVariants: () => false,
-});
-Object.defineProperty(User.prototype, "attachmentReflections", {
-  value: {},
-  configurable: true,
-});
 
 describe("Attachment", () => {
   let attachment: Attachment;
@@ -29,6 +19,11 @@ describe("Attachment", () => {
       record: await User.createBang({ name: "Josh" }),
       blob: await createBlob({ filename: "hello.txt" }),
     });
+  });
+
+  it("keeps its qualified name through registerModel", () => {
+    expect(rbModName(Attachment)).toBe("ActiveStorage::Attachment");
+    expect(User.computeType("ActiveStorage::Attachment")).toBe(Attachment);
   });
 
   it("delegates missing names to a loaded blob", async () => {
@@ -85,8 +80,35 @@ describe("Attachment", () => {
   });
 
   it("raises for an unknown named variant", async () => {
-    await expect(attachment.variant("thumb")).rejects.toThrow(
+    expect(() => attachment.variant("thumb")).toThrow(
       new ArgumentError("Cannot find variant :thumb for User#avatar"),
     );
+  });
+});
+
+describe("Attachment#variant", () => {
+  it("answers synchronously for a transformation hash once the blob is loaded", async () => {
+    ActiveStorage.verifier = new MessageVerifier("Testing");
+    const attachment = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    await attachment.blob;
+
+    const variant = attachment.variant({ resizeToLimit: [100, 100] });
+
+    expect(variant).toBeInstanceOf(VariantWithRecord);
+  });
+
+  it("raises TypeError before the blob is loaded", async () => {
+    const created = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    const attachment = await Attachment.find(created.id);
+
+    expect(() => attachment.variant({ resizeToLimit: [100, 100] })).toThrow(TypeError);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { encode, warn } from "@blazetrails/ruby-compat";
+import { encode, Range, warn } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
@@ -765,7 +765,7 @@ describe("get_byte_ranges", () => {
   });
 
   it("parse simple byte ranges from env", () => {
-    expect(Utils.byteRanges({ HTTP_RANGE: "bytes=123-456" }, 500)).toEqual([[123, 456]]);
+    expect(Utils.byteRanges({ HTTP_RANGE: "bytes=123-456" }, 500)).toEqual([new Range(123, 456)]);
   });
 
   it("ignore missing or syntactically invalid byte ranges", () => {
@@ -780,24 +780,24 @@ describe("get_byte_ranges", () => {
   });
 
   it("parse simple byte ranges", () => {
-    expect(Utils.getByteRanges("bytes=123-456", 500)).toEqual([[123, 456]]);
-    expect(Utils.getByteRanges("bytes=123-", 500)).toEqual([[123, 499]]);
-    expect(Utils.getByteRanges("bytes=-100", 500)).toEqual([[400, 499]]);
-    expect(Utils.getByteRanges("bytes=0-0", 500)).toEqual([[0, 0]]);
-    expect(Utils.getByteRanges("bytes=499-499", 500)).toEqual([[499, 499]]);
+    expect(Utils.getByteRanges("bytes=123-456", 500)).toEqual([new Range(123, 456)]);
+    expect(Utils.getByteRanges("bytes=123-", 500)).toEqual([new Range(123, 499)]);
+    expect(Utils.getByteRanges("bytes=-100", 500)).toEqual([new Range(400, 499)]);
+    expect(Utils.getByteRanges("bytes=0-0", 500)).toEqual([new Range(0, 0)]);
+    expect(Utils.getByteRanges("bytes=499-499", 500)).toEqual([new Range(499, 499)]);
   });
 
   it("parse several byte ranges", () => {
     expect(Utils.getByteRanges("bytes=500-600,601-999", 1000)).toEqual([
-      [500, 600],
-      [601, 999],
+      new Range(500, 600),
+      new Range(601, 999),
     ]);
   });
 
   it("truncate byte ranges", () => {
-    expect(Utils.getByteRanges("bytes=123-999", 500)).toEqual([[123, 499]]);
+    expect(Utils.getByteRanges("bytes=123-999", 500)).toEqual([new Range(123, 499)]);
     expect(Utils.getByteRanges("bytes=600-999", 500)).toEqual([]);
-    expect(Utils.getByteRanges("bytes=-999", 500)).toEqual([[0, 499]]);
+    expect(Utils.getByteRanges("bytes=-999", 500)).toEqual([new Range(0, 499)]);
   });
 
   it("ignore unsatisfiable byte ranges", () => {

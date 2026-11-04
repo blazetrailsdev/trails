@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-schema-dumper.generated.js";
 import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import type { Column } from "./column.js";
 import type { SQLite3Adapter } from "../sqlite3-adapter.js";

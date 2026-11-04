@@ -1,4 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-specialized-string.generated.js";
+
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { StringType } from "@blazetrails/activemodel";
 
 export class SpecializedString extends StringType {
@@ -17,7 +19,4 @@ export class SpecializedString extends StringType {
   }
 }
 
-registerConstant(
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::SpecializedString",
-  SpecializedString,
-);
+ConnectionAdapters.PostgreSQL.OID.SpecializedString = SpecializedString;

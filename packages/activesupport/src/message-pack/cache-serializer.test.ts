@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../message-pack.js";
-import { env as ENV, registerConstant, setEnv } from "@blazetrails/ruby-compat";
+import { env as ENV, setEnv, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { assertNotNil } from "../testing/assertions.js";
 
 class HasValue {
@@ -48,13 +48,13 @@ describe("MessagePackCacheSerializerTest", () => {
   };
 
   beforeAll(() => {
-    registerConstant("DefinesJsonCreate", DefinesJsonCreate);
-    registerConstant("DefinesFromMsgpackExt", DefinesFromMsgpackExt);
+    constSet(TopLevel, "DefinesJsonCreate", DefinesJsonCreate);
+    constSet(TopLevel, "DefinesFromMsgpackExt", DefinesFromMsgpackExt);
   });
 
-  it("works with ENV['RAILS_MAX_THREADS']", () => {
+  it("works with ENV['TRAILS_MAX_THREADS']", () => {
     const originalEnv = { ...ENV };
-    setEnv("RAILS_MAX_THREADS", "1");
+    setEnv("TRAILS_MAX_THREADS", "1");
     try {
       const serialized = dump("value");
       expect(serialized).toBeInstanceOf(Uint8Array);

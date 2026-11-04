@@ -1,16 +1,15 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { CachedDeveloper, Developer } from "./test-helpers/models/developer.js";
 import { Client, Firm } from "./test-helpers/models/company.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
-import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
-registerModel(Owner);
-registerModel(Pet);
+constSet(TopLevel, "Owner", Owner);
+constSet(TopLevel, "Pet", Pet);
 
 function toFs(ts: unknown, fmt: "usec" | "number"): string {
   if (!(ts instanceof RubyTime)) throw new Error("expected a Time");

@@ -1,3 +1,4 @@
+import { Rack } from "./namespaces.js";
 export class MediaType {
   static SPLIT_PATTERN = /[;,]/;
 
@@ -28,3 +29,5 @@ export class MediaType {
     return str && str.startsWith('"') && str.endsWith('"') ? str.slice(1, -1) : str || "";
   }
 }
+
+Rack.MediaType = MediaType;

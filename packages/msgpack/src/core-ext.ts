@@ -10,7 +10,7 @@ import {
   rbCSymbol,
   rbCTrueClass,
   rbFSend,
-  rbModConstSet,
+  constSet,
   rbModDefineMethod,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -98,4 +98,4 @@ rbModDefineMethod(
   },
 );
 
-rbModConstSet(MessagePack, "CoreExt", CoreExt);
+constSet(MessagePack, "CoreExt", CoreExt);

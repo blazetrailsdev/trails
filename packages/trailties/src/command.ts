@@ -1,5 +1,18 @@
+import "./constants.command.generated.js";
+import { Trails } from "./trails.js";
 import { presence } from "@blazetrails/activesupport";
-import { File, Pathname, env, rbArgv } from "@blazetrails/ruby-compat";
+import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
+import {
+  File,
+  Pathname,
+  StandardError,
+  env,
+  exit,
+  prepend,
+  rbArgv,
+  rbInspect,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
@@ -9,6 +22,34 @@ import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
+
+export class CorrectableNameError extends StandardError {
+  readonly name: string;
+  /** @internal */
+  _alternatives: string[];
+  /** @internal */
+  _corrections?: string[];
+
+  constructor(message: string, name: string, alternatives: string[]) {
+    super(message);
+    this.name = name;
+    this._alternatives = alternatives;
+  }
+
+  get corrections(): string[] {
+    return (this._corrections ??= new SpellChecker({ dictionary: this._alternatives }).correct(
+      this.name,
+    ));
+  }
+}
+
+prepend(CorrectableNameError, Correctable);
+
+export class UnrecognizedCommandError extends CorrectableNameError {
+  constructor(name: string, commands: string[]) {
+    super(`Unrecognized command ${rbInspect(name)}`, name, commands);
+  }
+}
 
 let _hiddenCommands: (typeof Base)[] | undefined;
 
@@ -28,44 +69,78 @@ export function root(): Pathname | undefined {
   }
 }
 
-/**
- * @inventedArm endsWith — CONVERGEABLE app-path-expands-to-the-application-root
- * @inventedArm dirname — CONVERGEABLE app-path-expands-to-the-application-root
- */
 export function applicationRoot(): Pathname | undefined {
-  if (APP_PATH != null) {
-    const path = File.expandPath("../..", APP_PATH);
-    return new Pathname(
-      APP_PATH.endsWith("/dist/config/application.js") ? File.dirname(path) : path,
-    );
-  }
+  if (APP_PATH != null) return new Pathname(File.expandPath("../..", APP_PATH));
   return undefined;
 }
 
 /**
- * @missingRailsArgs invoke_rake — PERMANENT
  * @inventedArm replaceAll — PERMANENT
+ * @inventedArm if — CONVERGEABLE port-help-and-version-commands-for-split-namespace
  */
-export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
+export async function invoke(
+  fullNamespace: string,
+  args: string[] = [],
+  config: Record<string, unknown> = {},
+): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
-  await withArgv(args, async () => {
-    if (command && "perform" in command) {
-      if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-        await command.perform(name, args, {});
-      } else {
-        await invokeRake(fullNamespace, args);
+  try {
+    await withArgv(args, async () => {
+      if (
+        fullNamespace === "" ||
+        fullNamespace === "help" ||
+        HELP_MAPPINGS.has(fullNamespace) ||
+        VERSION_MAPPINGS.has(fullNamespace)
+      ) {
+        const rake = (await findByNamespace("rake")) as typeof Base;
+        await lookupBang();
+        const program = createProgram();
+        if (fullNamespace !== "" && !VERSION_MAPPINGS.has(fullNamespace)) {
+          const tasks = await rake.printingCommands();
+          const width = Math.max(0, ...tasks.map(([name]) => name.length));
+          program.addHelpText(
+            "after",
+            ["", "In addition to those commands, there are:", ""]
+              .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
+              .join("\n"),
+          );
+        }
+        await program.parseAsync(fullNamespace === "" ? args : [fullNamespace, ...args], {
+          from: "user",
+        });
+        return;
       }
-    } else if (command && command.name() === name) {
-      await command.parent!.parseAsync([name, ...args], { from: "user" });
-    } else if (command && command.commands.some((c) => c.name() === name)) {
-      await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
+      if (command && "perform" in command) {
+        if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+          await command.perform(name, args, config);
+        } else {
+          await invokeRake(fullNamespace, args, config);
+        }
+      } else if (command && command.name() === name) {
+        await command.parent!.parseAsync([name, ...args], { from: "user" });
+      } else if (command && command.commands.some((c) => c.name() === name)) {
+        await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
+      } else {
+        await invokeRake(fullNamespace, args, config);
+      }
+    });
+  } catch (error) {
+    if (!(error instanceof UnrecognizedCommandError)) throw error;
+    if (
+      error.name === fullNamespace &&
+      command &&
+      "perform" in command &&
+      commandName === fullNamespace
+    ) {
+      await command.perform("help", [], config);
     } else {
-      await invokeRake(fullNamespace, args);
+      stdout.write(`${error.detailedMessage()}\n`);
     }
-  });
+    exit(1);
+  }
 }
 
 /** @inventedArm replaceAll — PERMANENT */
@@ -76,7 +151,7 @@ export async function findByNamespace(
   namespace = namespace.replaceAll("_", "-");
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName.replaceAll("_", "-")}`);
-  lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
+  lookups.push(...lookups.map((lookup) => `trails:${lookup}`));
 
   await lookup(lookups);
 
@@ -87,6 +162,16 @@ export async function findByNamespace(
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
   const found = lookups.find((lookup) => namespaces.has(lookup));
   return found === undefined ? undefined : namespaces.get(found);
+}
+
+export async function printingCommands(): Promise<[string, string | null][]> {
+  await lookupBang();
+  const commands = await Promise.all(
+    subclasses()
+      .filter((klass) => !hiddenCommands().includes(klass))
+      .map((klass) => klass.printingCommands()),
+  );
+  return commands.flat();
 }
 
 /** @internal */
@@ -111,17 +196,13 @@ async function withArgv(argv: string[], block: () => Promise<void>): Promise<voi
 }
 
 /** @internal */
-async function invokeRake(task: string, args: string[]): Promise<void> {
-  await lookupBang();
-  const program = createProgram();
-  const colon = task.indexOf(":");
-  if (colon > 0) {
-    const command = program.commands.find((c) => c.name() === task.slice(0, colon));
-    const subcommand = task.slice(colon + 1);
-    if (command?.commands.some((c) => c.name() === subcommand)) {
-      await program.parseAsync([command.name(), subcommand, ...args], { from: "user" });
-      return;
-    }
-  }
-  await program.parseAsync(task === "" ? args : [task, ...args], { from: "user" });
+async function invokeRake(
+  task: string,
+  args: string[],
+  config: Record<string, unknown>,
+): Promise<void> {
+  if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
+  await ((await findByNamespace("rake")) as typeof Base).perform(task, args, config);
 }
+
+Trails.Command = { invoke };

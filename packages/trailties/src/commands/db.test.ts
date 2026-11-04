@@ -3,9 +3,10 @@ import {
   env,
   setEnv,
   getProcessAdapter,
-  registerConstant,
   registerProcessAdapter,
   StringIO,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { createProgram } from "../cli.js";
 import { setAppPath, setEnginePath } from "../app-path.js";
@@ -27,7 +28,7 @@ import {
   setSchemaFormat,
 } from "@blazetrails/activerecord";
 import { Base, DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
@@ -61,7 +62,7 @@ async function establishMigrationConnection(
   const { Base, HashConfig, ConnectionAdapters } = await import("@blazetrails/activerecord");
   const adapterName = `sqlite3_migration_${(migrationAdapters += 1)}`;
   const className = `SQLite3MigrationAdapter${migrationAdapters}`;
-  registerConstant(className, function () {
+  constSet(TopLevel, className, function () {
     return adapter;
   });
   ConnectionAdapters.register(adapterName, className);
@@ -192,11 +193,11 @@ describe("DbCommand", () => {
 });
 
 describe("resolveEnv", () => {
-  const origRailsEnv = env.TRAILS_ENV;
+  const origTrailsEnv = env.TRAILS_ENV;
   const origNodeEnv = env.NODE_ENV;
 
   afterEach(() => {
-    setEnv("TRAILS_ENV", origRailsEnv);
+    setEnv("TRAILS_ENV", origTrailsEnv);
     setEnv("NODE_ENV", origNodeEnv);
   });
 

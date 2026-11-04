@@ -1,14 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Post } from "../test-helpers/models/post.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { registerModel } from "../index.js";
 
-registerModel(ShipPart);
-registerModel(Ship);
-registerModel(Treasure);
+constSet(TopLevel, "ShipPart", ShipPart);
+constSet(TopLevel, "Ship", Ship);
+constSet(TopLevel, "Treasure", Treasure);
 
 describe("Relation#[] — delegated to records (delegation.rb:98-102)", () => {
   fixtures(["posts"]);

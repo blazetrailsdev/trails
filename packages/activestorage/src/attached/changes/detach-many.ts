@@ -18,7 +18,6 @@ export class DetachMany {
     this.attachments = attachments;
   }
 
-  /** @missingRailsCall delete — CONVERGEABLE call-gate-credits-computed-delete */
   async detach(): Promise<void> {
     if ((await this.attachments).length > 0) {
       if (rbObjRespondTo(this.attachments, "deleteAll")) {

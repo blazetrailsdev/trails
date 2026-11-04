@@ -1,6 +1,7 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { SingularAssociation } from "../associations/singular-association.js";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -21,12 +22,12 @@ describe("PresenceValidationTest", () => {
   fixtures([]);
 
   beforeAll(async () => {
-    registerModel("Human", Human);
-    registerModel("Boy", Boy);
-    registerModel("Face", Face);
-    registerModel("Interest", Interest);
-    registerModel("Speedometer", Speedometer);
-    registerModel("Dashboard", Dashboard);
+    constSet(TopLevel, "Human", Human);
+    constSet(TopLevel, "Boy", Boy);
+    constSet(TopLevel, "Face", Face);
+    constSet(TopLevel, "Interest", Interest);
+    constSet(TopLevel, "Speedometer", Speedometer);
+    constSet(TopLevel, "Dashboard", Dashboard);
   });
 
   afterEach(() => {

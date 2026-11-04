@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Dir, File, FileUtils, SecureRandom, getProcessAdapter } from "@blazetrails/ruby-compat";
-import { AppBuilder, AppGenerator } from "./app-generator.js";
+import { AppBuilder, AppGenerator } from "./trails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
 
@@ -16,12 +16,35 @@ describe("AppGenerator (trails-only)", () => {
     FileUtils.mkdirP(tmpDir);
   });
 
+  const startDir = process.cwd();
   afterEach(() => {
+    process.chdir(startDir);
     FileUtils.rmRf(tmpDir);
   });
 
+  it("sourceRoot names the existing templates directory", async () => {
+    const root = (await AppGenerator.sourceRoot()) as string;
+    expect(root.endsWith("/generators/trails/app/templates")).toBe(true);
+    expect(await File.isDirectory(root)).toBe(true);
+  });
+
+  it("ignores public/assets unless the app is API only", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(await File.readAsync(File.join(tmpDir, "my-app/.gitignore"))).toContain(
+      "!/tmp/storage/.keep\n\n/public/assets\n\n*.tsbuildinfo\n",
+    );
+  });
+
   it("generates action cable files by default", async () => {
-    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     const cable = fs.readFileSync(path.join(tmpDir, "my-app/config/cable.ts"), "utf-8");
     expect(cable).toContain('adapter: "redis"');
@@ -29,6 +52,19 @@ describe("AppGenerator (trails-only)", () => {
     expect(fs.existsSync(path.join(tmpDir, "my-app/app/channels"))).toBe(false);
     const pkg = JSON.parse(fs.readFileSync(path.join(tmpDir, "my-app/package.json"), "utf-8"));
     expect(pkg.dependencies["@blazetrails/actioncable"]).toBeDefined();
+    expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
+  });
+
+  it("writes config/boot.ts and imports it first from config/application.ts", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, database: "sqlite" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(fs.existsSync(path.join(tmpDir, "my-app/config/boot.ts"))).toBe(true);
+    expect(fs.readFileSync(path.join(tmpDir, "my-app/config/application.ts"), "utf8")).toMatch(
+      /^import "\.\/boot\.ts";\n/,
+    );
   });
 
   it("boots and builds its views under plain node, with no loader", async () => {
@@ -37,7 +73,7 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator(
         ["my-app"],
-        { database: "sqlite" },
+        { skipInstall: true, database: "sqlite" },
         { destinationRoot: root },
       ).invokeAll();
       const app = path.join(root, "my-app");
@@ -75,7 +111,7 @@ describe("AppGenerator (trails-only)", () => {
   it("builds with trails-tsc against db/schema.ts so models need no declares", async () => {
     await new AppGenerator(
       ["my-app"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
@@ -88,11 +124,11 @@ describe("AppGenerator (trails-only)", () => {
   it("--dev points every @blazetrails package at the local checkout", async () => {
     await new AppGenerator(
       ["my-app"],
-      { database: "sqlite", dev: true },
+      { skipInstall: true, database: "sqlite", dev: true },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
-    const trailties = File.join(Generators.RAILS_DEV_PATH, "packages", "trailties");
+    const trailties = File.join(Generators.TRAILS_DEV_PATH, "packages", "trailties");
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`link:${trailties}`);
     expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^link:.*trails-tsc$/);
@@ -105,7 +141,7 @@ describe("AppGenerator (trails-only)", () => {
   it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
     await new AppGenerator(
       ["my-app"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
@@ -117,7 +153,7 @@ describe("AppGenerator (trails-only)", () => {
   it("guards each namespaced environment setting the way the Rails templates do", async () => {
     await new AppGenerator(
       ["my-app"],
-      { database: "sqlite", api: true, skipActiveRecord: true },
+      { skipInstall: true, database: "sqlite", api: true, skipActiveRecord: true },
       { destinationRoot: tmpDir },
     ).invokeAll();
 
@@ -135,7 +171,11 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("generates an app with Active Job on unless --skip-active-job is passed", async () => {
-    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
 
     expect(File.isExist(File.join(tmpDir, "my-app", "app", "jobs", "application-job.ts"))).toBe(
       true,
@@ -146,7 +186,7 @@ describe("AppGenerator (trails-only)", () => {
 
     await new AppGenerator(
       ["skipped-app"],
-      { skipActiveJob: true },
+      { skipInstall: true, skipActiveJob: true },
       { destinationRoot: tmpDir },
     ).invokeAll();
     expect(File.isExist(File.join(tmpDir, "skipped-app", "app", "jobs"))).toBe(false);
@@ -154,13 +194,17 @@ describe("AppGenerator (trails-only)", () => {
 
   it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
     const build = (o: { skipEslint?: boolean } = {}) =>
-      new AppGenerator(["my-app"], { ...o }, { destinationRoot: tmpDir });
+      new AppGenerator(["my-app"], { skipInstall: true, ...o }, { destinationRoot: tmpDir });
     expect(build().options.skipEslint).toBeUndefined();
     expect(build({ skipEslint: false }).options.skipEslint).toBe(false);
   });
 
   it("writes bin/eslint executable, as bin/trails is", async () => {
-    await new AppGenerator(["my-app"], {}, { destinationRoot: tmpDir }).invokeAll();
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
     expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
   });
 
@@ -170,7 +214,7 @@ describe("AppGenerator (trails-only)", () => {
       FileUtils.mkdirP(dir);
       await new AppGenerator(
         ["my-app"],
-        { database: "postgresql", ...opts },
+        { skipInstall: true, database: "postgresql", ...opts },
         { destinationRoot: dir },
       ).invokeAll();
       return File.read(File.join(dir, "my-app", ".github", "workflows", "ci.yml"));
@@ -194,7 +238,7 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator(
         ["my-app"],
-        { database: "sqlite" },
+        { skipInstall: true, database: "sqlite" },
         { destinationRoot: tmpDir },
       ).invokeAll();
     } finally {
@@ -218,7 +262,7 @@ describe("AppGenerator (trails-only)", () => {
     try {
       await new AppGenerator(
         ["my-app"],
-        { database: "sqlite" },
+        { skipInstall: true, database: "sqlite" },
         { destinationRoot: tmpDir },
       ).invokeAll();
     } finally {
@@ -228,5 +272,70 @@ describe("AppGenerator (trails-only)", () => {
     expect(File.isExist(File.join(tmpDir, "my-app", "custom-keep", ".keep"))).toBe(true);
     expect(kept).toBe("custom-keep/.keep");
     expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
+  });
+
+  it("honors the skip options create_* guards read", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, skipGit: true, skipActiveRecord: true, skipTest: true, dummyApp: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    const exists = (file: string) => File.isExist(File.join(tmpDir, "my-app", file));
+    expect(exists(".gitignore")).toBe(false);
+    expect(exists(".gitattributes")).toBe(false);
+    expect(exists("config/database.ts")).toBe(false);
+    expect(exists("db/seeds.ts")).toBe(false);
+    expect(exists("test/test-helper.ts")).toBe(false);
+    expect(exists("Dockerfile")).toBe(false);
+  });
+
+  it("writes the system test keep file unless skipKeeps", async () => {
+    await new AppGenerator(
+      ["kept"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    await new AppGenerator(
+      ["bare"],
+      { skipInstall: true, skipKeeps: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(File.isExist(File.join(tmpDir, "kept/test/system/.keep"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "bare/test/system/.keep"))).toBe(false);
+    expect(File.isExist(File.join(tmpDir, "bare/test/application-system-test-case.ts"))).toBe(true);
+  });
+
+  it("dispatches Rails' root steps to a builder that answers them", async () => {
+    const calls: string[] = [];
+    TopLevel.AppBuilder = class extends AppBuilder {
+      async rakefile(): Promise<void> {
+        calls.push("rakefile");
+      }
+      async rubyVersion(): Promise<void> {
+        calls.push("rubyVersion");
+      }
+      async versionControl(): Promise<void> {
+        calls.push("versionControl");
+      }
+    };
+    try {
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true },
+        { destinationRoot: tmpDir },
+      ).invokeAll();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
+  });
+
+  it("writes .node-version twice without a conflict when usingNode", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, javascript: "esbuild" },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    expect(fs.readFileSync(path.join(tmpDir, "my-app/.node-version"), "utf-8")).toBe("24.16.0\n");
   });
 });

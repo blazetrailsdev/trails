@@ -102,3 +102,18 @@ export async function assertInitializer(
 ): Promise<void> {
   await assertFile.call(this, `config/initializers/${name}`, ...contents);
 }
+
+export const Assertions = {
+  assertFile,
+  assertDirectory,
+  assertNoFile,
+  assertNoDirectory,
+  assertMigration,
+  assertNoMigration,
+  assertClassMethod,
+  assertInstanceMethod,
+  assertMethod,
+  assertFieldType,
+  assertFieldDefaultValue,
+  assertInitializer,
+};

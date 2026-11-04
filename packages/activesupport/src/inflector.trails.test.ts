@@ -3,7 +3,7 @@ import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
-import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
   interface ConstantTable {
@@ -31,17 +31,19 @@ describe("constantize walks seated constants like Object.const_get", () => {
   const Bar = {};
   const Foo: Record<string, unknown> = {};
 
-  afterEach(() => unregisterConstant("Foo", Foo));
+  afterEach(() => {
+    if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
+  });
 
   it("resolves a nested constant seated on a registered namespace", () => {
-    registerConstant("Foo", Foo);
-    rbModConstSet(Foo, "Bar", Bar);
+    constSet(TopLevel, "Foo", Foo);
+    constSet(Foo, "Bar", Bar);
     expect(constantize("Foo::Bar")).toBe(Bar);
   });
 
   it("names only the path up to the unresolved segment", () => {
-    registerConstant("Foo", Foo);
-    rbModConstSet(Foo, "Bar", Bar);
+    constSet(TopLevel, "Foo", Foo);
+    constSet(Foo, "Bar", Bar);
     let error: unknown;
     try {
       constantize("Foo::Bar::Baz::Qux");
@@ -57,11 +59,11 @@ describe("constantize walks seated constants like Object.const_get", () => {
   it("sends const_missing to the namespace a segment missed on", () => {
     const Baz = {};
     const Host = { constMissing: (name: string) => (name === "Baz" ? Baz : undefined) };
-    registerConstant("Foo", Host);
+    constSet(TopLevel, "Foo", Host);
     try {
       expect(constantize("Foo::Baz")).toBe(Baz);
     } finally {
-      unregisterConstant("Foo", Host);
+      if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
     }
   });
 
@@ -71,11 +73,11 @@ describe("constantize walks seated constants like Object.const_get", () => {
         throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
       },
     };
-    registerConstant("Foo", Host);
+    constSet(TopLevel, "Foo", Host);
     try {
       expect(() => safeConstantize("Foo::Baz")).toThrow(/oops/);
     } finally {
-      unregisterConstant("Foo", Host);
+      if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
     }
   });
 });

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "../test-helpers/assertions.js";
 import { Range, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import {
   AtLeastOneRequiredArgumentError,

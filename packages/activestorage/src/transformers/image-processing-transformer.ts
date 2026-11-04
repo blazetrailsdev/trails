@@ -5,13 +5,13 @@ import {
   Hash,
   isPlainHash,
   LoadError,
-  rbModConstGet,
+  constGet,
   StandardError,
   type Tempfile,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Transformers } from "../active-storage.js";
 import { Transformer } from "./transformer.js";
-import "../class-paths.excluded.generated.js";
+import "../constants.excluded.generated.js";
 
 let ImageProcessing: typeof Namespace;
 try {
@@ -32,7 +32,7 @@ export class ImageProcessingTransformer extends Transformer {
 
   /**
    * @internal
-   * @inventedArm loadPath — CONVERGEABLE activestorage-transformer-deviations-ruling
+   * @inventedArm loadPath — PERMANENT
    */
   protected override async process(
     file: unknown,
@@ -49,16 +49,13 @@ export class ImageProcessingTransformer extends Transformer {
 
   /** @internal */
   private processor(): ChainableHost {
-    return rbModConstGet(
+    return constGet(
       ImageProcessing,
       camelize(String(ActiveStorage.variantProcessor)),
     ) as ChainableHost;
   }
 
-  /**
-   * @internal
-   * @inventedArm camelize — CONVERGEABLE activestorage-transformer-deviations-ruling
-   */
+  /** @internal */
   private operations(): [string, unknown][] {
     const list: [string, unknown][] = [];
     for (const [name, argument] of Object.entries(this.transformations)) {
@@ -66,31 +63,24 @@ export class ImageProcessingTransformer extends Transformer {
         this.validateTransformation(name, argument);
       }
 
-      if (name === "combine_options" || name === "combineOptions") {
+      if (name === "combineOptions") {
         throw new ArgumentError(
           "Active Storage's ImageProcessing transformer doesn't support :combine_options, as it always generates a single command.",
         );
       }
 
       if (isPresent(argument)) {
-        list.push([camelize(name.replaceAll("-", "_"), false), argument]);
+        list.push([name, argument]);
       }
     }
     return list;
   }
 
-  /**
-   * @internal
-   * @inventedArm camelize — CONVERGEABLE activestorage-transformer-deviations-ruling
-   */
+  /** @internal */
   private validateTransformation(name: string, argument: unknown): void {
     const methodName = name.replaceAll("-", "_");
 
-    if (
-      !ActiveStorage.supportedImageProcessingMethods.some(
-        (method) => methodName === method || methodName === camelize(method, false),
-      )
-    ) {
+    if (!ActiveStorage.supportedImageProcessingMethods.some((method) => methodName === method)) {
       throw new UnsupportedImageProcessingMethod(
         "One or more of the provided transformation methods is not supported.",
       );

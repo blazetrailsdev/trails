@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Sharded } from "./namespace.js";
 import "../../../destroy-association-async-job.js";
-import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlogPostDestroyAsync } from "./blog-post-destroy-async.js";
@@ -8,7 +10,8 @@ import type { ShardedBlogPostDestroyAsync } from "./blog-post-destroy-async.js";
 export class ShardedCommentDestroyAsync extends Base {
   static _tableName = "sharded_comments";
   static {
-    registerModel("Sharded::CommentDestroyAsync", this);
+    constSet(Sharded, "CommentDestroyAsync", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

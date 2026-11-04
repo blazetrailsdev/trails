@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { Attribute } from "../attributes/attribute.js";
@@ -79,4 +79,4 @@ export class HomogeneousIn extends Node {
   }
 }
 
-rbModConstSet(Nodes, "HomogeneousIn", HomogeneousIn);
+constSet(Nodes, "HomogeneousIn", HomogeneousIn);

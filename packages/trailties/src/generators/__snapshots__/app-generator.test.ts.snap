@@ -54,19 +54,23 @@ import { Trails } from "@blazetrails/trailties";
 
 import "./config/environment.ts";
 
-export default Trails.application;
+export const Config = Trails.application;
 
 await Trails.application.loadServer();
 "
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
-"import { Application } from "@blazetrails/trailties";
+"import "./boot.ts";
+
+import { Application } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
 
 export class MyApp extends Application {
   static {
+    Application.register(this, import.meta.dirname);
+
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("8.0");
   }
@@ -80,7 +84,10 @@ export class MyApp extends Application {
   // config.eagerLoadPaths.push("extras");
 }
 
-Application.register(MyApp, import.meta.dirname);
+// Please, add to the \`ignore\` list any other \`lib\` subdirectories that do
+// not contain \`.ts\` files, or that should not be reloaded or eager loaded.
+// Common ones are \`templates\`, \`generators\`, or \`middleware\`, for example.
+await MyApp.config.autoloadLib({ ignore: ["assets", "tasks"] });
 
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {
@@ -117,7 +124,11 @@ Trails.application.routes().draw(function () {
 
   // Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   // Can be used by load balancers and uptime monitors to verify that the app is live.
-  this.get("up", { to: "rails/health#show", as: "rails_health_check" });
+  this.get("up", { to: "trails/health#show", as: "trails_health_check" });
+
+  // Render dynamic PWA files from app/views/pwa/* (remember to link manifest in application.html.tse)
+  // this.get("manifest", { to: "trails/pwa#manifest", as: "pwa_manifest" });
+  // this.get("service-worker", { to: "trails/pwa#service_worker", as: "pwa_service_worker" });
 
   // Defines the root path route ("/")
   // this.root("posts#index");
@@ -260,7 +271,7 @@ Trails.application.configure(function () {
   this.config.logger = TaggedLogging.logger(process.stdout);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = process.env.RAILS_LOG_LEVEL ?? "info";
+  this.config.logLevel = process.env.TRAILS_LOG_LEVEL ?? "info";
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";

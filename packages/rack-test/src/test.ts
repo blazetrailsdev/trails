@@ -12,6 +12,7 @@ import {
 import {
   MockRequest,
   MockResponse,
+  Rack,
   Request,
   parseNestedQuery,
   release,
@@ -191,7 +192,6 @@ export class Session {
     this.env(name, value);
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   env(name: string, value: unknown): void {
     if (value == null) {
       delete this._env[name];
@@ -396,3 +396,6 @@ export function encodingAwareStrings(): boolean {
 }
 
 export const MockSession = Session;
+
+export const Test = { name: "Rack::Test" };
+Rack.Test = Test;

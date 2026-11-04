@@ -3,6 +3,7 @@ import { rbProcCall } from "@blazetrails/ruby-compat";
 import { RACK_TEMPFILES } from "./constants.js";
 import { BodyProxy } from "./body-proxy.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class TempfileReaper {
   private app: RackApp | { call: RackApp };
@@ -30,3 +31,5 @@ export class TempfileReaper {
     return response;
   }
 }
+
+Rack.TempfileReaper = TempfileReaper;

@@ -1,3 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 export class RaisesNoMethodError {}
-registerConstant("RaisesNoMethodError", RaisesNoMethodError);
+constSet(TopLevel, "RaisesNoMethodError", RaisesNoMethodError);

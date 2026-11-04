@@ -25,6 +25,6 @@ describe("ActiveStorage::Service::DiskPublicServiceTest", () => {
       contentType: "image/png",
     });
 
-    expect(url).toMatch(/^https:\/\/example.com\/rails\/active_storage\/disk\/.*\/avatar\.png/);
+    expect(url).toMatch(/^https:\/\/example.com\/trails\/active_storage\/disk\/.*\/avatar\.png/);
   });
 });

@@ -1,13 +1,16 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Joke extends Base {
   declare name: string;
   static _tableName = "funny_jokes";
 }
-registerModel(Joke);
+constSet(TopLevel, "Joke", Joke);
+DescendantsTracker.registerSubclass(Base, Joke);
 
 export class GoodJoke extends Base {
   static _tableName = "funny_jokes";
 }
-registerModel(GoodJoke);
+constSet(TopLevel, "GoodJoke", GoodJoke);
+DescendantsTracker.registerSubclass(Base, GoodJoke);

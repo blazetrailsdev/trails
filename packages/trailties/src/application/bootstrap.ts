@@ -3,6 +3,7 @@ import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/repo
 import {
   ActiveSupport,
   BroadcastLogger,
+  Dependencies,
   Logger,
   type LoggerOutput,
   type LogLevel,
@@ -12,15 +13,19 @@ import {
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
 import {
+  File,
   LoadError,
-  rbModConstGet,
+  constGet,
   rbObjRespondTo,
   StandardError,
   STDERR,
 } from "@blazetrails/ruby-compat";
+import type { Autoloaders } from "../autoloaders.js";
 import { Initializable } from "../initializable.js";
+import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
+  root: string | null;
   logger?: Logger | null;
   logLevel: LogLevel | number | string;
   logFormatter: Logger["formatter"];
@@ -35,10 +40,12 @@ export interface BootstrapConfig {
 
 export interface BootstrapHost {
   config: BootstrapConfig;
+  autoloaders: Autoloaders;
 }
 
 export abstract class Bootstrap extends Initializable implements BootstrapHost {
   abstract config: BootstrapConfig;
+  abstract autoloaders: Autoloaders;
 }
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
@@ -62,7 +69,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
         const logger = TaggedLogging.new(new Logger(STDERR));
         logger.level = Logger.WARN;
         logger.warn(
-          `Rails Error: Unable to access log file. Please ensure that ${path} exists and is writable ` +
+          `Trails Error: Unable to access log file. Please ensure that ${path} exists and is writable ` +
             `(i.e. make it writable for user and group: chmod 0664 ${path}). ` +
             "The log level has been raised to WARN and the output directed to STDERR until the problem is fixed.",
         );
@@ -72,13 +79,13 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, asyn
 
   if (TopLevel.Trails!.logger instanceof BroadcastLogger) {
     if (this.config.broadcastLogLevel != null) {
-      TopLevel.Trails!.logger.level = rbModConstGet(
+      TopLevel.Trails!.logger.level = constGet(
         Logger,
         String(this.config.broadcastLogLevel).replace(/^:/, "").toUpperCase(),
       ) as number;
     }
   } else {
-    TopLevel.Trails!.logger.level = rbModConstGet(
+    TopLevel.Trails!.logger.level = constGet(
       Logger,
       String(this.config.logLevel).replace(/^:/, "").toUpperCase(),
     ) as number;
@@ -124,6 +131,30 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
     }
   }
 });
+
+Bootstrap.initializer<BootstrapHost>(
+  "setup_once_autoloader",
+  { after: "set_eager_load_paths", before: "bootstrap_hook" },
+  async function () {
+    const autoloader = this.autoloaders.once;
+    autoloader.manifestRoot ??= this.config.root;
+
+    const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
+
+    Object.freeze(Dependencies.autoloadOncePaths);
+    for (const path of new Set(Dependencies.autoloadOncePaths)) {
+      if (!(await File.isDirectoryAsync(path))) continue;
+      if (alreadyConfiguredDirs.has(path)) continue;
+
+      await autoloader.pushDir(path);
+      if (!Dependencies.isEagerLoad(path)) autoloader.doNotEagerLoad(path);
+    }
+
+    autoloader.onLoad(_registerAutoloaded);
+    await autoloader.setup();
+    await autoloader.eagerLoad();
+  },
+);
 
 Bootstrap.initializer<BootstrapHost>("bootstrap_hook", { group: "all" }, function () {
   runLoadHooks("before_initialize", this);

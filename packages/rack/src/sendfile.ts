@@ -4,6 +4,7 @@ import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
 import { escapePath } from "./utils.js";
+import { Rack } from "./namespaces.js";
 
 export class Sendfile {
   private app: RackApp | { call: RackApp };
@@ -83,3 +84,5 @@ export class Sendfile {
     return undefined;
   }
 }
+
+Rack.Sendfile = Sendfile;

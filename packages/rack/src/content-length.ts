@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class ContentLength {
   private app: RackApp | { call: RackApp };
@@ -32,3 +33,5 @@ export class ContentLength {
     return response;
   }
 }
+
+Rack.ContentLength = ContentLength;

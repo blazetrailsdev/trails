@@ -1,4 +1,5 @@
-import { Exception, RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { Exception, RuntimeError, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";
@@ -29,7 +30,6 @@ import type { VerySpecialComment } from "./comment.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { FirstPost } from "./post.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Author extends Base {
@@ -907,7 +907,8 @@ export class Author extends Base {
     return ["twitter", "github"];
   }
 }
-registerModel(Author);
+constSet(TopLevel, "Author", Author);
+DescendantsTracker.registerSubclass(Base, Author);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Author {
   get post(): Post | null | Promise<Post | null>;
@@ -961,7 +962,8 @@ export class AuthorAddress extends Base {
     });
   }
 }
-registerModel(AuthorAddress);
+constSet(TopLevel, "AuthorAddress", AuthorAddress);
+DescendantsTracker.registerSubclass(Base, AuthorAddress);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorAddress {
   get author(): Author | null | Promise<Author | null>;
@@ -978,7 +980,8 @@ export class AuthorFavorite extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
-registerModel(AuthorFavorite);
+constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+DescendantsTracker.registerSubclass(Base, AuthorFavorite);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavorite {
   get author(): Author | null | Promise<Author | null>;
@@ -998,7 +1001,8 @@ export class AuthorFavoriteWithScope extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
-registerModel(AuthorFavoriteWithScope);
+constSet(TopLevel, "AuthorFavoriteWithScope", AuthorFavoriteWithScope);
+DescendantsTracker.registerSubclass(Base, AuthorFavoriteWithScope);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavoriteWithScope {
   get author(): Author | null | Promise<Author | null>;

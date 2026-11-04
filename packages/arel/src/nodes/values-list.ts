@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Unary } from "./unary.js";
 
 export class ValuesList extends Unary {
@@ -8,4 +8,4 @@ export class ValuesList extends Unary {
   }
 }
 
-rbModConstSet(Nodes, "ValuesList", ValuesList);
+constSet(Nodes, "ValuesList", ValuesList);

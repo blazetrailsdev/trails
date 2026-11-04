@@ -1,0 +1,12 @@
+import { ApplicationRecord } from "./application-record.ts";
+
+export class User extends ApplicationRecord {
+  declare static findByPasswordResetTokenBang: (token: unknown) => Promise<User>;
+
+  static {
+    this.hasSecurePassword();
+    this.hasMany("sessions", { dependent: "destroy" });
+
+    this.normalizes("email_address", { with: (e: string) => e.trim().toLowerCase() });
+  }
+}

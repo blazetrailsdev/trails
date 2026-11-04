@@ -11,6 +11,7 @@ import {
   block as blockPass,
   rbBlockGivenP,
   rbSetClassPathString,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 
 type BlockPass<F> = F & Pick<Block<unknown>, keyof Block<unknown>>;
@@ -95,4 +96,12 @@ rbSetClassPathString(Error, { name: "MiniMagick" }, "Error");
 rbSetClassPathString(Invalid, { name: "MiniMagick" }, "Invalid");
 rbSetClassPathString(TimeoutError, { name: "MiniMagick" }, "TimeoutError");
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+
+TopLevel.MiniMagick = MiniMagick;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    MiniMagick?: typeof MiniMagick;
+  }
+}

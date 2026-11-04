@@ -4,10 +4,10 @@ import {
   extend,
   include,
   rbInspect,
-  rbModConstSet,
-  registerConstant,
+  constSet,
   Struct,
   toS,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 
 export class Comment {
@@ -107,8 +107,8 @@ class Book {
   }
 }
 export const Cpk = { name: "Cpk" } as { name: string; Book: typeof Book };
-registerConstant("Cpk", Cpk);
-rbModConstSet(Cpk, "Book", Book);
+constSet(TopLevel, "Cpk", Cpk);
+constSet(Cpk, "Book", Book);
 
 export class Customer extends Struct.new("name", "id") {
   declare name: string;
@@ -200,9 +200,9 @@ export const Blog = { name: "Blog", isUseRelativeModelNaming: () => true } as {
   isUseRelativeModelNaming(): boolean;
   Post: new (title: string, id: unknown) => { title: string; id: unknown };
 };
-registerConstant("Blog", Blog);
+constSet(TopLevel, "Blog", Blog);
 
-rbModConstSet(
+constSet(
   Blog,
   "Post",
   class Post extends Struct.new("title", "id") {

@@ -1,5 +1,6 @@
 import type { InlineConfig, ViteDevServer } from "vite";
-import { Handler, type RackMiddleware } from "@blazetrails/rack";
+import { type RackMiddleware } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */

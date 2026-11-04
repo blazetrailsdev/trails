@@ -17,6 +17,7 @@ export interface Token {
 export class TseSyntaxError extends Error {}
 
 const TAG_RE = /<%!([\s\S]*?)!%>|<%(==|=|-|#|%)?([\s\S]*?)([-=])?%>([ \t]*\r?\n)?/g;
+const ERB_TAG_RE = /<%!([\s\S]*?)!%>|<%%|<%(==|=|-|#)?((?:%%>|[\s\S])*?)([-=])?%>([ \t]*\r?\n)?/g;
 const KIND: Record<string, TokenKind> = { "=": "expr", "==": "rawExpr", "#": "comment" };
 
 function buildLineStarts(source: string): number[] {
@@ -44,7 +45,7 @@ const text = (value: string, srcLine: number): Token => ({
   srcLine,
 });
 
-export function tokenize(source: string, trim = true): Token[] {
+export function tokenize(source: string, trim = true, erb = false): Token[] {
   const tokens: Token[] = [];
   const starts = buildLineStarts(source);
   const line = (offset: number): number => lineAt(starts, offset);
@@ -57,7 +58,7 @@ export function tokenize(source: string, trim = true): Token[] {
     buf = "";
   };
 
-  for (const m of source.matchAll(TAG_RE)) {
+  for (const m of source.matchAll(erb ? ERB_TAG_RE : TAG_RE)) {
     if (buf.length === 0) bufStartOffset = last;
     buf += source.slice(last, m.index);
     last = m.index + m[0].length;
@@ -69,6 +70,10 @@ export function tokenize(source: string, trim = true): Token[] {
         srcLine: line(m.index),
       });
       isBol = false;
+    } else if (m[0] === "<%%") {
+      buf += "<%";
+      isBol = false;
+      continue;
     } else {
       const tailch = m[4];
       let rspace: string | undefined = m[5];
@@ -101,7 +106,7 @@ export function tokenize(source: string, trim = true): Token[] {
       flush();
       tokens.push({
         kind,
-        value: m[3],
+        value: erb ? m[3].replaceAll("%%>", "%>") : m[3],
         srcLine: line(m.index),
         srcCol: m.index + 2 + (m[2]?.length ?? 0) - starts[line(m.index)],
       });

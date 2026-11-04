@@ -7,13 +7,29 @@ import {
   FileUtils,
   registerChildProcessAdapter,
   setEnv,
+  StandardError,
   type ChildProcessAdapter,
+  stderr,
+  SystemExit,
 } from "@blazetrails/ruby-compat";
-import { assertEqual, assertMock, capture, Mock } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertMatch,
+  assertMock,
+  assertRaises,
+  assertNotCalled,
+  capture,
+  Mock,
+} from "@blazetrails/activesupport";
+import { Application } from "../application.js";
+import { Trails } from "../trails.js";
+import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
 import { GeneratorBase } from "./base.js";
 import * as Assertions from "./testing/assertions.js";
 
 class TestGenerator extends GeneratorBase {}
+class ActionsTestApp extends Application {}
 
 let mock: Mock | null;
 let previousAdapter: string | null;
@@ -43,6 +59,7 @@ const draw = "Trails.application.routes().draw(function () {\n";
 
 beforeEach(() => {
   mock = null;
+  Trails.application = ActionsTestApp.instance();
   registerChildProcessAdapter("trailties-actions-test", testAdapter);
   previousAdapter = childProcessAdapterConfig.adapter;
   childProcessAdapterConfig.adapter = "trailties-actions-test";
@@ -60,6 +77,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Trails.application = null;
   childProcessAdapterConfig.adapter = previousAdapter;
   FileUtils.rmRf(root);
 });
@@ -200,6 +218,20 @@ describe("ActionsTest", () => {
     });
   });
 
+  it("trails_command with inline option", async () => {
+    await assertNotCalled(testAdapter, "system", null, async () => {
+      await makeGen().trailsCommand("generate model MyModel", { inline: true });
+    });
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("trails_command with inline option should raise on failure", async () => {
+    const error = await assertRaises([StandardError], {}, () =>
+      makeGen().trailsCommand("generate model 1234567890", { inline: true }),
+    );
+    assertMatch(/1234567890/, error.message);
+  });
+
   it("rake with env option should run rake with the env environment", async () => {
     await assertRuns("rake log:clear", { env: { TRAILS_ENV: "production" } }, () =>
       makeGen().rake("log:clear", { env: "production" }),
@@ -266,10 +298,40 @@ describe("ActionsTest", () => {
     );
   });
 
-  it("generate should queue a sub-generator invocation", () => {
-    const gen = makeGen();
-    gen.generate("scaffold", "Post", "title:string");
-    expect(gen.pendingGenerators).toEqual([{ what: "scaffold", args: ["Post", "title:string"] }]);
+  it("generate", async () => {
+    await assertRuns("bin/trails generate model MyModel", null, () =>
+      makeGen().generate("model", "MyModel"),
+    );
+  });
+
+  it("generate should raise on failure", async () => {
+    const { system } = testAdapter;
+    testAdapter.system = async (command, _env, args) => {
+      stderr.write(`${[command, ...(args ?? [])].join(" ")}\n`);
+      return { pid: 1, status: 1, signal: null };
+    };
+    try {
+      const message = await capture("stderr", () =>
+        assertRaises([SystemExit], {}, () => makeGen().generate("model", "1234567890")),
+      );
+      assertMatch(/1234567890/, message);
+    } finally {
+      testAdapter.system = system;
+    }
+  });
+
+  it("generate with inline option", async () => {
+    await assertNotCalled(testAdapter, "system", null, async () => {
+      await makeGen().generate("model", "MyModel", { inline: true });
+    });
+    await assertFile("app/models/my-model.js", /MyModel/);
+  });
+
+  it("generate with inline option should raise on failure", async () => {
+    const error = await assertRaises([StandardError], {}, () =>
+      makeGen().generate("model", "1234567890", { inline: true }),
+    );
+    assertMatch(/1234567890/, error.message);
   });
 
   function action(quiet: boolean, ...args: unknown[]): Promise<string> {

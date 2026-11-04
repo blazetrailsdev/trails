@@ -1,13 +1,13 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import "./test-helpers/models/bird.js";
 import type { Bird } from "./test-helpers/models/bird.js";
-import { registerModel } from "./index.js";
 
 let addCallbackCalled: Bird[] = [];
 
-registerModel(Pirate);
+constSet(TopLevel, "Pirate", Pirate);
 Pirate.hasMany("birdsWithAddLoad", {
   className: "Bird",
   beforeAdd: (p: any, b: any) => {

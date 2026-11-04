@@ -1,3 +1,5 @@
+import { File, getFs, StringIO } from "@blazetrails/ruby-compat";
+
 export type FileType =
   | "rb"
   | "tse"
@@ -75,40 +77,49 @@ export class CodeStatisticsCalculator {
     this.methods += codeStatisticsCalculator.methods;
   }
 
-  async addByFilePath(filePath: string, readFile: (p: string) => Promise<string>): Promise<void> {
-    this.addByString(await readFile(filePath), fileType(filePath));
+  async addByFilePath(filePath: string): Promise<void> {
+    const f = new StringIO(await getFs().readFile(filePath, "utf-8"));
+    this.addByIo(f, this.fileType(filePath));
   }
 
-  addByString(content: string, type: FileType | undefined): void {
-    const patterns = (type && PATTERNS[type]) || {};
-    let commentStarted = false;
-    const lines = content.split("\n");
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  addByIo(io: { gets(): string | null }, fileType: string): void {
+    const patterns: PatternSet = PATTERNS[fileType as FileType] ?? {};
 
-    for (const line of lines) {
+    let commentStarted = false;
+
+    let line: string | null;
+    while ((line = io.gets()) != null) {
       this.lines += 1;
+
       if (commentStarted) {
-        if (patterns.endBlockComment?.test(line)) commentStarted = false;
+        if (patterns.endBlockComment && patterns.endBlockComment.test(line)) {
+          commentStarted = false;
+        }
         continue;
+      } else {
+        if (patterns.beginBlockComment && patterns.beginBlockComment.test(line)) {
+          commentStarted = true;
+          continue;
+        }
       }
-      if (patterns.beginBlockComment?.test(line)) {
-        commentStarted = true;
-        continue;
-      }
-      if (patterns.class?.test(line)) this.classes += 1;
-      if (patterns.method?.test(line)) this.methods += 1;
-      if (!/^\s*$/.test(line) && (!patterns.lineComment || !patterns.lineComment.test(line))) {
+
+      if (patterns.class && patterns.class.test(line)) this.classes += 1;
+      if (patterns.method && patterns.method.test(line)) this.methods += 1;
+      if (
+        !/^\s*$/.test(line) &&
+        (patterns.lineComment == null || !patterns.lineComment.test(line))
+      ) {
         this.codeLines += 1;
       }
     }
   }
-}
 
-/** @internal */
-export function fileType(filePath: string): FileType | undefined {
-  if (filePath.endsWith("_test.rb")) return "minitest";
-  const m = /\.([^.]+)$/.exec(filePath);
-  if (!m) return undefined;
-  const ext = m[1].toLowerCase() as FileType;
-  return ext in PATTERNS ? ext : undefined;
+  /** @internal */
+  private fileType(filePath: string): string {
+    if (filePath.endsWith("_test.rb")) {
+      return "minitest";
+    } else {
+      return File.extname(filePath).replace(/^\./, "").toLowerCase();
+    }
+  }
 }

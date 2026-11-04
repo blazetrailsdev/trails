@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { Locator, type LocatorModel } from "./locator.js";
 
@@ -21,7 +21,7 @@ describe("Locator (trails)", () => {
   });
 
   it("locate_many keeps a composite id distinct from its String spelling", async () => {
-    registerConstant("MixedIdModel", MixedIdModel as unknown as LocatorModel);
+    constSet(TopLevel, "MixedIdModel", MixedIdModel as unknown as LocatorModel);
     const composite = GlobalID.create(new MixedIdModel(["a", "b"]), { app: "bcx" });
     const scalar = GlobalID.create(new MixedIdModel("a,b"), { app: "bcx" });
     const located = (await Locator.locateMany([composite, scalar])) as MixedIdModel[];

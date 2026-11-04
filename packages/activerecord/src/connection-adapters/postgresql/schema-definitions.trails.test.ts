@@ -288,14 +288,14 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
   });
 
   it("raises when given no column name", () => {
-    for (const [method, railsType] of types) {
+    for (const [method, trailsType] of types) {
       const td = new TableDefinition(leased, "t");
       expect(() =>
         (td as unknown as Record<string, (...args: unknown[]) => void>)[method](),
-      ).toThrow(`Missing column name(s) for ${railsType}`);
+      ).toThrow(`Missing column name(s) for ${trailsType}`);
       expect(() =>
         (td as unknown as Record<string, (...args: unknown[]) => void>)[method]({ null: false }),
-      ).toThrow(`Missing column name(s) for ${railsType}`);
+      ).toThrow(`Missing column name(s) for ${trailsType}`);
     }
   });
 

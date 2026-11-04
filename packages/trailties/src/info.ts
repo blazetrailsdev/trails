@@ -21,10 +21,22 @@ export class PropertyList {
 export class Info {
   static properties: PropertyList = new PropertyList();
 
+  static setProperties(properties: PropertyList): void {
+    Info.properties = properties;
+  }
+
+  get properties(): PropertyList {
+    return Info.properties;
+  }
+
+  setProperties(properties: PropertyList): void {
+    Info.properties = properties;
+  }
+
   static property(name: string, value: InfoValue | (() => InfoValue | undefined)): void {
     try {
       const resolved = typeof value === "function" ? value() : value;
-      if (resolved !== undefined && resolved !== null && resolved !== "") {
+      if (resolved != null) {
         Info.properties.entries.push([name, resolved]);
       }
     } catch {
@@ -43,6 +55,10 @@ export class Info {
   }
 
   static toString(): string {
+    return Info.toS();
+  }
+
+  static inspect(): string {
     return Info.toS();
   }
 

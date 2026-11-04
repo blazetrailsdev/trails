@@ -1,9 +1,9 @@
-import { registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { registerModel } from "./associations.js";
 import { merge, SpawnMethods } from "./relation/spawn-methods.js";
 import { reverseSqlOrder, QueryMethods } from "./relation/query-methods.js";
 import { Relation } from "./relation.js";
@@ -163,9 +163,12 @@ describe("RelationTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("CJDAuthor", Author);
-    registerModel("CJDPost", Post);
-    registerModel("CJDComment", Comment);
+    constSet(TopLevel, "CJDAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "CJDPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "CJDComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     const sql = Author.all().leftJoins([":posts", ":comments"]).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
@@ -191,9 +194,12 @@ describe("RelationTest", () => {
         this.attribute("post_id", "integer");
       }
     }
-    registerModel("HashAuthor", Author);
-    registerModel("HashPost", Post);
-    registerModel("HashComment", Comment);
+    constSet(TopLevel, "HashAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "HashPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "HashComment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
     const sql = Author.all().leftJoins({ ":posts": ":comments" }).toSql();
     expect(sql).toMatch(/LEFT OUTER JOIN.*posts/i);
     expect(sql).toMatch(/LEFT OUTER JOIN.*comments/i);
@@ -229,8 +235,10 @@ describe("RelationTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("LeftJoinAuthor2", Author);
-    registerModel("LeftJoinPost2", Post);
+    constSet(TopLevel, "LeftJoinAuthor2", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "LeftJoinPost2", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.leftJoins(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
@@ -250,8 +258,10 @@ describe("RelationTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("LazyRaiseAuthor", Author);
-    registerModel("LazyRaisePost", Post);
+    constSet(TopLevel, "LazyRaiseAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "LazyRaisePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.leftJoins(5 as any);
     expect((rel as any).leftOuterJoinsValues).toContain(5);
@@ -271,8 +281,10 @@ describe("RelationTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("RefLeftAuthor", Author);
-    registerModel("RefLeftPost", Post);
+    constSet(TopLevel, "RefLeftAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "RefLeftPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
 
     const rel = Author.all().includes(":posts").references("posts").leftJoins(":posts");
     const sqlStr = rel.toSql();
@@ -293,8 +305,10 @@ describe("RelationTest", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("EagerLeftAuthor", Author);
-    registerModel("EagerLeftPost", Post);
+    constSet(TopLevel, "EagerLeftAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "EagerLeftPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
     const rel = Author.leftJoins(":posts").eagerLoad(":posts");
     expect((rel as any).eagerLoadValues).toContain(":posts");
     expect((rel as any).leftOuterJoinsValues).toContain(":posts");
@@ -364,7 +378,7 @@ describe("RelationTest", () => {
       class Author extends Base {
         static {
           this.attribute("name", "string");
-          registerModel(this);
+          constSet(TopLevel, "Author", this);
         }
       }
       class Book extends Base {
@@ -372,15 +386,15 @@ describe("RelationTest", () => {
           this.attribute("title", "string");
           this.attribute("author_id", "integer");
           this.belongsTo("author", { className: "Author" });
-          registerModel(this);
+          constSet(TopLevel, "Book", this);
         }
       }
       const sql = Book.all().eagerLoad(":author").limit(10).toSql();
       expect(sql).toContain("LIMIT 10");
       expect(sql).not.toContain(" IN (SELECT");
     } finally {
-      unregisterConstant("Author", registeredConstant("Author"));
-      unregisterConstant("Book", registeredConstant("Book"));
+      rbModRemoveConst(TopLevel, "Author");
+      rbModRemoveConst(TopLevel, "Book");
     }
   });
 
@@ -391,7 +405,7 @@ describe("RelationTest", () => {
           this.tableName = "eager_comments";
           this.attribute("body", "string");
           this.attribute("eager_article_id", "integer");
-          registerModel(this);
+          constSet(TopLevel, "EagerComment", this);
         }
       }
       class EagerArticle extends Base {
@@ -402,15 +416,15 @@ describe("RelationTest", () => {
             className: "EagerComment",
             foreignKey: "eager_article_id",
           });
-          registerModel(this);
+          constSet(TopLevel, "EagerArticle", this);
         }
       }
       const sql = EagerArticle.all().eagerLoad(":eagerComments").limit(5).toSql();
       expect(sql).toContain(" IN (SELECT");
       expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
     } finally {
-      unregisterConstant("EagerComment", registeredConstant("EagerComment"));
-      unregisterConstant("EagerArticle", registeredConstant("EagerArticle"));
+      rbModRemoveConst(TopLevel, "EagerComment");
+      rbModRemoveConst(TopLevel, "EagerArticle");
     }
   });
 
@@ -421,14 +435,14 @@ describe("RelationTest", () => {
           this.tableName = "jl_comments";
           this.attribute("body", "string");
           this.attribute("jl_article_id", "integer");
-          registerModel(this);
+          constSet(TopLevel, "JlComment", this);
         }
       }
       class JlProfile extends Base {
         static {
           this.tableName = "jl_profiles";
           this.attribute("bio", "string");
-          registerModel(this);
+          constSet(TopLevel, "JlProfile", this);
         }
       }
       class JlAuthor extends Base {
@@ -440,7 +454,7 @@ describe("RelationTest", () => {
             className: "JlProfile",
             foreignKey: "jl_profile_id",
           });
-          registerModel(this);
+          constSet(TopLevel, "JlAuthor", this);
         }
       }
       class JlArticle extends Base {
@@ -456,7 +470,7 @@ describe("RelationTest", () => {
             className: "JlComment",
             foreignKey: "jl_article_id",
           });
-          registerModel(this);
+          constSet(TopLevel, "JlArticle", this);
         }
       }
       const limitableEager = JlArticle.all().eagerLoad(":jlAuthor").limit(5);
@@ -483,10 +497,10 @@ describe("RelationTest", () => {
         .limit(5);
       expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
     } finally {
-      unregisterConstant("JlComment", registeredConstant("JlComment"));
-      unregisterConstant("JlProfile", registeredConstant("JlProfile"));
-      unregisterConstant("JlAuthor", registeredConstant("JlAuthor"));
-      unregisterConstant("JlArticle", registeredConstant("JlArticle"));
+      rbModRemoveConst(TopLevel, "JlComment");
+      rbModRemoveConst(TopLevel, "JlProfile");
+      rbModRemoveConst(TopLevel, "JlAuthor");
+      rbModRemoveConst(TopLevel, "JlArticle");
     }
   });
 });
@@ -494,8 +508,10 @@ describe("RelationTest", () => {
 describe("Relation#arel build_arel convergence", () => {
   fixtures([]);
   beforeAll(() => {
-    registerModel("Widget", Widget);
-    registerModel("Gadget", Gadget);
+    constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
+    constSet(TopLevel, "Gadget", Gadget);
+    DescendantsTracker.registerSubclass(Base, Gadget);
   });
 
   class Widget extends Base {
@@ -607,12 +623,12 @@ describe("RelationTest", () => {
   ]);
 
   beforeAll(() => {
-    registerModel(CanonAuthor);
-    registerModel(CanonPost);
-    registerModel(CanonComment);
-    registerModel(CanonSpecialComment);
-    registerModel(CanonRating);
-    registerModel(CanonCategorization);
+    constSet(TopLevel, "Author", CanonAuthor);
+    constSet(TopLevel, "Post", CanonPost);
+    constSet(TopLevel, "Comment", CanonComment);
+    constSet(TopLevel, "SpecialComment", CanonSpecialComment);
+    constSet(TopLevel, "Rating", CanonRating);
+    constSet(TopLevel, "Categorization", CanonCategorization);
   });
 
   it("merging a string join keeps both the association join and the merged string", () => {
@@ -836,8 +852,8 @@ describe("Relation Enumerable surface (trails)", () => {
   fixtures(["authors", "posts"]);
 
   beforeAll(() => {
-    registerModel(CanonAuthor);
-    registerModel(CanonPost);
+    constSet(TopLevel, "Author", CanonAuthor);
+    constSet(TopLevel, "Post", CanonPost);
   });
 
   it("groups, indexes and compacts the loaded records the way Enumerable does", async () => {
@@ -896,8 +912,8 @@ describe("Relation#empty_scope? STI type_condition (trails)", () => {
   fixtures(["companies"]);
 
   beforeAll(() => {
-    registerModel(CanonCompany);
-    registerModel(CanonFirm);
+    constSet(TopLevel, "Company", CanonCompany);
+    constSet(TopLevel, "Firm", CanonFirm);
   });
 
   it("reports an empty scope for an unscoped subclass relation carrying the type_condition", () => {

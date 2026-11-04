@@ -1,5 +1,4 @@
 import { Base } from "@blazetrails/activejob";
-import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class RecurringJob extends Base {
   static {
@@ -10,4 +9,3 @@ export class RecurringJob extends Base {
     await ((await import(command)) as { default: () => unknown }).default();
   }
 }
-registerConstant("SolidQueue::RecurringJob", RecurringJob);

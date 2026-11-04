@@ -21,6 +21,7 @@ const posix: PathAdapter = {
 };
 
 const files = new Map<string, string>();
+const openFiles: Uint8Array[] = [];
 const norm = (p: string): string => p.replace(/^\.\//, "").replace(/\/+$/, "");
 const dirs = (): Set<string> => {
   const out = new Set<string>();
@@ -44,6 +45,16 @@ const memoryFs = {
     if (contents === undefined) throw new Error(`ENOENT: ${p}`);
     return contents;
   },
+  openSync: (p: string) => {
+    openFiles.push(new TextEncoder().encode(files.get(norm(p))));
+    return openFiles.length + 2;
+  },
+  readSync: (fd: number, buf: Uint8Array, off: number, len: number, pos: number) => {
+    const chunk = openFiles[fd - 3].subarray(pos, pos + len);
+    buf.set(chunk, off);
+    return chunk.length;
+  },
+  closeSync: () => {},
   readdirSync: (dir: string): string[] => {
     const pre = norm(dir) === "" ? "" : `${norm(dir)}/`;
     const seen = new Set<string>();

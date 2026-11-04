@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
-import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
+import { Module, extend, rbDefineAllocFunc, constSet } from "./include.js";
 import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
 import {
   rbCBasicObject,
@@ -12,13 +12,15 @@ import {
   rbObjIvarSet,
   rbObjSingletonClass,
   rbSetClassPathString,
+  TopLevel,
 } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Set as RbSet } from "./set.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
-import { registerConstant, unregisterConstant } from "./variable.js";
+import { rbModRemoveConst } from "./variable.js";
+import { constDefined } from "./include.js";
 
 const fixtures = JSON.parse(
   readFileSync(new URL("./marshal.fixtures.json", import.meta.url), "utf8"),
@@ -39,16 +41,16 @@ class Shape {
 }
 const Geo = { name: "Geo", Shape } as { name: string; Shape: typeof Shape; Mark?: object };
 rbSetClassPathString(Shape, Geo, "Shape");
-const Kind = rbModConstSet(Geo, "Kind", {});
-rbModConstSet(Geo, "Mark", {});
+const Kind = constSet(Geo, "Kind", {});
+constSet(Geo, "Mark", {});
 class Pair extends Struct.new("a", "b") {}
-rbModConstSet(Geo, "Pair", Pair);
+constSet(Geo, "Pair", Pair);
 class Shadow extends Struct.new("a") {
   override get a(): unknown {
     return 99;
   }
 }
-rbModConstSet(Geo, "Shadow", Shadow);
+constSet(Geo, "Shadow", Shadow);
 const STRUCT = "0408533a0e47656f3a3a50616972073a066169063a06625b063a0678";
 const EXTENDED =
   "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65";
@@ -99,10 +101,12 @@ function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: 
 const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Point };
 
 beforeAll(() => {
-  for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);
+  for (const [name, value] of Object.entries(CONSTANTS)) constSet(TopLevel, name, value);
 });
 afterAll(() => {
-  for (const [name, value] of Object.entries(CONSTANTS)) unregisterConstant(name, value);
+  for (const name of Object.keys(CONSTANTS)) {
+    if (constDefined(Object, name, false)) rbModRemoveConst(Object, name);
+  }
 });
 
 function bytes(name: string): string {
@@ -315,13 +319,13 @@ describe("Marshal.dump", () => {
       new ArgumentError("undefined class/module Unreachable"),
     );
     const other = class {};
-    registerConstant("Unreachable", other);
+    constSet(TopLevel, "Unreachable", other);
     try {
       expect(() => Marshal.dump(new Unreachable())).toThrow(
         new TypeError("Unreachable can't be referred to"),
       );
     } finally {
-      unregisterConstant("Unreachable", other);
+      if (constDefined(Object, "Unreachable", false)) rbModRemoveConst(Object, "Unreachable");
     }
   });
 

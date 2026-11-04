@@ -21,7 +21,7 @@ describe("DebugLocksTest", () => {
     try {
       await threadReady.wait();
 
-      const response = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/rails/locks" });
+      const response = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/trails/locks" });
 
       testTerminated.countDown();
 

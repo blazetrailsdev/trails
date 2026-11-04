@@ -1,0 +1,14 @@
+/node_modules/
+/doc/
+/log/*.log
+/pkg/
+/tmp/
+<% if (this.isWithDummyApp()) { -%>
+<% if (this.sqlite3()) { -%>
+/<%= this.dummyPath() %>/db/*.sqlite3
+/<%= this.dummyPath() %>/db/*.sqlite3-*
+<% } -%>
+/<%= this.dummyPath() %>/log/*.log
+/<%= this.dummyPath() %>/storage/
+/<%= this.dummyPath() %>/tmp/
+<% } -%>

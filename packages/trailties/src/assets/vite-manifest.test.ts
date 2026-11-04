@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { AppGenerator } from "../generators/app-generator.js";
+import { AppGenerator } from "../generators/trails/app/app-generator.js";
 import {
   ViteManifest,
   loadViteManifest,
@@ -14,7 +14,9 @@ import {
 
 let tmpDir: string | undefined;
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   setViteManifest(new ViteManifest());
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   tmpDir = undefined;
@@ -26,7 +28,7 @@ async function generateApp(): Promise<string> {
   );
   await new AppGenerator(
     ["my-app"],
-    { database: "sqlite", skipDocker: true },
+    { skipInstall: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
   return path.join(tmpDir, "my-app");

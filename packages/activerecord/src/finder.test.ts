@@ -1,19 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  IrreversibleOrderError,
-  Range,
-  RecordNotFound,
-  registerModel,
-  SoleRecordExceeded,
-} from "./index.js";
+import { IrreversibleOrderError, Range, RecordNotFound, SoleRecordExceeded } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Client } from "./test-helpers/models/company.js";
 import "./support/canonical-model-index.js";
-import { CpkBook, CpkReview } from "./test-helpers/models/cpk.js";
+import { Cpk, CpkBook, CpkReview } from "./test-helpers/models/cpk.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
@@ -23,7 +17,7 @@ import {
   BlankTopic as CanonicalBlankTopic,
 } from "./test-helpers/models/topic.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
@@ -71,10 +65,10 @@ describe("FinderTest", () => {
   const { self, topics } = fixtures(["topics", "entrants", "developers", "developersProjects"]);
   const rid = (r: unknown) => (r as { id: number }).id;
   const Topic = CanonicalTopic;
-  registerModel("Topic", Topic);
-  registerModel("Reply", CanonicalReply);
-  registerModel(Entrant);
-  registerModel(CanonicalDeveloper);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Reply", CanonicalReply);
+  constSet(TopLevel, "Entrant", Entrant);
+  constSet(TopLevel, "Developer", CanonicalDeveloper);
 
   it("take", async () => {
     expect(rid(await Topic.where("title = 'The First Topic'").take())).toBe(rid(topics("first")));
@@ -429,8 +423,8 @@ describe("FinderTest", () => {
 describe("FinderTest", () => {
   const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);
   const Topic = CanonicalTopic;
-  registerModel("Topic", Topic);
-  registerModel("Reply", CanonicalReply);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Reply", CanonicalReply);
   const idOf = (r: unknown) => (r as { id: unknown }).id;
 
   it("find passing active record object is not permitted", async () => {
@@ -556,20 +550,20 @@ describe("FinderTest", () => {
     "categorizations",
     "categories",
   ]);
-  registerModel("Topic", CanonicalTopic);
-  registerModel("Reply", CanonicalReply);
-  registerModel(CanonicalPost);
-  registerModel(CanonicalComment);
-  registerModel(CanonicalCompany);
-  registerModel(CanonicalFirm);
-  registerModel(CanonicalDependentFirm);
-  registerModel(Account);
-  registerModel(Entrant);
-  registerModel(CanonicalAuthor);
-  registerModel(CanonicalDeveloper);
-  registerModel("Cpk::Book", CpkBook);
-  registerModel("Cpk::Review", CpkReview);
-  registerModel(NonPrimaryKey);
+  constSet(TopLevel, "Topic", CanonicalTopic);
+  constSet(TopLevel, "Reply", CanonicalReply);
+  constSet(TopLevel, "Post", CanonicalPost);
+  constSet(TopLevel, "Comment", CanonicalComment);
+  constSet(TopLevel, "Company", CanonicalCompany);
+  constSet(TopLevel, "Firm", CanonicalFirm);
+  constSet(TopLevel, "DependentFirm", CanonicalDependentFirm);
+  constSet(TopLevel, "Account", Account);
+  constSet(TopLevel, "Entrant", Entrant);
+  constSet(TopLevel, "Author", CanonicalAuthor);
+  constSet(TopLevel, "Developer", CanonicalDeveloper);
+  constSet(Cpk, "Book", CpkBook);
+  constSet(Cpk, "Review", CpkReview);
+  constSet(TopLevel, "NonPrimaryKey", NonPrimaryKey);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
   const Customer = CanonicalCustomer;
@@ -1388,13 +1382,13 @@ describe("FinderTest", () => {
     "cars",
     "authors",
   ]);
-  registerModel(CanonicalPost);
-  registerModel("Topic", CanonicalTopic);
-  registerModel(Account);
-  registerModel(CanonicalCompany);
-  registerModel(Client);
-  registerModel(CanonicalAuthor);
-  registerModel(CanonicalCar);
+  constSet(TopLevel, "Post", CanonicalPost);
+  constSet(TopLevel, "Topic", CanonicalTopic);
+  constSet(TopLevel, "Account", Account);
+  constSet(TopLevel, "Company", CanonicalCompany);
+  constSet(TopLevel, "Client", Client);
+  constSet(TopLevel, "Author", CanonicalAuthor);
+  constSet(TopLevel, "Car", CanonicalCar);
   const Post = CanonicalPost;
   const rid = (r: unknown) => (r as { id: number }).id;
 
@@ -1563,7 +1557,7 @@ describe("FinderTest", () => {
 
 describe("FinderTest", () => {
   fixtures(["topics"]);
-  registerModel("Topic", CanonicalTopic);
+  constSet(TopLevel, "Topic", CanonicalTopic);
 
   it("find_by returns nil if the record is missing", async () => {
     const found = await (CanonicalTopic as any).findByTitle("Nobody");
@@ -1573,7 +1567,7 @@ describe("FinderTest", () => {
 
 describe("FinderTest", () => {
   const { posts } = fixtures(["posts"]);
-  registerModel(CanonicalPost);
+  constSet(TopLevel, "Post", CanonicalPost);
   const rid = (r: unknown) => (r as { id: number }).id;
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
@@ -1585,8 +1579,8 @@ describe("FinderTest", () => {
 
 describe("FinderTest", () => {
   const { posts } = fixtures(["posts", "comments"]);
-  registerModel(CanonicalPost);
-  registerModel(CanonicalComment);
+  constSet(TopLevel, "Post", CanonicalPost);
+  constSet(TopLevel, "Comment", CanonicalComment);
 
   const rid = (r: unknown) => (r as { id: number }).id;
   const idOf = (r: unknown) => (r == null ? r : rid(r));
@@ -1655,12 +1649,12 @@ describe("FinderTest", () => {
 
 describe("FinderTest", () => {
   const { self } = fixtures(["topics", "comments", "posts", "companies", "accounts"]);
-  registerModel("Topic", CanonicalTopic);
-  registerModel("Reply", CanonicalReply);
-  registerModel("Comment", CanonicalComment);
-  registerModel("Post", CanonicalPost);
-  registerModel("Company", CanonicalCompany);
-  registerModel("Firm", CanonicalFirm);
+  constSet(TopLevel, "Topic", CanonicalTopic);
+  constSet(TopLevel, "Reply", CanonicalReply);
+  constSet(TopLevel, "Comment", CanonicalComment);
+  constSet(TopLevel, "Post", CanonicalPost);
+  constSet(TopLevel, "Company", CanonicalCompany);
+  constSet(TopLevel, "Firm", CanonicalFirm);
   const Topic = CanonicalTopic;
   const Comment = CanonicalComment;
   const Post = CanonicalPost;
@@ -1903,9 +1897,9 @@ describe("FinderTest", () => {
   ]);
   const Customer = CanonicalCustomer;
   const Author = CanonicalAuthor;
-  registerModel("Customer", Customer);
-  registerModel("Cpk::Book", CpkBook);
-  registerModel("Author", Author);
+  constSet(TopLevel, "Customer", Customer);
+  constSet(Cpk, "Book", CpkBook);
+  constSet(TopLevel, "Author", Author);
 
   const oneLimitRe = /1 AS one.*LIMIT/;
 
@@ -2170,10 +2164,10 @@ describe("FinderTest", () => {
   const Tagging = CanonicalTagging;
   const Subscriber = CanonicalSubscriber;
   const Developer = CanonicalDeveloper;
-  registerModel("Topic", Topic);
-  registerModel("Reply", CanonicalReply);
-  registerModel("Tag", CanonicalTag);
-  registerModel("SpecialComment", SpecialComment);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Reply", CanonicalReply);
+  constSet(TopLevel, "Tag", CanonicalTag);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
 
   it("exists", async () => {
     expect(await Topic.isExists(1)).toBe(true);
@@ -2463,10 +2457,9 @@ describe("FinderTest", () => {
   const { self, topics, posts, accounts } = fixtures(["topics", "posts", "accounts"]);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
-  registerModel("Topic", Topic);
-  registerModel(Post);
-  registerModel(Account);
-  registerModel(Dog);
+  constSet(TopLevel, "Topic", Topic);
+  constSet(TopLevel, "Account", Account);
+  constSet(TopLevel, "Dog", Dog);
 
   it("find by id with hash", async () => {
     await assertNothingRaised(async () => {

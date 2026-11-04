@@ -2,7 +2,7 @@ import {
   ArgumentError,
   NameError,
   rbBlockGivenP,
-  rbConstGet,
+  constGet,
   rbEqq,
   rbInspect,
   rbModName,
@@ -142,7 +142,7 @@ export const ClassMethods = {
   ): ExceptionClass | null | undefined {
     if (typeof classOrName === "string") {
       try {
-        return rbConstGet(this, classOrName) as ExceptionClass;
+        return constGet(this, classOrName) as ExceptionClass;
       } catch (e) {
         if (!(e instanceof NameError)) throw e;
         return safeConstantize(classOrName) as ExceptionClass | undefined;

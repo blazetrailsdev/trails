@@ -13,7 +13,7 @@ import {
   Enumerable,
   isEmpty,
   rbDefineAllocFunc,
-  rbModConstSet,
+  constSet,
   rbObjClone,
   toS,
   type Each,
@@ -1817,9 +1817,9 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 }
 
-rbModConstSet(ActiveRecord, "Relation", Relation);
-rbModConstSet(Relation, "WhereClause", WhereClause);
-rbModConstSet(Relation, "QueryAttribute", QueryAttribute);
+constSet(ActiveRecord, "Relation", Relation);
+constSet(Relation, "WhereClause", WhereClause);
+constSet(Relation, "QueryAttribute", QueryAttribute);
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}

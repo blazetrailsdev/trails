@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Request } from "../../http/request.js";
 import type { DrawCallback } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
@@ -8,7 +8,7 @@ import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
 
 describe("RoutingInstrumentationTest", () => {
   class RoutingInstrumentationTest extends IntegrationTest {}
-  registerConstant("RoutingInstrumentationTest", RoutingInstrumentationTest);
+  constSet(TopLevel, "RoutingInstrumentationTest", RoutingInstrumentationTest);
 
   let t: RoutingInstrumentationTest;
   beforeEach(({ testCase }) => {

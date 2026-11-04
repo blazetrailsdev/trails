@@ -1,8 +1,9 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNot, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { ActiveRecordError } from "../errors.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -12,35 +13,15 @@ import { Developer } from "../test-helpers/models/developer.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Tag } from "../test-helpers/models/tag.js";
-import { Tagging } from "../test-helpers/models/tagging.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { Toy } from "../test-helpers/models/toy.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";
-import { CpkOrder, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
-import { Category } from "../test-helpers/models/category.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
+import { CpkOrder } from "../test-helpers/models/cpk.js";
 import { StaleObjectError } from "../errors.js";
-import { registerModel } from "../associations.js";
-
-for (const klass of [
-  Author,
-  Post,
-  Pet,
-  Toy,
-  Tag,
-  Tagging,
-  Comment,
-  Developer,
-  Person,
-  Topic,
-  Category,
-  Categorization,
-  CpkOrder,
-  CpkOrderAgreement,
-]) {
-  registerModel(klass as any);
-}
+import "../test-helpers/models/tag.js";
+import "../test-helpers/models/tagging.js";
+import "../test-helpers/models/toy.js";
+import "../test-helpers/models/category.js";
+import "../test-helpers/models/categorization.js";
 
 function epochMs(v: unknown): number {
   if (v instanceof RubyTime) return v.toF() * 1000;
@@ -278,7 +259,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({
@@ -311,7 +293,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({
@@ -353,7 +336,8 @@ describe("UpdateAllTest", () => {
         });
       }
     }
-    registerModel(TopicWithCallbacks);
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
 
     const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
     const topic2 = await TopicWithCallbacks.createBang({

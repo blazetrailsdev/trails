@@ -1,6 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../../action-controller/base.js";
-import { registerController } from "../../../action-controller/base.js";
 
 export class ContentController extends Base {}
 
@@ -39,7 +38,7 @@ export class UserController extends Base {}
 export class UsersController extends Base {}
 
 for (const [mod, constants] of Object.entries({ Admin, Api })) {
-  registerConstant(mod, constants);
+  constSet(TopLevel, mod, constants);
   for (const [name, klass] of Object.entries(constants)) {
     Object.defineProperty(klass, "name", { value: `${mod}::${name}` });
   }
@@ -47,8 +46,6 @@ for (const [mod, constants] of Object.entries({ Admin, Api })) {
 
 for (const klass of [
   ContentController,
-  ...Object.values(Admin),
-  ...Object.values(Api),
   AccountController,
   ArchiveController,
   ArticlesController,
@@ -70,5 +67,5 @@ for (const klass of [
   UserController,
   UsersController,
 ]) {
-  registerController(klass);
+  constSet(TopLevel, klass.name, klass);
 }

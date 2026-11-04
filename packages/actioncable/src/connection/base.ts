@@ -15,9 +15,6 @@ import {
   rbEqq,
   rbFArray,
   rbInspect,
-  ArgumentError,
-  rbClassInheritedP,
-  registerConstant,
   rbModName,
   rbObjId,
   rbObjRespondTo,
@@ -364,34 +361,5 @@ include(Base, Callbacks);
 include(Base, Rescuable);
 
 Connection.Base = Base;
-
-/** @noRailsEquivalent PERMANENT */
-export function registerConnection(connection: typeof Base): void;
-export function registerConnection(name: string, connection: typeof Base): void;
-export function registerConnection(connections: (typeof Base)[]): void;
-export function registerConnection(
-  nameOrConnection: string | typeof Base | (typeof Base)[],
-  connection?: typeof Base,
-): void {
-  if (Array.isArray(nameOrConnection)) {
-    for (const k of nameOrConnection) registerConnection(k);
-    return;
-  }
-  if (typeof nameOrConnection === "string") {
-    if (!connection)
-      throw new ArgumentError("registerConnection(name, connection) requires a connection class");
-  } else {
-    connection = nameOrConnection;
-  }
-  if (typeof connection !== "function" || rbClassInheritedP(connection, Base) !== true) {
-    throw new ArgumentError(
-      `registerConnection expects an ActionCable::Connection::Base subclass, got ${String(connection?.name ?? connection)}`,
-    );
-  }
-  if (typeof nameOrConnection === "string") return registerConstant(nameOrConnection, connection);
-  registerConstant(connection.name, connection);
-  const qualified = rbModName(connection)!;
-  if (qualified !== connection.name) registerConstant(qualified, connection);
-}
 
 runLoadHooks("action_cable_connection", Base);

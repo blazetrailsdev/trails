@@ -66,7 +66,7 @@ export class Group {
     shell.say("Usage:");
     shell.say(`  ${this.banner()}\n`);
     shell.say();
-    this.classOptionsHelp(shell);
+    await this.classOptionsHelp(shell);
     const desc = await this.desc();
     if (rtest(desc)) shell.say(desc);
   }
@@ -174,20 +174,24 @@ export class Group {
     });
   }
 
-  static classOptionsHelp(this: GroupClass, shell: Basic, groups: OptionGroups = new Map()): void {
-    this.getOptionsFromInvocations(groups, this.classOptions(), (klass) => {
-      klass.getOptionsFromInvocations(groups, this.classOptions());
-    });
+  static async classOptionsHelp(
+    this: GroupClass,
+    shell: Basic,
+    groups: OptionGroups = new Map(),
+  ): Promise<void> {
+    await this.getOptionsFromInvocations(groups, this.classOptions(), (klass) =>
+      klass.getOptionsFromInvocations(groups, this.classOptions()),
+    );
     Base.ClassMethods.classOptionsHelp.call(this, shell, groups);
   }
 
-  static getOptionsFromInvocations(
+  static async getOptionsFromInvocations(
     this: GroupClass,
     groupOptions: OptionGroups,
     baseOptions: Record<string, Option>,
-    block?: (klass: GroupClass) => void,
-  ): void {
-    this.invocations().forEach((fromOption, name) => {
+    block?: (klass: GroupClass) => Promise<void>,
+  ): Promise<void> {
+    for (const [name, fromOption] of this.invocations()) {
       let value: unknown;
       if (rtest(fromOption)) {
         const option = this.classOptions()[name as string];
@@ -195,11 +199,11 @@ export class Group {
       } else {
         value = name;
       }
-      if (!rtest(value)) return;
+      if (!rtest(value)) continue;
 
-      const prepared = this.prepareForInvocation(name, value);
+      const prepared = await this.prepareForInvocation(name, value);
       const [klass] = (Array.isArray(prepared) ? prepared : [prepared]) as [GroupClass];
-      if (!(rtest(klass) && rbObjRespondTo(klass, "classOptions"))) return;
+      if (!(rtest(klass) && rbObjRespondTo(klass, "classOptions"))) continue;
 
       value = toS(value);
       const humanName = (
@@ -223,8 +227,8 @@ export class Group {
           ),
       );
 
-      if (block !== undefined) block(klass);
-    });
+      if (block !== undefined) await block(klass);
+    }
   }
 
   static async printableCommands(this: GroupClass, ..._: unknown[]): Promise<string[][]> {

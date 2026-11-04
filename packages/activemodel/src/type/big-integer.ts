@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { IntegerType } from "./integer.js";
 
 export class BigIntegerType extends IntegerType {
@@ -10,5 +9,3 @@ export class BigIntegerType extends IntegerType {
     return Number.POSITIVE_INFINITY;
   }
 }
-
-registerConstant("ActiveModel::Type::BigInteger", BigIntegerType);

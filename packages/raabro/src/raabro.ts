@@ -18,6 +18,7 @@ import {
   toI,
   toS,
   toSym,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 
 export type Parser = string;
@@ -789,4 +790,12 @@ extend(Raabro, ModuleMethods);
 
 Raabro.makeIncludable();
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+
+TopLevel.Raabro = Raabro;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Raabro?: typeof Raabro;
+  }
+}

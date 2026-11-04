@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { _makeInfo, platformInfo, renderNozoneTime } from "./info.js";
 import { isChronicEnabled, make, makeTime, now, parse, setChronicEnabled } from "./make.js";
 import { getTzone } from "./zone.js";
@@ -51,4 +52,12 @@ export const EtOrbi = Object.assign(ZonesEtOrbi, {
 
 export { EoTime } from "./time.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+
+TopLevel.EtOrbi = EtOrbi;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    EtOrbi?: typeof EtOrbi;
+  }
+}

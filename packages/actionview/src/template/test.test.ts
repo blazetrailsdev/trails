@@ -1,7 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { Naming } from "@blazetrails/activemodel";
 import { assertEqual, extend } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../test-helpers/abstract-unit.js";
 import { TestCase } from "../test-case.js";
 
@@ -45,8 +45,8 @@ const PeopleHelper = {
     return this.linkTo(person.name, person);
   },
 };
-registerConstant("PeopleHelper", PeopleHelper);
-registerConstant("Minitest", {});
+constSet(TopLevel, "PeopleHelper", PeopleHelper);
+constSet(TopLevel, "Minitest", {});
 
 function testCase(klass: TestCaseClass): () => Tc {
   let tc: Tc;

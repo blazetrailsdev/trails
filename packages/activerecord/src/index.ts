@@ -13,6 +13,7 @@ export {
 } from "./encryption/auto-filtered-parameters.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
+import * as TypeModule from "./type.js";
 
 export { Relation, Range } from "./relation.js";
 export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
@@ -46,7 +47,7 @@ export type {
 } from "./connection-adapters/abstract/schema-definitions.js";
 export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";
-export { Associations, registerModel } from "./associations.js";
+export { Associations } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
@@ -222,7 +223,8 @@ export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.j
 export * from "./active-record.js";
 export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
-export { ActiveRecord } from "./namespaces.js";
+import { ActiveRecord } from "./namespaces.js";
+export { ActiveRecord };
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
 export type {
@@ -262,4 +264,6 @@ export { ShardSelector } from "./middleware/shard-selector.js";
 
 import "./associations/disable-joins-association-scope.js";
 
-import "./class-paths.generated.js";
+ActiveRecord.Type = TypeModule;
+
+import "./constants.generated.js";

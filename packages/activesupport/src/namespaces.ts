@@ -1,4 +1,4 @@
-import { LoadError, registerConstant, warn } from "@blazetrails/ruby-compat";
+import { LoadError, warn, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -34,7 +34,23 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   },
 };
 
-export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
+export const ActiveSupport = {
+  name: "ActiveSupport",
+  loadPath,
+  Cache: { name: "ActiveSupport::Cache" },
+  Concurrency: { name: "ActiveSupport::Concurrency" },
+  Messages: { name: "ActiveSupport::Messages" },
+  Testing: { name: "ActiveSupport::Testing" },
+} as AutoloadModule & {
+  Cache: { name: string } & Partial<typeof import("./cache.js")>;
+  Concurrency: { name: string };
+  JSON: typeof import("./json.js");
+  Messages: { name: string };
+  Testing: {
+    name: string;
+    SetupAndTeardown?: typeof import("./testing/setup-and-teardown.js");
+  };
+  XmlMini: typeof import("./xml-mini.js");
   BroadcastLogger: typeof BroadcastLogger;
   Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
@@ -58,6 +74,13 @@ interface ParametersInstance {
 export { TopLevel } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
+  interface TrailsConfiguration {
+    generators(): {
+      options: { get(namespace: unknown): Record<string, unknown> | undefined };
+      orm?(): unknown;
+    };
+  }
+
   interface TopLevelConstants {
     I18n?: typeof import("@blazetrails/i18n");
     ActiveSupport?: typeof ActiveSupport;
@@ -71,7 +94,9 @@ declare module "@blazetrails/ruby-compat" {
         config: {
           considerAllRequestsLocal: boolean;
           root?: string | null;
-          paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
+          paths(): {
+            get(path: string): { firstSync(): string | undefined; toAry(): string[] } | undefined;
+          };
         };
         reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
         routes(): {
@@ -79,20 +104,20 @@ declare module "@blazetrails/ruby-compat" {
           urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
         };
         envConfig(): Record<string, unknown>;
-        executor: { wrap<T>(block: () => T): T; runBang(): unknown };
+        executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
         configFor(name: string): Promise<unknown>;
+        migrationRailties(): Array<{
+          railtieName: string;
+          root(): string | null;
+          paths?(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
+        }>;
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
       } | null;
       Application: abstract new (...args: never[]) => unknown;
       Engine: abstract new (...args: never[]) => unknown;
       Trailtie: abstract new (...args: never[]) => unknown;
       root(): string | null | undefined;
-      configuration?: {
-        generators(): {
-          options: { get(namespace: unknown): Record<string, unknown> | undefined };
-          orm?(): unknown;
-        };
-      } | null;
+      configuration?: TrailsConfiguration | null;
     };
     ActionDispatch?: {
       Request: new (env: Record<string, unknown>) => {
@@ -126,4 +151,4 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-registerConstant("ActiveSupport", ActiveSupport);
+constSet(TopLevel, "ActiveSupport", ActiveSupport);

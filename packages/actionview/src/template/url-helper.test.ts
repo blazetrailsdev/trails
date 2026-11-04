@@ -9,7 +9,8 @@ import {
   ArgumentError,
   include,
   rbObjSingletonClass,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
@@ -1225,7 +1226,7 @@ describe("UrlHelperTest", () => {
   });
 });
 
-registerConstant("UrlHelperControllerTest", { name: "UrlHelperControllerTest" });
+constSet(TopLevel, "UrlHelperControllerTest", { name: "UrlHelperControllerTest" });
 
 class UrlHelperController extends ActionController.Base {
   static {

@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class UserWithInvalidRelation extends Base {
   static {
@@ -21,13 +21,14 @@ export class UserWithInvalidRelation extends Base {
     });
   }
 }
-registerModel(UserWithInvalidRelation);
+constSet(TopLevel, "UserWithInvalidRelation", UserWithInvalidRelation);
+DescendantsTracker.registerSubclass(Base, UserWithInvalidRelation);
 
 export class AccountInvalid {}
-registerConstant("AccountInvalid", AccountInvalid);
+constSet(TopLevel, "AccountInvalid", AccountInvalid);
 
 export class InfoInvalid {}
-registerConstant("InfoInvalid", InfoInvalid);
+constSet(TopLevel, "InfoInvalid", InfoInvalid);
 
 export class UserInfoInvalid extends Base {
   static {
@@ -35,4 +36,5 @@ export class UserInfoInvalid extends Base {
     this.belongsTo("userInvalid");
   }
 }
-registerModel(UserInfoInvalid);
+constSet(TopLevel, "UserInfoInvalid", UserInfoInvalid);
+DescendantsTracker.registerSubclass(Base, UserInfoInvalid);

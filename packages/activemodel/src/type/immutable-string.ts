@@ -1,5 +1,5 @@
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
-import { Rational, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
+import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {
@@ -51,5 +51,3 @@ export class ImmutableStringType extends ValueType<string> {
     else return Object.freeze(toS(value));
   }
 }
-
-registerConstant("ActiveModel::Type::ImmutableString", ImmutableStringType);

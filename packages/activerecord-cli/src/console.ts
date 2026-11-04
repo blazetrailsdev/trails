@@ -39,7 +39,7 @@ export async function arConsole(
   }
 
   const models = await tryLoadModels(cwd).catch((err: unknown) => {
-    console.error(`ar: failed to load app/models/index.ts — ${String(err)}`);
+    console.error(`ar: failed to load .trails/models/index.ts — ${String(err)}`);
     return null;
   });
   if (!models) return 1;

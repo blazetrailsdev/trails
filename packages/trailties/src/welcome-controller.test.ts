@@ -3,8 +3,8 @@ import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { WelcomeController } from "./welcome-controller.js";
 
 describe("WelcomeController", () => {
-  it("controllerPath mirrors Rails::WelcomeController (`rails/welcome`)", () => {
-    expect(WelcomeController.controllerPath()).toBe("rails/welcome");
+  it("controllerPath mirrors Trails::WelcomeController (`trails/welcome`)", () => {
+    expect(WelcomeController.controllerPath()).toBe("trails/welcome");
   });
 
   it("disables the layout (mirrors Rails `layout false`)", () => {
@@ -20,7 +20,7 @@ describe("WelcomeController", () => {
     await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
-      this.root({ to: "rails/welcome#index" });
+      this.root({ to: "trails/welcome#index" });
     });
     await expect(t.get("index")).rejects.toBeInstanceOf(ActionController.MissingExactTemplate);
   });

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { NameError } from "./name-error.js";
 import { constantize } from "../inflector.js";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { assert, assertNot, assertRaise, assertNil } from "../testing/assertions.js";
 
 describe("NameErrorTest", () => {
   it("name error should set missing name", async () => {
     class NameErrorTest {}
-    registerConstant("NameErrorTest", NameErrorTest);
+    constSet(TopLevel, "NameErrorTest", NameErrorTest);
 
     let exc: NameError;
     try {
@@ -15,7 +15,7 @@ describe("NameErrorTest", () => {
         constantize("NameErrorTest::SomeNameThatNobodyWillUse____Really"),
       );
     } finally {
-      unregisterConstant("NameErrorTest", NameErrorTest);
+      if (constDefined(Object, "NameErrorTest", false)) rbModRemoveConst(Object, "NameErrorTest");
     }
     expect(exc.missingName()).toEqual("NameErrorTest::SomeNameThatNobodyWillUse____Really");
     assert(exc.isMissingName(":SomeNameThatNobodyWillUse____Really"));

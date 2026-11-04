@@ -1,12 +1,13 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
-import { Base, registerModel } from "../../index.js";
+import { Base } from "../../index.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 
-registerModel(Author);
-registerModel(Post);
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
 
 fixtures(["authors", "authorAddresses"]);
 

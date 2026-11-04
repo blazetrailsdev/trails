@@ -1,4 +1,4 @@
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 import { RuntimeError } from "./runtime-error.js";
 
 /**
@@ -50,4 +50,4 @@ class TimeoutError extends RuntimeError {}
 
 TimeoutError.prototype.name = "Timeout::Error";
 
-rbModConstSet(Timeout, "Error", TimeoutError);
+constSet(Timeout, "Error", TimeoutError);

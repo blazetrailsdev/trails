@@ -52,6 +52,7 @@ export {
   InvalidCrossOriginRequest,
 } from "./metal/request-forgery-protection.js";
 export {
+  Live,
   SSE,
   ClientDisconnected,
   Buffer as LiveBuffer,
@@ -71,3 +72,4 @@ import * as RailtiesHelpers from "./trailties/helpers.js";
 export const Railties = { Helpers: RailtiesHelpers };
 export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";
+export { DataStreaming } from "./metal/data-streaming.js";

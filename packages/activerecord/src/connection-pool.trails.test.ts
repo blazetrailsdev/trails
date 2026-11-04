@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { rbObjInspect, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjInspect, RuntimeError, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
@@ -1064,6 +1064,37 @@ describe("checkout/checkin callbacks", () => {
     try {
       const conn = await pool.checkout();
       expect(calls).toEqual([conn.adapterName]);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
+  it("an async :checkout :after callback settles before checkout resolves", async () => {
+    const calls: string[] = [];
+    const callback = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      calls.push("after");
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      await pool.checkout();
+      expect(calls).toEqual(["after"]);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
+  it("a synchronous lease refuses an async :checkout callback and removes the connection", async () => {
+    const callback = async function () {};
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      expect(() => pool.withConnectionSync(() => null)).toThrow(RuntimeError);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(pool.connections).toHaveLength(0);
     } finally {
       await closePoolConnections(pool);
       checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);

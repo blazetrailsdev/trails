@@ -1,10 +1,11 @@
+import "../../../constants.postgresql-oid-point.generated.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   ArgumentError,
   kernelFloat,
   rbEqual,
   rbObjAsString,
   rbStrSend,
-  registerConstant,
   Struct,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
@@ -92,4 +93,4 @@ function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown]
   return [value.x ?? value["x"], value.y ?? value["y"]];
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Point", Point);
+ConnectionAdapters.PostgreSQL.OID.Point = Point;

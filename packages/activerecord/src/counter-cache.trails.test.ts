@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
@@ -7,8 +8,8 @@ import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 describe("CounterCacheTest (trails)", () => {
   fixtures(["posts", "comments"]);
   beforeAll(() => {
-    registerModel(CanonicalPost);
-    registerModel(CanonicalComment);
+    constSet(TopLevel, "Post", CanonicalPost);
+    constSet(TopLevel, "Comment", CanonicalComment);
   });
 
   it("counter cache updates an aliased column", async () => {

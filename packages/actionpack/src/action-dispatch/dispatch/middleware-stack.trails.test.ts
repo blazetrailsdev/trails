@@ -90,3 +90,23 @@ describe("MiddlewareStackTest", () => {
     );
   });
 });
+
+describe("MiddlewareStack#delete on a class that is not a MiddlewareFactory", () => {
+  class NoRackConstructor {
+    constructor(_options: { required: string }) {}
+  }
+
+  it("deletes it by name", () => {
+    const stack = new MiddlewareStack();
+    stack.use(FooMiddleware);
+    stack.use(NoRackConstructor as never);
+    expect(stack.delete(NoRackConstructor)).not.toBeNull();
+    expect(stack.size).toBe(1);
+  });
+
+  it("deleteBang raises when it is absent", () => {
+    expect(() => new MiddlewareStack().deleteBang(NoRackConstructor)).toThrow(
+      "No such middleware to remove",
+    );
+  });
+});

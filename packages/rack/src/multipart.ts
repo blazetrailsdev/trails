@@ -27,6 +27,7 @@ export {
   BoundaryTooLongError,
   EmptyContentError,
 } from "./multipart/parser.js";
+import { Rack } from "./namespaces.js";
 
 export interface UploadedFileInfo {
   filename: string;
@@ -116,3 +117,5 @@ export const Multipart = {
   MultipartPartLimitError,
   MultipartTotalPartLimitError,
 };
+
+Rack.Multipart = Multipart;

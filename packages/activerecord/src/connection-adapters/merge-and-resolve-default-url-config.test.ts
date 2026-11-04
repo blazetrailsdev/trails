@@ -75,7 +75,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     });
   });
 
-  it("resolver with database uri and current env symbol key and rails env", () => {
+  it("resolver with database uri and current env symbol key and trails env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     setEnv("TRAILS_ENV", "foo");
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
@@ -151,7 +151,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("resolver with database uri containing only database name", () => {
     process.env["DATABASE_URL"] = "foo";
-    process.env["RAILS_ENV"] = "test";
+    process.env["TRAILS_ENV"] = "test";
     setEnv("TRAILS_ENV", "test");
 
     const config = { test: { adapter: "postgres", database: "not_foo", host: "localhost" } };
@@ -248,7 +248,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost" });
   });
 
-  it("blank with database url with rails env", () => {
+  it("blank with database url with trails env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
     setEnv("TRAILS_ENV", "not_production");
     const actual = resolveConfig({}, "not_production");

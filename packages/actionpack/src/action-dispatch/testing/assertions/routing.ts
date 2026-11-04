@@ -35,16 +35,93 @@ type Options = Record<string, unknown>;
 
 const URL_FORM_RE = /:\/\//;
 
-/** @internal Exported so `with-integration-routing.ts` can annotate `this`. */
+/** @internal */
 export interface TestClass<H> {
   setup(...args: ((this: H) => void)[]): void;
   teardown(...args: ((this: H) => void)[]): void;
 }
 
-// `WithIntegrationRouting` lives in its own module: its nested `ClassMethods`
-// must not share a module with the top-level `ClassMethods` below (perry
-// mis-lowers that collision). Re-exported here so consumer paths are unchanged.
-export { WithIntegrationRouting } from "./with-integration-routing.js";
+export const WithIntegrationRouting = {
+  ClassMethods: {
+    withRouting(this: TestClass<IntegrationTest>, block: (routes: RouteSet) => unknown): void {
+      let oldRoutes: RouteSet | undefined;
+      let oldRoutesCallMethod: Method | undefined;
+      let oldIntegrationSession: Session | undefined;
+
+      this.setup(function () {
+        oldRoutes = (this.app as { routes: RouteSet }).routes;
+        oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+        oldIntegrationSession = this.integrationSession;
+        this.createRoutes(block);
+      });
+
+      this.teardown(function () {
+        this.resetRoutes(oldRoutes!, oldRoutesCallMethod!, oldIntegrationSession!);
+      });
+    },
+  },
+
+  withRouting<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const oldRoutes = (this.app as { routes: RouteSet }).routes;
+    const oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+    const oldIntegrationSession = this.integrationSession;
+    let result: T;
+    try {
+      result = this.createRoutes(block);
+    } catch (e) {
+      this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+      throw e;
+    }
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      return Promise.resolve(result).finally(() =>
+        this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession),
+      ) as T;
+    }
+    this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+    return result;
+  },
+
+  /** @internal */
+  createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const app = this.app as { routes: RouteSet };
+    const routes = new RouteSet();
+
+    this._originalRoutes ??= app.routes;
+    const routesCallMethod = rbObjMethod(routes, "call");
+    (rbObjSingletonClass(this._originalRoutes).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => routesCallMethod.call(...args);
+
+    const https = this.integrationSession.isHttps();
+    const host = this.integrationSession.host;
+
+    app.routes = routes;
+    const klass = class extends ActionDispatch.Integration.Session {};
+    include(klass, app.routes.urlHelpers());
+    include(klass, app.routes.mountedHelpers());
+    this._integrationSession = new klass(app);
+    this._integrationSession.httpsBang(https);
+    this._integrationSession.hostBang(host);
+    this.routes = routes;
+
+    return block(routes);
+  },
+
+  /** @internal */
+  resetRoutes(
+    this: IntegrationTest,
+    oldRoutes: RouteSet,
+    oldRoutesCallMethod: Method,
+    oldIntegrationSession: Session,
+  ): void {
+    (this.app as { routes: RouteSet }).routes = oldRoutes;
+    (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => oldRoutesCallMethod.call(...args);
+    this._integrationSession = oldIntegrationSession;
+    this.routes = oldRoutes;
+  },
+};
 
 // eslint-disable-next-line @typescript-eslint/no-namespace -- `RoutingAssertions::ClassMethods` (`routing.rb:79`), whose `with_routing` shares its name with the instance method.
 export namespace ClassMethods {

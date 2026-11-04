@@ -1,5 +1,6 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
 import {
+  camelized,
   hashAset,
   rbCheckArrayType,
   rbFSend,
@@ -56,7 +57,12 @@ export function serializableHash(
   const result = this.serializableAttributes(attributeNames);
 
   for (const method of rubyArray(options.methods)) {
-    hashAset(result, method, rbFSend(this, method));
+    const n = String(method);
+    hashAset(
+      result,
+      method,
+      rbFSend(this, camelized(n.endsWith("?") ? `is_${n.slice(0, -1)}` : n)),
+    );
   }
 
   this.serializableAddIncludes(options, (assocName, records, opts) => {

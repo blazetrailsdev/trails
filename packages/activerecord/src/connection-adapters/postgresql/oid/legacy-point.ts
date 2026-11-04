@@ -1,10 +1,6 @@
-import {
-  kernelFloat,
-  rbEqual,
-  rbObjAsString,
-  registerConstant,
-  rbStrSend,
-} from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-legacy-point.generated.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
+import { kernelFloat, rbEqual, rbObjAsString, rbStrSend } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType {
@@ -45,4 +41,4 @@ export class LegacyPoint extends ValueType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint", LegacyPoint);
+ConnectionAdapters.PostgreSQL.OID.LegacyPoint = LegacyPoint;

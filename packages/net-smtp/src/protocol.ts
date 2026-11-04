@@ -1,8 +1,18 @@
-import { StandardError, Timeout } from "@blazetrails/ruby-compat";
-import type { SMTPAuthenticationError } from "./smtp.js";
+import { StandardError, Timeout, TopLevel } from "@blazetrails/ruby-compat";
+import type { SMTP, SMTPAuthenticationError } from "./smtp.js";
 
 /** @noRailsEquivalent PERMANENT */
-export const Net: { SMTPAuthenticationError?: typeof SMTPAuthenticationError } = {};
+export const Net: {
+  SMTP?: typeof SMTP;
+  SMTPAuthenticationError?: typeof SMTPAuthenticationError;
+} = {};
+TopLevel.Net = Net;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Net?: typeof Net;
+  }
+}
 
 /** @noRailsEquivalent PERMANENT */
 export class ProtocolError extends StandardError {}
@@ -18,3 +28,5 @@ export class ProtoServerError extends ProtocolError {}
 export class ProtoAuthError extends ProtocolError {}
 /** @noRailsEquivalent PERMANENT */
 export class OpenTimeout extends Timeout.Error {}
+/** @noRailsEquivalent PERMANENT */
+export class ReadTimeout extends Timeout.Error {}

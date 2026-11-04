@@ -1,6 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, vi } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -42,10 +44,14 @@ describe("association create on a target whose schema is not reflected yet", () 
         this.belongsTo("author", { className: "ColdAuthor" });
       }
     }
-    registerModel(ColdComment);
-    registerModel(ColdPost);
-    registerModel(ColdAuthor);
-    registerModel(ColdAuthoredPost);
+    constSet(TopLevel, "ColdComment", ColdComment);
+    DescendantsTracker.registerSubclass(Base, ColdComment);
+    constSet(TopLevel, "ColdPost", ColdPost);
+    DescendantsTracker.registerSubclass(Base, ColdPost);
+    constSet(TopLevel, "ColdAuthor", ColdAuthor);
+    DescendantsTracker.registerSubclass(Base, ColdAuthor);
+    constSet(TopLevel, "ColdAuthoredPost", ColdAuthoredPost);
+    DescendantsTracker.registerSubclass(Base, ColdAuthoredPost);
     return { ColdComment, ColdPost, ColdAuthoredPost };
   }
 

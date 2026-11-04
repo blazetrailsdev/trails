@@ -1,0 +1,9 @@
+import { Base } from "@blazetrails/activerecord";
+
+<% this.moduleNamespacing(() => { -%>
+export class ApplicationRecord extends Base {
+  static {
+    this.primaryAbstractClass();
+  }
+}
+<% }) -%>

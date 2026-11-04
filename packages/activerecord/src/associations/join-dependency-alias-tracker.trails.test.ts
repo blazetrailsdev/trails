@@ -1,11 +1,12 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { Nodes } from "@blazetrails/arel";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { AliasTracker } from "./alias-tracker.js";
 
 describe("JoinDependency AliasTracker wiring", () => {
@@ -30,8 +31,13 @@ describe("JoinDependency AliasTracker wiring", () => {
   beforeEach(() => {
     for (const m of [Post, Comment, Tag]) {
       (m as any)._reflections = {};
-      registerModel(m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Tag", Tag);
+    DescendantsTracker.registerSubclass(Base, Tag);
     Associations.hasMany.call(Post, "comments", { className: "Comment", foreignKey: "postId" });
     Associations.hasMany.call(Post, "tags", { className: "Tag", foreignKey: "postId" });
   });

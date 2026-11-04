@@ -1,3 +1,4 @@
+import "../constants.read-only-null-encryptor.generated.js";
 import { Encryption as ActiveRecordEncryption } from "../namespaces.js";
 import { Encryption } from "./errors.js";
 

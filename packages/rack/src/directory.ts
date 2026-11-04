@@ -5,6 +5,7 @@ import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
 import { mimeType } from "./mime.js";
 import { Files } from "./files.js";
 import { Head } from "./head.js";
+import { Rack } from "./namespaces.js";
 
 const DIR_FILE =
   "<tr><td class='name'><a href='%s'>%s</a></td><td class='size'>%s</td><td class='type'>%s</td><td class='mtime'>%s</td></tr>\n";
@@ -226,3 +227,5 @@ export class Directory {
     return `${int}B`;
   }
 }
+
+Rack.Directory = Directory;

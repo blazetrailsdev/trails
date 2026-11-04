@@ -5244,3 +5244,45 @@ describe("buildReport — a RUBY_FILE_TS_OVERRIDES row onto a path-mirrored file
     expect(pkg.totalInternal).toBe(2);
   });
 });
+
+describe("thor scoring across lanes", () => {
+  const pkg = (classes: Record<string, ClassInfo>): PackageInfo =>
+    ({ classes, modules: {} }) as unknown as PackageInfo;
+  const manifest = (packages: Record<string, PackageInfo>): ApiManifest =>
+    ({ packages }) as unknown as ApiManifest;
+  const thorRuby = pkg({ "Thor::Runner": rubyClass({ name: "Runner", file: "thor/runner.rb" }) });
+  const thorTs = manifest({
+    thor: pkg({
+      Runner: rubyClass({
+        name: "Runner",
+        file: "runner.ts",
+        instance: [method("group"), method("run")],
+      }),
+    }),
+  });
+  const extras = (ruby: ApiManifest) =>
+    buildReport(ruby, thorTs, {
+      filterPkg: "thor",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    }).packages[0]?.extraFiles[0]?.extras.map((e) => [e.name, e.kind]);
+
+  it("gives the same verdict whichever other gems the artifact holds", () => {
+    const arel = pkg({
+      "Arel::Foo": rubyClass({
+        name: "Foo",
+        file: "arel/foo.rb",
+        instance: [method("group"), method("run")],
+      }),
+    });
+    const alone = extras(manifest({ thor: thorRuby }));
+    expect(alone).toEqual(
+      expect.arrayContaining([
+        ["group", "novel"],
+        ["run", "novel"],
+      ]),
+    );
+    expect(extras(manifest({ thor: thorRuby, arel }))).toEqual(alone);
+  });
+});

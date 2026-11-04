@@ -1,12 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
-import { CpkBook, CpkOrder, CpkAuthor } from "./test-helpers/models/cpk.js";
-import { registerModel } from "./associations.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-
-for (const klass of [Topic, CpkBook, CpkOrder, CpkAuthor]) {
-  registerModel(klass);
-}
 
 describe("RelationDestroyTrailsTest", () => {
   const { cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);

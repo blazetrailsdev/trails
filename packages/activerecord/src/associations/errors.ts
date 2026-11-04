@@ -382,7 +382,7 @@ export class CollectionPersistedAssignmentError extends ActiveRecordError {
   constructor(association: string) {
     super(
       `Cannot assign collection association \`${association}\` by mass assignment when the ` +
-        `replace needs the database: Rails replaces the collection at assignment time, ` +
+        `replace needs the database: Trails replaces the collection at assignment time, ` +
         `which requires \`await\` in JS. Use \`await owner.${association}.replace([...])\` ` +
         `(or \`.concat(...)\` / \`.destroy(...)\`).`,
     );

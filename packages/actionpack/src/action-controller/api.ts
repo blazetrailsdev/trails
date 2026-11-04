@@ -5,8 +5,14 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { Logging, type logAt } from "./metal/logging.js";
-import { include, runLoadHooks, TopLevel, type Included } from "@blazetrails/activesupport";
-import { isModuleIncluded, rbModConstGet } from "@blazetrails/ruby-compat";
+import {
+  include,
+  runLoadHooks,
+  TopLevel,
+  type Included,
+  type Rescuable,
+} from "@blazetrails/activesupport";
+import { isModuleIncluded, constGet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Caching } from "./caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
@@ -71,9 +77,7 @@ export class API extends Metal {
   static withoutModules(
     ...modules: Array<string | Parameters<typeof include>[1]>
   ): Array<Parameters<typeof include>[1]> {
-    const mods = modules.map((m) =>
-      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
-    );
+    const mods = modules.map((m) => (typeof m === "string" ? constGet(ActionController, m) : m));
     return API.MODULES.filter((m) => !mods.includes(m));
   }
 
@@ -133,6 +137,7 @@ export class API extends Metal {
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
+  declare static rescueFrom: OmitThisParameter<typeof Rescuable.ClassMethods.rescueFrom>;
 
   /** @internal */
   declare _urlOptions: Readonly<Record<string, unknown>> | null;

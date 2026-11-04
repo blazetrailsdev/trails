@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import type { RackResponse } from "@blazetrails/rack";
 import { Thread } from "@blazetrails/ruby-compat";
 import { Executor, type ExecutorLike } from "../middleware/executor.js";

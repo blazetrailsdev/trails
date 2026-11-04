@@ -4,6 +4,8 @@ import {
   rbObjRespondTo,
   ArgumentError,
   RuntimeError,
+  getChildProcess,
+  Tempfile,
 } from "@blazetrails/ruby-compat";
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
@@ -49,6 +51,7 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
     jpegload: `shrink autorotate unlimited ${LOAD_OPTIONS}`,
     jxlload: `page n ${LOAD_OPTIONS}`,
+    magickload: `density page n ${LOAD_OPTIONS}`,
     matrixload: LOAD_OPTIONS,
     pngload: `unlimited ${LOAD_OPTIONS}`,
     ppmload: LOAD_OPTIONS,
@@ -101,11 +104,73 @@ const SAVER_SUFFIXES: Record<string, string> = {
 };
 
 /** @noRailsEquivalent PERMANENT */
+function isVipsForeignLoadUnknown(error: unknown): boolean {
+  return (
+    error instanceof WebAssembly.Exception &&
+    String((error as { message?: unknown }).message).includes("is not a known file format")
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+function vipsForeignLoadMagick(
+  filename: string,
+  { page = 0, n = 1, density = null }: Options = {},
+  error: unknown,
+): Image {
+  const tempfile = Tempfile.new(["magickload", ".png"]);
+  try {
+    const args = density != null ? ["-density", String(density)] : [];
+    const first = Number(page);
+    const pages = Number(n) === -1 ? `${first}-` : `${first}-${first + Number(n) - 1}`;
+    for (const cmd of ["magick", "convert"]) {
+      const {
+        status,
+        error: spawnError,
+        stdout,
+        stderr,
+      } = getChildProcess().spawnSync(cmd, [
+        ...args,
+        `${filename}[${pages}]`,
+        "-print",
+        "%h",
+        "-append",
+        `png:${tempfile.path()!}`,
+      ]);
+      if (spawnError !== undefined) continue;
+      if (status !== 0) {
+        const message = `${String((error as { message?: unknown }).message)}\n${String(stderr ?? "").trim()}`;
+        Object.defineProperty(error, "message", { value: message, configurable: true });
+        throw error;
+      }
+      const image = vips.Image.newFromFile(tempfile.path()!).copyMemory();
+      image.setString("vips-loader", "magickload");
+      const pageHeight = parseInt(String(stdout), 10);
+      if (pageHeight > 0 && pageHeight < image.height) image.setInt("page-height", pageHeight);
+      return image;
+    }
+    throw error;
+  } finally {
+    tempfile.closeBang();
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function vipsImageNewFromFile(filename: string, options: Options = {}): Image {
+  try {
+    return vips.Image.newFromFile(filename, options);
+  } catch (error) {
+    if (!isVipsForeignLoadUnknown(error)) throw error;
+    return vipsForeignLoadMagick(filename, options, error);
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
 function vipsForeignFindLoad(filename: string): string | null {
   try {
     const loader = vips.Image.newFromFile(filename).getString("vips-loader");
     return Object.hasOwn(INTROSPECT_OPTIONAL_INPUT, loader) ? loader : null;
   } catch (error) {
+    if (isVipsForeignLoadUnknown(error)) return "magickload";
     if (error instanceof WebAssembly.Exception) return null;
     throw error;
   }
@@ -164,6 +229,7 @@ class Processor extends BaseProcessor {
     24,
   );
 
+  /** @inventedArm delete — PERMANENT */
   static loadImage(
     pathOrImage: string | Image,
     { loader = null, autorot = true, ...options }: Options = {},
@@ -178,12 +244,14 @@ class Processor extends BaseProcessor {
         image = rbFSend(vips.Image, `${loader}load`, path, options) as Image;
       } else {
         options = Processor.Utils.selectValidLoaderOptions(path, options);
-        image = vips.Image.newFromFile(path, options);
+        image = vipsImageNewFromFile(path, options);
       }
     }
 
     if (autorot != null && autorot !== false && !Object.hasOwn(options, "autorotate")) {
+      const loaded = image;
       image = image.autorot();
+      if (loaded !== pathOrImage) loaded.delete();
     }
     return image;
   }
@@ -221,7 +289,10 @@ class Processor extends BaseProcessor {
     return this.thumbnail(width, height, { crop: "centre", ...options });
   }
 
-  /** @missingRailsArgs gravity — PERMANENT */
+  /**
+   * @missingRailsArgs gravity — PERMANENT
+   * @inventedArm delete — PERMANENT
+   */
   resizeAndPad(
     width: number,
     height: number,
@@ -234,13 +305,20 @@ class Processor extends BaseProcessor {
     }: Options = {},
   ): Image {
     let image = this.thumbnail(width, height, options);
-    if (alpha != null && alpha !== false && !image.hasAlpha()) image = addAlpha(image);
-    return image.gravity(gravity as string, width, height, {
+    if (alpha != null && alpha !== false && !image.hasAlpha()) {
+      const thumbnail = image;
+      image = addAlpha(image);
+      thumbnail.delete();
+    }
+    const padded = image.gravity(gravity as string, width, height, {
       ...(extend != null ? { extend: extend as string } : {}),
       ...(background != null ? { background: background as number[] } : {}),
     });
+    image.delete();
+    return padded;
   }
 
+  /** @inventedArm delete — PERMANENT */
   resizeToCover(width: number, height: number, options: Options = {}): Image {
     const image =
       typeof this.image === "string"
@@ -249,6 +327,7 @@ class Processor extends BaseProcessor {
 
     const imageRatio = image.width / image.height;
     const thumbnailRatio = width / height;
+    if (image !== this.image) image.delete();
 
     if (imageRatio > thumbnailRatio) {
       width = MAX_COORD;
@@ -269,6 +348,7 @@ class Processor extends BaseProcessor {
     }
   }
 
+  /** @inventedArm delete — PERMANENT */
   composite(
     overlay: unknown,
     _mode: unknown = null,
@@ -285,11 +365,23 @@ class Processor extends BaseProcessor {
         this.convertToImage(object, "overlay"),
       );
 
-      return image.composite(overlays, _mode as Parameters<Image["composite"]>[1], options);
+      const composited = image.composite(
+        overlays,
+        _mode as Parameters<Image["composite"]>[1],
+        options,
+      );
+      overlays.forEach((object, index) => {
+        if (object !== (Array.isArray(overlay) ? overlay[index] : overlay)) object.delete();
+      });
+      return composited;
     }
 
     let overlayImage = this.convertToImage(overlay, "overlay");
-    if (!overlayImage.hasAlpha()) overlayImage = addAlpha(overlayImage);
+    const superseded: Image[] = [];
+    if (!overlayImage.hasAlpha()) {
+      superseded.push(overlayImage);
+      overlayImage = addAlpha(overlayImage);
+    }
 
     if (offset != null && offset !== false) {
       const opposite: Record<string, string> = {
@@ -300,6 +392,7 @@ class Processor extends BaseProcessor {
       };
       const oppositeGravity = String(gravity).replace(/\w+/g, (word) => opposite[word] ?? "");
       const [x, y] = offset as [number, number];
+      superseded.push(overlayImage);
       overlayImage = overlayImage.gravity(
         oppositeGravity,
         overlayImage.width + x,
@@ -307,9 +400,18 @@ class Processor extends BaseProcessor {
       );
     }
 
+    superseded.push(overlayImage);
     overlayImage = overlayImage.gravity(gravity as string, image.width, image.height);
 
-    return image.composite([overlayImage], mode as Parameters<Image["composite"]>[1], options);
+    const composited = image.composite(
+      [overlayImage],
+      mode as Parameters<Image["composite"]>[1],
+      options,
+    );
+    for (const intermediate of [...superseded, overlayImage]) {
+      if (intermediate !== overlay) intermediate.delete();
+    }
+    return composited;
   }
 
   set(...args: [string, unknown]): Image {
@@ -336,7 +438,10 @@ class Processor extends BaseProcessor {
     return image;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm delete — PERMANENT
+   */
   private thumbnail(
     width: number,
     height: number,
@@ -353,7 +458,9 @@ class Processor extends BaseProcessor {
     }
 
     if (sharpen != null && sharpen !== false) {
+      const thumbnail = image;
       image = image.conv(sharpen as Image, { precision: "integer" });
+      thumbnail.delete();
     }
     return image;
   }
@@ -384,7 +491,7 @@ class Processor extends BaseProcessor {
       );
     }
 
-    return vips.Image.newFromFile(path);
+    return vipsImageNewFromFile(path);
   }
 
   static Utils = {
@@ -414,7 +521,7 @@ const ImageProcessingVips = {
 
   isValidImage(file: { path(): string }): boolean {
     try {
-      vips.Image.newFromFile(file.path(), { access: "sequential" }).avg();
+      vipsImageNewFromFile(file.path(), { access: "sequential" }).avg();
       return true;
     } catch (error) {
       if (error instanceof WebAssembly.Exception) return false;

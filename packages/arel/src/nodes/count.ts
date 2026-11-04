@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Function } from "./function.js";
 import type { NodeOrValue } from "./binary.js";
 
@@ -14,4 +14,4 @@ export class Count extends Function {
   }
 }
 
-rbModConstSet(Nodes, "Count", Count);
+constSet(Nodes, "Count", Count);

@@ -2,7 +2,7 @@ import type { RackResponse } from "@blazetrails/rack";
 import {
   publicInstanceMethods,
   rbFSend,
-  rbModConstSet,
+  constSet,
   StringIO,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
@@ -50,7 +50,7 @@ import {
 import { Engine } from "./engine.js";
 import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
 
 const posixPath: PathAdapter = {
@@ -123,7 +123,7 @@ describe("Application", () => {
 
   it("Application is abstract and cannot be instantiated directly", () => {
     expect(() => new Application()).toThrow(
-      "Rails::Application is abstract, you cannot instantiate it directly.",
+      "Trails::Application is abstract, you cannot instantiate it directly.",
     );
   });
 
@@ -237,7 +237,7 @@ describe("Application", () => {
       class IApp2 extends Application {}
       Application.register(IApp2);
       const app = IApp2.instance();
-      await app.initialize();
+      await app.initializeBang();
       expect(app.initialized()).toBe(true);
       expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
       expect(Trails.cache).toBeInstanceOf(FileStore);
@@ -251,7 +251,7 @@ describe("Application", () => {
         seen.push(base);
       });
       const app = IApp3.instance();
-      await app.initialize();
+      await app.initializeBang();
       expect(seen).toEqual([app]);
     });
 
@@ -261,7 +261,7 @@ describe("Application", () => {
       class RootPubApp extends Application {}
       Application.register(RootPubApp, "/app/src");
       try {
-        await RootPubApp.instance().initialize();
+        await RootPubApp.instance().initializeBang();
         expect(trailsRoot()).toBe("/app");
       } finally {
         setTrailsRoot(null);
@@ -280,7 +280,7 @@ describe("Application", () => {
       const app = RootOverrideApp.instance();
       app.config.setRoot("/override");
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/override");
       } finally {
         setTrailsRoot(null);
@@ -295,7 +295,7 @@ describe("Application", () => {
       const app = RelRootApp.instance();
       app.config.setRoot("rel");
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/cwd/rel");
       } finally {
         setTrailsRoot(null);
@@ -309,7 +309,7 @@ describe("Application", () => {
       Application.register(LiveRootApp, "/app/src");
       const app = LiveRootApp.instance();
       try {
-        await app.initialize();
+        await app.initializeBang();
         expect(trailsRoot()).toBe("/app");
         app.config.setRoot("/later");
         expect(trailsRoot()).toBe("/later");
@@ -322,8 +322,8 @@ describe("Application", () => {
       class IApp4 extends Application {}
       Application.register(IApp4);
       const app = IApp4.instance();
-      await app.initialize();
-      await expect(app.initialize()).rejects.toThrow(/already initialized/);
+      await app.initializeBang();
+      await expect(app.initializeBang()).rejects.toThrow(/already initialized/);
     });
 
     it("splices Bootstrap initializers ahead of inherited Engine ones", () => {
@@ -340,7 +340,7 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-12)).toEqual([
+      expect(names.slice(-13)).toEqual([
         "add_generator_templates",
         "setup_main_autoloader",
         "setup_default_session_store",
@@ -350,6 +350,7 @@ describe("Application", () => {
         "run_prepare_callbacks",
         "eager_load!",
         "finisher_hook",
+        "configure_executor_for_concurrency",
         "add_internal_routes",
         "set_routes_reloader_hook",
         "set_clear_dependencies_hook",
@@ -360,7 +361,7 @@ describe("Application", () => {
       class IApp7 extends Application {}
       Application.register(IApp7);
       const app = IApp7.instance();
-      await app.initialize();
+      await app.initializeBang();
       const middleware = app.config.middleware as MiddlewareStack;
       expect(middleware.middlewares.length).toBeGreaterThan(0);
       expect(middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
@@ -393,6 +394,11 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
 });
 
 describe("Trails.application integration (boot-app fixture)", () => {
+  beforeEach(async () => {
+    const { Base } = await import("@blazetrails/activerecord");
+    runLoadHooks("active_record", Base);
+  });
+
   afterEach(() => {
     Trails.application = null;
     Application.appClass = null;
@@ -583,7 +589,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
 describe("Application::Configuration", () => {
   it("config.session_store writes the store and reads it back resolved", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.isSessionStore()).toBeNull();
     expect(c.sessionStore()).toBeNull();
 
@@ -594,7 +600,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.session_store :disabled reads back as nil", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.sessionStore(":disabled");
     expect(c.isSessionStore()).toBe(":disabled");
     expect(c.sessionStore()).toBeNull();
@@ -602,9 +608,9 @@ describe("Application::Configuration", () => {
 
   it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
     class MyCustomStore extends Session.CookieStore {}
-    rbModConstSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
+    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
     try {
-      const c = new Configuration();
+      const c = new Configuration("/app");
       c.sessionStore(":my_custom_store");
       expect(c.sessionStore()).toBe(MyCustomStore);
     } finally {
@@ -613,27 +619,27 @@ describe("Application::Configuration", () => {
   });
 
   it("config.session_store with unknown store raises helpful error", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.sessionStore(":nonexistent_store");
     expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
   });
 
   it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.debugExceptionResponseFormat).toBe("default");
     c.apiOnly = true;
     expect(c.debugExceptionResponseFormat).toBe("api");
   });
 
   it("config.debug_exception_response_format can be overridden", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.apiOnly = true;
     c.debugExceptionResponseFormat = "default";
     expect(c.debugExceptionResponseFormat).toBe("default");
   });
 
-  it("defaults match Rails::Application::Configuration#initialize", () => {
-    const c = new Configuration();
+  it("defaults match Trails::Application::Configuration#initialize", () => {
+    const c = new Configuration("/app");
     expect(c.considerAllRequestsLocal).toBe(false);
     expect(c.apiOnly).toBe(false);
     expect(c.timeZone).toBe("UTC");
@@ -659,7 +665,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults 5.0 assigns the 5.0 framework defaults", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("activeRecord", {});
     c.set("actionController", {});
     c.set("activeSupport", {});
@@ -677,7 +683,7 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults includes defaults for versions prior to the target version", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("activeRecord", { encryption: {} });
 
     c.loadDefaults("7.2");
@@ -694,41 +700,72 @@ describe("Application::Configuration", () => {
   });
 
   it("config.load_defaults skips a framework that has not registered its config", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(() => c.loadDefaults("8.0")).not.toThrow();
     expect(c.isRespondTo("assets")).toBe(false);
   });
 
   it("config.load_defaults raises on an unknown version", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
   });
 
-  it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
-    const c = new Configuration();
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
     c.setRoot("/app");
-    c.autoloadLib({ ignore: ["tasks", "generators"] });
+    await c.autoloadLib({ ignore: ["tasks", "generators"] });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
   });
 
-  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
-    const c = new Configuration();
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
     c.setRoot("/app");
-    c.autoloadLib({ ignore: [] });
+    await c.autoloadLib({ ignore: [] });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
   });
 
-  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
-    const c = new Configuration();
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
     c.setRoot("/app");
-    c.autoloadLib({ ignore: "tasks" });
+    await c.autoloadLib({ ignore: "tasks" });
 
     expect(c.autoloadPaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib_once adds lib to the once paths and ignores through the once loader", async () => {
+    class AutoloadLibOnceApp extends Application {}
+    const app = AutoloadLibOnceApp.instance();
+    Trails.application = app;
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    await c.autoloadLibOnce({ ignore: "tasks" });
+
+    expect(c.autoloadOncePaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+    expect(app.autoloaders.once.ignoredGlobPatterns.has("/app/lib/tasks")).toBe(true);
   });
 
   it("setting priority for engines with config.railties_order", () => {
@@ -768,12 +805,12 @@ describe("Application::Configuration", () => {
   });
 
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     expect(c.paths().get("public")).toBeDefined();
   });
 
   it("config.enable_reloading is !config.cache_classes", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.cacheClasses = true;
     expect(c.enableReloading).toBe(false);
     c.enableReloading = true;
@@ -789,7 +826,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     return root;
   })();
   const buildApp = () => ({
-    config: new Configuration(),
+    config: new Configuration("/app"),
     executor: class extends Executor {},
     reloader: class extends Reloader {},
   });
@@ -898,7 +935,10 @@ describe("Application key/message/credentials wiring", () => {
   };
 
   it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
-    expect(new Configuration().credentials).toEqual({ contentPath: null, keyPath: null });
+    expect(new Configuration("/app").credentials.toH()).toEqual({
+      contentPath: "/app/config/credentials.yml.enc",
+      keyPath: "/app/config/master.key",
+    });
     class A extends Application {}
     Application.register(A);
     const app = A.instance();
@@ -939,7 +979,7 @@ describe("Application key/message/credentials wiring", () => {
     expect([f.contentPath, f.keyPath, f.envKey]).toEqual([
       "/o/config/credentials.yml.enc",
       "/o/config/master.key",
-      "RAILS_MASTER_KEY",
+      "TRAILS_MASTER_KEY",
     ]);
   });
 
@@ -959,7 +999,7 @@ describe("Application key/message/credentials wiring", () => {
     const f = await A.instance().credentials();
     expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
     expect(() => A.instance().secretKeyBase()).toThrow(
-      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/rails credentials:edit`",
+      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/trails credentials:edit`",
     );
   });
 });

@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
+import { CpkBook, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { nodeAt, nodePaths, aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
@@ -11,10 +10,6 @@ import "../association-relation.js";
 
 describe("CpkBook eager pluck / cache_version over a composite-FK collection", () => {
   fixtures([]);
-
-  beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));
-  });
 
   async function seedBooks(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });

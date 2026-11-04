@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { clearTimestampAttributes } from "./timestamp.js";
@@ -7,19 +8,15 @@ import { DefaultScope } from "./scoping/default.js";
 import type { Relation } from "./relation.js";
 import { RecordInvalid } from "./validations.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Movie } from "./test-helpers/models/movie.js";
-
-for (const klass of [Topic, Reply, SillyReply, UniqueReply, SillyUniqueReply]) {
-  registerModel(klass);
-}
+import "./test-helpers/models/reply.js";
 
 describe("DupTest", () => {
   fixtures(["topics", "cars"]);
 
   beforeAll(async () => {
-    registerModel("Car", Car);
+    constSet(TopLevel, "Car", Car);
     void Car.resetColumnInformation();
     await Car.loadSchema();
   });

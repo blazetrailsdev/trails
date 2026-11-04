@@ -14,7 +14,6 @@ import {
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { Visitors } from "@blazetrails/arel";
 import { Base } from "./base.js";
-import { registerModel } from "./associations.js";
 import { Fixture, FixtureSet } from "./fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
@@ -304,7 +303,6 @@ async function resolvePrimaryModel(entry: {
 }): Promise<typeof Base> {
   const resolved = await entry.model();
   const models = (Array.isArray(resolved) ? resolved : [resolved]) as (typeof Base)[];
-  registerModel(models);
   return models[0];
 }
 

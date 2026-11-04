@@ -1,0 +1,9 @@
+<h1>Update your password</h1>
+
+<%%= flash().get("alert") != null ? tag.div(flash().get("alert"), { style: "color:red" }) : null %>
+
+<%%= formWith({ url: passwordPath(params().get("token")), method: "put" }, (form) => { %>
+  <%%= form.passwordField("password", { required: true, autocomplete: "new-password", placeholder: "Enter new password", maxlength: 72 }) %><br>
+  <%%= form.passwordField("password_confirmation", { required: true, autocomplete: "new-password", placeholder: "Repeat new password", maxlength: 72 }) %><br>
+  <%%= form.submit("Save") %>
+<%% }) %>

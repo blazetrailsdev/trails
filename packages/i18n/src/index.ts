@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 export { Config } from "./config.js";
 export type { ExceptionHandlerLike, MissingInterpolationArgumentHandler } from "./config.js";
 export {
@@ -61,7 +62,8 @@ export {
   transliterate,
   withLocale,
 } from "./i18n.js";
-export type { Locale, TranslateKey, TranslationKey } from "./i18n.js";
+export { Locale } from "./locale.js";
+export type { TranslateKey, TranslationKey } from "./i18n.js";
 export {
   Base,
   registerFileReader,
@@ -74,6 +76,7 @@ export { FLATTEN_SEPARATOR, Flatten, SEPARATOR_ESCAPE_CHAR } from "./backend/fla
 export { KeyValue, SubtreeProxy } from "./backend/key-value.js";
 export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
+export * as Backend from "./backend.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
 export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
@@ -81,4 +84,14 @@ export type { FallbackMappings } from "./locale.js";
 export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";
 export type { TranslationData } from "./utils.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+
+import * as I18n from "./index.js";
+
+TopLevel.I18n = I18n;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    I18n?: typeof import("./index.js");
+  }
+}

@@ -1,3 +1,4 @@
+import type { Duration } from "@blazetrails/activesupport";
 import {
   type Hash,
   block as rbBlock,
@@ -20,6 +21,7 @@ import {
   AttributeMethodPattern,
   type AttributeMethodsClassHalf,
   AttributeRegistration,
+  deferringToAssignment,
   type AttributeRegistrationClassHalf,
   Dirty as AMDirty,
   JSONSerializer,
@@ -1383,8 +1385,16 @@ export class Base extends Model {
     if (attributes != null) this.assignAttributes(attributes);
 
     if (!allocating) {
-      initBlock?.(this);
-      this._runInitializeCallbacks();
+      const deferred = deferringToAssignment(this, async () => {
+        await initBlock?.(this);
+        this._runInitializeCallbacks();
+      });
+      if (!deferred) {
+        initBlock?.(this);
+        if (!deferringToAssignment(this, () => this._runInitializeCallbacks())) {
+          this._runInitializeCallbacks();
+        }
+      }
     }
   }
 
@@ -1662,7 +1672,7 @@ export class Base extends Model {
 
   signedId(options?: {
     purpose?: string;
-    expiresIn?: number;
+    expiresIn?: number | Duration;
     expiresAt?: Temporal.Instant;
   }): string {
     return _signedId(this, options);

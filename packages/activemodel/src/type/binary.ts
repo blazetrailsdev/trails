@@ -1,4 +1,4 @@
-import { rbEqual, rbObjAsString as toS, registerConstant, unpack1 } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString as toS, unpack1 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
@@ -59,6 +59,3 @@ export class Data {
     return this.toString();
   }
 }
-
-registerConstant("ActiveModel::Type::Binary", BinaryType);
-registerConstant("ActiveModel::Type::Binary::Data", Data);

@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { ActiveRecordError, RecordInvalid, registerModel } from "./index.js";
+import { ActiveRecordError, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -67,6 +69,19 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(topic.id)).title).toBe("after");
   });
 
+  it("create runs after_initialize once an async block settles", async () => {
+    class Settled extends Topic {}
+    let seen: unknown;
+    Settled.afterInitialize((record: Base) => {
+      seen = (record as InstanceType<typeof Topic>).title;
+    });
+    await Settled.create({ title: "before" }, async (t: Base) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      (t as InstanceType<typeof Topic>).title = "after";
+    });
+    expect(seen).toBe("after");
+  });
+
   it("a bare new runs the block and the initialize callbacks once", () => {
     class Counted extends Topic {}
     let initialized = 0;
@@ -79,6 +94,47 @@ describe("PersistenceTest (trails)", () => {
     });
     expect(topic).toBeInstanceOf(Counted);
     expect([initialized, yielded]).toEqual([1, 1]);
+  });
+
+  it("after_initialize sees every attribute when an earlier writer is async", async () => {
+    let seen: unknown[] = [];
+    class Deferred extends Topic {
+      async setAttachment(_value: unknown): Promise<void> {
+        await Promise.resolve();
+        this.writeAttribute("content", "attached");
+      }
+    }
+    Deferred.afterInitialize((record: Deferred) => {
+      seen = [record.title, record.content, record.author_name];
+    });
+    const topic = await Deferred.create(
+      { attachment: "file", title: "after" } as Record<string, unknown>,
+      async (record: Base) => {
+        (record as Deferred).author_name = "block";
+      },
+    );
+    expect(seen).toEqual(["after", "attached", "block"]);
+    expect(topic.isPersisted()).toBe(true);
+  });
+
+  it("after_initialize sees an async block's writes when an earlier writer is async", async () => {
+    let seen: unknown;
+    class DeferredBlock extends Topic {
+      async setAttachment(_value: unknown): Promise<void> {
+        await Promise.resolve();
+      }
+    }
+    DeferredBlock.afterInitialize((record: DeferredBlock) => {
+      seen = record.author_name;
+    });
+    await DeferredBlock.create(
+      { attachment: "file" } as Record<string, unknown>,
+      async (record: Base) => {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        (record as DeferredBlock).author_name = "block";
+      },
+    );
+    expect(seen).toBe("block");
   });
 
   it("create inside a scope keeps an explicit attribute over the scope's", async () => {
@@ -214,7 +270,8 @@ describe("PersistenceTest (trails)", () => {
         this.attribute("wingspan", "integer");
       }
     }
-    registerModel(MinimalisticAircraft);
+    constSet(TopLevel, "MinimalisticAircraft", MinimalisticAircraft);
+    DescendantsTracker.registerSubclass(Minimalistic, MinimalisticAircraft);
 
     void Aircraft.resetColumnInformation();
 
@@ -265,7 +322,11 @@ describe("PersistenceTest (trails)", () => {
         return "654321" as unknown as number;
       }
     }
-    registerModel(PostWithStringSequence as never);
+    constSet(TopLevel, "PostWithStringSequence", PostWithStringSequence);
+    DescendantsTracker.registerSubclass(
+      CanonicalPost as unknown as typeof Base,
+      PostWithStringSequence,
+    );
 
     let insertSql: string | null = null;
     let insertBinds: unknown[] = [];

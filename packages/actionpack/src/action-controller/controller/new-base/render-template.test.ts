@@ -1,14 +1,14 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { assertMatch } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
-registerConstant("RenderTemplate", { name: "RenderTemplate" });
+constSet(TopLevel, "RenderTemplate", { name: "RenderTemplate" });
 
 class WithoutLayoutController extends Base {
   static {
@@ -222,8 +222,8 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
-registerController("RenderTemplate::WithoutLayoutController", WithoutLayoutController);
-registerController("RenderTemplate::WithLayoutController", WithLayoutController);
+constSetPath("RenderTemplate::WithoutLayoutController", WithoutLayoutController);
+constSetPath("RenderTemplate::WithLayoutController", WithLayoutController);
 
 class TestWithLayout extends Rack.TestCase {}
 
@@ -283,8 +283,6 @@ describe("TestWithLayout", () => {
 });
 
 {
-  registerConstant("RenderTemplate::Compatibility", { name: "RenderTemplate::Compatibility" });
-
   class WithoutLayoutController extends Base {
     static {
       Object.defineProperty(this, "name", {
@@ -303,10 +301,7 @@ describe("TestWithLayout", () => {
     }
   }
 
-  registerController(
-    "RenderTemplate::Compatibility::WithoutLayoutController",
-    WithoutLayoutController,
-  );
+  constSetPath("RenderTemplate::Compatibility::WithoutLayoutController", WithoutLayoutController);
 
   class TestTemplateRenderWithForwardSlash extends Rack.TestCase {}
 

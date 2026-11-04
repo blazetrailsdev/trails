@@ -135,13 +135,12 @@ describe("extra-surface mark", () => {
       "actionview",
       "i18n",
       "ruby-compat",
-      "thor",
     ]);
     expect(
       unmarkedPackages({
         "ruby-compat": { novel: 0, total: 0, noCounterpartFiles: 0, allowed: 0 },
       }),
-    ).toEqual(["actioncontroller", "actiondispatch", "actionview", "i18n", "thor"]);
+    ).toEqual(["actioncontroller", "actiondispatch", "actionview", "i18n"]);
   });
 
   it("demands a mark from a tagged-only package too, because total stays gated", () => {

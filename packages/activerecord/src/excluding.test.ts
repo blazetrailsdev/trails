@@ -1,18 +1,17 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { assertEmpty, assertNotEmpty, assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError, regexpEscape } from "@blazetrails/ruby-compat";
+import { ArgumentError, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { registerModel } from "./associations.js";
 import type { Relation } from "./relation.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 
 const ids = (records: { id: unknown }[]) => records.map((r) => r.id);
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 async function assertNoExcludes(post: Post, relation: Relation<Post>) {
   expect(ids(await relation)).toContain(post.id);

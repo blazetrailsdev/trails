@@ -1,13 +1,13 @@
 import { Logger, assertCalled } from "@blazetrails/activesupport";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import {
   AtomicFixnum,
   Concurrent,
   RuntimeError,
   SecureRandom,
   StringIO,
-  rbModConstSet,
-  registerConstant,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Base as ChannelBase } from "./channel/base.js";
@@ -25,7 +25,7 @@ const sleep = (seconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, seconds * 1000));
 
 class ClientTest extends TestCase {}
-registerConstant("ClientTest", ClientTest);
+constSet(TopLevel, "ClientTest", ClientTest);
 
 class Connection extends ConnectionBase {
   declare id: string;
@@ -35,7 +35,7 @@ class Connection extends ConnectionBase {
   }
 }
 Connection.identifiedBy("id");
-rbModConstSet(ClientTest, "Connection", Connection);
+constSet(ClientTest, "Connection", Connection);
 
 class EchoChannel extends ChannelBase {
   protected override subscribed(): unknown {
@@ -59,7 +59,7 @@ class EchoChannel extends ChannelBase {
     return (ActionCable.server() as ServerBase).broadcast("global", { wide: data["message"] });
   }
 }
-rbModConstSet(ClientTest, "EchoChannel", EchoChannel);
+constSet(ClientTest, "EchoChannel", EchoChannel);
 
 class SyncClient {
   readonly pings = new AtomicFixnum(0);

@@ -13,7 +13,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Attachment } from "../../attachment.js";
 import { Attached, type AssociationWriter, type AttachedRecord } from "../../attached.js";
-import { Blob } from "../../blob.js";
+import { ActiveStorage } from "../../active-storage.js";
+import type { Blob } from "../../blob.js";
 import { Changes } from "../changes.js";
 
 type BlobIo = Parameters<typeof Blob.buildAfterUnfurling>[0]["io"];
@@ -23,7 +24,7 @@ export class CreateOne {
   readonly record: AttachedRecord;
   readonly attachable: unknown;
   private _blob!: Blob;
-  private _attachment!: Attachment;
+  private _attachment: Attachment | Promise<Attachment> | undefined;
 
   constructor(name: string, record: AttachedRecord, attachable: unknown) {
     this.name = name;
@@ -35,11 +36,10 @@ export class CreateOne {
   async unfurl(): Promise<void> {
     this._blob = await this.findOrBuildBlob();
     await this._blob.identifyWithoutSaving();
-    this._attachment = await this.findOrBuildAttachment();
   }
 
-  get attachment(): Attachment {
-    return this._attachment;
+  get attachment(): Attachment | Promise<Attachment> {
+    return (this._attachment ??= this.findOrBuildAttachment());
   }
 
   get blob(): Blob {
@@ -62,7 +62,7 @@ export class CreateOne {
       await this.blob.uploadWithoutUnfurling(attachable as unknown as BlobIo);
     } else if (attachable instanceof Pathname) {
       await this.blob.uploadWithoutUnfurling(attachable.open() as BlobIo);
-    } else if (!(attachable instanceof Blob) && typeof attachable !== "string") {
+    } else if (!(attachable instanceof ActiveStorage.Blob!) && typeof attachable !== "string") {
       throw new ArgumentError(
         `Could not upload: expected attachable, got ${rbInspect(attachable)}`,
       );
@@ -73,22 +73,44 @@ export class CreateOne {
   async save(): Promise<void> {
     await (
       this.record.association(`${this.name}Attachment`) as unknown as AssociationWriter
-    ).writer(this.attachment);
+    ).writer(await this.attachment);
     await (this.record.association(`${this.name}Blob`) as unknown as AssociationWriter).writer(
       this.blob,
     );
   }
 
-  /** @internal */
-  private async findOrBuildAttachment(): Promise<Attachment> {
-    return (await this.findAttachment()) || this.buildAttachment();
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  private findOrBuildAttachment(): Attachment | Promise<Attachment> {
+    const attachment = this.findAttachment();
+    if (attachment instanceof Promise) {
+      return attachment.then((found) => (this._attachment = found || this.buildAttachment()));
+    }
+    return attachment || this.buildAttachment();
   }
 
-  /** @internal */
-  protected async findAttachment(): Promise<Attachment | null | undefined> {
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  protected findAttachment():
+    | Attachment
+    | null
+    | undefined
+    | Promise<Attachment | null | undefined> {
     const record = this.record as unknown as { [k: string]: unknown };
-    if (rbEqual(await record[`${this.name}Blob`], this.blob)) {
-      return (await record[`${this.name}Attachment`]) as Attachment | null;
+    const blob = record[`${this.name}Blob`];
+    if (blob instanceof Promise) {
+      return blob.then((found) =>
+        rbEqual(found, this.blob)
+          ? (record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>)
+          : undefined,
+      );
+    }
+    if (rbEqual(blob, this.blob)) {
+      return record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>;
     }
   }
 
@@ -100,10 +122,10 @@ export class CreateOne {
   /** @internal */
   private async findOrBuildBlob(): Promise<Blob> {
     const attachable = this.attachable;
-    if (attachable instanceof Blob) {
+    if (attachable instanceof ActiveStorage.Blob!) {
       return attachable;
     } else if (attachable instanceof UploadedFile) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable.open() as unknown as BlobIo,
         filename: attachable.originalFilename!,
         contentType: attachable.contentType,
@@ -111,7 +133,7 @@ export class CreateOne {
         serviceName: this.attachmentServiceName(),
       });
     } else if (attachable instanceof RackTestUploadedFile) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: (rbObjRespondTo(attachable, "open")
           ? (attachable as unknown as { open(): BlobIo }).open()
           : attachable) as unknown as BlobIo,
@@ -121,22 +143,22 @@ export class CreateOne {
         serviceName: this.attachmentServiceName(),
       });
     } else if (isPlainHash(attachable)) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         record: this.record,
         serviceName: this.attachmentServiceName(),
         ...(attachable as Parameters<typeof Blob.buildAfterUnfurling>[0]),
       });
     } else if (typeof attachable === "string") {
-      return await Blob.findSignedBang(attachable, { record: this.record });
+      return await ActiveStorage.Blob!.findSignedBang(attachable, { record: this.record });
     } else if (attachable instanceof File) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable as unknown as BlobIo,
         filename: File.basename(attachable.path()!),
         record: this.record,
         serviceName: this.attachmentServiceName(),
       });
     } else if (attachable instanceof Pathname) {
-      return Blob.buildAfterUnfurling({
+      return ActiveStorage.Blob!.buildAfterUnfurling({
         io: attachable.open() as BlobIo,
         filename: File.basename(attachable.toString()),
         record: this.record,

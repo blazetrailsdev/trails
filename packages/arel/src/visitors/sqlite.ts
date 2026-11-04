@@ -1,5 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import "../nodes/index.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -89,4 +89,4 @@ export class SQLite extends ToSql {
   }
 }
 
-rbModConstSet(Visitors, "SQLite", SQLite);
+constSet(Visitors, "SQLite", SQLite);

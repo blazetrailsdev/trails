@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
@@ -18,7 +18,7 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { FutureResult, type FutureResultPool } from "./future-result.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
-registerModel(Task as never);
+constSet(TopLevel, "Task", Task);
 
 type SqlPayload = {
   cached?: boolean;

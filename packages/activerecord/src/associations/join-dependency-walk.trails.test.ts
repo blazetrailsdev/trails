@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -40,8 +42,15 @@ describe("JoinDependency walk() deduplication", () => {
     for (const m of [Post, Comment, Author, Like]) {
       (m as any)._reflections = {};
       clearReflectionsCache(m);
-      registerModel(m);
     }
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Like", Like);
+    DescendantsTracker.registerSubclass(Base, Like);
 
     Post.hasMany("comments", { className: "Comment" });
     Comment.belongsTo("author", { className: "Author" });
@@ -92,7 +101,8 @@ describe("JoinDependency walk() deduplication", () => {
     }
     (Tag as any)._reflections = {};
     clearReflectionsCache(Tag);
-    registerModel(Tag);
+    constSet(TopLevel, "Tag", Tag);
+    DescendantsTracker.registerSubclass(Base, Tag);
     Post.hasMany("tags", { className: "Tag" });
 
     const jd2 = new JoinDependency(Post, Post.arelTable, "tags", Nodes.OuterJoin);

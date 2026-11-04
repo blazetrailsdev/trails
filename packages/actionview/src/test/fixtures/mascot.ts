@@ -1,4 +1,4 @@
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Mascot extends Base {
@@ -9,4 +9,3 @@ export class Mascot extends Base {
   }
 }
 (TopLevel as { Mascot?: typeof Mascot }).Mascot = Mascot;
-registerModel(Mascot);

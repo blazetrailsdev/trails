@@ -1,4 +1,4 @@
-import { File, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { File, rbFLoad, rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat";
 import type { Application } from "./application.js";
 import { CpuCounter } from "./cpu-counter.js";
 
@@ -78,4 +78,12 @@ export function fromPathname(path: unknown): unknown {
   if (typeof path !== "string" && rbObjRespondTo(path, "toStr"))
     path = (path as { toStr(): unknown }).toStr();
   return path;
+}
+
+TopLevel.Rake = Rake;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Rake?: typeof Rake;
+  }
 }

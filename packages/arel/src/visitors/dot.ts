@@ -10,7 +10,7 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjId,
-  rbModConstSet,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 export class Dot extends Visitor {
@@ -377,6 +377,6 @@ export class Edge {
   }
 }
 
-rbModConstSet(Visitors, "Dot", Dot);
-rbModConstSet(Dot, "Node", Node);
-rbModConstSet(Dot, "Edge", Edge);
+constSet(Visitors, "Dot", Dot);
+constSet(Dot, "Node", Node);
+constSet(Dot, "Edge", Edge);

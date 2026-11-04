@@ -16,13 +16,7 @@ import {
   assertNil,
   extend,
 } from "@blazetrails/activesupport";
-import {
-  FrozenError,
-  Marshal,
-  rbModConstSet,
-  rbObjIvarGet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { FrozenError, Marshal, constSet, rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
@@ -31,11 +25,11 @@ import { Naming, type ModelName } from "./naming.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 const ErrorsTest = {};
-registerConstant("ErrorsTest", ErrorsTest);
+constSet(TopLevel, "ErrorsTest", ErrorsTest);
 
 class Person {
   static {
-    rbModConstSet(ErrorsTest, "Person", this);
+    constSet(ErrorsTest, "Person", this);
   }
   declare modelName: ModelName;
   errors: Errors<Person>;

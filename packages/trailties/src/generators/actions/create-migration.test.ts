@@ -4,6 +4,7 @@ import { Basic } from "@blazetrails/thor/shell/basic";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { ClassMethods } from "../migration.js";
 import { CreateMigration, type MigrationRenderer } from "./create-migration.js";
 
 const DEFAULT = "db/migrate/create_articles.rb";
@@ -40,6 +41,7 @@ function makeMigration(
     options: generatorOptions,
     destinationRoot: ROOT,
     migrationFileName: fileName,
+    constructor: ClassMethods,
     relativeToOriginalDestinationRoot: (p: string) =>
       p.startsWith(`${ROOT}/`) ? p.slice(ROOT.length + 1) : p,
   };

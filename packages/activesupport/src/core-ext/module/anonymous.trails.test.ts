@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  constGet,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { isAnonymous } from "../../module-ext.js";
 
 describe("Module#anonymous? for a JS class (anonymous.rb:27-29)", () => {
@@ -40,11 +46,13 @@ describe("Module#anonymous? for a JS class (anonymous.rb:27-29)", () => {
 
   it("names a class a constant seat paths", () => {
     const klass = class {};
-    registerConstant("AnonymousTrailsTest::Seated", klass);
+    constSet(TopLevel, "AnonymousTrailsTest", {});
+    constSet(constGet(Object, "AnonymousTrailsTest") as object, "Seated", klass);
     try {
       expect(isAnonymous(klass)).toBe(false);
     } finally {
-      unregisterConstant("AnonymousTrailsTest::Seated", klass);
+      if (constDefined(Object, "AnonymousTrailsTest::Seated", false))
+        rbModRemoveConst(constGet(Object, "AnonymousTrailsTest") as object, "Seated");
     }
   });
 

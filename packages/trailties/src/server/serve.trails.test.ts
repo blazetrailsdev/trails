@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { serve } from "./boot.js";
 import type { HttpServer } from "@blazetrails/ruby-compat";
 

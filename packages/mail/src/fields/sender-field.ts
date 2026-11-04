@@ -1,5 +1,6 @@
 import { rbFArray } from "@blazetrails/ruby-compat";
 import { CommonAddressField } from "./common-address-field.js";
+import { Mail } from "../mail.js";
 
 export class SenderField extends CommonAddressField {
   static readonly NAME = "Sender";
@@ -16,3 +17,4 @@ export class SenderField extends CommonAddressField {
     return rbFArray(super.addresses()[0] ?? null) as (string | null)[];
   }
 }
+Mail.SenderField = SenderField;

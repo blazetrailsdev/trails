@@ -2,9 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { LazyRouteSet } from "./lazy-route-set.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Trails } from "../rails.js";
-import { registerController } from "@blazetrails/actionpack";
+import { rbObjRespondTo, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Trails } from "../trails.js";
 
 class StubController extends ActionController.Base {
   static actionEncodingTemplate(): null {
@@ -28,7 +27,7 @@ describe("LazyRouteSet", () => {
     routes = new LazyRouteSet();
     reload = vi.fn(async () => true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
-    registerController("PostsController", StubController);
+    constSet(TopLevel, "PostsController", StubController);
   });
 
   afterEach(() => {

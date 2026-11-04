@@ -4,14 +4,14 @@
   "description": "File attachments for Trails models, mirroring the activestorage gem",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/types/index.d.ts",
       "default": "./dist/index.js"
     },
     "./*": {
-      "types": "./dist/*.d.ts",
+      "types": "./dist/types/*.d.ts",
       "default": "./dist/*.js"
     }
   },
@@ -22,12 +22,15 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/marcel": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
@@ -37,7 +40,8 @@
   },
   "devDependencies": {
     "@blazetrails/mini-magick": "workspace:*",
-    "@blazetrails/image-processing": "workspace:*"
+    "@blazetrails/image-processing": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "peerDependencies": {
     "@blazetrails/image-processing": "workspace:*"

@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
 import {
@@ -9,14 +10,13 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { include, rbModConstSet, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
+import { include, constSet, regexpEscape, TopLevel } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Inheritance, stiName, isBaseClass, baseClass } from "./inheritance.js";
-import { registerModel } from "./associations.js";
 import {
   ActiveRecordError,
   SubclassNotFound,
@@ -100,7 +100,7 @@ describe("InheritanceTest", () => {
   });
 
   it("compute type success", () => {
-    registerModel(Author);
+    constSet(TopLevel, "Author", Author);
     expect(Company.computeType("Author")).toBe(Author);
   });
 
@@ -593,12 +593,12 @@ describe("InheritanceComputeTypeTest", () => {
 
 describe("InheritanceAttributeTest", () => {
   const InheritanceAttributeTest = {};
-  registerConstant("InheritanceAttributeTest", InheritanceAttributeTest);
+  constSet(TopLevel, "InheritanceAttributeTest", InheritanceAttributeTest);
   fixtures(["companies"]);
 
   class AttrTestCompany extends Base {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Company", this);
+      constSet(InheritanceAttributeTest, "Company", this);
     }
     static {
       this.tableName = "companies";
@@ -607,18 +607,25 @@ describe("InheritanceAttributeTest", () => {
   }
   class AttrTestStartup extends AttrTestCompany {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Startup", this);
+      constSet(InheritanceAttributeTest, "Startup", this);
     }
   }
   class AttrTestEmpire extends AttrTestCompany {
     static {
-      rbModConstSet(InheritanceAttributeTest, "Empire", this);
+      constSet(InheritanceAttributeTest, "Empire", this);
     }
   }
 
-  registerModel([AttrTestCompany, AttrTestStartup, AttrTestEmpire]);
-  registerModel(AttrTestStartup);
-  registerModel(AttrTestEmpire);
+  constSet(TopLevel, "AttrTestCompany", AttrTestCompany);
+  DescendantsTracker.registerSubclass(Base, AttrTestCompany);
+  constSet(TopLevel, "AttrTestStartup", AttrTestStartup);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestStartup);
+  constSet(TopLevel, "AttrTestEmpire", AttrTestEmpire);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestEmpire);
+  constSet(TopLevel, "AttrTestStartup", AttrTestStartup);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestStartup);
+  constSet(TopLevel, "AttrTestEmpire", AttrTestEmpire);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestEmpire);
 
   it("inheritance new with subclass as default", () => {
     const startup = new AttrTestCompany();
@@ -633,7 +640,7 @@ describe("InheritanceAttributeTest", () => {
 
 describe("InheritanceAttributeMappingTest", () => {
   const InheritanceAttributeMappingTest = {};
-  registerConstant("InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
+  constSet(TopLevel, "InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
   fixtures(["companies", "sponsors"]);
 
   class OmgStiType extends StringType {
@@ -656,7 +663,7 @@ describe("InheritanceAttributeMappingTest", () => {
 
   class IamtCompany extends Base {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Company", this);
+      constSet(InheritanceAttributeMappingTest, "Company", this);
     }
     static {
       this.tableName = "companies";
@@ -665,18 +672,25 @@ describe("InheritanceAttributeMappingTest", () => {
   }
   class IamtStartup extends IamtCompany {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Startup", this);
+      constSet(InheritanceAttributeMappingTest, "Startup", this);
     }
   }
   class IamtEmpire extends IamtCompany {
     static {
-      rbModConstSet(InheritanceAttributeMappingTest, "Empire", this);
+      constSet(InheritanceAttributeMappingTest, "Empire", this);
     }
   }
 
-  registerModel([IamtCompany, IamtStartup, IamtEmpire]);
-  registerModel(IamtStartup);
-  registerModel(IamtEmpire);
+  constSet(TopLevel, "IamtCompany", IamtCompany);
+  DescendantsTracker.registerSubclass(Base, IamtCompany);
+  constSet(TopLevel, "IamtStartup", IamtStartup);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtStartup);
+  constSet(TopLevel, "IamtEmpire", IamtEmpire);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtEmpire);
+  constSet(TopLevel, "IamtStartup", IamtStartup);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtStartup);
+  constSet(TopLevel, "IamtEmpire", IamtEmpire);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtEmpire);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class IamtSponsor extends Base {
@@ -691,7 +705,8 @@ describe("InheritanceAttributeMappingTest", () => {
     get sponsorable(): Base | null | Promise<Base | null>;
     set sponsorable(value: Base | null);
   }
-  registerModel(IamtSponsor);
+  constSet(TopLevel, "IamtSponsor", IamtSponsor);
+  DescendantsTracker.registerSubclass(Base, IamtSponsor);
 
   beforeEach(async () => {
     await IamtCompany.deleteAll();

@@ -57,6 +57,9 @@ name becomes a file name or a locale key, and each site carries
 - `AbstractController::Translation#translate`'s lazy-lookup scope
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
+- `ActionMailer::Base#collectResponsesFromTemplates`
+  (`actionmailer/src/base.ts`; `base.rb:991-1002`), which also dasherizes the
+  default `mailer_name` directory, as `localPrefixes` does
 
 The DIRECTORY a controller's templates are looked up in is kebab-case too.
 `ViewPaths::ClassMethods#localPrefixes` (`actionview/src/view-paths.ts`; Rails'
@@ -213,3 +216,61 @@ citing this section. There is no story to make params a
 `HashWithIndifferentAccess`.
 Ruled by the repo owner on 2026-10-18, closing story
 `param-builder-make-params-is-hash-with-indifferent-access` as PERMANENT.
+
+## `$!` is passed explicitly, and a response body is iterated async (`BadRequest#initialize`, `Response#each`)
+
+Ruby sets `$!` for the length of a `rescue`, so a constructor called there can
+read the exception being handled with no argument:
+`ActionController::BadRequest#initialize`
+(`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/exceptions.rb:10-13`)
+is `super(msg)` and then `set_backtrace $!.backtrace if $!`. JS has no
+equivalent: a `catch` binds its exception to a local only, and no hook runs on
+entry to a `catch` that could seat a carrier. **The exception being rescued is
+passed as a trailing `errinfo` parameter.** `excSetupMessage(mesg, errinfo)`
+(`ruby-compat/src/exception.ts`) is the shape for `raise`'s implicit `cause:`,
+and `new BadRequest(msg, errinfo)` is the shape for a constructor that reads
+`$!`. A carrier that every rescue site has to set would be an invented call at
+each site, and would still be wrong as soon as an `await` interleaved two
+handlers.
+
+Rails' `RackBody#each` and `Response#each`
+(`action_dispatch/http/response.rb:77-82`, `:526-528`) are synchronous, because
+a Ruby server iterates the body on the thread that waits for `Live::Buffer`'s
+queue. A Node handler cannot block its thread, so trails' Rack handlers write a
+body with `for await` (`packages/rack/src/handler/node.ts`), and a streamed
+body yields chunks as a `Live::Buffer` receives them. **`each` stays ported at
+its Rails name, and a body also answers `Symbol.asyncIterator`** (and
+`Symbol.iterator` where Rails' `each` is reached by a sync caller). Those
+protocol members are how a JS caller spells `body.each do |chunk|`. A
+sync-only protocol would have to buffer a whole live stream before its first
+byte was written.
+
+Both are genuine language shortcomings, ratified repo-wide here. The members
+and parameters that serve them carry `@noRailsEquivalent PERMANENT` /
+`@missingRailsCall … PERMANENT` receipts against this section.
+
+## DOM testing is HTML5 only (`Rails::Dom::Testing.default_html_version`)
+
+rails-dom-testing picks `Nokogiri::HTML4` or `HTML5` parser classes by
+`default_html_version`, which defaults to `:html4`
+(`vendor/rails-dom-testing/v2.2.0/lib/rails/dom/testing.rb:12,19-48`). A Rails 7.1+
+app sets it to `:html5` through the gem's railtie (`railtie.rb:7-10`,
+`railties/lib/rails/application/configuration.rb:276`). `@blazetrails/nokogiri` is
+backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
+`Testing.defaultHtmlVersion` defaults to `:html5`, no railtie copies
+`domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
+`NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
+the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `action_dispatch/testing/integration.rb` holds two definers.
+  `Integration::Runner` is a module carrying `respondToMissing` /
+  `methodMissing` as named methods, so a class that includes it on its own
+  answers `respond_to?` for the session's names but has no trap.
+  `IntegrationTest` splices the Proxy into its own prototype chain above the
+  `Runner` link.

@@ -1,0 +1,14 @@
+Description:
+    Generate benchmarks to compare performance optimizations.
+
+Example:
+    `bin/trails generate benchmark opt_compare`
+
+    This will create:
+        script/benchmarks/opt-compare.ts
+
+    You can run the generated benchmark file using:
+        `node script/benchmarks/opt-compare.ts`
+
+    You can specify different reports:
+        `bin/trails generate benchmark opt_compare patch1 patch2 patch3`

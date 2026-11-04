@@ -1,3 +1,4 @@
+import "../constants.encrypted-fixtures.generated.js";
 import { Encryption } from "../namespaces.js";
 import type { ValueType } from "@blazetrails/activemodel";
 

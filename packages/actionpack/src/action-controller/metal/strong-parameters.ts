@@ -32,11 +32,11 @@ import {
   rbObjClassname,
   rbObjDup,
   rbObjRespondTo,
+  rbSetClassPathString,
   toEnum,
   toH,
   transformValues,
   filterMap,
-  registerClassPaths,
   ArgumentError,
   IndexError,
 } from "@blazetrails/ruby-compat";
@@ -1044,8 +1044,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-registerClassPaths([[() => Parameters, "ActionController::Parameters"]]);
 ActionController.Parameters = Parameters;
+rbSetClassPathString(Parameters, ActionController, "Parameters");
 Parameters.hookIntoYamlLoading();
 
 ActionController.StrongParameters = StrongParameters;

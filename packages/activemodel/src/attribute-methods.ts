@@ -11,8 +11,8 @@ import {
   rbFSend,
   rbClearMethodCache,
   rbObjRespondTo,
-  rbModConstDefined,
-  rbModConstSet,
+  constDefined,
+  constSet,
   regexpEscape,
   unpack1,
   filterMap,
@@ -63,7 +63,7 @@ export class AttrNames {
     } else {
       const safeName = unpack1(b(attrName), "h*");
       const constName = `ATTR_${safeName}`;
-      if (!rbModConstDefined(this, constName)) rbModConstSet(this, constName, attrName);
+      if (!constDefined(this, constName)) constSet(this, constName, attrName);
       const tempMethodName = `__temp__${safeName}${writer ? "=" : ""}`;
       const attrNameExpr = `::ActiveModel::AttributeMethods::AttrNames::${constName}`;
       block(tempMethodName, attrNameExpr);

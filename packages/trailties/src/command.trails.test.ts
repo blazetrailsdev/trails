@@ -3,6 +3,7 @@ import { setAppPath, setEngineRoot } from "./app-path.js";
 import { root } from "./command.js";
 import type { Base } from "./command/base.js";
 import { Command as Program } from "commander";
+import { Rake } from "@blazetrails/rake";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
 import { createProgram } from "./cli.js";
 import { findByNamespace, hiddenCommands, invoke } from "./command.js";
@@ -19,9 +20,10 @@ function programName(command: Awaited<ReturnType<typeof findByNamespace>>): unkn
   return (command as Program | undefined)?.name();
 }
 
-describe("Rails::Command.find_by_namespace", () => {
+describe("Trails::Command.find_by_namespace", () => {
   it("loads only the candidate command, as lookup requires only its file", async () => {
-    expect(programName(await findByNamespace("server", "server"))).toBe("server");
+    const server = (await findByNamespace("server", "server")) as typeof Base;
+    expect(server.namespace()).toBe("trails:server");
     expect(loaded).toEqual([]);
   }, 30_000);
 
@@ -30,7 +32,7 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
     expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
     expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
-      "credentials",
+      "trails:credentials",
     );
   }, 30_000);
 
@@ -57,9 +59,54 @@ describe("Rails::Command.find_by_namespace", () => {
     expect(rake).not.toHaveBeenCalled();
 
     perform.mockClear();
-    await invoke("unused_routes:constructor");
+    await expect(invoke("unused_routes:constructor")).rejects.toThrow('called with "1"');
     expect(perform).not.toHaveBeenCalled();
-    expect(rake).toHaveBeenCalled();
+    expect(rake).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("hands an unknown name to the rake command, with --describe for help", async () => {
+    const { RakeCommand } = await import("./commands/rake.js");
+    const location = vi.spyOn(Rake.application!, "findRakefileLocation");
+    location.mockResolvedValue(["Rakefile.ts", "/app"] as never);
+    const perform = vi.spyOn(RakeCommand, "perform").mockResolvedValue();
+    onTestFinished(() => (location.mockRestore(), perform.mockRestore()));
+
+    await invoke("db:migrate[1]", ["x"]);
+    expect(perform).toHaveBeenLastCalledWith("db:migrate[1]", ["x"], {});
+
+    await invoke("zeitwerk:check", ["--help"]);
+    expect(perform).toHaveBeenLastCalledWith(
+      "zeitwerk:check",
+      ["--describe", "zeitwerk:check"],
+      {},
+    );
+  }, 30_000);
+
+  it("prints rake tasks with a comment defined outside the application", async () => {
+    const { RakeCommand } = await import("./commands/rake.js");
+    const location = vi.spyOn(Rake.application!, "findRakefileLocation");
+    location.mockResolvedValue(["Rakefile.ts", "/app"] as never);
+    onTestFinished(() => location.mockRestore());
+    setAppPath("/app/config/application.ts");
+    const host = RakeCommand as unknown as { _rakeTasks: unknown };
+    const task = (name: string, comment: string | null, file: string) => ({
+      comment,
+      locations: [file],
+      nameWithArgs: () => name,
+    });
+    host._rakeTasks = [
+      task("zeitwerk:check", "Check project structure", "/gem/zeitwerk.ts:1"),
+      task("mine", "Application task", "/app/lib/tasks/mine.ts:1"),
+      task("quiet", null, "/gem/quiet.ts:1"),
+    ];
+    onTestFinished(() => {
+      host._rakeTasks = undefined;
+      setAppPath(undefined);
+    });
+
+    expect(await RakeCommand.printingCommands()).toEqual([
+      ["zeitwerk:check", "Check project structure"],
+    ]);
   }, 30_000);
 
   it("finds nothing for an unknown namespace", async () => {
@@ -73,7 +120,7 @@ describe("Rails::Command.find_by_namespace", () => {
   });
 });
 
-describe("Rails::Command.root", () => {
+describe("Trails::Command.root", () => {
   afterEach(() => {
     setAppPath(undefined);
     setEngineRoot(undefined);
@@ -82,9 +129,7 @@ describe("Rails::Command.root", () => {
   it("expands the application root from APP_PATH, source or built", () => {
     setAppPath("/app/config/application.ts");
     expect(root()?.toString()).toBe("/app");
-    setAppPath("/app/dist/config/application.js");
-    expect(root()?.toString()).toBe("/app");
-    setAppPath("/srv/dist/config/application.ts");
+    setAppPath("/srv/dist/config/application.js");
     expect(root()?.toString()).toBe("/srv/dist");
   });
 

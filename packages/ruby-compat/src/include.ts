@@ -26,10 +26,10 @@ import { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { isRegisteredConstant, registeredConstant } from "./variable.js";
+import { constGet } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
-import { generatedClassPath, markModuleObject } from "./classpath.js";
+import { rbClassPath, markModuleObject } from "./classpath.js";
 export { classModule };
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -43,7 +43,6 @@ import {
   FL_SINGLETON,
   T_ICLASS,
   TopLevel,
-  type TopLevelConstants,
   classpaths,
   isPlainHash,
   rbSetClassPathString,
@@ -71,6 +70,7 @@ import {
   reopened,
   rbSeatSuper,
   superSlots,
+  type TopLevelConstants,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
 
@@ -101,7 +101,7 @@ type ModuleHooks = {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModConstSet<T>(
+export function constSet<T>(
   mod:
     | Module
     | (abstract new (...args: never) => unknown)
@@ -139,7 +139,12 @@ export function rbModConstSet<T>(
         ? mod.inspect()
         : rbModToS(klass);
     if (parentalPathPermanent && valPath?.permanent !== true) {
-      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
+      classpaths.set(
+        value,
+        mod instanceof Module || classpaths.has(mod)
+          ? { path: `${parentalPath}::${id}`, permanent: true }
+          : { path: `${parentalPath}::${id}`, permanent: true, under: mod, id },
+      );
     } else if (!parentalPathPermanent && valPath === undefined) {
       classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: false });
     }
@@ -154,11 +159,11 @@ export function rbModConstSet<T>(
  * module or one of its ancestors, or on the module alone when `recur` is
  * false. A `::` path is walked a segment at a time, each
  * later segment read from the namespace before it alone, and the first also
- * from the top-level table `registerConstant` fills.
+ * from the top-level table `TopLevel`.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModConstDefined(
+export function constDefined(
   mod:
     | Module
     | (abstract new (...args: never) => unknown)
@@ -167,7 +172,6 @@ export function rbModConstDefined(
   name: string,
   recur: boolean = true,
 ): boolean {
-  if (recur && isRegisteredConstant(name)) return true;
   let c: unknown = mod;
   for (const [i, part] of name.split("::").entries()) {
     if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(part)) {
@@ -176,8 +180,8 @@ export function rbModConstDefined(
     if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
     if (i === 0 && recur ? part in c : Object.hasOwn(c, part)) {
       c = (c as Record<string, unknown>)[part];
-    } else if (i === 0 && recur && isRegisteredConstant(part)) {
-      c = registeredConstant(part);
+    } else if (i === 0 && (recur || mod === Object) && Object.hasOwn(TopLevel, part)) {
+      c = (TopLevel as Record<string, unknown>)[part];
     } else {
       return false;
     }
@@ -251,7 +255,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   get name(): string | null {
-    return classpaths.get(this)?.path ?? generatedClassPath(this) ?? null;
+    return rbClassPath(this) ?? null;
   }
 
   /**
@@ -1211,7 +1215,12 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
       return true;
     }
-    if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
+    if (
+      p === globalThis.Set.prototype &&
+      constDefined(Object, "Set") &&
+      c === constGet(Object, "Set")
+    )
+      return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;

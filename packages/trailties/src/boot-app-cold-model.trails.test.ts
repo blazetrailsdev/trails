@@ -5,7 +5,7 @@ import { Base } from "@blazetrails/activerecord";
 import { MockRequest } from "@blazetrails/rack";
 import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
-import { Trails, _resetTrailsEnv } from "./rails.js";
+import { Trails, _resetTrailsEnv } from "./trails.js";
 
 describe("a booted app's models are warm before user code runs", () => {
   let savedEnv: string | undefined;

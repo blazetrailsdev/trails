@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import { _resetTrailsEnv } from "../rails.js";
+import { _resetTrailsEnv } from "../trails.js";
 import { serverEnvironment, serverHost, serverPort } from "./boot.js";
 
 describe("server boot options (trails)", () => {

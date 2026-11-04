@@ -3,11 +3,11 @@ import {
   type Included,
   include,
   rbEqual,
-  rbModConstSet,
-  registerConstant,
+  constSet,
   StandardError,
   toI,
   toS,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 
 class RecordNotFound extends StandardError {}
@@ -40,5 +40,5 @@ export class Person {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface Person extends Included<typeof Identification> {}
 include(Person, Identification);
-registerConstant("Person", Person);
-rbModConstSet(Person, "RecordNotFound", RecordNotFound);
+constSet(TopLevel, "Person", Person);
+constSet(Person, "RecordNotFound", RecordNotFound);

@@ -3,6 +3,7 @@ import type { Base } from "../../base.js";
 import { foreignKey, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../namespaces.js";
 import { HasMany } from "./has-many.js";
+import { Builder } from "../../namespaces.js";
 
 export class HasAndBelongsToMany {
   readonly lhsModel: typeof Base;
@@ -132,3 +133,5 @@ export class HasAndBelongsToMany {
     }
   }
 }
+
+Builder.HasAndBelongsToMany = HasAndBelongsToMany;

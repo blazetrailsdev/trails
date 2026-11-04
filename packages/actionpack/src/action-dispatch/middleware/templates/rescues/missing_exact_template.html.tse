@@ -7,7 +7,7 @@
 
   <div class="summary">
     <p>
-      <strong>NOTE:</strong> Rails usually expects a controller action to render a view template with the same name.
+      <strong>NOTE:</strong> Trails usually expects a controller action to render a view template with the same name.
     </p>
     <p>
       For example, a <code><%= this.exception.controller %>#<%= this.exception.actionName %></code> action defined in <code>app/controllers/<%= this.exception.controller.controllerPath %>_controller.rb</code> should have a corresponding view template

@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Dashboard } from "./dashboard.js";
 import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Minivan extends Base {
@@ -17,7 +18,8 @@ export class Minivan extends Base {
     this.attrReadonly("color");
   }
 }
-registerModel(Minivan);
+constSet(TopLevel, "Minivan", Minivan);
+DescendantsTracker.registerSubclass(Base, Minivan);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Minivan {
   get speedometer(): Speedometer | null | Promise<Speedometer | null>;

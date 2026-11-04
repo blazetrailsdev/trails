@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
@@ -20,8 +20,8 @@ describe("CollectionAssociation#size arms", () => {
   const { authors } = fixtures(["authors", "posts", "comments"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
   });
 
   it("counts the target when the association is loaded", async () => {
@@ -61,8 +61,8 @@ describe("CollectionAssociation#size with a grouped association scope", () => {
   const { companies } = fixtures(["companies", "accounts"]);
 
   beforeAll(() => {
-    registerModel(Firm);
-    registerModel(Client);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
   });
 
   it("loads the target and counts it when the association scope groups", async () => {

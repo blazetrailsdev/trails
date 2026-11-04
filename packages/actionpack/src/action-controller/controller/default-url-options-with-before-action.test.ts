@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
@@ -32,7 +32,8 @@ class ControllerWithBeforeActionAndDefaultUrlOptions extends Base {
   }
 }
 
-registerConstant(
+constSet(
+  TopLevel,
   "ControllerWithBeforeActionAndDefaultUrlOptions",
   ControllerWithBeforeActionAndDefaultUrlOptions,
 );

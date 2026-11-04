@@ -1,3 +1,6 @@
+import type { VariantWithRecord } from "./variant-with-record.js";
+import type { Variant } from "./variant.js";
+import type { Variation } from "./variation.js";
 import { type Base } from "@blazetrails/activerecord";
 import { delegateMissingTo, DelegationError, runLoadHooks } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch } from "@blazetrails/ruby-compat";
@@ -6,7 +9,7 @@ import type { Blob } from "./blob.js";
 import type { NamedVariant } from "./named-variant.js";
 import { Record } from "./record.js";
 
-type Transformations = string | { [k: string]: unknown };
+type Transformations = string | Variation | { [k: string]: NonNullable<unknown> | null };
 
 interface AttachmentReflection {
   options?: { dependent?: unknown };
@@ -16,12 +19,6 @@ interface AttachmentReflection {
 interface AttachedBlob extends Blob {
   isAnalyzed(): unknown;
   analyzeLater(): Promise<void>;
-  variant(transformations: unknown): unknown;
-  preview(transformations: unknown): unknown;
-  representation(transformations: unknown): unknown;
-  isPreviewImageNeededBeforeProcessingVariants(): boolean;
-  createPreviewImageLater(variations: unknown[]): Promise<void>;
-  preprocessed(transformations: unknown): Promise<void>;
 }
 
 type AttachedRecord = Base & {
@@ -85,19 +82,19 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  async variant(transformations: Transformations): Promise<unknown> {
-    transformations = await this.transformationsByName(transformations);
-    return (await this.blob)!.variant(transformations);
+  variant(transformations: Transformations): Variant | VariantWithRecord {
+    transformations = this.transformationsByName(transformations);
+    return (this.blob as AttachedBlob).variant(transformations);
   }
 
-  async preview(transformations: Transformations): Promise<unknown> {
-    transformations = await this.transformationsByName(transformations);
-    return (await this.blob)!.preview(transformations);
+  preview(transformations: Transformations): unknown {
+    transformations = this.transformationsByName(transformations);
+    return (this.blob as AttachedBlob).preview(transformations);
   }
 
-  async representation(transformations: Transformations): Promise<unknown> {
-    transformations = await this.transformationsByName(transformations);
-    return (await this.blob)!.representation(transformations);
+  representation(transformations: Transformations): unknown {
+    transformations = this.transformationsByName(transformations);
+    return (this.blob as AttachedBlob).representation(transformations);
   }
 
   /** @internal */
@@ -114,12 +111,15 @@ export class Attachment extends Record {
   /** @internal */
   private async transformVariantsLater(): Promise<void> {
     const record = await this.record;
-    const preprocessedVariations = Object.values(await this.namedVariants())
+    const preprocessedVariations = Object.values(this.namedVariants())
       .filter((namedVariant) => namedVariant.isPreprocessed(record))
       .map((namedVariant) => namedVariant.transformations);
 
     const blob = (await this.blob)!;
-    if (blob.isPreviewImageNeededBeforeProcessingVariants() && preprocessedVariations.length > 0) {
+    if (
+      (await blob.isPreviewImageNeededBeforeProcessingVariants()) &&
+      preprocessedVariations.length > 0
+    ) {
       await blob.createPreviewImageLater(preprocessedVariations);
     } else {
       for (const transformations of preprocessedVariations) {
@@ -141,21 +141,22 @@ export class Attachment extends Record {
   }
 
   /** @internal */
-  private async namedVariants(): Promise<{ [k: string]: NamedVariant }> {
-    const record = (await this.record)!;
+  private namedVariants(): { [k: string]: NamedVariant } {
+    const record = this.record as AttachedRecord;
     return record.attachmentReflections[this.name]?.namedVariants ?? {};
   }
 
   /** @internal */
-  private async transformationsByName(transformations: Transformations) {
+  private transformationsByName(
+    transformations: Transformations,
+  ): Exclude<Transformations, string> {
     if (typeof transformations === "string") {
       const variantName = transformations;
       return fetch<NamedVariant>(
-        await this.namedVariants(),
+        this.namedVariants(),
         variantName,
         block(() => {
-          const record = this.association("record").target as AttachedRecord;
-          const recordModelName = record.toModel().modelName.name;
+          const recordModelName = (this.record as AttachedRecord).toModel().modelName.name;
           throw new ArgumentError(
             `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
           );
@@ -170,7 +171,9 @@ export class Attachment extends Record {
 Object.setPrototypeOf(
   Attachment.prototype,
   delegateMissingTo.call(
-    Object.create(Object.getPrototypeOf(Attachment.prototype) as object),
+    Object.create(Object.getPrototypeOf(Attachment.prototype) as object, {
+      constructor: { value: Attachment },
+    }),
     "blob",
   ),
 );

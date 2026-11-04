@@ -1,8 +1,10 @@
-import { Base as JobBase, DeserializationError, registerJob } from "@blazetrails/activejob";
-import { rbFSend, StandardError } from "@blazetrails/ruby-compat";
+import "./constants.destroy-association-async-job.generated.js";
+import { constantize } from "@blazetrails/activesupport";
+import { Base as JobBase, DeserializationError } from "@blazetrails/activejob";
+import { constSet, rbFSend, StandardError } from "@blazetrails/ruby-compat";
 import { queues } from "./active-record.js";
 import { Base } from "./base.js";
-import { computeType } from "./inheritance.js";
+import { ActiveRecord } from "./namespaces.js";
 
 export class DestroyAssociationAsyncError extends StandardError {}
 
@@ -13,10 +15,6 @@ export class DestroyAssociationAsyncJob extends JobBase {
     this.discardOn(DeserializationError);
   }
 
-  /**
-   * @inventedArm replace — CONVERGEABLE destroy-association-async-job-reads-models-from-register-model
-   * @inventedArm computeType — CONVERGEABLE destroy-association-async-job-reads-models-from-register-model
-   */
   async perform({
     ownerModelName = null,
     ownerId = null,
@@ -32,8 +30,8 @@ export class DestroyAssociationAsyncJob extends JobBase {
     associationPrimaryKeyColumn?: string | string[] | null;
     ensuringOwnerWasMethod?: string | null;
   } = {}): Promise<void> {
-    const associationModel = computeType(Base, associationClass!.replace(/^(::)?/, "::"));
-    const ownerClass = computeType(Base, ownerModelName!.replace(/^(::)?/, "::"));
+    const associationModel = constantize(associationClass!) as typeof Base;
+    const ownerClass = constantize(ownerModelName!) as typeof Base;
     const owner = await ownerClass.findBy(new Map([[ownerClass.primaryKey, [ownerId]]]));
 
     if (!(await this.isOwnerDestroyed(owner, ensuringOwnerWasMethod))) {
@@ -62,4 +60,4 @@ export class DestroyAssociationAsyncJob extends JobBase {
   }
 }
 
-registerJob("ActiveRecord::DestroyAssociationAsyncJob", DestroyAssociationAsyncJob);
+constSet(ActiveRecord, "DestroyAssociationAsyncJob", DestroyAssociationAsyncJob);

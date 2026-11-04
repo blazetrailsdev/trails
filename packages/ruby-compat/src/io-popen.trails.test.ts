@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { Errno } from "./errno.js";
+import { File } from "./file.js";
 import { IO } from "./io.js";
 import { Process } from "./process.js";
 import { Tempfile } from "./tempfile.js";
+import { Thread } from "./thread.js";
 
 describe("IO.popen", () => {
   it("yields the child's stdout and answers the block's value", async () => {
@@ -49,5 +51,26 @@ describe("IO.popen", () => {
       (o) => o.read(),
     );
     expect(new TextDecoder().decode(out)).toBe("yes");
+  });
+
+  it("keeps $? per thread when two children finish concurrently", async () => {
+    const run = (code: number) =>
+      new Thread(async () => {
+        await IO.popen(["sh", "-c", `sleep 0.0${code}; exit ${code}`], (out) => out.read());
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return Process.lastStatus!.exitstatus();
+      });
+    const [a, b] = [run(1), run(2)];
+    expect(await a.value()).toBe(1);
+    expect(await b.value()).toBe(2);
+  });
+
+  it("writes a w+ block's output to the child's stdin and merges err into out", async () => {
+    const path = Tempfile.create("popen").path()!;
+    await IO.popen(`cat > ${path}; echo oops >&2`, "w+", { err: "out" }, (io) => {
+      io.puts("hello");
+    });
+    expect(Process.lastStatus!.exitstatus()).toBe(0);
+    expect(await File.readAsync(path)).toBe("hello\n");
   });
 });

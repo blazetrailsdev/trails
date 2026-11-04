@@ -1,24 +1,33 @@
 import { assertCalled, assertEqual, Inflections, inflections } from "@blazetrails/activesupport";
-import { except, rbObjDup, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  except,
+  rbObjDup,
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import { inheritedParamsWrapper } from "../metal/params-wrapper.js";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
-registerConstant("IrregularInflectionParamsWrapperTest", {
+constSet(TopLevel, "IrregularInflectionParamsWrapperTest", {
   name: "IrregularInflectionParamsWrapperTest",
 });
-registerConstant("NamespacedParamsWrapperTest", { name: "NamespacedParamsWrapperTest" });
-registerConstant("NamespacedParamsWrapperTest::Admin", {
+constSet(TopLevel, "NamespacedParamsWrapperTest", { name: "NamespacedParamsWrapperTest" });
+constSet(constGet(Object, "NamespacedParamsWrapperTest") as object, "Admin", {
   name: "NamespacedParamsWrapperTest::Admin",
 });
-registerConstant("NamespacedParamsWrapperTest::Admin::Users", {
+constSet(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "Users", {
   name: "NamespacedParamsWrapperTest::Admin::Users",
 });
-registerConstant("ParamsWrapperTest", { name: "ParamsWrapperTest" });
+constSet(TopLevel, "ParamsWrapperTest", { name: "ParamsWrapperTest" });
 
-registerConstant("Admin::User", class User {});
+constSet(TopLevel, "Admin", {});
+constSet(constGet(Object, "Admin") as object, "User", class User {});
 
 let tc: TestCase;
 
@@ -61,14 +70,14 @@ describe("ParamsWrapperTest", () => {
       return { settings: ["color", "size"] };
     }
   }
-  registerConstant("ParamsWrapperTest::User", User);
+  constSet(constGet(Object, "ParamsWrapperTest") as object, "User", User);
 
   class Person {
     static attributeNames(): string[] {
       return [];
     }
   }
-  registerConstant("ParamsWrapperTest::Person", Person);
+  constSet(constGet(Object, "ParamsWrapperTest") as object, "Person", Person);
 
   class ParamsWrapperTest extends TestCase {
     static {
@@ -439,7 +448,7 @@ describe("NamespacedParamsWrapperTest", () => {
 
   it("namespace lookup from model", async () => {
     const user = class extends SampleOne {};
-    registerConstant("NamespacedParamsWrapperTest::Admin::User", user);
+    constSet(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User", user);
     try {
       await withDefaultWrapperOptions(async () => {
         tc.request.env["CONTENT_TYPE"] = "application/json";
@@ -451,13 +460,14 @@ describe("NamespacedParamsWrapperTest", () => {
         });
       });
     } finally {
-      unregisterConstant("NamespacedParamsWrapperTest::Admin::User", user);
+      if (constDefined(Object, "NamespacedParamsWrapperTest::Admin::User", false))
+        rbModRemoveConst(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User");
     }
   });
 
   it("namespace lookup from model alias", async () => {
     const user = class extends SampleOne {};
-    registerConstant("NamespacedParamsWrapperTest::Admin::User", user);
+    constSet(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User", user);
     try {
       await withDefaultWrapperOptions(async () => {
         tc.request.env["CONTENT_TYPE"] = "application/json";
@@ -465,13 +475,14 @@ describe("NamespacedParamsWrapperTest", () => {
         assertParameters({ nick: "sikachu", title: "Developer", user: { nick: "sikachu" } });
       });
     } finally {
-      unregisterConstant("NamespacedParamsWrapperTest::Admin::User", user);
+      if (constDefined(Object, "NamespacedParamsWrapperTest::Admin::User", false))
+        rbModRemoveConst(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User");
     }
   });
 
   it("hierarchy namespace lookup from model", async () => {
     const user = class extends SampleTwo {};
-    registerConstant("User", user);
+    constSet(TopLevel, "User", user);
     try {
       await withDefaultWrapperOptions(async () => {
         tc.request.env["CONTENT_TYPE"] = "application/json";
@@ -483,7 +494,7 @@ describe("NamespacedParamsWrapperTest", () => {
         });
       });
     } finally {
-      unregisterConstant("User", user);
+      if (constDefined(Object, "User", false)) rbModRemoveConst(Object, "User");
     }
   });
 });
@@ -543,8 +554,9 @@ describe("IrregularInflectionParamsWrapperTest", () => {
       return ["test_attr"];
     }
   }
-  registerConstant(
-    "IrregularInflectionParamsWrapperTest::ParamswrappernewsItem",
+  constSet(
+    constGet(Object, "IrregularInflectionParamsWrapperTest") as object,
+    "ParamswrappernewsItem",
     ParamswrappernewsItem,
   );
 

@@ -1,10 +1,11 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
 import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Categorization extends Base {
@@ -38,7 +39,8 @@ export class Categorization extends Base {
     });
   }
 }
-registerModel(Categorization);
+constSet(TopLevel, "Categorization", Categorization);
+DescendantsTracker.registerSubclass(Base, Categorization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Categorization {
   get post(): Post | null | Promise<Post | null>;
@@ -64,7 +66,8 @@ export class SpecialCategorization extends Base {
     this.belongsTo("category");
   }
 }
-registerModel(SpecialCategorization);
+constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
+DescendantsTracker.registerSubclass(Base, SpecialCategorization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialCategorization {
   get author(): Author | null | Promise<Author | null>;

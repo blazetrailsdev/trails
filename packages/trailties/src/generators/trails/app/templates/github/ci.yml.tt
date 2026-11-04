@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+<% if (!this.skipEslint()) { -%>
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Install dependencies
+        run: corepack enable && <%= this.packageManager %> install
+
+      - name: Lint code for consistent style
+        run: bin/eslint --format stylish
+
+<% } -%>
+<% if (!this.options.skipTest) { -%>
+  test:
+    runs-on: ubuntu-latest
+
+<% if (this.database.name === "postgres") { -%>
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+<% } else if (this.database.name !== "sqlite3") { -%>
+    services:
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+<% } -%>
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Install dependencies
+        run: corepack enable && <%= this.packageManager %> install
+
+      - name: Run tests
+        env:
+          TRAILS_ENV: test
+<% if (this.database.name === "postgres") { -%>
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+<% } else if (this.database.name !== "sqlite3") { -%>
+          DATABASE_URL: mysql2://127.0.0.1:3306
+<% } -%>
+        run: bin/trails db test:prepare && <%= this.packageManager %> test
+<% } -%>

@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, type TestContext } from "vitest";
+import { describe, expect, it, type TestContext } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
-import { hashAref, registerConstant } from "@blazetrails/ruby-compat";
+import { hashAref, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../test-helpers/test-helper.js";
 import { User } from "../test-helpers/stubs/user.js";
 import { ActionCable } from "../namespaces.js";
@@ -12,11 +12,11 @@ type Data = Record<string, unknown>;
 type ChannelContext = TestContext & { testCase: TestCase };
 
 class TestTestChannel extends Base {}
-registerConstant("TestTestChannel", TestTestChannel);
+constSet(TopLevel, "TestTestChannel", TestTestChannel);
 
 class NonInferrableExplicitClassChannelTest extends TestCase {}
 NonInferrableExplicitClassChannelTest.tests(TestTestChannel);
-registerConstant("NonInferrableExplicitClassChannelTest", NonInferrableExplicitClassChannelTest);
+constSet(TopLevel, "NonInferrableExplicitClassChannelTest", NonInferrableExplicitClassChannelTest);
 
 describe("NonInferrableExplicitClassChannelTest", () => {
   it("set channel class manual", () => {
@@ -26,7 +26,7 @@ describe("NonInferrableExplicitClassChannelTest", () => {
 
 class NonInferrableSymbolNameChannelTest extends TestCase {}
 NonInferrableSymbolNameChannelTest.tests("test_test_channel");
-registerConstant("NonInferrableSymbolNameChannelTest", NonInferrableSymbolNameChannelTest);
+constSet(TopLevel, "NonInferrableSymbolNameChannelTest", NonInferrableSymbolNameChannelTest);
 
 describe("NonInferrableSymbolNameChannelTest", () => {
   it("set channel class manual using symbol", () => {
@@ -36,7 +36,7 @@ describe("NonInferrableSymbolNameChannelTest", () => {
 
 class NonInferrableStringNameChannelTest extends TestCase {}
 NonInferrableStringNameChannelTest.tests("test_test_channel");
-registerConstant("NonInferrableStringNameChannelTest", NonInferrableStringNameChannelTest);
+constSet(TopLevel, "NonInferrableStringNameChannelTest", NonInferrableStringNameChannelTest);
 
 describe("NonInferrableStringNameChannelTest", () => {
   it("set channel class manual using string", () => {
@@ -45,18 +45,16 @@ describe("NonInferrableStringNameChannelTest", () => {
 });
 
 class SubscriptionsTestChannel extends Base {}
-registerConstant("SubscriptionsTestChannel", SubscriptionsTestChannel);
+constSet(TopLevel, "SubscriptionsTestChannel", SubscriptionsTestChannel);
 
 class SubscriptionsTestChannelTest extends TestCase {
   setup(): void {
     this.stubConnection();
   }
 }
-registerConstant("SubscriptionsTestChannelTest", SubscriptionsTestChannelTest);
+constSet(TopLevel, "SubscriptionsTestChannelTest", SubscriptionsTestChannelTest);
 
 describe("SubscriptionsTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as SubscriptionsTestChannelTest).setup());
-
   it("no subscribe", ({ testCase: t }: ChannelContext) => {
     expect(t.subscription).toBeNull();
   });
@@ -75,7 +73,7 @@ describe("SubscriptionsTestChannelTest", () => {
 
 class StubConnectionTest extends TestCase {}
 StubConnectionTest.tests(SubscriptionsTestChannel);
-registerConstant("StubConnectionTest", StubConnectionTest);
+constSet(TopLevel, "StubConnectionTest", StubConnectionTest);
 
 describe("StubConnectionTest", () => {
   it("connection identifiers", async ({ testCase: t }: ChannelContext) => {
@@ -95,10 +93,10 @@ class RejectionTestChannel extends Base {
     this.reject();
   }
 }
-registerConstant("RejectionTestChannel", RejectionTestChannel);
+constSet(TopLevel, "RejectionTestChannel", RejectionTestChannel);
 
 class RejectionTestChannelTest extends TestCase {}
-registerConstant("RejectionTestChannelTest", RejectionTestChannelTest);
+constSet(TopLevel, "RejectionTestChannelTest", RejectionTestChannelTest);
 
 describe("RejectionTestChannelTest", () => {
   it("rejection", async ({ testCase: t }: ChannelContext) => {
@@ -122,10 +120,10 @@ class StreamsTestChannel extends Base {
     await this.stopStreamFrom(`test_${hashAref(this.params, "id") ?? 0}`);
   }
 }
-registerConstant("StreamsTestChannel", StreamsTestChannel);
+constSet(TopLevel, "StreamsTestChannel", StreamsTestChannel);
 
 class StreamsTestChannelTest extends TestCase {}
-registerConstant("StreamsTestChannelTest", StreamsTestChannelTest);
+constSet(TopLevel, "StreamsTestChannelTest", StreamsTestChannelTest);
 
 describe("StreamsTestChannelTest", () => {
   it("stream without params", async ({ testCase: t }: ChannelContext) => {
@@ -171,10 +169,10 @@ class StreamsForTestChannel extends Base {
     await this.stopStreamFor(new User(hashAref(this.params, "id") as string));
   }
 }
-registerConstant("StreamsForTestChannel", StreamsForTestChannel);
+constSet(TopLevel, "StreamsForTestChannel", StreamsForTestChannel);
 
 class StreamsForTestChannelTest extends TestCase {}
-registerConstant("StreamsForTestChannelTest", StreamsForTestChannelTest);
+constSet(TopLevel, "StreamsForTestChannelTest", StreamsForTestChannelTest);
 
 describe("StreamsForTestChannelTest", () => {
   it("stream with params", async ({ testCase: t }: ChannelContext) => {
@@ -194,10 +192,10 @@ describe("StreamsForTestChannelTest", () => {
 class NoStreamsTestChannel extends Base {
   subscribed(): void {}
 }
-registerConstant("NoStreamsTestChannel", NoStreamsTestChannel);
+constSet(TopLevel, "NoStreamsTestChannel", NoStreamsTestChannel);
 
 class NoStreamsTestChannelTest extends TestCase {}
-registerConstant("NoStreamsTestChannelTest", NoStreamsTestChannelTest);
+constSet(TopLevel, "NoStreamsTestChannelTest", NoStreamsTestChannelTest);
 
 describe("NoStreamsTestChannelTest", () => {
   it("stream with params", async ({ testCase: t }: ChannelContext) => {
@@ -217,7 +215,7 @@ class PerformTestChannel extends Base {
     this.transmit({ type: "pong" });
   }
 }
-registerConstant("PerformTestChannel", PerformTestChannel);
+constSet(TopLevel, "PerformTestChannel", PerformTestChannel);
 
 class PerformTestChannelTest extends TestCase {
   async setup(): Promise<void> {
@@ -225,11 +223,9 @@ class PerformTestChannelTest extends TestCase {
     await this.subscribe({ id: 5 });
   }
 }
-registerConstant("PerformTestChannelTest", PerformTestChannelTest);
+constSet(TopLevel, "PerformTestChannelTest", PerformTestChannelTest);
 
 describe("PerformTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as PerformTestChannelTest).setup());
-
   it("perform with params", async ({ testCase: t }: ChannelContext) => {
     await t.perform("echo", { text: "You are man!" });
 
@@ -245,7 +241,7 @@ describe("PerformTestChannelTest", () => {
 
 class PerformUnsubscribedTestChannelTest extends TestCase {}
 PerformUnsubscribedTestChannelTest.tests(PerformTestChannel);
-registerConstant("PerformUnsubscribedTestChannelTest", PerformUnsubscribedTestChannelTest);
+constSet(TopLevel, "PerformUnsubscribedTestChannelTest", PerformUnsubscribedTestChannelTest);
 
 describe("PerformUnsubscribedTestChannelTest", () => {
   it("perform when unsubscribed", async ({ testCase: t }: ChannelContext) => {
@@ -269,7 +265,7 @@ class BroadcastsTestChannel extends Base {
     await (this as unknown as typeof Broadcasting).broadcastTo(user, { text: data["message"] });
   }
 }
-registerConstant("BroadcastsTestChannel", BroadcastsTestChannel);
+constSet(TopLevel, "BroadcastsTestChannel", BroadcastsTestChannel);
 
 class BroadcastsTestChannelTest extends TestCase {
   async setup(): Promise<void> {
@@ -277,11 +273,9 @@ class BroadcastsTestChannelTest extends TestCase {
     await this.subscribe({ id: 5 });
   }
 }
-registerConstant("BroadcastsTestChannelTest", BroadcastsTestChannelTest);
+constSet(TopLevel, "BroadcastsTestChannelTest", BroadcastsTestChannelTest);
 
 describe("BroadcastsTestChannelTest", () => {
-  beforeEach(({ testCase: t }: ChannelContext) => (t as BroadcastsTestChannelTest).setup());
-
   it("broadcast matchers included", async ({ testCase: t }: ChannelContext) => {
     await t.assertBroadcastOn("broadcast_5", { userId: 2017, text: "SOS" }, () =>
       t.perform("broadcast", { message: "SOS" }),

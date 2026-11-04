@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { safeConstantize } from "@blazetrails/activesupport";
 import {
   include,
-  rbModConstSet,
-  registerConstant,
-  unregisterConstant,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Naming } from "./naming.js";
@@ -15,15 +16,17 @@ describe("ActionCable::Channel::Naming constant names", () => {
   const Chat = { name: "Chat" };
   class AppearancesChannel extends ChatChannel {}
 
-  afterEach(() => unregisterConstant("Chat", Chat));
+  afterEach(() => {
+    if (constDefined(Object, "Chat", false)) rbModRemoveConst(Object, "Chat");
+  });
 
   it("names a framework module by its Ruby constant path", () => {
     expect(safeConstantize("ActionCable::Channel::Naming")).toBe(Naming);
   });
 
   it("reads a namespaced channel's full Ruby name and resolves it through safeConstantize", () => {
-    registerConstant("Chat", Chat);
-    rbModConstSet(Chat, "AppearancesChannel", AppearancesChannel);
+    constSet(TopLevel, "Chat", Chat);
+    constSet(Chat, "AppearancesChannel", AppearancesChannel);
 
     const channelName = (AppearancesChannel as unknown as { channelName: string }).channelName;
     expect(channelName).toBe("chat:appearances");
@@ -34,12 +37,12 @@ describe("ActionCable::Channel::Naming constant names", () => {
   });
 
   it("does not read a parent's channel_name memo", () => {
-    rbModConstSet(ActionCable.Channel, "ChatChannel", ChatChannel);
+    constSet(ActionCable.Channel, "ChatChannel", ChatChannel);
     expect((ChatChannel as unknown as { channelName: string }).channelName).toBe(
       "action_cable:channel:chat",
     );
-    registerConstant("Chat", Chat);
-    rbModConstSet(Chat, "AppearancesChannel", AppearancesChannel);
+    constSet(TopLevel, "Chat", Chat);
+    constSet(Chat, "AppearancesChannel", AppearancesChannel);
     expect((AppearancesChannel as unknown as { channelName: string }).channelName).toBe(
       "chat:appearances",
     );

@@ -1,4 +1,4 @@
-import { rbModConstSet } from "../include.js";
+import { constSet } from "../include.js";
 import { Concurrent } from "./map.js";
 
 /**
@@ -47,4 +47,4 @@ export class AtomicBoolean {
   }
 }
 
-rbModConstSet(Concurrent, "AtomicBoolean", AtomicBoolean);
+constSet(Concurrent, "AtomicBoolean", AtomicBoolean);

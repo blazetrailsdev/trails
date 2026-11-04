@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ActiveSupportJSON, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Interrupt, StringIO } from "@blazetrails/ruby-compat";
@@ -9,7 +10,6 @@ import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { Base } from "../base.js";
 import { Parameters } from "../metal/strong-parameters.js";
 import "../../test-helpers/abstract-unit.js";
-import { registerController } from "../base.js";
 
 class TestController extends Base {
   declare params: Parameters;
@@ -53,7 +53,7 @@ class WebServiceTest extends IntegrationTest {
   declare controller: TestController;
 
   static {
-    registerController("WebServiceTest::TestController", TestController);
+    constSetPath("WebServiceTest::TestController", TestController);
   }
 
   async withParamsParsers(

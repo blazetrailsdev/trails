@@ -195,11 +195,13 @@ export const MANIFEST_PACKAGES = [
   "actionview",
   "actioncable",
   "activejob",
+  "actionmailer",
   "activestorage",
   "trailties",
   "rack",
   "rack-session",
   "rack-test",
+  "rackup",
   "globalid",
   "i18n",
   "did-you-mean",
@@ -213,6 +215,7 @@ export const MANIFEST_PACKAGES = [
   "mini-mime",
   "net-smtp",
   "rake",
+  "zeitwerk",
 ] as const;
 
 /**

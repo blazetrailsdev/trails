@@ -10,8 +10,9 @@ import {
   ValueType,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import { ActiveRecord } from "./namespaces.js";
+import * as Type from "./type.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 
 import { Date } from "./type/date.js";
@@ -46,16 +47,6 @@ export const Integer = IntegerType;
 export const ImmutableString = ImmutableStringType;
 export const String = StringType;
 export const Value = ValueType;
-
-registerConstant("ActiveRecord::Type::BigInteger", BigIntegerType);
-registerConstant("ActiveRecord::Type::Binary", BinaryType);
-registerConstant("ActiveRecord::Type::Boolean", BooleanType);
-registerConstant("ActiveRecord::Type::Decimal", DecimalType);
-registerConstant("ActiveRecord::Type::Float", FloatType);
-registerConstant("ActiveRecord::Type::Integer", IntegerType);
-registerConstant("ActiveRecord::Type::ImmutableString", ImmutableStringType);
-registerConstant("ActiveRecord::Type::String", StringType);
-registerConstant("ActiveRecord::Type::Value", ValueType);
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: ValueType | undefined;
@@ -128,3 +119,6 @@ export function adapterNameFrom(model: AdapterNameSource): string {
 export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
+
+ActiveRecord.Type = Type;
+export * as Internal from "./type/internal/timezone.js";

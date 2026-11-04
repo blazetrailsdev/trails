@@ -15,13 +15,13 @@ import {
   include,
   type Included,
   File,
-  rbModConstSet,
+  constSet,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjSingletonClass,
-  registerConstant,
   stringSplit,
   Struct,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Template } from "../../template.js";
@@ -33,7 +33,7 @@ import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { BadCustomer, Customer, GoodCustomer, Post } from "../../test-helpers/fake-models.js";
 
 const Quiz = {} as { Question: typeof Question; QuestionsController: typeof QuestionsController };
-registerConstant("Quiz", Quiz);
+constSet(TopLevel, "Quiz", Quiz);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Conversion` (render_test.rb); the class/interface merge is how a mixin surfaces on the type side.
 interface Question extends Included<typeof Conversion> {}
@@ -51,17 +51,17 @@ class Question extends Struct.new("name", "id") {
     return isPresent(this.id);
   }
 }
-rbModConstSet(Quiz, "Question", Question);
+constSet(Quiz, "Question", Question);
 
 class QuestionsController extends ActionController.Base {
   async new(): Promise<void> {
     await this.render({ partial: new Quiz.Question("Namespaced Partial") });
   }
 }
-rbModConstSet(Quiz, "QuestionsController", QuestionsController);
+constSet(Quiz, "QuestionsController", QuestionsController);
 
 const Fun = {} as { GamesController: typeof GamesController };
-registerConstant("Fun", Fun);
+constSet(TopLevel, "Fun", Fun);
 
 class GamesController extends ActionController.Base {
   async helloWorld(): Promise<void> {}
@@ -70,7 +70,7 @@ class GamesController extends ActionController.Base {
     await this.render({ partial: new FormBuilder("post", null, this.viewContext(), {}) });
   }
 }
-rbModConstSet(Fun, "GamesController", GamesController);
+constSet(Fun, "GamesController", GamesController);
 
 class ValidatingPost extends Post {
   declare static validates: (...args: unknown[]) => void;

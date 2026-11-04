@@ -5,7 +5,7 @@ import {
   RUBY_VERSION,
   env,
   numericModulo,
-  registeredConstant,
+  constGet,
   rbInspect,
   rbObjClass,
   toF,
@@ -27,7 +27,7 @@ export function platformInfo(): string {
     win: Gem.isWinPlatform(),
     rorv: (() => {
       try {
-        return (registeredConstant("Trails") as { VERSION: { STRING: string } }).VERSION.STRING;
+        return (constGet(Object, "Trails") as { VERSION: { STRING: string } }).VERSION.STRING;
       } catch {
         return null;
       }

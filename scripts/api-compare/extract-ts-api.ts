@@ -117,12 +117,18 @@ const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
  * which is a call to Ruby's `load`, and `rbProcCall`, Ruby's
  * `callable.call(*args)` (`rb_proc_call`, vendor/ruby/v3.3.11/proc.c:990),
- * which is a call to Ruby's `call`.
+ * which is a call to Ruby's `call`, and `rbFSystem`, Ruby's `system`.
  */
 const KERNEL_CALLEES = new Map([
   ["rbFLoad", "load"],
   ["rbProcCall", "call"],
+  ["rbFSystem", "system"],
 ]);
+/**
+ * ruby-compat's `Module#const_get` family. The module is Ruby's receiver, so it
+ * is not an argument: `constGet(Object, name)` pairs with `Object.const_get(name)`.
+ */
+const CONST_FAMILY_CALLEES = new Set(["constGet", "constSet", "constDefined"]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
 const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
@@ -978,6 +984,7 @@ export function extractFromProgram(
           file: relPath,
           ...(internal ? { internal: true } : {}),
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+          ...perfTagOf(node),
           ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnOptionKeys != null && fnOptionReads !== undefined
@@ -4576,6 +4583,11 @@ function localCallableDeclaration(
   return decl;
 }
 
+/** `perf: true` when the declaration carries a `@perf` tag (`CLAUDE.md § "Speed"`). */
+function perfTagOf(node: ts.Node): Partial<MethodInfo> {
+  return ts.getJSDocTags(node).some((t) => t.tagName.text === "perf") ? { perf: true } : {};
+}
+
 /**
  * The `@missingRailsCall` / `@missingRailsArgs` receipts on a file-local
  * helper. A helper Rails extracts as a private method is a call-gate
@@ -4599,6 +4611,11 @@ function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   };
 }
 
+function fileLocalReceiptOf(node: ts.Node): Partial<MethodInfo> {
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+  return noRailsEquivalent !== undefined ? { noRailsEquivalent } : {};
+}
+
 export function extractFileLocalHelpers(
   node: ts.FunctionDeclaration | ts.VariableStatement,
   relPath: string,
@@ -4619,6 +4636,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4664,6 +4683,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4860,6 +4881,7 @@ export function extractClass(
     const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...perfTagOf(member),
       ...(memberMissingRailsCalls !== undefined
         ? { missingRailsCalls: memberMissingRailsCalls }
         : {}),
@@ -7106,7 +7128,12 @@ function recordCallSite(
   const name = callSiteName(call);
   if (name !== undefined && !(ts.isNewExpression(call) && isThrownConstruction(call))) {
     const flags: string[] = [];
-    const args = describeArgs(call.arguments, flags);
+    const args = describeArgs(
+      ts.isIdentifier(callee) && CONST_FAMILY_CALLEES.has(callee.text)
+        ? ts.factory.createNodeArray(call.arguments?.slice(1))
+        : call.arguments,
+      flags,
+    );
     const recv =
       wrapped !== undefined
         ? describeArg(wrapped, [])
@@ -7459,6 +7486,13 @@ function isSuspensionTimer(
   );
 }
 
+function answersVoid(n: ts.Node): boolean {
+  let fn: ts.Node | undefined = n;
+  while (fn !== undefined && !ts.isFunctionLike(fn)) fn = fn.parent;
+  const type = fn === undefined ? undefined : fn.type?.getText();
+  return type === "void" || type === "Promise<void>";
+}
+
 function collectCalls(
   node: ts.Node | undefined,
   skipHoistedClosures = false,
@@ -7508,6 +7542,9 @@ function collectCalls(
     for (const tail of tails) {
       if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
     }
+    if (form === "delete" && answersVoid(receiver)) {
+      hashForms.add(`${NATIVE_FORM_PREFIX}delete:void`);
+    }
     if (checkerProvenKind(receiver) === "object") {
       if (form === "spread") hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.merge}`);
       if (form === "assign" && assignSourceProven(receiver)) {
@@ -7524,7 +7561,7 @@ function collectCalls(
       nativeHashForms(n).some(
         ([form, receiver]) => form === "fetch" && checkerProvenKind(receiver!) === "object",
       ) &&
-      readCannotBeUndefined(unwrapped(n.whenTrue))
+      readCannotBeUndefined(n.whenTrue)
     ) {
       hashForms.add(`${NATIVE_FORM_PREFIX}${TYPED_NATIVE_FORM.fetch}`);
     }
@@ -7554,6 +7591,11 @@ function collectCalls(
       if (settler !== undefined) promiseSettlers.push(settler);
       for (const block of blocks) visit(block);
       if (settler !== undefined) promiseSettlers.pop();
+      return;
+    } else if (ts.isDeleteExpression(n)) {
+      visit(n.expression);
+      names.add("delete");
+      tally(occurrences, "delete");
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
@@ -7889,12 +7931,22 @@ function assignSourceProven(target: ts.Expression): boolean {
 /**
  * Whether the checker proves a read cannot answer `undefined`, so an
  * `Object.hasOwn(h, "k") ? h.k : d` agrees with ruby-compat's `fetch`, whose
- * `hasKey` reads an own `undefined` as a missing key.
+ * `hasKey` reads an own `undefined` as a missing key. An `as T` on the read is
+ * the author's claim and is taken at its asserted type.
  */
 function readCannotBeUndefined(expr: ts.Expression): boolean {
   const checker = currentChecker;
   if (checker === undefined) return false;
-  const type = checker.getTypeAtLocation(expr);
+  let read = expr;
+  while (
+    ts.isParenthesizedExpression(read) ||
+    ts.isAsExpression(read) ||
+    ts.isTypeAssertionExpression(read) ||
+    ts.isSatisfiesExpression(read)
+  ) {
+    read = read.expression;
+  }
+  const type = checker.getTypeAtLocation(read);
   const parts = type.isUnion() ? type.types : [type];
   const loose =
     ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Any | ts.TypeFlags.Unknown;

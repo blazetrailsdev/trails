@@ -1,4 +1,4 @@
-import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -87,4 +87,4 @@ export class SelectCore extends Node {
   }
 }
 
-rbModConstSet(Nodes, "SelectCore", SelectCore);
+constSet(Nodes, "SelectCore", SelectCore);

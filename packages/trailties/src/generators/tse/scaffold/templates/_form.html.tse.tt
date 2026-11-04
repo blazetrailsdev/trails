@@ -1,0 +1,37 @@
+<%%= formWith({ model: <%= this.modelResourceName() %> }, (form) => { %>
+  <%% if (<%= this.singularTableName() %>.errors.isAny()) { %>
+    <div style="color: red">
+      <h2><%%= pluralize(<%= this.singularTableName() %>.errors.count, "error") %> prohibited this <%= this.singularTableName() %> from being saved:</h2>
+
+      <ul>
+        <%% <%= this.singularTableName() %>.errors.each((error) => { %>
+          <li><%%= error.fullMessage %></li>
+        <%% }) %>
+      </ul>
+    </div>
+  <%% } %>
+
+<% for (const attribute of this.attributes) { -%>
+  <div>
+<% if (attribute.passwordDigest()) { -%>
+    <%%= form.label("password", { style: "display: block" }) %>
+    <%%= form.passwordField("password") %>
+  </div>
+
+  <div>
+    <%%= form.label("password_confirmation", { style: "display: block" }) %>
+    <%%= form.passwordField("password_confirmation") %>
+<% } else if (attribute.attachments()) { -%>
+    <%%= form.label("<%= attribute.columnName() %>", { style: "display: block" }) %>
+    <%%= form.<%= ActiveSupport.Inflector.camelize(attribute.fieldType(), false) %>("<%= attribute.columnName() %>", { multiple: true }) %>
+<% } else { -%>
+    <%%= form.label("<%= attribute.columnName() %>", { style: "display: block" }) %>
+    <%%= form.<%= ActiveSupport.Inflector.camelize(attribute.fieldType(), false) %>("<%= attribute.columnName() %>") %>
+<% } -%>
+  </div>
+
+<% } -%>
+  <div>
+    <%%= form.submit() %>
+  </div>
+<%% }) %>

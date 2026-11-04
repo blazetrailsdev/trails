@@ -1,16 +1,10 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import type { Base } from "../index.js";
 
 describe("Post single-PK eager count limit id subquery applies order", () => {
   const { self } = fixtures([]);
-
-  beforeAll(() => {
-    [Post, Comment].forEach((m) => registerModel(m as unknown as typeof Base));
-  });
 
   async function seedPosts(): Promise<void> {
     await Post.create({ id: 1, title: "C", body: "b", tags_count: 5 });

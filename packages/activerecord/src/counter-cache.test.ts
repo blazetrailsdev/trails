@@ -1,61 +1,32 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Wheel } from "./test-helpers/models/wheel.js";
 import { Engine } from "./test-helpers/models/engine.js";
 import { Tyre } from "./test-helpers/models/tyre.js";
-import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import { Category } from "./test-helpers/models/category.js";
-import { Categorization } from "./test-helpers/models/categorization.js";
-import { Dog } from "./test-helpers/models/dog.js";
 import { DogLover } from "./test-helpers/models/dog-lover.js";
-import { Friendship } from "./test-helpers/models/friendship.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
-import { Subscription } from "./test-helpers/models/subscription.js";
-import { Book } from "./test-helpers/models/book.js";
-import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { assertNothingRaised, DescendantsTracker } from "@blazetrails/activesupport";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
-
-for (const model of [
-  Topic,
-  Reply,
-  UniqueReply,
-  SillyUniqueReply,
-  SillyReply,
-  Car,
-  Engine,
-  Wheel,
-  Aircraft,
-  Tyre,
-  Bulb,
-  CustomBulb,
-  FunkyBulb,
-  FailedBulb,
-  Person,
-  Dog,
-  DogLover,
-  Friendship,
-  Subscriber,
-  Subscription,
-  Book,
-  Category,
-  Categorization,
-  CpkOrder,
-  CpkBook,
-]) {
-  registerModel(model);
-}
+import "./test-helpers/models/categorization.js";
+import "./test-helpers/models/dog.js";
+import "./test-helpers/models/friendship.js";
+import "./test-helpers/models/subscription.js";
+import "./test-helpers/models/book.js";
 
 export class SpecialTopic extends Topic {
   static {
+    constSet(TopLevel, "SpecialTopic", this);
+    DescendantsTracker.registerSubclass(Topic, this);
     this.hasMany("specialReplies", { className: "SpecialReply", foreignKey: "parent_id" });
     this.hasMany(
       "lightweightSpecialReplies",
@@ -72,16 +43,13 @@ export class SpecialTopic extends Topic {
 
 export class SpecialReply extends Reply {
   static {
+    constSet(TopLevel, "SpecialReply", this);
+    DescendantsTracker.registerSubclass(Reply, this);
     this.belongsTo("specialTopic", {
       foreignKey: "parent_id",
       counterCache: "replies_count",
     });
   }
-}
-
-for (const klass of [SpecialTopic, SpecialReply]) {
-  registerModel(klass);
-  registerModel(klass);
 }
 
 function epochMs(v: unknown): number {

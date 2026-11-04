@@ -159,9 +159,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "reload_models_test.rb",
     reason:
-      "Removes the Owner constant and `Kernel.load`s models/owner.rb again, simulating " +
-      "development class reloading. An ES module is evaluated once per process and trails has " +
-      'no class unload to re-evaluate it after (CLAUDE.md § "Trails has no autoloader").',
+      "Removes the Owner constant and `Kernel.load`s models/owner.rb again inside " +
+      "ActiveSupport::Testing::Isolation, whose forked child keeps the reload out of later " +
+      'tests. Node has no fork (CLAUDE.md § "Runtime facts Node does not expose").',
   },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
   {
@@ -176,7 +176,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Registers an Object.autoload for a model whose file raises during require, so the " +
       "exception surfaces from constantize inside compute_type. Naming a constant loads no " +
       "file in ESM, so there is no load for the exception to come from (CLAUDE.md § " +
-      '"Trails has no autoloader").',
+      '"`Module#autoload` is a build step").',
   },
   {
     testFile: "inheritance_test.rb",
@@ -184,8 +184,8 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["new with autoload paths"],
     reason:
       "Stands up a Zeitwerk loader at runtime so STI dispatch resolves a constant from an " +
-      "autoload path. Zeitwerk is not ported and trails has no loader graph to push a " +
-      'directory onto (CLAUDE.md § "Trails has no autoloader").',
+      "autoload path during a synchronous `Company.new`. A JS read cannot run the awaited " +
+      'load (CLAUDE.md § "`Module#autoload` is a build step").',
   },
   {
     testFile: "inheritance_test.rb",

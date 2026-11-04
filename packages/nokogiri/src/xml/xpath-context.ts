@@ -12,7 +12,7 @@ import {
   stringValue,
   toS,
   rbFSend,
-  rbModConstSet,
+  constSet,
   rbObjRespondTo,
   warn,
 } from "@blazetrails/ruby-compat";
@@ -463,8 +463,5 @@ export class XPathContext {
   }
 }
 
-rbModConstSet(XML, "XPathContext", XPathContext);
-
-// Last step of this module's initialisation, so `searchable.ts` never has to
-// import this module at runtime. See node-set-ctor.ts for why.
+constSet(XML, "XPathContext", XPathContext);
 registerXPathContextCtor(XPathContext);

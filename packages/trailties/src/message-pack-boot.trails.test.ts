@@ -1,16 +1,24 @@
-import { resetLoadHooks, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
+import { Autoloaders } from "./autoloaders.js";
+import {
+  Executor,
+  Reloader,
+  resetLoadHooks,
+  runLoadHooks,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import { LoadError, verbose } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./application/bootstrap.js";
-import { Trails } from "./rails.js";
+import { Trails } from "./trails.js";
 import { runTrailtieInitializers } from "./support/trailtie-initializers.js";
 import { Trailtie as ActionDispatchTrailtie } from "./trailties/action-dispatch.js";
 import { Trailtie as ActiveSupportTrailtie } from "./trailties/active-support.js";
 
 const baseConfig = (): BootstrapConfig => ({
+  root: null,
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,
@@ -20,6 +28,7 @@ const baseConfig = (): BootstrapConfig => ({
 
 class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = { ...baseConfig() };
+  autoloaders = new Autoloaders();
 }
 
 const MESSAGE_PACK = "active_support/message_pack";
@@ -62,7 +71,12 @@ describe("active_support/message_pack is awaited at boot", () => {
     ActionDispatchTrailtie.config.set("actionDispatch", savedActionDispatch);
   });
 
-  const app = () => ({ config: ActiveSupportTrailtie.config, deprecators: new Map() });
+  const app = () => ({
+    config: ActiveSupportTrailtie.config,
+    deprecators: new Map(),
+    executor: class extends Executor {},
+    reloader: class extends Reloader {},
+  });
 
   it("boots with the peer absent, attempting the load with warnings silenced", async () => {
     expect(ActiveSupport.MessagePack).toBeUndefined();

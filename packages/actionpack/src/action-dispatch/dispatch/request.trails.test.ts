@@ -3,15 +3,16 @@ import type { RackEnv } from "@blazetrails/rack";
 import {
   Encoding,
   StringIO,
-  isRegisteredConstant,
+  constDefined,
   rbModRemoveConst,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { ParamBuilder } from "../http/param-builder.js";
 import { InvalidParameterError } from "@blazetrails/rack";
 import { Request, PASS_NOT_FOUND } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
-import { registerController } from "../../action-controller/base.js";
 
 describe("Request", () => {
   it("content_length measures the body when the request is chunked", () => {
@@ -113,13 +114,14 @@ describe("Request", () => {
     class ChildReposController extends ReposController {}
 
     function get(action: string, queryString: string): Record<string, unknown> {
-      registerController("ReposController", ReposController);
+      constSet(TopLevel, "ReposController", ReposController);
       try {
         const req = new Request({ QUERY_STRING: queryString });
         req.pathParameters = { controller: "repos", action };
         return req.GET();
       } finally {
-        if (isRegisteredConstant("ReposController")) rbModRemoveConst(Object, "ReposController");
+        if (constDefined(Object, "ReposController", false))
+          rbModRemoveConst(Object, "ReposController");
       }
     }
 
@@ -310,11 +312,12 @@ describe("RequestControllerClass", () => {
 
   it("controllerClassFor resolves the registered controller constant", () => {
     class PostsController extends Base {}
-    registerController("PostsController", PostsController);
+    constSet(TopLevel, "PostsController", PostsController);
     try {
       expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
     } finally {
-      if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+      if (constDefined(Object, "PostsController", false))
+        rbModRemoveConst(Object, "PostsController");
     }
   });
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { toGidParam, toSgidParam } from "./identification.js";
@@ -26,7 +26,7 @@ class Person {
 describe("GlobalIdentificationTest", () => {
   beforeEach(() => {
     GlobalID.setApp("bcx");
-    registerConstant("Person", Person);
+    constSet(TopLevel, "Person", Person);
   });
   afterEach(() => {
     GlobalID["_app"] = undefined;
@@ -53,7 +53,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
   let previousVerifier: MessageVerifier | undefined;
   beforeEach(() => {
     GlobalID.setApp("bcx");
-    registerConstant("Person", Person);
+    constSet(TopLevel, "Person", Person);
     previousVerifier = SignedGlobalID.verifier;
   });
   afterEach(() => {

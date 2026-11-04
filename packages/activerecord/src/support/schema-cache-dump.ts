@@ -30,6 +30,7 @@ export async function dumpTemplateSchemaCache(
   pool: Pool,
   runToken: string,
 ): Promise<{ filename: string; fingerprint: string } | null> {
+  await import("../index.js");
   const reflection = adapter.pool.schemaReflection;
   await reflection.loadAllBang(pool);
   for (const table of BOOKKEEPING_TABLE_NAMES) {
@@ -138,6 +139,7 @@ async function shapeQueriesFor(adapter: DatabaseAdapter): Promise<string[]> {
 export async function templateSchemaCache(): Promise<SchemaCache | null> {
   if (loaded === undefined) {
     const filename = getEnv(SCHEMA_CACHE_DUMP_ENV);
+    if (filename !== undefined) await import("../index.js");
     loaded = filename === undefined ? null : await SchemaCache._loadFrom(filename);
   }
   return loaded;

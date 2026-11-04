@@ -3,8 +3,11 @@ import {
   ArgumentError,
   NoMethodError,
   rbObjMethod,
-  registerConstant,
-  unregisterConstant,
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
 import { DelegationError } from "../delegation.js";
@@ -33,7 +36,7 @@ class Somewhere {
     return block();
   }
 }
-registerConstant("Somewhere", Somewhere);
+constSet(TopLevel, "Somewhere", Somewhere);
 
 class Someone {
   static FAILED_DELEGATE_LINE: number;
@@ -165,12 +168,13 @@ class ArityTester {
     block?: unknown,
   ) {}
 }
-registerConstant("ModuleTest::ArityTester", ArityTester);
+constSet(TopLevel, "ModuleTest", {});
+constSet(constGet(Object, "ModuleTest") as object, "ArityTester", ArityTester);
 
 class ArityTesterModule {
   static zero() {}
 }
-registerConstant("ModuleTest::ArityTesterModule", ArityTesterModule);
+constSet(constGet(Object, "ModuleTest") as object, "ArityTesterModule", ArityTesterModule);
 
 class DecoratedReserved {
   constructor(public case_: any) {}
@@ -277,13 +281,13 @@ describe("ModuleTest", () => {
   });
 
   it("delegation with allow nil", () => {
-    const rails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
-    expect(rails.name()).toEqual("David");
+    const trails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
+    expect(trails.name()).toEqual("David");
   });
 
   it("delegation with allow nil and nil value", () => {
-    const rails = new Project("Rails") as Project & Record<string, any>;
-    expect(rails.name()).toBeUndefined();
+    const trails = new Project("Rails") as Project & Record<string, any>;
+    expect(trails.name()).toBeUndefined();
   });
 
   it("delegation with allow nil and false value", async () => {
@@ -292,14 +296,14 @@ describe("ModuleTest", () => {
   });
 
   it("delegation with allow nil and invalid value", async () => {
-    const rails = new Project("Rails", 42) as Project & Record<string, any>;
-    await assertRaise([NoMethodError], {}, () => rails.name());
+    const trails = new Project("Rails", 42) as Project & Record<string, any>;
+    await assertRaise([NoMethodError], {}, () => trails.name());
   });
 
   it("delegation with allow nil and nil value and prefix", () => {
     delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
-    const rails = new Project("Rails") as Project & Record<string, any>;
-    expect(rails.person_name()).toBeUndefined();
+    const trails = new Project("Rails") as Project & Record<string, any>;
+    expect(trails.person_name()).toBeUndefined();
   });
 
   it("delegation without allow nil and nil value", async () => {
@@ -658,14 +662,16 @@ describe("ModuleTest", () => {
         return JSON.parse(source);
       }
     }
-    registerConstant("Admin::Json", Json);
+    constSet(TopLevel, "Admin", {});
+    constSet(constGet(Object, "Admin") as object, "Json", Json);
     try {
       class C {}
       delegate.call(C, "parse", { to: Json });
       const c = C as typeof C & { parse(source: string): unknown };
       expect(c.parse("[1]")).toEqual([1]);
     } finally {
-      unregisterConstant("Admin::Json", Json);
+      if (constDefined(Object, "Admin::Json", false))
+        rbModRemoveConst(constGet(Object, "Admin") as object, "Json");
     }
   });
 

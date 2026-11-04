@@ -10,6 +10,7 @@ import { safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { belongsToRequiredValidatesForeignKey } from "../../active-record.js";
+import { Builder } from "../../namespaces.js";
 
 export class BelongsTo extends SingularAssociation {
   static override macro(): "belongsTo" {
@@ -187,3 +188,5 @@ export class BelongsTo extends SingularAssociation {
     });
   }
 }
+
+Builder.BelongsTo = BelongsTo;

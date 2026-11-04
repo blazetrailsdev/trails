@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { MissingTemplate } from "@blazetrails/actionview";
 import {
@@ -37,7 +38,6 @@ import { BadRequest } from "../metal/exceptions.js";
 import type { Parameters } from "../metal/strong-parameters.js";
 import { Buffer, Live, SSE, type LiveControllerHost } from "../metal/live.js";
 import { TestCase, type LiveTestResponse } from "../test-case.js";
-import { registerController } from "../base.js";
 
 describe("SSETest", () => {
   class SSETestController extends Base {
@@ -515,7 +515,7 @@ describe("LiveStreamTest", () => {
   });
 
   it.skip("delayed autoload after write within interlock hook", () => {
-    // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; trails has no autoloader (packages/trailties/CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)") and so no load interlock to deadlock against.
+    // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; a JS constant read cannot run a load (CLAUDE.md, "`Module#autoload` is a build step"), so no load runs inside the action to deadlock against.
   });
 
   it("async stream", async () => {
@@ -815,7 +815,7 @@ describe("LiveStreamRouterTest", () => {
     }
 
     static {
-      registerController("LiveStreamRouterTest::TestController", TestController);
+      constSetPath("LiveStreamRouterTest::TestController", TestController);
       this.routes.draw(function () {
         this.get("/test", { to: "live_stream_router_test/test#index" });
       });

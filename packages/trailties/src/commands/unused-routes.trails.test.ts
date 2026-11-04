@@ -9,12 +9,15 @@ import {
   getPath,
   setEnv,
   rbFLoad,
-  registerConstant,
-  unregisterConstant,
+  rbModRemoveConst,
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
 } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { invoke } from "../command.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { RouteInfo } from "./unused-routes.js";
 import { lookupBang } from "../command/behavior.js";
 
@@ -33,12 +36,25 @@ function route(requirements: Record<string, string>): Journey.Route {
 describe("UnusedRoutesCommand", () => {
   const seated: [string, unknown][] = [];
   const seat = (name: string, klass: unknown): void => {
-    registerConstant(name, klass);
+    const i = name.lastIndexOf("::");
+    if (i >= 0 && !constDefined(Object, name.slice(0, i))) seat(name.slice(0, i), {});
+    constSet(
+      i < 0 ? TopLevel : (constGet(Object, name.slice(0, i)) as object),
+      i < 0 ? name : name.slice(i + 2),
+      klass,
+    );
     seated.push([name, klass]);
   };
 
   afterEach(() => {
-    for (const [name, klass] of seated.splice(0)) unregisterConstant(name, klass);
+    for (const [name] of seated.splice(0)) {
+      if (!constDefined(Object, name, false)) continue;
+      const i = name.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, name.slice(0, i)) as object),
+        i < 0 ? name : name.slice(i + 2),
+      );
+    }
   });
 
   it("RouteInfo is unused when the controller class is not registered", async () => {
@@ -138,10 +154,10 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(true);
   });
 
-  it("RouteInfo resolves the framework rails/pwa controller by its Rails constant", async () => {
+  it("RouteInfo resolves the framework trails/pwa controller by its Rails constant", async () => {
     await import("../pwa-controller.js");
 
-    const info = new RouteInfo(route({ controller: "rails/pwa", action: "manifest" }));
+    const info = new RouteInfo(route({ controller: "trails/pwa", action: "manifest" }));
 
     expect(await info.unused()).toBe(false);
   });
@@ -173,7 +189,7 @@ describe("UnusedRoutesCommand", () => {
     );
     await Trails.initialize();
 
-    const output = await capture(":stdout", () => invoke("routes", ["-u"]));
+    const output = await capture(":stdout", () => invoke("routes", ["-u", "-c", "legacy"]));
     expect(output).toMatch(/^Found 1 unused route:$/m);
     expect(output).toMatch(/legacy GET\s+\/legacy\(\.:format\)\s+legacy#index/);
     expect(exit).toHaveBeenCalledWith(1);

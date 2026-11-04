@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { UuidEntry } from "./uuid-entry.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class UuidComment extends Base {
@@ -8,7 +9,8 @@ export class UuidComment extends Base {
     this.hasOne("uuidEntry", { as: "entryable" });
   }
 }
-registerModel(UuidComment);
+constSet(TopLevel, "UuidComment", UuidComment);
+DescendantsTracker.registerSubclass(Base, UuidComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface UuidComment {
   get uuidEntry(): UuidEntry | null | Promise<UuidEntry | null>;

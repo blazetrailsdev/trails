@@ -1,3 +1,4 @@
+import { Fiber } from "./fiber.js";
 import { Thread } from "./thread.js";
 import { ThreadError } from "./thread-error.js";
 import {
@@ -6,7 +7,7 @@ import {
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
 
-type Owner = symbol | Thread;
+type Owner = symbol | Fiber;
 
 interface MonEntry {
   owner: Owner;
@@ -46,7 +47,7 @@ function currentOwner(data: MonData): Owner {
   const store = data.storage!.getStore();
   const thread = Thread.current();
   if (data.entries.some((entry) => entry.owner === store && entry.thread === thread)) return store!;
-  return thread;
+  return Fiber.current();
 }
 
 function topOwner(data: MonData): Owner | null {
@@ -106,6 +107,41 @@ export function isMonOwned(this: object): boolean {
 }
 
 /**
+ * `monitor_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`). Answers a
+ * promise only when it has to wait for the monitor. The entry is owned by
+ * `rb_fiber_current()`, as MRI records it; flows sharing a `Fiber` re-enter.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#enter`
+ * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`).
+ */
+export function enter(this: object): Promise<void> | void {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const entry = data.entries.find((entry) => entry.owner === owner);
+  if (entry) {
+    entry.count += 1;
+    return;
+  }
+  return acquire(data, null, { owner, count: 1, thread: Thread.current() });
+}
+
+/**
+ * `monitor_exit` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:98`), after
+ * `monitor_check_owner` (`:88`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#exit`
+ * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:98`).
+ */
+export function exit(this: object): void {
+  const data = monData(this);
+  const owner = currentOwner(data);
+  const entry = data.entries.find((entry) => entry.owner === owner);
+  if (!entry) throw new ThreadError("current fiber not owner");
+  entry.count -= 1;
+  if (entry.count === 0) release(data, owner);
+}
+
+/**
  * `vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200` `mon_synchronize`
  * (`monitor_synchronize`, `ext/monitor/monitor.c:236`), aliased `synchronize`
  * at `:203`.
@@ -156,6 +192,8 @@ export interface MonitorMixin {
  * (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:256`).
  */
 export class Monitor implements MonitorMixin {
+  enter = enter;
+  exit = exit;
   isMonOwned = isMonOwned;
   synchronize = synchronize;
 }

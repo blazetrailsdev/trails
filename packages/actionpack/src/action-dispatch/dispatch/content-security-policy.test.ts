@@ -1,3 +1,4 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import {
   ContentSecurityPolicy,
@@ -29,13 +30,14 @@ import {
   ArgumentError,
   RuntimeError,
   rbObjDup,
-  registerConstant,
-  unregisterConstant,
+  TopLevel,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { RouteSet } from "../routing/route-set.js";
-import { registerController } from "../../action-controller/base.js";
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -622,10 +624,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       this.get("/redirect", { to: this.redirect("/") });
     });
   });
-  registerController(
-    "DefaultContentSecurityPolicyIntegrationTest::PolicyController",
-    PolicyController,
-  );
+  constSetPath("DefaultContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
 
   const POLICY = new ContentSecurityPolicy((p) => {
     p.defaultSrc(() => ":self");
@@ -785,7 +784,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
       this.get("/not-modified", { to: "policy#notModified" });
     });
   });
-  registerController("ContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
+  constSetPath("ContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
 
   const POLICY = new ContentSecurityPolicy((p) => {
     p.defaultSrc(":self");
@@ -911,10 +910,7 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
       this.get("/inline", { to: "policy#inline" });
     });
   });
-  registerController(
-    "DisabledContentSecurityPolicyIntegrationTest::PolicyController",
-    PolicyController,
-  );
+  constSetPath("DisabledContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
 
   class PolicyConfigMiddleware {
     constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
@@ -969,7 +965,7 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
       this.get("/", { to: "policy#index" });
     });
   });
-  registerController(
+  constSetPath(
     "NonceDirectiveContentSecurityPolicyIntegrationTest::PolicyController",
     PolicyController,
   );
@@ -1026,8 +1022,11 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
       return false;
     },
   };
-  registerConstant("ApplicationHelper", ApplicationHelper);
-  afterAll(() => unregisterConstant("ApplicationHelper", ApplicationHelper));
+  constSet(TopLevel, "ApplicationHelper", ApplicationHelper);
+  afterAll(() => {
+    if (constDefined(Object, "ApplicationHelper", false))
+      rbModRemoveConst(Object, "ApplicationHelper");
+  });
 
   class ApplicationController extends Base {
     static {
@@ -1059,10 +1058,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
       this.get("/", { to: "policy#index" });
     });
   });
-  registerController(
-    "HelpersContentSecurityPolicyIntegrationTest::PolicyController",
-    PolicyController,
-  );
+  constSetPath("HelpersContentSecurityPolicyIntegrationTest::PolicyController", PolicyController);
 
   const POLICY = new ContentSecurityPolicy((p) => {
     p.defaultSrc(() => ":self");

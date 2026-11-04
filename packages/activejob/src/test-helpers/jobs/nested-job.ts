@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { LoggingJob } from "./logging-job.js";
 
@@ -19,4 +19,4 @@ export class NestedJob extends Base {
     this._jobId = value;
   }
 }
-registerConstant("NestedJob", NestedJob);
+constSet(TopLevel, "NestedJob", NestedJob);

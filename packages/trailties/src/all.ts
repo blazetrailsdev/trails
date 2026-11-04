@@ -1,5 +1,9 @@
-import "./rails.js";
+import "./trails.js";
 import { LoadError, rbFRequire } from "@blazetrails/ruby-compat";
+export type {} from "./trailties/active-record.js";
+export type {} from "./trailties/action-controller.js";
+export type {} from "./trailties/action-view.js";
+export type {} from "./trailties/active-job.js";
 
 const activeStorageEngine = "@blazetrails/activestorage/engine";
 const loadPath: Record<string, () => Promise<unknown>> = {
@@ -9,7 +13,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_view/railtie": () => import("./trailties/action-view.js"),
   "active_job/railtie": () => import("./trailties/active-job.js"),
   "action_cable/engine": () => import("./trailties/action-cable.js"),
-  "rails/test_unit/railtie": () => import("./test-unit/trailtie.js"),
+  "trails/test_unit/railtie": () => import("./test-unit/trailtie.js"),
 };
 
 for (const railtie of [
@@ -22,7 +26,7 @@ for (const railtie of [
   "action_cable/engine",
   "action_mailbox/engine",
   "action_text/engine",
-  "rails/test_unit/railtie",
+  "trails/test_unit/railtie",
 ]) {
   try {
     await rbFRequire(loadPath, railtie);

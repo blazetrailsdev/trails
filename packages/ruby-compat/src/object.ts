@@ -1,6 +1,7 @@
+import { classModule } from "./class-module.js";
 import { LocalJumpError } from "./local-jump-error.js";
-import { classpaths, generatedClassPath, isModuleObject } from "./classpath.js";
-import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
+import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
+import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
@@ -99,6 +100,35 @@ export function rbObjClass(obj: unknown): Klass {
 }
 
 /**
+ * The receiver phrase of `name_err_mesg_to_str`
+ * (`vendor/ruby/v3.3.11/error.c:2325-2390`), the `%3$s%4$s` of an
+ * `undefined method '…' for …` message: `nil`, `true` or `false` for those
+ * receivers, `module M` / `class C` for a module or class, and
+ * `an instance of C` otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function nameErrMesgReceiver(obj: unknown): string {
+  switch (obj) {
+    case null:
+    case undefined:
+      return "nil";
+    case true:
+      return "true";
+    case false:
+      return "false";
+  }
+  if (
+    (typeof obj === "object" && obj !== null && isModuleObject(obj)) ||
+    (typeof obj === "function" && Object.hasOwn(obj, classModule))
+  ) {
+    return `module ${rbModToS(obj as never)}`;
+  }
+  if (rbObjClass(obj) === rbCClass) return `class ${rbModToS(obj as new () => unknown)}`;
+  return `an instance of ${rbObjClassname(obj)}`;
+}
+
+/**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
  * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
  * interpolates `obj.class`.
@@ -135,6 +165,8 @@ export function rbSetClassPathString(
 /** @noRailsEquivalent PERMANENT */
 export interface TopLevelConstants {
   Object?: ObjectConstructor;
+  Psych?: typeof import("./psych.js").Psych;
+  URI?: typeof import("./uri/common.js").URI;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -144,7 +176,7 @@ export interface ConstantTable {} // eslint-disable-line @typescript-eslint/no-e
  * Ruby's top-level `Object`, whose constant table is
  * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`). It
  * lives with `rb_cObject` so `object.ts` reads it without importing
- * `variable.ts`, whose load-time `registerConstant` calls need this module
+ * `variable.ts`, whose load-time core-class seats need this module
  * evaluated first. It has no prototype, so a name such as `constructor` is
  * not a constant.
  *
@@ -154,7 +186,7 @@ export const TopLevel = Object.create(null) as TopLevelConstants;
 
 /**
  * The one class object a core class has once a gem reopens it
- * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
+ * (`class Date extends rbCDate`, seated on `TopLevel`): MRI has one
  * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
  * the class reopening it are the same class. A class nothing reopens is
  * answered as it is.
@@ -493,7 +525,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  const path = classpaths.get(klass)?.path ?? generatedClassPath(klass);
+  const path = rbClassPath(klass);
   if (path !== undefined) return path;
   const name = (klass as { name?: string | null }).name;
   if (!name) return null;
@@ -769,7 +801,9 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
+    if (o === Uint8Array.prototype || o === Object.getPrototypeOf(Uint8Array.prototype)) continue;
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
+    if (UNDEF_HALVES.has(entry?.get as object)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
@@ -868,6 +902,7 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
     o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
+    if (UNDEF_HALVES.has(me?.get as object)) return false;
     if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter !== undefined && !isAbsentHalf(setter)) return true;
@@ -984,6 +1019,7 @@ export function rbModDefineMethod(
 }
 
 const ABSENT_HALVES = new WeakSet<object>();
+const UNDEF_HALVES = new WeakSet<object>();
 
 /**
  * Whether `half` is the getter or setter {@link defineAccessorHalf} seats for
@@ -1067,6 +1103,46 @@ export function defineAccessorHalf(
     set: half.set ?? existing?.set ?? absentHalf(name, true),
   });
   rbClearMethodCache();
+}
+
+/**
+ * `Module#undef_method` (`rb_mod_undef_method`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1973`). An undefined name raises `NameError`.
+ * `name` and `name=` are one JS descriptor, so `name=` is undefined by a `"name="`
+ * entry, which every lookup reads first, and `name` by a reader half that stops
+ * the search and keeps the writer.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModUndefMethod<K extends { prototype: object }>(klass: K, ...names: string[]): K {
+  const proto = klass.prototype;
+  for (const name of names) {
+    if (!checkDefinition(klass, name)) {
+      throw new NameError(`undefined method '${name}' for class '${rbModName(klass)}'`, name);
+    }
+    UNDEF_METHOD_TABLES.add(proto);
+    if (name.endsWith("=")) {
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
+      continue;
+    }
+    let set: PropertyDescriptor["set"];
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      const half = Object.getOwnPropertyDescriptor(o, name)?.set;
+      if (half !== undefined && !isAbsentHalf(half)) {
+        set = half;
+        break;
+      }
+    }
+    if (set !== undefined) {
+      const get = (): undefined => undefined;
+      UNDEF_HALVES.add(get);
+      Object.defineProperty(proto, name, { configurable: true, get, set });
+    } else {
+      Object.defineProperty(proto, name, { value: undefined, writable: true, configurable: true });
+    }
+  }
+  rbClearMethodCache();
+  return klass;
 }
 
 /**
@@ -1306,6 +1382,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
+    if (UNDEF_HALVES.has(desc?.get as object)) break;
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }
@@ -1344,13 +1421,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if (mid === "each" && typeof args[0] === "function") {
     const block = args[0] as AnyFunction;
-    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map) {
-      for (const i of recv) block(i);
-      return recv;
-    }
-    if (isPlainHash(recv)) {
-      for (const key of Object.keys(recv)) block([key, recv[key]]);
-      return recv;
+    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map || isPlainHash(recv)) {
+      return aryEach(recv as object, block as (item: unknown) => unknown);
     }
   }
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
@@ -1886,6 +1958,10 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     typeof value === "function" &&
     Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
   ) {
+    if (value.toString !== Function.prototype.toString) {
+      const str: unknown = value.toString();
+      if (typeof str === "string") return str;
+    }
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "object") {

@@ -45,3 +45,15 @@ user block inside theirs before the `-format` guard and the output path
 (`image.rb:411-418,565-572`): Ruby's `yield` finishes first, so a read the
 block makes (`subject.type`, `image_spec.rb:271-274`) sees the file as it
 was, and options it adds land before the path.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `mini_magick/image.rb`'s `respond_to_missing?` answers `false`
+  (`image.rb:471-473`) only to keep `Array#flatten` off an image, so its
+  Proxy forwards every name but `PROTOCOL_PROBES` to `mogrify` without
+  consulting it — the one exception to the first rule above (owner ruling,
+  2026-10-22).

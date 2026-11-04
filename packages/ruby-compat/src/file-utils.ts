@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { classModule } from "./class-module.js";
 import { Dir } from "./dir.js";
 import { File, rbGetPath, type PathLike } from "./file.js";
 import { getFs, getPath, type FsFileHandle, type FsStatResult } from "./fs-adapter.js";
@@ -724,6 +725,7 @@ function fuOutputMessage(msg: string): void {
   output.puts(msg);
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * Ruby's `FileUtils` (stdlib, `vendor/ruby/v3.3.11/lib/fileutils.rb:1`), the file
  * operations Rails sends from ported bodies — `mkdir_p` when a schema dump or a
@@ -734,11 +736,17 @@ function fuOutputMessage(msg: string): void {
  * `FileUtils` is synchronous exactly as Ruby's is, and a caller reads the same
  * `FileUtils.mkdir_p(dir)` a Rails dev reads.
  *
+ * Each method is `module_function` (`vendor/ruby/v3.3.11/lib/fileutils.rb:185-188`),
+ * so it is both a static and a prototype member, and `include FileUtils` answers `cd`.
+ *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `FileUtils` ships with
  * the interpreter, so no Rails file defines it and no port can remove the need
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
  */
 export class FileUtils {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
   /** `@fileutils_output` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2497`), the sink
    * `fu_output_message` writes to when a host has set one.
    * @noRailsEquivalent PERMANENT — the JS spelling of a Ruby module instance
@@ -2071,4 +2079,18 @@ export class FileUtils {
       }
     }
   }
+
+  static {
+    const proto = FileUtils.prototype as unknown as Record<string, unknown>;
+    for (const name of Object.getOwnPropertyNames(FileUtils)) {
+      const method = (FileUtils as unknown as Record<string, unknown>)[name];
+      if (typeof method === "function") proto[name] = method;
+    }
+  }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface FileUtils extends Omit<
+  typeof FileUtils,
+  "prototype" | "fileutilsOutput" | "fileutilsLabel"
+> {}

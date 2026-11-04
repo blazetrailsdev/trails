@@ -74,7 +74,7 @@ describe("ArDestroyModelTest", () => {
     expect(result.deleted).toBe(true);
     expect(await fileExists(modelPath)).toBe(false);
     expect(await fileExists(migrationPath)).toBe(false);
-    const manifest = await readFile(join(dir, "app", "models", "index.ts"), "utf8");
+    const manifest = await readFile(join(dir, ".trails", "models", "index.ts"), "utf8");
     expect(manifest).not.toContain("Article");
   });
 

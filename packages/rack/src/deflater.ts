@@ -9,6 +9,7 @@ import {
   CONTENT_LENGTH,
   STATUS_WITH_NO_ENTITY_BODY,
 } from "./constants.js";
+import { Rack } from "./namespaces.js";
 
 export interface DeflaterOptions {
   include?: string[];
@@ -174,3 +175,5 @@ export class GzipStream {
     if (typeof this.body.close === "function") this.body.close();
   }
 }
+
+Rack.Deflater = Deflater;

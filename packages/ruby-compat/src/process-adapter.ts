@@ -22,18 +22,30 @@ export interface ReadStream {
   setNoecho?(): void;
 }
 
-export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT";
+export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT" | "exit";
+
+/** @noRailsEquivalent PERMANENT */
+export interface ModuleHooks {
+  resolve(
+    specifier: string,
+    context: { parentURL?: string },
+    nextResolve: (specifier: string, context: { parentURL?: string }) => { url: string },
+  ): { url: string };
+}
 
 export interface ProcessAdapter {
+  registerHooks?(hooks: ModuleHooks): void;
   envSnapshot(): Record<string, string | undefined>;
   argvSnapshot(): readonly string[];
   cwd(): string;
   chdir(dir: string): void;
   platform(): string;
   execPath?(): string;
+  umask?(): number;
   pid(): number;
   ppid?(): number;
   kill?(pid: number, signal: number | string): void;
+  signo?(name: string): number;
   hostname?(): string;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
@@ -47,6 +59,10 @@ export interface ProcessAdapter {
   setExitCode(code: number): void;
   setSourceMapsSupport?(enabled: boolean): void;
   onSignal(name: SignalName, handler: () => void): () => void;
+  /** @noRailsEquivalent PERMANENT */
+  signalListenerCount?(name: SignalName): number;
+  /** @noRailsEquivalent PERMANENT */
+  onExit?(handler: () => void): void;
   readonly stdout: WriteStream;
   readonly stderr: WriteStream;
   readonly stdin: ReadStream;
@@ -74,6 +90,15 @@ let prognameInternal = "";
 export function rbArgv(): string[] {
   return rbArgvInternal;
 }
+
+/**
+ * MRI's `ARGV` constant (`rb_argv`, vendor/ruby/v3.3.11/ruby.c:2980), the
+ * array `rbArgv` answers: one array for the life of the process, refilled in
+ * place when a process adapter is registered.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ARGV: string[] = rbArgvInternal;
 
 /**
  * MRI's `$PROGRAM_NAME` / `$0` (`rb_progname`,
@@ -386,6 +411,25 @@ export function setSourceMapsSupport(enabled: boolean): void {
   requireAdapter().setSourceMapsSupport?.(enabled);
 }
 
+const endProcs: (() => void)[] = [];
+
+/**
+ * `rb_f_at_exit` (`vendor/ruby/v3.3.11/eval_jump.c:38`), `Kernel#at_exit`,
+ * through `rb_set_end_proc` (`:59`): the blocks run once, newest first, when
+ * the process exits.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function atExit(block: () => void): () => void {
+  if (endProcs.length === 0) {
+    requireAdapter().onExit?.(() => {
+      for (const proc of endProcs.splice(0).reverse()) proc();
+    });
+  }
+  endProcs.push(block);
+  return block;
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
@@ -528,12 +572,14 @@ interface NodeProcessLike {
   chdir(dir: string): void;
   platform: string;
   execPath: string;
+  umask(): number;
   pid: number;
   ppid: number;
   kill(pid: number, signal: number | string): boolean;
   exit(code?: number): never;
   exitCode: number | string | undefined;
   on(event: string, handler: () => void): void;
+  listenerCount(event: string): number;
   off(event: string, handler: () => void): void;
   stdout: NodeStream;
   stderr: NodeStream;
@@ -600,11 +646,15 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     chdir: (dir) => proc.chdir(dir),
     platform: () => proc.platform,
     execPath: () => proc.execPath,
+    umask: () => proc.umask(),
     pid: () => proc.pid,
     ppid: () => proc.ppid,
     kill: (pid, signal) => {
       proc.kill(pid, signal);
     },
+    signo: (name) =>
+      (proc.getBuiltinModule?.("node:os") as { constants: { signals: Record<string, number> } })
+        .constants.signals[name],
     hostname: () => (proc.getBuiltinModule?.("node:os") as { hostname(): string }).hostname(),
     setEnv: (key, value) => {
       if (value === undefined) delete proc.env[key];
@@ -639,6 +689,19 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
         | { setSourceMapsSupport?(enabled: boolean): void }
         | undefined;
       nodeModule?.setSourceMapsSupport?.(enabled);
+    },
+    registerHooks: (hooks) => {
+      const nodeModule = proc.getBuiltinModule?.("node:module") as
+        | { registerHooks?(hooks: ModuleHooks): unknown }
+        | undefined;
+      if (nodeModule?.registerHooks === undefined) {
+        throw new NotImplementedError("registerHooks() function is unimplemented on this machine");
+      }
+      nodeModule.registerHooks(hooks);
+    },
+    signalListenerCount: (name) => proc.listenerCount(name),
+    onExit: (handler) => {
+      proc.on("exit", handler);
     },
     onSignal: (name, handler) => {
       proc.on(name, handler);

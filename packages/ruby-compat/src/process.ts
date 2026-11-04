@@ -1,13 +1,22 @@
+import { NotImplementedError } from "./not-implemented-error.js";
 import { ArgumentError } from "./argument-error.js";
 import type { IO } from "./io.js";
 import { IOError } from "./io-error.js";
-import { isPlainHash, rbBuiltinClassName } from "./object.js";
+import { isPlainHash, rbBuiltinClassName, rbInspect } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
+import { Thread } from "./thread.js";
 
 interface SystemCallError extends Error {
   code?: string;
 }
+
+type ExecargOpthash = {
+  out?: string | IO;
+  err?: string | IO;
+  unsetenvOthers?: unknown;
+  exception?: boolean;
+};
 
 /**
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
@@ -27,19 +36,29 @@ interface SystemCallError extends Error {
  */
 export function rbExecargNew(
   argv: readonly unknown[],
+  allowExcOpt = false,
 ): [
   prog: string,
   env: Record<string, string | undefined>,
   args: string[] | null,
-  opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown },
+  opthash: ExecargOpthash,
 ] {
   const rest = [...argv];
-  let opthash: { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown } = {};
+  let opthash: ExecargOpthash = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
-    opthash = rest.pop() as { out?: string | IO; err?: string | IO; unsetenvOthers?: unknown };
+    opthash = rest.pop() as ExecargOpthash;
     for (const key of Object.keys(opthash)) {
+      if (key === "exception") {
+        const { exception } = opthash;
+        if (exception != null && exception !== true && exception !== false) {
+          throw new ArgumentError(`expected true or false as exception: ${rbInspect(exception)}`);
+        }
+      }
       if (EXEC_OPTIONS.has(key) || key.startsWith("rlimit_") || /^\d+$/.test(key)) continue;
       throw new ArgumentError(`wrong exec option symbol: ${key}`);
+    }
+    if (!allowExcOpt && "exception" in opthash) {
+      throw new ArgumentError("exception option is not allowed");
     }
   }
   for (const redirect of [opthash.out, opthash.err]) {
@@ -211,15 +230,16 @@ export class Process {
   /**
    * `Process.last_status` (`proc_s_last_status`,
    * `vendor/ruby/v3.3.11/process.c:638-642`), the `$?` a waited child leaves
-   * behind. Ruby keeps it per thread (`rb_last_status_set`, `process.c:681-685`);
-   * trails keeps it per async context, falling back to one process-wide seat
-   * outside any.
+   * behind. Ruby keeps it per thread (`rb_last_status_get`, `process.c:610-614`;
+   * `rb_last_status_set`, `process.c:681-685`), and so does trails: each
+   * {@link Thread} holds its own, and code outside any `Thread.new` reads
+   * `Thread.main`'s.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process.last_status`
    * (`vendor/ruby/v3.3.11/process.c:639`).
    */
   static get lastStatus(): Status | null {
-    return lastStatus;
+    return lastStatuses.get(Thread.current()) ?? null;
   }
 
   /**
@@ -251,6 +271,18 @@ export class Process {
    */
   static get pid(): number {
     return getProcessAdapter().pid();
+  }
+
+  /**
+   * `proc_daemon` (`vendor/ruby/v3.3.11/process.c:6973`) forks, and a host
+   * with no `fork(2)` defines it as `rb_f_notimplement`, which raises
+   * `NotImplementedError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.daemon`
+   * (`vendor/ruby/v3.3.11/process.c:6973`).
+   */
+  static daemon(_nochdir: unknown = null, _noclose: unknown = null): never {
+    throw new NotImplementedError("daemon() function is unimplemented on this machine");
   }
 
   /**
@@ -338,7 +370,7 @@ function makeClockResult(milliseconds: number, unit: string): number {
   }
 }
 
-let lastStatus: Status | null = null;
+const lastStatuses = new WeakMap<Thread, Status>();
 
 /**
  * `rb_last_status_set` (`vendor/ruby/v3.3.11/process.c:681-685`).
@@ -347,5 +379,5 @@ let lastStatus: Status | null = null;
  * (`vendor/ruby/v3.3.11/process.c:681`).
  */
 export function rbLastStatusSet(status: Status): void {
-  lastStatus = status;
+  lastStatuses.set(Thread.current(), status);
 }

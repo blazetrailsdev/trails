@@ -5,6 +5,7 @@ import {
   arySlice,
   cmp,
   eachPair,
+  each,
   include,
   mergeBang,
   puts,
@@ -12,12 +13,11 @@ import {
   rbCmpint,
   rbFArray,
   rbFCaller,
-  isPlainHash,
   rbFSend,
   rbInspect,
   rbObjAsString,
   rbObjRespondTo,
-  rbModConstSet,
+  constSet,
   rbSetClassPathString,
   rtest,
   sort,
@@ -29,6 +29,7 @@ import {
   Hash,
   hashDelete,
   isModuleIncluded,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import type { Invocation } from "./invocation.js";
@@ -44,6 +45,7 @@ import { Option, type OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
+import * as LineEditor from "./line-editor.js";
 
 type Mappings = Record<string, string> | Map<unknown, string>;
 
@@ -70,7 +72,12 @@ export class Thor {
     if (!rtest(rbGvGet("$thor_runner"))) rbGvSet("$thor_runner", false);
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  declare static start: BaseClass["start"];
+
   static Group = Group;
+
+  static LineEditor = LineEditor;
 
   /** @internal */
   static _packageName?: string | null;
@@ -174,7 +181,6 @@ export class Thor {
     }
   }
 
-  /** @inventedArm if — PERMANENT */
   static map(
     this: ThorClass,
     mappings: Mappings | null = null,
@@ -192,8 +198,7 @@ export class Thor {
     if (rtest(mappings)) {
       eachPair(mappings as Map<string, string>, (key: unknown, value) => {
         if (rbObjRespondTo(key, "each")) {
-          for (const subkey of (isPlainHash(key) ? Object.entries(key) : key) as Iterable<string>)
-            this._map![subkey] = value;
+          each(key as Iterable<string>, (subkey) => (this._map![subkey] = value));
         } else {
           this._map![key as string] = value;
         }
@@ -816,14 +821,14 @@ rbSetClassPathString(Argument, Thor, "Argument");
 rbSetClassPathString(Arguments, Thor, "Arguments");
 rbSetClassPathString(Option, Thor, "Option");
 rbSetClassPathString(Options, Thor, "Options");
-rbModConstSet(Thor, "Command", Command);
-rbModConstSet(Thor, "Task", Command);
-rbModConstSet(Thor, "HiddenCommand", HiddenCommand);
-rbModConstSet(Thor, "HiddenTask", HiddenCommand);
-rbModConstSet(Thor, "DynamicCommand", DynamicCommand);
-rbModConstSet(Thor, "DynamicTask", DynamicCommand);
-rbModConstSet(Thor, "CoreExt", CoreExt);
-rbModConstSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
+constSet(Thor, "Command", Command);
+constSet(Thor, "Task", Command);
+constSet(Thor, "HiddenCommand", HiddenCommand);
+constSet(Thor, "HiddenTask", HiddenCommand);
+constSet(Thor, "DynamicCommand", DynamicCommand);
+constSet(Thor, "DynamicTask", DynamicCommand);
+constSet(Thor, "CoreExt", CoreExt);
+constSet(CoreExt, "HashWithIndifferentAccess", HashWithIndifferentAccess);
 
 Thor.defaultTask = Thor.defaultCommand;
 Thor.options = Thor.methodOptions;
@@ -847,4 +852,12 @@ include(Thor, Base);
 (Thor as ThorClass).desc("help [COMMAND]", "Describe available commands or one specific command");
 (Thor as ThorClass).methodAdded("help");
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+
+TopLevel.Thor = Thor;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    Thor?: typeof Thor;
+  }
+}

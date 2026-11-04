@@ -30,8 +30,8 @@ async function runDevCacheCommand(): Promise<string> {
   return output;
 }
 
-describe("Rails::Command::DevTest", { timeout: 30_000 }, () => {
-  it("`bin/rails dev:cache` creates both caching and restart file when restart file doesn't exist and dev caching is currently off", async () => {
+describe("Trails::Command::DevTest", { timeout: 30_000 }, () => {
+  it("`bin/trails dev:cache` creates both caching and restart file when restart file doesn't exist and dev caching is currently off", async () => {
     expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
     expect(File.isExist("tmp/restart.txt")).toBeFalsy();
 
@@ -43,7 +43,7 @@ describe("Rails::Command::DevTest", { timeout: 30_000 }, () => {
     expect(File.isExist("tmp/restart.txt")).toBeTruthy();
   });
 
-  it("`bin/rails dev:cache` creates caching file and touches restart file when dev caching is currently off", async () => {
+  it("`bin/trails dev:cache` creates caching file and touches restart file when dev caching is currently off", async () => {
     appFile("tmp/restart.txt", "");
 
     expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
@@ -59,7 +59,7 @@ describe("Rails::Command::DevTest", { timeout: 30_000 }, () => {
     expect(restartFileTimeBefore.getTime()).toBeLessThan(restartFileTimeAfter.getTime());
   });
 
-  it("`bin/rails dev:cache` removes caching file and touches restart file when dev caching is currently on", async () => {
+  it("`bin/trails dev:cache` removes caching file and touches restart file when dev caching is currently on", async () => {
     appFile("tmp/caching-dev.txt", "");
     appFile("tmp/restart.txt", "");
 

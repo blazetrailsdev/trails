@@ -1,16 +1,17 @@
+import { TopLevel } from "./object.js";
 import { describe, expect, it } from "vitest";
 import { toYaml } from "./yaml.js";
 import { Struct } from "./struct.js";
 import { Range } from "./range.js";
-import { registerConstant } from "./variable.js";
-import { rbModConstSet } from "./include.js";
+
+import { constSet } from "./include.js";
 
 function cleanYaml(yaml: string): string {
   return yaml.replace(/([^-]|^---)[ \t]+\n/gm, "$1\n").replace(/\n\.\.\.\n$/, "\n");
 }
 
-const YAMLSpecs = rbModConstSet(Object, "YAMLSpecs", {});
-const Example = rbModConstSet(
+const YAMLSpecs = constSet(Object, "YAMLSpecs", {});
+const Example = constSet(
   YAMLSpecs,
   "Example",
   class Example {
@@ -84,7 +85,7 @@ describe("Object#to_yaml", () => {
 
   it("returns the YAML representation of a Struct object", () => {
     const Person = Struct.new("name", "gender");
-    registerConstant("Person", Person);
+    constSet(TopLevel, "Person", Person);
     expect(cleanYaml(toYaml(new Person("Jane", "female")))).toBe(
       cleanYaml("--- !ruby/struct:Person\nname: Jane\ngender: female\n"),
     );

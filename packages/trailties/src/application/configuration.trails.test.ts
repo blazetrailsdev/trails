@@ -4,7 +4,7 @@ import { Configuration } from "./configuration.js";
 
 describe("Configuration#loadDefaults 7.1", () => {
   it("assigns action_view and action_text sanitizer_vendor from best_supported_vendor", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("activeRecord", { encryption: {} });
     c.set("actionView", {});
     c.set("actionText", {});
@@ -21,7 +21,7 @@ describe("Configuration#loadDefaults 7.1", () => {
   });
 
   it("leaves sanitizer_vendor unset before 7.1", () => {
-    const c = new Configuration();
+    const c = new Configuration("/app");
     c.set("actionView", {});
 
     c.loadDefaults("7.0");

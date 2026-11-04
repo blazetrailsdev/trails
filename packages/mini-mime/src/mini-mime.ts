@@ -5,6 +5,7 @@ import {
   IO,
   forceEncoding,
   rbModMethodDefined,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { VERSION } from "./version.js";
 
@@ -226,5 +227,12 @@ export const MiniMime = {
   Info,
   Db,
 };
+TopLevel.MiniMime = MiniMime;
 
-import "./class-paths.generated.js";
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    MiniMime?: typeof MiniMime;
+  }
+}
+
+import "./constants.generated.js";

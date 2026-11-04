@@ -126,6 +126,26 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, ".trails"))).toBe(false);
   });
 
+  it("--in-place leaves no module under an app/views root", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/posts/index.html.tse", "<%= 1 %>");
+    write(cwd, "app/views/posts/show.json.builder", "json");
+    write(cwd, "app/views/posts/index.html.tse.js", "stale");
+    write(cwd, ".trails/views/posts/deleted.html.tse.js", "stale");
+
+    const { count } = await buildViews({ cwd, inPlace: true });
+
+    expect(count).toBe(2);
+    expect(fs.readdirSync(path.join(cwd, "app/views/posts")).sort()).toEqual([
+      "index.html.tse",
+      "show.json.builder",
+    ]);
+    const emitted = fs.readdirSync(path.join(cwd, ".trails/views/posts"));
+    expect(emitted).toContain("index.html.tse.js");
+    expect(emitted).toContain("show.json.builder.js");
+    expect(emitted).not.toContain("deleted.html.tse.js");
+  });
+
   it("is a no-op when the views dir is absent", async () => {
     const cwd = mkScratch();
     const { count } = await buildViews({ cwd });

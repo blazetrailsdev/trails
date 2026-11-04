@@ -1,8 +1,15 @@
 import { toEnum } from "./enumerator.js";
 import { IO, ioObjects } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { getProcessAdapter, onSignal } from "./process-adapter.js";
 
-const finalizers = new FinalizationRegistry<() => void>((aProc) => aProc());
+type FinalizerEntry = { obj: WeakRef<object>; aProc: () => void };
+
+let finalizerTable: Set<FinalizerEntry> | undefined;
+const finalizers = new FinalizationRegistry<FinalizerEntry>((entry) => {
+  finalizerTable!.delete(entry);
+  entry.aProc();
+});
 
 type WeakmapEntry<K extends object> = { key: WeakRef<K>; val: unknown };
 
@@ -50,8 +57,39 @@ class WeakMap<K extends object, V = unknown> {
 export const ObjectSpace = {
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/gc.c:4364 */
   defineFinalizer(obj: object, aProc: () => void): [number, () => void] {
-    finalizers.register(obj, aProc);
+    if (finalizerTable === undefined) {
+      const table = (finalizerTable = new Set());
+      const callFinalizers = () => {
+        for (const entry of table) {
+          table.delete(entry);
+          entry.aProc();
+        }
+      };
+      onSignal("exit", callFinalizers);
+      for (const signo of ["SIGINT", "SIGTERM"] as const) {
+        const off = onSignal(signo, () => {
+          off();
+          const adapter = getProcessAdapter();
+          if ((adapter.signalListenerCount?.(signo) ?? 0) > 0) return;
+          callFinalizers();
+          if (adapter.kill) adapter.kill(adapter.pid(), signo);
+          else adapter.exit(128 + (adapter.signo?.(signo) ?? 0));
+        });
+      }
+    }
+    const entry = { obj: new WeakRef(obj), aProc };
+    finalizerTable.add(entry);
+    finalizers.register(obj, entry, entry);
     return [0, aProc];
+  },
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/gc.c:4227 */
+  undefineFinalizer(obj: object): object {
+    for (const entry of finalizerTable ?? []) {
+      if (entry.obj.deref() !== obj) continue;
+      finalizerTable!.delete(entry);
+      finalizers.unregister(entry);
+    }
+    return obj;
   },
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/gc.c:4209 */
   eachObject(of: { prototype: object; name: string }, block?: (obj: object) => unknown) {

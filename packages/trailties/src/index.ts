@@ -1,7 +1,9 @@
-export { Trails } from "./rails.js";
-export type { ApplicationRegistry } from "./rails.js";
+export { Trails } from "./trails.js";
+export type { ApplicationRegistry } from "./trails.js";
 export { Application } from "./application.js";
 export { Engine } from "./engine.js";
 export { Trailtie } from "./trailtie.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+export { ZeitwerkChecker } from "./zeitwerk-checker.js";
+import "./rack.js";

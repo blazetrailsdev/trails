@@ -15,7 +15,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import { include, rbEqual, regexpEscape, registerConstant } from "@blazetrails/ruby-compat";
+import { include, rbEqual, regexpEscape, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import type { TestCase } from "./cases/test-case.js";
 import { RecordNotFound, Rollback } from "./errors.js";
@@ -53,7 +53,7 @@ import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 
 class DestroyAssociationAsyncTest extends rootTestCase() {}
-registerConstant("DestroyAssociationAsyncTest", DestroyAssociationAsyncTest);
+constSet(TopLevel, "DestroyAssociationAsyncTest", DestroyAssociationAsyncTest);
 include(DestroyAssociationAsyncTest, ActiveJobTestHelper);
 
 type Ctx = TestContext & { testCase: TestCase & TestHelper };

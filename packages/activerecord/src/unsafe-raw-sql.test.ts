@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { UnknownAttributeReference, registerModel } from "./index.js";
+import { UnknownAttributeReference } from "./index.js";
 import { assertRaises, assertNotEmpty } from "@blazetrails/activesupport";
 import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
@@ -7,8 +8,8 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 
-registerModel(Post);
-registerModel(Comment);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
 
 describe("UnsafeRawSqlTest", () => {
   const { self } = fixtures(["posts", "comments"]);

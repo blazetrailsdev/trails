@@ -1,5 +1,7 @@
+import "../../../constants.postgresql-oid-cidr.generated.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { ArgumentError, IPAddr, rbEql, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, IPAddr, rbEql } from "@blazetrails/ruby-compat";
 
 export class Cidr extends ValueType<IPAddr> {
   override type(): string {
@@ -50,4 +52,4 @@ export class Cidr extends ValueType<IPAddr> {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Cidr", Cidr);
+ConnectionAdapters.PostgreSQL.OID.Cidr = Cidr;

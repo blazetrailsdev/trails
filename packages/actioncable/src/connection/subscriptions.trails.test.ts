@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base as ChannelBase } from "../channel/base.js";
 import { Subscriptions } from "./subscriptions.js";
 
@@ -23,8 +23,8 @@ class Base extends ChannelBase {
 }
 
 class ChatChannel extends Base {}
-registerConstant("SubscriptionsTestChatChannel", ChatChannel);
-registerConstant("SubscriptionsTestBase", ChannelBase);
+constSet(TopLevel, "SubscriptionsTestChatChannel", ChatChannel);
+constSet(TopLevel, "SubscriptionsTestBase", ChannelBase);
 
 function buildConnection() {
   const logged: string[] = [];
@@ -85,7 +85,7 @@ describe("ActionCable::Connection::Subscriptions", () => {
   });
 
   it("logs the TypeError for a constant that is not a module", async () => {
-    registerConstant("SubscriptionsTestNotAModule", "a string");
+    constSet(TopLevel, "SubscriptionsTestNotAModule", "a string");
     const { subscriptions, logged } = buildConnection();
     await subscriptions.executeCommand({
       command: "subscribe",

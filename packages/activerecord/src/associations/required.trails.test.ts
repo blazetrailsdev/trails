@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import type { CollectionAssociation } from "./collection-association.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
@@ -30,8 +32,10 @@ describe("RequiredAssociationsTest", () => {
         });
       }
     }
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const orphan = new Child();
     orphan.parent_id = 999999;
@@ -65,8 +69,10 @@ describe("RequiredAssociationsTest", () => {
         });
       }
     }
-    registerModel("Parent", Parent);
-    registerModel("Child", Child);
+    constSet(TopLevel, "Parent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "Child", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
 
     const parent = new Parent();
     await (parent.association("children") as CollectionAssociation).writer([new Child()]);

@@ -1,3 +1,4 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, describe, expect, it } from "vitest";
 import "../../../test-helpers/abstract-unit.js";
@@ -11,7 +12,7 @@ import {
   withRouting,
   type RoutingAssertionsHost,
 } from "./routing.js";
-import { Base, registerController } from "../../../action-controller/base.js";
+import { Base } from "../../../action-controller/base.js";
 
 function buildHost(): RoutingAssertionsHost {
   const routes = new RouteSet();
@@ -33,7 +34,7 @@ class StubController extends Base {
 
 beforeAll(() => {
   for (const name of ["items", "tmp", "x"]) {
-    registerController(`${camelize(name)}Controller`, StubController);
+    constSetPath(`${camelize(name)}Controller`, StubController);
   }
 });
 

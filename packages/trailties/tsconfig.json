@@ -3,16 +3,20 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["@blazetrails/vitest-matchers"]
   },
   "include": ["src"],
   "references": [
     { "path": "../ruby-compat" },
+    { "path": "../zeitwerk" },
+    { "path": "../rake" },
     { "path": "../activesupport" },
     { "path": "../activerecord" },
     { "path": "../activejob" },
     { "path": "../activerecord-cli" },
     { "path": "../rack" },
+    { "path": "../rackup" },
     { "path": "../actioncable" },
     { "path": "../actionpack" },
     { "path": "../actionview" },
@@ -23,6 +27,7 @@
     { "path": "../nokogiri" },
     { "path": "../did-you-mean" },
     { "path": "../thor" },
-    { "path": "../et-orbi" }
+    { "path": "../et-orbi" },
+    { "path": "../vitest-matchers" }
   ]
 }

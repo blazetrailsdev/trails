@@ -8,8 +8,8 @@ function captureRender(c: PwaController): ReturnType<typeof vi.fn> {
 }
 
 describe("PWAController", () => {
-  it("controllerPath mirrors Rails::PwaController (`rails/pwa`)", () => {
-    expect(PwaController.controllerPath()).toBe("rails/pwa");
+  it("controllerPath mirrors Trails::PwaController (`trails/pwa`)", () => {
+    expect(PwaController.controllerPath()).toBe("trails/pwa");
   });
 
   it("service_worker renders the pwa/service-worker template without a layout", () => {

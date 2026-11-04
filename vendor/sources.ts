@@ -162,6 +162,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "activejob/test",
       },
       {
+        name: "actionmailer",
+        libPath: "actionmailer/lib/action_mailer",
+        libEntryFile: "actionmailer/lib/action_mailer.rb",
+        testPath: "actionmailer/test",
+      },
+      {
         name: "activestorage",
         libPath: "activestorage/lib/active_storage",
         libEntryFile: "activestorage/lib/active_storage.rb",
@@ -243,6 +249,18 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "spec",
       },
     ],
+  },
+  {
+    name: "rackup",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rackup.git",
+      // vendor/rails/Gemfile.lock:445 resolves rackup (2.2.1), required by
+      // railties `rackup (>= 1.0.0)` (vendor/rails/Gemfile.lock:93).
+      ref: "v2.2.1",
+    },
+    // `lib/rackup/` (the Rackup module root), the same shape as `rack`.
+    packages: [{ name: "rackup", libPath: "lib/rackup", testPath: "test" }],
   },
   {
     name: "did_you_mean",
@@ -493,8 +511,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/zeitwerk",
         libEntryFile: "lib/zeitwerk.rb",
         testPath: "test",
-        compareApi: false,
-        compareTests: false,
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },

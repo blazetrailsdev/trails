@@ -5,8 +5,9 @@ import type { Base } from "./backend/base.js";
 import { Config } from "./config.js";
 import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./exceptions.js";
 import type { TranslateOptions } from "./backend/base.js";
+import type { Locale } from "./locale.js";
 
-export type Locale = string;
+export type { Locale };
 export type TranslationKey = string | number | boolean;
 
 export const EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});

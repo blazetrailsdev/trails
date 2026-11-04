@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../associations.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../test-helpers/models/cpk.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -8,10 +7,6 @@ const RAISE = 'Expected corresponding value for ["shop_id", "id"] to be an Array
 
 describe("CpkBook grouped calculation over a composite-key belongs_to applies order", () => {
   const { self } = fixtures([]);
-
-  beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
-  });
 
   async function seedOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });

@@ -1,8 +1,24 @@
-import { File, getFs, rbFBinding, strNew, TSE } from "@blazetrails/ruby-compat";
+import {
+  File,
+  getFs,
+  extend,
+  include,
+  rbFBinding,
+  strNew,
+  TSE,
+  type Extended,
+  type Included,
+} from "@blazetrails/ruby-compat";
+import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
-import { createMigration, migrationTemplate, type MigrationTemplateHost } from "../../migration.js";
-import { nextMigrationNumber } from "../migration.js";
+import { ClassMethods, Migration } from "../../migration.js";
+import {
+  configuredMigratePath,
+  dbMigratePath,
+  defaultMigratePath,
+  nextMigrationNumber,
+} from "../migration.js";
 import { GeneratedAttribute } from "../../generated-attribute.js";
 import {
   camelize,
@@ -15,6 +31,7 @@ import {
 export interface MigrationGeneratorOptions extends GeneratorOptions {
   timestamps?: boolean;
   primaryKeyType?: string;
+  database?: string;
   [key: string]: unknown;
 }
 
@@ -30,6 +47,10 @@ function kwargs(...options: Array<string | undefined>): string {
   return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface MigrationGenerator extends Included<typeof Migration> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MigrationGenerator extends NamedBase {
   static {
     this.argument("attributes", {
@@ -40,6 +61,11 @@ export class MigrationGenerator extends NamedBase {
 
     this.classOption("timestamps", { type: "boolean" });
     this.classOption("primaryKeyType", { type: "string", desc: "The type for primary key" });
+    this.classOption("database", {
+      type: "string",
+      aliases: ["--db"],
+      desc: "The database for your migration. By default, the current environment's primary database is used.",
+    });
 
     this.methodAdded("createMigrationFile");
   }
@@ -50,26 +76,25 @@ export class MigrationGenerator extends NamedBase {
   migrationFileName = "";
   migrationClassName = "";
 
+  declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
+  declare static migrationExists: Extended<typeof ClassMethods>["migrationExists"];
+  declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
   static nextMigrationNumber = nextMigrationNumber;
 
-  private migrationTemplate = "migration.ts";
-  createMigration = createMigration;
+  private _migrationTemplate = "migration.ts";
+  dbMigratePath = dbMigratePath;
+  defaultMigratePath = defaultMigratePath;
+  configuredMigratePath = configuredMigratePath;
   private migrationAction: string | undefined;
   private joinTables: string[] = [];
 
   async createMigrationFile(): Promise<void> {
     const name = this.name;
-    if (!/^\w+$/.test(name)) {
-      throw new Error(
-        `Illegal migration name: ${name} (only letters, numbers, and underscores allowed)`,
-      );
-    }
-
     this.setLocalAssignsBang(underscore(name));
-    const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
+    this.validateFileName();
+    const source = File.expandPath(await this.findInSourcePaths(this._migrationTemplate));
 
-    await migrationTemplate.call(
-      this as unknown as MigrationTemplateHost,
+    await this.migrationTemplate(
       async () => {
         const erb = new TSE(strNew(Array.from(await getFs().readFile(source))), {
           trimMode: "-",
@@ -78,7 +103,7 @@ export class MigrationGenerator extends NamedBase {
         erb.filename = source;
         return erb.result(rbFBinding(this));
       },
-      File.join("db/migrate", `${underscore(name)}${this.ext()}`),
+      File.join(this.dbMigratePath(), `${underscore(name)}${this.ext()}`),
     );
   }
 
@@ -193,8 +218,13 @@ export class MigrationGenerator extends NamedBase {
     if (keyType) return `, type: "${keyType}"`;
   }
 
+  /** @internal */
+  private validateFileName(): void {
+    if (!/^[_a-z0-9]+$/.test(this.fileName)) throw new IllegalMigrationNameError(this.fileName);
+  }
+
   private setLocalAssignsBang(fileName: string): void {
-    this.migrationTemplate = "migration.ts";
+    this._migrationTemplate = "migration.ts";
     let m: RegExpMatchArray | null;
     if ((m = fileName.match(/^(add)_.*_to_(.*)/) ?? fileName.match(/^(remove)_.*?_from_(.*)/))) {
       this.migrationAction = m[1];
@@ -209,7 +239,7 @@ export class MigrationGenerator extends NamedBase {
       }
     } else if ((m = fileName.match(/^create_(.+)/))) {
       this._tableName = this.normalizeTableName(m[1]);
-      this.migrationTemplate = "create_table_migration.ts";
+      this._migrationTemplate = "create_table_migration.ts";
     }
   }
 
@@ -231,6 +261,9 @@ export class MigrationGenerator extends NamedBase {
     return this.isPluralizeTableNames() ? pluralize(tableName) : singularize(tableName);
   }
 }
+
+include(MigrationGenerator, Migration);
+extend(MigrationGenerator, ClassMethods);
 
 Object.defineProperty(MigrationGenerator, "name", {
   value: "ActiveRecord::Generators::MigrationGenerator",

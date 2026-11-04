@@ -18,6 +18,7 @@ import {
   PeriodNotFound,
   Timezone,
   TimezonePeriod,
+  InvalidCountryCode,
 } from "@blazetrails/tzinfo";
 import {
   equals as cmpEquals,
@@ -706,7 +707,7 @@ export class TimeZone {
     }
     const additions = COUNTRY_ZONE_IDENTIFIER_ADDITIONS[code];
     if (country === undefined || (country.length === 0 && additions === undefined)) {
-      throw new Error(`Invalid country code: ${code}`);
+      throw new InvalidCountryCode(`Invalid country code: ${code}`);
     }
     const identifiers = country.map((tzId) => CANONICAL_ZONE_IDENTIFIERS[tzId] ?? tzId);
     for (const tzId of additions ?? []) {

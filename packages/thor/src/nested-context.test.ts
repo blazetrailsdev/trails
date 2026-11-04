@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
+import { assertNotPredicate, assertPredicate } from "./test-helpers/assertions.js";
 import { NestedContext } from "./nested-context.js";
 
 describe("Thor::NestedContext", () => {

@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { assert, assertEqual, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  rbInspect,
-  rbModConstSet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 import { ObjectSerializer } from "./serializers/object-serializer.js";
 import type { SerializerLike } from "./namespaces.js";
@@ -16,7 +11,7 @@ class SerializersTest {
     return "SerializersTest";
   }
 }
-registerConstant("SerializersTest", SerializersTest);
+constSet(TopLevel, "SerializersTest", SerializersTest);
 
 class DummyValueObject {
   value: unknown;
@@ -29,7 +24,7 @@ class DummyValueObject {
     return this.value === other.value;
   }
 }
-rbModConstSet(SerializersTest, "DummyValueObject", DummyValueObject);
+constSet(SerializersTest, "DummyValueObject", DummyValueObject);
 
 class DummySerializer extends ObjectSerializer {
   serialize(object: DummyValueObject): Record<string, unknown> {
@@ -45,7 +40,7 @@ class DummySerializer extends ObjectSerializer {
     return DummyValueObject;
   }
 }
-rbModConstSet(SerializersTest, "DummySerializer", DummySerializer);
+constSet(SerializersTest, "DummySerializer", DummySerializer);
 
 describe("SerializersTest", () => {
   let valueObject: DummyValueObject;

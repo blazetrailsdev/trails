@@ -1,10 +1,12 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { describe, it, afterEach, beforeEach } from "vitest";
 import {
   Encoding,
   EOFError,
   File,
   rbObjEncoding,
-  registerConstant,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertNil } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
@@ -12,7 +14,6 @@ import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import type { RouteSet } from "../../routing/route-set.js";
 import "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../../action-controller/base.js";
 
 interface UploadedFile {
   originalFilename: string;
@@ -22,7 +23,7 @@ interface UploadedFile {
 }
 
 class MultipartParamsParsingTest extends IntegrationTest {}
-registerConstant("MultipartParamsParsingTest", MultipartParamsParsingTest);
+constSet(TopLevel, "MultipartParamsParsingTest", MultipartParamsParsingTest);
 
 describe("MultipartParamsParsingTest", () => {
   class TestController extends Base {
@@ -61,7 +62,7 @@ describe("MultipartParamsParsingTest", () => {
       });
     }
   }
-  registerController("MultipartParamsParsingTest::TestController", TestController);
+  constSetPath("MultipartParamsParsingTest::TestController", TestController);
 
   const FIXTURE_PATH = File.expandPath(
     "../../../test-helpers/fixtures/multipart",

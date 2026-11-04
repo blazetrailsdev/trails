@@ -1,6 +1,7 @@
 import type { Module } from "@blazetrails/ruby-compat";
 import { assigningSynchronously } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
+import { Builder } from "../../namespaces.js";
 
 export class HasOne extends SingularAssociation {
   static override macro(): "hasOne" {
@@ -87,3 +88,5 @@ export class HasOne extends SingularAssociation {
     model.afterTouch(callback);
   }
 }
+
+Builder.HasOne = HasOne;

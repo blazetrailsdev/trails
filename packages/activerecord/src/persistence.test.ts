@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 function epochMs(v: unknown): number {
@@ -26,7 +27,6 @@ import {
   RecordNotSaved,
   RecordNotDestroyed,
   ActiveRecordError,
-  registerModel,
 } from "./index.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 
@@ -41,18 +41,10 @@ import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "./test-helpers/mo
 import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { PostWithPrefetchedPk } from "./test-helpers/models/post-with-prefetched-pk.js";
 import { Account } from "./test-helpers/models/account.js";
-import {
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  WrongReply,
-} from "./test-helpers/models/reply.js";
-import { Item as CanonicalItem } from "./test-helpers/models/item.js";
+import { Reply, WrongReply } from "./test-helpers/models/reply.js";
 import {
   Developer as CanonicalDeveloper,
   DeveloperCalledDavid,
-  AuditLog,
 } from "./test-helpers/models/developer.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
@@ -66,44 +58,11 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Person } from "./test-helpers/models/person.js";
-import { Car } from "./test-helpers/models/car.js";
-import { Ship } from "./test-helpers/models/ship.js";
 import { sql as arelSql } from "@blazetrails/arel";
-
-for (const klass of [
-  CanonicalTopic,
-  Minimalistic,
-  Account,
-  ClothingItem,
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  CanonicalItem,
-  CanonicalDeveloper,
-  Parrot,
-  CanonicalPost,
-  CpkBook,
-  CpkOrder,
-  Minivan,
-  Company,
-  Firm,
-  LargeClient,
-  Client,
-  AdminUser,
-  AutoId,
-  Person,
-  Car,
-  WrongReply,
-  DeveloperCalledDavid,
-  Dashboard,
-  CpkBestSeller,
-  ClothingItemSized,
-  AuditLog,
-  Ship,
-]) {
-  registerModel(klass);
-}
+import "./test-helpers/models/item.js";
+import "./test-helpers/models/car.js";
+import "./test-helpers/models/ship.js";
+import "./test-helpers/models/dashboard.js";
 
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
@@ -1741,8 +1700,8 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(ChatMessage);
-  registerModel(ChatMessageCustomPk);
+  constSet(TopLevel, "ChatMessage", ChatMessage);
+  constSet(TopLevel, "ChatMessageCustomPk", ChatMessageCustomPk);
   fixtures([]);
 
   it.skipIf(adapterType !== "postgres")("create model with uuid pk populates id", async () => {
@@ -1887,7 +1846,7 @@ describe("QueryConstraintsTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(Default);
+  constSet(TopLevel, "Default", Default);
   fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
@@ -1996,7 +1955,8 @@ describe("PersistenceTest", () => {
         class IdentityTable extends Base {
           static _tableName = "postgresql_identity_table";
         }
-        registerModel(IdentityTable);
+        constSet(TopLevel, "IdentityTable", IdentityTable);
+        DescendantsTracker.registerSubclass(Base, IdentityTable);
         await (IdentityTable as unknown as { loadSchema(): Promise<void> }).loadSchema();
         const identityRecord = (await IdentityTable.createBang()) as any;
         expect(identityRecord.id).not.toBeNull();
@@ -2034,7 +1994,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  registerModel(PkAutopopulatedByATriggerRecord);
+  constSet(TopLevel, "PkAutopopulatedByATriggerRecord", PkAutopopulatedByATriggerRecord);
   fixtures([]);
 
   const supportsTrigger = adapterSupports("insert_returning") && adapterType !== "sqlite";
@@ -2080,7 +2040,8 @@ describe("PersistenceTest", () => {
         });
       }
     }
-    registerModel(TrackingTopic);
+    constSet(TopLevel, "TrackingTopic", TrackingTopic);
+    DescendantsTracker.registerSubclass(Topic, TrackingTopic);
 
     await TrackingTopic.create({ title: "New Topic", author_name: "Not David" });
 
@@ -2093,7 +2054,8 @@ describe("PersistenceTest", () => {
         this.tableName = "aircraft";
       }
     }
-    registerModel(MinimalisticAircraft);
+    constSet(TopLevel, "MinimalisticAircraft", MinimalisticAircraft);
+    DescendantsTracker.registerSubclass(Minimalistic, MinimalisticAircraft);
 
     await assertDifference(
       () => Aircraft.count(),

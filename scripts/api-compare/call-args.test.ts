@@ -56,6 +56,11 @@ describe("normalizeArg", () => {
   it("compares a non-identifier string byte-for-byte", () => {
     expect(normalizeArg("str: GROUP BY ")).toBe("str: GROUP BY ");
     expect(normalizeArg("str:AND ")).toBe("str:AND ");
+    expect(normalizeArg("str:config/routes.rb")).toBe(normalizeArg("str:config/routes.ts"));
+    expect(normalizeArg("str:layouts/application.html.erb")).toBe(
+      normalizeArg("str:layouts/application.html.tse"),
+    );
+    expect(normalizeArg("str:x.rbs")).toBe("str:x.rbs");
   });
 
   it("canonicalizes an escape through literals.ts", () => {

@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -14,9 +15,9 @@ describe("Association scope cache", () => {
   const { authors, posts } = fixtures(["authors", "posts", "comments"]);
 
   beforeAll(async () => {
-    registerModel(Author);
-    registerModel(Post);
-    registerModel(Comment);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Comment", Comment);
     await Author.loadSchema();
     await Post.loadSchema();
     await Comment.loadSchema();
@@ -100,11 +101,11 @@ describe("Association scope cache — through singular loads", () => {
   const { members, clubs } = fixtures(["memberTypes", "members", "clubs", "memberships"]);
 
   beforeAll(async () => {
-    registerModel(Member);
-    registerModel(Club);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "Club", Club);
     Membership.inheritanceColumn = "type";
-    registerModel(Membership);
-    registerModel(CurrentMembership);
+    constSet(TopLevel, "Membership", Membership);
+    constSet(TopLevel, "CurrentMembership", CurrentMembership);
     await Member.loadSchema();
     await Club.loadSchema();
     await Membership.loadSchema();

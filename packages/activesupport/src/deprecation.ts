@@ -1,4 +1,3 @@
-import * as nodeUtil from "node:util";
 import { wrap } from "./array-utils.js";
 import { currentErrorReporter } from "./error-reporter.js";
 import { deprecateMethods } from "./deprecation/method-wrappers.js";
@@ -171,44 +170,26 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
   return length == null ? locations : locations.slice(0, length);
 }
 
-/**
- * Fallback for runtimes that do not implement V8's stack introspection.
- *
- * `callerLocations` above parses `new Error().stack` after installing an
- * `Error.prepareStackTrace` hook. Both are V8 internals, and a runtime can
- * provide neither while still being a valid Node target: perry (the native
- * TypeScript compiler) accepts the `prepareStackTrace` assignment but never
- * invokes it, emits frames as a bare `at <anonymous>` with no file/line/column,
- * and produces only one frame, so the regex above matches nothing and the
- * result is `[]`. `Delegation.generate` then does `callerLocations(1, 1)[0].path`
- * and throws `Cannot read properties of undefined (reading 'path')`, which takes
- * down module initialisation for anything that calls `delegate` at top level.
- *
- * `node:util.getCallSites` is the *public, documented* API for the same job
- * (Node 22+), so preferring it here is a portability fix rather than a
- * workaround for one runtime. It stays a fallback so that Node's behaviour —
- * including `absolutePath` and the `callSite` passthrough — is byte-for-byte
- * unchanged whenever the V8 path works.
- */
 function callerLocationsViaCallSites(start: number, length?: number): CallerLocation[] {
-  const getCallSites = (
-    nodeUtil as { getCallSites?: (frameCount?: number) => NodeCallSite[] }
-  ).getCallSites;
+  const nodeUtil = (
+    globalThis as {
+      process?: { getBuiltinModule?: (id: string) => unknown };
+    }
+  ).process?.getBuiltinModule?.("node:util") as
+    | { getCallSites?: (frameCount?: number) => NodeCallSite[] }
+    | undefined;
+  const getCallSites = nodeUtil?.getCallSites;
   if (typeof getCallSites !== "function") return [];
   let sites: NodeCallSite[];
   try {
-    // Index 0 is this helper's own caller (`callerLocations`), matching the
-    // `sites[1 + start + i]` indexing of the V8 path above.
-    sites = getCallSites(length == null ? 200 : 1 + start + length);
+    sites = getCallSites(length == null ? 200 : 2 + start + length);
   } catch {
     return [];
   }
   if (!Array.isArray(sites)) return [];
-  const locations = sites.slice(1 + start).map((site) => {
+  const locations = sites.slice(2 + start).map((site) => {
     const raw = typeof site?.scriptName === "string" ? site.scriptName : "";
-    const path = raw.startsWith("file://")
-      ? decodeURIComponent(raw.slice("file://".length))
-      : raw;
+    const path = raw.startsWith("file://") ? decodeURIComponent(raw.slice("file://".length)) : raw;
     const lineno = Number.isFinite(site?.lineNumber) ? Number(site.lineNumber) : 0;
     const label = typeof site?.functionName === "string" ? site.functionName : "";
     return {
@@ -289,7 +270,7 @@ export class Deprecation {
     this._silenced = silenced;
   }
 
-  constructor(deprecationHorizon = "8.1", gemName = "Rails") {
+  constructor(deprecationHorizon = "8.1", gemName = "Trails") {
     this.gemName = gemName;
     this.deprecationHorizon = deprecationHorizon;
     this.silenced = false;

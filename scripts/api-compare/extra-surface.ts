@@ -120,7 +120,7 @@ import { libExtraPathsManifest, libPathsManifest } from "../../vendor/sources.js
  * e.g. `AbstractAdapter` including `"Quoting"` resolves to
  * `ConnectionAdapters::Quoting`, not the adapter-specific siblings.
  */
-interface RubyEntity {
+export interface RubyEntity {
   fqn: string;
   info: ClassInfo;
   /**
@@ -724,6 +724,7 @@ function staleMovedDeclarations(extras: readonly ExtraName[], reason: string): s
 }
 
 import { classifyReason, type Permanence } from "./missing-rails-call-tags.js";
+import { buildPrivatesReport } from "./privates-surface.js";
 
 export { classifyReason, type Permanence };
 
@@ -1645,7 +1646,7 @@ export async function loadConcernHooks(
  * only to `ConnectionAdapters::Quoting`, never to PG/MySQL siblings of the
  * same short name. Cross-package / stdlib mixins are silently skipped.
  */
-function collectAllowedNames(
+export function collectAllowedNames(
   entities: RubyEntity[],
   pkg: string,
   rubyModules: Record<string, ClassInfo>,
@@ -1669,16 +1670,26 @@ function collectAllowedNames(
    * O(1) the way an FQN-keyed set does.
    */
   scoped?: Map<string, Set<string>>,
+  /**
+   * `"private"` is the privates lane (`privates-surface.ts`, RFC 0218): only a
+   * Ruby private/protected method allows a name, so constants, hash keys,
+   * entity names and the name-only tables (which are public surface) are not
+   * gathered, and a delegated owner's private methods are kept. `"public"` is
+   * the same walk keeping only Ruby public methods, which the privates lane
+   * reads for its `visibility` column.
+   */
+  visibility: "any" | "private" | "public" = "any",
 ): Set<string> {
   const allowed = new Set<string>();
+  const methodsOnly = visibility !== "any";
   // File-level constants are declared per Ruby *file*, not per entity, so they
   // enter the allow-set once for the whole file rather than through the
   // entity/mixin walk below.
-  for (const name of fileConstantNames) {
+  for (const name of methodsOnly ? [] : fileConstantNames) {
     for (const c of rubyConstantCandidates(name)) allowed.add(c);
   }
   // Hash keys are file-scoped for the same reason — see `fileHashKeys`.
-  for (const key of fileHashKeyNames) {
+  for (const key of methodsOnly ? [] : fileHashKeyNames) {
     for (const c of rubyHashKeyCandidates(key)) allowed.add(c);
   }
   const visitedByTarget = new Map<Set<string>, Set<string>>();
@@ -1697,6 +1708,8 @@ function collectAllowedNames(
     };
     for (const m of methods) {
       if (methodFile !== undefined && m.file !== methodFile) continue;
+      if (visibility === "private" && m.visibility === "public") continue;
+      if (visibility === "public" && m.visibility !== "public") continue;
       // A Ruby OPERATOR (`*`, `<<`, `~@`) carries no canonical camelCase
       // spelling, so `rubyMethodCandidates` refuses it and the TS port of
       // `Arel::Math#*` reads as novel surface. The port is real and its
@@ -1719,6 +1732,7 @@ function collectAllowedNames(
   };
 
   const addRubyName = (rubyName: string, target: Set<string> = allowed): void => {
+    if (methodsOnly) return;
     const candidates = rubyMethodCandidates(rubyName);
     if (!candidates) return;
     for (const c of candidates) target.add(c);
@@ -1753,6 +1767,7 @@ function collectAllowedNames(
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
     for (const name of CORE_MIXIN_METHODS[fqn] ?? []) {
+      if (methodsOnly) continue;
       for (const c of CORE_MIXIN_OPERATOR_SPELLINGS[name] ?? []) target.add(c);
       addRubyName(name, target);
     }
@@ -1818,7 +1833,9 @@ function collectAllowedNames(
     if (seen.has(ownerFqn)) return;
     seen.add(ownerFqn);
     addMethods(
-      owner.instanceMethods.filter((m) => m.visibility !== "private"),
+      visibility === "private"
+        ? owner.instanceMethods
+        : owner.instanceMethods.filter((m) => m.visibility !== "private"),
       ownerFqn,
       undefined,
       target,
@@ -1852,7 +1869,7 @@ function collectAllowedNames(
     // either as a real TS nested class or as `static readonly Inner = Inner`
     // re-attaching a sibling export.
     const short = fqn.split("::").pop();
-    if (short) {
+    if (short && !methodsOnly) {
       for (const c of rubyConstantCandidates(short)) allowed.add(c);
       // The renamed spelling `parity:api` already resolves this Ruby class to
       // (`TS_CLASS_RENAMES`). Without it the two tools disagree: `naming.rb`
@@ -1943,6 +1960,24 @@ function resolveDelegatedClass(
 }
 
 /**
+ * Packages whose Ruby-name credit comes from their own names only, so the
+ * verdict does not change with which other gems the artifact holds: the scoped
+ * lane's `rails-api.json` carries thor and its mixins, the full lane every gem.
+ */
+const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor"]);
+
+/** The Ruby-name oracle a file in `pkg` is scored against. */
+function creditCandidates(
+  pkg: string,
+  ruby: ApiManifest,
+  globalRubyCandidates: Map<string, RubyOwner[]>,
+): Map<string, RubyOwner[]> {
+  const own = ruby.packages[pkg];
+  if (!OWN_MOVED_CREDIT_PACKAGES.has(pkg) || own === undefined) return globalRubyCandidates;
+  return buildGlobalRubyCandidates({ ...ruby, packages: { [pkg]: own } });
+}
+
+/**
  * Build the global "all Ruby method candidate names anywhere in Rails-land"
  * map, used to classify each extra as novel (nowhere in Rails) vs moved
  * (somewhere in Rails, just not in the matched file).
@@ -1966,7 +2001,10 @@ function resolveDelegatedClass(
  * doesn't sit in its own file as novel-by-omission, which is exactly the
  * miscount this pass exists to remove.
  */
-export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOwner[]> {
+export function buildGlobalRubyCandidates(
+  ruby: ApiManifest,
+  maxOwners: number = MAX_OWNERS_PER_NAME,
+): Map<string, RubyOwner[]> {
   const all = new Map<string, RubyOwner[]>();
   const add = (candidate: string, owner: RubyOwner): void => {
     const owners = all.get(candidate);
@@ -1974,7 +2012,7 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOw
       all.set(candidate, [owner]);
       return;
     }
-    if (owners.length < MAX_OWNERS_PER_NAME) owners.push(owner);
+    if (owners.length < maxOwners) owners.push(owner);
   };
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
     for (const [file, consts] of Object.entries(pkg.fileConstants ?? {})) {
@@ -2099,7 +2137,7 @@ const TEST_SUPPORT_BASENAMES = new Set(["test-helper.ts", "test-helpers.ts"]);
 /**
  * An engine's `db/` (`activestorage/db/migrate/`, `db/update_migrate/`) sits beside `lib/`,
  * so its ported migrations have no lib counterpart either. Only the package's top-level
- * `db/` counts: trailties' `generators/rails/db/` mirrors lib.
+ * `db/` counts: trailties' `generators/trails/db/` mirrors lib.
  */
 const ENGINE_DB_DIRS = new Set(["migrate", "update-migrate"]);
 
@@ -2277,6 +2315,118 @@ export function inlinedModuleMembers(
 }
 
 /**
+ * The Ruby side of a package, bucketed by `.rb`: each file's entities (a
+ * reopening file's method-file-filtered), the module short-name index the
+ * mixin walk resolves through, and the TS files those `.rb`s cover. Shared
+ * by this lane and `privates-surface.ts` so both score the same buckets.
+ * Mutates `rubyPkg.modules` (see `foldClassMethodsModules`).
+ */
+export function indexRubyFiles(
+  pkg: string,
+  rubyPkg: PackageInfo,
+): {
+  moduleFqnByShort: Map<string, string[]>;
+  rubyFiles: Map<string, RubyEntity[]>;
+  rubyFileNames: Set<string>;
+  coveredTsFiles: Set<string>;
+} {
+  // Pre-fold ASC's `::ClassMethods` submodules into their parent's
+  // classMethods (mirrors compare.ts:759-773). Mutates rubyPkg.modules.
+  const foldedFqns = foldClassMethodsModules(rubyPkg.modules);
+
+  const moduleFqnByShort = new Map<string, string[]>();
+  for (const fqn of Object.keys(rubyPkg.modules)) {
+    if (foldedFqns.has(fqn)) continue;
+    const short = fqn.split("::").pop();
+    if (!short) continue;
+    const list = moduleFqnByShort.get(short) ?? [];
+    list.push(fqn);
+    moduleFqnByShort.set(short, list);
+  }
+
+  // compare.ts drops a class nested in a same-file parent from `allRuby`
+  // outright (compare.ts:1321-1339), so its methods never count toward the
+  // coverage denominator. Extra surface is the inverse question and needs the
+  // opposite answer: the nested class IS surface the enclosing file declares,
+  // so counting the TS port of it as drift is wrong. It therefore enters the
+  // file's allow-set like any other entity — deliberately NOT mirroring
+  // compare.ts's use of the same filter.
+  const rubyFiles = new Map<string, RubyEntity[]>();
+  for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
+    if (!info.file) continue;
+    pushTo(rubyFiles, info.file, { fqn, info, isClass: true });
+  }
+  for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
+    if (!info.file) continue;
+    pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
+  }
+  for (const entities of rubyFiles.values()) {
+    const classFqns = new Set(entities.filter((e) => e.isClass === true).map((e) => e.fqn));
+    for (const e of entities) {
+      if (e.isClass !== true) continue;
+      const parent = e.fqn.slice(0, e.fqn.lastIndexOf("::"));
+      if (parent !== "" && classFqns.has(parent)) e.nestedIn = parent;
+    }
+  }
+
+  // A Ruby file can declare file-level constants and no class/module at all
+  // (rails/engine/commands.rb:3-9 is `Rails::Command::…` constants only), so it
+  // never lands in `rubyFiles` — but it IS a Rails counterpart, and the literal
+  // pass already treats it as one by mapping every `fileConstants` key through
+  // `rubyFileToTs` (compare.ts:1838-1841). Score it here the same way: with an
+  // empty entity list, so `collectAllowedNames` allows exactly its constants.
+  const rubyFileNames = new Set<string>([
+    ...rubyFiles.keys(),
+    ...Object.keys(rubyPkg.fileConstants ?? {}),
+  ]);
+  const coveredTsFiles = new Set<string>();
+  for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
+
+  // A reopened class is stamped with whichever reopening the extractor read
+  // first (`Date` with `core_ext/date/acts_like.rb`), so every other file that
+  // reopens it is absent from `rubyFiles` and its TS target falls into the
+  // `uncoveredTsFiles(...)` arm below — scored against an EMPTY allowed set.
+  // The methods ARE stamped per-file, so recover the file list from them; the
+  // `RUBY_FILE_TS_OVERRIDES` rows are the subset of it found by hand.
+  //
+  // A file already IN `rubyFiles` needs the same pass: a module reopened in it
+  // (`ActiveModel::Validations`, primary site `validations.rb`, declaring
+  // `validates_with` in `validations/with.rb`) is registered under its primary
+  // file only, so its methods score as drift in the very file Rails puts them
+  // in. Those entities enter method-file-filtered, which is what keeps the
+  // allow-set to the methods that Ruby file actually declares.
+  const methodDeclarationFiles = new Set<string>();
+  for (const info of [...Object.values(rubyPkg.classes), ...Object.values(rubyPkg.modules)]) {
+    for (const m of [...info.instanceMethods, ...info.classMethods]) {
+      if (m.file) methodDeclarationFiles.add(m.file);
+    }
+  }
+  for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
+    const tsFile = rubyFileToTs(rubyFile, pkg);
+    const alreadyDeclared = rubyFileNames.has(rubyFile);
+    if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
+    const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
+    for (const [fqn, info] of [
+      ...Object.entries(rubyPkg.classes),
+      ...Object.entries(rubyPkg.modules),
+    ]) {
+      if (declared.has(fqn)) continue;
+      const declaresHere = (m: MethodInfo): boolean => m.file === rubyFile;
+      if (!info.instanceMethods.some(declaresHere) && !info.classMethods.some(declaresHere)) {
+        continue;
+      }
+      pushTo(rubyFiles, rubyFile, { fqn, info, methodFile: rubyFile });
+    }
+    if (rubyFiles.has(rubyFile)) {
+      rubyFileNames.add(rubyFile);
+      coveredTsFiles.add(tsFile);
+    }
+  }
+
+  return { moduleFqnByShort, rubyFiles, rubyFileNames, coveredTsFiles };
+}
+
+/**
  * The Rails side of a `TS_ONLY_PACKAGES` package — one with no gem at all, so
  * no file of it maps onto any Ruby file, every TS file lands in the
  * `rubyFile === null` slice and every public name in it scores novel. That is
@@ -2327,45 +2477,11 @@ function buildPackageReport(
   };
   if (!tsPkg) return result;
 
-  // Pre-fold ASC's `::ClassMethods` submodules into their parent's
-  // classMethods (mirrors compare.ts:759-773). Mutates rubyPkg.modules.
-  const foldedFqns = foldClassMethodsModules(rubyPkg.modules);
-
-  const moduleFqnByShort = new Map<string, string[]>();
-  for (const fqn of Object.keys(rubyPkg.modules)) {
-    if (foldedFqns.has(fqn)) continue;
-    const short = fqn.split("::").pop();
-    if (!short) continue;
-    const list = moduleFqnByShort.get(short) ?? [];
-    list.push(fqn);
-    moduleFqnByShort.set(short, list);
-  }
-
-  // compare.ts drops a class nested in a same-file parent from `allRuby`
-  // outright (compare.ts:1321-1339), so its methods never count toward the
-  // coverage denominator. Extra surface is the inverse question and needs the
-  // opposite answer: the nested class IS surface the enclosing file declares,
-  // so counting the TS port of it as drift is wrong. It therefore enters the
-  // file's allow-set like any other entity — deliberately NOT mirroring
-  // compare.ts's use of the same filter.
-  const rubyFiles = new Map<string, RubyEntity[]>();
-  for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
-    if (!info.file) continue;
-    pushTo(rubyFiles, info.file, { fqn, info, isClass: true });
-  }
-  for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
-    if (!info.file) continue;
-    pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
-  }
-  for (const entities of rubyFiles.values()) {
-    const classFqns = new Set(entities.filter((e) => e.isClass === true).map((e) => e.fqn));
-    for (const e of entities) {
-      if (e.isClass !== true) continue;
-      const parent = e.fqn.slice(0, e.fqn.lastIndexOf("::"));
-      if (parent !== "" && classFqns.has(parent)) e.nestedIn = parent;
-    }
-  }
-
+  const { moduleFqnByShort, rubyFiles, rubyFileNames, coveredTsFiles } = indexRubyFiles(
+    pkg,
+    rubyPkg,
+  );
+  const candidates = creditCandidates(pkg, ruby, globalRubyCandidates);
   const tsClassesByFile = new Map<string, ClassInfo[]>();
   const tsModulesByFile = new Map<string, ClassInfo[]>();
   for (const c of Object.values(tsPkg.classes)) {
@@ -2425,60 +2541,6 @@ function buildPackageReport(
     bodiedByTsFile,
     taggedByTsFile,
   );
-
-  // A Ruby file can declare file-level constants and no class/module at all
-  // (rails/engine/commands.rb:3-9 is `Rails::Command::…` constants only), so it
-  // never lands in `rubyFiles` — but it IS a Rails counterpart, and the literal
-  // pass already treats it as one by mapping every `fileConstants` key through
-  // `rubyFileToTs` (compare.ts:1838-1841). Score it here the same way: with an
-  // empty entity list, so `collectAllowedNames` allows exactly its constants.
-  const rubyFileNames = new Set<string>([
-    ...rubyFiles.keys(),
-    ...Object.keys(rubyPkg.fileConstants ?? {}),
-  ]);
-  const coveredTsFiles = new Set<string>();
-  for (const rubyFile of rubyFileNames) coveredTsFiles.add(rubyFileToTs(rubyFile, pkg));
-
-  // A reopened class is stamped with whichever reopening the extractor read
-  // first (`Date` with `core_ext/date/acts_like.rb`), so every other file that
-  // reopens it is absent from `rubyFiles` and its TS target falls into the
-  // `uncoveredTsFiles(...)` arm below — scored against an EMPTY allowed set.
-  // The methods ARE stamped per-file, so recover the file list from them; the
-  // `RUBY_FILE_TS_OVERRIDES` rows are the subset of it found by hand.
-  //
-  // A file already IN `rubyFiles` needs the same pass: a module reopened in it
-  // (`ActiveModel::Validations`, primary site `validations.rb`, declaring
-  // `validates_with` in `validations/with.rb`) is registered under its primary
-  // file only, so its methods score as drift in the very file Rails puts them
-  // in. Those entities enter method-file-filtered, which is what keeps the
-  // allow-set to the methods that Ruby file actually declares.
-  const methodDeclarationFiles = new Set<string>();
-  for (const info of [...Object.values(rubyPkg.classes), ...Object.values(rubyPkg.modules)]) {
-    for (const m of [...info.instanceMethods, ...info.classMethods]) {
-      if (m.file) methodDeclarationFiles.add(m.file);
-    }
-  }
-  for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
-    const tsFile = rubyFileToTs(rubyFile, pkg);
-    const alreadyDeclared = rubyFileNames.has(rubyFile);
-    if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
-    const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
-    for (const [fqn, info] of [
-      ...Object.entries(rubyPkg.classes),
-      ...Object.entries(rubyPkg.modules),
-    ]) {
-      if (declared.has(fqn)) continue;
-      const declaresHere = (m: MethodInfo): boolean => m.file === rubyFile;
-      if (!info.instanceMethods.some(declaresHere) && !info.classMethods.some(declaresHere)) {
-        continue;
-      }
-      pushTo(rubyFiles, rubyFile, { fqn, info, methodFile: rubyFile });
-    }
-    if (rubyFiles.has(rubyFile)) {
-      rubyFileNames.add(rubyFile);
-      coveredTsFiles.add(tsFile);
-    }
-  }
 
   const foreignEntities = new Set<ClassInfo>();
   const entityPackages = new Map<ClassInfo, string>();
@@ -2748,7 +2810,7 @@ function buildPackageReport(
     let interfaceExemptCount = 0;
     let overrideExemptCount = 0;
     const trailsOnly = (klass: string): boolean =>
-      !allowed.has(klass) && !scopedAllows(klass) && !globalRubyCandidates.has(klass);
+      !allowed.has(klass) && !scopedAllows(klass) && !candidates.has(klass);
     for (const name of tsNames) {
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       // A tag on a name the scorer already allows covers no extra — it asserts
@@ -2764,7 +2826,7 @@ function buildPackageReport(
         allowlistedCount++;
         continue;
       }
-      const owners = globalRubyCandidates.get(name);
+      const owners = candidates.get(name);
       const kind: ExtraKind = owners ? "moved" : "novel";
       if (kind === "moved" && overrideOnly.get(name)?.every(trailsOnly) === true) {
         overrideExemptCount++;
@@ -2781,7 +2843,7 @@ function buildPackageReport(
       const memberOwners = interfaceMemberOnly.get(name);
       if (
         memberOwners !== undefined &&
-        memberOwners.every((o) => interfaceOnly.has(o) && !globalRubyCandidates.has(o))
+        memberOwners.every((o) => interfaceOnly.has(o) && !candidates.has(o))
       ) {
         interfaceExemptCount++;
         continue;
@@ -3074,6 +3136,8 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
+    /** Receipt keys the privates lane reads (RFC 0218); computed when absent. */
+    privatesRead?: ReadonlySet<string>;
     /**
      * Per-(package, Ruby file) Concern hooks from `loadConcernHooks`. Optional
      * so a caller measuring a synthetic manifest need not stage `.rb` files on
@@ -3131,10 +3195,18 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
+  const privatesRead =
+    opts.privatesRead ??
+    new Set(
+      buildPrivatesReport(ruby, ts, { filterPkg: opts.filterPkg })
+        .names.filter((n) => n.receipted === true)
+        .map(allowKeyOf),
+    );
   const staleTagged = tagged.filter(
     (e) =>
       !e.inherited &&
       scannedPkgs.has(e.package) &&
+      !privatesRead.has(allowKeyOf(e)) &&
       !matchedTagKeys.has(allowKeyOf(e)) &&
       !redundantTagKeys.has(allowKeyOf(e)),
   );

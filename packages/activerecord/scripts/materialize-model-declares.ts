@@ -75,10 +75,12 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
   for (const file of files) {
     const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
-      if (ts.isExpressionStatement(stmt) && isCall(stmt.expression, "registerConstant")) {
-        const [name, value] = stmt.expression.arguments;
-        if (ts.isStringLiteralLikeNode(name) && ts.isIdentifier(value)) {
-          paths.set(value.text, name.text);
+      if (ts.isExpressionStatement(stmt) && isCall(stmt.expression, "constSet")) {
+        const [owner, name, value] = stmt.expression.arguments;
+        if (ts.isIdentifier(owner) && ts.isStringLiteralLikeNode(name) && ts.isIdentifier(value)) {
+          const prefix =
+            owner.text === "TopLevel" ? "" : `${paths.get(owner.text) ?? owner.text}::`;
+          paths.set(value.text, `${prefix}${name.text}`);
         }
       }
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
@@ -86,7 +88,7 @@ function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Ma
       for (const m of stmt.members) {
         if (!ts.isClassStaticBlockDeclaration(m)) continue;
         for (const s of m.body.statements) {
-          if (!ts.isExpressionStatement(s) || !isCall(s.expression, "rbModConstSet")) continue;
+          if (!ts.isExpressionStatement(s) || !isCall(s.expression, "constSet")) continue;
           const [mod, id] = s.expression.arguments;
           if (!ts.isIdentifier(mod) || !ts.isStringLiteralLikeNode(id)) continue;
           const qualified = `${paths.get(mod.text) ?? mod.text}::${id.text}`;
@@ -430,9 +432,9 @@ function buildClassNameAliases(sf: ts.SourceFile): Map<string, string> {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === "registerModel"
+      node.expression.text === "constSet"
     ) {
-      const [nameArg, classArg] = node.arguments;
+      const [, nameArg, classArg] = node.arguments;
       if (
         nameArg &&
         ts.isStringLiteralLikeNode(nameArg) &&

@@ -3,10 +3,10 @@ import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void };
-const rails = new URL("../rails.js", import.meta.url).href;
+const trails = new URL("../trails.js", import.meta.url).href;
 const makeRouteSet = (): Counted => {
   const r: Counted = {
     disableClearAndFinalize: false,
@@ -47,7 +47,7 @@ describe("RoutesReloader", () => {
     for (const name of ["a", "b"]) {
       File.write(
         `${tmp}/routes-${name}.ts`,
-        `import { Trails } from "${rails}";\n` +
+        `import { Trails } from "${trails}";\n` +
           `Trails.application.routes().draw(function () { this.get("/${name}"); });\n`,
       );
       r.paths.push(`${tmp}/routes-${name}.ts`);

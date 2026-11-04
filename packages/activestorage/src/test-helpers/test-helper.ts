@@ -2,7 +2,14 @@ import { Notifications, type Extended } from "@blazetrails/activesupport";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ActionController } from "@blazetrails/actionpack";
 import { Image } from "@blazetrails/mini-magick/image";
-import { File, OpenSSL, StringIO, type Pathname } from "@blazetrails/ruby-compat";
+import {
+  File,
+  OpenSSL,
+  StringIO,
+  type Pathname,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import type { ClassMethods } from "../attached/model.js";
 import type { Attachment } from "../attachment.js";
@@ -12,16 +19,16 @@ import { Blob } from "../blob.js";
 import { FixtureSet } from "../fixture-set.js";
 import { Service } from "../service.js";
 import type { DiskService } from "../service/disk-service.js";
-import { Base, registerModel } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import type { AssociationProxy } from "@blazetrails/activerecord/associations/collection-proxy";
 
 export class User extends Base {
   declare name: string | null;
-  declare recordCallbacks: boolean | undefined;
+  declare private _recordCallbacks: boolean | undefined;
   declare callbackCounter: number | undefined;
   notificationSent: boolean | undefined;
 
-  declare avatar: One;
+  declare avatar: One & Pick<Attachment, "signedId">;
   declare coverPhoto: One;
   declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
   declare avatarBlob: Blob | null | Promise<Blob | null>;
@@ -37,7 +44,7 @@ export class User extends Base {
   declare highlightsWithConditionalPreprocessed: Many;
   declare setAvatar: (attachable: unknown) => Promise<void>;
   declare setCoverPhoto: (attachable: unknown) => Promise<void>;
-  declare highlights: Many;
+  declare highlights: Many & Pick<AssociationProxy<Attachment>, "findBy">;
   declare vlogs: Many;
   declare highlightsAttachments: Attachment[] | Promise<Attachment[]>;
   declare highlightsBlobs: { count(): Promise<number> };
@@ -101,6 +108,14 @@ export class User extends Base {
     this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
   }
 
+  get recordCallbacks(): boolean | undefined {
+    return this._recordCallbacks;
+  }
+
+  set recordCallbacks(value: boolean | undefined) {
+    this._recordCallbacks = value;
+  }
+
   isShouldPreprocessed(): boolean {
     return this.name === "transform via method";
   }
@@ -118,7 +133,7 @@ export class User extends Base {
     }
   }
 }
-registerModel(User);
+constSet(TopLevel, "User", User);
 
 export class Group extends Base {
   declare avatar: One;
@@ -131,7 +146,7 @@ export class Group extends Base {
     this.acceptsNestedAttributesFor("users");
   }
 }
-registerModel(Group);
+constSet(TopLevel, "Group", Group);
 
 FixtureSet.fileFixturePath = File.expandPath("fixtures/files", import.meta.dirname);
 
@@ -271,8 +286,13 @@ export async function directlyUploadFileBlob({
   return blob;
 }
 
-export async function readImage(blobOrVariant: { service: Service; key: string }) {
-  return await Image.open((blobOrVariant.service as DiskService).pathFor(blobOrVariant.key));
+export async function readImage(blobOrVariant: {
+  service: Service;
+  key: string | Promise<string | null>;
+}) {
+  return await Image.open(
+    (blobOrVariant.service as DiskService).pathFor((await blobOrVariant.key)!),
+  );
 }
 
 export async function extractMetadataFrom(blob: Blob) {

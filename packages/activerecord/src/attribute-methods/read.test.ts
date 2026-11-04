@@ -37,6 +37,7 @@ describe("ReadTest", () => {
         AMAttributeMethods.ClassMethods.defineAttributeMethodPattern;
       static generatedAttributeMethods = Base.generatedAttributeMethods;
       static isInstanceMethodAlreadyImplemented = Base.isInstanceMethodAlreadyImplemented;
+      static isDangerousAttributeMethod = Base.isDangerousAttributeMethod;
       static attributeMethodPatternsCache = Base.attributeMethodPatternsCache;
       static aliasesByAttributeName = AMAttributeMethods.ClassMethods.aliasesByAttributeName;
       static generateAliasAttributeMethods = Base.generateAliasAttributeMethods;

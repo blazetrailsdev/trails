@@ -261,3 +261,19 @@ describe("Dir.mktmpdir", () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+
+describe("Dir.globAsync base:", () => {
+  it("does not read glob characters in the base, and answers paths relative to it", async () => {
+    const root = mkdtempSync(join(tmpdir(), "glob-base"));
+    const base = join(root, "[a]{b}");
+    mkdirSync(join(base, "x", "concerns"), { recursive: true });
+
+    expect((await Dir.globAsync("{*,*/concerns}", 0, { base })).sort()).toEqual([
+      "x",
+      "x/concerns",
+    ]);
+    expect(await Dir.globAsync("*", 0, { base: `${base}/` })).toEqual(["x"]);
+    expect(await Dir.globAsync("./*", 0, { base })).toEqual(["./x"]);
+    rmSync(root, { recursive: true, force: true });
+  });
+});

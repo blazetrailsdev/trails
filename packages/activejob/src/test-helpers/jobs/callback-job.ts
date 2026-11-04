@@ -1,4 +1,4 @@
-import { block, registerConstant } from "@blazetrails/ruby-compat";
+import { block, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class CallbackJob extends Base {
@@ -14,7 +14,7 @@ export class CallbackJob extends Base {
 
   private _history?: string[];
 }
-registerConstant("CallbackJob", CallbackJob);
+constSet(TopLevel, "CallbackJob", CallbackJob);
 
 CallbackJob.beforePerform((job: CallbackJob) => job.history.push("CallbackJob ran before_perform"));
 CallbackJob.afterPerform((job: CallbackJob) => job.history.push("CallbackJob ran after_perform"));

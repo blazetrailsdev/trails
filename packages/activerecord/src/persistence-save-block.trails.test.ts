@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -22,8 +22,8 @@ describe("save block threading (trails)", () => {
   const { self, authors } = fixtures(["authors", "posts"]);
 
   beforeAll(() => {
-    registerModel(Author);
-    registerModel(Post);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
   });
 
   it("save yields the block after the INSERT and before after_create", async () => {

@@ -6,7 +6,6 @@ import {
   rbInspect as inspect,
   rbObjAsString as toS,
   rbObjRespondTo,
-  registerConstant,
   round,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
@@ -83,5 +82,3 @@ export class DecimalType extends NumericValueType {
     }
   }
 }
-
-registerConstant("ActiveModel::Type::Decimal", DecimalType);

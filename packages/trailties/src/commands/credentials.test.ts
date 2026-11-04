@@ -1,8 +1,8 @@
 import { File, FileUtils, Dir, setEnv, env, getFs } from "@blazetrails/ruby-compat";
-import { EncryptedConfiguration } from "@blazetrails/activesupport";
+import { EncryptedConfiguration, InheritableOptions } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "../command.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 import { CredentialsCommand } from "./credentials.js";
 
 const DEFAULT_CREDENTIALS_PATTERN = /access_key_id: 123\n[\s\S]*secret_key_base: [0-9a-f]{128}\n/;
@@ -15,9 +15,9 @@ function assertNoFile(relative: string): void {
   expect(File.isExist(relative)).toBeFalsy();
 }
 
-describe("Rails::Command::CredentialsTest", () => {
+describe("Trails::Command::CredentialsTest", () => {
   let appPath: string, cwd: string, output: string[];
-  const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR };
+  const saved = { VISUAL: env.VISUAL, EDITOR: env.EDITOR, TRAILS_ENV: env.TRAILS_ENV };
 
   const run = async (command: string, args: string[] = []): Promise<string> => {
     output = [];
@@ -40,17 +40,16 @@ describe("Rails::Command::CredentialsTest", () => {
     File.write(".gitignore", "");
     const config = {
       root: appPath,
-      credentials: { contentPath: null, keyPath: null },
-      credentialsDefaults: async () =>
-        File.isExist("config/credentials/production.yml.enc")
-          ? {
-              contentPath: `${appPath}/config/credentials/production.yml.enc`,
-              keyPath: `${appPath}/config/credentials/production.key`,
-            }
-          : {
-              contentPath: `${appPath}/config/credentials.yml.enc`,
-              keyPath: `${appPath}/config/master.key`,
-            },
+      get credentials() {
+        let contentPath = `config/credentials/${env.TRAILS_ENV}.yml.enc`;
+        if (!File.isExist(contentPath)) contentPath = "config/credentials.yml.enc";
+        let keyPath = `config/credentials/${env.TRAILS_ENV}.key`;
+        if (!File.isExist(keyPath)) keyPath = "config/master.key";
+        return new InheritableOptions({
+          contentPath: `${appPath}/${contentPath}`,
+          keyPath: `${appPath}/${keyPath}`,
+        });
+      },
     };
     vi.spyOn(Trails, "application", "get").mockReturnValue({
       config,
@@ -59,7 +58,7 @@ describe("Rails::Command::CredentialsTest", () => {
         new EncryptedConfiguration({
           configPath: `${appPath}/${path}`,
           keyPath: `${appPath}/${opts.keyPath}`,
-          envKey: "RAILS_MASTER_KEY",
+          envKey: "TRAILS_MASTER_KEY",
           raiseIfMissingKey: false,
         }),
     } as never);
@@ -72,6 +71,7 @@ describe("Rails::Command::CredentialsTest", () => {
     vi.restoreAllMocks();
     setEnv("VISUAL", saved.VISUAL);
     setEnv("EDITOR", saved.EDITOR);
+    setEnv("TRAILS_ENV", saved.TRAILS_ENV);
     Dir.chdir(cwd);
     FileUtils.rmRf(appPath);
   });
@@ -79,7 +79,7 @@ describe("Rails::Command::CredentialsTest", () => {
   it("edit without visual or editor gives hint", async () => {
     const out = await edit([], "", "");
     expect(out).toMatch("No $VISUAL or $EDITOR to open file in");
-    expect(out).toMatch("rails credentials:edit");
+    expect(out).toMatch("trails credentials:edit");
   });
 
   it("edit with visual but not editor does not give hint", async () => {
@@ -143,7 +143,7 @@ describe("Rails::Command::CredentialsTest", () => {
   it("diff enroll diffing", async () => {
     expect(await diff("--enroll")).toMatch(/\benrolled project/i);
     expect(File.read(".gitattributes")).toContain(
-      "config/credentials/*.yml.enc diff=rails_credentials\nconfig/credentials.yml.enc diff=rails_credentials\n",
+      "config/credentials/*.yml.enc diff=trails_credentials\nconfig/credentials.yml.enc diff=trails_credentials\n",
     );
   });
 

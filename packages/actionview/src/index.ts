@@ -105,4 +105,5 @@ export { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
 export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+import "./template/sources.js";

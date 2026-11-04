@@ -17,7 +17,6 @@ import {
   rbObjClone,
   rbObjDup,
   transformValues,
-  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 
@@ -157,5 +156,3 @@ export class AttributeSet {
 }
 
 rbDeclareIvar(AttributeSet, "@attributes", "_attributes");
-
-registerConstant("ActiveModel::AttributeSet", AttributeSet);

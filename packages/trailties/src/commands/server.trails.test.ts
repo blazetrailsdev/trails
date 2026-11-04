@@ -4,46 +4,36 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import { Handler, MockRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { MockRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Application } from "../application.js";
-import { DetailsKey } from "@blazetrails/actionview";
-import type { BuildViewsResult, WatchViewsOptions } from "@blazetrails/trails-tsc";
 
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
-vi.mock("../command/actions.js", () => ({ requireApplicationBang: async () => {} }));
-const devServerLoads = vi.hoisted(() => [] as string[]);
-vi.mock(
-  "../server/dev-server.js",
-  () => (
-    devServerLoads.push("dev-server"),
-    {
-      DevServer: class {
-        constructor(options: unknown) {
-          devServerStarts.push(options);
-        }
-        async start(): Promise<void> {}
-      },
-    }
-  ),
-);
-
-const viewWatches = vi.hoisted(() => [] as WatchViewsOptions[]);
-const watchState = vi.hoisted(() => ({ initialError: null as Error | null, closed: 0 }));
-vi.mock("@blazetrails/trails-tsc", () => ({
-  watchViews: async (opts: WatchViewsOptions) => {
-    viewWatches.push(opts);
-    if (watchState.initialError) opts.onError!(watchState.initialError);
-    return {
-      close() {
-        watchState.closed++;
-      },
-    };
-  },
+vi.mock("../command/actions.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../command/actions.js")>()),
+  requireApplicationBang: async () => {},
 }));
+const devServerLoads = vi.hoisted(() => [] as string[]);
+vi.mock("../server/dev-server.js", async () => {
+  devServerLoads.push("dev-server");
+  const { Handler } = await import("@blazetrails/rackup");
+  class DevServer {
+    static async run(app: unknown, options: object) {
+      devServerStarts.push({ ...options, app });
+      return { on() {} };
+    }
+  }
+  Handler.register("vite", DevServer);
+  return { DevServer };
+});
 
-const { serverCommand } = await import("./server.js");
+vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
+
+const { ServerCommand } = await import("./server.js");
+
+const run = (...args: string[]): Promise<void> => ServerCommand.perform("server", args, {});
 
 describe("trails server environment (trails)", () => {
   let tmpDir: string;
@@ -52,8 +42,10 @@ describe("trails server environment (trails)", () => {
   let savedNodeEnv: string | undefined;
   let runOptions: Array<Record<string, unknown>>;
   let runApps: RackApp[];
+  let said: string[];
 
   beforeEach(() => {
+    said = [];
     origCwd = process.cwd();
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-server-env-"));
     fs.writeFileSync(path.join(tmpDir, "vite.config.ts"), "export default {};\n");
@@ -64,9 +56,6 @@ describe("trails server environment (trails)", () => {
     setEnv("NODE_ENV", undefined);
     _resetTrailsEnv();
     devServerStarts.length = 0;
-    viewWatches.length = 0;
-    watchState.initialError = null;
-    watchState.closed = 0;
     runOptions = [];
     runApps = [];
     Trails.logger = new BroadcastLogger(new Logger(null));
@@ -80,9 +69,17 @@ describe("trails server environment (trails)", () => {
     ) => {
       runApps.push(app);
       runOptions.push(options);
-      return { address: () => ({ port: options.Port }) };
+      return { on() {} };
     }) as never);
+    vi.spyOn(Trails, "root").mockReturnValue(tmpDir);
+    vi.spyOn(Trails, "application", "get").mockReturnValue({
+      root: () => tmpDir,
+      config: { root: tmpDir },
+    } as never);
     vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(ServerCommand.prototype, "say").mockImplementation(((message: string) => {
+      said.push(message);
+    }) as never);
   });
 
   afterEach(() => {
@@ -95,38 +92,43 @@ describe("trails server environment (trails)", () => {
   });
 
   it("serves production through the Node handler, not the dev server, with a vite.config.ts present", async () => {
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    await run("-e", "production");
 
     expect(devServerStarts).toEqual([]);
     expect(devServerLoads).toEqual([]);
-    expect(runOptions).toEqual([{ Port: 3000, Host: "0.0.0.0" }]);
+    expect(runOptions).toEqual([expect.objectContaining({ Port: 3000, Host: "0.0.0.0" })]);
     expect(env.TRAILS_ENV).toBe("production");
-    expect(console.log).toHaveBeenCalledWith(
-      "=> Trails application starting in production on http://0.0.0.0:3000",
-    );
+    expect(said[0]).toContain("application starting in production http://0.0.0.0:3000");
   });
 
   it("starts the dev server in development", async () => {
-    await serverCommand().parseAsync([], { from: "user" });
+    await run();
 
     expect(runOptions).toEqual([]);
     expect(devServerStarts).toHaveLength(1);
     expect(env.TRAILS_ENV).toBe("development");
   });
 
+  it("serves development through the Node handler under -u node", async () => {
+    await run("-u", "node");
+
+    expect(devServerStarts).toEqual([]);
+    expect(runOptions).toEqual([expect.objectContaining({ Port: 3000, Host: "localhost" })]);
+  });
+
   it("broadcasts the Trails logger to stdout in development only", async () => {
-    await serverCommand().parseAsync([], { from: "user" });
+    await run();
     expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(2);
 
     Trails.logger = new BroadcastLogger(new Logger(null));
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    await run("-e", "production");
     expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(1);
   });
 
   it("does not override an already-set TRAILS_ENV", async () => {
     setEnv("TRAILS_ENV", "test");
 
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    await run("-e", "production");
 
     expect(env.TRAILS_ENV).toBe("test");
   });
@@ -134,7 +136,7 @@ describe("trails server environment (trails)", () => {
   it("leaves an explicitly-empty TRAILS_ENV alone", async () => {
     setEnv("TRAILS_ENV", "");
 
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    await run("-e", "production");
 
     expect(env.TRAILS_ENV).toBe("");
   });
@@ -150,10 +152,10 @@ describe("trails server environment (trails)", () => {
     } as never);
     vi.mocked(Handler.Node.run).mockImplementation((async () => {
       order.push("run");
-      return { address: () => null };
+      return { on() {} };
     }) as never);
 
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    await run("-e", "production");
 
     expect(order).toEqual(["loadServer", "run"]);
   });
@@ -166,9 +168,7 @@ describe("trails server environment (trails)", () => {
       },
     } as never);
 
-    await expect(
-      serverCommand().parseAsync(["-e", "production"], { from: "user" }),
-    ).rejects.toThrow("no database");
+    await expect(run("-e", "production")).rejects.toThrow("no database");
     expect(runOptions).toEqual([]);
   });
 
@@ -185,6 +185,8 @@ describe("trails server environment (trails)", () => {
 
     beforeEach(() => {
       vi.spyOn(Trails, "initialize").mockResolvedValue(app);
+      vi.spyOn(Trails, "application", "get").mockReturnValue(app as never);
+      vi.spyOn(app, "root").mockReturnValue(tmpDir);
     });
 
     afterAll(() => {
@@ -192,15 +194,15 @@ describe("trails server environment (trails)", () => {
       Application.appClass = null;
     });
 
-    async function served(railsApp: RackApp): Promise<RackEnv> {
+    async function served(trailsApp: RackApp): Promise<RackEnv> {
       const rackEnv = MockRequest.envFor("/up", { HTTP_ACCEPT: "*/*" });
-      const [status] = await railsApp(rackEnv);
+      const [status] = await trailsApp(rackEnv);
       expect(status).toBe(200);
       return rackEnv;
     }
 
     it("hands the Node handler Engine#call, which seeds the request env with env_config", async () => {
-      await serverCommand().parseAsync(["-e", "test"], { from: "user" });
+      await run("-e", "test");
 
       expect(runApps).toHaveLength(1);
       const rackEnv = await served(runApps[0]);
@@ -208,62 +210,11 @@ describe("trails server environment (trails)", () => {
     });
 
     it("hands the dev server Engine#call, which seeds the request env with env_config", async () => {
-      await serverCommand().parseAsync([], { from: "user" });
+      await run();
 
       expect(devServerStarts).toHaveLength(1);
       const rackEnv = await served((devServerStarts[0] as { app: RackApp }).app);
       expect(rackEnv["action_dispatch.key_generator"]).toBe(app.keyGenerator());
     });
-  });
-
-  function initializeWith(actionView: Record<string, unknown>, reloading: boolean): void {
-    vi.spyOn(Trails, "initialize").mockResolvedValue({
-      app: () => () => [200, {}, []],
-      loadServer: async () => {},
-      config: { actionView, isReloadingEnabled: () => reloading },
-    } as never);
-  }
-
-  it("watches app/views when template caching is off", async () => {
-    initializeWith({ cacheTemplateLoading: null }, true);
-    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
-
-    expect(viewWatches.map((o) => o.cwd)).toEqual([process.cwd()]);
-  });
-
-  it("loads templates once from the build when template caching is on", async () => {
-    initializeWith({ cacheTemplateLoading: null }, false);
-    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
-    initializeWith({ cacheTemplateLoading: true }, true);
-    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
-
-    expect(viewWatches).toEqual([]);
-  });
-
-  it("refuses to boot when the initial view build fails", async () => {
-    initializeWith({ cacheTemplateLoading: null }, true);
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    watchState.initialError = new Error("bad view");
-
-    await expect(
-      serverCommand().parseAsync(["-e", "development"], { from: "user" }),
-    ).rejects.toThrow("bad view");
-    expect(watchState.closed).toBe(1);
-    expect(devServerStarts).toEqual([]);
-  });
-
-  it("clears the template caches on a rebuild, not on the initial build", async () => {
-    initializeWith({ cacheTemplateLoading: null }, true);
-    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
-    const clear = vi.spyOn(DetailsKey, "clear");
-
-    viewWatches[0].onRebuild!({ kind: "initial", result: { count: 0 } as BuildViewsResult });
-    expect(clear).not.toHaveBeenCalled();
-    viewWatches[0].onRebuild!({
-      kind: "change",
-      trigger: "a.html.tse",
-      result: { count: 1 } as BuildViewsResult,
-    });
-    expect(clear).toHaveBeenCalledTimes(1);
   });
 });

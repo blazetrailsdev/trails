@@ -1,5 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { registerModel, type Base } from "../index.js";
+import { type Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Club } from "../test-helpers/models/club.js";
@@ -10,11 +11,11 @@ type AwaitableClubSetter = { setClub(value: Club | null): Promise<void> };
 describe("HasOneThroughSetterTrails", () => {
   const { members, clubs } = fixtures(["members", "clubs", "memberships"]);
 
-  registerModel(Member);
-  registerModel(Club);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Club", Club);
   Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
 
   it("assigning to a persisted owner updates the existing join row inline", async () => {
     const member = members("some_other_guy");
@@ -78,11 +79,11 @@ describe("HasOneThroughSetterTrails", () => {
 describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
   const { clubs } = fixtures(["members", "clubs", "memberships"]);
 
-  registerModel(Member);
-  registerModel(Club);
+  constSet(TopLevel, "Member", Member);
+  constSet(TopLevel, "Club", Club);
   Membership.inheritanceColumn = "type";
-  registerModel(Membership);
-  registerModel(CurrentMembership);
+  constSet(TopLevel, "Membership", Membership);
+  constSet(TopLevel, "CurrentMembership", CurrentMembership);
 
   it("awaits the in-memory join record's assignment before the setter answers", async () => {
     const member = new Member({ name: "Unsaved" });

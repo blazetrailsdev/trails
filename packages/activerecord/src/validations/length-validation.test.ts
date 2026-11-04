@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
-import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 describe("LengthValidationTest", () => {
   fixtures([]);
 
   beforeAll(async () => {
-    registerModel("Owner", Owner);
-    registerModel("Pet", Pet);
+    constSet(TopLevel, "Owner", Owner);
+    constSet(TopLevel, "Pet", Pet);
   });
 
   function ownerClass(): typeof Owner {
@@ -81,14 +80,14 @@ describe("LengthValidationTest", () => {
         this.validatesLengthOf("nickname", { minimum: 1 });
       }
     };
-    registerModel("Pet", pet);
+    constSet(TopLevel, "Pet", pet);
     try {
       const p = await pet.create({ pet_id: 1, name: "Fancy Pants", nickname: "Fancy" });
       expect(await p.isValid()).toBeTruthy();
       (p as unknown as { nickname: string }).nickname = "";
       expect(await p.isInvalid()).toBeTruthy();
     } finally {
-      registerModel("Pet", Pet);
+      constSet(TopLevel, "Pet", Pet);
     }
   });
 });

@@ -1,6 +1,6 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import type { Base } from "../base.js";
@@ -18,7 +18,7 @@ class TypedTopic extends Topic {
   declare static approved: ScopeMethod<TypedTopic>;
 }
 
-registerModel(Topic);
+constSet(TopLevel, "Topic", Topic);
 
 describe("NamedScopingTypesTest", () => {
   fixtures(["topics"]);

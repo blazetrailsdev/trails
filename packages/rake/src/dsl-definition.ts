@@ -14,6 +14,7 @@ import { FileTask } from "./file-task.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { MultiTask } from "./multi-task.js";
 import type { NameSpace } from "./name-space.js";
+import type { InNamespaceResult } from "./task-manager.js";
 import { eachDirParent, fromPathname, Rake } from "./rake-module.js";
 import { Task } from "./task.js";
 
@@ -59,7 +60,7 @@ export const DSL = {
     return MultiTask.defineTask(...args);
   },
 
-  namespace(name: unknown = null, block: (ns: NameSpace) => unknown): NameSpace {
+  namespace<T>(name: unknown = null, block: (ns: NameSpace) => T): InNamespaceResult<T> {
     if (typeof name !== "string" && rbObjRespondTo(name, "toStr")) {
       name = (name as { toStr(): unknown }).toStr();
     }

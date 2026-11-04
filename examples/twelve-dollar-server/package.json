@@ -1,0 +1,23 @@
+{
+  "name": "@blazetrails/example-twelve-dollar-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A port of the full-Rails $12 Server Challenge submission onto trails",
+  "scripts": {
+    "start": "trails server",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "better-sqlite3": "^12.6.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5"
+  }
+}

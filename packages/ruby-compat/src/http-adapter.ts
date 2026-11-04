@@ -45,6 +45,7 @@ export interface HttpServer {
   close(callback?: (error?: Error) => void): unknown;
   address(): string | { port: number } | null;
   on(event: "upgrade", listener: HttpUpgradeListener): unknown;
+  on(event: "close", listener: () => void): unknown;
 }
 
 export interface HttpAdapter {

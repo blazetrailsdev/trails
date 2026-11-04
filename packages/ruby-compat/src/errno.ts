@@ -289,6 +289,27 @@ class EPERM extends SystemCallError {
 }
 
 /**
+ * `Errno::EACCES`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: what `Kernel#system` raises for a program it may not run.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EACCES`.
+ */
+class EACCES extends SystemCallError {
+  static readonly Errno = 13;
+  readonly code = "EACCES";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Permission denied" : `Permission denied - ${mesg}`);
+    this.name = "Errno::EACCES";
+    this.errno = EACCES.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EACCES";
+  }
+}
+
+/**
  * `Errno::EMFILE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "EMFILE"` is this
  * class to `rescue Errno::EMFILE`; a subclass answers the ordinary prototype test.
@@ -346,6 +367,7 @@ class ECONNRESET extends SystemCallError {
  * without defining.
  */
 export const Errno = {
+  EACCES,
   EAGAIN,
   ECONNRESET,
   EEXIST,

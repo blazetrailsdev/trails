@@ -19,7 +19,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Attached, type AttachedRecord } from "../attached.js";
-import { Blob } from "../blob.js";
 import { CreateMany } from "./changes/create-many.js";
 import type { CreateOneOfMany } from "./changes/create-one-of-many.js";
 import { CreateOne } from "./changes/create-one.js";
@@ -233,7 +232,7 @@ function validateServiceConfiguration(
   associationName: string,
 ): void {
   if (serviceName != null && serviceName !== (false as unknown)) {
-    Blob.services.fetch(
+    ActiveStorage.Blob!.services.fetch(
       serviceName,
       block(() => {
         throw new ArgumentError(
@@ -248,13 +247,19 @@ function validateServiceConfiguration(
 
 /**
  * @internal
- * @missingRailsCall table_exists — CONVERGEABLE activestorage-engine
+ * @missingRailsCall table_exists — PERMANENT
  */
 function validateGlobalServiceConfiguration(modelClass: typeof Base): void {
   const trails = TopLevel.Trails as unknown as
     | { configuration: { activeStorage?: { service?: unknown } }; env: unknown }
     | undefined;
-  if (modelClass.isConnected() && trails!.configuration.activeStorage?.service == null) {
+  if (
+    modelClass.isConnected() &&
+    ActiveStorage.Blob!.connectionPool().schemaCache.getCachedDataSourceExists(
+      ActiveStorage.Blob!.tableName!,
+    ) === true &&
+    trails!.configuration.activeStorage?.service == null
+  ) {
     throw new RuntimeError(
       `Missing Active Storage service name. Specify Active Storage service name for config.active_storage.service in config/environments/${String(trails!.env)}.rb`,
     );

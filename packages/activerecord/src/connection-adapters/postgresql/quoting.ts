@@ -1,3 +1,4 @@
+import "../../constants.postgresql-quoting.generated.js";
 import { BinaryData, type ValueType } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import {

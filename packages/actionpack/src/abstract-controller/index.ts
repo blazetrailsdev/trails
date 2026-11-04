@@ -7,6 +7,7 @@ export {
 } from "./base.js";
 export { Error } from "./error.js";
 export {
+  Translation,
   translate,
   t,
   localize,
@@ -17,7 +18,7 @@ export {
 } from "./translation.js";
 export { deprecator } from "./deprecator.js";
 export { AssetPaths, type AssetPathsHost } from "./asset-paths.js";
-export { benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
+export { Logger, benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
 export { Collector } from "./collector.js";
 export {
   DoubleRenderError,
@@ -84,3 +85,4 @@ export {
   type RoutesHelpersControllerClass,
   type UrlHelpersRouteSet,
 } from "./trailties/routes-helpers.js";
+export { Callbacks } from "./callbacks.js";

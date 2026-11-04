@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentOverlappingCounterCache extends Base {
@@ -15,7 +16,8 @@ export class CommentOverlappingCounterCache extends Base {
     this.belongsTo("commentable", { polymorphic: true, counterCache: "comments_count" });
   }
 }
-registerModel(CommentOverlappingCounterCache);
+constSet(TopLevel, "CommentOverlappingCounterCache", CommentOverlappingCounterCache);
+DescendantsTracker.registerSubclass(Base, CommentOverlappingCounterCache);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentOverlappingCounterCache {
   get userCommentsCount(): UserCommentsCount | null | Promise<UserCommentsCount | null>;
@@ -34,7 +36,8 @@ export class UserCommentsCount extends Base {
     this.hasMany("comments", { as: "commentable", className: "CommentOverlappingCounterCache" });
   }
 }
-registerModel(UserCommentsCount);
+constSet(TopLevel, "UserCommentsCount", UserCommentsCount);
+DescendantsTracker.registerSubclass(Base, UserCommentsCount);
 
 export class PostCommentsCount extends Base {
   declare comments: AssociationProxy<CommentOverlappingCounterCache>;
@@ -44,4 +47,5 @@ export class PostCommentsCount extends Base {
     this.hasMany("comments", { className: "CommentOverlappingCounterCache" });
   }
 }
-registerModel(PostCommentsCount);
+constSet(TopLevel, "PostCommentsCount", PostCommentsCount);
+DescendantsTracker.registerSubclass(Base, PostCommentsCount);

@@ -6,7 +6,6 @@ import {
   isSymbol,
   keywordSplat,
   rbRegMatchP,
-  registerConstant,
   slice,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -1284,5 +1283,3 @@ export class Table {
 export interface Table extends ColumnMethods {}
 
 include(Table, ColumnMethods);
-
-registerConstant("ActiveRecord::ConnectionAdapters::IndexDefinition", IndexDefinition);

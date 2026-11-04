@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assertNothingRaised, assertPredicate, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertPredicate, assertRaises } from "../test-helpers/assertions.js";
 import { ArgumentError, NoMethodError, rbFSend } from "@blazetrails/ruby-compat";
 import { Option, type OptionOptions } from "./option.js";
 

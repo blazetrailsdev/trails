@@ -1,6 +1,6 @@
 import { inTimeZone, TimeWithZone, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { cmp, registerConstant } from "@blazetrails/ruby-compat";
+import { cmp, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
@@ -26,4 +26,4 @@ export class TimezoneDependentJob extends Base {
     return timeZone ? timeZone.local(...args) : Time.utc(...args);
   }
 }
-registerConstant("TimezoneDependentJob", TimezoneDependentJob);
+constSet(TopLevel, "TimezoneDependentJob", TimezoneDependentJob);

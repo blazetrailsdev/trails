@@ -7,6 +7,7 @@ import {
 import {
   FileUpdateChecker,
   getEnv,
+  InheritableOptions,
   isPresent,
   type Logger,
   OrderedOptions,
@@ -15,17 +16,12 @@ import {
 } from "@blazetrails/activesupport";
 import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
-import {
-  ArgumentError,
-  File,
-  getFs,
-  getPath,
-  OpenSSL,
-  SecureRandom,
-} from "@blazetrails/ruby-compat";
-import { FileUtils, RuntimeError } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrails/ruby-compat";
+import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
-import { Trails } from "../rails.js";
+import { Annotation } from "../source-annotation-extractor.js";
+import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
 
 export interface PublicFileServer {
@@ -52,14 +48,14 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
-  allowConcurrency: boolean | null = null;
+  allowConcurrency: boolean | "unsafe" | null = null;
   assetHost: string | null = null;
   considerAllRequestsLocal = false;
   filterParameters: Array<string | RegExp | ((key: string, value: unknown) => unknown)> = [];
   filterRedirect: Array<string | RegExp> = [];
   precompileFilterParameters: boolean | null = null;
   helpersPaths: string[] = [];
-  hosts: Array<string | RegExp> = [];
+  hosts: Array<string | RegExp | ((host: string) => boolean)> = [];
   hostAuthorization: Record<string, unknown> = {};
   publicFileServer: PublicFileServer = { enabled: true, indexName: "index", headers: null };
   assumeSsl = false;
@@ -86,10 +82,9 @@ export class Configuration extends EngineConfiguration {
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
   private _secretKeyBase: string | null = null;
-  private _localSecret?: string;
-  credentials: { contentPath: string | null; keyPath: string | null } = {
-    contentPath: null,
-    keyPath: null,
+  credentials = new InheritableOptions(this.credentialsDefaults()) as InheritableOptions & {
+    contentPath: string;
+    keyPath: string;
   };
   console: { start(): unknown } | null = null;
   disableSandbox = false;
@@ -99,6 +94,8 @@ export class Configuration extends EngineConfiguration {
   eagerLoad: boolean | null = null;
   addAutoloadPathsToLoadPath = true;
   rakeEagerLoad = false;
+  /** @noRailsEquivalent CONVERGEABLE zeitwerk-check-name-error-reaches-task-abort */
+  deferBootEagerLoad = false;
   serverTiming = false;
   domTestingDefaultHtmlVersion = ":html4";
   private _contentSecurityPolicy: ContentSecurityPolicy | null = null;
@@ -302,7 +299,7 @@ export class Configuration extends EngineConfiguration {
             "-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015),loop=loop=-1:size=2,trim=start_frame=1'" +
             " -frames:v 1 -f image2";
 
-          activeStorage.variantProcessor = ":vips";
+          activeStorage.variantProcessor = "vips";
           activeStorage.multipleFileFieldIncludeHidden = true;
         }
 
@@ -423,11 +420,41 @@ export class Configuration extends EngineConfiguration {
     this._loadedConfigVersion = targetVersion;
   }
 
-  autoloadLib({ ignore }: { ignore: string | string[] }): void {
+  async autoloadLib({ ignore }: { ignore: string | string[] }): Promise<void> {
     const lib = File.join(this.root as string, "lib");
 
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);
+
+    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    await Trails.autoloaders.main.ignore(ignoredAbspaths);
+  }
+
+  async autoloadLibOnce({ ignore }: { ignore: string | string[] }): Promise<void> {
+    const lib = File.join(this.root as string, "lib");
+
+    this.autoloadOncePaths.push(lib);
+    this.eagerLoadPaths.push(lib);
+
+    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    await Trails.autoloaders.once.ignore(ignoredAbspaths);
+  }
+
+  get colorizeLogging(): boolean {
+    return LogSubscriber.colorizeLogging;
+  }
+
+  set colorizeLogging(val: boolean) {
+    LogSubscriber.colorizeLogging = val;
+    (this.generators() as unknown as { colorizeLogging: boolean }).colorizeLogging = val;
+  }
+
+  annotations(): typeof Annotation {
+    return Annotation;
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name}:0x${(rbObjId(this) * 2).toString(16).padStart(14, "0")}>`;
   }
 
   /** @internal */
@@ -458,7 +485,7 @@ export class Configuration extends EngineConfiguration {
       );
     } else {
       throw new ArgumentError(
-        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/rails credentials:edit\``,
+        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/trails credentials:edit\``,
       );
     }
   }
@@ -554,38 +581,29 @@ export class Configuration extends EngineConfiguration {
   }
 
   /** @internal */
-  async credentialsDefaults(): Promise<{ contentPath: string; keyPath: string }> {
+  private credentialsDefaults(): { contentPath: string; keyPath: string } {
     const root = this.root as string;
     let contentPath = getPath().join(root, `config/credentials/${Trails.env}.yml.enc`);
-    if (!(await getFs().exists(contentPath)))
+    if (!File.isExist(contentPath))
       contentPath = getPath().join(root, "config/credentials.yml.enc");
 
     let keyPath = getPath().join(root, `config/credentials/${Trails.env}.key`);
-    if (!(await getFs().exists(keyPath))) keyPath = getPath().join(root, "config/master.key");
+    if (!File.isExist(keyPath)) keyPath = getPath().join(root, "config/master.key");
 
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  async loadLocalSecret(): Promise<string> {
+  /** @internal */
+  private generateLocalSecret(): string {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
-    if (!(await getFs().exists(keyFile))) {
+    if (!File.isExist(keyFile)) {
       const randomKey = SecureRandom.hex(64);
-      await getFs().mkdir!(getPath().dirname(keyFile), { recursive: true });
-      await getFs().writeFile!(keyFile, randomKey);
+      FileUtils.mkdirP(File.dirname(keyFile));
+      File.binwrite(keyFile, randomKey);
     }
 
-    return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
-  }
-
-  private generateLocalSecret(): string {
-    if (this._localSecret === undefined) {
-      throw new RuntimeError(
-        "tmp/local_secret.txt is not loaded; await Application#initialize first",
-      );
-    }
-    return this._localSecret;
+    return new TextDecoder().decode(File.binread(keyFile));
   }
 }
 

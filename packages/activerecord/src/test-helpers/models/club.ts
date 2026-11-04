@@ -1,3 +1,5 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
@@ -7,7 +9,6 @@ import type { Membership } from "./membership.js";
 import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -73,7 +74,8 @@ export class Club extends Base {
     return "I'm sorry sir, this is a *private* club, not a *pirate* club";
   }
 }
-registerModel(Club);
+constSet(TopLevel, "Club", Club);
+DescendantsTracker.registerSubclass(Base, Club);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Club {
   get membership(): Membership | null | Promise<Membership | null>;
@@ -96,4 +98,5 @@ export class SuperClub extends Base {
     this.hasMany("members", { through: "memberships" });
   }
 }
-registerModel(SuperClub);
+constSet(TopLevel, "SuperClub", SuperClub);
+DescendantsTracker.registerSubclass(Base, SuperClub);

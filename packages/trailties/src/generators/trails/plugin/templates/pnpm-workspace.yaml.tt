@@ -1,0 +1,3 @@
+packages:
+  # Specify your package's dependencies in package.json.
+  - .

@@ -1,5 +1,5 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -17,8 +17,8 @@ describe("CollectionAssociation#_create_record Array arm", () => {
   const { posts } = fixtures(["posts", "comments"]);
 
   beforeAll(() => {
-    registerModel(Post);
-    registerModel(Comment);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Comment", Comment);
   });
 
   it("returns an array of records, one per attribute hash", async () => {

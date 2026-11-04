@@ -1,12 +1,15 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import {
   kernelCatch,
   kernelThrow,
   FrozenError,
   RuntimeError,
   StandardError,
+  constSet,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { transaction, Rollback, registerModel, RecordInvalid } from "./index.js";
+import { transaction, Rollback, RecordInvalid } from "./index.js";
 import { afterAllTransactionsCommit } from "./active-record.js";
 import { deprecator } from "./deprecator.js";
 
@@ -15,9 +18,8 @@ import { itIfSupports } from "./support/supports.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
-import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Movie } from "./test-helpers/models/movie.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Base } from "./base.js";
@@ -33,25 +35,12 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
+import "./test-helpers/models/reply.js";
+import "./test-helpers/models/topic.js";
 
 const Topic = CanonicalTopic;
 
 class SomeError extends StandardError {}
-for (const klass of [
-  Topic,
-  Reply,
-  SillyReply,
-  UniqueReply,
-  SillyUniqueReply,
-  CpkBook,
-  CpkOrder,
-  CpkAuthor,
-  CpkChapter,
-  Author,
-  Book,
-]) {
-  registerModel(klass as any);
-}
 
 describe("TransactionTest", () => {
   const { topics } = fixtures(["topics", "developers", "authors", "authorAddresses", "posts"], {
@@ -703,7 +692,8 @@ describe("TransactionTest", () => {
     (CallbackRollbackTopic.prototype as any).afterCreateForTransaction = function () {
       throw new RuntimeError("Make the transaction rollback");
     };
-    registerModel(CallbackRollbackTopic as any);
+    constSet(TopLevel, "CallbackRollbackTopic", CallbackRollbackTopic);
+    DescendantsTracker.registerSubclass(Topic, CallbackRollbackTopic);
 
     const newTopic = new CallbackRollbackTopic({
       title: "A new topic",
@@ -738,7 +728,8 @@ describe("TransactionTest", () => {
     (RecordInvalidTopic.prototype as any).afterCreateForTransaction = function () {
       throw new RecordInvalid(new Author() as any);
     };
-    registerModel(RecordInvalidTopic as any);
+    constSet(TopLevel, "RecordInvalidTopic", RecordInvalidTopic);
+    DescendantsTracker.registerSubclass(Topic, RecordInvalidTopic);
 
     const newTopic = (await RecordInvalidTopic.create({ title: "A new topic" })) as any;
     expect(newTopic.isPersisted()).toBeFalsy();
@@ -750,7 +741,8 @@ describe("TransactionTest", () => {
     (RollbackTopic.prototype as any).afterCreateForTransaction = function () {
       throw new Rollback();
     };
-    registerModel(RollbackTopic as any);
+    constSet(TopLevel, "RollbackTopic", RollbackTopic);
+    DescendantsTracker.registerSubclass(Topic, RollbackTopic);
 
     const newTopic = (await RollbackTopic.create({ title: "A new topic" })) as any;
     expect(newTopic.isPersisted()).toBeFalsy();
@@ -1037,7 +1029,6 @@ describe("TransactionTest", () => {
         this._tableName = "topics";
       }
     };
-    registerModel(topicWithoutCallbacks as any);
 
     const topic1 = new Topic({ title: "test_1" }) as any;
     const topic2 = new Topic({ title: "test_2" }) as any;
@@ -1354,7 +1345,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     };
 
     await Topic.transaction(async () => {
-      topic.title = "Rails is broken";
+      topic.title = "Trails is broken";
       await topic.save();
       throw new Rollback();
     });
@@ -1372,7 +1363,7 @@ describe.skipIf(inMemoryDb())("TransactionTest", () => {
     };
 
     await Topic.transaction(async () => {
-      topic.title = "Rails is broken";
+      topic.title = "Trails is broken";
       await topic.save();
       throw new Rollback();
     });

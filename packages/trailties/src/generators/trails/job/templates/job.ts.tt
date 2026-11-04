@@ -1,0 +1,13 @@
+<% const parentLeaf = ActiveSupport.Inflector.classify(this.parentClassName().split("::").pop()); -%>
+<% const parentClass = ActiveSupport.Inflector.classify(this.parentClassName().replace(/::/g, "_")); -%>
+import { <%= parentLeaf === parentClass ? parentClass : `${parentLeaf} as ${parentClass}` %> } from "<%= "../".repeat(this.classPathParts.length) || "./" %><%= ActiveSupport.Inflector.dasherize(ActiveSupport.Inflector.underscore(this.parentClassName())) %><%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>Job extends <%= parentClass %> {
+  static {
+    this.queueAs("<%= this.options.queue %>");
+  }
+
+  perform(...args: unknown[]): void {
+    // Do something later
+  }
+}

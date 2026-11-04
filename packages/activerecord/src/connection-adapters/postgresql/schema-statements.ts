@@ -1,3 +1,4 @@
+import "../../constants.postgresql-schema-statements.generated.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { type ArelNode } from "@blazetrails/arel";
 import {

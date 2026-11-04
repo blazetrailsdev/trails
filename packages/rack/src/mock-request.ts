@@ -32,6 +32,7 @@ import { MockResponse } from "./mock-response.js";
 import { buildMultipart, MULTIPART_BOUNDARY } from "./multipart.js";
 import { buildNestedQuery, parseNestedQuery } from "./utils.js";
 import type { RackResponse } from "./index.js";
+import { Rack } from "./namespaces.js";
 
 export class FatalWarning extends Error {
   constructor(message: string) {
@@ -181,3 +182,5 @@ export class MockRequest {
     return env;
   }
 }
+
+Rack.MockRequest = MockRequest;

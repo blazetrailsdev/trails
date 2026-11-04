@@ -2,7 +2,7 @@ import { Dir } from "./dir.js";
 import { File } from "./file.js";
 import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
-import { rbModConstSet } from "./include.js";
+import { constSet } from "./include.js";
 import { TopLevel } from "./object.js";
 
 let loads = 0;
@@ -24,7 +24,7 @@ export async function rbFLoad(fname: string): Promise<true> {
   path.search = `?${(loads += 1)}`;
   const exports = (await import(path.href)) as Record<string, unknown>;
   for (const [id, val] of Object.entries(exports)) {
-    if (/^[\p{Lu}\p{Lt}]/u.test(id)) rbModConstSet(TopLevel, id, val);
+    if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
   }
   return true;
 }

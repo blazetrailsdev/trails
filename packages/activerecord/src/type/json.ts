@@ -1,6 +1,6 @@
 import { Mutable, ValueType } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
@@ -58,5 +58,3 @@ export class Json extends ValueType<unknown> {
 export interface Json extends Mutable {}
 
 include(Json, Mutable);
-
-registerConstant("ActiveRecord::Type::Json", Json);

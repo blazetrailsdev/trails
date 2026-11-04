@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { resetLoadHooks } from "@blazetrails/activesupport";
 import { Application } from "../../application.js";
-import { Trails } from "../../rails.js";
+import { Trails } from "../../trails.js";
 
 describe("HooksTest", () => {
   afterEach(() => {
@@ -22,7 +22,7 @@ describe("HooksTest", () => {
     });
     app.config.afterInitialize(() => initializationCallbacks.push(3));
 
-    await app.initialize();
+    await app.initializeBang();
 
     expect(initializationCallbacks).toEqual([1, 2, 3]);
   });
@@ -38,7 +38,7 @@ describe("HooksTest", () => {
     app.config.beforeEagerLoad(() => initializationCallbacks.push(3));
     app.config.afterInitialize(() => initializationCallbacks.push(4));
 
-    await app.initialize();
+    await app.initializeBang();
 
     expect(initializationCallbacks).toEqual([1, 2, 3, 4]);
   });

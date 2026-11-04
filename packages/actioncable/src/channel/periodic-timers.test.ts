@@ -1,5 +1,5 @@
 import { Duration, Mock } from "@blazetrails/activesupport";
-import { ArgumentError, block, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../test-helpers/test-helper.js";
 import { ActionCable } from "../namespaces.js";
@@ -34,8 +34,8 @@ class ChatChannel extends Base {
 const Chat = ChatChannel as unknown as ChannelClass;
 
 const PeriodicTimersTest = { name: "ActionCable::Channel::PeriodicTimersTest" };
-rbModConstSet(ActionCable.Channel, "PeriodicTimersTest", PeriodicTimersTest);
-rbModConstSet(PeriodicTimersTest, "ChatChannel", ChatChannel);
+constSet(ActionCable.Channel, "PeriodicTimersTest", PeriodicTimersTest);
+constSet(PeriodicTimersTest, "ChatChannel", ChatChannel);
 
 describe("ActionCable::Channel::PeriodicTimersTest", () => {
   let tc: TestCase;

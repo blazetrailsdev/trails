@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { rbHash } from "@blazetrails/activesupport";
 import { NodeExpression } from "./node-expression.js";
 
@@ -18,4 +18,4 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface False extends _AliasPredication {}
 
-rbModConstSet(Nodes, "False", False);
+constSet(Nodes, "False", False);

@@ -1,34 +1,19 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
-import { include, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat";
+import { capture } from "./test-helpers/helper.js";
+import { MyCounter as Fixture } from "./test-helpers/fixtures/group.js";
 import { Base, Shell } from "./shell.js";
 import { Basic } from "./shell/basic.js";
 
-Base.shell = Shell.Basic;
-
-class Counter {
-  options: Record<string, unknown>;
-
-  constructor(
-    args: unknown[] = [],
-    options: Record<string, unknown> = {},
-    config: { shell?: Basic | null } = {},
-  ) {
-    this.options = options;
-    (this as unknown as Shell).shell = config.shell as Basic;
-    if (rbObjRespondTo((this as unknown as Shell).shell, "base")) {
-      (this as unknown as Shell).shell.base ||= this as never;
-    }
-  }
-}
-include(Counter, Shell);
-const MyCounter = Counter as unknown as new (
-  ...args: ConstructorParameters<typeof Counter>
-) => Counter & Shell;
+const MyCounter = Fixture as unknown as new (
+  args?: unknown[],
+  options?: Record<string, unknown>,
+  config?: { shell?: Basic | null },
+) => Fixture & Shell;
 
 describe("Thor::Shell", () => {
   let _shell: Basic | undefined;
-  const shell = () => (_shell ??= new Base.shell!());
+  const shell = () => (_shell ??= new Base.shell());
   beforeEach(() => {
     _shell = undefined;
   });
@@ -47,7 +32,7 @@ describe("Thor::Shell", () => {
 
   describe("#shell", () => {
     it("returns the shell in use", () => {
-      expect(new MyCounter([1, 2]).shell).toBeInstanceOf(Base.shell!);
+      expect(new MyCounter([1, 2]).shell).toBeInstanceOf(Base.shell);
     });
 
     it("uses $THOR_SHELL", () => {

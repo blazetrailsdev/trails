@@ -1,9 +1,10 @@
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { beforeAll, describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { RouteSet } from "./route-set.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
-import { Base, registerController } from "../../action-controller/base.js";
+import { Base } from "../../action-controller/base.js";
 
 class StubController extends Base {
   static actionEncodingTemplate(): null {
@@ -25,7 +26,7 @@ beforeAll(() => {
     "api/v1/articles",
     "api/v1/posts",
   ]) {
-    registerController(`${camelize(name)}Controller`, StubController);
+    constSetPath(`${camelize(name)}Controller`, StubController);
   }
 });
 

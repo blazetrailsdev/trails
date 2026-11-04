@@ -1,4 +1,4 @@
-import { rbInspect, registerConstant, toS } from "@blazetrails/ruby-compat";
+import { rbInspect, toS } from "@blazetrails/ruby-compat";
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {
@@ -10,5 +10,3 @@ export class DecimalWithoutScale extends BigIntegerType {
     return rbInspect(toS(value));
   }
 }
-
-registerConstant("ActiveRecord::Type::DecimalWithoutScale", DecimalWithoutScale);

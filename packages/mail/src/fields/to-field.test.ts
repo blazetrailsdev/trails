@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Mail } from "../mail.js";
 import { ToField } from "./to-field.js";
 
 describe("Mail::ToField", () => {
@@ -90,5 +91,10 @@ describe("Mail::ToField", () => {
       const t = new ToField(", 😍@me.eu");
       expect(t.encoded()).toEqual("To: =?UTF-8?B?8J+YjQ==?=@me.eu\r\n");
     });
+  });
+  it("should not crash if it can't understand a name", () => {
+    const t = Mail.new('To: <"Undisclosed-Recipient:"@msr19.hinet.net;>');
+    expect(() => t.encoded()).not.toThrow();
+    expect(t.encoded()).toMatch(/To:\s<"Undisclosed-Recipient:"@msr19\.hinet\.net;>\r\n/);
   });
 });

@@ -1,5 +1,11 @@
 import { camelize } from "@blazetrails/activesupport";
-import { isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import {
+  constSet,
+  constDefined,
+  constGet,
+  rbModRemoveConst,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
 import { X_CASCADE } from "../constants.js";
@@ -7,10 +13,8 @@ import { Response } from "../http/response.js";
 import { Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
 import type { RouterRequest } from "../journey/router.js";
-import {
-  Base,
-  registerController as registerControllerClass,
-} from "../../action-controller/base.js";
+import { Base } from "../../action-controller/base.js";
+import { constSetPath } from "../../test-helpers/const-set-path.js";
 
 function makeReq(path: string, method = "GET"): RouterRequest {
   const req = new Request({
@@ -47,15 +51,21 @@ function makeControllerClass(
 describe("RouteDispatcher", () => {
   const registered: string[] = [];
 
-  function registerController(controller: string, controllerClass: typeof Base) {
-    registerControllerClass(`${camelize(controller)}Controller`, controllerClass);
+  function seatController(controller: string, controllerClass: typeof Base) {
+    constSetPath(`${camelize(controller)}Controller`, controllerClass);
     registered.push(controller);
   }
 
   afterEach(() => {
-    for (const controller of registered.splice(0))
-      if (isRegisteredConstant(`${camelize(controller)}Controller`))
-        rbModRemoveConst(Object, `${camelize(controller)}Controller`);
+    for (const controller of registered.splice(0)) {
+      const path = `${camelize(controller)}Controller`;
+      if (!constDefined(Object, path, false)) continue;
+      const i = path.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, path.slice(0, i)) as object),
+        i < 0 ? path : path.slice(i + 2),
+      );
+    }
   });
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {
@@ -65,7 +75,7 @@ describe("RouteDispatcher", () => {
     });
 
     const calls: Array<{ action: string; id: string }> = [];
-    registerController(
+    seatController(
       "posts",
       makeControllerClass((action, req) => {
         const params = req.pathParameters as Record<string, string>;
@@ -117,7 +127,7 @@ describe("RouteDispatcher", () => {
     routes.draw(function () {
       this.get("/posts", { to: "posts#index" });
     });
-    registerController(
+    seatController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
@@ -134,11 +144,11 @@ describe("RouteDispatcher", () => {
       this.get("/x", { to: "second#index" });
     });
 
-    registerController(
+    seatController(
       "first",
       makeControllerClass(() => [404, { "x-cascade": "pass" }, []]),
     );
-    registerController(
+    seatController(
       "second",
       makeControllerClass(() => [200, {}, ["second"]]),
     );
@@ -178,7 +188,7 @@ describe("RouteDispatcher", () => {
     routes.draw(function () {
       this.get("/:controller/:action");
     });
-    registerController(
+    seatController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
@@ -204,10 +214,10 @@ describe("Dispatcher over the controller constant table", () => {
   }
 
   beforeEach(() => {
-    registerControllerClass("PostsController", PostsController);
+    constSet(TopLevel, "PostsController", PostsController);
   });
   afterEach(() => {
-    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+    if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
   });
 
   const reqFor = (params: Record<string, unknown>): RouterRequest => {

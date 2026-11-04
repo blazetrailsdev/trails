@@ -542,6 +542,7 @@ export type { ClassMethods } from "./callbacks.js";
 export { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
 export * as Autoload from "./dependencies/autoload.js";
 export { Dependencies } from "./dependencies.js";
+export { MessageVerifiers } from "./message-verifiers.js";
 export { Interlock } from "./dependencies/interlock.js";
 export { ShareLock } from "./concurrency/share-lock.js";
 export type { ShareLockThreadInfo } from "./concurrency/share-lock.js";
@@ -631,6 +632,8 @@ export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
+export { Isolation } from "./testing/isolation.js";
+export { TestHelper as ExecutorTestHelper } from "./executor/test-helper.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
@@ -656,4 +659,4 @@ export { Chars } from "./multibyte/chars.js";
 export { Unicode } from "./multibyte/unicode.js";
 export { mbChars, isUtf8 } from "./core-ext/string/multibyte.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

@@ -1,6 +1,6 @@
 import { Table } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -124,4 +124,4 @@ export class TableMetadata {
     return this._reflection?.joinForeignType ?? null;
   }
 }
-rbModConstSet(ActiveRecord, "TableMetadata", TableMetadata);
+constSet(ActiveRecord, "TableMetadata", TableMetadata);

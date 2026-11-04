@@ -1,4 +1,4 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
@@ -14,12 +14,7 @@ import {
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";
-import {
-  include,
-  publicInstanceMethods,
-  rbModConstSet,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { include, publicInstanceMethods, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../deprecator.js";
 import { TestCase } from "../test-case.js";
@@ -28,7 +23,6 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import "../../test-helpers/abstract-unit.js";
-import { registerController } from "../base.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -55,7 +49,7 @@ class Comment {
   }
 }
 
-registerConstant("Submodule", { name: "Submodule" });
+constSet(TopLevel, "Submodule", { name: "Submodule" });
 class ContainedEmptyController extends Base {}
 Object.defineProperty(ContainedEmptyController, "name", {
   value: "Submodule::ContainedEmptyController",
@@ -127,8 +121,8 @@ class RecordIdentifierIncludedController extends Base {
 }
 include(RecordIdentifierIncludedController, { domId, domClass });
 
-registerController("UrlOptionsController", UrlOptionsController);
-registerController("DefaultUrlOptionsController", DefaultUrlOptionsController);
+constSet(TopLevel, "UrlOptionsController", UrlOptionsController);
+constSet(TopLevel, "DefaultUrlOptionsController", DefaultUrlOptionsController);
 
 describe("ControllerClassTests", () => {
   it("controller path", () => {
@@ -197,7 +191,7 @@ describe("ControllerInstanceTests", () => {
   it("temporary anonymous controllers", () => {
     const name = "ExamplesController";
     const klass = class extends Base {};
-    rbModConstSet(Object, name, klass);
+    constSet(Object, name, klass);
 
     try {
       const controller = new klass();

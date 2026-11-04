@@ -1,5 +1,6 @@
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "./index.js";
+import { Rack } from "./namespaces.js";
 
 export interface LoggerStream {
   write(msg: string): void;
@@ -50,3 +51,5 @@ class RackLogger {
     }
   }
 }
+
+Rack.Logger = Logger;

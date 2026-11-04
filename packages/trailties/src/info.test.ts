@@ -27,7 +27,7 @@ describe("InfoTest", () => {
     expect(Info.properties.valueFor("Goodbye")).toBe("World");
   });
 
-  test("test_rails_version", () => {
+  test("test_trails_version", () => {
     expect(Info.properties.valueFor("Trails version")).toBe(VERSION.STRING);
   });
 

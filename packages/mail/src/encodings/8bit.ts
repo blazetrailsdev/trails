@@ -6,6 +6,7 @@ export class EightBit extends Binary {
   static override readonly NAME: string = "8bit";
   static override readonly PRIORITY: number = 4;
   static {
+    Encodings.EightBit = this;
     Encodings.register(this.NAME, this);
   }
 

@@ -42,7 +42,7 @@ export class Generators {
   static namespace: { readonly name: string } | null = null;
 
   static readonly DEFAULT_ALIASES: Record<string, Record<string, unknown>> = {
-    rails: {
+    trails: {
       actions: "-a",
       orm: "-o",
       javascripts: ["-j", "--js"],
@@ -59,7 +59,7 @@ export class Generators {
   };
 
   static readonly DEFAULT_OPTIONS: Record<string, Record<string, unknown>> = {
-    rails: {
+    trails: {
       api: false,
       assets: true,
       forcePlural: false,
@@ -75,7 +75,7 @@ export class Generators {
     },
   };
 
-  static readonly RAILS_DEV_PATH: string = File.expandPath(
+  static readonly TRAILS_DEV_PATH: string = File.expandPath(
     "../../..",
     urlToPath(new URL(".", import.meta.url)),
   );
@@ -149,7 +149,7 @@ export class Generators {
       }
     };
     for (const base of Generators.lookupPaths())
-      await walk(base, getPath().join(urlToPath(base), "rails"));
+      await walk(base, getPath().join(urlToPath(base), "trails"));
   }
 
   /** @internal */
@@ -177,7 +177,7 @@ export class Generators {
     if (!(base != null || context != null)) {
       if (!name.includes(":")) {
         lookups.push(`${name}:${name}`);
-        lookups.push(`rails:${name}`);
+        lookups.push(`trails:${name}`);
       }
       lookups.push(name);
     }
@@ -213,7 +213,7 @@ export class Generators {
     }
     if (args.length === 0 && klass.arguments().some((a) => a.isRequired())) args.push("--help");
     await klass.start(args, config);
-    if (config.behavior === "invoke") Generators.runAfterGenerateCallback();
+    if (config.behavior === "invoke") await Generators.runAfterGenerateCallback();
   }
 
   static addGeneratedFile(file: string): string {
@@ -227,7 +227,7 @@ export class Generators {
   }
 
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= ["rails", "resource-route", "devcontainer"]);
+    return (_hiddenNamespaces ??= ["trails", "resource-route", "devcontainer"]);
   }
 
   static hideNamespaces(...namespaces: string[]): void {
@@ -265,18 +265,18 @@ export class Generators {
       groups.get(base)!.push(namespace);
     }
 
-    const rails = (groups.get("rails") ?? []).map((n) =>
-      n.startsWith("rails:") ? n.slice("rails:".length) : n,
+    const trails = (groups.get("trails") ?? []).map((n) =>
+      n.startsWith("trails:") ? n.slice("trails:".length) : n,
     );
-    groups.delete("rails");
+    groups.delete("trails");
     for (const n of HIDDEN_FROM_LISTING) {
-      const i = rails.indexOf(n);
-      if (i !== -1) rails.splice(i, 1);
+      const i = trails.indexOf(n);
+      if (i !== -1) trails.splice(i, 1);
     }
 
     for (const n of Generators.hiddenNamespaces()) groups.delete(n);
 
-    return [["rails", rails], ...[...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))];
+    return [["trails", trails], ...[...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))];
   }
 
   /** @missingRailsArgs print_list — PERMANENT */
@@ -286,10 +286,10 @@ export class Generators {
     }
   }
 
-  private static runAfterGenerateCallback(): void {
+  private static async runAfterGenerateCallback(): Promise<void> {
     if (_generatedFiles !== undefined && _generatedFiles.length !== 0) {
       for (const callback of Generators.afterGenerateCallbacks()) {
-        callback(_generatedFiles);
+        await callback(_generatedFiles);
       }
       _generatedFiles = [];
     }

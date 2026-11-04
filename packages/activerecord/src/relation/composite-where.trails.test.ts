@@ -1,21 +1,14 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
-import { Post } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
-import { Customer } from "../test-helpers/models/customer.js";
-import { Company } from "../test-helpers/models/company.js";
-import { Contract } from "../test-helpers/models/contract.js";
+import { CpkBook, CpkOrder } from "../test-helpers/models/cpk.js";
+import "../test-helpers/models/post.js";
+import "../test-helpers/models/comment.js";
+import "../test-helpers/models/customer.js";
+import "../test-helpers/models/company.js";
+import "../test-helpers/models/contract.js";
 
 describe("Relation#where — composite-key form", () => {
   fixtures([]);
-
-  beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment, Customer, Company, Contract].forEach(
-      (m) => registerModel(m),
-    );
-  });
 
   it("Relation#where(single array arg) routes to the sanitized-conditions form, not composite", () => {
     const sql = (CpkBook as any).all().where(["author_id = 1"]).toSql();

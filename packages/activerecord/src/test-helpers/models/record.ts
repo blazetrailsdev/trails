@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Record extends Base {}
-registerModel(Record);
+constSet(TopLevel, "Record", Record);
+DescendantsTracker.registerSubclass(Base, Record);

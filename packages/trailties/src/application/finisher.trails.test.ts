@@ -1,16 +1,41 @@
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { Base as JobBase } from "@blazetrails/activejob";
+import { constantize, TopLevel } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
+import { Base } from "@blazetrails/activerecord";
+import { Autoloaders } from "../autoloaders.js";
+import { afterEach, beforeEach, describe, it, expect, onTestFinished, vi } from "vitest";
 import {
+  _registerAutoloaded,
   Finisher,
+  InterlockHook,
+  MonitorHook,
   type FinisherConfig,
   type FinisherReloader,
   type FinisherReloaderInstance,
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
-import { FileUpdateChecker, onLoad, Reloader, resetLoadHooks } from "@blazetrails/activesupport";
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
-import { Root } from "../paths.js";
-import { Trails } from "../rails.js";
+import {
+  Dependencies,
+  DescendantsTracker,
+  ExecutionWrapper,
+  Executor,
+  FileUpdateChecker,
+  onLoad,
+  Reloader,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
+import {
+  Dir,
+  FileUtils,
+  Monitor,
+  Thread,
+  ThreadPoolExecutor,
+  TimerTask,
+} from "@blazetrails/ruby-compat";
+import { Loader } from "@blazetrails/zeitwerk";
+import { ActionController } from "@blazetrails/actionpack";
+import { Trails } from "../trails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
 import { ActiveModel, ValidationError } from "@blazetrails/activemodel";
@@ -21,8 +46,17 @@ import { Trailtie as ActiveRecordTrailtie } from "../trailties/active-record.js"
 import { ActiveRecord, AssociationRelation } from "@blazetrails/activerecord";
 
 class TestApp extends Finisher {
+  autoloaders = new Autoloaders();
   sessionStoreArgs: unknown[] | null = null;
+  hooks: [unknown, { outer?: boolean } | undefined][] = [];
+  executor = {
+    registerHook: (hook: unknown, options?: { outer?: boolean }) => {
+      this.hooks.push([hook, options]);
+    },
+  };
   config: FinisherConfig = {
+    root: null,
+    allowConcurrency: null,
     toPrepareBlocks: [],
     eagerLoad: null,
     eagerLoadNamespaces: [],
@@ -79,17 +113,15 @@ class TestApp extends Finisher {
   routesReloader(): FinisherRoutesReloader {
     return this._routesReloader;
   }
-  paths(): Root {
-    return new Root(null);
-  }
-
   routes(): FinisherRoutes {
     return this._routes;
   }
+  afterClassUnload: Array<() => unknown> = [];
   toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
   toComplete: Array<(this: FinisherReloaderInstance) => unknown> = [];
   reloader: FinisherReloader = {
     check: () => false,
+    afterClassUnload: (block) => this.afterClassUnload.push(block),
     toPrepare: (block) => this.toPrepared.push(block),
     toRun: (block) => this.toRun.push(block),
     toComplete: (block) => this.toComplete.push(block),
@@ -132,6 +164,7 @@ describe("Finisher", () => {
       "run_prepare_callbacks",
       "eager_load!",
       "finisher_hook",
+      "configure_executor_for_concurrency",
       "add_internal_routes",
       "set_routes_reloader_hook",
       "set_clear_dependencies_hook",
@@ -140,9 +173,7 @@ describe("Finisher", () => {
 
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
-    for (const skipped of ["configure_executor_for_concurrency", "enable_yjit"]) {
-      expect(names).not.toContain(skipped);
-    }
+    expect(names).not.toContain("enable_yjit");
   });
 
   it("add_generator_templates calls ensureGeneratorTemplatesAdded", async () => {
@@ -190,15 +221,15 @@ describe("Finisher", () => {
     expect(app.calls).toEqual(["prepare!"]);
   });
 
-  it("add_internal_routes prepends rails/info routes in development", async () => {
+  it("add_internal_routes prepends trails/info routes in development", async () => {
     Trails.env = "development";
     const app = new TestApp();
     await run(app, "add_internal_routes");
     expect(app.internalRoutes).toEqual([
-      "get /rails/info/properties -> rails/info#properties (internal)",
-      "get /rails/info/routes -> rails/info#routes (internal)",
-      "get /rails/info/notes -> rails/info#notes (internal)",
-      "get /rails/info -> rails/info#index (internal)",
+      "get /trails/info/properties -> trails/info#properties (internal)",
+      "get /trails/info/routes -> trails/info#routes (internal)",
+      "get /trails/info/notes -> trails/info#notes (internal)",
+      "get /trails/info -> trails/info#index (internal)",
     ]);
   });
 
@@ -208,7 +239,7 @@ describe("Finisher", () => {
     await run(app, "add_internal_routes");
     app.internalRoutes.length = 0;
     await app.routesReloader().runAfterLoadPaths();
-    expect(app.internalRoutes).toEqual(["get / -> rails/welcome#index (internal)"]);
+    expect(app.internalRoutes).toEqual(["get / -> trails/welcome#index (internal)"]);
   });
 
   it("add_internal_routes is a no-op outside development", async () => {
@@ -261,6 +292,98 @@ describe("Finisher", () => {
     resetLoadHooks();
   });
 
+  it("eager_load! registers no after_class_unload block when reloading is disabled", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toEqual([]);
+  });
+
+  it("eager_load! loads every Zeitwerk loader and Trails before the namespaces", async () => {
+    const app = new TestApp();
+    const seen: string[] = [];
+    const all = vi.spyOn(Loader, "eagerLoadAll").mockImplementation(async () => {
+      seen.push("eager_load_all");
+    });
+    const trails = vi.spyOn(Trails, "eagerLoadBang").mockImplementation(async () => {
+      seen.push("trails");
+    });
+    onTestFinished(() => {
+      all.mockRestore();
+      trails.mockRestore();
+    });
+    app.config.eagerLoad = true;
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
+    await run(app, "eager_load!");
+    expect(seen).toEqual(["eager_load_all", "trails", "namespace"]);
+  });
+
+  it("eager_load! reloads the main autoloader after class unload when reloading is enabled", async () => {
+    const app = new TestApp();
+    app.config.eagerLoad = true;
+    app.config.isReloadingEnabled = () => true;
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toHaveLength(1);
+
+    const eagerLoad = vi.spyOn(app.autoloaders.main, "eagerLoad").mockResolvedValue(undefined);
+    await app.afterClassUnload[0]();
+    expect(eagerLoad).toHaveBeenCalledOnce();
+  });
+
+  it("on_load runs Helpers.inherited for an autoloaded controller", async () => {
+    const base = ActionController.Base as unknown as { includeAllHelpers: boolean };
+    const include = base.includeAllHelpers;
+    base.includeAllHelpers = false;
+    onTestFinished(() => {
+      base.includeAllHelpers = include;
+    });
+    class OnLoadedController extends ActionController.Base {}
+    let assigned: unknown = null;
+    Object.defineProperty(OnLoadedController, "helpersPath", {
+      get: () => assigned,
+      set: (paths) => {
+        assigned = paths;
+      },
+    });
+    await _registerAutoloaded("OnLoadedController", OnLoadedController);
+    expect(assigned).toBeInstanceOf(Array);
+  });
+
+  it("registers an autoloaded model with its superclass, as a class definition does", async () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    await _registerAutoloaded("Child", Child);
+    await _registerAutoloaded("Child", Child);
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Child]);
+  });
+
+  it("replaces a stale model with its reloaded class in subclasses", async () => {
+    vi.resetModules();
+    const { DescendantsTracker } = await import("@blazetrails/activesupport");
+    const { _registerAutoloaded } = await import("./finisher.js");
+    const { Base } = await import("@blazetrails/activerecord");
+    class Parent extends Base {}
+    class Stale extends Parent {}
+    class Reloaded extends Parent {}
+    await _registerAutoloaded("Child", Stale);
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Stale]);
+
+    DescendantsTracker.clear([Stale as never]);
+    await _registerAutoloaded("Child", Reloaded);
+
+    expect(DescendantsTracker.subclasses(Parent as never)).toEqual([Reloaded]);
+  });
+
+  it("leaves an autoloaded job resolving through the loader's seat", async () => {
+    class SeatedJob extends JobBase {}
+    constSet(TopLevel, "SeatedJob", SeatedJob);
+    onTestFinished(() => {
+      delete (TopLevel as Record<string, unknown>).SeatedJob;
+    });
+    await _registerAutoloaded("SeatedJob", SeatedJob);
+    expect(constantize("SeatedJob")).toBe(SeatedJob);
+  });
+
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
     const app = new TestApp();
     const seen: string[] = [];
@@ -306,6 +429,24 @@ describe("Finisher", () => {
     await run(app, "finisher_hook");
     expect(seen).toEqual(["namespace", "after_initialize"]);
     resetLoadHooks();
+  });
+
+  it("eager_load! eager loads the main autoloader after class unload whatever config.eagerLoad says", async () => {
+    const app = new TestApp();
+    app.config.isReloadingEnabled = () => true;
+    app.autoloaders.main.eagerLoad = async () => {
+      app.calls.push("eager_load");
+    };
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toHaveLength(1);
+    await app.afterClassUnload[0]();
+    expect(app.calls).toEqual(["eager_load"]);
+  });
+
+  it("eager_load! registers no after_class_unload when reloading is disabled", async () => {
+    const app = new TestApp();
+    await run(app, "eager_load!");
+    expect(app.afterClassUnload).toEqual([]);
   });
 
   it("eager_load! is a no-op when config.eagerLoad is false", async () => {
@@ -365,6 +506,12 @@ describe("Finisher", () => {
       klass.toRun(() => void order.push("view"));
       klass.beforeClassUnload(() => void order.push("class_unload"));
       app.reloader = klass as unknown as FinisherReloader;
+      const tracker = vi.spyOn(DescendantsTracker, "clear").mockImplementation(() => {
+        order.push("descendants_clear");
+      });
+      const dependencies = vi.spyOn(Dependencies, "clear").mockImplementation(async () => {
+        order.push("dependencies_clear");
+      });
       await run(app, "set_clear_dependencies_hook");
 
       expect(app.reloaders).toHaveLength(1);
@@ -373,7 +520,9 @@ describe("Finisher", () => {
       expect(klass.check()).toBe(true);
 
       await klass.runBang();
-      expect(order).toEqual(["class_unload", "view"]);
+      tracker.mockRestore();
+      dependencies.mockRestore();
+      expect(order).toEqual(["class_unload", "descendants_clear", "dependencies_clear", "view"]);
       expect(klass.check()).toBe(false);
     });
 
@@ -394,5 +543,167 @@ describe("Finisher", () => {
       expect(app.reloaders).toEqual([]);
       expect(app.toRun).toEqual([]);
     });
+  });
+});
+
+describe("configure_executor_for_concurrency", () => {
+  const name = "configure_executor_for_concurrency";
+
+  it("registers an outer MonitorHook when concurrency is off", async () => {
+    const app = new TestApp();
+    app.config.allowConcurrency = false;
+    await run(app, name);
+    expect(app.hooks[0][0]).toBeInstanceOf(MonitorHook);
+    expect(app.hooks[0][1]).toEqual({ outer: true });
+  });
+
+  it("registers nothing when concurrency is unsafe", async () => {
+    const app = new TestApp();
+    app.config.allowConcurrency = "unsafe";
+    app.reloadingEnabled = true;
+    await run(app, name);
+    expect(app.hooks).toEqual([]);
+  });
+
+  it("registers an outer InterlockHook only when reloading", async () => {
+    const app = new TestApp();
+    await run(app, name);
+    expect(app.hooks).toEqual([]);
+    app.reloadingEnabled = true;
+    await run(app, name);
+    expect(app.hooks).toEqual([[InterlockHook, { outer: true }]]);
+  });
+});
+
+describe("InterlockHook", () => {
+  it("shares the interlock from run to complete", async () => {
+    await InterlockHook.run();
+    const held = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(held?.sharing).toBe(1);
+    await InterlockHook.complete(null);
+    const left = await Dependencies.interlock.rawState((data) => data.get(Thread.current()));
+    expect(left?.sharing ?? 0).toBe(0);
+  });
+});
+
+describe("MonitorHook", () => {
+  it("excludes a second thread's executor until the first completes", async () => {
+    const executor = class extends Executor {};
+    executor.registerHook(new MonitorHook(), { outer: true });
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const first = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("first");
+        await gate;
+        order.push("first done");
+      }),
+    );
+    await Thread.pass();
+    const second = new Thread(() =>
+      executor.wrap(async () => {
+        order.push("second");
+      }),
+    );
+    await Thread.pass();
+    release();
+    await first.join();
+    await second.join();
+    expect(order).toEqual(["first", "first done", "second"]);
+  });
+
+  it("holds its monitor from run to complete", () => {
+    const monitor = new Monitor();
+    const hook = new MonitorHook(monitor);
+    hook.run();
+    expect(monitor.isMonOwned()).toBe(true);
+    hook.complete(null);
+    expect(monitor.isMonOwned()).toBe(false);
+  });
+});
+
+describe("executor.wrap on pool threads outside a request", () => {
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+  function pool(): ThreadPoolExecutor {
+    return new ThreadPoolExecutor({ minThreads: 0, maxThreads: 2, maxQueue: 0 });
+  }
+
+  it("excludes concurrent flows under allow_concurrency = false", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(new MonitorHook(), { outer: true });
+    const events: string[] = [];
+    const threads = new Set<Thread>();
+    const executor = pool();
+    for (const name of ["a", "b"]) {
+      executor.post(() =>
+        PoolExecutor.wrap(async () => {
+          threads.add(Thread.current());
+          events.push(`enter ${name}`);
+          await pause();
+          events.push(`leave ${name}`);
+        }),
+      );
+    }
+
+    executor.shutdown();
+    await executor.waitForTermination();
+
+    expect(events).toEqual(["enter a", "leave a", "enter b", "leave b"]);
+    expect(threads.size).toBe(2);
+  });
+
+  it("blocks a reload through InterlockHook while a flow runs", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(InterlockHook, { outer: true });
+    const events: string[] = [];
+    const executor = pool();
+    executor.post(() =>
+      PoolExecutor.wrap(async () => {
+        events.push("running");
+        await pause();
+        await pause();
+        events.push("done");
+      }),
+    );
+    await pause();
+
+    await Dependencies.interlock.unloading(() => {
+      events.push("unloading");
+    });
+    executor.shutdown();
+    await executor.waitForTermination();
+
+    expect(events).toEqual(["running", "done", "unloading"]);
+  });
+
+  it("excludes overlapping TimerTask flows started on one thread", async () => {
+    class PoolExecutor extends ExecutionWrapper {}
+    PoolExecutor.registerHook(new MonitorHook(), { outer: true });
+    const events: string[] = [];
+    const threads = new Set<Thread>();
+    const finished: Promise<void>[] = [];
+    const tasks = ["a", "b"].map((name) => {
+      let finish!: () => void;
+      finished.push(new Promise((resolve) => (finish = resolve)));
+      return new TimerTask({ executionInterval: 0.001, runNow: true }, (task) => {
+        task.shutdown();
+        return PoolExecutor.wrap(async () => {
+          threads.add(Thread.current());
+          events.push(`enter ${name}`);
+          await pause();
+          events.push(`leave ${name}`);
+          finish();
+        });
+      });
+    });
+
+    for (const task of tasks) task.execute();
+    await Promise.all(finished);
+
+    expect(events).toEqual(["enter a", "leave a", "enter b", "leave b"]);
+    expect(threads.size).toBe(2);
+    expect(threads.has(Thread.current())).toBe(false);
   });
 });

@@ -9,14 +9,7 @@ export const BASE58_ALPHABET = [...DIGITS, ...UPPERCASE, ...LOWERCASE].filter(
 );
 export const BASE36_ALPHABET = [...DIGITS, ...LOWERCASE];
 
-/**
- * Ruby's `SecureRandom.random_number(n)`. Rejection-sampled so every value in
- * `0...n` is equally likely, the way MRI's implementation is.
- *
- * @noRailsEquivalent SecureRandom.random_number is Ruby stdlib, not a Rails
- * core_ext member; trails has no stdlib to inherit it from, so the two callers
- * below need it spelled out. Not exported.
- */
+/** @noRailsEquivalent PERMANENT */
 function randomNumber(n: number): number {
   const limit = Math.floor(0x100000000 / n) * n;
   for (;;) {

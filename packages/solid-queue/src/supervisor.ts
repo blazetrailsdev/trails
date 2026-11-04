@@ -1,5 +1,5 @@
 import { include, seconds } from "@blazetrails/activesupport";
-import { Process, STDERR, STDOUT, abort, registerConstant } from "@blazetrails/ruby-compat";
+import { Process, STDERR, STDOUT, abort } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import {
   LifecycleHooks,
@@ -314,5 +314,3 @@ export interface Supervisor {
 }
 
 SolidQueue.Supervisor = Supervisor;
-
-registerConstant("SolidQueue::Supervisor", Supervisor);

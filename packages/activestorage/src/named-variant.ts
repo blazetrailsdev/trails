@@ -1,10 +1,10 @@
 import { rbFSend, rbProcCall } from "@blazetrails/ruby-compat";
 
 export class NamedVariant {
-  readonly transformations: { [k: string]: unknown };
+  readonly transformations: { [k: string]: NonNullable<unknown> | null };
   readonly preprocessed: unknown;
 
-  constructor(transformations: { [k: string]: unknown }) {
+  constructor(transformations: { [k: string]: NonNullable<unknown> | null }) {
     const { preprocessed, ...rest } = transformations;
     this.preprocessed = preprocessed ?? null;
     this.transformations = rest;

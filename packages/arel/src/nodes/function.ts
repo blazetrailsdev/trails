@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
@@ -53,9 +53,9 @@ export interface Function extends WindowPredicationsModule, FilterPredicationsMo
 include(Function, WindowPredications);
 include(Function, FilterPredications);
 
-rbModConstSet(Nodes, "Function", Function);
-rbModConstSet(Nodes, "Exists", Exists);
-rbModConstSet(Nodes, "Sum", Sum);
-rbModConstSet(Nodes, "Max", Max);
-rbModConstSet(Nodes, "Min", Min);
-rbModConstSet(Nodes, "Avg", Avg);
+constSet(Nodes, "Function", Function);
+constSet(Nodes, "Exists", Exists);
+constSet(Nodes, "Sum", Sum);
+constSet(Nodes, "Max", Max);
+constSet(Nodes, "Min", Min);
+constSet(Nodes, "Avg", Avg);

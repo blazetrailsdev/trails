@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void };
 const makeRouteSet = (): Counted => {
@@ -21,10 +21,10 @@ const makeRouteSet = (): Counted => {
   };
   return r;
 };
-const rails = new URL("../rails.js", import.meta.url).href;
+const trails = new URL("../trails.js", import.meta.url).href;
 const engine = new URL("../engine.js", import.meta.url).href;
 const drawInto = (receiver: string, path: string): string =>
-  `import { Trails } from "${rails}";\n` +
+  `import { Trails } from "${trails}";\n` +
   `${receiver}.routes().draw(function () { this.get("${path}", { to: "posts#index" }); });\n`;
 
 describe("RoutesReloader", () => {

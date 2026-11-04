@@ -38,6 +38,9 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:packages/trailties
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:packages/zeitwerk
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3(jiti@2.6.1)(supports-color@8.1.1))
@@ -178,11 +181,42 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.20.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  examples/twelve-dollar-server:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../../packages/actionpack
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../../packages/rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../../packages/ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../../packages/trailties
+      better-sqlite3:
+        specifier: ^12.6.2
+        version: 12.6.2
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
+
   examples/twitter-clone:
     dependencies:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../../packages/activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../../packages/activesupport
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../../packages/date
@@ -217,12 +251,18 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
       pg:
         specifier: '>=8.19.0'
         version: 8.20.0
+      websocket-driver:
+        specifier: '>=0.7.4'
+        version: 0.7.4
     devDependencies:
       '@blazetrails/activerecord':
         specifier: workspace:*
@@ -236,9 +276,24 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)
-      websocket-driver:
-        specifier: 0.7.4
-        version: 0.7.4
+
+  packages/actionmailer:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../i18n
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../mail
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/actionpack:
     dependencies:
@@ -272,6 +327,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -393,6 +451,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -458,6 +519,9 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
       '@blazetrails/activejob':
         specifier: workspace:*
         version: link:../activejob
@@ -473,9 +537,15 @@ importers:
       '@blazetrails/marcel':
         specifier: workspace:*
         version: link:../marcel
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -489,6 +559,9 @@ importers:
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../mini-magick
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/activesupport:
     dependencies:
@@ -700,6 +773,12 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/mini-mime':
+        specifier: workspace:*
+        version: link:../mini-mime
+      '@blazetrails/net-smtp':
+        specifier: workspace:*
+        version: link:../net-smtp
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -707,6 +786,12 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/smtp-server':
+        specifier: ^3.5.13
+        version: 3.5.13
+      smtp-server:
+        specifier: ^3.21.2
+        version: 3.21.2
 
   packages/marcel:
     dependencies:
@@ -820,6 +905,19 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/rackup:
+    dependencies:
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/rake:
     dependencies:
       '@blazetrails/did-you-mean':
@@ -908,6 +1006,10 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+    devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/thor:
     dependencies:
@@ -942,6 +1044,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:../zeitwerk
       typescript-5:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
@@ -969,6 +1074,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean
@@ -984,6 +1092,12 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -996,6 +1110,12 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+      '@blazetrails/tzinfo':
+        specifier: workspace:*
+        version: link:../tzinfo
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:../zeitwerk
       commander:
         specifier: ^14.0.0
         version: 14.0.3
@@ -1012,6 +1132,9 @@ importers:
       '@blazetrails/et-orbi':
         specifier: workspace:*
         version: link:../et-orbi
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
@@ -1096,11 +1219,24 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/zeitwerk:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   scripts/guides-typecheck:
     dependencies:
       '@blazetrails/actioncable':
         specifier: workspace:*
         version: link:../../packages/actioncable
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../../packages/actionmailer
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
@@ -1194,6 +1330,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../../packages/rack-test
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../../packages/rackup
       '@blazetrails/rake':
         specifier: workspace:*
         version: link:../../packages/rake
@@ -1224,6 +1363,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers
+      '@blazetrails/zeitwerk':
+        specifier: workspace:*
+        version: link:../../packages/zeitwerk
 
   scripts/parity:
     dependencies:

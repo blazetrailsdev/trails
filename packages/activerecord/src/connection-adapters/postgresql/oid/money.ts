@@ -1,5 +1,8 @@
+import "../../../constants.postgresql-oid-money.generated.js";
+
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {
@@ -26,4 +29,4 @@ export class Money extends DecimalType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Money", Money);
+ConnectionAdapters.PostgreSQL.OID.Money = Money;

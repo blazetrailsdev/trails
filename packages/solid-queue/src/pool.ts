@@ -1,10 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import {
-  AtomicFixnum,
-  Mutex,
-  ThreadPoolExecutor,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { AtomicFixnum, Mutex, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "./app-executor.js";
 import type { ClaimedExecution } from "./claimed-execution.js";
 
@@ -104,5 +99,3 @@ export interface Pool {
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }
-
-registerConstant("SolidQueue::Pool", Pool);

@@ -1,5 +1,5 @@
 import type { Plugin, ViteDevServer } from "vite";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import type { HttpRequest, HttpResponse, HttpSocket } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/actionpack";
 

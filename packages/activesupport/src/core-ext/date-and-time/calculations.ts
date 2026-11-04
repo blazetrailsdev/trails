@@ -4,7 +4,7 @@ import * as dateTime from "../date-time/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
-import { cmp, fetch, include, Range, type Included } from "@blazetrails/ruby-compat";
+import { cmp, fetch, include, Range, TopLevel, type Included } from "@blazetrails/ruby-compat";
 import { actsLike } from "../object/acts-like.js";
 import * as DateAndTimeCalculations from "./calculations.js";
 
@@ -486,3 +486,11 @@ declare module "@blazetrails/date" {
 
 include(RubyTime, DateAndTimeCalculations);
 include(RubyDate, DateAndTimeCalculations);
+
+TopLevel.DateAndTime = { name: "DateAndTime", Calculations: DateAndTimeCalculations };
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    DateAndTime?: { name: string; Calculations: typeof DateAndTimeCalculations };
+  }
+}

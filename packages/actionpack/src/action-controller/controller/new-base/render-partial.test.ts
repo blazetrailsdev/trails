@@ -1,11 +1,11 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
-registerConstant("RenderPartial", { name: "RenderPartial" });
+constSet(TopLevel, "RenderPartial", { name: "RenderPartial" });
 
 class BasicController extends Base {
   declare testUnchanged: string;
@@ -50,8 +50,8 @@ class ChildController extends BasicController {
   }
 }
 
-registerController("RenderPartial::BasicController", BasicController);
-registerController("RenderPartial::ChildController", ChildController);
+constSetPath("RenderPartial::BasicController", BasicController);
+constSetPath("RenderPartial::ChildController", ChildController);
 
 class TestPartial extends Rack.TestCase {
   static {

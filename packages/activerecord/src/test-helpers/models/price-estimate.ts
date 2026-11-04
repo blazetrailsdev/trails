@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { NumberHelper } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PriceEstimate extends Base {
@@ -26,4 +27,5 @@ export interface PriceEstimate {
   set thing(value: Base | null);
 }
 
-registerModel(PriceEstimate);
+constSet(TopLevel, "PriceEstimate", PriceEstimate);
+DescendantsTracker.registerSubclass(Base, PriceEstimate);

@@ -74,7 +74,7 @@ export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unk
   const heads = this.constructor.fragmentCacheKeys!.map((k) => k.call(this));
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
-  const version = env?.RAILS_CACHE_ID || env?.RAILS_APP_VERSION || null;
+  const version = env?.TRAILS_CACHE_ID || env?.TRAILS_APP_VERSION || null;
 
   let tail: unknown;
   if (isPlainObject(key)) {

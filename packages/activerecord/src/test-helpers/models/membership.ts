@@ -1,9 +1,10 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Membership extends Base {
@@ -54,7 +55,8 @@ export class Membership extends Base {
     this.belongsTo("club");
   }
 }
-registerModel(Membership);
+constSet(TopLevel, "Membership", Membership);
+DescendantsTracker.registerSubclass(Base, Membership);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Membership {
   get member(): Member | null | Promise<Member | null>;
@@ -66,7 +68,8 @@ export interface Membership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CurrentMembership extends Membership {
   static {
-    registerModel(CurrentMembership);
+    constSet(TopLevel, "CurrentMembership", CurrentMembership);
+    DescendantsTracker.registerSubclass(Membership, CurrentMembership);
     this.belongsTo("member");
     this.belongsTo("club", { inverseOf: "membership" });
   }
@@ -82,7 +85,8 @@ export interface CurrentMembership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SuperMembership extends Membership {
   static {
-    registerModel(SuperMembership);
+    constSet(TopLevel, "SuperMembership", SuperMembership);
+    DescendantsTracker.registerSubclass(Membership, SuperMembership);
     this.belongsTo("member", function () {
       return this.order("members.id DESC");
     });
@@ -99,7 +103,8 @@ export interface SuperMembership {
 
 export class SelectedMembership extends Membership {
   static {
-    registerModel(SelectedMembership);
+    constSet(TopLevel, "SelectedMembership", SelectedMembership);
+    DescendantsTracker.registerSubclass(Membership, SelectedMembership);
     this.defaultScope(function () {
       return this.select("'1' as foo");
     });
@@ -111,7 +116,8 @@ export class TenantMembership extends Membership {
   static currentMember: any = null;
 
   static {
-    registerModel(TenantMembership);
+    constSet(TopLevel, "TenantMembership", TenantMembership);
+    DescendantsTracker.registerSubclass(Membership, TenantMembership);
     this.belongsTo("member");
     this.belongsTo("club");
     this.defaultScope(function () {

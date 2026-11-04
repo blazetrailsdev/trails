@@ -90,6 +90,18 @@ describe("tokenize", () => {
     expect(tokenize("<%= x + 1 %>")[0].kind).toBe("expr");
   });
 
+  it("scans <%% and an in-tag %%> as ERB does in erb mode", () => {
+    expect(
+      tokenize("hello<%%world\nsecond<%= x %>", true, true).map((t) => [t.kind, t.value]),
+    ).toEqual([
+      ["text", "hello<%world\nsecond"],
+      ["expr", " x "],
+    ]);
+    expect(tokenize('<%= "%%>" %>', true, true).map((t) => [t.kind, t.value])).toEqual([
+      ["expr", ' "%>" '],
+    ]);
+  });
+
   it("srcLine tracks through escape sequences", () => {
     expect(tokenize("hello<%%world\nsecond<%= x %>")).toEqual([
       { kind: "text", value: "hello<%world\nsecond<%= x %>", srcLine: 0 },

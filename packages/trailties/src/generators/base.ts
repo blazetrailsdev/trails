@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Thor::Base includes Thor::Invocation and Thor::Shell (`thor/v1.3.2/lib/thor/base.rb:30-34`); the class/interface merge is how those mixins surface on the type side. */
 import {
   camelize,
-  constantize,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
   humanize,
+  isBlank,
 } from "@blazetrails/activesupport";
 import {
   File,
@@ -14,8 +14,10 @@ import {
   getFs,
   include,
   hashDelete,
-  isRegisteredConstant,
+  constGet,
+  constDefined,
 } from "@blazetrails/ruby-compat";
+import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
 import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
@@ -79,6 +81,7 @@ type GroupStatics = {
   addRuntimeOptionsBang(): void;
   strictArgsPositionBang(): void;
   methodAdded(meth: string): void;
+  publicCommand(...names: string[]): void;
   namespace(name?: string | null): string;
   start(givenArgs?: string[], config?: GeneratorConfig): Promise<unknown>;
   sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
@@ -92,6 +95,10 @@ export interface GeneratorBase extends Invocation, GeneratorActionsState {
   say: ShellHost["say"];
   sayStatus: ShellHost["sayStatus"];
   template(source: string, ...args: unknown[]): Promise<unknown>;
+  removeFile(path: string, ...args: unknown[]): Promise<unknown>;
+  removeDir(path: string, ...args: unknown[]): Promise<unknown>;
+  capture: OmitThisParameter<typeof ThorActions.Actions.capture>;
+  concat: OmitThisParameter<typeof ThorActions.Actions.concat>;
 }
 
 export abstract class GeneratorBase extends (Group as unknown as (abstract new (
@@ -102,6 +109,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   GroupStatics) {
   declare static _sourcePaths?: string[];
   declare static _sourceRoot?: string | null;
+  declare static _namespace?: string;
   /** @internal */
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
@@ -121,6 +129,33 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
     this.addRuntimeOptionsBang();
     this.strictArgsPositionBang();
+  }
+
+  static addShebangOptionBang(): void {
+    this.classOption("ruby", {
+      type: "string",
+      aliases: "-r",
+      default: rubyCommand(),
+      desc: "Path to the Ruby binary of your choice",
+      banner: "PATH",
+    });
+
+    this.noCommands(() => {
+      Object.defineProperty(this.prototype, "shebang", {
+        configurable: true,
+        writable: true,
+        value(this: { _shebang?: string; options: { ruby?: string } }): string {
+          if (this._shebang === undefined) {
+            const command =
+              this.options.ruby === rubyCommand()
+                ? `/usr/bin/env ${File.basename(rubyCommand())}`
+                : this.options.ruby;
+            this._shebang = `#!${command}`;
+          }
+          return this._shebang;
+        },
+      });
+    });
   }
 
   static isExitOnFailure(): boolean {
@@ -149,6 +184,15 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return klass._desc;
   }
 
+  static override namespace(name: string | null = null): string {
+    if (name != null) return super.namespace(name);
+    if (Object.hasOwn(this, "_namespace") && this._namespace != null) return this._namespace;
+    return (this._namespace = super
+      .namespace()
+      .replace(/_generator$/, "")
+      .replace(/:generators:/, ":"));
+  }
+
   static async defaultSourceRoot(): Promise<string | undefined> {
     if (!(this.baseName() != null && this.generatorName() != null)) return;
     if ((await this.defaultGeneratorRoot()) == null) return;
@@ -167,11 +211,11 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare options: GeneratorOptions;
   declare args: unknown[];
   declare behavior: "invoke" | "revoke";
-  pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
   _sourcePaths?: string[];
   private _namespaceDirs?: string[];
+  private _namespacedPath?: string;
 
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
@@ -180,6 +224,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
   declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
+  declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
   declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;
   declare appendToFile: OmitThisParameter<typeof ThorActions.Actions.appendToFile>;
   /** @internal */
@@ -195,6 +240,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   generate = Actions.generate;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+  trailsCommand = Actions.trailsCommand;
   route = Actions.route;
   readme = Actions.readme;
   log = Actions.log;
@@ -284,14 +330,10 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       const lastName = nesting.pop()!;
       const last = this.extractLastModule(nesting);
 
-      if (
-        last &&
-        (isRegisteredConstant([...nesting, camelize(lastName)].join("::")) ||
-          (last !== Object && Object.hasOwn(last, camelize(lastName))))
-      ) {
+      if (last && constDefined(last, camelize(lastName), false)) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +
-            "or reserved by Ruby on Rails. Please choose an alternative or use --skip-collision-check " +
+            "or reserved by Trails. Please choose an alternative or use --skip-collision-check " +
             "or --force to skip this check and run this generator again.",
         );
       }
@@ -300,23 +342,16 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
 
   protected extractLastModule(nesting: string[]): object | undefined {
     let lastModule: object = Object;
-    const path: string[] = [];
     for (const nest of nesting) {
-      path.push(nest);
-      if (isRegisteredConstant(path.join("::"))) {
-        lastModule = constantize(path.join("::")) as object;
-      } else if (lastModule !== Object && Object.hasOwn(lastModule, nest)) {
-        lastModule = (lastModule as Record<string, object>)[nest];
-      } else {
-        return undefined;
-      }
+      if (!constDefined(lastModule, nest, false)) return undefined;
+      lastModule = constGet(lastModule, nest) as object;
     }
     return lastModule;
   }
 
   /** @internal */
   protected static banner(): string {
-    const namespace = this.namespace().replace(/^rails:/, "");
+    const namespace = this.namespace().replace(/^trails:/, "");
     const usage = this.arguments()
       .map((argument) => argument.usage())
       .join(" ");
@@ -369,8 +404,8 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       return c[name];
     } else if (baseName && (c = config[baseName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (Object.hasOwn(config["rails"], name)) {
-      return config["rails"][name];
+    } else if (Object.hasOwn(config["trails"], name)) {
+      return config["trails"][name];
     } else {
       return defaultValue;
     }
@@ -435,6 +470,31 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   }
 
   /** @internal */
+  protected moduleNamespacing(block: () => unknown): void {
+    let content = this.capture(block);
+    if (this.isNamespaced()) content = this.wrapWithNamespace(content);
+    this.concat(content);
+  }
+
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
+  protected indent(content: string, multiplier = 2): string {
+    const spaces = " ".repeat(multiplier);
+    return content
+      .split(/(?<=\n)/)
+      .map((line) => (isBlank(line) ? line : `${spaces}${line}`))
+      .join("");
+  }
+
+  /** @internal */
+  protected wrapWithNamespace(content: string): string {
+    content = this.indent(content).replace(/(\r\n|\n|\r)$/, "");
+    return `export namespace ${this.namespace()!.name} {\n${content}\n}\n`;
+  }
+
+  /** @internal */
   protected namespace(): { readonly name: string } | null {
     return Generators.namespace;
   }
@@ -449,6 +509,11 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     return (this._namespaceDirs ??= this.namespace()!
       .name.split("::")
       .map((n) => _underscore(n)));
+  }
+
+  /** @internal */
+  protected namespacedPath(): string {
+    return (this._namespacedPath ??= this.namespaceDirs().join("/"));
   }
 
   protected isTypeScript(): boolean {

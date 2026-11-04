@@ -9,8 +9,9 @@
 it when Zeitwerk first loads the class, which is after the `solid_queue.config`
 initializer (`vendor/solid_queue/v1.1.3/lib/solid_queue/engine.rb:13-17`) has
 copied `config.solid_queue` onto `SolidQueue`. ESM evaluates `record.ts` as
-soon as the package entry is imported, before any initializer, and trails has no
-autoloader (`packages/trailties/CLAUDE.md` § "Trails has no autoloader").
+soon as the package entry is imported, before any initializer, because framework
+packages stay ES modules and only application code goes through Zeitwerk
+(`packages/trailties/CLAUDE.md` § "The application loader is Zeitwerk").
 An engine-driven deferred load of `app/models` was considered and rejected: it
 needs a loader with no Rails body to mirror, and still runs only under
 `config.eager_load`. The `solid_queue_record` load hook this section's heading

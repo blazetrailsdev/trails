@@ -11,7 +11,7 @@ const EXPECTED_RELATIVE = [
   "config/database.ts",
   "db/migrate/.gitkeep",
   "db/seeds.ts",
-  "app/models/index.ts",
+  "app/models/.gitkeep",
   "db.ts",
 ];
 

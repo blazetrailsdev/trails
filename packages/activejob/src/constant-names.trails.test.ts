@@ -4,8 +4,11 @@ import {
   NameError,
   TypeError,
   rbModName,
-  registerConstant,
-  unregisterConstant,
+  TopLevel,
+  constGet,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 
@@ -14,9 +17,10 @@ describe("ActiveJob constant names", () => {
   class NestedJob extends Base {}
 
   afterEach(() => {
-    unregisterConstant("HelloJob", HelloJob);
-    unregisterConstant("Admin::NestedJob", NestedJob);
-    unregisterConstant("Raising", Raising);
+    if (constDefined(Object, "HelloJob", false)) rbModRemoveConst(Object, "HelloJob");
+    if (constDefined(Object, "Admin::NestedJob", false))
+      rbModRemoveConst(constGet(Object, "Admin") as object, "NestedJob");
+    if (constDefined(Object, "Raising", false)) rbModRemoveConst(Object, "Raising");
   });
 
   const Raising = {
@@ -35,8 +39,9 @@ describe("ActiveJob constant names", () => {
   });
 
   it("round-trips a registered job class name through constantize", () => {
-    registerConstant("HelloJob", HelloJob);
-    registerConstant("Admin::NestedJob", NestedJob);
+    constSet(TopLevel, "HelloJob", HelloJob);
+    constSet(TopLevel, "Admin", {});
+    constSet(constGet(Object, "Admin") as object, "NestedJob", NestedJob);
 
     expect(rbModName(HelloJob)).toBe("HelloJob");
     expect(constantize(rbModName(HelloJob)!)).toBe(HelloJob);
@@ -45,14 +50,14 @@ describe("ActiveJob constant names", () => {
   });
 
   it("demodulizes the full constant path, not a last-segment name", () => {
-    registerConstant("Admin::NestedJob", NestedJob);
+    constSet(constGet(Object, "Admin") as object, "NestedJob", NestedJob);
 
     expect(demodulize(rbModName(Base)!)).toBe("Base");
     expect(demodulize(rbModName(NestedJob)!)).toBe("NestedJob");
   });
 
   it("safeConstantize propagates an error that is not about the requested constant", () => {
-    registerConstant("Raising", Raising);
+    constSet(TopLevel, "Raising", Raising);
 
     expect(() => safeConstantize("Raising::Other")).toThrow("uninitialized constant Elsewhere");
     expect(() => safeConstantize("Raising::Broken")).toThrow(TypeError);

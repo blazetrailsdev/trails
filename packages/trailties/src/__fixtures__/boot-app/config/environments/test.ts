@@ -1,4 +1,4 @@
-import { Trails } from "../../../../rails.js";
+import { Trails } from "../../../../trails.js";
 
 Trails.application!.configure(function () {
   this.config.enableReloading = false;

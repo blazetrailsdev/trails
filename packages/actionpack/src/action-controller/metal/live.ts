@@ -53,7 +53,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     this.ignoreDisconnect = false;
   }
 
-  override write(string: string): void {
+  override write(string: string | Uint8Array): void {
     if (!this._response!.committed) {
       if (this._response!.headers.get("Cache-Control") === undefined) {
         this._response!.headers.set("Cache-Control", "no-cache");

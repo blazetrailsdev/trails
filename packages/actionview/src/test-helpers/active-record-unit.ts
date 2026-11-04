@@ -13,9 +13,10 @@ import {
   File,
   RuntimeError,
   getFs,
-  isRegisteredConstant,
-  registerConstant,
+  constDefined,
   warn,
+  TopLevel,
+  constSet,
 } from "@blazetrails/ruby-compat";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
@@ -54,15 +55,15 @@ export class ActiveRecordTestConnector {
   }
 
   private static async setupConnection(): Promise<void> {
-    if (isRegisteredConstant("ActiveRecord")) {
+    if (constDefined(Object, "ActiveRecord")) {
       const defaults = { database: ":memory:" };
       const options = { ...defaults, adapter: "sqlite3", timeout: 500 };
       await Base.establishConnection(options);
       Base.configurations({ sqlite3_ar_integration: options });
       await Base.leaseConnection();
 
-      if (!isRegisteredConstant("QUOTED_TYPE")) {
-        registerConstant("QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
+      if (!constDefined(Object, "QUOTED_TYPE")) {
+        constSet(TopLevel, "QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
       }
     } else {
       throw new RuntimeError("Can't setup connection since ActiveRecord isn't loaded.");

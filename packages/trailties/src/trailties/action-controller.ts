@@ -19,8 +19,8 @@ import {
   rbFSend,
   rbObjIsKindOf,
   rbObjRespondTo,
-  registerConstant,
   RuntimeError,
+  constSet,
 } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -78,7 +78,14 @@ export class Trailtie extends BaseTrailtie {
         const helpersPaths = app.config.helpersPaths;
         ActionController.setHelpersPath(helpersPaths);
 
-        for (const [name, mod] of await helperConstants(helpersPaths)) registerConstant(name, mod);
+        for (const [name, mod] of await helperConstants(helpersPaths)) {
+          let owner: object = TopLevel;
+          for (const part of name.split("::").slice(0, -1)) {
+            const tbl = owner as Record<string, unknown>;
+            owner = (Object.hasOwn(tbl, part) ? tbl[part] : constSet(owner, part, {})) as object;
+          }
+          constSet(owner, demodulize(name), mod);
+        }
 
         onLoad("action_controller", (base: unknown) => {
           (base as ActionController.HelpersPathControllerClass).helpersPath =

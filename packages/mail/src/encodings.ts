@@ -14,6 +14,12 @@ import {
   toEnum,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
+import type { SevenBit } from "./encodings/7bit.js";
+import type { EightBit } from "./encodings/8bit.js";
+import type { Base64 } from "./encodings/base64.js";
+import type { Binary } from "./encodings/binary.js";
+import type { Identity } from "./encodings/identity.js";
+import type { UnixToUnix } from "./encodings/unix-to-unix.js";
 import type { QuotedPrintable } from "./encodings/quoted-printable.js";
 import type { TransferEncoding } from "./encodings/transfer-encoding.js";
 import { Utilities } from "./utilities.js";
@@ -25,12 +31,20 @@ const transferEncodings: Record<string, typeof TransferEncoding> = Object.create
 type RubyString = string | Uint8Array;
 
 export const Encodings = {
+  Base64: null as typeof Base64 | null,
+  SevenBit: null as typeof SevenBit | null,
+  EightBit: null as typeof EightBit | null,
+  Binary: null as typeof Binary | null,
+  Identity: null as typeof Identity | null,
+  TransferEncoding: null as typeof TransferEncoding | null,
+  UnixToUnix: null as typeof UnixToUnix | null,
   QuotedPrintable: null as typeof QuotedPrintable | null,
 
   register(name: string, cls: typeof TransferEncoding): void {
     transferEncodings[Encodings.getName(name)] = cls;
   },
 
+  /** @missingRailsCall include? — CONVERGEABLE mail-message-spec-port */
   isDefined(name: string): boolean {
     return Encodings.getName(name) in transferEncodings;
   },

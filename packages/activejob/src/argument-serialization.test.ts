@@ -21,10 +21,10 @@ import {
   defineModule,
   rbInspect,
   rbEqual,
-  rbModConstSet,
+  constSet,
   rbObjClass,
   rbObjIsKindOf,
-  registerConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { DeserializationError, SerializationError } from "./arguments.js";
 import { ActiveJob } from "./namespaces.js";
@@ -42,23 +42,23 @@ class ArgumentSerializationTest {
     return "ArgumentSerializationTest";
   }
 }
-registerConstant("ArgumentSerializationTest", ArgumentSerializationTest);
+constSet(TopLevel, "ArgumentSerializationTest", ArgumentSerializationTest);
 
 const ModuleArgument = defineModule({});
-rbModConstSet(ArgumentSerializationTest, "ModuleArgument", ModuleArgument);
+constSet(ArgumentSerializationTest, "ModuleArgument", ModuleArgument);
 class ModuleArgumentClassArgument {}
-rbModConstSet(ModuleArgument, "ClassArgument", ModuleArgumentClassArgument);
+constSet(ModuleArgument, "ClassArgument", ModuleArgumentClassArgument);
 
 class ClassArgument {}
-rbModConstSet(ArgumentSerializationTest, "ClassArgument", ClassArgument);
+constSet(ArgumentSerializationTest, "ClassArgument", ClassArgument);
 
 class MyClassWithPermitted {
   static isPermitted(): void {}
 }
-rbModConstSet(ArgumentSerializationTest, "MyClassWithPermitted", MyClassWithPermitted);
+constSet(ArgumentSerializationTest, "MyClassWithPermitted", MyClassWithPermitted);
 
 class MyString extends String {}
-rbModConstSet(ArgumentSerializationTest, "MyString", MyString);
+constSet(ArgumentSerializationTest, "MyString", MyString);
 
 class MyStringSerializer extends ObjectSerializer {
   serialize(argument: unknown): Record<string, unknown> {
@@ -74,10 +74,10 @@ class MyStringSerializer extends ObjectSerializer {
     return MyString;
   }
 }
-rbModConstSet(ArgumentSerializationTest, "MyStringSerializer", MyStringSerializer);
+constSet(ArgumentSerializationTest, "MyStringSerializer", MyStringSerializer);
 
 class StringWithoutSerializer extends String {}
-rbModConstSet(ArgumentSerializationTest, "StringWithoutSerializer", StringWithoutSerializer);
+constSet(ArgumentSerializationTest, "StringWithoutSerializer", StringWithoutSerializer);
 
 async function assertArgumentsUnchanged(...args: unknown[]): Promise<void> {
   await assertArgumentsRoundtrip(args);

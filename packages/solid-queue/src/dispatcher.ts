@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { include, seconds } from "@blazetrails/activesupport";
 import { Configuration } from "./configuration.js";
 import { ConcurrencyMaintenance } from "./dispatcher/concurrency-maintenance.js";
@@ -99,5 +98,3 @@ export class Dispatcher extends Poller {
 }
 
 SolidQueue.Dispatcher = Dispatcher;
-
-registerConstant("SolidQueue::Dispatcher", Dispatcher);

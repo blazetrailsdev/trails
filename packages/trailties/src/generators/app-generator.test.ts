@@ -5,14 +5,22 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import { execFile } from "node:child_process";
-import { AppGenerator, type AppDatabase } from "./app-generator.js";
+import { AppGenerator, type AppDatabase } from "./trails/app/app-generator.js";
 import * as Assertions from "./testing/assertions.js";
+import { VERSION } from "../gem-version.js";
+import { Application } from "../application.js";
+import { Trails } from "../trails.js";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+
+class AppGeneratorApp extends Application {}
 
 let tmpDir: string;
 let lines: string[];
 const destination = { destinationRoot: "" };
 const assertFile = Assertions.assertFile.bind(destination);
 const assertNoFile = Assertions.assertNoFile.bind(destination);
+const assertDirectory = Assertions.assertDirectory.bind(destination);
+const assertNoDirectory = Assertions.assertNoDirectory.bind(destination);
 
 function assertGem(name: string): Promise<void> {
   return assertFile("my-app/package.json", new RegExp(`"${name}": `));
@@ -33,7 +41,9 @@ beforeEach(() => {
   );
 });
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -48,8 +58,56 @@ function makeGen(
   database: AppDatabase = "sqlite",
   opts: { skipDocker?: boolean; [k: `skip${string}`]: boolean | undefined } = {},
 ) {
-  return new AppGenerator(["my-app"], { database, ...opts }, { destinationRoot: tmpDir });
+  return new AppGenerator(
+    ["my-app"],
+    { database, skipInstall: true, ...opts },
+    { destinationRoot: tmpDir },
+  );
 }
+
+describe("AppGeneratorTest", () => {
+  it("version control initializes git repo", async () => {
+    await makeGen().invokeAll();
+    await assertDirectory("my-app/.git");
+  });
+
+  it("app update", async () => {
+    await makeGen().invokeAll();
+
+    const defaultsPath = `my-app/config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
+
+    assertNoFile(defaultsPath);
+    assertNoFile("my-app/config/initializers/cors.ts");
+
+    const shell = new ThorBase.shell() as InstanceType<typeof ThorBase.shell> & {
+      _alwaysForce: boolean;
+    };
+    shell._alwaysForce = true;
+    Trails.application = AppGeneratorApp.instance();
+    try {
+      await new AppGenerator(
+        ["my-app"],
+        { database: "sqlite", skipInstall: true, update: true },
+        { destinationRoot: appPath(), shell },
+      ).updateConfigFiles();
+    } finally {
+      Trails.application = null;
+    }
+
+    await assertFile(
+      defaultsPath,
+      /this\.config\.activeSupport\.toTimePreservesTimezone = ":zone";[\s\S]*this\.config\.actionDispatch\.strictFreshness = true;/,
+    );
+    assertNoFile("my-app/config/initializers/cors.ts");
+  });
+
+  it("skip git", async () => {
+    await makeGen("sqlite", { skipGit: true }).invokeAll();
+    assertNoFile("my-app/.gitignore");
+    assertNoFile("my-app/.gitattributes");
+    assertNoDirectory("my-app/.git");
+  });
+});
 
 function appPath(...segments: string[]) {
   return path.join(tmpDir, "my-app", ...segments);
@@ -93,26 +151,25 @@ describe("AppGenerator", () => {
     expect(exists("config/locales/en.json")).toBe(true);
 
     expect(exists("app/controllers/application-controller.ts")).toBe(true);
-    expect(exists("app/controllers/concerns/.gitkeep")).toBe(true);
+    expect(exists("app/controllers/concerns/.keep")).toBe(true);
     expect(exists("app/models/application-record.ts")).toBe(true);
-    expect(exists("app/models/concerns/.gitkeep")).toBe(true);
+    expect(exists("app/models/concerns/.keep")).toBe(true);
     expect(exists("app/helpers/application-helper.ts")).toBe(true);
     expect(exists("app/views/layouts/application.html.tse")).toBe(true);
     expect(exists("app/assets/stylesheets/application.css")).toBe(true);
-    expect(exists("app/assets/images/.gitkeep")).toBe(true);
+    expect(exists("app/assets/images/.keep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
 
-    expect(exists("db/migrate/.gitkeep")).toBe(true);
     expect(exists("db/seeds.ts")).toBe(true);
     expect(exists("db/schema.ts")).toBe(false);
 
     expect(exists("test/test-helper.ts")).toBe(true);
     expect(exists("test/global-setup.ts")).toBe(true);
-    expect(exists("test/models/.gitkeep")).toBe(true);
-    expect(exists("test/controllers/.gitkeep")).toBe(true);
-    expect(exists("test/helpers/.gitkeep")).toBe(true);
-    expect(exists("test/integration/.gitkeep")).toBe(true);
-    expect(exists("test/fixtures/files/.gitkeep")).toBe(true);
+    expect(exists("test/models/.keep")).toBe(true);
+    expect(exists("test/controllers/.keep")).toBe(true);
+    expect(exists("test/helpers/.keep")).toBe(true);
+    expect(exists("test/integration/.keep")).toBe(true);
+    expect(exists("test/fixtures/files/.keep")).toBe(true);
 
     expect(exists("public/index.html")).toBe(false);
     expect(exists("public/404.html")).toBe(true);
@@ -121,11 +178,11 @@ describe("AppGenerator", () => {
     expect(exists("public/robots.txt")).toBe(true);
     expect(exists("public/favicon.ico")).toBe(true);
 
-    expect(exists("lib/tasks/.gitkeep")).toBe(true);
-    expect(exists("log/.gitkeep")).toBe(true);
-    expect(exists("tmp/.gitkeep")).toBe(true);
-    expect(exists("tmp/pids/.gitkeep")).toBe(true);
-    expect(exists("vendor/.gitkeep")).toBe(true);
+    expect(exists("lib/tasks/.keep")).toBe(true);
+    expect(exists("log/.keep")).toBe(true);
+    expect(exists("tmp/.keep")).toBe(true);
+    expect(exists("tmp/pids/.keep")).toBe(true);
+    expect(exists("vendor/.keep")).toBe(true);
   });
 
   it("skips scaffolding for subsystems trails has no package for", async () => {
@@ -142,7 +199,7 @@ describe("AppGenerator", () => {
   it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
     await makeGen("sqlite").invokeAll();
 
-    expect(exists("storage/.gitkeep")).toBe(true);
+    expect(exists("storage/.keep")).toBe(true);
   });
 
   it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
@@ -177,7 +234,7 @@ describe("AppGenerator", () => {
     expect(exists("app/mailers/application-mailer.ts")).toBe(true);
     expect(exists("app/views/layouts/mailer.html.tse")).toBe(true);
     expect(exists("app/views/layouts/mailer.text.tse")).toBe(true);
-    expect(exists("storage/.gitkeep")).toBe(true);
+    expect(exists("storage/.keep")).toBe(true);
   });
 
   it("generator if skip action cable is given", async () => {
@@ -196,14 +253,45 @@ describe("AppGenerator", () => {
     });
   });
 
+  it("implied options with conflicting option", async () => {
+    await expect(
+      makeGen("sqlite", { skipActiveJob: true, skipActiveStorage: false }).invokeAll(),
+    ).rejects.toThrow(/conflicting option/i);
+  });
+
+  it("--api implies its options and a default run reports nothing", async () => {
+    const api = new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, api: true },
+      { destinationRoot: tmpDir },
+    );
+    expect(api.options.skipAssetPipeline).toBe(true);
+    expect(api.options.skipJavascript).toBe(true);
+    makeGen().reportImpliedOptions();
+    expect(lines.join("\n")).not.toMatch(/will also be activated/);
+    const minimal = new AppGenerator(
+      ["my-app"],
+      { skipInstall: true, minimal: true, skipActionText: false },
+      { destinationRoot: tmpDir },
+    );
+    expect(() => minimal.reportImpliedOptions()).not.toThrow();
+  });
+
   it("skip active job option", async () => {
-    await makeGen("sqlite", { ...UNPORTED, skipActiveJob: true }).invokeAll();
+    await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
 
     for (const env of ["production", "development", "test"]) {
       await assertFile(`my-app/config/environments/${env}.ts`, (content) => {
         assertNoMatch(/activeJob/, content);
       });
     }
+  });
+
+  it("skip git", async () => {
+    await makeGen("sqlite", { skipGit: true }).invokeAll();
+    await assertNoFile("my-app/.gitignore");
+    await assertNoFile("my-app/.gitattributes");
+    await assertNoDirectory("my-app/.git");
   });
 
   it("generates valid package.json", async () => {
@@ -312,7 +400,7 @@ describe("AppGenerator", () => {
   it("--package-manager npm uses npm install in bin/setup", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { packageManager: "npm" },
+      { skipInstall: true, packageManager: "npm" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -321,24 +409,10 @@ describe("AppGenerator", () => {
     expect(setup).not.toContain("pnpm");
   });
 
-  it("--package-manager yarn uses yarn in bin/setup and Dockerfile", async () => {
-    const gen = new AppGenerator(
-      ["my-app"],
-      { packageManager: "yarn" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
-    expect(setup).toContain('system("yarn")');
-    const dockerfile = fs.readFileSync(appPath("Dockerfile"), "utf-8");
-    expect(dockerfile).toContain("yarn.lock");
-    expect(dockerfile).not.toContain("pnpm");
-  });
-
   it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { sqliteDriver: "node-sqlite" },
+      { skipInstall: true, sqliteDriver: "node-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -354,7 +428,7 @@ describe("AppGenerator", () => {
       () =>
         new AppGenerator(
           ["my-app"],
-          { sqliteDriver: "bogus-driver" as never },
+          { skipInstall: true, sqliteDriver: "bogus-driver" as never },
           { destinationRoot: tmpDir },
         ),
     ).toThrow(/Unknown SQLite driver/);
@@ -363,7 +437,7 @@ describe("AppGenerator", () => {
   it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
     const gen = new AppGenerator(
       ["my-app"],
-      { database: "sqlite", sqliteDriver: "expo-sqlite" },
+      { skipInstall: true, database: "sqlite", sqliteDriver: "expo-sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -445,28 +519,43 @@ describe("AppGenerator", () => {
     expect(layout).toContain(`contentFor("title") ?? "My App"`);
   });
 
+  it("rejects a name whose constant is already in use", async () => {
+    await expect(
+      new AppGenerator(
+        ["string"],
+        { skipInstall: true },
+        { destinationRoot: "/tmp/string" },
+      ).createRoot(),
+    ).rejects.toThrow(
+      "Invalid application name string, constant String is already in use. Please choose another application name.",
+    );
+  });
+
   it("generates an application class that subclasses Application", async () => {
     await makeGen().invokeAll();
 
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
     expect(appConfig).toContain("export class MyApp extends Application {");
-    expect(appConfig).toContain("Application.register(MyApp, import.meta.dirname);");
+    expect(appConfig).toContain("Application.register(this, import.meta.dirname);");
 
     const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
     expect(environment).toContain(`import "./application.ts";`);
     expect(environment).toContain("await Trails.initialize()");
+    const importer = environment.indexOf("loader.importer = (url) => import(url);");
+    expect(importer).toBeGreaterThan(-1);
+    expect(importer).toBeLessThan(environment.indexOf("await Trails.initialize()"));
 
     const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
     expect(configRu).toContain(`import "./config/environment.ts";`);
-    expect(configRu).toContain("export default Trails.application;");
+    expect(configRu).toContain("export const Config = Trails.application;");
     expect(configRu).toContain("await Trails.application.loadServer();");
   });
 
   it("invalid application name raises an error", async () => {
     const gen = new AppGenerator(
       ["43-things"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await expect(gen.invokeAll()).rejects.toThrow(
@@ -477,7 +566,7 @@ describe("AppGenerator", () => {
   it("invalid application name is fixed", async () => {
     const gen = new AppGenerator(
       ["things-43"],
-      { database: "sqlite" },
+      { skipInstall: true, database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();
@@ -488,7 +577,7 @@ describe("AppGenerator", () => {
   it("name option", async () => {
     const gen = new AppGenerator(
       ["app-dir"],
-      { name: "my-app", database: "sqlite" },
+      { skipInstall: true, name: "my-app", database: "sqlite" },
       { destinationRoot: tmpDir },
     );
     await gen.invokeAll();

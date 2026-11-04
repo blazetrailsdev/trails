@@ -24,11 +24,11 @@ import {
   included,
   rbEqual,
   rbInspect,
-  rbModConstSet,
+  constSet,
   rbModName,
   rbObjClass,
-  registerConstant,
   toF,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 import "./queue-adapters/async-adapter.js";
@@ -58,7 +58,7 @@ class NotTestAdapterTest extends TestCase {
     return "NotTestAdapterTest";
   }
 }
-registerConstant("NotTestAdapterTest", NotTestAdapterTest);
+constSet(TopLevel, "NotTestAdapterTest", NotTestAdapterTest);
 
 class AdapterIsNotTestAdapterTest extends TestCase {
   static override toString(): string {
@@ -67,7 +67,7 @@ class AdapterIsNotTestAdapterTest extends TestCase {
 
   override queueAdapterForTest = (): unknown => new QueueAdapters.InlineAdapter();
 }
-registerConstant("AdapterIsNotTestAdapterTest", AdapterIsNotTestAdapterTest);
+constSet(TopLevel, "AdapterIsNotTestAdapterTest", AdapterIsNotTestAdapterTest);
 
 describe.skipIf(isAdapterIs("test"))("NotTestAdapterTest", () => {
   let adapter: string | null;
@@ -191,7 +191,7 @@ class EnqueuedJobsTest extends TestCase {
     return "EnqueuedJobsTest";
   }
 }
-registerConstant("EnqueuedJobsTest", EnqueuedJobsTest);
+constSet(TopLevel, "EnqueuedJobsTest", EnqueuedJobsTest);
 if (isAdapterIs("test")) include(EnqueuedJobsTest, DoNotPerformEnqueuedJobs);
 
 describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
@@ -993,7 +993,7 @@ class PerformedJobsTest extends TestCase {
   declare _performEnqueuedJobs: unknown;
   declare _performEnqueuedAtJobs: unknown;
 }
-registerConstant("PerformedJobsTest", PerformedJobsTest);
+constSet(TopLevel, "PerformedJobsTest", PerformedJobsTest);
 if (isAdapterIs("test")) include(PerformedJobsTest, DoNotPerformEnqueuedJobs);
 
 describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
@@ -2462,8 +2462,8 @@ class QueueAdapterTest extends TestCase {
 
   override queueAdapterForTest = (): unknown => new QueueAdapters.TestAdapter();
 }
-registerConstant("QueueAdapterTest", QueueAdapterTest);
-rbModConstSet(QueueAdapterTest, "JobWithAnAdapter", JobWithAnAdapter);
+constSet(TopLevel, "QueueAdapterTest", QueueAdapterTest);
+constSet(QueueAdapterTest, "JobWithAnAdapter", JobWithAnAdapter);
 
 describe("QueueAdapterTest", () => {
   it("assert_enqueued_with enqueues a job with a queue_adapter and queue_adapter_for_test", async ({
@@ -2486,8 +2486,8 @@ class OverrideQueueAdapterTest extends TestCase {
 
   override queueAdapterForTest = (): unknown => new CustomQueueAdapter();
 }
-registerConstant("OverrideQueueAdapterTest", OverrideQueueAdapterTest);
-rbModConstSet(OverrideQueueAdapterTest, "CustomQueueAdapter", CustomQueueAdapter);
+constSet(TopLevel, "OverrideQueueAdapterTest", OverrideQueueAdapterTest);
+constSet(OverrideQueueAdapterTest, "CustomQueueAdapter", CustomQueueAdapter);
 
 describe("OverrideQueueAdapterTest", () => {
   it("assert job has custom queue adapter set", () => {
@@ -2500,7 +2500,7 @@ class InheritedJobTest extends TestCase {
     return "InheritedJobTest";
   }
 }
-registerConstant("InheritedJobTest", InheritedJobTest);
+constSet(TopLevel, "InheritedJobTest", InheritedJobTest);
 
 describe("InheritedJobTest", () => {
   it("queue adapter is inline adapter because it is set on the job class", () => {

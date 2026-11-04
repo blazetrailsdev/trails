@@ -25,7 +25,7 @@ Object.setPrototypeOf(
       if (methodName.endsWith("?")) {
         const expected = methodName.slice(0, -1);
         return function (this: unknown): boolean {
-          return String(this) === expected;
+          return String.prototype.valueOf.call(this) === expected;
         };
       }
       return function (this: unknown): never {

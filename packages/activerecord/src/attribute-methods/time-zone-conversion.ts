@@ -12,7 +12,6 @@ import {
   rbEqual,
   rbFSend,
   rbObjRespondTo,
-  registerConstant,
   rtest,
 } from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
@@ -144,8 +143,3 @@ function isCreateTimeZoneConversionAttribute(
 }
 
 AttributeMethods.TimeZoneConversion = TimeZoneConversion;
-
-registerConstant(
-  "ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter",
-  TimeZoneConverter,
-);

@@ -1,5 +1,11 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { registerConstant, Thread, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  Thread,
+  TopLevel,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import "../test-helpers/helper.js";
 import { Base } from "../base.js";
 import { AsyncAdapter } from "./async-adapter.js";
@@ -19,8 +25,11 @@ class ThreadRecordingJob extends Base {
     threads.push(thread);
   }
 }
-registerConstant("ThreadRecordingJob", ThreadRecordingJob);
-afterAll(() => unregisterConstant("ThreadRecordingJob", ThreadRecordingJob));
+constSet(TopLevel, "ThreadRecordingJob", ThreadRecordingJob);
+afterAll(() => {
+  if (constDefined(Object, "ThreadRecordingJob", false))
+    rbModRemoveConst(Object, "ThreadRecordingJob");
+});
 
 describe("AsyncAdapter", () => {
   it("runs two concurrent jobs in separate execution contexts", async () => {

@@ -1,0 +1,8 @@
+<% if (this.isEngine() && !this.options.skipActiveRecord && this.isWithDummyApp()) { -%>
+const { File, TopLevel } = await import("@blazetrails/ruby-compat");
+TopLevel.APP_RAKEFILE = File.expandPath("<%= this.dummyPath() %>/Rakefile.ts", import.meta.dirname);
+await import("@blazetrails/trailties/tasks/engine");
+<% } -%>
+<% if (this.isEngine()) { -%>
+await import("@blazetrails/trailties/tasks/statistics");
+<% } -%>

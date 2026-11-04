@@ -168,3 +168,55 @@ describe("Monitor#synchronize after the holder's block returns", () => {
     expect(served).toEqual(["first", "second"]);
   });
 });
+
+describe("Monitor#enter", () => {
+  it("counts a re-entry, and leaves on the matching exit", () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    monitor.enter();
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(true);
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(false);
+  });
+
+  it("holds another thread out until exit", async () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    const order: string[] = [];
+    const other = new Thread(async () => {
+      await monitor.enter();
+      order.push("entered");
+      monitor.exit();
+    });
+    await Thread.pass();
+    order.push("exiting");
+    monitor.exit();
+    await other.join();
+    expect(order).toEqual(["exiting", "entered"]);
+  });
+
+  it("raises ThreadError from exit when not the owner", () => {
+    expect(() => new Monitor().exit()).toThrow("current fiber not owner");
+  });
+});
+
+describe("Monitor#enter", () => {
+  it("is owned by the fiber, so two fibers on one thread exclude each other", async () => {
+    const { Fiber } = await import("./fiber.js");
+    const monitor = new Monitor();
+    const events: string[] = [];
+    const flow = (name: string) =>
+      new Fiber(async () => {
+        await monitor.enter();
+        await monitor.enter();
+        events.push(`${name} in`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push(`${name} out`);
+        monitor.exit();
+        monitor.exit();
+      }).resume();
+    await Promise.all([flow("a"), flow("b")]);
+    expect(events).toEqual(["a in", "a out", "b in", "b out"]);
+  });
+});

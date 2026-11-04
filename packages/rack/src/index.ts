@@ -61,7 +61,22 @@ export {
   RACK_SESSION,
   QUERY_STRING,
   RACK_SESSION_OPTIONS,
+  REQUEST_METHOD,
+  HTTPS,
+  PATH_INFO,
+  RACK_HIJACK,
+  RACK_INPUT,
+  RACK_IS_HIJACK,
+  RACK_URL_SCHEME,
+  REQUEST_PATH,
+  SCRIPT_NAME,
+  SERVER_NAME,
+  SERVER_PORT,
+  SERVER_PROTOCOL,
+  STATUS_WITH_NO_ENTITY_BODY,
 } from "./constants.js";
+export { CommonLogger } from "./common-logger.js";
+export { ShowExceptions } from "./show-exceptions.js";
 export { BadRequest } from "./bad-request.js";
 export { Runtime } from "./runtime.js";
 export { Files } from "./files.js";
@@ -79,7 +94,6 @@ export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";
 export * as Mime from "./mime.js";
 export * as Utils from "./utils.js";
-/** @noRailsEquivalent PERMANENT */
-export * as Handler from "./handler/index.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";
+export { Rack } from "./namespaces.js";

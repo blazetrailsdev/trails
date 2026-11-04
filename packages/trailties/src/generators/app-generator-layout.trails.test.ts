@@ -3,11 +3,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
-import { AppGenerator } from "./app-generator.js";
+import { AppGenerator } from "./trails/app/app-generator.js";
 
 let tmpDir: string | undefined;
 
+const startDir = process.cwd();
 afterEach(() => {
+  process.chdir(startDir);
   if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   tmpDir = undefined;
 });
@@ -16,7 +18,7 @@ async function generatedLayout(): Promise<string> {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-layout-"));
   await new AppGenerator(
     ["blog"],
-    { database: "sqlite", skipDocker: true },
+    { skipInstall: true, database: "sqlite", skipDocker: true },
     { destinationRoot: tmpDir },
   ).invokeAll();
   return fs.readFileSync(

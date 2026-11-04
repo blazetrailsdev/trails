@@ -1,5 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { Base } from "../index.js";
 import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
@@ -38,8 +40,13 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   beforeEach(() => {
     for (const m of [Comment, Post, Reader]) {
       m._reflections = {};
-      registerModel(m);
     }
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    constSet(TopLevel, "Reader", Reader);
+    DescendantsTracker.registerSubclass(Base, Reader);
     Associations.hasMany.call(Post, "comments", { className: "Comment" });
     Associations.belongsTo.call(Reader, "post", { className: "Post" });
   });
@@ -62,7 +69,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("collapses equal rows to one parent when the root has no primary key", () => {
-    registerModel(Edge);
+    constSet(TopLevel, "Edge", Edge);
     const jd = new JoinDependency(Edge, Edge.arelTable, [], Nodes.OuterJoin);
 
     const row = aliasedRow(jd, { "": { source_id: 1, sink_id: 2 } });
@@ -91,7 +98,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("keys composite primary keys by the value array, not a delimited string", () => {
-    registerModel(CpkBook);
     const jd = new JoinDependency(CpkBook, CpkBook.arelTable, [], Nodes.OuterJoin);
 
     const rows = [

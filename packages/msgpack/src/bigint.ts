@@ -1,4 +1,4 @@
-import { pack, rbBigNorm, rbModConstSet, unpack } from "@blazetrails/ruby-compat";
+import { pack, rbBigNorm, constSet, unpack } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 
 const CHUNK_BITLENGTH = 32;
@@ -47,4 +47,4 @@ export const Bigint = {
   fromMsgpackExt,
 };
 
-rbModConstSet(MessagePack, "Bigint", Bigint);
+constSet(MessagePack, "Bigint", Bigint);

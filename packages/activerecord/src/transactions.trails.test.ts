@@ -7,12 +7,12 @@ import {
   NullLock,
   ThreadLoadInterlockAwareMonitor,
 } from "@blazetrails/activesupport";
-import { Base, transaction, registerModel } from "./index.js";
+import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { WrongReply } from "./test-helpers/models/reply.js";
-import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -37,10 +37,6 @@ interface CpkRestoreView {
 
 interface AdapterTxView {
   currentTransaction?(): unknown;
-}
-
-for (const klass of [CpkBook, CpkOrder, CpkAuthor, CpkChapter]) {
-  registerModel(klass as unknown as typeof Base);
 }
 
 const openAdapters: SQLite3Adapter[] = [];

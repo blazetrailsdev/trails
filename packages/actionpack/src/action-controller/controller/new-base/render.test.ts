@@ -1,16 +1,16 @@
+import { constSetPath } from "../../../test-helpers/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { assertRaises } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ActionNotFound } from "../../../abstract-controller/base.js";
 import { DoubleRenderError } from "../../../abstract-controller/rendering.js";
 import { Base } from "../../base.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
-import { registerController } from "../../base.js";
 
-registerConstant("Render", { name: "Render" });
+constSet(TopLevel, "Render", { name: "Render" });
 
 class BlankRenderController extends Base {
   static {
@@ -82,9 +82,9 @@ class ChildRenderController extends BlankRenderController {
   }
 }
 
-registerController("Render::BlankRenderController", BlankRenderController);
-registerController("Render::DoubleRenderController", DoubleRenderController);
-registerController("Render::ChildRenderController", ChildRenderController);
+constSetPath("Render::BlankRenderController", BlankRenderController);
+constSetPath("Render::DoubleRenderController", DoubleRenderController);
+constSetPath("Render::ChildRenderController", ChildRenderController);
 
 class RenderTest extends Rack.TestCase {}
 

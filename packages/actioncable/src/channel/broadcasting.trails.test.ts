@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   include,
-  rbModConstSet,
-  registerConstant,
-  unregisterConstant,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Broadcasting } from "./broadcasting.js";
@@ -22,12 +23,14 @@ describe("ActionCable::Channel::Broadcasting", () => {
   class RoomsChannel extends ChatChannel {}
   const klass = RoomsChannel as unknown as Host;
 
-  registerConstant("ChatChannel", ChatChannel);
-  afterEach(() => unregisterConstant("Chat", Chat));
+  constSet(TopLevel, "ChatChannel", ChatChannel);
+  afterEach(() => {
+    if (constDefined(Object, "Chat", false)) rbModRemoveConst(Object, "Chat");
+  });
 
   it("serializes a namespaced class's channel name with the model", () => {
-    registerConstant("Chat", Chat);
-    rbModConstSet(Chat, "RoomsChannel", RoomsChannel);
+    constSet(TopLevel, "Chat", Chat);
+    constSet(Chat, "RoomsChannel", RoomsChannel);
     expect(klass.broadcastingFor("lobby")).toBe("chat:rooms:lobby");
   });
 

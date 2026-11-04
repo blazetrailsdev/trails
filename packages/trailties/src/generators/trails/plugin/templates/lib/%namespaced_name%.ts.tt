@@ -1,0 +1,8 @@
+import "./<%= this.namespacedName().split("/").at(-1) %>/version.js";
+<% if (this.isEngine()) { -%>
+import "./<%= this.namespacedName().split("/").at(-1) %>/engine.js";
+<% } else { -%>
+import "./<%= this.namespacedName().split("/").at(-1) %>/railtie.js";
+<% } -%>
+
+<%= this.wrapInModules("// Your code goes here...") %>

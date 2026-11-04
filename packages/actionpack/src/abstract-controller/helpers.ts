@@ -20,9 +20,9 @@ import {
   rbClassSuperclass,
   rbDeclareIvar,
   rbFSend,
-  rbModConstDefined,
-  rbModConstGet,
-  rbModConstSet,
+  constDefined,
+  constGet,
+  constSet,
   rbModSingletonP,
   rbObjIsKindOf,
   rbObjIvarDefined,
@@ -197,12 +197,12 @@ export function defineHelpersModule(
   klass: HelpersClass,
   helpers: HelperMethodsModule | null = null,
 ): HelperMethodsModule {
-  if (rbModConstDefined(klass, "HelperMethods", false)) {
-    return rbModConstGet(klass, "HelperMethods") as HelperMethodsModule;
+  if (constDefined(klass, "HelperMethods", false)) {
+    return constGet(klass, "HelperMethods") as HelperMethodsModule;
   }
 
   const mod: HelperMethodsModule = {};
-  rbModConstSet(klass, "HelperMethods", mod);
+  constSet(klass, "HelperMethods", mod);
   if (helpers != null) include(mod, helpers);
   return mod;
 }

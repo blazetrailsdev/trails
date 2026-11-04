@@ -1,13 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  NameError,
-  StandardError,
-  Thread,
-  rbEqual,
-  stderr,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
-import { include, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -89,13 +82,14 @@ expect.addEqualityTesters([
 ]);
 
 class Undeprecated {}
-const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", {}), {
+constSet(TopLevel, "Undeprecated", Undeprecated);
+const UndeprecatedFoo = Object.assign(constSet(Undeprecated, "Foo", {}), {
   BAR: "foo bar",
 });
-registerConstant("Undeprecated::Foo", UndeprecatedFoo);
-registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
+constSet(Undeprecated, "Foo", UndeprecatedFoo);
+constSet(UndeprecatedFoo, "BAR", UndeprecatedFoo.BAR);
 class UndeprecatedError extends StandardError {}
-registerConstant("Undeprecated::Error", UndeprecatedError);
+constSet(Undeprecated, "Error", UndeprecatedError);
 
 class CallerLocationFixture implements CallerLocation {
   path = "packages/activesupport/src/deprecation.test.ts";
@@ -457,7 +451,7 @@ describe("DeprecationTest", () => {
     expect(output.join("")).toMatch("call stack!");
   });
 
-  it(":log behavior without Rails.logger", () => {
+  it(":log behavior without Trails.logger", () => {
     deprecator.behavior = "log";
 
     const output = capture(":stderr", () => {
@@ -827,11 +821,11 @@ describe("DeprecationTest", () => {
     expect(deprecator.messages[deprecator.messages.length - 1]).toMatch("foo");
   });
 
-  it("default deprecation_horizon is greater than the current Rails version", () => {
+  it("default deprecation_horizon is greater than the current Trails version", () => {
     expect(new Deprecation().deprecationHorizon.localeCompare(VERSION.STRING)).toBeGreaterThan(0);
   });
 
-  it("default gem_name is Rails", () => {
+  it("default gem_name is Trails", () => {
     const deprecator = new Deprecation();
 
     const message = callDeprecatedMethodWarning(
@@ -839,7 +833,7 @@ describe("DeprecationTest", () => {
       "deprecated_method",
       "You are calling deprecated method",
     );
-    expect(message).toMatch(/is deprecated and will be removed from Rails/);
+    expect(message).toMatch(/is deprecated and will be removed from Trails/);
   });
 
   it("custom gem_name", () => {

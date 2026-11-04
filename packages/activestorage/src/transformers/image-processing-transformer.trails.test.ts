@@ -52,9 +52,12 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     ).rejects.toThrow(UnsupportedImageProcessingArgument);
   });
 
-  it("holds the allowlist to the exact name and its camelCase spelling", async () => {
+  it("holds the allowlist to the exact camelCase name", async () => {
     await expect(transform({ Resize: "10x10" })).rejects.toThrow(UnsupportedImageProcessingMethod);
     await expect(transform({ RESIZE: "10x10" })).rejects.toThrow(UnsupportedImageProcessingMethod);
+    await expect(transform({ resize_to_limit: [10, 10] })).rejects.toThrow(
+      UnsupportedImageProcessingMethod,
+    );
   });
 
   it("resolves through the Transformers autoload path", async () => {
@@ -75,17 +78,12 @@ describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
     );
   });
 
-  it.each(["mini_magick", "vips"])("dispatches a snake_case name under %s", async (processor) => {
-    ActiveStorage.variantProcessor = processor;
-    await expect(transform({ resize_to_limit: [10, 10] })).resolves.toBeGreaterThan(0);
-  });
-
   it("raises UnsupportedImageProcessingMethod for an unlisted method", async () => {
     await expect(transform({ systemCall: "x" })).rejects.toThrow(UnsupportedImageProcessingMethod);
   });
 
   it("refuses combine_options", async () => {
-    ActiveStorage.supportedImageProcessingMethods = [...supported, "combine_options"];
+    ActiveStorage.supportedImageProcessingMethods = [...supported, "combineOptions"];
     await expect(transform({ combineOptions: { a: 1 } })).rejects.toThrow(
       "doesn't support :combine_options",
     );

@@ -3,6 +3,7 @@ import { base58, freezeTime, minutes, travelBack } from "@blazetrails/activesupp
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { Dir, OpenSSL, StringIO } from "@blazetrails/ruby-compat";
+import "../test-helpers/database/setup.js";
 import { Blob } from "../blob.js";
 import { Filename } from "../filename.js";
 import { MirrorJob } from "../mirror-job.js";

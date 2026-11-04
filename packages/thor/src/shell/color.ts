@@ -1,4 +1,4 @@
-import { env, isSymbol, rbConstGet, rtest, symbolToS } from "@blazetrails/ruby-compat";
+import { env, isSymbol, constGet, rtest, symbolToS } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 
 export class Color extends Basic {
@@ -32,7 +32,7 @@ export class Color extends Basic {
     } else {
       let [foreground, bold] = colors;
       if (isSymbol(foreground)) {
-        foreground = rbConstGet(this.constructor, symbolToS(foreground).toUpperCase());
+        foreground = constGet(this.constructor, symbolToS(foreground).toUpperCase());
       }
 
       bold = rtest(bold) ? Color.BOLD : "";

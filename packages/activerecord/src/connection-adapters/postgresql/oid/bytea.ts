@@ -1,4 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-bytea.generated.js";
+
+import { ConnectionAdapters } from "../../../namespaces.js";
 import { BinaryType, BinaryData } from "@blazetrails/activemodel";
 import { unescapeBytea } from "../../../pg/connection.js";
 
@@ -10,4 +12,4 @@ export class Bytea extends BinaryType {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bytea", Bytea);
+ConnectionAdapters.PostgreSQL.OID.Bytea = Bytea;

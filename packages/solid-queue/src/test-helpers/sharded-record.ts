@@ -1,4 +1,4 @@
-import { registerModel } from "@blazetrails/activerecord";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
 
 export class ShardedRecord extends ApplicationRecord {
@@ -13,4 +13,4 @@ export class ShardedRecord extends ApplicationRecord {
     });
   }
 }
-registerModel(ShardedRecord);
+constSet(TopLevel, "ShardedRecord", ShardedRecord);

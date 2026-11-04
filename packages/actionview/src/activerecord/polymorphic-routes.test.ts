@@ -16,9 +16,9 @@ import {
   extend,
   include,
   NoMethodError,
-  rbModConstSet,
+  constSet,
   rbObjSingletonClass,
-  registerConstant,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Context } from "../context.js";
 import { RoutingUrlFor } from "../routing-url-for.js";
@@ -81,18 +81,18 @@ class ModelDelegate {
 }
 
 const Weblog: { name: string; isUseRelativeModelNaming?: () => boolean } = { name: "Weblog" };
-registerConstant("Weblog", Weblog);
+constSet(TopLevel, "Weblog", Weblog);
 
 class Post extends Base {
   static {
-    rbModConstSet(Weblog, "Post", this);
+    constSet(Weblog, "Post", this);
     this.tableName = "projects";
   }
 }
 
 class Blog extends Base {
   static {
-    rbModConstSet(Weblog, "Blog", this);
+    constSet(Weblog, "Blog", this);
     this.tableName = "projects";
   }
 }

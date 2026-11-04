@@ -1,4 +1,4 @@
-import { registerConstant, RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   assert,
@@ -19,7 +19,7 @@ import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 
-registerConstant("Admin", { name: "Admin" });
+constSet(TopLevel, "Admin", { name: "Admin" });
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import "../../test-helpers/abstract-unit.js";
 

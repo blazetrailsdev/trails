@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isNil, rbFSend, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
@@ -41,4 +41,4 @@ export class BindParam extends Node {
   }
 }
 
-rbModConstSet(Nodes, "BindParam", BindParam);
+constSet(Nodes, "BindParam", BindParam);

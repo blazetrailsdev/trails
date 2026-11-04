@@ -1,5 +1,14 @@
-import { env as ENV, File, Gem, regexpEscape, Shellwords } from "@blazetrails/ruby-compat";
-import { chomp, indent, stripHeredoc } from "@blazetrails/activesupport";
+import {
+  env as ENV,
+  File,
+  Gem,
+  rbFRequire,
+  regexpEscape,
+  Shellwords,
+} from "@blazetrails/ruby-compat";
+import { chomp, extractOptionsBang, indent, stripHeredoc } from "@blazetrails/activesupport";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
+import { Trails } from "../trails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
 import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
@@ -15,7 +24,6 @@ export interface ActionsHost {
 }
 
 export interface GeneratorActionsState {
-  pendingGenerators: Array<{ what: string; args: string[] }>;
   afterInstallCallbacks: Array<() => void | Promise<void>>;
 }
 
@@ -132,12 +140,16 @@ export async function initializer(
 }
 
 export function generate(
-  this: ActionsHost & GeneratorActionsState,
+  this: ActionsHost,
   what: string,
-  ...args: string[]
-): void {
+  ...args: Array<string | TrailsCommandOptions>
+): Promise<unknown> {
   log.call(this, "generate", what);
-  this.pendingGenerators.push({ what, args });
+
+  const options = extractOptionsBang(args) as TrailsCommandOptions;
+  options.abortOnFailure = !options.inline;
+
+  return trailsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
 }
 
 export function afterInstall(
@@ -162,14 +174,38 @@ export function rake(
   return executeCommand.call(this, "rake", command, options);
 }
 
+const commandModule = "../command.js";
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "trails/command": () => import(commandModule),
+};
+
+export interface TrailsCommandOptions extends RakeOptions {
+  inline?: boolean;
+}
+
+/** @inventedArm rbFRequire — PERMANENT */
+export async function trailsCommand(
+  this: ActionsHost,
+  command: string,
+  options: TrailsCommandOptions = {},
+): Promise<unknown> {
+  if (options.inline) {
+    log.call(this, "trails", command);
+    let args: string[];
+    [command, ...args] = Shellwords.shellwords(command);
+    await rbFRequire(loadPath, "trails/command");
+    return await this.inRoot(() =>
+      silenceWarnings(() => Trails.Command!.invoke(command, args, { ...options })),
+    );
+  } else {
+    return await executeCommand.call(this, "trails", command, options);
+  }
+}
+
 export interface RouteOptions {
   namespace?: string | string[] | null;
 }
 
-/**
- * @missingRailsArgs inject_into_file — PERMANENT
- * @missingRailsArgs match_file — PERMANENT
- */
 export async function route(
   this: ActionsHost,
   routingCode: string,

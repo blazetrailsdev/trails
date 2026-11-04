@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= this.humanized() %></title>
+  <%%= csrfMetaTags() %>
+  <%%= cspMetaTag() %>
+
+  <%%= yield("head") %>
+
+  <%= "<" + `%= stylesheetLinkTag("${this.namespacedName()}/application", { media: "all" }) %` + ">" %>
+</head>
+<body>
+
+<%%= yield %>
+
+</body>
+</html>

@@ -16,6 +16,7 @@ import {
   rbFSend,
   rbInspect,
   rbModAttrReader,
+  rbModUndefMethod,
   rbModAttrWriter,
   rbModName,
   rbModMethodDefined,
@@ -354,11 +355,7 @@ export const ClassMethods = {
     names.forEach((name) => {
       aryDeleteIf(this.arguments(), (a) => a.name === rbObjAsString(name));
       if (rtest(options.undefine)) {
-        Object.defineProperty(this.prototype, name as string, {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
+        rbModUndefMethod(this, rbObjAsString(name), `${rbObjAsString(name)}=`);
       }
     });
   },
@@ -407,11 +404,7 @@ export const ClassMethods = {
       delete this.commands()[kebabCase(rbObjAsString(name))];
       delete this.allCommands()[kebabCase(rbObjAsString(name))];
       if (rtest(options.undefine)) {
-        Object.defineProperty(this.prototype, rbObjAsString(name), {
-          value: undefined,
-          writable: true,
-          configurable: true,
-        });
+        rbModUndefMethod(this, rbObjAsString(name));
       }
     });
   },
@@ -450,7 +443,7 @@ export const ClassMethods = {
     config: BaseConfig = {},
   ): Promise<unknown> {
     try {
-      config.shell ||= new ThorBase.shell!();
+      config.shell ||= new ThorBase.shell();
       return await this.dispatch(null, rbObjDup(givenArgs), null, config);
     } catch (e) {
       if (e instanceof ThorError) {

@@ -1,11 +1,12 @@
+import { constSet, constDefined } from "../include.js";
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { ArgumentError } from "../argument-error.js";
 import { Exception } from "../exception.js";
-import { rbModName } from "../object.js";
+import { rbModName, TopLevel } from "../object.js";
 import { Psych } from "../psych.js";
 import { Range } from "../range.js";
 import { RuntimeError } from "../runtime-error.js";
-import { registerConstant, unregisterConstant } from "../variable.js";
+import { constGet, rbModRemoveConst } from "../variable.js";
 
 class Widget {}
 class Point {}
@@ -23,13 +24,14 @@ function restricted(classes: string[], symbols: string[], aliases = false) {
 
 describe("Psych::ClassLoader", () => {
   beforeEach(() => {
-    registerConstant("LoaderWidget", Widget);
-    registerConstant("Struct::LoaderPoint", Point);
+    constSet(TopLevel, "LoaderWidget", Widget);
+    constSet(constGet(Object, "Struct") as object, "LoaderPoint", Point);
   });
 
   afterEach(() => {
-    unregisterConstant("LoaderWidget", Widget);
-    unregisterConstant("Struct::LoaderPoint", Point);
+    if (constDefined(Object, "LoaderWidget", false)) rbModRemoveConst(Object, "LoaderWidget");
+    if (constDefined(Object, "Struct::LoaderPoint", false))
+      rbModRemoveConst(constGet(Object, "Struct") as object, "LoaderPoint");
   });
 
   it("names Psych's constants", () => {
@@ -72,8 +74,12 @@ describe("Psych::ClassLoader", () => {
 });
 
 describe("Psych::ClassLoader::Restricted", () => {
-  beforeEach(() => registerConstant("LoaderWidget", Widget));
-  afterEach(() => unregisterConstant("LoaderWidget", Widget));
+  beforeEach(() => {
+    constSet(TopLevel, "LoaderWidget", Widget);
+  });
+  afterEach(() => {
+    if (constDefined(Object, "LoaderWidget", false)) rbModRemoveConst(Object, "LoaderWidget");
+  });
 
   it("loads a permitted class by its name", () => {
     const loader = new Psych.ClassLoader.Restricted([rbModName(Widget)!], []);

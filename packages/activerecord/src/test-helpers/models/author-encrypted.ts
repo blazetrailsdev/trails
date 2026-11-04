@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Scheme } from "../../encryption/scheme.js";
-import { registerModel } from "../../associations.js";
 
 export class EncryptedAuthor extends Base {
   static _tableName = "authors";
@@ -10,7 +11,8 @@ export class EncryptedAuthor extends Base {
     this.encrypts("name", { previousSchemes: [new Scheme({ deterministic: true })] });
   }
 }
-registerModel(EncryptedAuthor);
+constSet(TopLevel, "EncryptedAuthor", EncryptedAuthor);
+DescendantsTracker.registerSubclass(Base, EncryptedAuthor);
 
 export class EncryptedAuthorWithKey extends Base {
   static _tableName = "authors";
@@ -19,4 +21,5 @@ export class EncryptedAuthorWithKey extends Base {
     this.encrypts("name", { key: "some secret key!" });
   }
 }
-registerModel(EncryptedAuthorWithKey);
+constSet(TopLevel, "EncryptedAuthorWithKey", EncryptedAuthorWithKey);
+DescendantsTracker.registerSubclass(Base, EncryptedAuthorWithKey);

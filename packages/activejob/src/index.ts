@@ -3,7 +3,7 @@ export { version } from "./version.js";
 export { deprecator } from "./deprecator.js";
 export * from "./active-job.js";
 export { ActiveJob } from "./namespaces.js";
-export { Base, registerJob } from "./base.js";
+export { Base } from "./base.js";
 export { Arguments, DeserializationError, SerializationError } from "./arguments.js";
 export { Serializers } from "./serializers.js";
 export { ObjectSerializer } from "./serializers/object-serializer.js";
@@ -21,4 +21,4 @@ export { InlineAdapter } from "./queue-adapters/inline-adapter.js";
 export { EnqueueError, Enqueuing, performAllLater } from "./enqueuing.js";
 export { ConfiguredJob } from "./configured-job.js";
 
-import "./class-paths.generated.js";
+import "./constants.generated.js";

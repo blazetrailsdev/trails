@@ -1,6 +1,6 @@
 import { describe, expect, it, onTestFinished } from "vitest";
 import { capture } from "./test-helpers/helper.js";
-import { ArgumentError, rbModConstSet, toS } from "@blazetrails/ruby-compat";
+import { ArgumentError, constSet, toS } from "@blazetrails/ruby-compat";
 import { Base, type BaseConfig } from "./base.js";
 import { Command } from "./command.js";
 import { Group, type GroupClass } from "./group.js";
@@ -317,11 +317,11 @@ describe("Thor.help with a nested Group", () => {
     class Host extends Thor {}
     class Nested extends Group {}
     (Nested as unknown as GroupClass).desc("nested things");
-    rbModConstSet(Host, "Nested", Nested);
+    constSet(Host, "Nested", Nested);
     (Base.subclasses() as unknown[]).push(Nested);
     onTestFinished(() => void (Base.subclasses() as unknown[]).pop());
     const output = await capture(":stdout", () =>
-      (Host as unknown as ThorClass).help(new Base.shell!()),
+      (Host as unknown as ThorClass).help(new Base.shell()),
     );
     expect(output).toContain("# nested things");
   });

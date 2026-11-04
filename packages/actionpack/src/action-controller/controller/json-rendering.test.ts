@@ -4,11 +4,16 @@ import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
-import { StringIO, isRegisteredConstant, rbModRemoveConst } from "@blazetrails/ruby-compat";
-import { registerController } from "../base.js";
+import {
+  StringIO,
+  constDefined,
+  rbModRemoveConst,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 
 afterEach(() => {
-  if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+  if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
 });
 
 describe("Controller JSON rendering integration", () => {
@@ -115,7 +120,7 @@ describe("Controller JSON rendering integration", () => {
     routes.draw(function () {
       this.resources("posts");
     });
-    registerController("PostsController", PostsController);
+    constSet(TopLevel, "PostsController", PostsController);
 
     const [status, headers, body] = await routes.call({
       REQUEST_METHOD: "GET",

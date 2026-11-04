@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { CodeStatistics } from "./code-statistics.js";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
@@ -14,12 +15,10 @@ describe("CodeStatisticsCalculatorTest", () => {
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-  const read = (p: string) => Promise.resolve(fs.readFileSync(p, "utf-8"));
-
   it("calculate statistics using #add_by_file_path", async () => {
     const p = path.join(tmpDir, "stats.rb");
     fs.writeFileSync(p, "      def foo\n        puts 'foo'\n        # bar\n      end\n");
-    await calc.addByFilePath(p, read);
+    await calc.addByFilePath(p);
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([4, 3, 0, 1]);
   });
 
@@ -29,7 +28,7 @@ describe("CodeStatisticsCalculatorTest", () => {
       p,
       "      class FooTest < ActionController::TestCase\n        test 'expectation' do\n          assert true\n        end\n\n        def test_expectation\n          assert true\n        end\n      end\n",
     );
-    await calc.addByFilePath(p, read);
+    await calc.addByFilePath(p);
     expect(calc.methods).toBe(2);
   });
 
@@ -42,141 +41,178 @@ describe("CodeStatisticsCalculatorTest", () => {
 
   it("accumulate statistics using #add_by_io", () => {
     calc.add(new CodeStatisticsCalculator(1, 2, 3, 4));
-    calc.addByString(
-      "      def foo\n        puts 'foo'\n      end\n\n      def bar; end\n      class A; end\n",
+    calc.addByIo(
+      new StringIO(
+        "      def foo\n        puts 'foo'\n      end\n\n      def bar; end\n      class A; end\n",
+      ),
       "rb",
     );
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([7, 7, 4, 6]);
   });
 
   it("calculate number of Ruby methods", () => {
-    calc.addByString(
-      "      def foo\n        puts 'foo'\n      end\n\n      def bar; end\n\n      class Foo\n        def bar(abc)\n        end\n      end\n",
+    calc.addByIo(
+      new StringIO(
+        "      def foo\n        puts 'foo'\n      end\n\n      def bar; end\n\n      class Foo\n        def bar(abc)\n        end\n      end\n",
+      ),
       "rb",
     );
     expect(calc.methods).toBe(3);
   });
 
   it("calculate Ruby LOCs", () => {
-    calc.addByString(
-      "      def foo\n        puts 'foo'\n      end\n\n      # def bar; end\n\n      class A < B\n      end\n",
+    calc.addByIo(
+      new StringIO(
+        "      def foo\n        puts 'foo'\n      end\n\n      # def bar; end\n\n      class A < B\n      end\n",
+      ),
       "rb",
     );
     expect([calc.lines, calc.codeLines]).toEqual([8, 5]);
   });
 
   it("calculate number of Ruby classes", () => {
-    calc.addByString(
-      "      class Foo < Bar\n        def foo\n          puts 'foo'\n        end\n      end\n\n      class Z; end\n\n      # class A\n      # end\n",
+    calc.addByIo(
+      new StringIO(
+        "      class Foo < Bar\n        def foo\n          puts 'foo'\n        end\n      end\n\n      class Z; end\n\n      # class A\n      # end\n",
+      ),
       "rb",
     );
     expect(calc.classes).toBe(2);
   });
 
   it("skip Ruby comments", () => {
-    calc.addByString(
-      "=begin\n      class Foo\n        def foo\n          puts 'foo'\n        end\n      end\n=end\n\n      # class A\n      # end\n",
+    calc.addByIo(
+      new StringIO(
+        "=begin\n      class Foo\n        def foo\n          puts 'foo'\n        end\n      end\n=end\n\n      # class A\n      # end\n",
+      ),
       "rb",
     );
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([10, 0, 0, 0]);
   });
 
   it("calculate number of JS methods", () => {
-    calc.addByString(
-      "      function foo(x, y, z) {\n        doX();\n      }\n\n      $(function () {\n        bar();\n      })\n\n      var baz = function ( x ) {\n      }\n",
+    calc.addByIo(
+      new StringIO(
+        "      function foo(x, y, z) {\n        doX();\n      }\n\n      $(function () {\n        bar();\n      })\n\n      var baz = function ( x ) {\n      }\n",
+      ),
       "js",
     );
     expect(calc.methods).toBe(3);
   });
 
   it("calculate JS LOCs", () => {
-    calc.addByString(
-      "      function foo()\n        alert('foo');\n      end\n\n      // var b = 2;\n\n      var a = 1;\n",
+    calc.addByIo(
+      new StringIO(
+        "      function foo()\n        alert('foo');\n      end\n\n      // var b = 2;\n\n      var a = 1;\n",
+      ),
       "js",
     );
     expect([calc.lines, calc.codeLines]).toEqual([7, 4]);
   });
 
   it("skip JS comments", () => {
-    calc.addByString(
-      "      /*\n       * var f = function () {\n       1 / 2;\n      }\n      */\n\n      // call();\n      //\n",
+    calc.addByIo(
+      new StringIO(
+        "      /*\n       * var f = function () {\n       1 / 2;\n      }\n      */\n\n      // call();\n      //\n",
+      ),
       "js",
     );
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([8, 0, 0, 0]);
   });
 
   it("skip TSE comments", () => {
-    calc.addByString(
-      "      <!-- This is an HTML comment -->\n      <%# This is a great comment! %>\n      <div>\n        <%= hello %>\n\n      </div>\n",
+    calc.addByIo(
+      new StringIO(
+        "      <!-- This is an HTML comment -->\n      <%# This is a great comment! %>\n      <div>\n        <%= hello %>\n\n      </div>\n",
+      ),
       "tse",
     );
     expect([calc.lines, calc.codeLines]).toEqual([6, 3]);
   });
 
   it("skip CSS comments", () => {
-    calc.addByString(
-      "      /* My cool CSS */\n      .selector {\n        background-color: blue;\n\n      }\n",
+    calc.addByIo(
+      new StringIO(
+        "      /* My cool CSS */\n      .selector {\n        background-color: blue;\n\n      }\n",
+      ),
       "css",
     );
     expect([calc.lines, calc.codeLines]).toEqual([5, 3]);
   });
 
   it("skip SCSS comments", () => {
-    calc.addByString(
-      "      // My cool SCSS\n      /* My cool SCSS */\n      .selector {\n        background-color: blue;\n\n      }\n",
+    calc.addByIo(
+      new StringIO(
+        "      // My cool SCSS\n      /* My cool SCSS */\n      .selector {\n        background-color: blue;\n\n      }\n",
+      ),
       "scss",
     );
     expect([calc.lines, calc.codeLines]).toEqual([6, 3]);
   });
 
   it("calculate number of CoffeeScript methods", () => {
-    calc.addByString(
-      "      square = (x) -> x * x\n\n      math =\n        cube: (x) -> x * square x\n\n      fill = (container, liquid = \"coffee\") ->\n        \"Filling the #{container} with #{liquid}...\"\n\n      $('.shopping_cart').bind 'click', (event) =>\n        @customer.purchase @cart\n",
+    calc.addByIo(
+      new StringIO(
+        "      square = (x) -> x * x\n\n      math =\n        cube: (x) -> x * square x\n\n      fill = (container, liquid = \"coffee\") ->\n        \"Filling the #{container} with #{liquid}...\"\n\n      $('.shopping_cart').bind 'click', (event) =>\n        @customer.purchase @cart\n",
+      ),
       "coffee",
     );
     expect(calc.methods).toBe(4);
   });
 
   it("calculate CoffeeScript LOCs", () => {
-    calc.addByString(
-      "      # Assignment:\n      number   = 42\n      opposite = true\n\n      ###\n      CoffeeScript Compiler v1.4.0\n      Released under the MIT License\n      ###\n\n      # Conditions:\n      number = -42 if opposite\n",
+    calc.addByIo(
+      new StringIO(
+        "      # Assignment:\n      number   = 42\n      opposite = true\n\n      ###\n      CoffeeScript Compiler v1.4.0\n      Released under the MIT License\n      ###\n\n      # Conditions:\n      number = -42 if opposite\n",
+      ),
       "coffee",
     );
     expect([calc.lines, calc.codeLines]).toEqual([11, 3]);
   });
 
   it("calculate number of CoffeeScript classes", () => {
-    calc.addByString(
-      '      class Animal\n        constructor: (@name) ->\n\n        move: (meters) ->\n          alert @name + " moved #{meters}m."\n\n      class Snake extends Animal\n        move: ->\n          alert "Slithering..."\n          super 5\n\n      # class Horse\n',
+    calc.addByIo(
+      new StringIO(
+        '      class Animal\n        constructor: (@name) ->\n\n        move: (meters) ->\n          alert @name + " moved #{meters}m."\n\n      class Snake extends Animal\n        move: ->\n          alert "Slithering..."\n          super 5\n\n      # class Horse\n',
+      ),
       "coffee",
     );
     expect(calc.classes).toBe(2);
   });
 
   it("skip CoffeeScript comments", () => {
-    calc.addByString(
-      "###\nclass Animal\n  constructor: (@name) ->\n\n  move: (meters) ->\n    alert @name + \" moved #{meters}m.\"\n  ###\n\n  # class Horse\n  alert 'hello'\n",
+    calc.addByIo(
+      new StringIO(
+        "###\nclass Animal\n  constructor: (@name) ->\n\n  move: (meters) ->\n    alert @name + \" moved #{meters}m.\"\n  ###\n\n  # class Horse\n  alert 'hello'\n",
+      ),
       "coffee",
     );
     expect([calc.lines, calc.codeLines, calc.classes, calc.methods]).toEqual([10, 1, 0, 0]);
   });
 
   it("count rake tasks", () => {
-    calc.addByString("      task :test_task do\n        puts 'foo'\n      end\n\n", "rake");
+    calc.addByIo(
+      new StringIO("      task :test_task do\n        puts 'foo'\n      end\n\n"),
+      "rake",
+    );
     expect([calc.lines, calc.codeLines]).toEqual([4, 3]);
   });
 
   it("calculate number of TypeScript methods", () => {
-    calc.addByString(
-      "function foo(x: number) {\n  return x;\n}\n\nconst bar = (y: number) => y;\n\nclass Baz {\n  async run() {}\n  get name() { return 'a'; }\n}\n",
+    calc.addByIo(
+      new StringIO(
+        "function foo(x: number) {\n  return x;\n}\n\nconst bar = (y: number) => y;\n\nclass Baz {\n  async run() {}\n  get name() { return 'a'; }\n}\n",
+      ),
       "ts",
     );
     expect(calc.methods).toBe(4);
   });
 
   it("calculate number of TypeScript classes", () => {
-    calc.addByString(
-      "export class Foo {}\nexport default class Bar {}\nabstract class Baz {}\n// class Hidden {}\n",
+    calc.addByIo(
+      new StringIO(
+        "export class Foo {}\nexport default class Bar {}\nabstract class Baz {}\n// class Hidden {}\n",
+      ),
       "ts",
     );
     expect(calc.classes).toBe(3);

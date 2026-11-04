@@ -1,10 +1,11 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
@@ -56,7 +57,8 @@ export class SecureReader extends Base {
     });
   }
 }
-registerModel(SecureReader);
+constSet(TopLevel, "SecureReader", SecureReader);
+DescendantsTracker.registerSubclass(Base, SecureReader);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SecureReader {
   get securePost(): Post | null | Promise<Post | null>;
@@ -81,7 +83,8 @@ export class LazyReader extends Base {
     this.belongsTo("person");
   }
 }
-registerModel(LazyReader);
+constSet(TopLevel, "LazyReader", LazyReader);
+DescendantsTracker.registerSubclass(Base, LazyReader);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LazyReader {
   get post(): Post | null | Promise<Post | null>;
@@ -90,4 +93,5 @@ export interface LazyReader {
   set person(value: Person | null);
 }
 
-registerModel(Reader);
+constSet(TopLevel, "Reader", Reader);
+DescendantsTracker.registerSubclass(Base, Reader);

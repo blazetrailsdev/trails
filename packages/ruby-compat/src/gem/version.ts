@@ -37,6 +37,17 @@ export class Version {
     return this.version;
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems/version.rb:336`, over `partition_segments` (`:419-423`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  segments(): (number | string)[] {
+    return (this.version.match(/\d+|[a-z]+/gi) ?? []).map((s) =>
+      /^\d/.test(s) ? parseInt(s, 10) : s,
+    );
+  }
+
   /** @noRailsEquivalent PERMANENT */
   isPrerelease(): boolean {
     this.#prerelease ??= /[a-zA-Z]/.test(this.version);

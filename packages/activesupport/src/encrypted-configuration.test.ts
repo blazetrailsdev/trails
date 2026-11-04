@@ -32,7 +32,7 @@ describe("EncryptedConfigurationTest", () => {
     credentials = new EncryptedConfiguration({
       configPath: credentialsConfigPath,
       keyPath: credentialsKeyPath,
-      envKey: "RAILS_MASTER_KEY",
+      envKey: "TRAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });
   });
@@ -81,7 +81,7 @@ describe("EncryptedConfigurationTest", () => {
     await assertRaise([InvalidKeyError], { match: invalidKey("42") }, () => credentials.config());
 
     await credentials.write("42.0: value");
-    await assertRaise([InvalidKeyError], undefined, () => credentials.config());
+    await assertRaise([InvalidKeyError], { match: invalidKey("42.0") }, () => credentials.config());
 
     await credentials.write("Off: value");
     await assertRaise([InvalidKeyError], { match: invalidKey("false") }, () =>
@@ -95,7 +95,9 @@ describe("EncryptedConfigurationTest", () => {
     );
 
     await credentials.write("42.0: value");
-    await assertRaise([InvalidKeyError], undefined, () => credentials.validateBang());
+    await assertRaise([InvalidKeyError], { match: invalidKey("42.0") }, () =>
+      credentials.validateBang(),
+    );
 
     await credentials.write("Off: value");
     await assertRaise([InvalidKeyError], { match: invalidKey("false") }, () =>

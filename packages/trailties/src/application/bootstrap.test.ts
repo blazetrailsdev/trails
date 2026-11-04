@@ -1,3 +1,4 @@
+import { Autoloaders } from "../autoloaders.js";
 import {
   BroadcastLogger,
   Logger,
@@ -8,9 +9,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Initializable } from "../initializable.js";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
-import { Trails } from "../rails.js";
+import { Trails } from "../trails.js";
 
 const baseConfig = (): BootstrapConfig => ({
+  root: null,
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,
@@ -20,6 +22,7 @@ const baseConfig = (): BootstrapConfig => ({
 
 class TestApp extends Bootstrap implements BootstrapHost {
   config: BootstrapConfig = { ...baseConfig() };
+  autoloaders = new Autoloaders();
 }
 
 describe("Bootstrap", () => {
@@ -105,6 +108,7 @@ describe("Bootstrap", () => {
       "load_environment_hook",
       "initialize_logger",
       "initialize_cache",
+      "setup_once_autoloader",
       "bootstrap_hook",
     ];
 
@@ -119,6 +123,7 @@ describe("Bootstrap", () => {
 
     it("places every initializer in the :all group", () => {
       for (const init of Bootstrap._ownInitializers()) {
+        if (init.name === "setup_once_autoloader") continue;
         expect(init.belongsTo("all")).toBe(true);
       }
     });

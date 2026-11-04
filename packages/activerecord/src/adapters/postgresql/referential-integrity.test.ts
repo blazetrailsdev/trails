@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(e.message).toBe("Should be re-raised");
         });
         const warning = warnSpy.mock.calls.map((c) => String(c[0])).join("\n");
-        expect(warning).toMatch(/WARNING: Rails was not able to disable referential integrity/);
+        expect(warning).toMatch(/WARNING: Trails was not able to disable referential integrity/);
         expect(warning).toMatch(/cause: PG::InsufficientPrivilege/);
       } finally {
         warnSpy.mockRestore();

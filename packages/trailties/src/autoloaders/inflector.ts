@@ -12,4 +12,9 @@ export const Inflector = {
   inflect(overrides: Record<string, string>): void {
     Object.assign(_overrides, overrides);
   },
+
+  /** @noRailsEquivalent PERMANENT */
+  overrides(): Readonly<Record<string, string>> {
+    return _overrides;
+  },
 };

@@ -211,12 +211,12 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     );
   }
 
-  if (pkg === "chronic" || pkg === "builder") {
+  if (pkg === "chronic" || pkg === "builder" || pkg === "zeitwerk") {
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
   }
 
-  if (pkg === "rack" || pkg === "rack-session") {
+  if (pkg === "rack" || pkg === "rack-session" || pkg === "rackup") {
     const dir = path.dirname(rubyFile);
     // rack-session's lib root is `lib/rack/session` while its test root is
     // `test`, so every spec repeats that root as a leading `session_` segment
@@ -268,8 +268,12 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
           .replace(/_/g, "-");
 
   // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
-  tsDir = tsDir.replace(/\berb\b/g, "tse");
-  const mappedTsFile = tsFile.replace(/\berb\b/g, "tse");
+  tsDir = tsDir
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+  const mappedTsFile = tsFile
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
 
   if (!tsDir) return mappedTsFile;
   return path.join(tsDir, mappedTsFile);
@@ -319,7 +323,8 @@ function normalizeErb(s: string): string {
   return normalize(s)
     .replace(/erb/g, "tse")
     .replace(/rubocop/g, "eslint")
-    .replace(/capybara/g, "vitest");
+    .replace(/capybara/g, "vitest")
+    .replace(/(?<![a-z])rails/g, "trails");
 }
 
 /**
@@ -413,6 +418,22 @@ export function matchesInterpolatedPath(pattern: readonly string[], tsPath: stri
     if (literals.every((piece) => piece === "")) return false;
     return new RegExp(`^${literals.join("\\s*.*\\s*")}$`).test(tsParts[i]);
   });
+}
+
+/**
+ * The order the pattern pass visits a file's Ruby cases in: the longest
+ * literal text first. A pattern is a prefix of another whenever one looped
+ * test's name starts with another's (`eager loads everything #{ancestor}` and
+ * `eager loads everything (multiple root directories) #{ancestor}`,
+ * zeitwerk `test_eager_load_namespace.rb`), and in file order the shorter one
+ * would consume every expansion of the longer.
+ */
+export function patternMatchOrder(testCases: readonly { pattern?: readonly string[] }[]): number[] {
+  const literalLength = (pattern: readonly string[] | undefined) =>
+    (pattern ?? []).join("").split(DYNAMIC_TITLE_PLACEHOLDER).join("").length;
+  return testCases
+    .map((_, ri) => ri)
+    .sort((a, b) => literalLength(testCases[b].pattern) - literalLength(testCases[a].pattern));
 }
 
 function normPath(ancestors: string[], description: string): string {
@@ -1109,7 +1130,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
-      for (let ri = 0; ri < file.testCases.length; ri++) {
+      for (const ri of patternMatchOrder(file.testCases)) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
         if (tc.pattern === undefined) continue;
@@ -1700,6 +1721,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   rack: "packages/rack/src/",
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
+  rackup: "packages/rackup/src/",
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
   marcel: "packages/marcel/src/",
@@ -1711,12 +1733,14 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "et-orbi": "packages/et-orbi/src/",
   raabro: "packages/raabro/src/",
   fugit: "packages/fugit/src/",
+  zeitwerk: "packages/zeitwerk/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
   actioncable: "packages/actioncable/src/",
   activejob: "packages/activejob/src/",
+  actionmailer: "packages/actionmailer/src/",
   activestorage: "packages/activestorage/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",

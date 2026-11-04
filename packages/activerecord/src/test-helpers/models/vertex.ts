@@ -1,7 +1,8 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Edge } from "./edge.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Vertex extends Base {
   declare sinkEdges: AssociationProxy<Edge>;
@@ -21,4 +22,5 @@ export class Vertex extends Base {
     });
   }
 }
-registerModel(Vertex);
+constSet(TopLevel, "Vertex", Vertex);
+DescendantsTracker.registerSubclass(Base, Vertex);

@@ -1,0 +1,11 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+// explicit eslint config increases performance slightly while avoiding config confusion.
+const result = spawnSync(join(root, "node_modules", ".bin", "eslint"), ["--config", join(root, "eslint.config.js"), ...process.argv.slice(2)], {
+  stdio: "inherit",
+});
+if (result.error) console.error(result.error);
+process.exit(result.status ?? 1);

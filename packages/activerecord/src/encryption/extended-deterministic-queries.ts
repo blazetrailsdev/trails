@@ -1,3 +1,4 @@
+import "../constants.extended-deterministic-queries.generated.js";
 import { Encryption } from "../namespaces.js";
 import {
   Concern,

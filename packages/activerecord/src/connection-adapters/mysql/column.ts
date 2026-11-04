@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import "../../constants.mysql-column.generated.js";
+
 import { Column as BaseColumn } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { ConnectionAdapters } from "../../namespaces.js";
@@ -29,5 +30,4 @@ export class Column extends BaseColumn {
   }
 }
 
-registerConstant("ActiveRecord::ConnectionAdapters::MySQL::Column", Column);
 ConnectionAdapters.MySQL.Column = Column;

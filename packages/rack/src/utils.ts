@@ -23,6 +23,7 @@ import {
   stringToSym,
   symbolToS,
   b as rbB,
+  Range,
 } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
@@ -382,19 +383,19 @@ export function rfc2822(time: Date): string {
   return `${d}, ${day} ${mon} ${year} ${h}:${m}:${s} -0000`;
 }
 
-export function byteRanges(env: Record<string, any>, size: number): [number, number][] | null {
+export function byteRanges(env: Record<string, any>, size: number): Range<number>[] | null {
   return getByteRanges(env["HTTP_RANGE"], size);
 }
 
 export function getByteRanges(
   httpRange: string | null | undefined,
   size: number,
-): [number, number][] | null {
+): Range<number>[] | null {
   if (size === 0) return null;
   if (!httpRange) return null;
   const match = httpRange.match(/bytes=([^;]+)/);
   if (!match) return null;
-  const ranges: [number, number][] = [];
+  const ranges: Range<number>[] = [];
 
   for (const spec of match[1].split(/,[ \t]*/)) {
     if (!spec.includes("-")) return null;
@@ -418,10 +419,10 @@ export function getByteRanges(
         if (r1 >= size) r1 = size - 1;
       }
     }
-    if (r0 <= r1) ranges.push([r0, r1]);
+    if (r0 <= r1) ranges.push(new Range(r0, r1));
   }
 
-  const totalBytes = ranges.reduce((sum, [a, b]) => sum + (b - a + 1), 0);
+  const totalBytes = ranges.reduce((sum, range) => sum + (range.end! - range.begin! + 1), 0);
   if (totalBytes > size) return [];
 
   return ranges;

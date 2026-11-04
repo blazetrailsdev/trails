@@ -11,7 +11,7 @@ import {
   rbClassSuperclass,
   rbFCaller,
   rbInspect as inspect,
-  rbModConstSet,
+  constSet,
   rbModMethodDefined,
   rbModInstanceMethod,
   rbObjIvarGet,
@@ -187,6 +187,7 @@ export interface AttributeMethodsHost {
   _generatedAttributeMethods?: GeneratedAttributeMethods;
   attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
+  isDangerousAttributeMethod(name: string): boolean;
   _ignoredColumns?: string[];
   prototype: any;
   isBaseClass(): boolean;
@@ -231,49 +232,25 @@ let _dangerousMethodsCache: Set<string> | null = null;
 
 /** @missingRailsCall map — PERMANENT */
 export function dangerousAttributeMethods(): Set<string> {
-  return (_dangerousMethodsCache ||= new Set([
-    "save",
-    "saveBang",
-    "destroy",
-    "delete",
-    "reload",
-    "update",
-    "increment",
-    "decrement",
-    "toggle",
-    "touch",
-    "lock",
-    "freeze",
-    "dup",
-    "clone",
-    "becomes",
-    "createOrUpdate",
-    "isFrozen",
-    "inspect",
-    "toJSON",
-    "isNewRecord",
-    "isPersisted",
-    "isDestroyed",
-    "isReadonly",
-    "isChanged",
-    "isValid",
-    "errors",
-    "validate",
-    "readAttribute",
-    "writeAttribute",
-    "assignAttributes",
-    "encrypt",
-    "decrypt",
-    "isEncryptedAttribute",
-    "ciphertextFor",
-    "attributes",
-    "logger",
-  ]));
+  if (_dangerousMethodsCache) return _dangerousMethodsCache;
+  const names = new Set<string>();
+  for (
+    let proto: object | null = ActiveRecord.Base.prototype;
+    proto && proto !== Object.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key !== "constructor") names.add(key);
+    }
+  }
+  for (const name of ["__id__", "dup", "freeze", "isFrozen", "hash", "class", "clone"])
+    names.add(name);
+  return (_dangerousMethodsCache = names);
 }
 
 /** @missingRailsName generatedAttributeMethods — PERMANENT */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  this._generatedAttributeMethods = rbModConstSet(
+  this._generatedAttributeMethods = constSet(
     this,
     "GeneratedAttributeMethods",
     new GeneratedAttributeMethods(),
@@ -437,7 +414,7 @@ export function isInstanceMethodAlreadyImplemented(
     ThisParameterType<typeof AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
-  if (isDangerousAttributeMethod.call(this, methodName)) {
+  if (this.isDangerousAttributeMethod(methodName)) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
     );

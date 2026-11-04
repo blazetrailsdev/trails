@@ -1,6 +1,7 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Human } from "./human.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MixedCaseMonkey extends Base {
@@ -15,7 +16,8 @@ export class MixedCaseMonkey extends Base {
     this.belongsTo("human");
   }
 }
-registerModel(MixedCaseMonkey);
+constSet(TopLevel, "MixedCaseMonkey", MixedCaseMonkey);
+DescendantsTracker.registerSubclass(Base, MixedCaseMonkey);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MixedCaseMonkey {
   get human(): Human | null | Promise<Human | null>;

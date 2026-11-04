@@ -74,9 +74,14 @@ export class CreateFile extends EmptyDirectory {
   override async invokeBang(): Promise<string> {
     await this.invokeWithConflictCheck(async () => {
       await FileUtils.mkdirPAsync(File.dirname(this.destination));
-      await File.writeAsync(this.destination, await this.render(), {
-        perm: this.config["perm"] as number | undefined,
-      });
+      const render = await this.render();
+      await File.writeAsync(
+        this.destination,
+        render instanceof Uint8Array ? render : Uint8Array.from(bytes(render)),
+        {
+          perm: this.config["perm"] as number | undefined,
+        },
+      );
     });
     return this.givenDestination;
   }

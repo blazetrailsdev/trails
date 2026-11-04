@@ -25,6 +25,43 @@ describe("TimerTask", () => {
     expect(runs).toBe(after);
   });
 
+  it("posts each run to the given executor", async () => {
+    let posts = 0;
+    let runs = 0;
+    const executor = {
+      post(task: () => unknown): boolean {
+        posts += 1;
+        task();
+        return true;
+      },
+    };
+    const task = new TimerTask({ executionInterval: 0.02, runNow: true, executor }, () => {
+      runs += 1;
+    }).execute();
+    await sleep(30);
+    task.shutdown();
+    expect(posts).toBeGreaterThanOrEqual(1);
+    expect(runs).toBe(posts);
+  });
+
+  it("yields to timers between runs at an interval the ScheduledTask gate posts at once", async () => {
+    const limit = 100_000;
+    let runs = 0;
+    let fired = false;
+    setTimeout(() => (fired = true), 0);
+    const task = new TimerTask({ executionInterval: 0.005 }, (self) => {
+      runs += 1;
+      if (runs >= limit) self.shutdown();
+    }).execute();
+    await sleep(30);
+    task.shutdown();
+    const after = runs;
+    await sleep(20);
+    expect(fired).toBe(true);
+    expect(after).toBeLessThan(limit);
+    expect(runs).toBe(after);
+  });
+
   it("keeps running after the block raises", async () => {
     let runs = 0;
     const task = new TimerTask({ executionInterval: 0.02 }, () => {

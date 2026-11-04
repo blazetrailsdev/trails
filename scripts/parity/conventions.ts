@@ -68,6 +68,11 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rubocop: "Eslint",
   capybara: "vitest",
   Capybara: "Vitest",
+  yarn: "pnpm",
+  Yarn: "Pnpm",
+  rails: "trails",
+  Rails: "Trails",
+  RAILS: "TRAILS",
 };
 
 /**
@@ -87,7 +92,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
  *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
- *   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
+ *   maps to the `Trails` global in `packages/trailties/src/trails.ts`.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -128,10 +133,35 @@ const TOKEN_RENAME_PATTERN = new RegExp(`(^|_)(${tokenRenameAlternation()})(?=_|
  * `TOKEN_RENAMES` used to reach method names and silently not file paths,
  * which is exactly how the `rb` entry sat dead between #6017 and #6043.
  */
-const FILE_TOKEN_RENAME_PATTERN = new RegExp(`\\b(${tokenRenameAlternation()})\\b`, "g");
+const FILE_TOKEN_RENAME_PATTERN = new RegExp(
+  `\\b(${tokenRenameAlternation()})\\b(?!-(?:dom-testing|html-sanitizer|api))`,
+  "g",
+);
+
+/**
+ * Multi-word renames, for a word that is only renamed in these phrases. trails
+ * installs through a package manager, never Bundler: `run_bundle`
+ * (generators/app_base.rb:705-707), `bundle_command` (:645), `bundle_install?`
+ * (:671) and the `skip_bundle` option credit at the install spelling, while
+ * `bundle` itself stays free for a JS bundle.
+ */
+export const PHRASE_RENAMES: Record<string, string> = {
+  apply_rails_template: "apply_trails_template",
+  run_bundle: "run_install",
+  bundle_command: "install_command",
+  bundle_install: "install",
+  skip_bundle: "skip_install",
+};
+
+const PHRASE_RENAME_PATTERN = new RegExp(
+  `(^|_)(${Object.keys(PHRASE_RENAMES).join("|")})(?=_|$)`,
+  "g",
+);
 
 export function applyTokenRenames(snake: string): string {
-  return snake.replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
+  return snake
+    .replace(PHRASE_RENAME_PATTERN, (_m, pre, phrase: string) => pre + PHRASE_RENAMES[phrase])
+    .replace(TOKEN_RENAME_PATTERN, (_m, pre, tok: string) => pre + TOKEN_RENAMES[tok]);
 }
 
 function applyFileTokenRenames(segment: string): string {
@@ -161,6 +191,7 @@ export function snakeToCamel(name: string): string {
  * framework that ships a `railtie.rb` or a `railties/` directory).
  */
 export const PATH_SEGMENT_ALIASES: Record<string, string> = {
+  yarn: "pnpm",
   railtie: "trailtie",
   railties: "trailties",
 };
@@ -714,6 +745,42 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no " +
+      "hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, " +
+      '"`Module#autoload` is a build step"). PERMANENT.',
+    names: ["require", "const_added"],
+    rubyFiles: ["core_ext/kernel.rb", "core_ext/module.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
+      "`Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no " +
+      "JS counterpart (RFC 0213). PERMANENT.",
+    names: ["unregister_inceptions"],
+    rubyFiles: ["loader.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
+      "`Loader.for_gem`, `for_gem_extension` and `Registry.loader_for_gem` are not ported: trails " +
+      "has no Ruby packaging concept, and `Registry.loaderForPackage` reads a `package.json` " +
+      '(RFC 0213 § "Non-goals", owner decision on trails#9619). PERMANENT.',
+    names: ["for_gem", "for_gem_extension", "loader_for_gem", "gem_loaders_by_root_file"],
+    rubyFiles: ["loader.rb", "registry.rb"],
+    packages: ["zeitwerk"],
+  },
+  {
+    reason:
+      "`Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node " +
+      'counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess ' +
+      "arm's `runInIsolation` exists. PERMANENT.",
+    names: ["run_in_isolation"],
+    rubyFiles: ["isolation.rb"],
+    packages: ["activesupport"],
+    tsMirrorName: "runInIsolation",
+  },
+  {
+    reason:
       "tasks RFC 0204-actionmailer-and-mail-port, Transport edges: the socket is " +
       "nodemailer's `SMTPConnection`, so Net::SMTP's socket setup members are not ported. " +
       "PERMANENT.",
@@ -837,9 +904,9 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "reference, and `eager_load!` forces the whole set in production. ESM has " +
       "no autoload — every converter module is a static `import` at the top of " +
       "number-helper.ts, resolved before the module body runs — so there is " +
-      "nothing to register and nothing to force. Same reason as the " +
-      "dependencies.rb group below; scoped to number_helper.rb so the names stay " +
-      "expected wherever a real autoload surface is ported.",
+      "nothing to register and nothing to force. Scoped to number_helper.rb so " +
+      "the names stay expected on the ported surface, " +
+      "dependencies/autoload.rb.",
     names: ["autoload", "autoload_under", "autoload_at", "eager_autoload", "eager_load!"],
     rubyFiles: ["number_helper.rb"],
   },
@@ -994,65 +1061,45 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveSupport::Dependencies (dependencies.rb), " +
-      "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
-      "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
-      "autoload/reload machinery: an interlock guarding concurrent constant " +
-      "loads, the autoload/eager-load path registries it walks, and the " +
-      "`autoload :Const` / `eager_autoload` DSL that defers a constant to a " +
-      "file. ESM has neither half — a module graph is resolved and evaluated " +
-      "eagerly at import, and there is no reloading — so trails has " +
-      "no constant table to guard and nothing to reload. Where Ruby leans on " +
-      "call-time constant resolution to break a load-order cycle, the port uses " +
-      "a plain ES import, whose binding is live and is read when the expression " +
-      'runs (CLAUDE.md, "Call-time constant ' +
-      'resolution"); the two require_dependency suites in trails ' +
-      "(dependencies.test.ts, autoload.test.ts) are permanent skips for the same " +
-      "reason. That includes every `eager_load!` a module inherits from " +
-      "`extend ActiveSupport::Autoload` with no `def` of its own — the `super` " +
-      "and the Locking / Scoping / AttributeMethods / ConnectionAdapters calls " +
-      "in `ActiveRecord.eager_load!` (active_record.rb:499-507) — so " +
-      "`eagerLoadBang` makes only the calls that reach a Rails `def`: " +
-      "Associations (associations.rb:44) then Encryption (encryption.rb:50). " +
-      "Scoped to these three files so `clear`, `autoload`, `autoloader`, " +
-      "`initialize`, `running` and the `*_paths` readers stay expected everywhere " +
-      "else.",
+      "`class TestParser < Ripper` (test_unit/test_parser.rb:52-133) is the " +
+      "fallback for a Ruby without Prism, parsing Ruby through Ripper's event " +
+      "callbacks. The port reads TypeScript through the compiler API in the " +
+      "Prism arm's `ranges`, so no Ripper event exists to handle.",
     names: [
-      "interlock",
-      "interlock=",
-      "run_interlock",
-      "load_interlock",
-      "unload_interlock",
-      "autoload_paths",
-      "autoload_paths=",
-      "autoload_once_paths",
-      "autoload_once_paths=",
-      "_eager_load_paths",
-      "_eager_load_paths=",
-      "_autoloaded_tracked_classes",
-      "_autoloaded_tracked_classes=",
-      "autoloader",
-      "autoloader=",
-      "clear",
-      "search_for_file",
-      "eager_load?",
-      "autoload",
-      "autoload_under",
-      "autoload_at",
-      "eager_autoload",
-      "eager_load!",
       "initialize",
-      "loading",
-      "unloading",
-      "start_unloading",
-      "done_unloading",
-      "start_running",
-      "done_running",
-      "running",
-      "permit_concurrent_loads",
-      "raw_state",
+      "parse",
+      "on_def",
+      "on_method_add_block",
+      "on_command_call",
+      "first_arg",
+      "just_lineno",
+      "on_method_add_arg",
+      "on_command",
+      "on_stmts_add",
+      "on_arg_paren",
+      "on_bodystmt",
+      "on_ident",
+      "on_do_block",
+      "on_stmts_new",
+      "on_brace_block",
+      "on_args_new",
+      "on_args_add",
+      "on_args_add_block",
     ],
-    rubyFiles: ["dependencies.rb", "dependencies/autoload.rb", "dependencies/interlock.rb"],
+    rubyFiles: ["test_unit/test_parser.rb"],
+    packages: ["trailties"],
+  },
+  {
+    reason:
+      "`Dependencies.search_for_file` (dependencies.rb:83-90) has one caller, " +
+      "`require_dependency` (dependencies/require_dependency.rb:18), which " +
+      "appends `.rb` and searches `autoload_paths` to hand `Kernel#require` an " +
+      "absolute path. `require_dependency` is obsolete in Rails and is not " +
+      "ported: ESM has no synchronous `require`, and a constant is reached by a " +
+      'plain ES import (CLAUDE.md, "Call-time constant resolution"). Scoped to ' +
+      "dependencies.rb.",
+    names: ["search_for_file"],
+    rubyFiles: ["dependencies.rb"],
   },
   {
     reason:

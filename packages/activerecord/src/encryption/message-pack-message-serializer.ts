@@ -1,3 +1,4 @@
+import "../constants.message-pack-message-serializer.generated.js";
 import { MessagePack } from "@blazetrails/activesupport/message-pack";
 import { isPlainObject } from "@blazetrails/activesupport";
 import { RuntimeError, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";

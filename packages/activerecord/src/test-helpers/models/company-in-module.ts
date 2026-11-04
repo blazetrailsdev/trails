@@ -1,27 +1,28 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import { Range, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
-import { registerModel } from "../../associations.js";
+import { Range, constSet, TopLevel, constGet } from "@blazetrails/ruby-compat";
 
-registerConstant("MyApplication", {});
+constSet(TopLevel, "MyApplication", {});
 const Business = {};
-registerConstant("MyApplication::Business", Business);
+constSet(constGet(Object, "MyApplication") as object, "Business", Business);
 const Prefixed = { tableNamePrefix: "prefixed_" };
-registerConstant("MyApplication::Business::Prefixed", Prefixed);
+constSet(Business, "Prefixed", Prefixed);
 const PrefixedNested = {};
-registerConstant("MyApplication::Business::Prefixed::Nested", PrefixedNested);
+constSet(Prefixed, "Nested", PrefixedNested);
 const Suffixed = { tableNameSuffix: "_suffixed" };
-registerConstant("MyApplication::Business::Suffixed", Suffixed);
+constSet(Business, "Suffixed", Suffixed);
 const SuffixedNested = {};
-registerConstant("MyApplication::Business::Suffixed::Nested", SuffixedNested);
+constSet(Suffixed, "Nested", SuffixedNested);
 const Billing = {};
-registerConstant("MyApplication::Billing", Billing);
+constSet(constGet(Object, "MyApplication") as object, "Billing", Billing);
 const BillingNested = {};
-registerConstant("MyApplication::Billing::Nested", BillingNested);
+constSet(Billing, "Nested", BillingNested);
 
 export class MyAppBusinessCompany extends Base {
   static {
-    registerModel(rbModConstSet(Business, "Company", this));
+    constSet(Business, "Company", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
@@ -33,7 +34,8 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   declare clientsLikeMs: AssociationProxy<MyAppBusinessClient>;
 
   static {
-    registerModel(rbModConstSet(Business, "Firm", this));
+    constSet(Business, "Firm", this);
+    DescendantsTracker.registerSubclass(MyAppBusinessCompany, this);
   }
 
   static {
@@ -80,7 +82,8 @@ export interface MyAppBusinessFirm {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessClient extends MyAppBusinessCompany {
   static {
-    registerModel(rbModConstSet(Business, "Client", this));
+    constSet(Business, "Client", this);
+    DescendantsTracker.registerSubclass(MyAppBusinessCompany, this);
   }
 
   static {
@@ -98,7 +101,8 @@ export interface MyAppBusinessClient {
 
 export class MyAppBusinessClientContact extends Base {
   static {
-    registerModel(rbModConstSet(MyAppBusinessClient, "Contact", this));
+    constSet(MyAppBusinessClient, "Contact", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
@@ -107,7 +111,8 @@ export class MyAppBusinessDeveloper extends Base {
   declare name: string;
 
   static {
-    registerModel(rbModConstSet(Business, "Developer", this));
+    constSet(Business, "Developer", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {
@@ -120,7 +125,8 @@ export class MyAppBusinessProject extends Base {
   declare developers: AssociationProxy<MyAppBusinessDeveloper>;
 
   static {
-    registerModel(rbModConstSet(Business, "Project", this));
+    constSet(Business, "Project", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {
@@ -130,13 +136,15 @@ export class MyAppBusinessProject extends Base {
 
 export class MyAppBusinessPrefixedCompany extends Base {
   static {
-    registerModel(rbModConstSet(Prefixed, "Company", this));
+    constSet(Prefixed, "Company", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
   static {
-    registerModel(rbModConstSet(Prefixed, "Firm", this));
+    constSet(Prefixed, "Firm", this);
+    DescendantsTracker.registerSubclass(MyAppBusinessPrefixedCompany, this);
   }
 
   static {
@@ -146,19 +154,22 @@ export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
 
 export class MyAppBusinessPrefixedNestedCompany extends Base {
   static {
-    registerModel(rbModConstSet(PrefixedNested, "Company", this));
+    constSet(PrefixedNested, "Company", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
 export class MyAppBusinessSuffixedCompany extends Base {
   static {
-    registerModel(rbModConstSet(Suffixed, "Company", this));
+    constSet(Suffixed, "Company", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
   static {
-    registerModel(rbModConstSet(Suffixed, "Firm", this));
+    constSet(Suffixed, "Firm", this);
+    DescendantsTracker.registerSubclass(MyAppBusinessSuffixedCompany, this);
   }
 
   static {
@@ -168,13 +179,15 @@ export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
 
 export class MyAppBusinessSuffixedNestedCompany extends Base {
   static {
-    registerModel(rbModConstSet(SuffixedNested, "Company", this));
+    constSet(SuffixedNested, "Company", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 }
 
 export class MyAppBillingFirm extends Base {
   static {
-    registerModel(rbModConstSet(Billing, "Firm", this));
+    constSet(Billing, "Firm", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {
@@ -184,7 +197,8 @@ export class MyAppBillingFirm extends Base {
 
 export class MyAppBillingNestedFirm extends Base {
   static {
-    registerModel(rbModConstSet(BillingNested, "Firm", this));
+    constSet(BillingNested, "Firm", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {
@@ -195,7 +209,8 @@ export class MyAppBillingNestedFirm extends Base {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBillingAccount extends Base {
   static {
-    registerModel(rbModConstSet(Billing, "Account", this));
+    constSet(Billing, "Account", this);
+    DescendantsTracker.registerSubclass(Base, this);
   }
 
   static {

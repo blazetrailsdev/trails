@@ -549,13 +549,28 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
    * (`vendor/ruby/v3.3.11/dir.c:3227`).
    */
-  static async globAsync(pattern: string, flags: number = 0): Promise<string[]> {
+  static async globAsync(
+    pattern: string,
+    flags: number = 0,
+    { base }: { base?: string } = {},
+  ): Promise<string[]> {
     const found: string[] = [];
     for (const expanded of braceExpand(pattern)) {
       const absolute = expanded.startsWith(File.SEPARATOR);
       const segments = expanded.split(File.SEPARATOR);
       if (absolute) segments.shift();
-      await globHelperAsync(absolute ? File.SEPARATOR : ".", segments, found, false, flags, false);
+      await globHelperAsync(
+        absolute ? File.SEPARATOR : (base ?? "."),
+        segments,
+        found,
+        false,
+        flags,
+        false,
+      );
+    }
+    if (base != null) {
+      const prefix = `${base.replace(/\/+$/, "")}/`;
+      return found.map((entry) => (entry.startsWith(prefix) ? entry.slice(prefix.length) : entry));
     }
     if (pattern.startsWith(".")) return found;
     return found.map((entry) => (entry.startsWith("./") ? entry.slice(2) : entry));

@@ -1,5 +1,6 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class Cart extends Base {
   declare shop_id: bigint;
@@ -9,4 +10,5 @@ export class Cart extends Base {
     this.primaryKey = "id";
   }
 }
-registerModel(Cart);
+constSet(TopLevel, "Cart", Cart);
+DescendantsTracker.registerSubclass(Base, Cart);

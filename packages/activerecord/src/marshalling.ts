@@ -8,6 +8,8 @@ import {
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as Marshalling from "./marshalling.js";
 
 let _formatVersion: 6.1 | 7.1 = 6.1;
 
@@ -120,3 +122,5 @@ declare module "./base.js" {
     marshalLoad(state: unknown[]): void;
   }
 }
+
+ActiveRecord.Marshalling = Marshalling;

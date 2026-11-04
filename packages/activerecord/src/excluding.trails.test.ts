@@ -1,14 +1,14 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { registerModel } from "./associations.js";
 import { Relation } from "./relation.js";
 import { DeferredIdsNotIn } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { Post } from "./test-helpers/models/post.js";
 
-registerModel(Post);
+constSet(TopLevel, "Post", Post);
 
 describe("excluding deferred arm (trails)", () => {
   fixtures(["posts"]);
@@ -59,7 +59,6 @@ describe("excluding a model with a composite primary key (trails)", () => {
 
   it("builds the predicate over the composite key rather than raising", async () => {
     const { CpkBook } = await import("./test-helpers/models/cpk.js");
-    registerModel(CpkBook);
     const book = (await CpkBook.all())[0];
 
     const relation = CpkBook.excluding(book);

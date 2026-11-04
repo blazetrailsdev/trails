@@ -1,9 +1,9 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { ActionController, registerController } from "@blazetrails/actionpack";
+import { ActionController } from "@blazetrails/actionpack";
 
 export class HealthController extends ActionController.Base {
   static override controllerPath(): string {
-    return "rails/health";
+    return "trails/health";
   }
 
   async show(): Promise<void> {
@@ -31,5 +31,3 @@ HealthController.rescueFrom(Error, {
     return this.renderDown();
   },
 });
-
-registerController("Rails::HealthController", HealthController);

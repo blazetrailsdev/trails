@@ -9,7 +9,7 @@ export class DebugLocks {
   private app: RackApp;
   private path: string;
 
-  constructor(app: RackApp, path = "/rails/locks") {
+  constructor(app: RackApp, path = "/trails/locks") {
     this.app = app;
     this.path = path;
   }

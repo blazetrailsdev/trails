@@ -1,3 +1,4 @@
+import "../constants.envelope-encryption-key-provider.generated.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
 import type { KeyGenerator } from "./key-generator.js";

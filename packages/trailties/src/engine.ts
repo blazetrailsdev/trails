@@ -4,12 +4,24 @@ import {
   Notifications,
   onLoad,
   TopLevel,
+  Dependencies,
   underscore,
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, getFs, getPath, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import {
+  File,
+  getFs,
+  getPath,
+  rbFLoad,
+  rbObjRespondTo,
+  rbProcCall,
+  block,
+  setEnv,
+} from "@blazetrails/ruby-compat";
+import { DSL, Task } from "@blazetrails/rake";
+import {
+  AbstractController,
   MiddlewareStack,
   type DrawCallback,
   type RackApp,
@@ -41,11 +53,17 @@ export class Engine extends Trailtie {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
-  private _railtiesCollection?: Trailties;
+  protected _railties?: Trailties;
+  protected _helpers?: object;
+  private _allAutoloadPathsCache?: string[];
   private _allLoadPathsCache?: string[];
-  private _routes?: RouteSet;
+  protected _routes?: RouteSet;
   private _app?: RackApp | RackAppObject;
   private _envConfig?: Record<string, unknown>;
+
+  static eagerLoadBang(): void | Promise<void> {
+    return this.instance().eagerLoadBang();
+  }
 
   static calledFrom(value?: string): string | undefined {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
@@ -179,6 +197,10 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).isolated();
   }
 
+  get middleware(): EngineConfiguration["middleware"] {
+    return this.config.middleware;
+  }
+
   root(): string | null {
     return this.config.root;
   }
@@ -209,9 +231,22 @@ export class Engine extends Trailtie {
     return node ? await node.existent() : [];
   }
 
+  eagerLoadBang(): void | Promise<void> {}
+
   railties(): Trailties {
-    if (!this._railtiesCollection) this._railtiesCollection = new Trailties();
-    return this._railtiesCollection;
+    if (!this._railties) this._railties = new Trailties();
+    return this._railties;
+  }
+
+  async helpers(): Promise<object> {
+    if (this._helpers) return this._helpers;
+    const helpers = {};
+    for (const mod of AbstractController.Helpers.helperModulesFromPaths(
+      await this.helpersPaths(),
+    )) {
+      include(helpers, mod);
+    }
+    return (this._helpers = helpers);
   }
 
   routes(block?: DrawCallback): RouteSet {
@@ -223,6 +258,16 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
+  loadConsole(app: unknown = this): this {
+    this.runConsoleBlocks(app);
+    return this;
+  }
+
+  loadRunner(app: unknown = this): this {
+    this.runRunnerBlocks(app);
+    return this;
+  }
+
   async loadGenerators(app: Engine = this): Promise<this> {
     const { Generators } = await import("./generators.js");
     this.runGeneratorsBlocks(app);
@@ -230,9 +275,20 @@ export class Engine extends Trailtie {
     return this;
   }
 
-  loadConsole(app: unknown = this): this {
-    this.runConsoleBlocks(app);
+  async loadTasks(app: unknown = this): Promise<this> {
+    await this.runTasksBlocks(app);
     return this;
+  }
+
+  /** @internal */
+  override async runTasksBlocks(app: unknown): Promise<void> {
+    await super.runTasksBlocks(app);
+    for (const ext of (await this.paths().get("lib/tasks")!.existent()).sort()) await rbFLoad(ext);
+  }
+
+  /** @internal */
+  private async hasMigrations(): Promise<boolean> {
+    return (await this.paths().get("db/migrate")!.existent()).length > 0;
   }
 
   async loadServer(app: unknown = this): Promise<this> {
@@ -301,14 +357,34 @@ export class Engine extends Trailtie {
   }
 
   /** @internal */
+  protected async isHasMigrations(): Promise<boolean> {
+    return (await this.paths().get("db/migrate")!.existent()).length > 0;
+  }
+
+  /** @internal */
+  async _allAutoloadOncePaths(): Promise<string[]> {
+    return Array.from(new Set(await this.config.allAutoloadOncePaths()));
+  }
+
+  /** @internal */
+  async _allAutoloadPaths(): Promise<string[]> {
+    if (this._allAutoloadPathsCache) return this._allAutoloadPathsCache;
+    const autoloadOncePaths = await this.config.allAutoloadOncePaths();
+    const autoloadPaths = [
+      ...(await this.config.allAutoloadPaths()),
+      ...(await this.config.allEagerLoadPaths()),
+    ].filter((path) => !autoloadOncePaths.includes(path));
+    return (this._allAutoloadPathsCache = Array.from(new Set(autoloadPaths)));
+  }
+
+  /** @internal */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = this.paths();
-    const cfg = this.config;
     const out = [...(await paths.loadPaths())];
     if (addAutoloadPathsToLoadPath) {
-      for (const p of await cfg.allAutoloadPaths()) out.push(p);
-      for (const p of await cfg.allAutoloadOncePaths()) out.push(p);
+      out.push(...(await this._allAutoloadPaths()));
+      out.push(...(await this._allAutoloadOncePaths()));
     }
     this._allLoadPathsCache = Array.from(new Set(out));
     return this._allLoadPathsCache;
@@ -347,6 +423,29 @@ Engine.initializer(
     for (const environment of (await this.paths().get("config/environments")?.existent()) ?? []) {
       await import(pathToFileURL!(environment).href);
     }
+  },
+);
+
+Engine.initializer(
+  "set_autoload_paths",
+  { before: "bootstrap_hook" },
+  async function (this: Engine) {
+    Dependencies.autoloadPaths.unshift(...(await this._allAutoloadPaths()));
+    Dependencies.autoloadOncePaths.unshift(...(await this._allAutoloadOncePaths()));
+
+    Object.freeze(this.config.autoloadPaths);
+    Object.freeze(this.config.autoloadOncePaths);
+  },
+);
+
+Engine.initializer(
+  "set_eager_load_paths",
+  { before: "bootstrap_hook" },
+  async function (this: Engine) {
+    for (const path of await this.config.allEagerLoadPaths()) {
+      Dependencies._eagerLoadPaths.add(path);
+    }
+    Object.freeze(this.config.eagerLoadPaths);
   },
 );
 
@@ -414,6 +513,28 @@ Engine.initializer("wrap_reloader_around_load_seed", function (this: Engine, ...
 
 Engine.initializer("engines_blank_point", function () {});
 
+Engine.rakeTasks(async function (this: Trailtie) {
+  if (this instanceof TopLevel.Trails!.Application) return;
+  if (!(await (this as Engine)["hasMigrations"]())) return;
+
+  DSL.namespace(this.railtieName, () => {
+    DSL.namespace("install", () => {
+      DSL.desc(`Copy migrations from ${this.railtieName} to application`);
+      DSL.task(
+        "migrations",
+        block(async () => {
+          setEnv("FROM", this.railtieName);
+          if (Task.isTaskDefined("railties:install:migrations")) {
+            await (await Task.get("railties:install:migrations")).invoke();
+          } else {
+            await (await Task.get("app:railties:install:migrations")).invoke();
+          }
+        }),
+      );
+    });
+  });
+});
+
 /** @internal */
 interface EngineReloaderApp {
   reloader: { wrap(block: () => void | Promise<void>): void | Promise<void> };
@@ -438,7 +559,7 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
   }
 }
 
-Object.defineProperty(Engine, "name", { value: "Rails::Engine" });
+Object.defineProperty(Engine, "name", { value: "Trails::Engine" });
 
 include(Engine, ASCallbacks);
 Engine.defineCallbacks("load_seed");

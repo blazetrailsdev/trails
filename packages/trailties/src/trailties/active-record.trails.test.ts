@@ -44,7 +44,7 @@ import { Encryption } from "@blazetrails/activerecord/encryption";
 import { Configuration } from "../application/configuration.js";
 import { Configuration as TrailtieConfiguration } from "../trailtie/configuration.js";
 import { MiddlewareStackProxy } from "../configuration.js";
-import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Application } from "../application.js";
 import type { ActiveRecordConfig } from "./active-record.js";
 
@@ -52,7 +52,7 @@ const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration
   const encrypted = new EncryptedConfiguration({
     configPath: `${dir}/credentials.yml.enc`,
     keyPath: `${dir}/master.key`,
-    envKey: "RAILS_MASTER_KEY",
+    envKey: "TRAILS_MASTER_KEY",
     raiseIfMissingKey: false,
   });
   await encrypted.config();
@@ -145,7 +145,7 @@ describe("RailtieTest (trails-only)", () => {
   it("config.loadDefaults 7.1 makes generate_secure_token_on initialize on a booted app", async () => {
     const saved = Trailtie.config.get("activeRecord");
     try {
-      const config = new Configuration();
+      const config = new Configuration("/app");
       config.set("activeRecord", { encryption: {} });
       config.loadDefaults("7.1");
 
@@ -254,7 +254,7 @@ describe("RailtieTest (trails-only)", () => {
       Trails.application = new BlogApplication() as never;
       try {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });
-        const config = new Configuration();
+        const config = new Configuration("/app");
         if (loadDefaults) config.loadDefaults(loadDefaults);
         const app = { deprecators: new Deprecators(), config, credentials };
         await runTrailtieInitializers(Trailtie, app);
@@ -333,7 +333,7 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
     expect(new ExceptionWrapper(null, new RecordNotSaved("unsaved")).statusCode).toBe(422);
   });
 });
-describe("ActiveRecord::ConnectionHandling::RAILS_ENV", () => {
+describe("ActiveRecord::ConnectionHandling::TRAILS_ENV", () => {
   it("reads Trails.env before TRAILS_ENV, so a booted app resolves its own environment's config", () => {
     const originalEnv = Trails.env;
     Trails.env = "staging";

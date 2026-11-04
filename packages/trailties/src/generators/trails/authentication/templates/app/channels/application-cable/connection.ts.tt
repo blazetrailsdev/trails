@@ -1,0 +1,16 @@
+import { Session } from "../../models/session.ts";
+
+export class Connection {
+  declare currentUser: unknown;
+  declare cookies: { signed: Record<string, string> };
+  declare rejectUnauthorizedConnection: () => void;
+
+  async connect(): Promise<void> {
+    if (!(await this.setCurrentUser())) this.rejectUnauthorizedConnection();
+  }
+
+  protected async setCurrentUser(): Promise<unknown> {
+    const session = await Session.findBy({ id: this.cookies.signed["session_id"] });
+    if (session) return (this.currentUser = await session.user);
+  }
+}

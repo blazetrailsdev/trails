@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../index.js";
-import { registerModel } from "../associations.js";
 import { adapterType } from "../test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -16,7 +15,7 @@ import { Guid } from "../test-helpers/models/guid.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Essay } from "../test-helpers/models/essay.js";
-import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
+import { CpkBook } from "../test-helpers/models/cpk.js";
 import { UuidItem, UuidValidatingItem } from "../test-helpers/models/uuid-item.js";
 import "../support/canonical-model-index.js";
 import { Range } from "@blazetrails/ruby-compat";
@@ -25,7 +24,9 @@ import {
   assertEmpty,
   assertNothingRaised,
   assertRaises,
+  DescendantsTracker,
 } from "@blazetrails/activesupport";
+import "../test-helpers/models/cpk.js";
 
 const INT_MAX_VALUE = 2147483647;
 
@@ -90,34 +91,40 @@ class BookWithUniqueRevision extends CpkBook {
   }
 }
 
-for (const klass of [ReplyWithTitleObject, CoolTopic, TopicWithAfterCreate]) {
-  registerModel(klass);
-}
-for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
-  registerModel(klass);
-}
+constSet(TopLevel, "ReplyWithTitleObject", ReplyWithTitleObject);
+DescendantsTracker.registerSubclass(Reply, ReplyWithTitleObject);
+constSet(TopLevel, "CoolTopic", CoolTopic);
+DescendantsTracker.registerSubclass(Topic, CoolTopic);
+constSet(TopLevel, "TopicWithAfterCreate", TopicWithAfterCreate);
+DescendantsTracker.registerSubclass(Topic, TopicWithAfterCreate);
+constSet(TopLevel, "Wizard", Wizard);
+DescendantsTracker.registerSubclass(Base, Wizard);
+constSet(TopLevel, "IneptWizard", IneptWizard);
+DescendantsTracker.registerSubclass(Wizard, IneptWizard);
+constSet(TopLevel, "Conjurer", Conjurer);
+DescendantsTracker.registerSubclass(IneptWizard, Conjurer);
+constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
+DescendantsTracker.registerSubclass(IneptWizard, Thaumaturgist);
 
 describe("UniquenessValidationTest", () => {
   fixtures(["topics", "warehouseThings"]);
 
   beforeAll(() => {
-    registerModel("Topic", Topic);
-    registerModel("Reply", Reply);
-    registerModel("UniqueReply", UniqueReply);
-    registerModel("SillyUniqueReply", SillyUniqueReply);
-    registerModel("ReplyWithTitleObject", ReplyWithTitleObject);
-    registerModel("WarehouseThing", WarehouseThing);
-    registerModel("Keyboard", Keyboard);
-    registerModel("Event", Event);
-    registerModel("Guid", Guid);
-    registerModel("Author", Author);
-    registerModel("Person", Person);
-    registerModel("Essay", Essay);
-    registerModel("CpkAuthor", CpkAuthor);
-    registerModel("CpkBook", CpkBook);
-    registerModel("IneptWizard", IneptWizard);
-    registerModel("Conjurer", Conjurer);
-    registerModel("Thaumaturgist", Thaumaturgist);
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Reply", Reply);
+    constSet(TopLevel, "UniqueReply", UniqueReply);
+    constSet(TopLevel, "SillyUniqueReply", SillyUniqueReply);
+    constSet(TopLevel, "ReplyWithTitleObject", ReplyWithTitleObject);
+    constSet(TopLevel, "WarehouseThing", WarehouseThing);
+    constSet(TopLevel, "Keyboard", Keyboard);
+    constSet(TopLevel, "Event", Event);
+    constSet(TopLevel, "Guid", Guid);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Person", Person);
+    constSet(TopLevel, "Essay", Essay);
+    constSet(TopLevel, "IneptWizard", IneptWizard);
+    constSet(TopLevel, "Conjurer", Conjurer);
+    constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
   });
 
   afterEach(() => {
@@ -701,9 +708,9 @@ describe("UniquenessValidationWithIndexTest", () => {
   fixtures(["topics"], { useTransactionalTests: false });
 
   beforeAll(() => {
-    registerModel("Topic", Topic);
-    registerModel("Event", Event);
-    registerModel("Keyboard", Keyboard);
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Event", Event);
+    constSet(TopLevel, "Keyboard", Keyboard);
   });
 
   beforeEach(async () => {
@@ -944,11 +951,6 @@ describe("UniquenessValidationWithIndexTest", () => {
 describe("UniquenessWithCompositeKey", () => {
   fixtures(["cpkAuthors"]);
 
-  beforeAll(() => {
-    registerModel("CpkAuthor", CpkAuthor);
-    registerModel("CpkBook", CpkBook);
-  });
-
   it("uniqueness validation for model with composite key", async () => {
     const bookOne = await BookWithUniqueRevision.createBang({
       id: [1, 42] as any,
@@ -1007,6 +1009,11 @@ class TopicWithUniqEvent extends Topic {
   }
 }
 
-for (const klass of [BigIntTest, BigIntReverseTest, TopicWithEvent, TopicWithUniqEvent]) {
-  registerModel(klass);
-}
+constSet(TopLevel, "BigIntTest", BigIntTest);
+DescendantsTracker.registerSubclass(Base, BigIntTest);
+constSet(TopLevel, "BigIntReverseTest", BigIntReverseTest);
+DescendantsTracker.registerSubclass(Base, BigIntReverseTest);
+constSet(TopLevel, "TopicWithEvent", TopicWithEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithEvent);
+constSet(TopLevel, "TopicWithUniqEvent", TopicWithUniqEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithUniqEvent);

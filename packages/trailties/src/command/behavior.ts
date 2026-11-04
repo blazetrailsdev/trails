@@ -9,7 +9,7 @@ type CommandFactory = () => Program;
 const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> = {
   new: async () => (await import("../commands/new.js")).newCommand,
   generate: async () => (await import("../commands/generate.js"), null),
-  server: async () => (await import("../commands/server.js")).serverCommand,
+  server: async () => (await import("../commands/server.js"), null),
   db: async () => (await import("../commands/db.js")).dbCommand,
   routes: async () => (await import("../commands/routes.js"), null),
   "unused-routes": async () => (await import("../commands/unused-routes.js"), null),
@@ -17,11 +17,19 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
   destroy: async () => (await import("../commands/destroy.js"), null),
   app: async () => (await import("../commands/app.js")).appTemplateCommand,
+  runner: async () => (await import("../commands/runner.js"), null),
   notes: async () => (await import("../commands/notes.js"), null),
   stats: async () => (await import("../commands/stats.js"), null),
   credentials: async () => (await import("../commands/credentials.js"), null),
   encrypted: async () => (await import("../commands/encrypted.js"), null),
   dev: async () => (await import("../commands/dev.js"), null),
+  test: async () => (await import("../commands/test.js"), null),
+  build: async () => (await import("../commands/build.js"), null),
+  rake: async () => (await import("../commands/rake.js"), null),
+  "db/system/change/change": async () => (
+    await import("../commands/db/system/change/change-command.js"),
+    null
+  ),
 };
 
 export function noColorBang(): void {

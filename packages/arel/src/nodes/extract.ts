@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Unary } from "./unary.js";
 import type { ArelNode } from "../arel.js";
@@ -21,4 +21,4 @@ export class Extract extends Unary {
   }
 }
 
-rbModConstSet(Nodes, "Extract", Extract);
+constSet(Nodes, "Extract", Extract);

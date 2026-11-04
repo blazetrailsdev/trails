@@ -9,7 +9,7 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { RouteSet, ActionController } from "@blazetrails/actionpack";
 import { camelize } from "@blazetrails/activesupport";
 import type { DrawCallback } from "@blazetrails/actionpack";
-import { registerController } from "@blazetrails/actionpack";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 export interface AppServerDeps {
   executeCode: (code: string) => Promise<unknown>;
@@ -43,7 +43,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
     },
 
     registerController(name: string, controllerClass: ControllerClass) {
-      registerController(`${camelize(name)}Controller`, controllerClass);
+      constSet(TopLevel, `${camelize(name)}Controller`, controllerClass);
     },
 
     drawRoutes(fn: DrawCallback) {

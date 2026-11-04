@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { Visitors, Arel } from "./namespaces.js";
 import { PlainString } from "./collectors/plain-string.js";
@@ -81,4 +81,4 @@ export interface TreeManager<T extends Node = Node> extends FactoryMethodsModule
 
 include(TreeManager, FactoryMethods);
 
-rbModConstSet(Arel, "TreeManager", TreeManager);
+constSet(Arel, "TreeManager", TreeManager);

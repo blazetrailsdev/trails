@@ -1,5 +1,6 @@
 import type { Module } from "@blazetrails/ruby-compat";
 import { Association, type AssociationInstanceHost } from "./association.js";
+import { Builder } from "../../namespaces.js";
 
 export class SingularAssociation extends Association {
   static override validOptions(options: Record<string, unknown>): string[] {
@@ -43,3 +44,5 @@ export class SingularAssociation extends Association {
     );
   }
 }
+
+Builder.SingularAssociation = SingularAssociation;

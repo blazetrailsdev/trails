@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 
 import { Base } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
@@ -36,7 +36,7 @@ describe("AggregationsTest (trails)", () => {
     class GpsLocation {
       constructor(public gpsLocation: string | null) {}
     }
-    registerConstant("GpsLocation", GpsLocation);
+    constSet(TopLevel, "GpsLocation", GpsLocation);
     try {
       class Customer extends Base {
         static {
@@ -54,7 +54,7 @@ describe("AggregationsTest (trails)", () => {
         "39x-110",
       );
     } finally {
-      unregisterConstant("GpsLocation", GpsLocation);
+      if (constDefined(Object, "GpsLocation", false)) rbModRemoveConst(Object, "GpsLocation");
     }
   });
 });

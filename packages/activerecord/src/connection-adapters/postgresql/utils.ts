@@ -1,3 +1,4 @@
+import "../../constants.postgresql-utils.generated.js";
 import { rbHash } from "@blazetrails/activesupport";
 import { rbEqual, rbObjClass, stringValue } from "@blazetrails/ruby-compat";
 

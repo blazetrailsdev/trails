@@ -30,7 +30,7 @@ describe("GeneratorBase#relativeToOriginalDestinationRoot", () => {
 });
 
 describe("GeneratorBase.classOption defaults from Generators.options / Generators.aliases", () => {
-  it("fills :default and :aliases from the :rails namespace", () => {
+  it("fills :default and :aliases from the :trails namespace", () => {
     class WidgetGenerator extends GeneratorBase {
       static {
         this.classOption("templateEngine", { type: "string" });
@@ -42,7 +42,7 @@ describe("GeneratorBase.classOption defaults from Generators.options / Generator
     });
   });
 
-  it("prefers the generator's own namespace over :rails, and an explicit default when unset", () => {
+  it("prefers the generator's own namespace over :trails, and an explicit default when unset", () => {
     const options = Generators.options();
     options["gadget"] = { orm: "active_record" };
     try {
@@ -146,7 +146,7 @@ describe("GeneratorBase.hookFor", () => {
   it("registers a class option defaulting from Generators.options and records [in, as]", () => {
     class AwesomeGenerator extends GeneratorBase {
       static {
-        this.hookFor("testFramework", "orm", { as: "controller", in: "rails" });
+        this.hookFor("testFramework", "orm", { as: "controller", in: "trails" });
       }
     }
     expect(AwesomeGenerator.classOptions()["testFramework"]).toMatchObject({
@@ -156,8 +156,8 @@ describe("GeneratorBase.hookFor", () => {
     });
     expect(AwesomeGenerator.classOptions()["orm"]).toMatchObject({ banner: "", default: false });
     expect(AwesomeGenerator.hooks()).toEqual({
-      testFramework: ["rails", "controller"],
-      orm: ["rails", "controller"],
+      testFramework: ["trails", "controller"],
+      orm: ["trails", "controller"],
     });
   });
 
@@ -168,7 +168,7 @@ describe("GeneratorBase.hookFor", () => {
       static {
         this.argument("name");
         this.methodAdded("perform");
-        this.hookFor("testFramework", { in: "rails", as: "invoking" });
+        this.hookFor("testFramework", { in: "trails", as: "invoking" });
       }
       declare name: string;
       perform(): void {
@@ -185,7 +185,7 @@ describe("GeneratorBase.hookFor", () => {
           destinationRoot: "/tmp",
         }),
       );
-      expect(find).toHaveBeenCalledWith("test_unit", "rails", "invoking");
+      expect(find).toHaveBeenCalledWith("test_unit", "trails", "invoking");
     } finally {
       find.mockRestore();
     }
@@ -529,9 +529,28 @@ describe("GeneratorBase.help", () => {
 
   it("--help falls back to the default description and a kebab-case banner", async () => {
     const help = await capture("stdout", () =>
-      Generators.invoke("scaffold_controller", ["--help"], { destinationRoot: "/tmp" }),
+      Generators.invoke("resource_route", ["--help"], { destinationRoot: "/tmp" }),
     );
-    expect(help).toContain("bin/trails generate scaffold-controller NAME");
+    expect(help).toContain("bin/trails generate resource-route NAME");
     expect(help).toContain("Description:\n    Create ");
+  });
+
+  it.each([
+    ["app", "The `trails new` command creates a new Trails application"],
+    ["authentication", "Generates a basic authentication system"],
+    ["benchmark", "`bin/trails generate benchmark opt_compare`"],
+    ["controller", "app/controllers/credit-cards-controller.ts"],
+    ["generator", "lib/generators/awesome/awesome-generator.ts"],
+    ["helper", "app/helpers/credit-card-helper.ts"],
+    ["migration", "db/migrate/20080514090912_add_ssl_flag.ts"],
+    ["scaffold_controller", "`bin/trails generate scaffold_controller CreditCard`"],
+    ["scaffold", "'bin/trails destroy scaffold ModelName'"],
+    ["script", "script/cleanup/my-script.ts"],
+    ["task", "lib/tasks/feeds.ts"],
+  ])("%s --help prints the generator's USAGE file", async (name, line) => {
+    const help = await capture("stdout", () =>
+      Generators.invoke(name, ["--help"], { destinationRoot: "/tmp" }),
+    );
+    expect(help).toContain(line);
   });
 });

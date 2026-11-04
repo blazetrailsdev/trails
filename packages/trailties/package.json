@@ -20,9 +20,9 @@
       "default": "./dist/server/index.js"
     },
     "./all": "./dist/all.js",
-    "./rails": {
-      "types": "./dist/rails.d.ts",
-      "default": "./dist/rails.js"
+    "./trails": {
+      "types": "./dist/trails.d.ts",
+      "default": "./dist/trails.js"
     },
     "./trailties/*": {
       "types": "./dist/trailties/*.d.ts",
@@ -41,9 +41,33 @@
       "default": "./dist/bin.js"
     },
     "./generators": "./dist/generators/index.js",
+    "./autoloaders": {
+      "types": "./dist/autoloaders.d.ts",
+      "default": "./dist/autoloaders.js"
+    },
+    "./zeitwerk-checker": {
+      "types": "./dist/zeitwerk-checker.d.ts",
+      "default": "./dist/zeitwerk-checker.js"
+    },
     "./autoloaders/inflector": {
       "types": "./dist/autoloaders/inflector.d.ts",
       "default": "./dist/autoloaders/inflector.js"
+    },
+    "./engine/commands": {
+      "types": "./dist/engine/commands.d.ts",
+      "default": "./dist/engine/commands.js"
+    },
+    "./plugin/test": {
+      "types": "./dist/plugin/test.d.ts",
+      "default": "./dist/plugin/test.js"
+    },
+    "./tasks/engine": {
+      "types": "./dist/tasks/engine.d.ts",
+      "default": "./dist/tasks/engine.js"
+    },
+    "./tasks/statistics": {
+      "types": "./dist/tasks/statistics.d.ts",
+      "default": "./dist/tasks/statistics.js"
     },
     "./engine": {
       "types": "./dist/engine.d.ts",
@@ -80,7 +104,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place && trails-tsc-views build-templates dist/generators"
+    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'runner', 'test']) require('fs').cpSync('src/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('src/templates/trails', 'dist/templates/trails', { recursive: true })\" && trails-tsc-views build --views dist/templates/trails --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
   },
   "files": [
     "dist",
@@ -94,15 +118,20 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
+    "@blazetrails/tzinfo": "workspace:*",
+    "@blazetrails/zeitwerk": "workspace:*",
     "commander": "^14.0.0",
     "vite": "^7.0.0"
   },
@@ -110,6 +139,7 @@
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {

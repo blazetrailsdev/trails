@@ -1,10 +1,4 @@
-import {
-  Enumerable,
-  include,
-  rbModConstSet,
-  toEnum,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+import { Enumerable, include, constSet, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 import { Namespace } from "./namespace.js";
@@ -103,7 +97,5 @@ export class NodeSet implements Iterable<Node> {
 
 include(NodeSet, Enumerable);
 include(NodeSet, Searchable);
-rbModConstSet(XML, "NodeSet", NodeSet);
-// Last step of this module's initialisation: hand `NodeSet` to the late-binding
-// holder so `searchable.ts` never has to import this module at runtime.
+constSet(XML, "NodeSet", NodeSet);
 registerNodeSetCtor(NodeSet);

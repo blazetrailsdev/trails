@@ -1,5 +1,6 @@
 import type { Encoding } from "@blazetrails/ruby-compat";
 import { CommonAddressField } from "./common-address-field.js";
+import { Mail } from "../mail.js";
 
 export class ReturnPathField extends CommonAddressField {
   static readonly NAME = "Return-Path";
@@ -30,3 +31,4 @@ export class ReturnPathField extends CommonAddressField {
     return this.address();
   }
 }
+Mail.ReturnPathField = ReturnPathField;

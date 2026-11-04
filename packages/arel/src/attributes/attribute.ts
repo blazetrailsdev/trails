@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { rbModConstSet, Struct } from "@blazetrails/ruby-compat";
+import { constSet, Struct } from "@blazetrails/ruby-compat";
 import { Arel, Attributes } from "../namespaces.js";
 import type { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
@@ -73,5 +73,5 @@ include(Attribute, AliasPredication);
 include(Attribute, OrderPredications);
 include(Attribute, MathMixin);
 
-rbModConstSet(Attributes, "Attribute", Attribute);
+constSet(Attributes, "Attribute", Attribute);
 Arel.Attribute = Attributes.Attribute;

@@ -6,6 +6,7 @@ import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
 import { TypeError } from "./type-error.js";
 import { FileUtils } from "./file-utils.js";
+import { include } from "./include.js";
 import { StringIO } from "./string-io.js";
 import {
   fsAdapterConfig,
@@ -915,5 +916,19 @@ describe("FileUtils.compareFileAsync", () => {
       fsAdapterConfig.adapter = previous;
       await fs.rm!(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("FileUtils module_function", () => {
+  it("gives an including class the instance forms", () => {
+    class Host {}
+    include(Host, FileUtils);
+    const host = new Host() as unknown as FileUtils;
+
+    expect(host.mkdirP).toBe(FileUtils.mkdirP);
+    expect(host.rmRf).toBe(FileUtils.rmRf);
+    expect(host.cd).toBe(FileUtils.cd);
+    expect(host.chdir).toBe(FileUtils.chdir);
+    expect("fileutilsLabel" in host).toBe(false);
   });
 });

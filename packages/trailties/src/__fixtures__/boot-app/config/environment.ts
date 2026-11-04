@@ -1,5 +1,5 @@
-import { Trails } from "../../../rails.js";
+import { Trails } from "../../../trails.js";
 
 await import("./application.js");
 
-await Trails.application!.initialize();
+await Trails.application!.initializeBang();

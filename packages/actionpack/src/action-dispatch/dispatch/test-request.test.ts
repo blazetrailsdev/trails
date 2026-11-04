@@ -26,7 +26,7 @@ describe("TestRequestTest", () => {
 
     expect(env["HTTP_HOST"]).toBe("test.host");
     expect(env["REMOTE_ADDR"]).toBe("0.0.0.0");
-    expect(env["HTTP_USER_AGENT"]).toBe("Rails Testing");
+    expect(env["HTTP_USER_AGENT"]).toBe("Trails Testing");
 
     expect(env["rack.errors"]).toBeInstanceOf(StringIO);
   });
@@ -83,9 +83,9 @@ describe("TestRequestTest", () => {
     expect(req.host).toBe("www.example.com");
   });
 
-  it("default user agent is 'Rails Testing'", () => {
+  it("default user agent is 'Trails Testing'", () => {
     const req = TestRequest.create({});
-    expect(req.userAgent).toBe("Rails Testing");
+    expect(req.userAgent).toBe("Trails Testing");
   });
 
   it("allows user agent to be overridden", () => {

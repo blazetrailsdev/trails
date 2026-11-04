@@ -49,6 +49,7 @@ import {
   OPTIONS,
   CONNECT,
 } from "./constants.js";
+import { Rack } from "./namespaces.js";
 
 export class LintError extends RuntimeError {}
 
@@ -800,3 +801,5 @@ export class Lint {
   static LintError = LintError;
   static Wrapper = Wrapper;
 }
+
+Rack.Lint = Lint;

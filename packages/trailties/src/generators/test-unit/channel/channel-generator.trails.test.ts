@@ -25,6 +25,6 @@ describe("TestUnit::Generators::ChannelGenerator", () => {
     const root = await generate("admin/chat");
     const path = File.join(root, "test/channels/admin/chat-channel.test.ts");
     expect(File.read(path)).toContain('import "../../test-helper.ts";');
-    expect(File.read(path)).toContain("export class AdminChatChannelTest");
+    expect(File.read(path)).toContain("export class ChatChannelTest");
   });
 });

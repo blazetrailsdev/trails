@@ -1,3 +1,4 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
@@ -9,7 +10,6 @@ import {
 
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
-import { registerModel } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import {
   Logger,
@@ -62,9 +62,11 @@ import {
   Range as ArRange,
   RuntimeError,
   sort,
-  rbModConstSet,
-  registerConstant,
-  unregisterConstant,
+  constSet,
+  TopLevel,
+  constGet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
@@ -103,29 +105,30 @@ class ThirdAbstractClass extends SecondAbstractClass {
 class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
-registerModel(CreditCard);
+constSet(TopLevel, "CreditCard", CreditCard);
+DescendantsTracker.registerSubclass(Base, CreditCard);
 class PinNumber extends Base {
   static {
-    rbModConstSet(CreditCard, "PinNumber", this);
+    constSet(CreditCard, "PinNumber", this);
   }
 }
 class CvvCode extends Base {
   static {
-    rbModConstSet(PinNumber, "CvvCode", this);
+    constSet(PinNumber, "CvvCode", this);
   }
 }
 class SubPinNumber extends PinNumber {
   static {
-    rbModConstSet(CreditCard, "SubPinNumber", this);
+    constSet(CreditCard, "SubPinNumber", this);
   }
 }
 class Brand extends Category {
   static {
-    rbModConstSet(CreditCard, "Brand", this);
+    constSet(CreditCard, "Brand", this);
   }
 }
 class MasterCreditCard extends Base {}
-registerModel("CreditCard::PinNumber", PinNumber);
+constSet(CreditCard, "PinNumber", PinNumber);
 class NonExistentTable extends Base {}
 
 class ReadonlyTitlePost extends Post {
@@ -164,7 +167,12 @@ class ReadonlyAuthorPost extends Post {
   }
 }
 
-registerModel([ReadonlyTitlePost, NonRaisingPost, ReadonlyAuthorPost]);
+constSet(TopLevel, "ReadonlyTitlePost", ReadonlyTitlePost);
+DescendantsTracker.registerSubclass(Post, ReadonlyTitlePost);
+constSet(TopLevel, "NonRaisingPost", NonRaisingPost);
+DescendantsTracker.registerSubclass(Post, NonRaisingPost);
+constSet(TopLevel, "ReadonlyAuthorPost", ReadonlyAuthorPost);
+DescendantsTracker.registerSubclass(Post, ReadonlyAuthorPost);
 
 class Weird extends Base {}
 
@@ -1192,8 +1200,12 @@ describe("BasicsTest", async () => {
   class DeveloperSalary {
     constructor(public amount: number) {}
   }
-  registerConstant("BasicsTest::DeveloperSalary", DeveloperSalary);
-  afterAll(() => unregisterConstant("BasicsTest::DeveloperSalary", DeveloperSalary));
+  constSet(TopLevel, "BasicsTest", {});
+  constSet(constGet(Object, "BasicsTest") as object, "DeveloperSalary", DeveloperSalary);
+  afterAll(() => {
+    if (constDefined(Object, "BasicsTest::DeveloperSalary", false))
+      rbModRemoveConst(constGet(Object, "BasicsTest") as object, "DeveloperSalary");
+  });
 
   it("dup with aggregate of same name as attribute", async () => {
     const developerWithAggregate = class extends Base {
