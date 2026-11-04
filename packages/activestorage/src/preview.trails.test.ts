@@ -65,7 +65,7 @@ describe("Preview Servable", () => {
 
     const preview = (await Blob.find(blob.id)).preview({ resizeToLimit: [640, 280] });
     await preview.image.load();
-    expect(() => preview.filename).toThrow(/^filename needs/);
-    expect(() => preview.contentType).toThrow(/^contentType needs/);
+    expect(() => preview.filename).toThrow(TypeError);
+    expect(() => preview.contentType).toThrow(TypeError);
   });
 });

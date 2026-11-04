@@ -87,14 +87,14 @@ export class Attachment extends Record {
     return (this.blob as AttachedBlob).variant(transformations);
   }
 
-  async preview(transformations: Transformations): Promise<unknown> {
+  preview(transformations: Transformations): unknown {
     transformations = this.transformationsByName(transformations);
-    return (await this.blob)!.preview(transformations);
+    return (this.blob as AttachedBlob).preview(transformations);
   }
 
-  async representation(transformations: Transformations): Promise<unknown> {
+  representation(transformations: Transformations): unknown {
     transformations = this.transformationsByName(transformations);
-    return (await this.blob)!.representation(transformations);
+    return (this.blob as AttachedBlob).representation(transformations);
   }
 
   /** @internal */

@@ -100,4 +100,15 @@ describe("Attachment#variant", () => {
 
     expect(variant).toBeInstanceOf(VariantWithRecord);
   });
+
+  it("raises TypeError before the blob is loaded", async () => {
+    const created = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    const attachment = await Attachment.find(created.id);
+
+    expect(() => attachment.variant({ resizeToLimit: [100, 100] })).toThrow(TypeError);
+  });
 });
