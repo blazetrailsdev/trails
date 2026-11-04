@@ -371,7 +371,6 @@ export class Blob extends Record {
     return this.content_type!.startsWith("text");
   }
 
-  /** @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob */
   async url({
     expiresIn = ActiveStorage.serviceUrlsExpireIn,
     disposition = "inline",
@@ -531,10 +530,7 @@ export class Blob extends Record {
     return ActiveStorage.webImageContentTypes.includes(this.content_type!);
   }
 
-  /**
-   * @internal
-   * @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob
-   */
+  /** @internal */
   private async serviceMetadata(): Promise<{ [k: string]: unknown }> {
     if (await this.forciblyServeAsBinary()) {
       return {

@@ -6,32 +6,24 @@ interface ServableHost {
   isAllowedInline(): Promise<boolean>;
 }
 
-/** @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob */
 async function contentTypeForServing(this: ServableHost): Promise<string | null> {
   return (await this.forciblyServeAsBinary())
     ? ActiveStorage.binaryContentType
     : await this.contentType;
 }
 
-/** @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob */
 async function forcedDispositionForServing(this: ServableHost): Promise<"attachment" | undefined> {
   if ((await this.forciblyServeAsBinary()) || !(await this.isAllowedInline())) {
     return "attachment";
   }
 }
 
-/**
- * @internal
- * @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob
- */
+/** @internal */
 async function forciblyServeAsBinary(this: ServableHost): Promise<boolean> {
   return ActiveStorage.contentTypesToServeAsBinary.includes((await this.contentType)!);
 }
 
-/**
- * @internal
- * @inventedArm await — CONVERGEABLE servable-reads-sync-on-blob
- */
+/** @internal */
 async function isAllowedInline(this: ServableHost): Promise<boolean> {
   return ActiveStorage.contentTypesAllowedInline.includes((await this.contentType)!);
 }
