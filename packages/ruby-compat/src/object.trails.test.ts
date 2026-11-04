@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { nameErrMesgReceiver } from "./object.js";
+import { classModule } from "./class-module.js";
 import {
   defineModule,
   rbCModule,
@@ -1576,5 +1578,21 @@ describe("respond_to? on a binary String", () => {
     const str = new Uint8Array([1, 2]);
     expect(rbObjRespondTo(str, "bytesize")).toBe(true);
     expect(rbObjRespondTo(str, "toString")).toBe(true);
+  });
+});
+
+describe("nameErrMesgReceiver", () => {
+  it("phrases each receiver kind as name_err_mesg_to_str does", () => {
+    class Customer {}
+    class Nameable {
+      static readonly [classModule] = true;
+    }
+    expect(nameErrMesgReceiver(null)).toBe("nil");
+    expect(nameErrMesgReceiver(true)).toBe("true");
+    expect(nameErrMesgReceiver(false)).toBe("false");
+    expect(nameErrMesgReceiver(Customer)).toBe("class Customer");
+    expect(nameErrMesgReceiver(Nameable)).toBe("module Nameable");
+    expect(nameErrMesgReceiver(() => 1)).toBe("an instance of Proc");
+    expect(nameErrMesgReceiver(new Customer())).toBe("an instance of Customer");
   });
 });

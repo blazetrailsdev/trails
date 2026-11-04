@@ -1,3 +1,4 @@
+import { classModule } from "./class-module.js";
 import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
@@ -117,10 +118,13 @@ export function nameErrMesgReceiver(obj: unknown): string {
     case false:
       return "false";
   }
-  if (typeof obj === "function") return `class ${rbModToS(obj as new () => unknown)}`;
-  if (typeof obj === "object" && isModuleObject(obj as object)) {
+  if (
+    (typeof obj === "object" && obj !== null && isModuleObject(obj)) ||
+    (typeof obj === "function" && Object.hasOwn(obj, classModule))
+  ) {
     return `module ${rbModToS(obj as never)}`;
   }
+  if (rbObjClass(obj) === rbCClass) return `class ${rbModToS(obj as new () => unknown)}`;
   return `an instance of ${rbObjClassname(obj)}`;
 }
 
