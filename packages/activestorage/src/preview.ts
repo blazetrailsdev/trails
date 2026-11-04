@@ -19,18 +19,13 @@ interface Presented {
   contentType: string | null;
   key: string | null | Promise<string | null>;
   url(options?: Parameters<Blob["url"]>[0]): unknown;
+  contentTypeForServing(): string | null;
+  forcedDispositionForServing(): "attachment" | undefined;
+  forciblyServeAsBinary(): boolean;
+  isAllowedInline(): boolean;
   download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Preview {
-  contentTypeForServing(): Promise<string | null>;
-  forcedDispositionForServing(): Promise<"attachment" | undefined>;
-  forciblyServeAsBinary(): Promise<boolean>;
-  isAllowedInline(): Promise<boolean>;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Preview {
   static readonly UnprocessedError = UnprocessedError;
 
@@ -110,6 +105,24 @@ export class Preview {
   /** @internal */
   private variant(): Variant | VariantWithRecord {
     return (this.image as One & Attachment).variant(this.variation);
+  }
+
+  async contentTypeForServing(): Promise<string | null> {
+    return (await this.presentation()).contentTypeForServing();
+  }
+
+  async forcedDispositionForServing(): Promise<"attachment" | undefined> {
+    return (await this.presentation()).forcedDispositionForServing();
+  }
+
+  /** @internal */
+  async forciblyServeAsBinary(): Promise<boolean> {
+    return (await this.presentation()).forciblyServeAsBinary();
+  }
+
+  /** @internal */
+  async isAllowedInline(): Promise<boolean> {
+    return (await this.presentation()).isAllowedInline();
   }
 
   /** @internal */

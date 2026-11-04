@@ -1,54 +1,29 @@
 import { ActiveStorage } from "../active-storage.js";
 
 interface ServableHost {
-  contentType?: string | null;
+  contentType: string | null;
+  forciblyServeAsBinary(): boolean;
+  isAllowedInline(): boolean;
 }
 
 function contentTypeForServing(this: ServableHost): string | null {
-  const contentType = this.contentType as string | null | Promise<string | null>;
-  if (contentType instanceof Promise) {
-    return contentType.then((contentType) =>
-      contentTypeForServing.call({ contentType }),
-    ) as unknown as string | null;
-  }
-  return forciblyServeAsBinary.call({ contentType })
-    ? ActiveStorage.binaryContentType
-    : contentType;
+  return this.forciblyServeAsBinary() ? ActiveStorage.binaryContentType : this.contentType;
 }
 
 function forcedDispositionForServing(this: ServableHost): "attachment" | undefined {
-  const contentType = this.contentType as string | null | Promise<string | null>;
-  if (contentType instanceof Promise) {
-    return contentType.then((contentType) =>
-      forcedDispositionForServing.call({ contentType }),
-    ) as unknown as "attachment" | undefined;
-  }
-  if (forciblyServeAsBinary.call({ contentType }) || !isAllowedInline.call({ contentType })) {
+  if (this.forciblyServeAsBinary() || !this.isAllowedInline()) {
     return "attachment";
   }
-  return undefined;
 }
 
 /** @internal */
 function forciblyServeAsBinary(this: ServableHost): boolean {
-  const contentType = this.contentType as string | null | Promise<string | null>;
-  if (contentType instanceof Promise) {
-    return contentType.then((contentType) =>
-      forciblyServeAsBinary.call({ contentType }),
-    ) as unknown as boolean;
-  }
-  return ActiveStorage.contentTypesToServeAsBinary.includes(contentType!);
+  return ActiveStorage.contentTypesToServeAsBinary.includes(this.contentType!);
 }
 
 /** @internal */
 function isAllowedInline(this: ServableHost): boolean {
-  const contentType = this.contentType as string | null | Promise<string | null>;
-  if (contentType instanceof Promise) {
-    return contentType.then((contentType) =>
-      isAllowedInline.call({ contentType }),
-    ) as unknown as boolean;
-  }
-  return ActiveStorage.contentTypesAllowedInline.includes(contentType!);
+  return ActiveStorage.contentTypesAllowedInline.includes(this.contentType!);
 }
 
 export const Servable = {
