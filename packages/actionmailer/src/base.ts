@@ -183,8 +183,19 @@ export class Base extends AbstractController.Base {
     this._message = value;
   }
 
+  /** @internal */
+  declare _actionHasLayout?: boolean;
+  /** @internal */
+  declare _renderedFormat: unknown;
+
+  /**
+   * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364
+   * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.2/actionview/lib/action_view/rendering.rb:32-35
+   */
   constructor() {
     super();
+    this._actionHasLayout = true;
+    this._renderedFormat = null;
     this._mailWasCalled = false;
     this._message = Mail.new();
   }

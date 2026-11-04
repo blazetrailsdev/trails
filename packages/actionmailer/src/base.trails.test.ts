@@ -5,6 +5,23 @@ import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { Collector } from "./collector.js";
 
+class LayoutMailer extends Base {
+  static {
+    this.setMailerName("layout_mailer");
+    (this as unknown as { layout(name: string): void }).layout("layout-mailer");
+    this.prependViewPath(
+      new ActionView.FixtureResolver({
+        "layout-mailer/plain.text.tse": "Body",
+        "layouts/layout-mailer.text.tse": "[<%= yield %>]",
+      }),
+    );
+  }
+
+  plain() {
+    return this.mail({ to: "a@example.com", from: "b@example.com" });
+  }
+}
+
 class TextMailer extends Base {
   static {
     this.setMailerName("text_mailer");
@@ -158,5 +175,10 @@ describe("Base#mail", () => {
       ["text/plain", "Text"],
       ["text/html", "<b>Html</b>"],
     ]);
+  });
+  it("wraps the rendered template in the mailer's layout", async () => {
+    const mailer = new LayoutMailer();
+    await mailer.process("plain");
+    expect((mailer.message as Message).body().encoded()).toBe("[Body]");
   });
 });
