@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Configuration } from "../configuration.js";
 import { ContentTypeField } from "./content-type-field.js";
 
 const params = (c: ContentTypeField) => Object.fromEntries(c.parameters().entries());
@@ -119,6 +120,7 @@ describe("Mail::ContentTypeField", () => {
   });
 
   describe("class methods", () => {
+    // PERMANENT-SKIP: red under MRI 3.3 too, `Mail.something_random` (vendor/mail/2.8.1/lib/mail/mail.rb:252-254) seeds `Mail.uniq` negative, so the boundary holds a "-".
     it.skip("should give back an initialized instance with a unique boundary", () => {
       const boundary = ContentTypeField.withBoundary("multipart/mixed");
       expect(boundary.encoded()).toMatch(
@@ -126,6 +128,7 @@ describe("Mail::ContentTypeField", () => {
       );
     });
 
+    // PERMANENT-SKIP: red under MRI 3.3 too, `Mail.something_random` (vendor/mail/2.8.1/lib/mail/mail.rb:252-254) seeds `Mail.uniq` negative, so the boundary holds a "-".
     it.skip("should give back an initialized instance with different type with a unique boundary", () => {
       const boundary = ContentTypeField.withBoundary("multipart/alternative");
       expect(boundary.encoded()).toMatch(
@@ -559,7 +562,16 @@ describe("Mail::ContentTypeField", () => {
     });
 
     // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the filename is `force_encoding('SJIS')`.
-    it.skip("should encode a non us-ascii filename", () => {});
+    it.skip("should encode a non us-ascii filename", () => {
+      Configuration.instance().paramEncodeLanguage("jp");
+      const c = new ContentTypeField("application/octet-stream");
+      const string = "01 Quien Te Dij\x91at. Pitbull.mp3";
+      const result =
+        "Content-Type: application/octet-stream;\r\n filename*=windows-31j'jp'01%20Quien%20Te%20Dij%91%61t.%20Pitbull.mp3\r\n";
+      c.methodMissing("filename=", string);
+      expect(Object.fromEntries(c.parameters().entries())).toEqual({ filename: string });
+      expect(c.encoded()).toEqual(result);
+    });
   });
 
   describe("handling badly formated content-type fields", () => {
