@@ -6684,8 +6684,14 @@ describe("typed fetch credit", () => {
   });
 
   it("credits a read asserted to a defined type", () => {
-    expect(forms(`return Object.hasOwn(h, "b") ? (h.b as string) : "";`).has("fetch@typed")).toBe(
+    expect(forms(`return Object.hasOwn(h, "a") ? (h.a as number) : 0;`).has("fetch@typed")).toBe(
       true,
+    );
+  });
+
+  it("judges an asserted read at its declared type", () => {
+    expect(forms(`return Object.hasOwn(h, "b") ? (h.b as string) : "";`).has("fetch@typed")).toBe(
+      false,
     );
   });
 });

@@ -7921,7 +7921,16 @@ function assignSourceProven(target: ts.Expression): boolean {
 function readCannotBeUndefined(expr: ts.Expression): boolean {
   const checker = currentChecker;
   if (checker === undefined) return false;
-  const type = checker.getTypeAtLocation(expr);
+  let read = expr;
+  while (
+    ts.isParenthesizedExpression(read) ||
+    ts.isAsExpression(read) ||
+    ts.isTypeAssertionExpression(read) ||
+    ts.isSatisfiesExpression(read)
+  ) {
+    read = read.expression;
+  }
+  const type = checker.getTypeAtLocation(read);
   const parts = type.isUnion() ? type.types : [type];
   const loose =
     ts.TypeFlags.Undefined | ts.TypeFlags.Void | ts.TypeFlags.Any | ts.TypeFlags.Unknown;

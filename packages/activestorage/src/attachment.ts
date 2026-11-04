@@ -9,7 +9,7 @@ import type { Blob } from "./blob.js";
 import type { NamedVariant } from "./named-variant.js";
 import { Record } from "./record.js";
 
-type Transformations = string | Variation | { [k: string]: unknown };
+type Transformations = string | Variation | { [k: string]: NonNullable<unknown> | null };
 
 interface AttachmentReflection {
   options?: { dependent?: unknown };

@@ -53,6 +53,26 @@ describe("ActiveStorage::Engine", () => {
     expect(late).toHaveBeenCalledOnce();
   });
 
+  it("attaches previewImage and image to a Blob and VariantRecord evaluated after the hook fired", async () => {
+    const saved = ActiveStorage.VariantRecord;
+    const savedBlob = ActiveStorage.Blob;
+    try {
+      const late: typeof import("./variant-record.js") =
+        // @ts-expect-error a query string forces a fresh evaluation
+        await import("./variant-record.js?late");
+      expect(late.VariantRecord).not.toBe(VariantRecord);
+      expect(late.VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
+      const lateBlob: typeof import("./blob.js") =
+        // @ts-expect-error a query string forces a fresh evaluation
+        await import("./blob.js?late");
+      expect(lateBlob.Blob).not.toBe(Blob);
+      expect(lateBlob.Blob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
+    } finally {
+      ActiveStorage.VariantRecord = saved;
+      ActiveStorage.Blob = savedBlob;
+    }
+  });
+
   it("attaches previewImage and image with no service argument", () => {
     expect(Blob.reflectOnAssociation("previewImageAttachment")).not.toBeNull();
     expect(VariantRecord.reflectOnAssociation("imageAttachment")).not.toBeNull();
