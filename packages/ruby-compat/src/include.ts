@@ -26,7 +26,7 @@ import { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { isRegisteredConstant, registeredConstant } from "./variable.js";
+import { constGet } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
 import { rbClassPath, markModuleObject } from "./classpath.js";
@@ -180,8 +180,8 @@ export function constDefined(
     if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
     if (i === 0 && recur ? part in c : Object.hasOwn(c, part)) {
       c = (c as Record<string, unknown>)[part];
-    } else if (i === 0 && (recur || mod === Object) && isRegisteredConstant(part)) {
-      c = registeredConstant(part);
+    } else if (i === 0 && (recur || mod === Object) && Object.hasOwn(TopLevel, part)) {
+      c = (TopLevel as Record<string, unknown>)[part];
     } else {
       return false;
     }
@@ -1215,7 +1215,12 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
       return true;
     }
-    if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
+    if (
+      p === globalThis.Set.prototype &&
+      constDefined(Object, "Set") &&
+      c === constGet(Object, "Set")
+    )
+      return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;

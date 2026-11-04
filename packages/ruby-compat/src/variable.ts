@@ -77,25 +77,6 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
 }
 
 /**
- * `rb_const_defined` (`vendor/ruby/v3.3.11/variable.c:3527`) on `rb_cObject`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function isRegisteredConstant(name: string): boolean {
-  return Object.hasOwn(tbl, name);
-}
-
-/**
- * The seat a `constSet` on `TopLevel` wrote (`vendor/ruby/v3.3.11/variable.c:3674`
- * `rb_const_set` on `rb_cObject`), or `undefined`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function registeredConstant(name: string): unknown {
-  return tbl[name];
-}
-
-/**
  * `Kernel#binding` (`vendor/ruby/v3.3.11/proc.c:376` `rb_f_binding`): the scope
  * a template is evaluated in. JS cannot capture a scope, so the binding is
  * `self` with the top-level constants behind it, which is where a constant
