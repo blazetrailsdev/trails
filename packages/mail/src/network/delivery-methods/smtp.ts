@@ -113,8 +113,10 @@ export class SMTP {
     const context = NetSMTP.defaultSslContext();
     if (opensslVerifyMode != null && opensslVerifyMode !== false)
       context.verifyMode = opensslVerifyMode;
-    if (this.settings.caPath) context.caPath = this.settings.caPath;
-    if (this.settings.caFile) context.caFile = this.settings.caFile;
+    if (this.settings.caPath != null && this.settings.caPath !== false)
+      context.caPath = this.settings.caPath;
+    if (this.settings.caFile != null && this.settings.caFile !== false)
+      context.caFile = this.settings.caFile;
     return context;
   }
 }

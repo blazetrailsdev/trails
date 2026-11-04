@@ -1,4 +1,4 @@
-import { IO, Process, StandardError, rbInspect, warn } from "@blazetrails/ruby-compat";
+import { IO, Process, StringIO, StandardError, rbInspect, warn } from "@blazetrails/ruby-compat";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import { Utilities } from "../../utilities.js";
 import type { Message } from "../../message.js";
@@ -10,7 +10,6 @@ export class Sendmail {
     location: "/usr/sbin/sendmail",
     arguments: ["-i"],
   };
-
   static readonly DeliveryError = DeliveryError;
 
   settings: Record<string, unknown>;
@@ -56,7 +55,10 @@ export class Sendmail {
   }
 
   /** @internal */
-  private async popen(command: string[] | string, block: (io: IO) => unknown): Promise<unknown> {
+  private async popen(
+    command: string[] | string,
+    block: (io: StringIO<Uint8Array>) => unknown,
+  ): Promise<unknown> {
     const result = await IO.popen(command, "w+", { err: "out" }, block as never);
     if (Process.lastStatus!.exitstatus() !== 0) {
       throw new DeliveryError(

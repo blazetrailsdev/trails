@@ -1,8 +1,7 @@
 import { SMTPServer } from "smtp-server";
 import { Message } from "../message.js";
 
-type Delivery = [message: string, from: string, to: string[]];
-export let deliveries: Delivery[] = [];
+export let deliveries: [message: string, from: string, to: string[]][] = [];
 const servers: SMTPServer[] = [];
 
 export async function mockSmtp(): Promise<number> {
@@ -13,8 +12,7 @@ export async function mockSmtp(): Promise<number> {
     closeTimeout: 50,
     onData(stream, session, callback) {
       let data = "";
-      stream.setEncoding("utf8");
-      stream.on("data", (chunk: string) => (data += chunk));
+      stream.on("data", (chunk: Uint8Array) => (data += new TextDecoder().decode(chunk)));
       stream.on("end", () => {
         deliveries.push([
           data,
@@ -25,7 +23,6 @@ export async function mockSmtp(): Promise<number> {
       });
     },
   });
-  server.on("error", () => {});
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   return (server.server.address() as { port: number }).port;
