@@ -1021,7 +1021,7 @@
     "residue": { "test.ts::Test": "Rack::Test" }
   },
   "rackup": {
-    "rows": 3,
+    "rows": 4,
     "excluded": [],
     "unwalked": [],
     "residue": { "server.ts::Options": "Rackup::Server::Options" }
