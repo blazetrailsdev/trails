@@ -86,10 +86,7 @@ export class Server extends RackupServer<ServerOptions> {
     if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", this.options.environment);
   }
 
-  /**
-   * @inventedArm atExit — PERMANENT
-   * @inventedArm if — PERMANENT
-   */
+  /** @inventedArm atExit — PERMANENT */
   override async start(afterStopCallback: (() => void) | null = null): Promise<unknown> {
     let stopped = false;
     const ensure = () => {
