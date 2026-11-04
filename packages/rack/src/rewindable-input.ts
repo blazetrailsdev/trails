@@ -1,5 +1,6 @@
 import { RACK_INPUT } from "./constants.js";
 import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+import { Rack } from "./namespaces.js";
 
 export class Middleware {
   private app: any;
@@ -101,3 +102,5 @@ export class RewindableInput {
 }
 
 RewindableInput.Middleware = Middleware;
+
+Rack.RewindableInput = RewindableInput;

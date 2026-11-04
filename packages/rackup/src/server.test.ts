@@ -1,12 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  CommonLogger,
-  ContentLength,
-  Lint,
-  MockRequest,
-  ShowExceptions,
-  TempfileReaper,
-} from "@blazetrails/rack";
+import { CommonLogger, Lint, MockRequest, ShowExceptions, TempfileReaper } from "@blazetrails/rack";
 import {
   ARGV,
   Dir,
@@ -372,24 +365,18 @@ describe("Rackup::Server", () => {
       ...["-scgi", "-E", "development", "-b"],
       "builder.use(Rack.ContentLength); builder.run(async () => [200, {}, []]);",
     );
-    const top = globalThis as { Rack?: unknown };
-    top.Rack = { ContentLength };
-    try {
-      const server = await newServer();
-      cgi.run = (app) => app;
-      let started: unknown;
-      await withOutput(async () => (started = await server.start()));
-      const [s, h, b] = await (
-        started as {
-          call(env: object): Promise<[number, Record<string, string>, string[]]>;
-        }
-      ).call({ "rack.errors": new StringIO() });
-      expect(s).toBe(500);
-      expect(h["content-type"]).toBe("text/plain");
-      expect([...b].join("")).toContain("Rack::Lint::LintError");
-    } finally {
-      delete top.Rack;
-    }
+    const server = await newServer();
+    cgi.run = (app) => app;
+    let started: unknown;
+    await withOutput(async () => (started = await server.start()));
+    const [s, h, b] = await (
+      started as {
+        call(env: object): Promise<[number, Record<string, string>, string[]]>;
+      }
+    ).call({ "rack.errors": new StringIO() });
+    expect(s).toBe(500);
+    expect(h["content-type"]).toBe("text/plain");
+    expect([...b].join("")).toContain("Rack::Lint::LintError");
   });
 
   it("support -e option to evaluate ruby code", async () => {

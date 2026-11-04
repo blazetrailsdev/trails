@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Configuration } from "../configuration.js";
+import { Mail } from "../mail.js";
 import { ContentTypeField } from "./content-type-field.js";
 
 const params = (c: ContentTypeField) => Object.fromEntries(c.parameters().entries());
@@ -563,7 +563,9 @@ describe("Mail::ContentTypeField", () => {
 
     // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the filename is `force_encoding('SJIS')`.
     it.skip("should encode a non us-ascii filename", () => {
-      Configuration.instance().paramEncodeLanguage("jp");
+      Mail.defaults(function () {
+        this.paramEncodeLanguage("jp");
+      });
       const c = new ContentTypeField("application/octet-stream");
       const string = "01 Quien Te Dij\x91at. Pitbull.mp3";
       const result =

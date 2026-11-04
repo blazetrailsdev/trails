@@ -71,6 +71,7 @@ export const Reader = {
     }
   },
 
+  /** @inventedArm _binary — PERMANENT */
   readPartial(this: Stream, length: number | null = null): Chunk | null {
     let buffer: Chunk | null;
     if (this._buffer != null) {
@@ -102,6 +103,7 @@ export const Reader = {
     }
   },
 
+  /** @inventedArm _binary — PERMANENT */
   // eslint-disable-next-line unused-imports/no-unused-vars
   readNonblock(this: Stream, length: number, buffer: Chunk | null = null): Chunk | null {
     if (this._buffer == null) {

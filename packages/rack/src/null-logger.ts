@@ -2,6 +2,7 @@ import type { RackHeaders } from "./index.js";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { RACK_LOGGER } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class NullLogger {
   private app: RackApp | { call: RackApp };
@@ -76,3 +77,5 @@ export class NullLogger {
   append(_msg: any): void {}
   reopen(_logdev?: any): void {}
 }
+
+Rack.NullLogger = NullLogger;

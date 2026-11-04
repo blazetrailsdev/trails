@@ -1,3 +1,4 @@
+import "./constants.test-databases.generated.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";

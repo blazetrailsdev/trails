@@ -5,6 +5,7 @@ import { HTTP_STATUS_CODES, escapeHtml } from "./utils.js";
 import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 type TemplateBinding = {
   h: (obj: unknown) => string;
@@ -113,3 +114,5 @@ const TEMPLATE = ({ h, req, message, status, detail }: TemplateBinding): string 
 </body>
 </html>
 `;
+
+Rack.ShowStatus = ShowStatus;

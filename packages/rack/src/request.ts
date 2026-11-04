@@ -52,6 +52,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
+import { Rack } from "./namespaces.js";
 
 const ipv6 = [
   /(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}/,
@@ -818,3 +819,5 @@ include(Request, Helpers);
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:790`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request
   extends Env, Omit<Helpers, "env" | "getHeader" | "setHeader" | "fetchHeader"> {}
+
+Rack.Request = Request;

@@ -5,6 +5,7 @@ import { Time } from "@blazetrails/date";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
+import { Rack } from "./namespaces.js";
 
 function clockTime(): number {
   return Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -76,3 +77,5 @@ export class CommonLogger {
     return !value || value === "0" ? "-" : String(value);
   }
 }
+
+Rack.CommonLogger = CommonLogger;

@@ -3,6 +3,7 @@ import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
 import { cleanPathInfo, unescape, unescapePath } from "./utils.js";
+import { Rack } from "./namespaces.js";
 
 export interface StaticOptions {
   urls?: string[] | Record<string, string>;
@@ -124,3 +125,5 @@ export class Static {
     });
   }
 }
+
+Rack.Static = Static;

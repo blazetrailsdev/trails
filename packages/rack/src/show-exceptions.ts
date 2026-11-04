@@ -13,6 +13,7 @@ import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Request } from "./request.js";
 import { bestQMatch, escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
+import { Rack } from "./namespaces.js";
 
 export class Frame {
   private _filename: string | null = null;
@@ -518,3 +519,5 @@ export class ShowExceptions {
     return bestQMatch(env["HTTP_ACCEPT"], ["text/html"]);
   }
 }
+
+Rack.ShowExceptions = ShowExceptions;

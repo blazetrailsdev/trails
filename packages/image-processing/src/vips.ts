@@ -51,7 +51,7 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
     jpegload: `shrink autorotate unlimited ${LOAD_OPTIONS}`,
     jxlload: `page n ${LOAD_OPTIONS}`,
-    magickload: `density page ${LOAD_OPTIONS}`,
+    magickload: `density page n ${LOAD_OPTIONS}`,
     matrixload: LOAD_OPTIONS,
     pngload: `unlimited ${LOAD_OPTIONS}`,
     ppmload: LOAD_OPTIONS,
@@ -114,24 +114,41 @@ function isVipsForeignLoadUnknown(error: unknown): boolean {
 /** @noRailsEquivalent PERMANENT */
 function vipsForeignLoadMagick(
   filename: string,
-  { page = 0, density = null }: Options = {},
-): Image | null {
+  { page = 0, n = 1, density = null }: Options = {},
+  error: unknown,
+): Image {
   const tempfile = Tempfile.new(["magickload", ".png"]);
   try {
     const args = density != null ? ["-density", String(density)] : [];
+    const first = Number(page);
+    const pages = Number(n) === -1 ? `${first}-` : `${first}-${first + Number(n) - 1}`;
     for (const cmd of ["magick", "convert"]) {
-      const { status, error } = getChildProcess().spawnSync(cmd, [
+      const {
+        status,
+        error: spawnError,
+        stdout,
+        stderr,
+      } = getChildProcess().spawnSync(cmd, [
         ...args,
-        `${filename}[${String(page)}]`,
+        `${filename}[${pages}]`,
+        "-print",
+        "%h",
+        "-append",
         `png:${tempfile.path()!}`,
       ]);
-      if (error !== undefined) continue;
-      if (status !== 0) return null;
+      if (spawnError !== undefined) continue;
+      if (status !== 0) {
+        const message = `${String((error as { message?: unknown }).message)}\n${String(stderr ?? "").trim()}`;
+        Object.defineProperty(error, "message", { value: message, configurable: true });
+        throw error;
+      }
       const image = vips.Image.newFromFile(tempfile.path()!).copyMemory();
       image.setString("vips-loader", "magickload");
+      const pageHeight = parseInt(String(stdout), 10);
+      if (pageHeight > 0 && pageHeight < image.height) image.setInt("page-height", pageHeight);
       return image;
     }
-    return null;
+    throw error;
   } finally {
     tempfile.closeBang();
   }
@@ -143,9 +160,7 @@ function vipsImageNewFromFile(filename: string, options: Options = {}): Image {
     return vips.Image.newFromFile(filename, options);
   } catch (error) {
     if (!isVipsForeignLoadUnknown(error)) throw error;
-    const image = vipsForeignLoadMagick(filename, options);
-    if (image === null) throw error;
-    return image;
+    return vipsForeignLoadMagick(filename, options, error);
   }
 }
 
