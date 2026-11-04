@@ -4,6 +4,8 @@ import {
   rbObjRespondTo,
   ArgumentError,
   RuntimeError,
+  getChildProcess,
+  Tempfile,
 } from "@blazetrails/ruby-compat";
 import WasmVips from "wasm-vips";
 import { Chainable, chainableProxy } from "./chainable.js";
@@ -49,6 +51,7 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
     jpegload: `shrink autorotate unlimited ${LOAD_OPTIONS}`,
     jxlload: `page n ${LOAD_OPTIONS}`,
+    magickload: `density page n ${LOAD_OPTIONS}`,
     matrixload: LOAD_OPTIONS,
     pngload: `unlimited ${LOAD_OPTIONS}`,
     ppmload: LOAD_OPTIONS,
@@ -101,9 +104,42 @@ const SAVER_SUFFIXES: Record<string, string> = {
 };
 
 /** @noRailsEquivalent PERMANENT */
+function vipsForeignLoadMagick(filename: string): Image | null {
+  const tempfile = Tempfile.new(["magickload", ".png"]);
+  try {
+    for (const cmd of ["magick", "convert"]) {
+      const { status, error } = getChildProcess().spawnSync(cmd, [
+        `${filename}[0]`,
+        `png:${tempfile.path()!}`,
+      ]);
+      if (error !== undefined) continue;
+      if (status !== 0) return null;
+      const image = vips.Image.newFromFile(tempfile.path()!).copyMemory();
+      image.setString("vips-loader", "magickload");
+      return image;
+    }
+    return null;
+  } finally {
+    tempfile.closeBang();
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function vipsImageNewFromFile(filename: string, options: Options = {}): Image {
+  try {
+    return vips.Image.newFromFile(filename, options);
+  } catch (error) {
+    if (!(error instanceof WebAssembly.Exception)) throw error;
+    const image = vipsForeignLoadMagick(filename);
+    if (image === null) throw error;
+    return image;
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
 function vipsForeignFindLoad(filename: string): string | null {
   try {
-    const loader = vips.Image.newFromFile(filename).getString("vips-loader");
+    const loader = vipsImageNewFromFile(filename).getString("vips-loader");
     return Object.hasOwn(INTROSPECT_OPTIONAL_INPUT, loader) ? loader : null;
   } catch (error) {
     if (error instanceof WebAssembly.Exception) return null;
@@ -178,7 +214,7 @@ class Processor extends BaseProcessor {
         image = rbFSend(vips.Image, `${loader}load`, path, options) as Image;
       } else {
         options = Processor.Utils.selectValidLoaderOptions(path, options);
-        image = vips.Image.newFromFile(path, options);
+        image = vipsImageNewFromFile(path, options);
       }
     }
 
@@ -384,7 +420,7 @@ class Processor extends BaseProcessor {
       );
     }
 
-    return vips.Image.newFromFile(path);
+    return vipsImageNewFromFile(path);
   }
 
   static Utils = {
@@ -414,7 +450,7 @@ const ImageProcessingVips = {
 
   isValidImage(file: { path(): string }): boolean {
     try {
-      vips.Image.newFromFile(file.path(), { access: "sequential" }).avg();
+      vipsImageNewFromFile(file.path(), { access: "sequential" }).avg();
       return true;
     } catch (error) {
       if (error instanceof WebAssembly.Exception) return false;
