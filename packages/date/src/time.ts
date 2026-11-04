@@ -180,7 +180,7 @@ const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
 
 function obj2vint(obj: number | string): number {
   if (typeof obj !== "string") return Math.trunc(obj);
-  return kernelInteger(obj, 10);
+  return Number(kernelInteger(obj, 10));
 }
 
 function monthArg(obj: number | string): number {

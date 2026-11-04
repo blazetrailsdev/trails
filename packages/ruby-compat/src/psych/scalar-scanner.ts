@@ -153,17 +153,9 @@ export class ScalarScanner {
     }
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   parseInt(string: string): number | bigint {
-    const digits = stringDelete(string, ",_");
-    const n = kernelInteger(digits);
-    if (Number.isSafeInteger(n)) return n;
-    const [, sign, body] = /^([-+]?)(.*)$/s.exec(digits)!;
-    const big = BigInt(/^0[0-7]/.test(body) ? `0o${body.slice(1)}` : body);
-    return sign === "-" ? -big : big;
+    return kernelInteger(stringDelete(string, ",_"));
   }
 
   /**
@@ -195,7 +187,7 @@ export class ScalarScanner {
       .exec(md[3])!
       .slice(1)
       .filter((digit) => digit != null)
-      .map((digit) => kernelInteger(digit, 10));
+      .map((digit) => Number(kernelInteger(digit, 10)));
     let offset = tz[0] * 3600;
 
     if (offset < 0) {

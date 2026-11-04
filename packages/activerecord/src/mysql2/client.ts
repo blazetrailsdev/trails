@@ -580,7 +580,7 @@ export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mys
       case "connectTimeout":
       case "readTimeout":
       case "writeTimeout":
-        if (opts[key] != null) this[key] = kernelInteger(opts[key]);
+        if (opts[key] != null) this[key] = Number(kernelInteger(opts[key]));
         break;
       default:
         this[key] = opts[key];

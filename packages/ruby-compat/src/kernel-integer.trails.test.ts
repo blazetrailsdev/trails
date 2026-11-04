@@ -162,4 +162,11 @@ describe("kernelInteger", () => {
       "can't convert Foo to Integer (Foo#to_i gives String)",
     );
   });
+
+  it("answers a bignum past 2**53 at the string's radix", () => {
+    expect(kernelInteger("9007199254740993")).toBe(9007199254740993n);
+    expect(kernelInteger("-0x20000000000001")).toBe(-0x20000000000001n);
+    expect(kernelInteger("0400000000000000001")).toBe(0o400000000000000001n);
+    expect(kernelInteger("12")).toBe(12);
+  });
 });
