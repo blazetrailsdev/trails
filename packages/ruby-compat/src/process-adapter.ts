@@ -453,22 +453,10 @@ const SIGNOS: Record<number, TrapSignal> = { 2: "SIGINT", 3: "SIGQUIT", 15: "SIG
 
 const traps = new Map<TrapSignal, { command: TrapCommand; off: (() => void) | null }>();
 
-function trapSignm(vsig: number | string): TrapSignal {
-  if (typeof vsig === "number") {
-    if (vsig < 0 || vsig >= 65) throw new ArgumentError(`invalid signal number (${vsig})`);
-    const signm = SIGNOS[vsig];
-    if (signm === undefined) throw new ArgumentError(`unsupported signal \`${vsig}'`);
-    return signm;
-  }
-  const signm = vsig.startsWith("SIG") ? vsig : `SIG${vsig}`;
-  if (signm === "SIGINT" || signm === "SIGTERM" || signm === "SIGQUIT") return signm;
-  throw new ArgumentError(`unsupported signal \`${signm}'`);
-}
-
 /**
  * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348): installs
  * `command` for `signal` (a name, with or without `SIG`, or a number, per
- * `trap_signm`, signal.c:1230) in place of the previous one and answers the
+ * `trap_signm`, signal.c:1230, inlined) in place of the previous one and answers the
  * previous one, named as `trap` (signal.c:1247) names it. String commands
  * follow `trap_handler` (signal.c:1158): `""`, `IGNORE` and `SIG_IGN` ignore
  * the signal, `SYSTEM_DEFAULT` restores the system default,
@@ -479,7 +467,19 @@ function trapSignm(vsig: number | string): TrapSignal {
  * @noRailsEquivalent PERMANENT
  */
 export function trap(signal: number | string, command: TrapCommand): TrapCommand {
-  const sig = trapSignm(signal);
+  let sig: TrapSignal;
+  if (typeof signal === "number") {
+    if (signal < 0 || signal >= 65) throw new ArgumentError(`invalid signal number (${signal})`);
+    const signm = SIGNOS[signal];
+    if (signm === undefined) throw new ArgumentError(`unsupported signal \`${signal}'`);
+    sig = signm;
+  } else {
+    const signm = signal.startsWith("SIG") ? signal : `SIG${signal}`;
+    if (signm !== "SIGINT" && signm !== "SIGTERM" && signm !== "SIGQUIT") {
+      throw new ArgumentError(`unsupported signal \`${signm}'`);
+    }
+    sig = signm;
+  }
   const previous = traps.get(sig);
   previous?.off?.();
   let off: (() => void) | null;
