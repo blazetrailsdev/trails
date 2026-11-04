@@ -19,11 +19,8 @@ export const FormBuilder = {
   },
 };
 extend(FormBuilder, Concern);
-(FormBuilder as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function () {
-    classAttribute.call(this, "_defaultFormBuilder", { instanceAccessor: false });
-  },
-);
+Concern.included.call(FormBuilder as never, null, function (this: object) {
+  classAttribute.call(this, "_defaultFormBuilder", { instanceAccessor: false });
+});
 
 ActionMailer.FormBuilder = FormBuilder;
