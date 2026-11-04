@@ -96,7 +96,7 @@ describe("AppGeneratorTest", () => {
 
     await assertFile(
       defaultsPath,
-      /toTimePreservesTimezone = ":zone";[\s\S]*strictFreshness = true;/,
+      /this\.config\.activeSupport\.toTimePreservesTimezone = ":zone";[\s\S]*this\.config\.actionDispatch\.strictFreshness = true;/,
     );
     assertNoFile("my-app/config/initializers/cors.ts");
   });

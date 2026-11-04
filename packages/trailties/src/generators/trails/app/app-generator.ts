@@ -1231,20 +1231,22 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 
 import { Trails } from "@blazetrails/trailties";
 
-///
-// Specifies whether \`toTime\` methods preserve the UTC offset of their receivers or preserves the timezone.
-// If set to \`":zone"\`, \`toTime\` methods will use the timezone of their receivers.
-// If set to \`":offset"\`, \`toTime\` methods will use the UTC offset.
-// If \`false\`, \`toTime\` methods will convert to the local system UTC offset instead.
-//++
-// Trails.application.config.activeSupport.toTimePreservesTimezone = ":zone";
+Trails.application.configure(function () {
+  ///
+  // Specifies whether \`toTime\` methods preserve the UTC offset of their receivers or preserves the timezone.
+  // If set to \`":zone"\`, \`toTime\` methods will use the timezone of their receivers.
+  // If set to \`":offset"\`, \`toTime\` methods will use the UTC offset.
+  // If \`false\`, \`toTime\` methods will convert to the local system UTC offset instead.
+  //++
+  // this.config.activeSupport.toTimePreservesTimezone = ":zone";
 
-///
-// When both \`If-Modified-Since\` and \`If-None-Match\` are provided by the client
-// only consider \`If-None-Match\` as specified by RFC 7232 Section 6.
-// If set to \`false\` both conditions need to be satisfied.
-//++
-// Trails.application.config.actionDispatch.strictFreshness = true;
+  ///
+  // When both \`If-Modified-Since\` and \`If-None-Match\` are provided by the client
+  // only consider \`If-None-Match\` as specified by RFC 7232 Section 6.
+  // If set to \`false\` both conditions need to be satisfied.
+  //++
+  // this.config.actionDispatch.strictFreshness = true;
+});
 `,
     );
 
