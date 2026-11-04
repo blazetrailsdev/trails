@@ -47,6 +47,7 @@ const defaultFiles = [
   "config/boot.ts",
   "config/environment.ts",
   "config/environments",
+  "config/initializers/cors.ts",
   "config/routes.ts",
   "db",
   "lib",

@@ -879,7 +879,7 @@ export default await Trails.initialize();
 
     if (!this.options.update) await this.template("config/routes.ts");
 
-    if (!(this.options.update || this.skipActionCable())) {
+    if (!(this.options.update || this.options.skipActionCable)) {
       await this.template("config/cable.ts");
     }
 
@@ -1190,6 +1190,28 @@ ${
 //   scriptSrc:  ["'self'"],
 //   styleSrc:   ["'self'", "https:"],
 // };
+`,
+    );
+
+    await this.createFile(
+      "config/initializers/cors.ts",
+      `// Be sure to restart your server when you modify this file.
+
+// Avoid CORS issues when API is called from the frontend app.
+// Handle Cross-Origin Resource Sharing (CORS) in order to accept cross-origin Ajax requests.
+
+// Read more: https://github.com/cyu/rack-cors
+
+// Trails.application.config.middleware.insertBefore(0, Rack.Cors, function () {
+//   this.allow(function () {
+//     this.origins("example.com");
+//
+//     this.resource("*", {
+//       headers: "any",
+//       methods: ["get", "post", "put", "patch", "delete", "options", "head"],
+//     });
+//   });
+// });
 `,
     );
 
