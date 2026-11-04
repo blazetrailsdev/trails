@@ -42,7 +42,7 @@ export class Preview {
     if (presentation instanceof Promise) {
       void presentation.catch(() => {});
       throw new RuntimeError(
-        "filename needs the preview image's blob loaded; `await preview.image.load()` first.",
+        `filename needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
       );
     }
     return presentation.filename;
@@ -53,7 +53,7 @@ export class Preview {
     if (presentation instanceof Promise) {
       void presentation.catch(() => {});
       throw new RuntimeError(
-        "contentType needs the preview image's blob loaded; `await preview.image.load()` first.",
+        `contentType needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
       );
     }
     return presentation.contentType;
