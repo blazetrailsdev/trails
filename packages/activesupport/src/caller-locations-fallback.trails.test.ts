@@ -45,6 +45,6 @@ describe("callerLocations on a runtime with no V8 stack positions", () => {
 
   it("start counts from the caller's caller", () => {
     const direct = callerLocations(0, 1);
-    expect(direct[0].path).toMatch(/caller-locations-fallback\.test\.ts$/);
+    expect(direct[0].path).toMatch(/caller-locations-fallback\.trails\.test\.ts$/);
   });
 });
