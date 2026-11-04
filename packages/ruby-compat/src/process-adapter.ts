@@ -471,8 +471,8 @@ function trapSignm(vsig: number | string): TrapSignal {
  * `trap_signm`, signal.c:1230) in place of the previous one and answers the
  * previous one, named as `trap` (signal.c:1247) names it. String commands
  * follow `trap_handler` (signal.c:1158): `""`, `IGNORE` and `SIG_IGN` ignore
- * the signal, `SIG_DFL` and `SYSTEM_DEFAULT` restore the system default,
- * `DEFAULT` installs Ruby's own handler, which raises `Interrupt` for SIGINT
+ * the signal, `SYSTEM_DEFAULT` restores the system default,
+ * `DEFAULT` and `SIG_DFL` install Ruby's own handler, which raises `Interrupt` for SIGINT
  * and `SignalException` otherwise (`default_handler`, signal.c:1100), and
  * `EXIT` exits. A signal never trapped answers `"DEFAULT"`.
  *
@@ -490,10 +490,10 @@ export function trap(signal: number | string, command: TrapCommand): TrapCommand
   } else if (command === "" || command === "IGNORE" || command === "SIG_IGN") {
     off = onSignal(sig, () => {});
     oldcmd = "IGNORE";
-  } else if (command === "SIG_DFL" || command === "SYSTEM_DEFAULT") {
+  } else if (command === "SYSTEM_DEFAULT") {
     off = null;
     oldcmd = "SYSTEM_DEFAULT";
-  } else if (command === "DEFAULT") {
+  } else if (command === "DEFAULT" || command === "SIG_DFL") {
     off = onSignal(sig, () => {
       throw sig === "SIGINT" ? new Interrupt("") : new SignalException(sig);
     });

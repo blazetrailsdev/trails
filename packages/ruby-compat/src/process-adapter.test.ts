@@ -569,10 +569,11 @@ describe("trap", () => {
     expect(typeof trap("SIGINT", "IGNORE")).toBe("function");
     for (const listener of listeners) listener();
     expect(calls).toEqual(["rackup"]);
-    expect(trap("INT", "SIG_DFL")).toBe("IGNORE");
+    expect(trap("INT", "SYSTEM_DEFAULT")).toBe("IGNORE");
     expect(listeners.size).toBe(0);
-    expect(trap(2, "DEFAULT")).toBe("SYSTEM_DEFAULT");
+    expect(trap(2, "SIG_DFL")).toBe("SYSTEM_DEFAULT");
     expect(() => [...listeners][0]()).toThrow(Interrupt);
+    expect(trap("SIGINT", "DEFAULT")).toBe("DEFAULT");
     expect(() => trap("SIGFOO", "IGNORE")).toThrow("unsupported signal `SIGFOO'");
     expect(() => trap(99, "IGNORE")).toThrow("invalid signal number (99)");
   });
