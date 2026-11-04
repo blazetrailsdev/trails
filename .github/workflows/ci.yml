@@ -1044,6 +1044,7 @@ jobs:
           packages/html-sanitizer
           packages/i18n
           packages/mail
+          packages/actionmailer
           packages/marcel
           packages/image-processing
           packages/mini-magick
@@ -1245,6 +1246,7 @@ jobs:
           packages/globalid
           packages/i18n
           packages/mail
+          packages/actionmailer
           packages/marcel
           packages/image-processing
           packages/mini-magick

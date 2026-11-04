@@ -210,6 +210,18 @@ importers:
         specifier: 0.7.4
         version: 0.7.4
 
+  packages/actionmailer:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../mail
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/actionpack:
     dependencies:
       '@blazetrails/actionview':

@@ -36,6 +36,22 @@
       "remote-connections.ts::InvalidIdentifiersError": "ActionCable::RemoteConnections::RemoteConnection::InvalidIdentifiersError"
     }
   },
+  "actionmailer": {
+    "rows": 9,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "callbacks.ts::Callbacks": "ActionMailer::Callbacks",
+      "callbacks.ts::ClassMethods": "ActionMailer::Callbacks::ClassMethods",
+      "form-builder.ts::ClassMethods": "ActionMailer::FormBuilder::ClassMethods",
+      "form-builder.ts::FormBuilder": "ActionMailer::FormBuilder",
+      "gem-version.ts::VERSION": "ActionMailer::VERSION",
+      "inline-preview-interceptor.ts::InlinePreviewInterceptor": "ActionMailer::InlinePreviewInterceptor",
+      "log-subscriber.ts::LogSubscriber": "ActionMailer::LogSubscriber",
+      "mail-helper.ts::MailHelper": "ActionMailer::MailHelper",
+      "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
+    }
+  },
   "actionpack": {
     "rows": 323,
     "excluded": [
