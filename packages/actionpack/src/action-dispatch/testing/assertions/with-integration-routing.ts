@@ -1,32 +1,9 @@
-import {
-  deleteIf,
-  extend,
-  include,
-  Module,
-  rbFSend,
-  rbObjClone,
-  rbObjMethod,
-  rbObjRespondTo,
-  rbObjSingletonClass,
-  type Method,
-} from "@blazetrails/ruby-compat";
+import { include, rbObjMethod, rbObjSingletonClass, type Method } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../routing/route-set.js";
 import { ActionDispatch } from "../../../namespaces.js";
 import type { IntegrationTest, Session } from "../integration.js";
-import type { RoutingAssertionsHost, TestClass } from "./routing.js";
+import type { TestClass } from "./routing.js";
 
-/**
- * Split out of `routing.ts` so that this module's nested `ClassMethods` does
- * not share a module with `RoutingAssertions`' top-level `ClassMethods`.
- *
- * perry mis-lowers that exact shape — a top-level namespace whose name collides
- * with a nested namespace name in the same module — and boot failed with
- * `TypeError: Cannot set properties of undefined (setting 'withRouting')`.
- * Nesting alone is fine, and two differently-nested `ClassMethods` are fine;
- * only the top-level/nested collision breaks. `routing.ts` re-exports this
- * namespace, so `ActionDispatch::Assertions::RoutingAssertions::WithIntegrationRouting`
- * and every consumer path are unchanged.
- */
 // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby `module WithIntegrationRouting` (`testing/assertions/routing.rb:18`) nests its own `ClassMethods`; a namespace keeps both at their Rails names beside RoutingAssertions' same-named members.
 export namespace WithIntegrationRouting {
   // eslint-disable-next-line @typescript-eslint/no-namespace -- `WithIntegrationRouting::ClassMethods` (`routing.rb:21`).

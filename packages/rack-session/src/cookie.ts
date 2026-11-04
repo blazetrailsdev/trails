@@ -33,16 +33,6 @@ interface RackErrors {
   puts(string?: string): unknown;
 }
 
-/**
- * Hoisted out of `Cookie` as a class DECLARATION rather than the named class
- * EXPRESSION it used to be. The nested `extends Base64` members below refer to
- * this class from inside its own static initialisers. A named class expression
- * binds its own name within its body per spec, but perry does not create that
- * binding, so the expression form failed at boot with
- * `ReferenceError: Base64 is not defined`. The declaration form behaves
- * identically on Node and perry (both verified). The name stays `Base64`, so
- * `.name` and the `Rack::Session::Cookie::Base64` class path are unchanged.
- */
 class Base64 {
   encode(str: string | Uint8Array): string {
     return RubyCompat.Base64.strictEncode64(str);
