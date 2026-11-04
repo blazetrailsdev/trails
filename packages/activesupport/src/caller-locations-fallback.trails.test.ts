@@ -43,6 +43,13 @@ describe("callerLocations on a runtime with no V8 stack positions", () => {
     expect(locations[0].callSite).toBeDefined();
   });
 
+  it("names the same frame as the V8 path", () => {
+    const viaV8 = callerLocations(0, 1)[0];
+    installPositionlessStack();
+    const viaCallSites = callerLocations(0, 1)[0];
+    expect(viaCallSites.path).toBe(viaV8.path);
+  });
+
   it("start counts from the caller's caller", () => {
     const direct = callerLocations(0, 1);
     expect(direct[0].path).toMatch(/caller-locations-fallback\.trails\.test\.ts$/);

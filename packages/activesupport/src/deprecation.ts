@@ -182,12 +182,12 @@ function callerLocationsViaCallSites(start: number, length?: number): CallerLoca
   if (typeof getCallSites !== "function") return [];
   let sites: NodeCallSite[];
   try {
-    sites = getCallSites(length == null ? 200 : 1 + start + length);
+    sites = getCallSites(length == null ? 200 : 2 + start + length);
   } catch {
     return [];
   }
   if (!Array.isArray(sites)) return [];
-  const locations = sites.slice(1 + start).map((site) => {
+  const locations = sites.slice(2 + start).map((site) => {
     const raw = typeof site?.scriptName === "string" ? site.scriptName : "";
     const path = raw.startsWith("file://") ? decodeURIComponent(raw.slice("file://".length)) : raw;
     const lineno = Number.isFinite(site?.lineNumber) ? Number(site.lineNumber) : 0;

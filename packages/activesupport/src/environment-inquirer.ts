@@ -19,6 +19,9 @@ export class EnvironmentInquirer extends StringInquirer {
     return "ActiveSupport::EnvironmentInquirer";
   }
 
+  /** @internal */
+  declare private local: boolean;
+
   constructor(env: string) {
     if (env === "local") throw new ArgumentError("'local' is a reserved environment name");
 
@@ -28,11 +31,11 @@ export class EnvironmentInquirer extends StringInquirer {
       (this as unknown as Record<string, boolean>)[defaultEnv] = env === defaultEnv;
     }
 
-    (this as unknown as Record<string, boolean>)["local"] = isIn(env, LOCAL_ENVIRONMENTS);
+    this.local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
   "local?"(): boolean {
-    return (this as unknown as Record<string, boolean>)["local"];
+    return this.local;
   }
 }
 
