@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, StandardError, type Included } from "@blazetrails/ruby-compat";
+import { include, StandardError } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
@@ -22,8 +22,13 @@ interface Presented {
   download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Preview extends Included<typeof Servable> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Preview {
+  contentTypeForServing(): Promise<string | null>;
+  forcedDispositionForServing(): Promise<"attachment" | undefined>;
+  forciblyServeAsBinary(): Promise<boolean>;
+  isAllowedInline(): Promise<boolean>;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Preview {

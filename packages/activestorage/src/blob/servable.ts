@@ -1,31 +1,62 @@
 import { ActiveStorage } from "../active-storage.js";
 
 interface ServableHost {
-  contentType: string | null | Promise<string | null>;
-  forciblyServeAsBinary(): Promise<boolean>;
-  isAllowedInline(): Promise<boolean>;
+  contentType?: string | null;
 }
 
-async function contentTypeForServing(this: ServableHost): Promise<string | null> {
-  return (await this.forciblyServeAsBinary())
+/** @inventedArm if — PERMANENT */
+function contentTypeForServing(this: ServableHost): string | null {
+  const contentType = this.contentType as string | null | Promise<string | null>;
+  if (contentType instanceof Promise) {
+    return contentType.then((contentType) =>
+      contentTypeForServing.call({ contentType }),
+    ) as unknown as string | null;
+  }
+  return forciblyServeAsBinary.call({ contentType })
     ? ActiveStorage.binaryContentType
-    : await this.contentType;
+    : contentType;
 }
 
-async function forcedDispositionForServing(this: ServableHost): Promise<"attachment" | undefined> {
-  if ((await this.forciblyServeAsBinary()) || !(await this.isAllowedInline())) {
+/** @inventedArm if — PERMANENT */
+function forcedDispositionForServing(this: ServableHost): "attachment" | undefined {
+  const contentType = this.contentType as string | null | Promise<string | null>;
+  if (contentType instanceof Promise) {
+    return contentType.then((contentType) =>
+      forcedDispositionForServing.call({ contentType }),
+    ) as unknown as "attachment" | undefined;
+  }
+  if (forciblyServeAsBinary.call({ contentType }) || !isAllowedInline.call({ contentType })) {
     return "attachment";
   }
+  return undefined;
 }
 
-/** @internal */
-async function forciblyServeAsBinary(this: ServableHost): Promise<boolean> {
-  return ActiveStorage.contentTypesToServeAsBinary.includes((await this.contentType)!);
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
+function forciblyServeAsBinary(this: ServableHost): boolean {
+  const contentType = this.contentType as string | null | Promise<string | null>;
+  if (contentType instanceof Promise) {
+    return contentType.then((contentType) =>
+      forciblyServeAsBinary.call({ contentType }),
+    ) as unknown as boolean;
+  }
+  return ActiveStorage.contentTypesToServeAsBinary.includes(contentType!);
 }
 
-/** @internal */
-async function isAllowedInline(this: ServableHost): Promise<boolean> {
-  return ActiveStorage.contentTypesAllowedInline.includes((await this.contentType)!);
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
+function isAllowedInline(this: ServableHost): boolean {
+  const contentType = this.contentType as string | null | Promise<string | null>;
+  if (contentType instanceof Promise) {
+    return contentType.then((contentType) =>
+      isAllowedInline.call({ contentType }),
+    ) as unknown as boolean;
+  }
+  return ActiveStorage.contentTypesAllowedInline.includes(contentType!);
 }
 
 export const Servable = {
