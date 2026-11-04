@@ -165,21 +165,14 @@ export class YAMLTree {
     }
     if (typeof target === "function") return this.visitClass(target);
     const tag = target == null ? null : temporalTag(target);
-    let dateTime = false;
-    for (
-      let k: unknown = target == null ? null : rbObjClass(target);
-      typeof k === "function" && k !== Function.prototype;
-      k = Object.getPrototypeOf(k)
-    ) {
-      if (rbModName(k as new () => unknown) === "DateTime") {
-        dateTime = true;
-        break;
+    if (target instanceof rbCDate) {
+      for (let k: unknown = rbObjClass(target); k !== rbCDate; k = Object.getPrototypeOf(k)) {
+        if (rbModName(k as new () => unknown) === "DateTime") {
+          return this.visitDateTime(target as DateTime);
+        }
       }
+      return this.visitDate(target as RubyDate);
     }
-    if (dateTime) {
-      return this.visitDateTime(target as DateTime);
-    }
-    if (target instanceof rbCDate) return this.visitDate(target as RubyDate);
     if (
       target instanceof rbCTime ||
       tag === "Temporal.ZonedDateTime" ||
