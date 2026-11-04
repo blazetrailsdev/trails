@@ -512,7 +512,7 @@ describe("AppGenerator", () => {
 
     const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
     expect(configRu).toContain(`import "./config/environment.ts";`);
-    expect(configRu).toContain("export default Trails.application;");
+    expect(configRu).toContain("export const Config = Trails.application;");
     expect(configRu).toContain("await Trails.application.loadServer();");
   });
 

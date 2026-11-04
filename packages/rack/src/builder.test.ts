@@ -280,48 +280,48 @@ describe("Rack::Builder", () => {
       return File.join(__dirname, "../test/builder", name);
     }
 
-    it("raises if parses commented options", () => {
+    it("raises if parses commented options", async () => {
       let error: unknown;
-      expect(() => {
-        try {
-          Builder.parseFile(configFile("options.ru"));
-        } catch (e) {
-          error = e;
-          throw e;
-        }
-      }).toThrow(RuntimeError);
+      try {
+        await Builder.parseFile(configFile("options.ru"));
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(RuntimeError);
       expect((error as Error).message).toContain(
         "Parsing options from the first comment line is no longer supported",
       );
     });
 
     it("removes __END__ before evaluating app", async () => {
-      const app = Builder.parseFile(configFile("end.ru"));
+      const app = await Builder.parseFile(configFile("end.ru"));
       expect((await new MockRequest(app).get("/")).body.toString()).toEqual("OK");
     });
 
-    it("supports multi-line comments", () => {
-      const app = Builder.parseFile(configFile("comment.ru"));
+    it("supports multi-line comments", async () => {
+      const app = await Builder.parseFile(configFile("comment.ru"));
       expect(app).toBeInstanceOf(Function);
     });
 
     it("requires an_underscore_app not ending in .ru", async () => {
-      const app = Builder.parseFile(configFile("an_underscore_app.rb"));
+      const app = await Builder.parseFile(
+        File.join(__dirname, "__fixtures__", "an_underscore_app.ts"),
+      );
       expect((await new MockRequest(app).get("/")).body.toString()).toEqual("OK");
     });
 
     it("sets __LINE__ correctly", async () => {
-      const app = Builder.parseFile(configFile("line.ru"));
+      const app = await Builder.parseFile(configFile("line.ru"));
       expect((await new MockRequest(app).get("/")).body.toString()).toEqual("3");
     });
 
     it("strips leading unicode byte order mark when present", async () => {
-      const app = Builder.parseFile(configFile("bom.ru"));
+      const app = await Builder.parseFile(configFile("bom.ru"));
       expect((await new MockRequest(app).get("/")).body.toString()).toEqual("OK");
     });
 
     it("respects the frozen_string_literal magic comment", async () => {
-      const app = Builder.parseFile(configFile("frozen.ru"));
+      const app = await Builder.parseFile(configFile("frozen.ru"));
       const response = await new MockRequest(app).get("/");
       expect(response.body).toEqual("frozen");
       const body = (response as any)._body;

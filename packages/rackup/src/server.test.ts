@@ -117,9 +117,9 @@ describe("Rackup::Server", () => {
     return server;
   }
 
-  it("overrides :config if :app is passed in", () => {
+  it("overrides :config if :app is passed in", async () => {
     const server = new Server({ app: "FOO" });
-    expect(server.app()).toBe("FOO");
+    expect(await server.app()).toBe("FOO");
   });
 
   it("Options#parse parses -p and --port options into :Port", async () => {
@@ -189,14 +189,12 @@ describe("Rackup::Server", () => {
     const server = await newServer();
     let error: unknown;
     await withStderr(async () => {
-      expect(() => {
-        try {
-          server.app();
-        } catch (e) {
-          error = e;
-          throw e;
-        }
-      }).toThrow(SystemExit);
+      try {
+        await server.app();
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(SystemExit);
     });
     expect((error as Error).message).toMatch(/^configuration .* not found$/);
   });
@@ -237,7 +235,7 @@ describe("Rackup::Server", () => {
       builder:
         "builder.run(function (env) { return [200, { 'content-type': 'text/plain' }, ['success']]; });",
     });
-    expect((await new MockRequest(server.app() as never).get("/")).body.toString()).toEqual(
+    expect((await new MockRequest((await server.app()) as never).get("/")).body.toString()).toEqual(
       "success",
     );
   });

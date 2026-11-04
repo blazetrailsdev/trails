@@ -1,9 +1,11 @@
 import {
   ArgumentError,
+  constGet,
   File,
   RuntimeError,
   rbBlockGivenP,
   rbFBinding,
+  rbFLoad,
   rbProcCall,
   TopLevel,
 } from "@blazetrails/ruby-compat";
@@ -34,9 +36,20 @@ export class Builder {
     if (block) block(this);
   }
 
-  /** @missingRailsCall map — CONVERGEABLE rack-builder-parse-file-ru-guard-and-require-arm */
-  static parseFile(path: string, options: Record<string, unknown> = {}): RackApp {
-    return this.loadFile(path, options);
+  /** @missingRailsArgs basename — PERMANENT */
+  static async parseFile(path: string, options: Record<string, unknown> = {}): Promise<RackApp> {
+    if (path.endsWith(".ru")) {
+      return this.loadFile(path, options);
+    } else {
+      await rbFLoad(File.expandPath(path));
+      return constGet(
+        TopLevel,
+        File.basename(path, ".*")
+          .split("_")
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+          .join(""),
+      ) as RackApp;
+    }
   }
 
   static loadFile(path: string, options: Record<string, unknown> = {}): RackApp {
