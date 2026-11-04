@@ -5,6 +5,7 @@ import type { ErrorReporter } from "./error-reporter.js";
 import { Callbacks } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import { Fiber } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -56,6 +57,10 @@ export class ExecutionWrapper {
   static _activeKey?: symbol;
 
   #_hookState?: Map<ExecutionHook, unknown>;
+
+  #_fiber?: Fiber;
+
+  #_previous?: ExecutionWrapper;
 
   static toRun(...args: FilterListEntry[]): void {
     this.setCallback("run", ...args);
@@ -110,9 +115,15 @@ export class ExecutionWrapper {
     return instance;
   }
 
+  /** @inventedArm Fiber — PERMANENT */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
+    return new Fiber(() => this._wrap(block, source)).resume();
+  }
+
+  /** @internal */
+  private static _wrap<T>(block: () => T, source: string): T {
     const instance = this.runBang();
     if (isThenable(instance)) {
       return (async () => {
@@ -190,14 +201,42 @@ export class ExecutionWrapper {
     return this._activeKey as symbol;
   }
 
+  /** @inventedArm loop — PERMANENT */
   static active(): boolean {
-    return IsolatedExecutionState.isKey(this.activeKey());
+    if (!IsolatedExecutionState.isKey(this.activeKey())) return false;
+
+    const fiber = Fiber.current();
+    let instance = IsolatedExecutionState.get<ExecutionWrapper>(this.activeKey());
+    while (instance != null) {
+      if (instance.#_fiber == null || instance.#_fiber === fiber) return true;
+      instance = instance.#_previous;
+    }
+    return false;
   }
 
   runBang(): unknown {
     const klass = this.constructor as typeof ExecutionWrapper;
+    this.#_previous = IsolatedExecutionState.get<ExecutionWrapper>(klass.activeKey());
+    this.#_fiber = Fiber.current();
     IsolatedExecutionState.set(klass.activeKey(), this);
     return this.run();
+  }
+
+  /** @inventedArm loop — PERMANENT */
+  private _deactivate(activeKey: symbol): void {
+    let instance = IsolatedExecutionState.get<ExecutionWrapper>(activeKey);
+    if (instance === this) {
+      if (this.#_previous == null) IsolatedExecutionState.delete(activeKey);
+      else IsolatedExecutionState.set(activeKey, this.#_previous);
+      return;
+    }
+    while (instance != null) {
+      if (instance.#_previous === this) {
+        instance.#_previous = this.#_previous;
+        return;
+      }
+      instance = instance.#_previous;
+    }
   }
 
   run(): unknown {
@@ -210,11 +249,11 @@ export class ExecutionWrapper {
     try {
       completed = this.complete();
       if (isThenable(completed)) {
-        return Promise.resolve(completed).finally(() => IsolatedExecutionState.delete(activeKey));
+        return Promise.resolve(completed).finally(() => this._deactivate(activeKey));
       }
       return completed;
     } finally {
-      if (!isThenable(completed)) IsolatedExecutionState.delete(activeKey);
+      if (!isThenable(completed)) this._deactivate(activeKey);
     }
   }
 
