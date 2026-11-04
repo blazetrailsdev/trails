@@ -206,7 +206,7 @@ describe("Mail::Body", () => {
   describe("matching", () => {
     it("should still equal itself", () => {
       const body = new Body("The body");
-      expect(body.equals(body)).toBeTruthy();
+      expect(body).toEqual(body);
     });
 
     it("should match on the body part decoded if given a string to ==", () => {
@@ -244,13 +244,13 @@ describe("Mail::Body", () => {
 
     it("should match on the body part decoded if given a string to include?", () => {
       const body = new Body("The Body");
-      expect(body.isInclude("The")).toBeTruthy();
+      expect(body.toString()).toContain("The");
     });
 
     it("should match on the body part decoded if given a string to include?", () => {
       const body = new Body("VGhlIGJvZHk=\n");
       body.setEncoding("base64");
-      expect(body.isInclude("The")).toBeTruthy();
+      expect(body.toString()).toContain("The");
     });
   });
 

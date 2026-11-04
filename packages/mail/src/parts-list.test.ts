@@ -91,7 +91,7 @@ describe("PartsList", () => {
 
   it("should respond to Array methods", () => {
     const p = new PartsList();
-    expect(typeof p.reduce).toBe("function");
+    expect(p).toRespondTo("reduce");
   });
 
   it("should have a round-tripping YAML serialization", () => {

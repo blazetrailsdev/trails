@@ -110,4 +110,14 @@ export const mail: Record<string, AssertionReceipt[]> = {
           'header_spec.rb:583 asserts `encoded.encoding`; a JS string has no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
       },
     ],
+  "mail:mail/part_spec.rb › parts that have a missing header › should not try to init a header if there is none":
+    [
+      {
+        kind: "expect_not_to_output",
+        value: null,
+        as: null,
+        reason:
+          "part_spec.rb:80-104 asserts `to_not output.to_stderr`; capturing stderr needs `process.stderr`, which package tests may not reference, so the port only constructs the part.",
+      },
+    ],
 };

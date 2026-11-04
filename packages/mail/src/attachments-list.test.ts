@@ -1,4 +1,4 @@
-import { IO, regexpEscape } from "@blazetrails/ruby-compat";
+import { Encoding, IO, rbObjEncoding, regexpEscape } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Encodings } from "./encodings.js";
 import { Base64 } from "./encodings/base64.js";
@@ -19,7 +19,7 @@ function encodeBase64(str: unknown) {
 }
 
 function checkDecoded(actual: unknown, expected: string | Uint8Array) {
-  expect(actual).toBeInstanceOf(Uint8Array);
+  expect(rbObjEncoding(actual as Uint8Array)).toEqual(Encoding.BINARY);
   expect(actual).toEqual(
     typeof expected === "string" ? new TextEncoder().encode(expected) : expected,
   );
@@ -203,7 +203,7 @@ describe("Attachments", () => {
 
     it("should return a valid content-id on inline attachments", () => {
       const field = new ContentIdField(cid);
-      expect(field.errors).toEqual([]);
+      expect(field.errors).toBeEmpty();
     });
 
     it("should provide a URL escaped content_id (without brackets) for use inside an email", () => {
@@ -231,7 +231,8 @@ describe("Attachments", () => {
 
   describe("should handle filenames with non-7bit characters correctly", () => {
     it("should not raise an exception with a filename that contains a non-7bit-character", async () => {
-      const filename = "föö.bär";
+      const filename = "f\u00f6\u00f6.b\u00e4r";
+      expect(rbObjEncoding(filename)).toEqual(Encoding.UTF_8);
       const mail = Mail.new();
       await expect(
         mail.attachments().set(filename, await readRawFixture("attachments", "test.pdf")),
