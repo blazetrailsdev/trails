@@ -1,4 +1,4 @@
-import { Time as RubyTime } from "@blazetrails/date";
+import { nowTimeZoneId, Time as RubyTime } from "@blazetrails/date";
 import { preserveTimezone as compatibilityPreserveTimezone } from "../date-and-time/compatibility.js";
 
 Object.assign(RubyTime.prototype, {
@@ -20,11 +20,10 @@ let _activeSupportLocalTz: string | null = null;
 let _activeSupportLocalZone: string | null = null;
 
 export function activeSupportLocalZone(): string | null {
-  const tz = RubyTime.now().zone as string | null;
-  if (_activeSupportLocalTz !== tz) _activeSupportLocalZone = null;
+  if (_activeSupportLocalTz !== nowTimeZoneId()) _activeSupportLocalZone = null;
   if (_activeSupportLocalZone == null) {
-    _activeSupportLocalTz = tz;
-    _activeSupportLocalZone = tz;
+    _activeSupportLocalTz = nowTimeZoneId();
+    _activeSupportLocalZone = RubyTime.now().zone as string | null;
   }
   return _activeSupportLocalZone;
 }

@@ -11,7 +11,7 @@ export {
   type DateParts,
   type StrftimeSubject,
 } from "./date.js";
-export { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
+export { Time, Timezone, nowTimeZoneId, resetLocalTimeZoneId } from "./time.js";
 export {
   tzdataBaseOffsets,
   tzdataIsdst,

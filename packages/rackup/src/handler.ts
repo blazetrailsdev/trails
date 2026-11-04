@@ -69,7 +69,10 @@ export class Handler {
   static readonly RACK_HANDLER = "RACK_HANDLER";
   static readonly RACKUP_HANDLER = "RACKUP_HANDLER";
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   static readonly SERVER_NAMES = Object.freeze(["puma", "falcon", "vite", "webrick", "node"]);
 
   static async pick(serverNames: string | string[]): Promise<unknown> {
