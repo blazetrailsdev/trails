@@ -31,10 +31,7 @@ function forcedDispositionForServing(this: ServableHost): "attachment" | undefin
   return undefined;
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 function forciblyServeAsBinary(this: ServableHost): boolean {
   const contentType = this.contentType as string | null | Promise<string | null>;
   if (contentType instanceof Promise) {
@@ -45,10 +42,7 @@ function forciblyServeAsBinary(this: ServableHost): boolean {
   return ActiveStorage.contentTypesToServeAsBinary.includes(contentType!);
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 function isAllowedInline(this: ServableHost): boolean {
   const contentType = this.contentType as string | null | Promise<string | null>;
   if (contentType instanceof Promise) {
