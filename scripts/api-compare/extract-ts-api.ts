@@ -4583,17 +4583,17 @@ function localCallableDeclaration(
   return decl;
 }
 
+/** `perf: true` when the declaration carries a `@perf` tag (`CLAUDE.md § "Speed"`). */
+function perfTagOf(node: ts.Node): Partial<MethodInfo> {
+  return ts.getJSDocTags(node).some((t) => t.tagName.text === "perf") ? { perf: true } : {};
+}
+
 /**
  * The `@missingRailsCall` / `@missingRailsArgs` receipts on a file-local
  * helper. A helper Rails extracts as a private method is a call-gate
  * population member like any other, so the tag that stands in for a baseline
  * row has to reach the artifact from here too.
  */
-/** `perf: true` when the declaration carries a `@perf` tag (`CLAUDE.md § "Speed"`). */
-function perfTagOf(node: ts.Node): Partial<MethodInfo> {
-  return ts.getJSDocTags(node).some((t) => t.tagName.text === "perf") ? { perf: true } : {};
-}
-
 function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   const calls = missingRailsCallTags(node);
   const args = missingRailsArgsTags(node);

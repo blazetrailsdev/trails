@@ -265,6 +265,18 @@ describe("visibility, receipts and @perf", () => {
     expect(
       stale([m("unclassified", "private", { internal: true, noRailsEquivalent: "because" })]),
     ).toEqual(["unclassified"]);
+    const helper = m("helper", "private", { internal: true, noRailsEquivalent: "PERMANENT" });
+    expect(
+      buildReport(RUBY, tsFoo([], [helper]), {
+        filterPkg: null,
+        excludeGlobs: [],
+        novelOnly: false,
+        topN: 50,
+      }).tagged.stale,
+    ).toEqual([]);
+    expect(buildPrivatesReport(RUBY, tsFoo([], [helper]), { filterPkg: null }).names).toMatchObject(
+      [{ name: "helper", population: "fileLocal", kind: "allowed" }],
+    );
   });
 });
 

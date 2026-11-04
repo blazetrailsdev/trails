@@ -3136,6 +3136,8 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
+    /** Receipt keys the privates lane reads (RFC 0218); computed when absent. */
+    privatesRead?: ReadonlySet<string>;
     /**
      * Per-(package, Ruby file) Concern hooks from `loadConcernHooks`. Optional
      * so a caller measuring a synthetic manifest need not stage `.rb` files on
@@ -3193,11 +3195,13 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
-  const privatesRead = new Set(
-    buildPrivatesReport(ruby, ts, { filterPkg: opts.filterPkg })
-      .names.filter((n) => n.receipted === true)
-      .map(allowKeyOf),
-  );
+  const privatesRead =
+    opts.privatesRead ??
+    new Set(
+      buildPrivatesReport(ruby, ts, { filterPkg: opts.filterPkg })
+        .names.filter((n) => n.receipted === true)
+        .map(allowKeyOf),
+    );
   const staleTagged = tagged.filter(
     (e) =>
       !e.inherited &&
