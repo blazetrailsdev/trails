@@ -29,6 +29,7 @@
     "parity:api": "bash scripts/api-compare/run.sh",
     "parity:api:drift": "pnpm tsx scripts/api-compare/drift.ts",
     "parity:api:extra": "pnpm tsx scripts/api-compare/extra-surface.ts",
+    "parity:api:privates": "pnpm tsx scripts/api-compare/privates-surface.ts",
     "parity:api:build": "pnpm tsx scripts/api-compare/build.ts",
     "parity:api:extra:gate": "pnpm tsx scripts/api-compare/lint-extra-surface-ratchet.ts",
     "parity:api:receipts": "pnpm tsx scripts/api-compare/receipt-audit.ts",
