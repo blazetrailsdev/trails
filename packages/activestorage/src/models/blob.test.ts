@@ -3,6 +3,7 @@ import {
   assertCalledWith,
   assertChanges,
   assertNoDifference,
+  assertNothingRaised,
   assertRaises,
   base36,
   Duration,
@@ -197,7 +198,7 @@ describe("ActiveStorage::BlobTest", () => {
   });
 
   it("create_and_upload accepts a record for overrides", async () => {
-    await createBlob({ record: new User() });
+    await assertNothingRaised(() => createBlob({ record: new User() }));
   });
 
   it("create_and_upload raises for non-rewindable io", async () => {
@@ -270,8 +271,9 @@ describe("ActiveStorage::BlobTest", () => {
       );
     }
 
-    const error = await Blob.compose(blobs, { filename: "all_numbers.txt" }).catch((e) => e);
-    expect(error).toBeInstanceOf(RecordNotSaved);
+    const error = await assertRaises([RecordNotSaved], {}, () =>
+      Blob.compose(blobs, { filename: "all_numbers.txt" }),
+    );
     expect(error.message).toBe("All blobs must be persisted.");
   });
 
@@ -456,7 +458,7 @@ describe("ActiveStorage::BlobTest", () => {
 
   it("purge doesn't raise when blob is not persisted", async () => {
     const blob = buildBlobAfterUnfurling();
-    await blob.purge();
+    await assertNothingRaised(() => blob.purge());
     expect(blob.isDestroyed()).toBeTruthy();
   });
 
@@ -523,13 +525,13 @@ describe("ActiveStorage::BlobTest", () => {
   });
 
   it("scope_for_strict_loading adds includes only when track_variants and strict_loading_by_default", async () => {
-    expect(Blob.scopeForStrictLoading().includesValues).toEqual([]);
+    expect(Blob.scopeForStrictLoading().includesValues).toBeEmpty();
 
     await withStrictLoadingByDefault(async () => {
-      expect(Blob.scopeForStrictLoading().includesValues).not.toEqual([]);
+      expect(Blob.scopeForStrictLoading().includesValues).not.toBeEmpty();
 
       await withoutVariantTracking(() => {
-        expect(Blob.scopeForStrictLoading().includesValues).toEqual([]);
+        expect(Blob.scopeForStrictLoading().includesValues).toBeEmpty();
       });
     });
   });

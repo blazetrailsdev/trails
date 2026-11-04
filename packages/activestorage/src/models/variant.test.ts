@@ -1,5 +1,5 @@
 import "../test-helpers/database/setup.js";
-import { assertChanges } from "@blazetrails/activesupport";
+import { assertChanges, assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";
@@ -177,15 +177,15 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     const blob = await createFileBlob({ filename: "image.gif", contentType: "image/gif" });
 
     await processVariantsWith(ctx, "vips", async () => {
-      await expect(
+      await assertNothingRaised(() =>
         variantOf(blob, {
           saver: { optimizeGifFrames: true, optimizeGifTransparency: true },
         }).processed(),
-      ).resolves.toBeDefined();
+      );
     });
 
     await processVariantsWith(ctx, "mini_magick", async () => {
-      await expect(variantOf(blob, { layers: "Optimize" }).processed()).resolves.toBeDefined();
+      await assertNothingRaised(() => variantOf(blob, { layers: "Optimize" }).processed());
     });
   });
 
@@ -206,10 +206,13 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   });
 
   it("variation of invariable blob", async () => {
-    const blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
-    expect(() => blob.variant({ resizeToLimit: [100, 100] })).toThrow(InvariableError);
-    expect(() => blob.variant({ resizeToLimit: [100, 100] })).toThrow(
-      /blob with ID=\d+ and content_type=application\/pdf/,
+    await assertRaises(
+      [InvariableError],
+      { match: /blob with ID=\d+ and content_type=application\/pdf/ },
+      async () =>
+        (await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" })).variant({
+          resizeToLimit: [100, 100],
+        }),
     );
   });
 
