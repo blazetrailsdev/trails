@@ -2,6 +2,7 @@ import "../constants.server.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include EnvironmentArgument` (`server_command.rb:94`); the class/interface merge is how a mixin surfaces on the type side. */
 import { type BroadcastLogger, getEnv, isBlank, Logger } from "@blazetrails/activesupport";
 import {
+  atExit,
   block,
   Dir,
   fetch,
@@ -85,7 +86,7 @@ export class Server extends RackupServer<ServerOptions> {
     if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", this.options.environment);
   }
 
-  /** @inventedArm on — PERMANENT */
+  /** @inventedArm atExit — PERMANENT */
   override async start(afterStopCallback: (() => void) | null = null): Promise<unknown> {
     try {
       onSignal("SIGINT", () => exit());
@@ -93,8 +94,8 @@ export class Server extends RackupServer<ServerOptions> {
       this.setupDevCaching();
       if (this.options.logStdout) await this.logToStdout();
 
-      const server = (await super.start()) as { on(event: string, cb: () => void): unknown };
-      if (afterStopCallback != null) server.on("close", afterStopCallback);
+      const server = await super.start();
+      if (afterStopCallback != null) atExit(afterStopCallback);
       return server;
     } catch (error) {
       afterStopCallback?.();
