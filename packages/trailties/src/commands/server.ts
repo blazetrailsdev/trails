@@ -24,7 +24,6 @@ import {
 import { type RackEnv } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
 import { demodulize, isPresent, underscore } from "@blazetrails/activesupport";
-import { DetailsKey } from "@blazetrails/actionview";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import * as Command from "../command.js";
@@ -33,8 +32,6 @@ import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
 import { Trails } from "../trails.js";
-import type { ActionViewConfig } from "../trailties/action-view.js";
-import type { WatchHandle } from "@blazetrails/trails-tsc";
 
 export interface ServerOptions {
   userSuppliedOptions?: string[];
@@ -88,7 +85,6 @@ export class Server {
 
       await app.loadServer();
       const root = Dir.pwd();
-      await watchViews(app, root);
       const trailsApp = (env: RackEnv) => app.call(env);
       const { Port: port, Host: host } = this.options;
       if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
@@ -468,40 +464,6 @@ interface ServerCommandOptions extends Record<string, unknown> {
   earlyHints?: boolean | null;
   logToStdout?: boolean | null;
   environment?: string;
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function watchViews(
-  app: Awaited<ReturnType<typeof Trails.initialize>>,
-  root: string,
-): Promise<WatchHandle | null> {
-  const { config } = app;
-  const actionView: ActionViewConfig | undefined = config?.actionView;
-  if (actionView == null) return null;
-  const cacheTemplateLoading = actionView.cacheTemplateLoading;
-  const enableCaching =
-    cacheTemplateLoading == null ? !config.isReloadingEnabled() : cacheTemplateLoading;
-  if (enableCaching) return null;
-
-  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
-  let started = false;
-  let initialError: Error | null = null;
-  const handle = await watchViewFiles({
-    cwd: root,
-    onRebuild: ({ kind }) => {
-      if (kind === "change") DetailsKey.clear();
-    },
-    onError: (err, trigger) => {
-      if (!started) initialError ??= err;
-      console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
-    },
-  });
-  started = true;
-  if (initialError !== null) {
-    handle.close();
-    throw initialError;
-  }
-  return handle;
 }
 
 /** @noRailsEquivalent PERMANENT */

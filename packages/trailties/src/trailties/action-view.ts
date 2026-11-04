@@ -2,6 +2,7 @@ import { onLoad, TopLevel, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
+  DetailsKey,
   deprecator,
   Resolver,
   RoutingUrlFor,
@@ -20,6 +21,8 @@ import {
   Template,
   ViewReloader,
 } from "@blazetrails/actionview";
+import { Dir } from "@blazetrails/ruby-compat";
+import type { Application } from "../application.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionViewConfig {
@@ -194,6 +197,34 @@ export class Trailtie extends BaseTrailtie {
       onLoad("action_controller", () => {
         RoutingUrlFor.include(UrlFor);
       });
+    });
+    this.server(async (app) => {
+      const { config } = app as Application;
+      const actionView = config.actionView;
+      const enableCaching =
+        actionView.cacheTemplateLoading == null
+          ? !config.isReloadingEnabled()
+          : actionView.cacheTemplateLoading;
+      if (enableCaching) return;
+
+      const { watchViews } = await import("@blazetrails/trails-tsc");
+      let started = false;
+      let initialError: Error | null = null;
+      const handle = await watchViews({
+        cwd: Dir.pwd(),
+        onRebuild: ({ kind }) => {
+          if (kind === "change") DetailsKey.clear();
+        },
+        onError: (err, trigger) => {
+          if (!started) initialError ??= err;
+          console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+        },
+      });
+      started = true;
+      if (initialError !== null) {
+        handle.close();
+        throw initialError;
+      }
     });
   }
 }
