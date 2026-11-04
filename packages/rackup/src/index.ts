@@ -8,6 +8,7 @@ import "./handler/node.js";
 
 export { VERSION } from "./version.js";
 export { Handler, Lobster, Server, Stream };
+export type { ServerOptions } from "./server.js";
 
 const Rackup = { name: "Rackup", VERSION, Handler, Lobster, Server, Stream };
 TopLevel.Rackup = Rackup;

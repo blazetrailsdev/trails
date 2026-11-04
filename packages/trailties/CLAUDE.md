@@ -129,13 +129,11 @@ Two rules bound it:
   and `rake_tasks` blocks have no async caller yet; widening them is its own
   decision when one appears.
 
-`trails server` calls `app.loadServer()` itself, after `log_to_stdout` and
-before it binds, which is where Rails reaches it through `config.ru`
-(`server_command.rb:32-41`). `trails server` never evaluates `config.ts`, so
-the generated `config.ts`'s own `loadServer()` runs only under another rackup
-host, and each path runs the blocks exactly once. When
-`port-server-command-onto-rails-command-base` builds the app from `config.ts`,
-the direct call in `commands/server.ts` goes, or blocks run twice.
+`trails server` reaches the blocks through `config.ts`, as Rails reaches them
+through `config.ru` (`server_command.rb:32-41`): `Server#start` is `super()`,
+`Rackup::Server#app` awaits `Builder.parseFile("config.ts")`, and the generated
+`config.ts` awaits `loadServer()` before the handler binds. The blocks run
+exactly once.
 
 This is a genuine language shortcoming, ratified here: JS has no synchronous
 await. A server-block runner returning a promise is the designed shape.

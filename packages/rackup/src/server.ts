@@ -490,7 +490,7 @@ export class Server {
   }
 
   /** @internal */
-  private optParser(): Options {
+  protected optParser(): { parseBang(args: string[]): ServerOptions | Promise<ServerOptions> } {
     return new Options();
   }
 
@@ -508,7 +508,7 @@ export class Server {
   }
 
   /** @internal */
-  private async wrappedApp(): Promise<unknown> {
+  protected async wrappedApp(): Promise<unknown> {
     return (this._wrappedApp ??= await this.buildApp(await this.app()));
   }
 
