@@ -3,6 +3,7 @@ import { Concern, extend, isBlank } from "@blazetrails/activesupport";
 import { Utils } from "@blazetrails/rack";
 import { include, rbStrPlus, SecureRandom } from "@blazetrails/ruby-compat";
 import type { Blob } from "./blob.js";
+import type { Filename } from "./filename.js";
 import { FileNotFoundError } from "./errors.js";
 
 export const DEFAULT_BLOB_STREAMING_DISPOSITION = "inline";
@@ -28,7 +29,7 @@ async function sendBlobByteRangeData(
   let data: Uint8Array;
   if (ranges!.length === 1) {
     const range = ranges![0];
-    contentType = blob.contentTypeForServing()!;
+    contentType = (await blob.contentTypeForServing())!;
     data = await blob.downloadChunk(range);
 
     this.response.headers.set(
@@ -44,7 +45,10 @@ async function sendBlobByteRangeData(
       const chunk = await blob.downloadChunk(range);
 
       data = rbStrPlus(data, `\r\n--${boundary}\r\n`) as Uint8Array;
-      data = rbStrPlus(data, `Content-Type: ${blob.contentTypeForServing()}\r\n`) as Uint8Array;
+      data = rbStrPlus(
+        data,
+        `Content-Type: ${await blob.contentTypeForServing()}\r\n`,
+      ) as Uint8Array;
       data = rbStrPlus(
         data,
         `Content-Range: bytes ${range.begin}-${range.end}/${blob.byte_size}\r\n\r\n`,
@@ -60,8 +64,10 @@ async function sendBlobByteRangeData(
 
   return this.sendData(data, {
     disposition:
-      blob.forcedDispositionForServing() ?? disposition ?? DEFAULT_BLOB_STREAMING_DISPOSITION,
-    filename: blob.filename.sanitized(),
+      (await blob.forcedDispositionForServing()) ??
+      disposition ??
+      DEFAULT_BLOB_STREAMING_DISPOSITION,
+    filename: (await blob.filename).sanitized(),
     status: "partial_content",
     type: contentType,
   });
@@ -70,17 +76,20 @@ async function sendBlobByteRangeData(
 /** @internal */
 async function sendBlobStream(
   this: StreamingHost,
-  blob: Pick<Blob, "filename" | "forcedDispositionForServing" | "contentTypeForServing"> & {
+  blob: Pick<Blob, "forcedDispositionForServing" | "contentTypeForServing"> & {
+    filename: Filename | Promise<Filename>;
     download(block: (chunk: Uint8Array) => unknown): Promise<unknown>;
   },
   { disposition = null }: { disposition?: string | null } = {},
 ): Promise<void> {
   await this.sendStream(
     {
-      filename: blob.filename.sanitized(),
+      filename: (await blob.filename).sanitized(),
       disposition:
-        blob.forcedDispositionForServing() ?? disposition ?? DEFAULT_BLOB_STREAMING_DISPOSITION,
-      type: blob.contentTypeForServing(),
+        (await blob.forcedDispositionForServing()) ??
+        disposition ??
+        DEFAULT_BLOB_STREAMING_DISPOSITION,
+      type: await blob.contentTypeForServing(),
     },
     async (stream: ActionController.LiveBuffer) => {
       try {

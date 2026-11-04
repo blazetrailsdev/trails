@@ -37,14 +37,12 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  get filename(): Filename {
-    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    return presentation.filename;
+  get filename(): Promise<Filename> {
+    return this.presentation().then((presentation) => presentation.filename);
   }
 
-  get contentType(): string | null {
-    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    return presentation.contentType;
+  get contentType(): Promise<string | null> {
+    return this.presentation().then((presentation) => presentation.contentType);
   }
 
   async processed(): Promise<this> {
@@ -114,8 +112,15 @@ export class Preview {
     return isPresent(this.variation.transformations);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm load — PERMANENT
+   */
   private async presentation(): Promise<Presented> {
+    await this.image.load();
+    await (
+      await this.image.attachment
+    )?.blob;
     return this.isVariant() ? await this.variant().processed() : (this.image as One & Presented);
   }
 

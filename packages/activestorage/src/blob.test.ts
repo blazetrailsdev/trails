@@ -365,8 +365,8 @@ describe("ActiveStorage::BlobTest", () => {
     const blob = await createBlob();
 
     freezeTime();
-    expect(blob.url()).toBe(expectedUrlFor(blob));
-    expect(blob.url({ disposition: "attachment" })).toBe(
+    expect(await blob.url()).toBe(expectedUrlFor(blob));
+    expect(await blob.url({ disposition: "attachment" })).toBe(
       expectedUrlFor(blob, { disposition: "attachment" }),
     );
   });
@@ -376,8 +376,8 @@ describe("ActiveStorage::BlobTest", () => {
     const expected = { disposition: "attachment", contentType: "application/octet-stream" };
 
     freezeTime();
-    expect(blob.url()).toBe(expectedUrlFor(blob, expected));
-    expect(blob.url({ disposition: "inline" })).toBe(expectedUrlFor(blob, expected));
+    expect(await blob.url()).toBe(expectedUrlFor(blob, expected));
+    expect(await blob.url({ disposition: "inline" })).toBe(expectedUrlFor(blob, expected));
   });
 
   it("URLs force attachment as content disposition when the content type is not allowed inline", async () => {
@@ -385,8 +385,8 @@ describe("ActiveStorage::BlobTest", () => {
     const expected = { disposition: "attachment", contentType: "application/zip" };
 
     freezeTime();
-    expect(blob.url()).toBe(expectedUrlFor(blob, expected));
-    expect(blob.url({ disposition: "inline" })).toBe(expectedUrlFor(blob, expected));
+    expect(await blob.url()).toBe(expectedUrlFor(blob, expected));
+    expect(await blob.url({ disposition: "inline" })).toBe(expectedUrlFor(blob, expected));
   });
 
   it("URLs allow for custom filename", async () => {
@@ -394,12 +394,16 @@ describe("ActiveStorage::BlobTest", () => {
     const newFilename = new Filename("new.txt");
 
     freezeTime();
-    expect(blob.url()).toBe(expectedUrlFor(blob));
-    expect(blob.url({ filename: newFilename })).toBe(
+    expect(await blob.url()).toBe(expectedUrlFor(blob));
+    expect(await blob.url({ filename: newFilename })).toBe(
       expectedUrlFor(blob, { filename: newFilename }),
     );
-    expect(blob.url({ filename: "new.txt" })).toBe(expectedUrlFor(blob, { filename: newFilename }));
-    expect(blob.url({ filename: null })).toBe(expectedUrlFor(blob, { filename: blob.filename }));
+    expect(await blob.url({ filename: "new.txt" })).toBe(
+      expectedUrlFor(blob, { filename: newFilename }),
+    );
+    expect(await blob.url({ filename: null })).toBe(
+      expectedUrlFor(blob, { filename: blob.filename }),
+    );
   });
 
   it("URLs allow for custom options", async () => {
@@ -413,8 +417,8 @@ describe("ActiveStorage::BlobTest", () => {
       thumbSize: "300x300",
       thumbMode: "crop",
     };
-    assertCalledWith(blob.service, "url", [blob.key, kwargs], {}, () => {
-      blob.url({ thumbSize: "300x300", thumbMode: "crop" });
+    await assertCalledWith(blob.service, "url", [blob.key, kwargs], {}, async () => {
+      await blob.url({ thumbSize: "300x300", thumbMode: "crop" });
     });
   });
 

@@ -371,7 +371,7 @@ export class Blob extends Record {
     return this.content_type!.startsWith("text");
   }
 
-  url({
+  async url({
     expiresIn = ActiveStorage.serviceUrlsExpireIn,
     disposition = "inline",
     filename = null,
@@ -381,12 +381,12 @@ export class Blob extends Record {
     disposition?: string;
     filename?: Filename | string | null;
     [k: string]: unknown;
-  } = {}): string {
+  } = {}): Promise<string> {
     return this.service.url(this.key, {
       expiresIn: expiresIn,
       filename: Filename.wrap(filename ?? this.filename),
-      contentType: this.contentTypeForServing(),
-      disposition: this.forcedDispositionForServing() ?? disposition,
+      contentType: await this.contentTypeForServing(),
+      disposition: (await this.forcedDispositionForServing()) ?? disposition,
       ...options,
     });
   }
@@ -428,13 +428,16 @@ export class Blob extends Record {
 
   /** @internal */
   async uploadWithoutUnfurling(io: Io): Promise<void> {
-    await this.service.upload(this.key, io, { checksum: this.checksum, ...this.serviceMetadata() });
+    await this.service.upload(this.key, io, {
+      checksum: this.checksum,
+      ...(await this.serviceMetadata()),
+    });
   }
 
   /** @internal */
   async compose(keys: string[]): Promise<void> {
     this.composed = true;
-    await this.service.compose(keys, this.key, this.serviceMetadata());
+    await this.service.compose(keys, this.key, await this.serviceMetadata());
   }
 
   async download(): Promise<Uint8Array>;
@@ -528,15 +531,15 @@ export class Blob extends Record {
   }
 
   /** @internal */
-  private serviceMetadata(): { [k: string]: unknown } {
-    if (this.forciblyServeAsBinary()) {
+  private async serviceMetadata(): Promise<{ [k: string]: unknown }> {
+    if (await this.forciblyServeAsBinary()) {
       return {
         contentType: ActiveStorage.binaryContentType,
         disposition: "attachment",
         filename: this.filename,
         customMetadata: this.customMetadata,
       };
-    } else if (!this.isAllowedInline()) {
+    } else if (!(await this.isAllowedInline())) {
       return {
         contentType: this.content_type,
         disposition: "attachment",
@@ -560,7 +563,7 @@ export class Blob extends Record {
 
   /** @internal */
   private async updateServiceMetadata(): Promise<void> {
-    const serviceMetadata = this.serviceMetadata();
+    const serviceMetadata = await this.serviceMetadata();
     if (Object.keys(serviceMetadata).length > 0) {
       await this.service.updateMetadata(this.key, serviceMetadata);
     }
