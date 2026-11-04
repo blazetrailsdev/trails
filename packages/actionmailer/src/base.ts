@@ -29,6 +29,25 @@ type Template = { format: string | null };
 type Observer = Parameters<typeof Mail.registerObserver>[0];
 type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 
+/** @internal */
+export class LateAttachmentsProxy extends SimpleDelegator {
+  inline(): this {
+    return this;
+  }
+
+  set(_name: string, _content: unknown): Promise<unknown> {
+    return this._raiseError();
+  }
+
+  /** @internal */
+  private _raiseError(): never {
+    throw new RuntimeError(
+      "Can't add attachments after `mail` was called.\n" +
+        "Make sure to use `attachments[]=` before calling `mail`.",
+    );
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
@@ -274,6 +293,11 @@ export class Base extends AbstractController.Base {
   }
 
   /** @internal */
+  static override supportsPath(): boolean {
+    return false;
+  }
+
+  /** @internal */
   protected applyDefaults(headers: Headers): Headers {
     const defaultValues: Headers = {};
     for (const [key, value] of Object.entries((this.constructor as typeof Base).default())) {
@@ -332,7 +356,11 @@ export class Base extends AbstractController.Base {
     headers: Headers,
     block: (collector: Collector) => unknown,
   ): Response[] {
-    const templatesName = (headers.templateName as string | null) ?? this.actionName;
+    const templatesName = (
+      headers.templateName != null && headers.templateName !== false
+        ? headers.templateName
+        : this.actionName
+    ) as string;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
     block(collector);
     return collector.responses;
@@ -345,15 +373,25 @@ export class Base extends AbstractController.Base {
     return [
       {
         body: body,
-        contentType: headers.contentType ?? "text/plain",
+        contentType:
+          headers.contentType != null && headers.contentType !== false
+            ? headers.contentType
+            : "text/plain",
       },
     ];
   }
 
   /** @internal */
   protected collectResponsesFromTemplates(headers: Headers): Response[] {
-    const templatesPath = headers.templatePath ?? (this.constructor as typeof Base).mailerName();
-    const templatesName = (headers.templateName as string | null) ?? this.actionName;
+    const templatesPath =
+      headers.templatePath != null && headers.templatePath !== false
+        ? headers.templatePath
+        : (this.constructor as typeof Base).mailerName();
+    const templatesName = (
+      headers.templateName != null && headers.templateName !== false
+        ? headers.templateName
+        : this.actionName
+    ) as string;
 
     const responses: Response[] = [];
     this.eachTemplate([templatesPath].flat() as string[], templatesName, (template) => {
@@ -420,14 +458,9 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   protected insertPart(container: Message, response: Response, charset: string | null): void {
-    response.charset ??= charset;
+    if (response.charset == null || response.charset === false) response.charset = charset;
     const part = new Mail.Part(response);
     container.addPart(part);
-  }
-
-  /** @internal */
-  static override supportsPath(): boolean {
-    return false;
   }
 }
 
@@ -435,25 +468,6 @@ export class Base extends AbstractController.Base {
 export interface Base extends Included<typeof Rescuable> {
   lookupContext: InstanceType<typeof ActionView.LookupContext>;
   render(...args: unknown[]): unknown;
-}
-
-/** @internal */
-export class LateAttachmentsProxy extends SimpleDelegator {
-  inline(): this {
-    return this;
-  }
-
-  set(_name: string, _content: unknown): Promise<unknown> {
-    return this._raiseError();
-  }
-
-  /** @internal */
-  private _raiseError(): never {
-    throw new RuntimeError(
-      "Can't add attachments after `mail` was called.\n" +
-        "Make sure to use `attachments[]=` before calling `mail`.",
-    );
-  }
 }
 
 /** @internal */

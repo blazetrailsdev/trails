@@ -65,14 +65,16 @@ describe("Base#mail", () => {
   it("collects formats from a Collector", () => {
     const context = { formats: null as unknown };
     const collector = new Collector(context, () => "default") as Collector & {
-      text(o?: object, b?: () => string): void;
+      text(o?: object | (() => string), b?: () => string): unknown;
     };
     collector.text();
     collector.any("html", () => "<p>Html</p>");
-    expect(context.formats).toEqual([":html"]);
+    collector.text(() => "Block");
+    expect(context.formats).toEqual([":text"]);
     expect(collector.responses).toEqual([
       { contentType: "text/plain", body: "default" },
       { contentType: "text/html", body: "<p>Html</p>" },
+      { contentType: "text/plain", body: "Block" },
     ]);
   });
 });
