@@ -198,35 +198,38 @@ export class Trailtie extends BaseTrailtie {
         RoutingUrlFor.include(UrlFor);
       });
     });
-    this.server(async (app) => {
-      const { config } = app as Application;
-      const actionView = config.actionView;
-      const enableCaching =
-        actionView.cacheTemplateLoading == null
-          ? !config.isReloadingEnabled()
-          : actionView.cacheTemplateLoading;
-      if (enableCaching) return;
-
-      const { watchViews } = await import("@blazetrails/trails-tsc");
-      let started = false;
-      let initialError: Error | null = null;
-      const handle = await watchViews({
-        cwd: Dir.pwd(),
-        onRebuild: ({ kind }) => {
-          if (kind === "change") DetailsKey.clear();
-        },
-        onError: (err, trigger) => {
-          if (!started) initialError ??= err;
-          console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
-        },
-      });
-      started = true;
-      if (initialError !== null) {
-        handle.close();
-        throw initialError;
-      }
-    });
+    this.server(watchViews);
   }
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionView::Railtie" });
+
+/** @noRailsEquivalent PERMANENT */
+async function watchViews(app: unknown): Promise<void> {
+  const { config } = app as Application;
+  const actionView = config.actionView;
+  const enableCaching =
+    actionView.cacheTemplateLoading == null
+      ? !config.isReloadingEnabled()
+      : actionView.cacheTemplateLoading;
+  if (enableCaching) return;
+
+  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
+  let started = false;
+  let initialError: Error | null = null;
+  const handle = await watchViewFiles({
+    cwd: Dir.pwd(),
+    onRebuild: ({ kind }) => {
+      if (kind === "change") DetailsKey.clear();
+    },
+    onError: (err, trigger) => {
+      if (!started) initialError ??= err;
+      TopLevel.Trails!.logger.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+    },
+  });
+  started = true;
+  if (initialError !== null) {
+    handle.close();
+    throw initialError;
+  }
+}

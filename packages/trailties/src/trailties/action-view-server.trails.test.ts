@@ -6,7 +6,7 @@ import { DetailsKey } from "@blazetrails/actionview";
 import { Dir, env, setEnv } from "@blazetrails/ruby-compat";
 import type { BuildViewsResult, WatchViewsOptions } from "@blazetrails/trails-tsc";
 import { Application } from "../application.js";
-import { _resetTrailsEnv } from "../trails.js";
+import { Trails, _resetTrailsEnv } from "../trails.js";
 import "./action-view.js";
 
 const viewWatches = vi.hoisted(() => [] as WatchViewsOptions[]);
@@ -38,6 +38,7 @@ describe("ActionView railtie server block (trails)", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    Trails.logger = null;
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
@@ -72,11 +73,13 @@ describe("ActionView railtie server block (trails)", () => {
   });
 
   it("refuses to boot when the initial view build fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const errors: string[] = [];
+    Trails.logger = { error: (m: string) => errors.push(m) } as never;
     watchState.initialError = new Error("bad view");
 
     await expect((await app("development", null)).loadServer()).rejects.toThrow("bad view");
     expect(watchState.closed).toBe(1);
+    expect(errors).toEqual(["trails-tsc-views: build: bad view"]);
   });
 
   it("clears the template caches on a rebuild, not on the initial build", async () => {
