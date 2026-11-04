@@ -41,7 +41,7 @@ export class Builder {
     if (path.endsWith(".ru")) {
       return this.loadFile(path, options);
     } else {
-      await rbFLoad(File.expandPath(path));
+      await rbFLoad(path);
       return constGet(
         TopLevel,
         File.basename(path, ".*")
