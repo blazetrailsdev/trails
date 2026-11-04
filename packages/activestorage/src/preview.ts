@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, StandardError, type Included } from "@blazetrails/ruby-compat";
+import { include, RuntimeError, StandardError, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
@@ -37,23 +37,31 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  private _presentation: Presented | null = null;
-
   get filename(): Filename {
-    if (this._presentation == null) throw new UnprocessedError();
-    return this._presentation.filename;
+    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
+    if (presentation instanceof Promise) {
+      void presentation.catch(() => {});
+      throw new RuntimeError(
+        `filename needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
+      );
+    }
+    return presentation.filename;
   }
 
   get contentType(): string | null {
-    if (this._presentation == null) throw new UnprocessedError();
-    return this._presentation.contentType;
+    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
+    if (presentation instanceof Promise) {
+      void presentation.catch(() => {});
+      throw new RuntimeError(
+        `contentType needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
+      );
+    }
+    return presentation.contentType;
   }
 
-  /** @inventedArm presentation — PERMANENT */
   async processed(): Promise<this> {
     if (!(await this.isProcessed())) await this.process();
     if (this.isVariant()) await (await this.variant()).processed();
-    this._presentation = await this.presentation();
     return this;
   }
 
@@ -109,8 +117,8 @@ export class Preview {
   }
 
   /** @internal */
-  private async variant(): Promise<Variant | VariantWithRecord> {
-    return await (this.image as One & Attachment).variant(this.variation);
+  private variant(): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
+    return (this.image as One & Attachment).variant(this.variation);
   }
 
   /** @internal */
