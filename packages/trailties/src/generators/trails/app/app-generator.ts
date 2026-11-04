@@ -253,7 +253,7 @@ built module raises \`LoadError\`.
     await this.template("node-version", ".node-version");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
+  /** @missingRailsArgs template — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async rubyVersion(): Promise<void> {
     await this.template("node-version", ".node-version");
   }
