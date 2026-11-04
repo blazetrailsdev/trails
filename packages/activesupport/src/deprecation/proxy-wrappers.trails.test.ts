@@ -3,10 +3,11 @@ import { Deprecation } from "../deprecation.js";
 import {
   NameError,
   rbEqual,
-  unregisterConstant,
   constGet,
   constSet,
   TopLevel,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import {
   DeprecatedConstantProxy,
@@ -104,7 +105,10 @@ describe("DeprecatedConstantProxy#const_missing", () => {
     constSet(TopLevel, "Undeprecated", {});
     constSet(constGet(Object, "Undeprecated") as object, "Target", Target);
   });
-  afterAll(() => unregisterConstant("Undeprecated::Target", Target));
+  afterAll(() => {
+    if (constDefined(Object, "Undeprecated::Target", false))
+      rbModRemoveConst(constGet(Object, "Undeprecated") as object, "Target");
+  });
 
   it("resolves a child constant against the target itself, as target.const_get does", async () => {
     const proxy = new DeprecatedConstantProxy(

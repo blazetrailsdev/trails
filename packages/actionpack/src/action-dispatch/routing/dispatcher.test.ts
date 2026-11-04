@@ -1,7 +1,8 @@
 import { camelize } from "@blazetrails/activesupport";
 import {
   constSet,
-  isRegisteredConstant,
+  constDefined,
+  constGet,
   rbModRemoveConst,
   TopLevel,
 } from "@blazetrails/ruby-compat";
@@ -56,9 +57,15 @@ describe("RouteDispatcher", () => {
   }
 
   afterEach(() => {
-    for (const controller of registered.splice(0))
-      if (isRegisteredConstant(`${camelize(controller)}Controller`))
-        rbModRemoveConst(Object, `${camelize(controller)}Controller`);
+    for (const controller of registered.splice(0)) {
+      const path = `${camelize(controller)}Controller`;
+      if (!constDefined(Object, path, false)) continue;
+      const i = path.lastIndexOf("::");
+      rbModRemoveConst(
+        i < 0 ? Object : (constGet(Object, path.slice(0, i)) as object),
+        i < 0 ? path : path.slice(i + 2),
+      );
+    }
   });
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {
@@ -210,7 +217,7 @@ describe("Dispatcher over the controller constant table", () => {
     constSet(TopLevel, "PostsController", PostsController);
   });
   afterEach(() => {
-    if (isRegisteredConstant("PostsController")) rbModRemoveConst(Object, "PostsController");
+    if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");
   });
 
   const reqFor = (params: Record<string, unknown>): RouterRequest => {

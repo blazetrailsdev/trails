@@ -6,9 +6,10 @@ import {
   setVerbose,
   stderr,
   StringIO,
-  unregisterConstant,
   verbose,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { SessionId } from "@blazetrails/rack-session";
 import { UploadedFile } from "@blazetrails/rack-test";
@@ -547,7 +548,8 @@ describe("TestCase class helpers", () => {
       Sub.tests("widget");
       expect(Sub.controllerClass).toBe(WidgetController);
     } finally {
-      unregisterConstant("WidgetController", WidgetController);
+      if (constDefined(Object, "WidgetController", false))
+        rbModRemoveConst(Object, "WidgetController");
     }
   });
 
@@ -572,7 +574,8 @@ describe("TestCase class helpers", () => {
       expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
       expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();
     } finally {
-      unregisterConstant("BooksController", PostsController);
+      if (constDefined(Object, "BooksController", false))
+        rbModRemoveConst(Object, "BooksController");
     }
   });
 });

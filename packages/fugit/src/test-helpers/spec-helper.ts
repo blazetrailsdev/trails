@@ -6,7 +6,7 @@ import {
   RUBY_PLATFORM,
   env,
   rbModRemoveConst,
-  registeredConstant,
+  constGet,
   setEnv,
   TopLevel,
   constSet,
@@ -16,7 +16,7 @@ import { TZInfo, type Timezone } from "@blazetrails/tzinfo";
 import "../fugit.js";
 import { TimeCursor } from "../cron.js";
 
-constSet(TopLevel, "Khronic", registeredConstant("Chronic"));
+constSet(TopLevel, "Khronic", constGet(Object, "Chronic"));
 rbModRemoveConst(Object, "Chronic");
 
 export function isJruby(): boolean {
@@ -61,7 +61,7 @@ export function inActiveSupportZone<T>(zoneName: string, block: () => T): T {
 }
 
 export function requireChronic(): void {
-  constSet(TopLevel, "Chronic", registeredConstant("Khronic"));
+  constSet(TopLevel, "Chronic", constGet(Object, "Khronic"));
 }
 
 export function unrequireChronic(): void {

@@ -7,7 +7,7 @@ import {
   rbInspect,
   rbObjClass,
   rbObjRespondTo,
-  registeredConstant,
+  constGet,
   setEnv,
 } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -261,7 +261,7 @@ describe("EtOrbi", () => {
       it("filters options given to Chronic", () => {
         SpecTime.activeSupportZone = "UTC";
 
-        const khronic = registeredConstant("Khronic") as { parse(...args: unknown[]): unknown };
+        const khronic = constGet(Object, "Khronic") as { parse(...args: unknown[]): unknown };
         const parse = vi.spyOn(khronic, "parse");
 
         const t = EtOrbi.parse("tomorrow", {

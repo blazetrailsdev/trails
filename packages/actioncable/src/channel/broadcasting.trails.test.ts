@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { include, constSet, unregisterConstant, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  include,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Broadcasting } from "./broadcasting.js";
 import { Naming } from "./naming.js";
@@ -18,7 +24,9 @@ describe("ActionCable::Channel::Broadcasting", () => {
   const klass = RoomsChannel as unknown as Host;
 
   constSet(TopLevel, "ChatChannel", ChatChannel);
-  afterEach(() => unregisterConstant("Chat", Chat));
+  afterEach(() => {
+    if (constDefined(Object, "Chat", false)) rbModRemoveConst(Object, "Chat");
+  });
 
   it("serializes a namespaced class's channel name with the model", () => {
     constSet(TopLevel, "Chat", Chat);

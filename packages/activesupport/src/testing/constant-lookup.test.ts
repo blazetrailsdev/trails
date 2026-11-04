@@ -2,9 +2,10 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   include,
   isPlainHash,
-  unregisterConstant,
   TopLevel,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { TestCase } from "../test-case.js";
 import { ClassMethods, ConstantLookup } from "./constant-lookup.js";
@@ -41,9 +42,9 @@ include(ConstantLookupTest, ConstantLookup);
 
 describe("ConstantLookupTest", () => {
   afterAll(() => {
-    unregisterConstant("Foo", Foo);
-    unregisterConstant("Bar", Bar);
-    unregisterConstant("FooBar", FooBar);
+    if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
+    if (constDefined(Object, "Bar", false)) rbModRemoveConst(Object, "Bar");
+    if (constDefined(Object, "FooBar", false)) rbModRemoveConst(Object, "FooBar");
   });
 
   it("find bar from foo", ({ task }) => {

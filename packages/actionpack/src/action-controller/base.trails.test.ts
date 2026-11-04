@@ -10,9 +10,10 @@ import { Model } from "@blazetrails/activemodel";
 import {
   extend,
   rbObjRespondTo,
-  unregisterConstant,
   TopLevel,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
@@ -131,7 +132,8 @@ describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)
       expect(() => new seated()).not.toThrow();
       expect(seated.controllerName()).toBe("seated");
     } finally {
-      unregisterConstant("SeatedController", seated);
+      if (constDefined(Object, "SeatedController", false))
+        rbModRemoveConst(Object, "SeatedController");
     }
   });
 });
@@ -389,7 +391,8 @@ describe("ActionController::Helpers included into ActionController::API", () => 
       expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
     } finally {
       setHelpersPath([]);
-      unregisterConstant("ApiSubclassProbeHelper", helper);
+      if (constDefined(Object, "ApiSubclassProbeHelper", false))
+        rbModRemoveConst(Object, "ApiSubclassProbeHelper");
     }
   });
 });

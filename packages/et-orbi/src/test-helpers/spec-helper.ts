@@ -8,7 +8,7 @@ import {
   format,
   rbEqual,
   rbModRemoveConst,
-  registeredConstant,
+  constGet,
   setEnv,
   TopLevel,
   constSet,
@@ -23,7 +23,7 @@ declare module "@blazetrails/date" {
 
 setEnv("_TZ", env["TZ"]);
 
-constSet(TopLevel, "Khronic", registeredConstant("Chronic"));
+constSet(TopLevel, "Khronic", constGet(Object, "Chronic"));
 rbModRemoveConst(Object, "Chronic");
 
 EtOrbi._makeInfo();
@@ -98,7 +98,7 @@ export function selectZoneNames(zs: string[]): string[] {
 }
 
 export function requireChronic(): void {
-  constSet(TopLevel, "Chronic", registeredConstant("Khronic"));
+  constSet(TopLevel, "Chronic", constGet(Object, "Khronic"));
 }
 
 export function unrequireChronic(): void {

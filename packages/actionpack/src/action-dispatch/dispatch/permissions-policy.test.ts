@@ -3,7 +3,8 @@ import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  unregisterConstant,
+  constDefined,
+  rbModRemoveConst,
   rbFSend,
   TopLevel,
   constSet,
@@ -223,12 +224,11 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     {},
   );
   constSet(PermissionsPolicyWithHelpersIntegrationTest, "ApplicationHelper", ApplicationHelper);
-  afterAll(() =>
-    unregisterConstant(
-      "PermissionsPolicyWithHelpersIntegrationTest",
-      PermissionsPolicyWithHelpersIntegrationTest,
-    ),
-  );
+  afterAll(() => {
+    if (constDefined(Object, "PermissionsPolicyWithHelpersIntegrationTest", false)) {
+      rbModRemoveConst(Object, "PermissionsPolicyWithHelpersIntegrationTest");
+    }
+  });
 
   class ApplicationController extends Base {
     static override name = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationController";

@@ -2,10 +2,11 @@ import { assertCalled, assertEqual, Inflections, inflections } from "@blazetrail
 import {
   except,
   rbObjDup,
-  unregisterConstant,
   TopLevel,
   constGet,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Base } from "../base.js";
@@ -459,7 +460,8 @@ describe("NamespacedParamsWrapperTest", () => {
         });
       });
     } finally {
-      unregisterConstant("NamespacedParamsWrapperTest::Admin::User", user);
+      if (constDefined(Object, "NamespacedParamsWrapperTest::Admin::User", false))
+        rbModRemoveConst(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User");
     }
   });
 
@@ -473,7 +475,8 @@ describe("NamespacedParamsWrapperTest", () => {
         assertParameters({ nick: "sikachu", title: "Developer", user: { nick: "sikachu" } });
       });
     } finally {
-      unregisterConstant("NamespacedParamsWrapperTest::Admin::User", user);
+      if (constDefined(Object, "NamespacedParamsWrapperTest::Admin::User", false))
+        rbModRemoveConst(constGet(Object, "NamespacedParamsWrapperTest::Admin") as object, "User");
     }
   });
 
@@ -491,7 +494,7 @@ describe("NamespacedParamsWrapperTest", () => {
         });
       });
     } finally {
-      unregisterConstant("User", user);
+      if (constDefined(Object, "User", false)) rbModRemoveConst(Object, "User");
     }
   });
 });

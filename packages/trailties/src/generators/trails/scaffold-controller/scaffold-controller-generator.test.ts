@@ -4,9 +4,10 @@ import {
   Dir,
   File,
   TopLevel,
-  unregisterConstant,
   constGet,
   constSet,
+  constDefined,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, it } from "vitest";
 import { ActiveModel } from "../../active-model.js";
@@ -260,7 +261,8 @@ describe("ScaffoldControllerGeneratorTest", () => {
         });
       });
     } finally {
-      unregisterConstant("Unknown::Generators::ActiveModel", klass);
+      if (constDefined(Object, "Unknown::Generators::ActiveModel", false))
+        rbModRemoveConst(constGet(Object, "Unknown::Generators") as object, "ActiveModel");
     }
   });
 

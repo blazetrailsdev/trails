@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { rbFSend, rbModName, registeredConstant } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModName, constGet } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import type { Base } from "@blazetrails/activerecord";
 import { Application } from "./application.js";
@@ -18,8 +18,8 @@ describe("a generated app's models resolve string association targets", () => {
 
     await Trails.initialize();
 
-    const Post = registeredConstant("Post") as typeof Base;
-    const Comment = registeredConstant("Comment") as typeof Base;
+    const Post = constGet(Object, "Post") as typeof Base;
+    const Comment = constGet(Object, "Comment") as typeof Base;
     expect(Post).toBeDefined();
     expect(Comment).toBeDefined();
     expect(Post.reflectOnAssociation("comments")!.klass).toBe(Comment);

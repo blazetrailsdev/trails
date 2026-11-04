@@ -3,7 +3,7 @@ import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
-import { constSet, unregisterConstant, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
   interface ConstantTable {
@@ -31,7 +31,9 @@ describe("constantize walks seated constants like Object.const_get", () => {
   const Bar = {};
   const Foo: Record<string, unknown> = {};
 
-  afterEach(() => unregisterConstant("Foo", Foo));
+  afterEach(() => {
+    if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
+  });
 
   it("resolves a nested constant seated on a registered namespace", () => {
     constSet(TopLevel, "Foo", Foo);
@@ -61,7 +63,7 @@ describe("constantize walks seated constants like Object.const_get", () => {
     try {
       expect(constantize("Foo::Baz")).toBe(Baz);
     } finally {
-      unregisterConstant("Foo", Host);
+      if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
     }
   });
 
@@ -75,7 +77,7 @@ describe("constantize walks seated constants like Object.const_get", () => {
     try {
       expect(() => safeConstantize("Foo::Baz")).toThrow(/oops/);
     } finally {
-      unregisterConstant("Foo", Host);
+      if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
     }
   });
 });

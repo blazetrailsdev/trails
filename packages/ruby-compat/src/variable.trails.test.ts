@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { include, Module, constSet } from "./include.js";
+import { include, Module, constSet, constDefined } from "./include.js";
 import { NameError } from "./name-error.js";
 import { TopLevel, rbCSymbol, rbModName } from "./object.js";
 import { TypeError } from "./type-error.js";
@@ -16,7 +16,6 @@ import {
   rbModRemoveConst,
   registeredConstant,
   resetConstants,
-  unregisterConstant,
 } from "./variable.js";
 import { Hash } from "./hash.js";
 
@@ -114,7 +113,8 @@ describe("rb_const_get", () => {
   class Sub extends Host {}
 
   afterEach(() => {
-    unregisterConstant("ConstGetTopCheck", TopCheck);
+    if (constDefined(Object, "ConstGetTopCheck", false))
+      rbModRemoveConst(Object, "ConstGetTopCheck");
   });
 
   it("reads a constant off the class before its included modules", () => {
@@ -159,7 +159,7 @@ describe("rb_const_get", () => {
     }
 
     afterEach(() => {
-      unregisterConstant("ConstGetOuter", Outer);
+      if (constDefined(Object, "ConstGetOuter", false)) rbModRemoveConst(Object, "ConstGetOuter");
     });
 
     it("reads each later segment from the namespace before it", () => {
@@ -391,7 +391,8 @@ describe("a constant under an owner no table names", () => {
     try {
       expect(rbModName(TemporaryInner)).toBe("TemporaryRenamed");
     } finally {
-      unregisterConstant("TemporaryRenamed", TemporaryInner);
+      if (constDefined(Object, "TemporaryRenamed", false))
+        rbModRemoveConst(Object, "TemporaryRenamed");
     }
   });
 });

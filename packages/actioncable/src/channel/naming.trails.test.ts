@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { safeConstantize } from "@blazetrails/activesupport";
-import { include, constSet, unregisterConstant, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  include,
+  constSet,
+  TopLevel,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { ActionCable } from "../index.js";
 import { Naming } from "./naming.js";
 
@@ -10,7 +16,9 @@ describe("ActionCable::Channel::Naming constant names", () => {
   const Chat = { name: "Chat" };
   class AppearancesChannel extends ChatChannel {}
 
-  afterEach(() => unregisterConstant("Chat", Chat));
+  afterEach(() => {
+    if (constDefined(Object, "Chat", false)) rbModRemoveConst(Object, "Chat");
+  });
 
   it("names a framework module by its Ruby constant path", () => {
     expect(safeConstantize("ActionCable::Channel::Naming")).toBe(Naming);

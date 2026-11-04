@@ -407,7 +407,6 @@ export {
   rbFBinding,
   registeredConstant,
   rbModRemoveConst,
-  unregisterConstant,
 } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";

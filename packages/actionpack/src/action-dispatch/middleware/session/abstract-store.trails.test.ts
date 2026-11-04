@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, unregisterConstant, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  TopLevel,
+  constSet,
+  constDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { AbstractSecureStore, AbstractStore, StaleSessionCheck } from "./abstract-store.js";
 import { MemCacheStore } from "./mem-cache-store.js";
 
@@ -20,7 +26,8 @@ describe("AbstractStore", () => {
           }),
         ).toBe(2);
       } finally {
-        unregisterConstant("StaleSessionCheckLoadable", Loadable);
+        if (constDefined(Object, "StaleSessionCheckLoadable", false))
+          rbModRemoveConst(Object, "StaleSessionCheckLoadable");
       }
     });
 
@@ -39,7 +46,8 @@ describe("AbstractStore", () => {
           }),
         ).toBe(2);
       } finally {
-        unregisterConstant("StaleSessionCheckLoadableAsync", LoadableAsync);
+        if (constDefined(Object, "StaleSessionCheckLoadableAsync", false))
+          rbModRemoveConst(Object, "StaleSessionCheckLoadableAsync");
       }
     });
 
