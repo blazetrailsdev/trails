@@ -1571,4 +1571,10 @@ describe("respond_to? on a binary String", () => {
   it("does not answer an Array-only name", () => {
     expect(rbObjRespondTo(new Uint8Array([1, 2]), "join")).toBe(false);
   });
+
+  it("still answers String and Object names", () => {
+    const str = new Uint8Array([1, 2]);
+    expect(rbObjRespondTo(str, "bytesize")).toBe(true);
+    expect(rbObjRespondTo(str, "toString")).toBe(true);
+  });
 });

@@ -729,7 +729,6 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     }
     if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
     if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
-    if (obj instanceof Uint8Array && mid !== "toString") return false;
     if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
     if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
     if (temporalMethod(obj, mid) !== undefined) return true;
@@ -772,6 +771,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
+    if (o === Uint8Array.prototype || o === Object.getPrototypeOf(Uint8Array.prototype)) continue;
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
     if (UNDEF_HALVES.has(entry?.get as object)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
