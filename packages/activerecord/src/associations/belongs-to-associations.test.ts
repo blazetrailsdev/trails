@@ -532,7 +532,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", async () => {
-    expect(constDefined(Object, "Region")).toBe(false);
+    expect(constDefined(Object, "Region") ? "constant" : null).toBeNull();
 
     const connection = (await Base.leaseConnection()) as any;
     try {
