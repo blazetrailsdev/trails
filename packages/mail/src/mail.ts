@@ -11,6 +11,7 @@ import {
   Thread,
   TopLevel,
 } from "@blazetrails/ruby-compat";
+import { Configuration } from "./configuration.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
 import type { CommonField } from "./fields/common-field.js";
@@ -21,6 +22,7 @@ interface MailConstants {
   Parsers?: typeof import("./parsers.js");
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
+  defaults(block: (this: Configuration) => unknown): unknown;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -35,6 +37,10 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   new(...args: unknown[]) {
     const block = typeof args.at(-1) === "function" ? args.pop() : undefined;
     return new Mail.Message(args, block);
+  },
+
+  defaults(block: (this: Configuration) => unknown) {
+    return block.call(Configuration.instance());
   },
 
   /**

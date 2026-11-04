@@ -63,6 +63,8 @@ const LAZY_DIRS: Record<string, string[]> = {
     "encryption/extended-deterministic-queries.ts",
     "encryption/message-pack-message-serializer.ts",
     "encryption/read-only-null-encryptor.ts",
+    "test-databases.ts",
+    "testing/query-assertions.ts",
   ],
   trailties: ["commands/", "command.ts"],
 };

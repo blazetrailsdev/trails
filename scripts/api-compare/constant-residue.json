@@ -419,7 +419,7 @@
     }
   },
   "activerecord": {
-    "rows": 556,
+    "rows": 559,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -727,6 +727,8 @@
       "store.ts::IndifferentCoder": "ActiveRecord::Store::IndifferentCoder",
       "store.ts::IndifferentHashAccessor": "ActiveRecord::Store::IndifferentHashAccessor",
       "store.ts::StringKeyedHashAccessor": "ActiveRecord::Store::StringKeyedHashAccessor",
+      "testing/query-assertions.ts::QueryAssertions": "ActiveRecord::Assertions::QueryAssertions",
+      "testing/query-assertions.ts::SQLCounter": "ActiveRecord::Assertions::QueryAssertions::SQLCounter",
       "token-for.ts::RelationMethods": "ActiveRecord::TokenFor::RelationMethods",
       "token-for.ts::TokenDefinition": "ActiveRecord::TokenFor::TokenDefinition",
       "trailties/controller-runtime.ts::ClassMethods": "ActiveRecord::Trailties::ControllerRuntime::ClassMethods",
