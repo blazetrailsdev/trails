@@ -15,11 +15,21 @@ type ProcessorClass = typeof Processor & {
   saveImage(accumulator: unknown, destination: string, saver: Record<string, unknown>): unknown;
 };
 
+/** @noRailsEquivalent PERMANENT */
+function deleteAccumulator(accumulator: unknown): void {
+  if (accumulator == null || typeof accumulator !== "object") return;
+  const prototype = Object.getPrototypeOf(accumulator) as { delete?: unknown } | null;
+  if (typeof prototype?.delete !== "function") return;
+  const handle = accumulator as { delete(): void; isDeleted(): boolean };
+  if (!handle.isDeleted()) handle.delete();
+}
+
 export class Processor {
   declare static ACCUMULATOR_CLASS: abstract new (...args: never[]) => unknown;
 
   declare protected _accumulator: unknown;
 
+  /** @inventedArm deleteAccumulator — CONVERGEABLE image-processing-wasm-vips-handle-lifetime */
   static async call(
     this: ProcessorClass,
     {
@@ -52,11 +62,15 @@ export class Processor {
     }
 
     for (const operation of operations) {
+      const previous = accumulator;
       accumulator = await this.applyOperation(accumulator, operation);
+      if (previous !== source && previous !== accumulator) deleteAccumulator(previous);
     }
 
     if (destination != null) {
-      return this.saveImage(accumulator, destination, saver);
+      const result = await this.saveImage(accumulator, destination, saver);
+      if (accumulator !== source) deleteAccumulator(accumulator);
+      return result;
     } else {
       return accumulator;
     }

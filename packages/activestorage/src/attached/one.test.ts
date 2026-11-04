@@ -729,7 +729,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   it("clearing change on reload", async () => {
     await user.setAvatar(await createBlob({ filename: "funky.jpg" }));
-    expect(await user.avatar.isAttached()).toBe(true);
+    await user.avatar.load();
+    expect(user.avatar.isAttached()).toBe(true);
 
     await user.reload();
     await user.avatar.load();

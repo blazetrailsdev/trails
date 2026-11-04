@@ -24,7 +24,7 @@ export class CreateOne {
   readonly record: AttachedRecord;
   readonly attachable: unknown;
   private _blob!: Blob;
-  private _attachment!: Attachment;
+  private _attachment: Attachment | Promise<Attachment> | undefined;
 
   constructor(name: string, record: AttachedRecord, attachable: unknown) {
     this.name = name;
@@ -36,11 +36,10 @@ export class CreateOne {
   async unfurl(): Promise<void> {
     this._blob = await this.findOrBuildBlob();
     await this._blob.identifyWithoutSaving();
-    this._attachment = await this.findOrBuildAttachment();
   }
 
-  get attachment(): Attachment {
-    return this._attachment;
+  get attachment(): Attachment | Promise<Attachment> {
+    return (this._attachment ??= this.findOrBuildAttachment());
   }
 
   get blob(): Blob {
@@ -74,22 +73,44 @@ export class CreateOne {
   async save(): Promise<void> {
     await (
       this.record.association(`${this.name}Attachment`) as unknown as AssociationWriter
-    ).writer(this.attachment);
+    ).writer(await this.attachment);
     await (this.record.association(`${this.name}Blob`) as unknown as AssociationWriter).writer(
       this.blob,
     );
   }
 
-  /** @internal */
-  private async findOrBuildAttachment(): Promise<Attachment> {
-    return (await this.findAttachment()) || this.buildAttachment();
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  private findOrBuildAttachment(): Attachment | Promise<Attachment> {
+    const attachment = this.findAttachment();
+    if (attachment instanceof Promise) {
+      return attachment.then((found) => (this._attachment = found || this.buildAttachment()));
+    }
+    return attachment || this.buildAttachment();
   }
 
-  /** @internal */
-  protected async findAttachment(): Promise<Attachment | null | undefined> {
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  protected findAttachment():
+    | Attachment
+    | null
+    | undefined
+    | Promise<Attachment | null | undefined> {
     const record = this.record as unknown as { [k: string]: unknown };
-    if (rbEqual(await record[`${this.name}Blob`], this.blob)) {
-      return (await record[`${this.name}Attachment`]) as Attachment | null;
+    const blob = record[`${this.name}Blob`];
+    if (blob instanceof Promise) {
+      return blob.then((found) =>
+        rbEqual(found, this.blob)
+          ? (record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>)
+          : undefined,
+      );
+    }
+    if (rbEqual(blob, this.blob)) {
+      return record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>;
     }
   }
 

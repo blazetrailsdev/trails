@@ -5,6 +5,8 @@ import { Collection, Initializer } from "../initializable.js";
 import {
   Deprecation,
   Deprecators,
+  Executor,
+  Reloader,
   DEFAULT_BEHAVIORS,
   deprecator as activeSupportDeprecator,
 } from "@blazetrails/activesupport";
@@ -14,7 +16,12 @@ import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
 const deprecator = activeSupportDeprecator();
 let deprecators: Deprecators;
-let app: { config: { get(key: string): unknown }; deprecators: Deprecators };
+let app: {
+  config: { get(key: string): unknown };
+  deprecators: Deprecators;
+  executor: typeof Executor;
+  reloader: typeof Reloader;
+};
 
 describe("RailtieTest", () => {
   let savedActiveSupport: unknown;
@@ -22,7 +29,12 @@ describe("RailtieTest", () => {
 
   beforeEach(() => {
     deprecators = new Deprecators();
-    app = { config: Trailtie.config, deprecators };
+    app = {
+      config: Trailtie.config,
+      deprecators,
+      executor: class extends Executor {},
+      reloader: class extends Reloader {},
+    };
     savedHashDigestClass = Digest.hashDigestClass;
     const cur = Trailtie.config.get("activeSupport");
     try {
@@ -128,7 +140,12 @@ describe("RailtieTest", () => {
     const appConfig: Record<string, unknown> = {
       activeSupport: { hashDigestClass: custom } satisfies ActiveSupportConfig,
     };
-    const yieldedApp = { config: appConfig, deprecators };
+    const yieldedApp = {
+      config: appConfig,
+      deprecators,
+      executor: class extends Executor {},
+      reloader: class extends Reloader {},
+    };
     Trailtie.config.set("activeSupport", {} satisfies ActiveSupportConfig);
     await runTrailtieInitializers(Trailtie, yieldedApp);
     expect(Digest.hashDigestClass).toBe(custom);

@@ -1,5 +1,11 @@
 import { Autoloaders } from "./autoloaders.js";
-import { resetLoadHooks, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
+import {
+  Executor,
+  Reloader,
+  resetLoadHooks,
+  runLoadHooks,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
@@ -65,7 +71,12 @@ describe("active_support/message_pack is awaited at boot", () => {
     ActionDispatchTrailtie.config.set("actionDispatch", savedActionDispatch);
   });
 
-  const app = () => ({ config: ActiveSupportTrailtie.config, deprecators: new Map() });
+  const app = () => ({
+    config: ActiveSupportTrailtie.config,
+    deprecators: new Map(),
+    executor: class extends Executor {},
+    reloader: class extends Reloader {},
+  });
 
   it("boots with the peer absent, attempting the load with warnings silenced", async () => {
     expect(ActiveSupport.MessagePack).toBeUndefined();
