@@ -53,11 +53,12 @@ const SUBPATH_ENTRIES: Record<string, string> = {
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
 const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
 
-/** A directory whose files load one at a time, so each carries its own table and loads no sibling. */
+/** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
   activerecord: [
     "connection-adapters/",
     "destroy-association-async-job.ts",
+    "encryption/encrypted-fixtures.ts",
     "encryption/envelope-encryption-key-provider.ts",
     "encryption/extended-deterministic-queries.ts",
     "encryption/message-pack-message-serializer.ts",
