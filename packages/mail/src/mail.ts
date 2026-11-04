@@ -19,6 +19,13 @@ import type { CommonField } from "./fields/common-field.js";
 interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
+  SMTP: typeof import("./network/delivery-methods/smtp.js").SMTP;
+  Sendmail: typeof import("./network/delivery-methods/sendmail.js").Sendmail;
+  Exim: typeof import("./network/delivery-methods/exim.js").Exim;
+  FileDelivery: typeof import("./network/delivery-methods/file-delivery.js").FileDelivery;
+  SMTPConnection: typeof import("./network/delivery-methods/smtp-connection.js").SMTPConnection;
+  TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
+  LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
   Parsers?: typeof import("./parsers.js");
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;

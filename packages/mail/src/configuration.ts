@@ -1,10 +1,4 @@
-import { Exim } from "./network/delivery-methods/exim.js";
-import { FileDelivery } from "./network/delivery-methods/file-delivery.js";
-import { LoggerDelivery } from "./network/delivery-methods/logger-delivery.js";
-import { Sendmail } from "./network/delivery-methods/sendmail.js";
-import { SMTP } from "./network/delivery-methods/smtp.js";
-import { SMTPConnection } from "./network/delivery-methods/smtp-connection.js";
-import { TestMailer } from "./network/delivery-methods/test-mailer.js";
+import { Mail } from "./mail.js";
 
 export class Configuration {
   private static _instance: Configuration | null = null;
@@ -28,21 +22,21 @@ export class Configuration {
     switch (method) {
       case null:
       case undefined:
-        return SMTP;
+        return Mail.SMTP;
       case "smtp":
-        return SMTP;
+        return Mail.SMTP;
       case "sendmail":
-        return Sendmail;
+        return Mail.Sendmail;
       case "exim":
-        return Exim;
+        return Mail.Exim;
       case "file":
-        return FileDelivery;
+        return Mail.FileDelivery;
       case "smtp_connection":
-        return SMTPConnection;
+        return Mail.SMTPConnection;
       case "test":
-        return TestMailer;
+        return Mail.TestMailer;
       case "logger":
-        return LoggerDelivery;
+        return Mail.LoggerDelivery;
       default:
         return method;
     }

@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { IO, Process, StringIO, StandardError, rbInspect, warn } from "@blazetrails/ruby-compat";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import { Utilities } from "../../utilities.js";
@@ -95,3 +96,5 @@ export class Sendmail {
     return warn;
   }
 }
+
+Mail.Sendmail = Sendmail;

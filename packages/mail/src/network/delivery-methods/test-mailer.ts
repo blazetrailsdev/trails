@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import type { Message } from "../../message.js";
 
@@ -25,3 +26,5 @@ export class TestMailer {
     return TestMailer.deliveries;
   }
 }
+
+Mail.TestMailer = TestMailer;

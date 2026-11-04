@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { Logger, STDOUT, constGet } from "@blazetrails/ruby-compat";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import type { Message } from "../../message.js";
@@ -38,3 +39,5 @@ export class LoggerDelivery {
     }
   }
 }
+
+Mail.LoggerDelivery = LoggerDelivery;
