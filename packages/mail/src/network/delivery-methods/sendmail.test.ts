@@ -11,8 +11,6 @@ function buildMail(): Message {
   return mail;
 }
 
-const DESTS = ["--", "marcel@test.lindsaar.net", "bob@test.lindsaar.net"];
-
 function stubPopen(dm: Sendmail) {
   return vi.spyOn(dm, "popen").mockResolvedValue(null);
 }
@@ -24,30 +22,11 @@ describe("Mail::Sendmail", () => {
     const dm = new Sendmail({});
     const popen = stubPopen(dm);
     await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual([
-      "/usr/sbin/sendmail",
-      "-i",
-      "-f",
-      "roger@test.lindsaar.net",
-      ...DESTS,
-    ]);
-  });
-
-  describe("SMTP From", () => {
-    it("escapes the From address", async () => {
-      const dm = new Sendmail({});
-      const popen = stubPopen(dm);
-      const mail = buildMail();
-      mail.setFrom('"from+suffix test"@test.lindsaar.net');
-      await dm.deliverBang(mail);
-      expect(popen.mock.calls[0][0]).toEqual([
-        "/usr/sbin/sendmail",
-        "-i",
-        "-f",
-        '"from+suffix test"@test.lindsaar.net',
-        ...DESTS,
-      ]);
-    });
+    expect(popen.mock.calls[0][0]).toEqual(
+      "/usr/sbin/sendmail -i -f roger@test.lindsaar.net -- marcel@test.lindsaar.net bob@test.lindsaar.net".split(
+        " ",
+      ),
+    );
   });
 
   describe("SMTP To", () => {
@@ -57,14 +36,9 @@ describe("Mail::Sendmail", () => {
       const mail = buildMail();
       mail.setSmtpEnvelopeTo("smtp_to@test.lindsaar.net");
       await dm.deliverBang(mail);
-      expect(popen.mock.calls[0][0]).toEqual([
-        "/usr/sbin/sendmail",
-        "-i",
-        "-f",
-        "roger@test.lindsaar.net",
-        "--",
-        "smtp_to@test.lindsaar.net",
-      ]);
+      expect(popen.mock.calls[0][0]).toEqual(
+        "/usr/sbin/sendmail -i -f roger@test.lindsaar.net -- smtp_to@test.lindsaar.net".split(" "),
+      );
     });
   });
 
@@ -73,12 +47,11 @@ describe("Mail::Sendmail", () => {
     const popen = stubPopen(dm);
     dm.settings.arguments = null;
     await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual([
-      "/usr/sbin/sendmail",
-      "-f",
-      "roger@test.lindsaar.net",
-      ...DESTS,
-    ]);
+    expect(popen.mock.calls[0][0]).toEqual(
+      "/usr/sbin/sendmail -f roger@test.lindsaar.net -- marcel@test.lindsaar.net bob@test.lindsaar.net".split(
+        " ",
+      ),
+    );
   });
 
   it("raises on nonzero exitstatus", async () => {

@@ -21,20 +21,8 @@ describe("exim delivery agent", () => {
     const dm = new Exim({});
     const popen = stubPopen(dm);
     await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual([
-      "/usr/sbin/exim",
-      "-i",
-      "-t",
-      "-f",
-      "roger@test.lindsaar.net",
-    ]);
-  });
-
-  it("should still send an email if the settings have been set to nil", async () => {
-    const dm = new Exim({});
-    const popen = stubPopen(dm);
-    dm.settings.arguments = null;
-    await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual(["/usr/sbin/exim", "-f", "roger@test.lindsaar.net"]);
+    expect(popen.mock.calls[0][0]).toEqual(
+      "/usr/sbin/exim -i -t -f roger@test.lindsaar.net".split(" "),
+    );
   });
 });

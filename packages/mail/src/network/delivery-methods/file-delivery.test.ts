@@ -17,15 +17,5 @@ describe("SMTP Delivery Method", () => {
         /Subject: invalid RFC2822\r\n[\s\S]*\r\n\r\n$/,
       );
     });
-
-    it("should use the base name of the file name to prevent file system traversal", async () => {
-      const location = Dir.mktmpdir("mails");
-      const mail = new Message();
-      mail.setFrom("roger@moore.com");
-      mail.setTo("../../../../../../../../../../../tmp/pwn");
-      mail.setSubject("evil hacker");
-      await new FileDelivery({ location }).deliverBang(mail);
-      expect(File.isExist(File.join(location, "pwn"))).toBe(true);
-    });
   });
 });

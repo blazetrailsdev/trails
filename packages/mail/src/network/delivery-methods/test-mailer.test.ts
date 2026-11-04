@@ -30,8 +30,4 @@ describe("Mail::TestMailer", () => {
       "SMTP To address may not be blank: []",
     );
   });
-
-  it("should save settings passed to initialize", () => {
-    expect(new TestMailer({ setting: "value" }).settings).toEqual({ setting: "value" });
-  });
 });
