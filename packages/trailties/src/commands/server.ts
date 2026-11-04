@@ -91,7 +91,10 @@ export class Server {
 
   async start(afterStopCallback: (() => void) | null = null): Promise<void> {
     try {
-      onSignal("SIGINT", () => exit());
+      onSignal("SIGINT", () => {
+        afterStopCallback?.();
+        exit();
+      });
       this.createTmpDirectories();
       this.setupDevCaching();
       const app = await Trails.initialize();
