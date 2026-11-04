@@ -37,11 +37,9 @@ export async function handleExceptions<T>(
 
 export const Rescuable = { handleExceptions };
 extend(Rescuable, Concern);
-(
-  Rescuable as unknown as { classMethods(def: (mod: Record<string, unknown>) => void): void }
-).classMethods((mod) => {
+include(Rescuable, ASRescuable);
+Concern.classMethods.call(Rescuable as never, (mod) => {
   mod.handleException = handleException;
 });
-include(Rescuable, ASRescuable);
 
 ActionMailer.Rescuable = Rescuable;

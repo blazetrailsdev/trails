@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { chomp, stringSplit } from "@blazetrails/ruby-compat";
+import { chomp, stringSplit, strip } from "@blazetrails/ruby-compat";
 import { ActionMailer } from "./namespaces.js";
 
 interface MailHelperHost {
@@ -21,7 +21,7 @@ export const MailHelper = {
     while ((line = splits.shift()) !== undefined) {
       if ((line.startsWith("*") || line.startsWith("#")) && splits[0]?.startsWith(" ")) {
         while (output.endsWith(" ")) output = chomp(output, " ");
-        output += `  ${line} ${splits.shift()!.trim()}\n`;
+        output += `  ${line} ${strip(splits.shift()!)}\n`;
       } else {
         output += line;
       }
