@@ -75,7 +75,10 @@ function asDate(instant: unknown): Date {
 }
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
-  return new Date(year, month - 1, day, hour, min, sec, ms);
+  return new Date(
+    RubyTime.local(year, month, day, hour, min, sec + ms / 1000).toZonedDateTime()
+      .epochMilliseconds,
+  );
 }
 
 function dateTimeInit(

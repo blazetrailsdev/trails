@@ -156,8 +156,8 @@ describe("fastStringToTime", () => {
 describe("userInputInTimeZone", () => {
   it("answers String#to_time when Time.zone is unset", () => {
     const result = userInputInTimeZone("2024-06-15 14:30:00");
-    expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
-    expect((result as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
+    expect(result).toBeInstanceOf(RubyTime);
+    expect((result as RubyTime).toZonedDateTime().toPlainDateTime().toString()).toBe(
       "2024-06-15T14:30:00",
     );
   });
