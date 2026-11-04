@@ -223,10 +223,7 @@ export class ExecutionWrapper {
     return this.run();
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   private _deactivate(activeKey: symbol): void {
     let instance = IsolatedExecutionState.get<ExecutionWrapper>(activeKey);
     if (instance === this) {
