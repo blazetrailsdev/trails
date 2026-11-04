@@ -99,7 +99,7 @@ export class Server extends RackupServer<ServerOptions> {
     };
     atExit(ensure);
     try {
-      trap("SIGINT", () => exit());
+      trap("INT", () => exit());
       this.createTmpDirectories();
       this.setupDevCaching();
       if (this.options.logStdout) await this.logToStdout();

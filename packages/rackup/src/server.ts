@@ -404,7 +404,7 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
 
     if (options.pid != null) await this.writePid();
 
-    trap("SIGINT", () => {
+    trap("INT", () => {
       if (typeof this._server!.shutdown === "function") {
         this._server!.shutdown();
       } else {
