@@ -24,6 +24,7 @@ import { Current } from "./current.js";
 import { IntegrityError } from "./errors.js";
 import { Filename } from "./filename.js";
 import { PurgeJob } from "./purge-job.js";
+import type { VariantWithRecord } from "./variant-with-record.js";
 import { DiskService } from "./service/disk-service.js";
 import {
   buildBlobAfterUnfurling,
@@ -424,22 +425,18 @@ describe("ActiveStorage::BlobTest", () => {
     expect(await Blob.service!.isExist(blob.key)).toBe(false);
   });
 
-  // BLOCKED: activestorage-variation-and-variants
-  it.skip("purge deletes variants from external service with the purge_later", async () => {
+  it("purge deletes variants from external service with the purge_later", async () => {
     const blob = await createFileBlob();
     const variant = await (
-      blob as unknown as {
-        variant(transformations: object): {
-          processed(): Promise<{ image: { blob: Blob } }>;
-        };
-      }
-    )
-      .variant({ resizeToLimit: [100, null] })
-      .processed();
+      blob.variant({ resizeToLimit: [100, null] }) as VariantWithRecord
+    ).processed();
 
     await blob.purge();
     const t = new BlobTest("purgeLater") as unknown as TestHelper;
-    await t.assertEnqueuedWith({ job: PurgeJob, args: [variant.image.blob] });
+    await t.assertEnqueuedWith({
+      job: PurgeJob,
+      args: [await (await (await variant.image)!.attachment)!.blob],
+    });
   });
 
   it("purge does nothing when attachments exist", async () => {

@@ -1,3 +1,4 @@
+import "../constants.postgresql-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type {
   DatabaseConfig,
@@ -11,7 +12,6 @@ import {
   rbObjRespondTo,
   setEnv,
   filterMap,
-  constSet,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
@@ -2128,4 +2128,4 @@ Type.register("xml", Xml, { adapter: "postgresql" });
 
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
 
-constSet(ConnectionAdapters, "PostgreSQLAdapter", PostgreSQLAdapter);
+ConnectionAdapters.PostgreSQLAdapter = PostgreSQLAdapter;

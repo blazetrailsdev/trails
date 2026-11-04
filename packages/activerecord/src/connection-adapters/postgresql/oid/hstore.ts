@@ -1,3 +1,4 @@
+import "../../../constants.postgresql-oid-hstore.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
 import { include, isPlainObject } from "@blazetrails/activesupport";
@@ -7,7 +8,6 @@ import {
   rbObjRespondTo,
   stringInspect,
   StringScanner,
-  constSet,
 } from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
@@ -117,4 +117,4 @@ function escapeHstore(value: string | null | undefined): string {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Hstore", Hstore);
+ConnectionAdapters.PostgreSQL.OID.Hstore = Hstore;

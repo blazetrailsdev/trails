@@ -52,6 +52,34 @@ import type {
   HasManyThroughNestedAssociationsAreReadonly,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./associations/errors.js";
+import type { TypeMetadata as MySQLTypeMetadata } from "./connection-adapters/mysql/type-metadata.js";
+import type { Column as PostgreSQLColumn } from "./connection-adapters/postgresql/column.js";
+import type { TypeMetadata as PostgreSQLTypeMetadata } from "./connection-adapters/postgresql/type-metadata.js";
+import type { Array as OIDArray } from "./connection-adapters/postgresql/oid/array.js";
+import type { BitVarying as OIDBitVarying } from "./connection-adapters/postgresql/oid/bit-varying.js";
+import type { Bit as OIDBit } from "./connection-adapters/postgresql/oid/bit.js";
+import type { Bytea as OIDBytea } from "./connection-adapters/postgresql/oid/bytea.js";
+import type { Cidr as OIDCidr } from "./connection-adapters/postgresql/oid/cidr.js";
+import type { DateTime as OIDDateTime } from "./connection-adapters/postgresql/oid/date-time.js";
+import type { Date as OIDDate } from "./connection-adapters/postgresql/oid/date.js";
+import type { Decimal as OIDDecimal } from "./connection-adapters/postgresql/oid/decimal.js";
+import type { Enum as OIDEnum } from "./connection-adapters/postgresql/oid/enum.js";
+import type { Hstore as OIDHstore } from "./connection-adapters/postgresql/oid/hstore.js";
+import type { Inet as OIDInet } from "./connection-adapters/postgresql/oid/inet.js";
+import type { Interval as OIDInterval } from "./connection-adapters/postgresql/oid/interval.js";
+import type { Jsonb as OIDJsonb } from "./connection-adapters/postgresql/oid/jsonb.js";
+import type { LegacyPoint as OIDLegacyPoint } from "./connection-adapters/postgresql/oid/legacy-point.js";
+import type { Macaddr as OIDMacaddr } from "./connection-adapters/postgresql/oid/macaddr.js";
+import type { Money as OIDMoney } from "./connection-adapters/postgresql/oid/money.js";
+import type { Oid as OIDOid } from "./connection-adapters/postgresql/oid/oid.js";
+import type { Point as OIDPoint } from "./connection-adapters/postgresql/oid/point.js";
+import type { SpecializedString as OIDSpecializedString } from "./connection-adapters/postgresql/oid/specialized-string.js";
+import type { TimestampWithTimeZone as OIDTimestampWithTimeZone } from "./connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
+import type { Timestamp as OIDTimestamp } from "./connection-adapters/postgresql/oid/timestamp.js";
+import type { Uuid as OIDUuid } from "./connection-adapters/postgresql/oid/uuid.js";
+import type { Vector as OIDVector } from "./connection-adapters/postgresql/oid/vector.js";
+import type { Xml as OIDXml } from "./connection-adapters/postgresql/oid/xml.js";
+import type { Column as SQLite3Column } from "./connection-adapters/sqlite3/column.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
@@ -458,9 +486,40 @@ export const ConnectionAdapters = {
 } as AutoloadModule & {
   adapters: Map<string, [string, string]>;
   ConnectionPool: typeof ConnectionPool;
-  MySQL: { name: string; Column: typeof MySQLColumn };
-  PostgreSQL: { name: string; OID: { name: string } };
-  SQLite3: { name: string };
+  MySQL: { name: string; Column: typeof MySQLColumn; TypeMetadata: typeof MySQLTypeMetadata };
+  PostgreSQL: {
+    name: string;
+    Column: typeof PostgreSQLColumn;
+    TypeMetadata: typeof PostgreSQLTypeMetadata;
+    OID: {
+      name: string;
+      Array: typeof OIDArray;
+      BitVarying: typeof OIDBitVarying;
+      Bit: typeof OIDBit;
+      Bytea: typeof OIDBytea;
+      Cidr: typeof OIDCidr;
+      DateTime: typeof OIDDateTime;
+      Date: typeof OIDDate;
+      Decimal: typeof OIDDecimal;
+      Enum: typeof OIDEnum;
+      Hstore: typeof OIDHstore;
+      Inet: typeof OIDInet;
+      Interval: typeof OIDInterval;
+      Jsonb: typeof OIDJsonb;
+      LegacyPoint: typeof OIDLegacyPoint;
+      Macaddr: typeof OIDMacaddr;
+      Money: typeof OIDMoney;
+      Oid: typeof OIDOid;
+      Point: typeof OIDPoint;
+      SpecializedString: typeof OIDSpecializedString;
+      TimestampWithTimeZone: typeof OIDTimestampWithTimeZone;
+      Timestamp: typeof OIDTimestamp;
+      Uuid: typeof OIDUuid;
+      Vector: typeof OIDVector;
+      Xml: typeof OIDXml;
+    };
+  };
+  SQLite3: { name: string; Column: typeof SQLite3Column };
   AbstractAdapter: typeof AbstractAdapter;
   BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
   SQLite3Adapter: typeof SQLite3Adapter;
@@ -485,8 +544,10 @@ ConnectionAdapters.MySQL = {
 ConnectionAdapters.PostgreSQL = {
   name: "ActiveRecord::ConnectionAdapters::PostgreSQL",
   OID: { name: "ActiveRecord::ConnectionAdapters::PostgreSQL::OID" },
-};
-ConnectionAdapters.SQLite3 = { name: "ActiveRecord::ConnectionAdapters::SQLite3" };
+} as typeof ConnectionAdapters.PostgreSQL;
+ConnectionAdapters.SQLite3 = {
+  name: "ActiveRecord::ConnectionAdapters::SQLite3",
+} as typeof ConnectionAdapters.SQLite3;
 
 export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as AutoloadModule & {
   AutoFilteredParameters: typeof AutoFilteredParameters;

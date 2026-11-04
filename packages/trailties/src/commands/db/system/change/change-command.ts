@@ -1,4 +1,4 @@
-import "../../../../constants.change-command.generated.js";
+import "../../../../constants.db-system-change-change-command.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../../../../command/base.js";
 import { ChangeGenerator } from "../../../../generators/trails/db/system/change/change-generator.js";

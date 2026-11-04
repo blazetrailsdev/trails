@@ -1,3 +1,4 @@
+import "../../constants.mysql-schema-definitions.generated.js";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,

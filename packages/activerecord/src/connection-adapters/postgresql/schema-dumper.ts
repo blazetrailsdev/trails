@@ -1,3 +1,4 @@
+import "../../constants.postgresql-schema-dumper.generated.js";
 import { any } from "@blazetrails/activesupport";
 import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";

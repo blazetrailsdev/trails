@@ -1,6 +1,7 @@
+import "../../../constants.postgresql-oid-uuid.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, constSet } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 
 export const ACCEPTABLE_UUID = /^(?:\{([a-fA-F0-9]{4}-?){8}\}|([a-fA-F0-9]{4}-?){8})$/;
 export const CANONICAL_UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
@@ -40,4 +41,4 @@ export class Uuid extends ValueType<string> {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Uuid", Uuid);
+ConnectionAdapters.PostgreSQL.OID.Uuid = Uuid;

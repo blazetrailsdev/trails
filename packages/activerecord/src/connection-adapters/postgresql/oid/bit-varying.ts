@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-bit-varying.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { Bit } from "./bit.js";
 
@@ -8,4 +9,4 @@ export class BitVarying extends Bit {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "BitVarying", BitVarying);
+ConnectionAdapters.PostgreSQL.OID.BitVarying = BitVarying;

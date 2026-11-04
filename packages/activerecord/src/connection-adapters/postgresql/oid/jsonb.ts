@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-jsonb.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { Json } from "../../../type/json.js";
 
@@ -8,4 +9,4 @@ export class Jsonb extends Json {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Jsonb", Jsonb);
+ConnectionAdapters.PostgreSQL.OID.Jsonb = Jsonb;

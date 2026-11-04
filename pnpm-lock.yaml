@@ -193,6 +193,9 @@ importers:
       pg:
         specifier: '>=8.19.0'
         version: 8.20.0
+      websocket-driver:
+        specifier: '>=0.7.4'
+        version: 0.7.4
     devDependencies:
       '@blazetrails/activerecord':
         specifier: workspace:*
@@ -206,9 +209,6 @@ importers:
       ioredis:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)
-      websocket-driver:
-        specifier: 0.7.4
-        version: 0.7.4
 
   packages/actionpack:
     dependencies:

@@ -1,3 +1,4 @@
+import "../../constants.mysql-schema-statements.generated.js";
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { hashDelete, rbRegMatchP, toI, toH, toS } from "@blazetrails/ruby-compat";

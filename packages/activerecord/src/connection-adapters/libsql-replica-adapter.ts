@@ -1,5 +1,4 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
-import { constSet } from "@blazetrails/ruby-compat";
 import { ConnectionAdapters } from "../namespaces.js";
 
 import type { SqliteDriver } from "../sqlite-adapter.js";
@@ -7,6 +6,7 @@ import { ConfigurationError } from "../errors.js";
 import { libsqlReplicaDriver, type SyncableSqliteConnection } from "../sqlite/libsql.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 
+/** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 export class LibSQLReplicaAdapter extends SQLite3Adapter {
   protected static override defaultSqliteDriver(): SqliteDriver {
     return libsqlReplicaDriver;
@@ -26,4 +26,4 @@ export class LibSQLReplicaAdapter extends SQLite3Adapter {
   }
 }
 
-constSet(ConnectionAdapters, "LibSQLReplicaAdapter", LibSQLReplicaAdapter);
+ConnectionAdapters.LibSQLReplicaAdapter = LibSQLReplicaAdapter;

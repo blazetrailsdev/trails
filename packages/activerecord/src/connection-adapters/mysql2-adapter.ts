@@ -1,3 +1,4 @@
+import "../constants.mysql2-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import mysql from "mysql2/promise";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
@@ -9,7 +10,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { include, rbObjRespondTo, constSet } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -389,4 +390,4 @@ Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 
 include(Mysql2Adapter, Mysql2DatabaseStatements);
 
-constSet(ConnectionAdapters, "Mysql2Adapter", Mysql2Adapter);
+ConnectionAdapters.Mysql2Adapter = Mysql2Adapter;

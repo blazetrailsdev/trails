@@ -1,3 +1,4 @@
+import "../../../constants.postgresql-oid-type-map-initializer.generated.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { toI } from "@blazetrails/ruby-compat";
 

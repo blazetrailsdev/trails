@@ -1,5 +1,6 @@
+import "../../../constants.postgresql-oid-date-time.generated.js";
 import { Time as RubyTime } from "@blazetrails/date";
-import { format, rbStrSend, toI, constSet } from "@blazetrails/ruby-compat";
+import { format, rbStrSend, toI } from "@blazetrails/ruby-compat";
 import * as Type from "../../../type.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import {
@@ -36,4 +37,4 @@ export class DateTime extends Type.DateTime {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "DateTime", DateTime);
+ConnectionAdapters.PostgreSQL.OID.DateTime = DateTime;

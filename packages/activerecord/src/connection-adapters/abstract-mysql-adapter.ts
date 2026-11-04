@@ -1,3 +1,4 @@
+import "../constants.abstract-mysql-adapter.generated.js";
 import type {
   DatabaseConfig,
   DatabaseConfigOptions,

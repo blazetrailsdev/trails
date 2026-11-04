@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../constants.mysql-column.generated.js";
+
 import { Column as BaseColumn } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { ConnectionAdapters } from "../../namespaces.js";
@@ -29,4 +30,4 @@ export class Column extends BaseColumn {
   }
 }
 
-constSet(ConnectionAdapters.MySQL, "Column", Column);
+ConnectionAdapters.MySQL.Column = Column;

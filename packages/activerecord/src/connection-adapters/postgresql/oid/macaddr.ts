@@ -1,5 +1,6 @@
+import "../../../constants.postgresql-oid-macaddr.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { casecmp, rbObjClass, rtest, constSet } from "@blazetrails/ruby-compat";
+import { casecmp, rbObjClass, rtest } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {
@@ -26,4 +27,4 @@ export class Macaddr extends StringType {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Macaddr", Macaddr);
+ConnectionAdapters.PostgreSQL.OID.Macaddr = Macaddr;

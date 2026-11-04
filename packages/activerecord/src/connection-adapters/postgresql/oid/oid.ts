@@ -1,4 +1,5 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import "../../../constants.postgresql-oid-oid.generated.js";
+
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { UnsignedInteger } from "../../../type/unsigned-integer.js";
 
@@ -8,4 +9,4 @@ export class Oid extends UnsignedInteger {
   }
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Oid", Oid);
+ConnectionAdapters.PostgreSQL.OID.Oid = Oid;

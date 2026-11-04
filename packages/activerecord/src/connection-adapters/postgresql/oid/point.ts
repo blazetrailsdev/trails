@@ -1,3 +1,4 @@
+import "../../../constants.postgresql-oid-point.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   ArgumentError,
@@ -6,7 +7,6 @@ import {
   rbObjAsString,
   rbStrSend,
   Struct,
-  constSet,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
@@ -93,4 +93,4 @@ function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown]
   return [value.x ?? value["x"], value.y ?? value["y"]];
 }
 
-constSet(ConnectionAdapters.PostgreSQL.OID, "Point", Point);
+ConnectionAdapters.PostgreSQL.OID.Point = Point;
