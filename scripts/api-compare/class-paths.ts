@@ -813,7 +813,6 @@ async function main(): Promise<void> {
         process.exitCode = 1;
       }
       if (entries.length > 0) {
-        /** A row nested in a lazy file's constant resolves only once that file loads. */
         const lazyOwners = entries.filter((e) => e.table).map((e) => `${e.fqn}::`);
         await checkSeatedPaths(
           dir,
