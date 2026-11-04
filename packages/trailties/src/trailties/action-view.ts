@@ -224,7 +224,7 @@ async function watchViews(app: unknown): Promise<void> {
     },
     onError: (err, trigger) => {
       if (!started) initialError ??= err;
-      TopLevel.Trails!.logger.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+      TopLevel.Trails!.logger!.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
     },
   });
   started = true;
