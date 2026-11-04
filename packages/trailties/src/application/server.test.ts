@@ -17,7 +17,7 @@ vi.mock("../server/dev-server.js", async () => {
   class DevServer {
     static async run() {
       output.push("Listening");
-      return null;
+      return { on() {} };
     }
   }
   Handler.register("vite", DevServer);

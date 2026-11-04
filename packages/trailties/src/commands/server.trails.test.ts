@@ -22,7 +22,7 @@ vi.mock("../server/dev-server.js", async () => {
   class DevServer {
     static async run(app: unknown, options: object) {
       devServerStarts.push({ ...options, app });
-      return null;
+      return { on() {} };
     }
   }
   Handler.register("vite", DevServer);
@@ -96,7 +96,7 @@ describe("trails server environment (trails)", () => {
 
     expect(devServerStarts).toEqual([]);
     expect(devServerLoads).toEqual([]);
-    expect(runOptions).toEqual([{ Port: 3000, Host: "0.0.0.0" }]);
+    expect(runOptions).toEqual([expect.objectContaining({ Port: 3000, Host: "0.0.0.0" })]);
     expect(env.TRAILS_ENV).toBe("production");
     expect(said[0]).toContain("application starting in production http://0.0.0.0:3000");
   });
@@ -113,7 +113,7 @@ describe("trails server environment (trails)", () => {
     await run("-u", "node");
 
     expect(devServerStarts).toEqual([]);
-    expect(runOptions).toEqual([{ Port: 3000, Host: "localhost" }]);
+    expect(runOptions).toEqual([expect.objectContaining({ Port: 3000, Host: "localhost" })]);
   });
 
   it("broadcasts the Trails logger to stdout in development only", async () => {

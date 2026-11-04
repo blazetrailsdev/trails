@@ -4,6 +4,7 @@ import { type BroadcastLogger, getEnv, isBlank, Logger } from "@blazetrails/acti
 import {
   block,
   Dir,
+  env,
   fetch,
   File,
   FileUtils,
@@ -56,7 +57,7 @@ interface ServerHandler {
   run(
     app: (env: RackEnv) => unknown,
     options: { Port?: number; Host?: string },
-  ): Promise<{ on(event: string, cb: () => void): unknown } | null | undefined>;
+  ): Promise<{ on(event: string, cb: () => void): unknown }>;
 }
 
 Handler.loadPath["rackup/handler/vite"] = () => import("../server/dev-server.js");
@@ -71,6 +72,8 @@ export class Server {
   /** @internal */
   _defaultOptions: ServerOptions;
   options: ServerOptions;
+  /** @internal */
+  _server: ServerHandler | null = null;
 
   constructor(options: ServerOptions | null = null) {
     this._defaultOptions = options ?? {};
@@ -96,9 +99,8 @@ export class Server {
 
       await app.loadServer();
       const trailsApp = (env: RackEnv) => app.call(env);
-      const { Port: port, Host: host } = this.options;
-      const server = await (await this.server()).run(trailsApp, { Port: port, Host: host });
-      if (afterStopCallback != null) server?.on("close", afterStopCallback);
+      const server = await (await this.server()).run(trailsApp, this.options);
+      if (afterStopCallback != null) server.on("close", afterStopCallback);
     } catch (error) {
       afterStopCallback?.();
       throw error;
@@ -117,12 +119,14 @@ export class Server {
 
   /** @noRailsEquivalent CONVERGEABLE rails-server-extends-rackup-server */
   async server(): Promise<ServerHandler> {
-    return ((await Handler.get(this.options.server)) ??
-      (await Handler.get(
-        this.options.environment === "development" && (await hasViteConfig(Dir.pwd()))
-          ? "vite"
-          : "node",
-      ))) as ServerHandler;
+    return (this._server ??= ((await Handler.get(this.options.server)) ??
+      (env[Handler.RACKUP_HANDLER] != null || env[Handler.RACK_HANDLER] != null
+        ? await Handler.default()
+        : await Handler.get(
+            this.options.environment === "development" && (await hasViteConfig(Dir.pwd()))
+              ? "vite"
+              : "node",
+          ))) as ServerHandler);
   }
 
   middleware(): Hash<string, unknown[]> {

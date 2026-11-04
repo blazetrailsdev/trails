@@ -29,7 +29,7 @@ export class DevServer {
   static async run(
     app: RackApp,
     options: { Port?: number; Host?: string } = {},
-  ): Promise<ViteDevServer["httpServer"]> {
+  ): Promise<NonNullable<ViteDevServer["httpServer"]>> {
     const server = new DevServer({
       port: options.Port ?? 3000,
       host: options.Host ?? "localhost",
@@ -37,7 +37,7 @@ export class DevServer {
       app,
     });
     await server.start();
-    return server.server?.httpServer ?? null;
+    return server.server!.httpServer!;
   }
 
   async start(): Promise<void> {
