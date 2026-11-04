@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
-import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { Application } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
@@ -30,7 +30,6 @@ import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
 import { Engine } from "../../engine.js";
 import "../../service/configurator.js";
-import database from "../config/database.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
@@ -83,8 +82,6 @@ export const app = Dummy.instance();
 app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root);
 const configurations = Base.configurations();
-DatabaseTasks.root = import.meta.dirname;
-await DatabaseTasks.purge(new HashConfig(envName, "primary", database[envName].primary));
 
 for (const railtie of [
   ActiveSupportRailtie,
@@ -98,6 +95,9 @@ for (const railtie of [
     await initializer.bind(railtie.instance()).run(app);
   }
 }
+
+DatabaseTasks.root = TopLevel.Trails!.root();
+await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "primary" })!);
 
 await import("../../config/routes.js");
 
