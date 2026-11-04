@@ -1,18 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { closeMockSmtp, deliveries, mockSmtp } from "../../test-helpers/mock-smtp.js";
+import { buildMail, closeMockSmtp, deliveries, mockSmtp } from "../../test-helpers/mock-smtp.js";
 import { SMTP as NetSMTP } from "@blazetrails/net-smtp";
-import { Message } from "../../message.js";
 import { SMTPConnection } from "./smtp-connection.js";
 
 afterEach(closeMockSmtp);
-
-function buildMail(): Message {
-  const mail = new Message();
-  mail.setFrom("roger@moore.com");
-  mail.setTo("marcel@amont.com");
-  mail.setSubject("invalid RFC2822");
-  return mail;
-}
 
 describe("SMTP Delivery Method", () => {
   it("should send an email using open SMTP connection", async () => {

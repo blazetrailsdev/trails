@@ -1,17 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { closeMockSmtp, deliveries, mockSmtp } from "../../test-helpers/mock-smtp.js";
-import { Message } from "../../message.js";
+import { buildMail, closeMockSmtp, deliveries, mockSmtp } from "../../test-helpers/mock-smtp.js";
 import { SMTP } from "./smtp.js";
 
 afterEach(closeMockSmtp);
-
-function buildMail(): Message {
-  const mail = new Message();
-  mail.setFrom("roger@moore.com");
-  mail.setTo("marcel@amont.com");
-  mail.setSubject("invalid RFC2822");
-  return mail;
-}
 
 describe("SMTP Delivery Method", () => {
   describe("general usage", () => {

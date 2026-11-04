@@ -95,8 +95,10 @@ export class SMTP {
       }
     }
 
-    if (this.settings.openTimeout) smtp.openTimeout = this.settings.openTimeout as number;
-    if (this.settings.readTimeout) smtp.readTimeout = this.settings.readTimeout as number;
+    if (this.settings.openTimeout != null && this.settings.openTimeout !== false)
+      smtp.openTimeout = this.settings.openTimeout as number;
+    if (this.settings.readTimeout != null && this.settings.readTimeout !== false)
+      smtp.readTimeout = this.settings.readTimeout as number;
     return smtp;
   }
 

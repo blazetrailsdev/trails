@@ -92,10 +92,8 @@ export interface ChildProcessAdapter {
    * Runs `command` with `args` as its argv and no shell, as `IO.popen` execs
    * an Array command (`rb_io_popen`, `vendor/ruby/v3.3.11/io.c:7968-7983`),
    * with stdin inherited, stdout on a pipe and stderr on the `err` descriptor
-   * (inherited when `null`, merged into stdout when `"out"`), and resolves
-   * with what it wrote to stdout. A `stdinData` is written to a stdin pipe,
-   * which is then closed, as a `"w"` mode's write end is
-   * (`vendor/ruby/v3.3.11/io.c:7458-7463`).
+   * (inherited when `null`, stdout when `"out"`), writes any `stdinData` to
+   * a stdin pipe, and resolves with what it wrote to stdout.
    */
   popen?(
     command: string,

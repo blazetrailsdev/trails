@@ -56,7 +56,7 @@ export class Sendmail {
   }
 
   /** @internal */
-  async popen(command: string[] | string, block: (io: IO) => unknown): Promise<unknown> {
+  private async popen(command: string[] | string, block: (io: IO) => unknown): Promise<unknown> {
     const result = await IO.popen(command, "w+", { err: "out" }, block as never);
     if (Process.lastStatus!.exitstatus() !== 0) {
       throw new DeliveryError(
@@ -67,7 +67,7 @@ export class Sendmail {
   }
 
   /** @internal */
-  async oldDeliver(envelope: SmtpEnvelope): Promise<unknown> {
+  private async oldDeliver(envelope: SmtpEnvelope): Promise<unknown> {
     const smtpFrom = envelope.from;
     const smtpTo = this.destinationsFor(envelope)!;
 
@@ -83,13 +83,13 @@ export class Sendmail {
   }
 
   /** @internal */
-  shellquote(address: string): string {
+  private shellquote(address: string): string {
     const escaped = address.replace(/([^A-Za-z0-9_\s+\-.,:/@~])/g, "\\$1").replaceAll("\n", "");
     return `"${escaped}"`;
   }
 
   /** @internal */
-  deprecationWarn(): (message: string) => unknown {
+  private deprecationWarn(): (message: string) => unknown {
     return warn;
   }
 }

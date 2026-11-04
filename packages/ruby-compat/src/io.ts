@@ -940,10 +940,9 @@ export class IO {
    * then the pipe is closed and `$?` set (`popen_finish`, `io.c:8020-8022`;
    * `pipe_finalize`, `io.c:7302`), readable as {@link Process.lastStatus}.
    * With no block the IO itself is answered (`popen_finish`, `io.c:8024`).
-   * A `"w"` mode yields a writable IO whose bytes become the child's stdin
-   * once the block returns, and `err: "out"` is Ruby's `:err => :out`. A
-   * String `pname` runs through `/bin/sh -c` when `rb_exec_fillarg`
-   * (`vendor/ruby/v3.3.11/process.c:2425`) finds a shell metacharacter.
+   * A `"w"` mode's block writes the child's stdin, `err: "out"` is `:err =>
+   * :out`, and a String `pname` with a shell metacharacter runs under
+   * `/bin/sh -c` (`rb_exec_fillarg`, `vendor/ruby/v3.3.11/process.c:2425`).
    * The child's stdout is read whole before the block runs, so the IO is a
    * binary `StringIO`, and `$?` is set once that read ends rather than at
    * `close`.

@@ -1,4 +1,4 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import type { Message } from "../../message.js";
 
@@ -12,7 +12,13 @@ export class FileDelivery {
   async deliverBang(mail: Message): Promise<void> {
     const envelope = new SmtpEnvelope(mail);
 
-    await FileUtils.mkdirPAsync(this.settings.location as string);
+    if (rbObjRespondTo(File, "makedirs")) {
+      await (File as unknown as { makedirs(path: unknown): unknown }).makedirs(
+        this.settings.location,
+      );
+    } else {
+      await FileUtils.mkdirPAsync(this.settings.location as string);
+    }
 
     for (const to of [...new Set(envelope.to)]) {
       const path = File.join(

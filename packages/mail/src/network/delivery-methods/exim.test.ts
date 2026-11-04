@@ -11,7 +11,15 @@ function buildMail(): Message {
 }
 
 function stubPopen(dm: Exim) {
-  return vi.spyOn(dm, "popen").mockResolvedValue(null);
+  return vi
+    .spyOn(dm as unknown as { popen(command: unknown): Promise<unknown> }, "popen")
+    .mockResolvedValue(null);
+}
+
+async function argvFor(dm: Exim, mail = buildMail()): Promise<unknown> {
+  const popen = stubPopen(dm);
+  await dm.deliverBang(mail);
+  return popen.mock.calls[0][0];
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -19,10 +27,6 @@ afterEach(() => vi.restoreAllMocks());
 describe("exim delivery agent", () => {
   it("should send an email using exim", async () => {
     const dm = new Exim({});
-    const popen = stubPopen(dm);
-    await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual(
-      "/usr/sbin/exim -i -t -f roger@test.lindsaar.net".split(" "),
-    );
+    expect(await argvFor(dm)).toEqual("/usr/sbin/exim -i -t -f roger@test.lindsaar.net".split(" "));
   });
 });

@@ -11,8 +11,18 @@ function buildMail(): Message {
   return mail;
 }
 
+const DESTS = "-- marcel@test.lindsaar.net bob@test.lindsaar.net";
+
 function stubPopen(dm: Sendmail) {
-  return vi.spyOn(dm, "popen").mockResolvedValue(null);
+  return vi
+    .spyOn(dm as unknown as { popen(command: unknown): Promise<unknown> }, "popen")
+    .mockResolvedValue(null);
+}
+
+async function argvFor(dm: Sendmail, mail = buildMail()): Promise<unknown> {
+  const popen = stubPopen(dm);
+  await dm.deliverBang(mail);
+  return popen.mock.calls[0][0];
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -20,23 +30,17 @@ afterEach(() => vi.restoreAllMocks());
 describe("Mail::Sendmail", () => {
   it("sends an email using sendmail", async () => {
     const dm = new Sendmail({});
-    const popen = stubPopen(dm);
-    await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual(
-      "/usr/sbin/sendmail -i -f roger@test.lindsaar.net -- marcel@test.lindsaar.net bob@test.lindsaar.net".split(
-        " ",
-      ),
+    expect(await argvFor(dm)).toEqual(
+      `/usr/sbin/sendmail -i -f roger@test.lindsaar.net ${DESTS}`.split(" "),
     );
   });
 
   describe("SMTP To", () => {
     it("explicitly passes envelope To addresses to sendmail", async () => {
       const dm = new Sendmail({});
-      const popen = stubPopen(dm);
       const mail = buildMail();
       mail.setSmtpEnvelopeTo("smtp_to@test.lindsaar.net");
-      await dm.deliverBang(mail);
-      expect(popen.mock.calls[0][0]).toEqual(
+      expect(await argvFor(dm, mail)).toEqual(
         "/usr/sbin/sendmail -i -f roger@test.lindsaar.net -- smtp_to@test.lindsaar.net".split(" "),
       );
     });
@@ -44,13 +48,9 @@ describe("Mail::Sendmail", () => {
 
   it("still sends an email if the arguments setting have been set to nil", async () => {
     const dm = new Sendmail({});
-    const popen = stubPopen(dm);
     dm.settings.arguments = null;
-    await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toEqual(
-      "/usr/sbin/sendmail -f roger@test.lindsaar.net -- marcel@test.lindsaar.net bob@test.lindsaar.net".split(
-        " ",
-      ),
+    expect(await argvFor(dm)).toEqual(
+      `/usr/sbin/sendmail -f roger@test.lindsaar.net ${DESTS}`.split(" "),
     );
   });
 
@@ -87,12 +87,13 @@ describe("Mail::Sendmail", () => {
 
   it("allows for legacy callers with :arguments strings", async () => {
     const warn = vi.fn();
-    vi.spyOn(Sendmail.prototype, "deprecationWarn").mockReturnValue(warn);
+    vi.spyOn(
+      Sendmail.prototype as unknown as { deprecationWarn(): unknown },
+      "deprecationWarn",
+    ).mockReturnValue(warn);
     const dm = new Sendmail({ arguments: "-i -t" });
     expect(warn.mock.calls[0][0]).toMatch(/:arguments of type String is deprecated/);
-    const popen = stubPopen(dm);
-    await dm.deliverBang(buildMail());
-    expect(popen.mock.calls[0][0]).toBe(
+    expect(await argvFor(dm)).toBe(
       '/usr/sbin/sendmail -i -t -f "roger@test.lindsaar.net" -- "marcel@test.lindsaar.net" "bob@test.lindsaar.net"',
     );
   });
