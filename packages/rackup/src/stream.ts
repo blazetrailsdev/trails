@@ -102,6 +102,7 @@ export const Reader = {
     }
   },
 
+  // eslint-disable-next-line unused-imports/no-unused-vars
   readNonblock(this: Stream, length: number, buffer: Chunk | null = null): Chunk | null {
     if (this._buffer == null) {
       const next = this.readNext();
@@ -121,13 +122,7 @@ export const Reader = {
       this._buffer = null;
     }
 
-    if (buffer != null) {
-      buffer = chunk;
-    } else {
-      buffer = chunk;
-    }
-
-    return buffer;
+    return chunk;
   },
 };
 
@@ -136,6 +131,8 @@ export interface Stream extends Included<typeof Reader> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Stream {
+  static Reader = Reader;
+
   /** @internal */
   _input: Input | null;
   /** @internal */
