@@ -115,26 +115,25 @@ describe("AppGenerator", () => {
     expect(exists("config/locales/en.json")).toBe(true);
 
     expect(exists("app/controllers/application-controller.ts")).toBe(true);
-    expect(exists("app/controllers/concerns/.gitkeep")).toBe(true);
+    expect(exists("app/controllers/concerns/.keep")).toBe(true);
     expect(exists("app/models/application-record.ts")).toBe(true);
-    expect(exists("app/models/concerns/.gitkeep")).toBe(true);
+    expect(exists("app/models/concerns/.keep")).toBe(true);
     expect(exists("app/helpers/application-helper.ts")).toBe(true);
     expect(exists("app/views/layouts/application.html.tse")).toBe(true);
     expect(exists("app/assets/stylesheets/application.css")).toBe(true);
-    expect(exists("app/assets/images/.gitkeep")).toBe(true);
+    expect(exists("app/assets/images/.keep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
 
-    expect(exists("db/migrate/.gitkeep")).toBe(true);
     expect(exists("db/seeds.ts")).toBe(true);
     expect(exists("db/schema.ts")).toBe(false);
 
     expect(exists("test/test-helper.ts")).toBe(true);
     expect(exists("test/global-setup.ts")).toBe(true);
-    expect(exists("test/models/.gitkeep")).toBe(true);
-    expect(exists("test/controllers/.gitkeep")).toBe(true);
-    expect(exists("test/helpers/.gitkeep")).toBe(true);
-    expect(exists("test/integration/.gitkeep")).toBe(true);
-    expect(exists("test/fixtures/files/.gitkeep")).toBe(true);
+    expect(exists("test/models/.keep")).toBe(true);
+    expect(exists("test/controllers/.keep")).toBe(true);
+    expect(exists("test/helpers/.keep")).toBe(true);
+    expect(exists("test/integration/.keep")).toBe(true);
+    expect(exists("test/fixtures/files/.keep")).toBe(true);
 
     expect(exists("public/index.html")).toBe(false);
     expect(exists("public/404.html")).toBe(true);
@@ -143,11 +142,11 @@ describe("AppGenerator", () => {
     expect(exists("public/robots.txt")).toBe(true);
     expect(exists("public/favicon.ico")).toBe(true);
 
-    expect(exists("lib/tasks/.gitkeep")).toBe(true);
-    expect(exists("log/.gitkeep")).toBe(true);
-    expect(exists("tmp/.gitkeep")).toBe(true);
-    expect(exists("tmp/pids/.gitkeep")).toBe(true);
-    expect(exists("vendor/.gitkeep")).toBe(true);
+    expect(exists("lib/tasks/.keep")).toBe(true);
+    expect(exists("log/.keep")).toBe(true);
+    expect(exists("tmp/.keep")).toBe(true);
+    expect(exists("tmp/pids/.keep")).toBe(true);
+    expect(exists("vendor/.keep")).toBe(true);
   });
 
   it("skips scaffolding for subsystems trails has no package for", async () => {
@@ -164,7 +163,7 @@ describe("AppGenerator", () => {
   it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
     await makeGen("sqlite").invokeAll();
 
-    expect(exists("storage/.gitkeep")).toBe(true);
+    expect(exists("storage/.keep")).toBe(true);
   });
 
   it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
@@ -199,7 +198,7 @@ describe("AppGenerator", () => {
     expect(exists("app/mailers/application-mailer.ts")).toBe(true);
     expect(exists("app/views/layouts/mailer.html.tse")).toBe(true);
     expect(exists("app/views/layouts/mailer.text.tse")).toBe(true);
-    expect(exists("storage/.gitkeep")).toBe(true);
+    expect(exists("storage/.keep")).toBe(true);
   });
 
   it("generator if skip action cable is given", async () => {

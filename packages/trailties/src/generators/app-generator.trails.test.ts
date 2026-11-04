@@ -35,7 +35,7 @@ describe("AppGenerator (trails-only)", () => {
       { destinationRoot: tmpDir },
     ).invokeAll();
     expect(await File.readAsync(File.join(tmpDir, "my-app/.gitignore"))).toContain(
-      "!/storage/.gitkeep\n\n/public/assets\n\n*.tsbuildinfo\n",
+      "!/tmp/storage/.keep\n\n/public/assets\n\n*.tsbuildinfo\n",
     );
   });
 
