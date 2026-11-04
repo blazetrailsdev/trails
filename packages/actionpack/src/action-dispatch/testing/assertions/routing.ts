@@ -8,18 +8,15 @@ import {
   rbFSend,
   rbObjClassname,
   rbObjClone,
-  rbObjMethod,
   rbObjRespondTo,
   rbObjSingletonClass,
   URI,
-  type Method,
 } from "@blazetrails/ruby-compat";
 import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesupport";
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import type { TestRequest } from "../../../action-controller/test-case.js";
-import { ActionController, ActionDispatch } from "../../../namespaces.js";
-import type { IntegrationTest, Session } from "../integration.js";
+import { ActionController } from "../../../namespaces.js";
 
 export interface RoutingAssertionsHost {
   routes?: RouteSet;
@@ -35,15 +32,12 @@ type Options = Record<string, unknown>;
 
 const URL_FORM_RE = /:\/\//;
 
-/** @internal Exported so `with-integration-routing.ts` can annotate `this`. */
+/** @internal */
 export interface TestClass<H> {
   setup(...args: ((this: H) => void)[]): void;
   teardown(...args: ((this: H) => void)[]): void;
 }
 
-// `WithIntegrationRouting` lives in its own module: its nested `ClassMethods`
-// must not share a module with the top-level `ClassMethods` below (perry
-// mis-lowers that collision). Re-exported here so consumer paths are unchanged.
 export { WithIntegrationRouting } from "./with-integration-routing.js";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace -- `RoutingAssertions::ClassMethods` (`routing.rb:79`), whose `with_routing` shares its name with the instance method.
