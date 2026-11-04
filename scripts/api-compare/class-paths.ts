@@ -47,6 +47,7 @@ const SKIPPED = new Set(["activerecord-test-support"]);
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {
   actionpack: "system-testing.ts",
+  activerecord: "fixtures.ts",
   activestorage: "transformers/image-processing-transformer.ts",
 };
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
@@ -54,7 +55,14 @@ const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "varia
 
 /** A directory whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
-  activerecord: ["connection-adapters/"],
+  activerecord: [
+    "connection-adapters/",
+    "destroy-association-async-job.ts",
+    "encryption/envelope-encryption-key-provider.ts",
+    "encryption/extended-deterministic-queries.ts",
+    "encryption/message-pack-message-serializer.ts",
+    "encryption/read-only-null-encryptor.ts",
+  ],
   trailties: ["commands/", "command.ts"],
 };
 
