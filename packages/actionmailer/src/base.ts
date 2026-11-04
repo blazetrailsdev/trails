@@ -10,6 +10,7 @@ import {
   presence,
   underscore,
   type EventPayload,
+  type Included,
 } from "@blazetrails/activesupport";
 import { Address, Mail, type Message } from "@blazetrails/mail";
 import { NoMethodError, rbModName } from "@blazetrails/ruby-compat";
@@ -20,6 +21,7 @@ import { Rescuable } from "./rescuable.js";
 type Observer = Parameters<typeof Mail.registerObserver>[0];
 type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static defaultParams: Readonly<Record<string, unknown>>;
 
@@ -133,7 +135,10 @@ export class Base extends AbstractController.Base {
     if (this.actionMethods().includes(methodName)) {
       return new ActionMailer.MessageDelivery!(this, methodName, ...args);
     } else {
-      throw new NoMethodError(`undefined method '${methodName}' for class ${rbModName(this)}`);
+      throw new NoMethodError(
+        `undefined method \`${methodName}' for class ${rbModName(this)}`,
+        methodName,
+      );
     }
   }
 
@@ -171,9 +176,7 @@ export class Base extends AbstractController.Base {
       args: args,
     };
     return Notifications.instrument("process.action_mailer", payload, async () => {
-      await (this as unknown as typeof Rescuable).handleExceptions.call(this as never, () =>
-        super.process(methodName, ...args),
-      );
+      await this.handleExceptions(() => super.process(methodName, ...args));
       if (!this._mailWasCalled) this._message = new NullMail();
     });
   }
@@ -191,6 +194,9 @@ export class Base extends AbstractController.Base {
     return false;
   }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
+export interface Base extends Included<typeof Rescuable> {}
 
 /** @internal */
 export class NullMail {
