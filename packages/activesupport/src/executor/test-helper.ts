@@ -1,5 +1,6 @@
 import { rbCallSuper, TopLevel } from "@blazetrails/ruby-compat";
 import type { Minitest } from "../testing/assertions.js";
+import { Executor } from "../executor.js";
 
 type Test = InstanceType<(typeof Minitest)["Test"]>;
 
@@ -10,3 +11,5 @@ async function run(this: Test, ...args: unknown[]): Promise<Test> {
 }
 
 export const TestHelper = { run };
+
+Executor.TestHelper = TestHelper;

@@ -164,6 +164,7 @@ class Processor extends BaseProcessor {
     24,
   );
 
+  /** @inventedArm delete — PERMANENT */
   static loadImage(
     pathOrImage: string | Image,
     { loader = null, autorot = true, ...options }: Options = {},
@@ -183,7 +184,9 @@ class Processor extends BaseProcessor {
     }
 
     if (autorot != null && autorot !== false && !Object.hasOwn(options, "autorotate")) {
+      const loaded = image;
       image = image.autorot();
+      if (loaded !== pathOrImage) loaded.delete();
     }
     return image;
   }
@@ -336,7 +339,10 @@ class Processor extends BaseProcessor {
     return image;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm delete — PERMANENT
+   */
   private thumbnail(
     width: number,
     height: number,
@@ -353,7 +359,9 @@ class Processor extends BaseProcessor {
     }
 
     if (sharpen != null && sharpen !== false) {
+      const thumbnail = image;
       image = image.conv(sharpen as Image, { precision: "integer" });
+      thumbnail.delete();
     }
     return image;
   }

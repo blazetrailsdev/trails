@@ -666,7 +666,7 @@
     }
   },
   "activesupport": {
-    "rows": 184,
+    "rows": 185,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -738,6 +738,7 @@
       "descendants-tracker.ts::ReloadedClassesFiltering",
       "error-reporter.ts::ErrorReporter.UnexpectedError",
       "execution-context.ts::ExecutionContext",
+      "executor/test-helper.ts::TestHelper",
       "gem-version.ts::VERSION",
       "gzip.ts::Gzip",
       "html-safe-translation.ts::HtmlSafeTranslation",
