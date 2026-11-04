@@ -1173,7 +1173,7 @@ export class Message {
     }
     if (present(filename)) {
       try {
-        filename = Encodings.decodeEncode(filename as string, ":decode");
+        filename = Encodings.decodeEncode(filename as string, "decode");
       } catch {
         return filename;
       }

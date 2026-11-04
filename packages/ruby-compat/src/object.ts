@@ -1927,6 +1927,10 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     typeof value === "function" &&
     Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
   ) {
+    if (value.toString !== Function.prototype.toString) {
+      const str: unknown = value.toString();
+      if (typeof str === "string") return str;
+    }
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "object") {

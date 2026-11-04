@@ -55,7 +55,7 @@ export class AttachmentsList extends Array<PartsListPart> {
   }
 
   async set(name: string, value: unknown): Promise<unknown> {
-    const encodedName = Encodings.decodeEncode(name, ":encode");
+    const encodedName = Encodings.decodeEncode(name, "encode");
     const defaultValues: Record<string, unknown> = {
       contentType: `${this.setMimeType(name)}; filename="${encodedName}"`,
       contentTransferEncoding: `${this.guessEncoding()}`,
@@ -68,7 +68,7 @@ export class AttachmentsList extends Array<PartsListPart> {
       const path = options.filename;
       delete options.filename;
       if (path != null && path !== false) {
-        options.content ??= await IO.binread(path as string);
+        options.content ??= await IO.binreadAsync(path as string);
       }
 
       if (options.content != null) {
@@ -111,7 +111,7 @@ export class AttachmentsList extends Array<PartsListPart> {
     }
 
     const attachment = new Mail.Part(hash);
-    attachment.addContentId(hash.contentId);
+    attachment.addContentId(hash.contentId ?? null);
 
     return this._partsList.push(attachment);
   }

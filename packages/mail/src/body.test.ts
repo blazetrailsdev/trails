@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Body } from "./body.js";
 import "./index.js";
+import { Part } from "./part.js";
 
 describe("Mail::Body", () => {
   describe("initialization", () => {
@@ -75,8 +76,82 @@ describe("Mail::Body", () => {
   });
 
   describe("splitting up a multipart document", () => {
+    function assertSplitInto(body: unknown, pre: string, epi: string, parts: number) {
+      const b = new Body(body);
+      b.splitBang("----=_Part_2192_32400445");
+      expect(b.parts.length).toEqual(parts);
+      expect(b.preamble).toEqual(pre);
+      expect(b.epilogue).toEqual(epi);
+    }
+
     const multipartBody =
       "this is some text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain; charset=ISO-8859-1\r\n\r\nThis is a plain text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/html\r\n\r\n<p>This is HTML</p>\r\n------=_Part_2192_32400445--\r\n";
+
+    it("should store the boundary passed in", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.boundary).toEqual("----=_Part_2192_32400445");
+    });
+
+    it("should split at the boundry string given returning two message bodies", () => {
+      const body = new Body(multipartBody);
+      expect(body.splitBang("----=_Part_2192_32400445").parts.length).toEqual(2);
+    });
+
+    it("should split with missing closing boundary", () => {
+      const multipartBody =
+        "this is some text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain\r\n\r\nWhere is the closing boundary...\r\n";
+      assertSplitInto(multipartBody, "this is some text", "", 1);
+    });
+
+    it("should not split with empty space after missing closing boundary", () => {
+      const multipartBody =
+        "this is some text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain\r\n\r\nWhere is the closing boundary...\r\n------=_Part_2192_32400445\r\n\r\n\r\n\r\n";
+      assertSplitInto(multipartBody, "this is some text", "", 1);
+    });
+
+    it("should split with multiple parts and missing closing boundary", () => {
+      const multipartBody =
+        "this is some text\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain\r\n\r\nExtra part 1\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain\r\n\r\nWhere is the closing boundary...\r\n";
+      assertSplitInto(multipartBody, "this is some text", "", 2);
+    });
+
+    it("should ignore blank parts", () => {
+      const multipartBody =
+        "this is some text\r\n\r\n------=_Part_2192_32400445\r\n\r\n\r\n------=_Part_2192_32400445\r\nContent-Type: text/plain\r\n\r\nWhere is the closing boundary...\r\n";
+      assertSplitInto(multipartBody, "this is some text", "", 1);
+    });
+
+    it("should keep the preamble text as its own preamble", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.preamble).toEqual("this is some text");
+    });
+
+    it("should return the parts as their own messages", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.parts[0].constructor).toEqual(Part);
+      expect(body.parts[1].constructor).toEqual(Part);
+    });
+
+    it("should return the first part as its own message", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.parts[0].contentType()).toEqual("text/plain; charset=ISO-8859-1");
+    });
+
+    it("should return the first part as its own message", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.parts[1].contentType()).toEqual("text/html");
+    });
+
+    it("should separate out its parts", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      expect(body.isMultipart()).toBeTruthy();
+    });
 
     it("should keep track of its parts", () => {
       const body = new Body(multipartBody);
@@ -84,10 +159,35 @@ describe("Mail::Body", () => {
       expect(body.parts.length).toEqual(2);
     });
 
-    it("should keep the preamble text as its own preamble", () => {
+    it("should round trip its parts", () => {
       const body = new Body(multipartBody);
       body.splitBang("----=_Part_2192_32400445");
-      expect(body.preamble).toEqual("this is some text");
+      body.preamble = "Really! this is some text";
+      body.epilogue = "And this is the end";
+      const newBody = new Body(body.encoded());
+      newBody.splitBang("----=_Part_2192_32400445");
+      expect(newBody.parts.length).toEqual(2);
+      expect(newBody.parts[0].decoded()).toEqual("This is a plain text\n");
+      expect(newBody.parts[1].decoded()).toEqual("<p>This is HTML</p>");
+      expect(newBody.preamble).toEqual("Really! this is some text");
+      expect(newBody.epilogue).toEqual("And this is the end");
+    });
+
+    it("should allow you to change the boundary", () => {
+      const body = new Body(multipartBody);
+      body.splitBang("----=_Part_2192_32400445");
+      body.boundary = "------=_MIMEPART";
+      const newBody = new Body(body.encoded());
+      newBody.splitBang("------=_MIMEPART");
+      expect(newBody.parts.length).toEqual(2);
+      expect(newBody.preamble).toEqual("this is some text");
+    });
+
+    it("should split if boundary is not set", () => {
+      const multipartBody =
+        '\n\n--\nDate: Thu, 01 Aug 2013 15:14:20 +0100\nMime-Version: 1.0\nContent-Type: text/plain\nContent-Transfer-Encoding: 7bit\nContent-Disposition: attachment;\n filename=""\nContent-ID: <51fa6d3cac796_d84e3fe5a58349e025683@local.mail>\n\n\n\n----';
+      const body = new Body(multipartBody);
+      expect(() => body.splitBang(null)).not.toThrow();
     });
   });
 
@@ -106,19 +206,51 @@ describe("Mail::Body", () => {
   describe("matching", () => {
     it("should still equal itself", () => {
       const body = new Body("The body");
-      expect(body).toEqual(body);
+      expect(body.equals(body)).toBeTruthy();
     });
+
     it("should match on the body part decoded if given a string to ==", () => {
-      expect(new Body("The body").equals("The body")).toBeTruthy();
+      const body = new Body("The body");
+      expect(body.equals("The body")).toBeTruthy();
     });
+
+    it("should match on the body part decoded if given a string to ==", () => {
+      const body = new Body("VGhlIGJvZHk=\n");
+      body.setEncoding("base64");
+      expect(body.equals("The body")).toBeTruthy();
+    });
+
     it("should match on the body part decoded if given a string to =~", () => {
-      expect(new Body("The body").matchOperator(/The/)).toEqual(0);
+      const body = new Body("The body");
+      expect(body.matchOperator(/The/)).toEqual(0);
     });
+
+    it("should match on the body part decoded if given a string to ==", () => {
+      const body = new Body("VGhlIGJvZHk=\n");
+      body.setEncoding("base64");
+      expect(body.matchOperator(/The/)).toEqual(0);
+    });
+
     it("should match on the body part decoded if given a string to match", () => {
-      expect(new Body("The body").match(/The/)![0]).toEqual("The");
+      const body = new Body("The body");
+      expect(body.match(/The/)![0]).toEqual("The");
     });
+
+    it("should match on the body part decoded if given a string to match", () => {
+      const body = new Body("VGhlIGJvZHk=\n");
+      body.setEncoding("base64");
+      expect(body.match(/The/)![0]).toEqual("The");
+    });
+
     it("should match on the body part decoded if given a string to include?", () => {
-      expect(new Body("The Body").decoded()).toContain("The");
+      const body = new Body("The Body");
+      expect(body.isInclude("The")).toBeTruthy();
+    });
+
+    it("should match on the body part decoded if given a string to include?", () => {
+      const body = new Body("VGhlIGJvZHk=\n");
+      body.setEncoding("base64");
+      expect(body.isInclude("The")).toBeTruthy();
     });
   });
 
