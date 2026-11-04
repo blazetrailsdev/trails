@@ -18,28 +18,36 @@
  * `aliasOf` helper (scored through its target) are held out.
  *
  * Columns: `credited` (a Ruby private/protected method of the mirrored `.rb`
- * matches), `moved` (a Ruby method in another `.rb` matches), `novel`.
+ * matches), `visibility` (only a Ruby public method of it matches), `moved` (a
+ * Ruby method in another `.rb` matches), `novel`, and `allowed` (a classified
+ * `@noRailsEquivalent` receipt covers a non-credited name; one on a credited
+ * name is STALE). `perf` counts the `novel` + `moved` rows carrying `@perf`.
  */
 import * as fsp from "fs/promises";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
 import { rubyFileToTs } from "@blazetrails/parity/conventions";
-import { OUTPUT_DIR } from "./config.js";
+import { OUTPUT_DIR, TS_ONLY_PACKAGES } from "./config.js";
 import {
+  allowKeyOf,
   buildCrossPackageModules,
+  classifyReason,
+  collectTaggedEntries,
   buildGlobalRubyCandidates,
   collectAllowedNames,
   indexRubyFiles,
   uncoveredTsFiles,
   type RubyOwner,
+  type TaggedEntry,
 } from "./extra-surface.js";
 
 export type PopulationKind = "modifier" | "internal" | "fileLocal" | "underscore";
-export type PrivateKind = "credited" | "moved" | "novel";
+export type PrivateKind = "credited" | "visibility" | "moved" | "novel" | "allowed";
 
 export interface PopulationName {
   name: string;
   population: PopulationKind;
+  perf?: true;
 }
 
 export interface PrivateName extends PopulationName {
@@ -47,19 +55,26 @@ export interface PrivateName extends PopulationName {
   tsFile: string;
   rubyFile: string | null;
   kind: PrivateKind;
+  receipted?: true;
 }
 
 export interface PrivatesTotals {
   package: string;
   population: number;
   credited: number;
+  visibility: number;
   moved: number;
   novel: number;
+  allowed: number;
+  /** `novel` + `moved` rows carrying `@perf`; a sub-count, never subtracted. */
+  perf: number;
 }
 
 export interface PrivatesReport {
   packages: PrivatesTotals[];
   names: PrivateName[];
+  /** Receipts on a name this lane credits: nothing for them to cover. */
+  stale: TaggedEntry[];
 }
 
 const HELP = `Usage: pnpm parity:api:privates [--package <name>] [--json]
@@ -67,12 +82,14 @@ const HELP = `Usage: pnpm parity:api:privates [--package <name>] [--json]
 Scores every internal TS declaration (private / protected / #, @internal,
 file-local helpers, _-prefixed names) against the Ruby private/protected
 methods of the mirrored .rb file:
-  credited  a Ruby private/protected method of the mirrored .rb matches
-  moved     a Ruby method elsewhere in the gem matches
-  novel     nothing matches
-Until privates-surface-visibility-column lands, a name whose only match in the
-mirrored .rb is a Ruby PUBLIC method counts as novel. A _ name is matched with
-its leading _ stripped once. Report-only: it never fails.`;
+  credited    a Ruby private/protected method of the mirrored .rb matches
+  visibility  only a Ruby PUBLIC method of the mirrored .rb matches
+  moved       a Ruby method elsewhere in the gem matches
+  novel       nothing matches
+  allowed     a @noRailsEquivalent PERMANENT|CONVERGEABLE receipt covers it
+  perf        the novel + moved rows carrying @perf (a sub-count)
+A _ name is matched with its leading _ stripped once. Exits non-zero only for a
+missing manifest or a STALE receipt (one on a credited name).`;
 
 function memberPopulation(m: MethodInfo): PopulationKind | null {
   if (m.name.startsWith("_")) return "underscore";
@@ -90,27 +107,28 @@ export function collectPrivatesPopulation(
   internalConstants: string[] = [],
   fileConstants: string[] = [],
 ): PopulationName[] {
-  const out = new Map<string, PopulationKind>();
-  const add = (name: string, population: PopulationKind | null): void => {
-    if (population !== null && name !== "constructor" && !out.has(name)) out.set(name, population);
+  const out = new Map<string, PopulationName>();
+  const add = (name: string, population: PopulationKind | null, perf?: boolean): void => {
+    if (population === null || name === "constructor" || out.has(name)) return;
+    out.set(name, { name, population, ...(perf === true ? { perf: true as const } : {}) });
   };
   for (const c of [...classes, ...modules]) {
     if (c.file !== file || c.synthesizedMixin === true) continue;
     if (c.isInterface === true && c.declaredAsNamespace !== true) continue;
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
       if (m.declaredIn !== undefined) continue;
-      add(m.name, memberPopulation(m));
+      add(m.name, memberPopulation(m), m.perf);
     }
   }
   for (const fn of fileFunctions ?? []) {
     if (fn.reExportedFrom !== undefined || fn.aliasOf !== undefined) continue;
-    if (fn.name.startsWith("_")) add(fn.name, "underscore");
-    else if (fn.visibility === "private") add(fn.name, "fileLocal");
-    else if (fn.internal === true) add(fn.name, "internal");
+    if (fn.name.startsWith("_")) add(fn.name, "underscore", fn.perf);
+    else if (fn.visibility === "private") add(fn.name, "fileLocal", fn.perf);
+    else if (fn.internal === true) add(fn.name, "internal", fn.perf);
   }
   for (const name of internalConstants) add(name, name.startsWith("_") ? "underscore" : "internal");
   for (const name of fileConstants) if (name.startsWith("_")) add(name, "underscore");
-  return [...out].map(([name, population]) => ({ name, population }));
+  return [...out.values()];
 }
 
 function matchNames(name: string): string[] {
@@ -124,9 +142,16 @@ export function buildPrivatesReport(
 ): PrivatesReport {
   const global = buildGlobalRubyCandidates(ruby, Infinity);
   const cross = buildCrossPackageModules(ruby);
+  const receipts = new Map<string, TaggedEntry>();
+  for (const e of collectTaggedEntries(ts)) {
+    if (e.inherited !== true && e.fileLevel !== true && classifyReason(e.reason) !== "unclassified")
+      receipts.set(allowKeyOf(e), e);
+  }
   const packages: PrivatesTotals[] = [];
   const names: PrivateName[] = [];
-  for (const [pkg, rubyPkgSource] of Object.entries(ruby.packages)) {
+  const stale: TaggedEntry[] = [];
+  for (const pkg of [...Object.keys(ruby.packages), ...TS_ONLY_PACKAGES]) {
+    const rubyPkgSource = ruby.packages[pkg] ?? { classes: {}, modules: {} };
     if (opts.filterPkg !== null && pkg !== opts.filterPkg) continue;
     const tsPkg = ts.packages[pkg];
     if (!tsPkg) continue;
@@ -148,7 +173,16 @@ export function buildPrivatesReport(
     const tsFileFunctions = tsPkg.fileFunctions ?? {};
     const tsFileConstants = tsPkg.fileConstants ?? {};
     const tsInternalConstants = tsPkg.fileInternalConstants ?? {};
-    const totals: PrivatesTotals = { package: pkg, population: 0, credited: 0, moved: 0, novel: 0 };
+    const totals: PrivatesTotals = {
+      package: pkg,
+      population: 0,
+      credited: 0,
+      visibility: 0,
+      moved: 0,
+      novel: 0,
+      allowed: 0,
+      perf: 0,
+    };
     const targets: { tsFile: string; rubyFile: string | null }[] = [
       ...[...rubyFileNames].sort().map((rubyFile) => ({
         tsFile: rubyFileToTs(rubyFile, pkg),
@@ -172,7 +206,7 @@ export function buildPrivatesReport(
         Object.keys(tsFileConstants[tsFile] ?? {}),
       );
       if (population.length === 0) continue;
-      const allowed =
+      const mirrored = (visibility: "private" | "public"): Set<string> =>
         rubyFile === null
           ? new Set<string>()
           : collectAllowedNames(
@@ -188,36 +222,55 @@ export function buildPrivatesReport(
               rubyFile,
               [],
               undefined,
-              "private",
+              visibility,
             );
+      const allowed = mirrored("private");
+      const publicOnly = mirrored("public");
       const elsewhere = (owner: RubyOwner): boolean =>
         owner.package !== pkg || owner.file !== rubyFile;
       for (const p of population) {
         const candidates = matchNames(p.name);
-        const kind: PrivateKind = candidates.some((c) => allowed.has(c))
+        const scored: PrivateKind = candidates.some((c) => allowed.has(c))
           ? "credited"
-          : candidates.some((c) => (global.get(c) ?? []).some(elsewhere))
-            ? "moved"
-            : "novel";
+          : candidates.some((c) => publicOnly.has(c))
+            ? "visibility"
+            : candidates.some((c) => (global.get(c) ?? []).some(elsewhere))
+              ? "moved"
+              : "novel";
+        const receipt = receipts.get(allowKeyOf({ package: pkg, tsFile, name: p.name }));
+        if (receipt !== undefined && scored === "credited") stale.push(receipt);
+        const kind: PrivateKind =
+          receipt !== undefined && scored !== "credited" ? "allowed" : scored;
         totals.population += 1;
         totals[kind] += 1;
-        names.push({ ...p, package: pkg, tsFile, rubyFile, kind });
+        if (p.perf === true && (kind === "novel" || kind === "moved")) totals.perf += 1;
+        names.push({
+          ...p,
+          package: pkg,
+          tsFile,
+          rubyFile,
+          kind,
+          ...(receipt !== undefined ? { receipted: true as const } : {}),
+        });
       }
     }
     packages.push(totals);
   }
-  return { packages, names };
+  return { packages, names, stale };
 }
 
 export function formatPrivatesReport(report: PrivatesReport): string {
-  const header = ["package", "population", "credited", "moved", "novel"];
-  const rows = report.packages.map((t) => [
-    t.package,
-    String(t.population),
-    String(t.credited),
-    String(t.moved),
-    String(t.novel),
-  ]);
+  const columns = [
+    "population",
+    "credited",
+    "visibility",
+    "moved",
+    "novel",
+    "allowed",
+    "perf",
+  ] as const;
+  const header = ["package", ...columns];
+  const rows = report.packages.map((t) => [t.package, ...columns.map((c) => String(t[c]))]);
   const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
   const line = (r: string[]): string =>
     r.map((cell, i) => (i === 0 ? cell.padEnd(widths[i]) : cell.padStart(widths[i]))).join("  ");
@@ -240,22 +293,45 @@ export function parsePrivatesArgs(argv: string[]): {
   return { filterPkg, json, help };
 }
 
-export async function main(argv: string[]): Promise<string> {
+/**
+ * The STALE gate of this lane: a receipt on a name a Ruby private/protected
+ * method of the mirrored `.rb` credits. Same message shape as `gateStale`.
+ */
+export function gatePrivatesStale(report: PrivatesReport): string | null {
+  if (report.stale.length === 0) return null;
+  return (
+    `\nprivates-surface: ${report.stale.length} STALE @noRailsEquivalent tag(s) on ` +
+    "internal declarations a Rails private/protected method of the mirrored file " +
+    "credits — the receipt covers nothing. Delete the tag next to the code:\n" +
+    report.stale.map((e) => `  - ${e.package}  ${e.tsFile}  ${e.name}`).join("\n") +
+    "\n"
+  );
+}
+
+export async function main(argv: string[]): Promise<{ out: string; failure: string | null }> {
   const args = parsePrivatesArgs(argv);
-  if (args.help) return HELP;
+  if (args.help) return { out: HELP, failure: null };
   const read = async (file: string): Promise<ApiManifest> =>
     JSON.parse(await fsp.readFile(path.join(OUTPUT_DIR, file), "utf-8"));
   const report = buildPrivatesReport(await read("rails-api.json"), await read("ts-api.json"), {
     filterPkg: args.filterPkg,
   });
-  return args.json ? JSON.stringify(report, null, 2) : formatPrivatesReport(report);
+  return {
+    out: args.json ? JSON.stringify(report, null, 2) : formatPrivatesReport(report),
+    failure: gatePrivatesStale(report),
+  };
 }
 
 const host = (globalThis as { process?: { argv?: string[]; exitCode?: number } }).process;
 const argv = host?.argv;
 if (argv !== undefined && path.basename(argv[1] ?? "") === "privates-surface.ts") {
   void main(argv.slice(2)).then(
-    (out) => console.log(out),
+    ({ out, failure }) => {
+      console.log(out);
+      if (failure === null) return;
+      console.error(failure);
+      if (host !== undefined) host.exitCode = 1;
+    },
     (error: unknown) => {
       const missing = (error as { code?: unknown } | null)?.code === "ENOENT";
       console.error(

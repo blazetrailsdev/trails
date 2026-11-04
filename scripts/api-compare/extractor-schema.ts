@@ -84,6 +84,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "optionReads",
   "declaredIn",
   "noRailsEquivalent",
+  "perf",
   "noRailsEquivalentInherited",
   "missingRailsCalls",
   "missingRailsArgs",

@@ -724,6 +724,7 @@ function staleMovedDeclarations(extras: readonly ExtraName[], reason: string): s
 }
 
 import { classifyReason, type Permanence } from "./missing-rails-call-tags.js";
+import { buildPrivatesReport } from "./privates-surface.js";
 
 export { classifyReason, type Permanence };
 
@@ -1673,20 +1674,22 @@ export function collectAllowedNames(
    * `"private"` is the privates lane (`privates-surface.ts`, RFC 0218): only a
    * Ruby private/protected method allows a name, so constants, hash keys,
    * entity names and the name-only tables (which are public surface) are not
-   * gathered, and a delegated owner's private methods are kept.
+   * gathered, and a delegated owner's private methods are kept. `"public"` is
+   * the same walk keeping only Ruby public methods, which the privates lane
+   * reads for its `visibility` column.
    */
-  visibility: "any" | "private" = "any",
+  visibility: "any" | "private" | "public" = "any",
 ): Set<string> {
   const allowed = new Set<string>();
-  const privatesOnly = visibility === "private";
+  const methodsOnly = visibility !== "any";
   // File-level constants are declared per Ruby *file*, not per entity, so they
   // enter the allow-set once for the whole file rather than through the
   // entity/mixin walk below.
-  for (const name of privatesOnly ? [] : fileConstantNames) {
+  for (const name of methodsOnly ? [] : fileConstantNames) {
     for (const c of rubyConstantCandidates(name)) allowed.add(c);
   }
   // Hash keys are file-scoped for the same reason — see `fileHashKeys`.
-  for (const key of privatesOnly ? [] : fileHashKeyNames) {
+  for (const key of methodsOnly ? [] : fileHashKeyNames) {
     for (const c of rubyHashKeyCandidates(key)) allowed.add(c);
   }
   const visitedByTarget = new Map<Set<string>, Set<string>>();
@@ -1705,7 +1708,8 @@ export function collectAllowedNames(
     };
     for (const m of methods) {
       if (methodFile !== undefined && m.file !== methodFile) continue;
-      if (privatesOnly && m.visibility === "public") continue;
+      if (visibility === "private" && m.visibility === "public") continue;
+      if (visibility === "public" && m.visibility !== "public") continue;
       // A Ruby OPERATOR (`*`, `<<`, `~@`) carries no canonical camelCase
       // spelling, so `rubyMethodCandidates` refuses it and the TS port of
       // `Arel::Math#*` reads as novel surface. The port is real and its
@@ -1728,7 +1732,7 @@ export function collectAllowedNames(
   };
 
   const addRubyName = (rubyName: string, target: Set<string> = allowed): void => {
-    if (privatesOnly) return;
+    if (methodsOnly) return;
     const candidates = rubyMethodCandidates(rubyName);
     if (!candidates) return;
     for (const c of candidates) target.add(c);
@@ -1763,7 +1767,7 @@ export function collectAllowedNames(
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
     for (const name of CORE_MIXIN_METHODS[fqn] ?? []) {
-      if (privatesOnly) continue;
+      if (methodsOnly) continue;
       for (const c of CORE_MIXIN_OPERATOR_SPELLINGS[name] ?? []) target.add(c);
       addRubyName(name, target);
     }
@@ -1829,7 +1833,7 @@ export function collectAllowedNames(
     if (seen.has(ownerFqn)) return;
     seen.add(ownerFqn);
     addMethods(
-      privatesOnly
+      visibility === "private"
         ? owner.instanceMethods
         : owner.instanceMethods.filter((m) => m.visibility !== "private"),
       ownerFqn,
@@ -1865,7 +1869,7 @@ export function collectAllowedNames(
     // either as a real TS nested class or as `static readonly Inner = Inner`
     // re-attaching a sibling export.
     const short = fqn.split("::").pop();
-    if (short && !privatesOnly) {
+    if (short && !methodsOnly) {
       for (const c of rubyConstantCandidates(short)) allowed.add(c);
       // The renamed spelling `parity:api` already resolves this Ruby class to
       // (`TS_CLASS_RENAMES`). Without it the two tools disagree: `naming.rb`
@@ -3132,6 +3136,8 @@ export function buildReport(
     excludeGlobs: string[];
     novelOnly: boolean;
     topN: number;
+    /** Receipt keys the privates lane reads (RFC 0218); computed when absent. */
+    privatesRead?: ReadonlySet<string>;
     /**
      * Per-(package, Ruby file) Concern hooks from `loadConcernHooks`. Optional
      * so a caller measuring a synthetic manifest need not stage `.rb` files on
@@ -3189,10 +3195,18 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
+  const privatesRead =
+    opts.privatesRead ??
+    new Set(
+      buildPrivatesReport(ruby, ts, { filterPkg: opts.filterPkg })
+        .names.filter((n) => n.receipted === true)
+        .map(allowKeyOf),
+    );
   const staleTagged = tagged.filter(
     (e) =>
       !e.inherited &&
       scannedPkgs.has(e.package) &&
+      !privatesRead.has(allowKeyOf(e)) &&
       !matchedTagKeys.has(allowKeyOf(e)) &&
       !redundantTagKeys.has(allowKeyOf(e)),
   );

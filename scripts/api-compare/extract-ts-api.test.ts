@@ -30,6 +30,7 @@ import {
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames, countTsInternalNames } from "./extra-surface.js";
+import { collectPrivatesPopulation } from "./privates-surface.js";
 import { partitionNegatedCalls, significantCallsForReceivers } from "./compare.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
@@ -6401,12 +6402,13 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
 
 /**
  * The pinned inventory. Every entry has a tagged declaration behind it and so
- * expects `hasReason: true`, except three:
+ * expects `hasReason: true`, except these:
  *
  * - `<fileFunctions>#Attributes` — the mixin factory, left untagged so an
  *   untagged counted site is represented too.
- * - `<fileFunctions>#aliasTarget` / `#shorthandRef` — `extractFileLocalHelpers`
- *   output, always `internal: true`, so uncounted and never metadata-bearing.
+ * - `<fileFunctions>#aliasTarget` — `extractFileLocalHelpers` output, always
+ *   `internal: true`, so uncounted; it carries no tag. `#shorthandRef` is the
+ *   same shape tagged, and its receipt reaches the privates lane (RFC 0218).
  * - `<fileFunctions>#renamedExport` — an untagged `export { x as y }` alias
  *   drops the declaration's reason: the reason justifies the declared
  *   spelling, not the alias. `#taggedAlias` is the tagged form.
@@ -6416,7 +6418,7 @@ const EMIT_SITE_INVENTORY: EmitEntry[] = [
   { container: "<fileFunctions>", name: "aliasTarget", counted: false, hasReason: false },
   { container: "<fileFunctions>", name: "renameSource", counted: true, hasReason: true },
   { container: "<fileFunctions>", name: "renamedExport", counted: true, hasReason: false },
-  { container: "<fileFunctions>", name: "shorthandRef", counted: false, hasReason: false },
+  { container: "<fileFunctions>", name: "shorthandRef", counted: false, hasReason: true },
   { container: "<fileFunctions>", name: "taggedAlias", counted: true, hasReason: true },
   { container: "<fileFunctions>", name: "topLevel", counted: true, hasReason: true },
   {
@@ -8721,5 +8723,56 @@ describe("extractClass — a delete expression", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "drop")!.calls).toContain("delete");
+  });
+});
+
+describe("@perf and the privates lane (RFC 0218)", () => {
+  const info = (): PackageInfo =>
+    extractFromFiles("/p", {
+      "foo.ts": `
+        /** @perf 2x — PERMANENT */
+        function _fastPath(): void {}
+        /** @noRailsEquivalent PERMANENT */
+        function helper(): void {}
+        const helperAlias = helper;
+        /** @internal @noRailsEquivalent PERMANENT */
+        export function receipted(): void {}
+        /** @internal */
+        export function tagged(): void {}
+        export class Foo {
+          /** @perf 30% — PERMANENT */
+          private hidden(): void {}
+          _cache(): void {}
+        }
+      `,
+    });
+
+  it("records @perf on members and file-local helpers, and a helper's receipt", () => {
+    const pkg = info();
+    const fns = Object.fromEntries(fileFunctionsOf(pkg, "foo.ts").map((f) => [f.name, f]));
+    expect(fns._fastPath.perf).toBe(true);
+    expect(fns.helper.perf).toBeUndefined();
+    expect(fns.helper.noRailsEquivalent).toBe("PERMANENT");
+    expect(classOf(pkg, "Foo").instanceMethods.find((m) => m.name === "hidden")?.perf).toBe(true);
+  });
+
+  it("pins Intrnl = population - (_-prefixed rows) + (aliasOf rows)", () => {
+    const pkg = info();
+    const classes = Object.values(pkg.classes);
+    const modules = Object.values(pkg.modules);
+    const fns = pkg.fileFunctions?.["foo.ts"];
+    const intrnl = countTsInternalNames("foo.ts", classes, modules, fns, []);
+    const population = collectPrivatesPopulation("foo.ts", classes, modules, fns);
+    const underscored = population.filter((p) => p.name.startsWith("_")).length;
+    const aliasRows = (fns ?? []).filter((f) => f.aliasOf !== undefined).length;
+    expect(population.map((p) => p.name).sort()).toEqual([
+      "_cache",
+      "_fastPath",
+      "helper",
+      "hidden",
+      "tagged",
+    ]);
+    expect([underscored, aliasRows]).toEqual([2, 1]);
+    expect(intrnl).toBe(population.length - underscored + aliasRows);
   });
 });

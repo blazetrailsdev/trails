@@ -984,6 +984,7 @@ export function extractFromProgram(
           file: relPath,
           ...(internal ? { internal: true } : {}),
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+          ...perfTagOf(node),
           ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnOptionKeys != null && fnOptionReads !== undefined
@@ -4582,6 +4583,11 @@ function localCallableDeclaration(
   return decl;
 }
 
+/** `perf: true` when the declaration carries a `@perf` tag (`CLAUDE.md § "Speed"`). */
+function perfTagOf(node: ts.Node): Partial<MethodInfo> {
+  return ts.getJSDocTags(node).some((t) => t.tagName.text === "perf") ? { perf: true } : {};
+}
+
 /**
  * The `@missingRailsCall` / `@missingRailsArgs` receipts on a file-local
  * helper. A helper Rails extracts as a private method is a call-gate
@@ -4605,6 +4611,11 @@ function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   };
 }
 
+function fileLocalReceiptOf(node: ts.Node): Partial<MethodInfo> {
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+  return noRailsEquivalent !== undefined ? { noRailsEquivalent } : {};
+}
+
 export function extractFileLocalHelpers(
   node: ts.FunctionDeclaration | ts.VariableStatement,
   relPath: string,
@@ -4625,6 +4636,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4670,6 +4683,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4866,6 +4881,7 @@ export function extractClass(
     const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...perfTagOf(member),
       ...(memberMissingRailsCalls !== undefined
         ? { missingRailsCalls: memberMissingRailsCalls }
         : {}),

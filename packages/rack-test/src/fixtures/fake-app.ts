@@ -163,7 +163,6 @@ export class FakeApp {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 function required(value: unknown): unknown {
   if (value == null || value === false) throw new Error("unhandled exception");
   return value;
