@@ -1319,6 +1319,16 @@ describe("setCallback with a block (trails)", () => {
   });
 });
 
+describe("Callbacks as a plain-object module (trails)", () => {
+  it("include copies run_callbacks and halted_callback_hook onto the includer", () => {
+    class Host {}
+    include(Host, Callbacks);
+    expect(Object.hasOwn(Host.prototype, "runCallbacks")).toBe(true);
+    expect(Object.hasOwn(Host.prototype, "haltedCallbackHook")).toBe(true);
+    expect(Object.hasOwn(Host.prototype, "ClassMethods")).toBe(false);
+  });
+});
+
 describe("module singleton-class callbacks (trails)", () => {
   it("runs an :execute chain defined on a plain-object module's singleton class", async () => {
     const mod: any = defineModule({});

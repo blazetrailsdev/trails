@@ -178,6 +178,7 @@ function ndigitsDenominator(ndigits: number): number | Rational {
 
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
+/** @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number */
 function obj2vint(obj: number | string): number {
   if (typeof obj !== "string") return Math.trunc(obj);
   return Number(kernelInteger(obj, 10));

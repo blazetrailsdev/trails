@@ -160,6 +160,7 @@ export class ScalarScanner {
 
   /**
    * @missingRailsArgs Rational — CONVERGEABLE kernel-rational-string-arm
+   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
    * @noRailsEquivalent PERMANENT
    */
   parseTime(string: string): unknown {

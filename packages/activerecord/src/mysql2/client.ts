@@ -547,7 +547,10 @@ async function connect(
   return client;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/**
+ * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
+ * @noRailsEquivalent PERMANENT
+ */
 export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mysql2Client> {
   if (opts === null || typeof opts !== "object" || Array.isArray(opts)) {
     throw new Mysql2Error("Options parameter must be a Hash");

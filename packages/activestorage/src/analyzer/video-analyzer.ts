@@ -143,7 +143,10 @@ export class VideoAnalyzer extends Analyzer {
     return (this._encodedHeight ??= kernelFloat(videoStream["height"]));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
+   */
   protected async displayHeightScale(): Promise<number | null> {
     const displayAspectRatio = await this.displayAspectRatio();
     if (displayAspectRatio == null) return null;
