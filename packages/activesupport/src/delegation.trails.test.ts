@@ -21,6 +21,7 @@ describe("Delegation.generate", () => {
     })();
     expect(error).toBeInstanceOf(NoMethodError);
     expect(error).not.toBeInstanceOf(DelegationError);
+    expect((error as Error).message).toBe("undefined method 'name' for nil");
   });
 
   it("ignores allowNil when nilable is false", () => {
@@ -46,7 +47,7 @@ describe("Delegation.generate", () => {
 
     expect(() => {
       new Order().name = "Ada";
-    }).toThrow(NoMethodError);
+    }).toThrow(new NoMethodError("undefined method 'name=' for nil"));
   });
 
   it("reads an accessor off a nil target bare when nilable is false", () => {
@@ -65,7 +66,36 @@ describe("Delegation.generate", () => {
       nilable: false,
     });
 
-    expect(() => new Order().name).toThrow(NoMethodError);
+    expect(() => new Order().name).toThrow(new NoMethodError("undefined method 'name' for nil"));
+  });
+
+  it("names an object receiver as an instance of its class", () => {
+    class Customer {}
+    class Order {
+      customer = new Customer();
+      declare name: () => string;
+    }
+    Delegation.generate(Order.prototype, ["name"], { to: "customer" });
+
+    expect(() => new Order().name()).toThrow(
+      new NoMethodError("undefined method 'name' for an instance of Customer"),
+    );
+  });
+
+  it("returns a function-valued accessor's value without calling it", () => {
+    class Job {}
+    class Customer {
+      get job() {
+        return Job;
+      }
+    }
+    class Order {
+      customer = new Customer();
+      declare job: () => unknown;
+    }
+    Delegation.generate(Order.prototype, ["job"], { to: "customer" });
+
+    expect(new Order().job()).toBe(Job);
   });
 
   it("looks the method up on a module named by as", () => {

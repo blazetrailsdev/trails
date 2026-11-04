@@ -203,6 +203,135 @@ describe("Mail::Body", () => {
     });
   });
 
+  describe("adding parts", () => {
+    it("should allow you to add a part", () => {
+      const body = new Body("");
+      body.push(new Part(""));
+      expect(body.parts.length).toEqual(1);
+      expect(body.isMultipart()).toBeTruthy();
+    });
+    it("should allow you to sort the parts", () => {
+      const body = new Body("");
+      body.push(new Part("content-type: text/html\r\nsubject: HTML"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      body.push(new Part("content-type: text/enriched\r\nsubject: Enriched"));
+      expect(body.parts.length).toEqual(3);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].contentType()).toEqual("text/plain");
+      expect(body.parts[1].contentType()).toEqual("text/enriched");
+      expect(body.parts[2].contentType()).toEqual("text/html");
+    });
+    it("should allow you to sort the parts with an arbitrary sort order", () => {
+      const body = new Body("");
+      body.setSortOrder(["text/plain", "text/html", "text/enriched"]);
+      body.push(new Part("content-type: text/html\r\nsubject: HTML"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      body.push(new Part("content-type: text/enriched\r\nsubject: Enriched"));
+      expect(body.parts.length).toEqual(3);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].contentType()).toEqual("text/plain");
+      expect(body.parts[1].contentType()).toEqual("text/html");
+      expect(body.parts[2].contentType()).toEqual("text/enriched");
+    });
+    it("should allow you to sort the parts with an arbitrary sort order", () => {
+      const body = new Body("");
+      body.setSortOrder(["application/x-yaml", "text/plain"]);
+      body.push(new Part("content-type: text/plain\r\nsubject: HTML"));
+      body.push(new Part("content-type: text/html\r\nsubject: Plain Text"));
+      body.push(new Part("content-type: application/x-yaml\r\nsubject: Enriched"));
+      expect(body.parts.length).toEqual(3);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].contentType()).toEqual("application/x-yaml");
+      expect(body.parts[1].contentType()).toEqual("text/plain");
+      expect(body.parts[2].contentType()).toEqual("text/html");
+    });
+    it("should sort the parts on encode", () => {
+      const body = new Body("");
+      body.push(new Part("content-type: text/html\r\nsubject: HTML"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      body.push(new Part("content-type: text/enriched\r\nsubject: Enriched"));
+      expect(body.parts.length).toEqual(3);
+      expect(body.isMultipart()).toBeTruthy();
+      body.encoded();
+      expect(body.parts[0].contentType()).toEqual("text/plain");
+      expect(body.parts[1].contentType()).toEqual("text/enriched");
+      expect(body.parts[2].contentType()).toEqual("text/html");
+    });
+    it("should put the part types it doesn't know about at the end", () => {
+      const body = new Body("");
+      body.push(new Part("content-type: text/html\r\nsubject: HTML"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      body.push(new Part("content-type: image/jpeg\r\n"));
+      expect(body.parts.length).toEqual(3);
+      expect(body.isMultipart()).toBeTruthy();
+      body.encoded();
+      expect(body.parts[0].contentType()).toEqual("text/plain");
+      expect(body.parts[1].contentType()).toEqual("text/html");
+      expect(body.parts[2].contentType()).toEqual("image/jpeg");
+    });
+    it("should allow you to sort the parts recursively", () => {
+      const part = new Part("Content-Type: multipart/alternate");
+      part.addPart(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      part.addPart(new Part("content-type: text/html\r\nsubject: HTML"));
+      part.addPart(new Part("content-type: text/enriched\r\nsubject: Enriched"));
+      const body = new Body("");
+      body.push(part);
+      body.push(new Part("content-type: image/jpeg\r\nsubject: JPGEG\r\n\r\nsdkjskjdksjdkjsd"));
+      expect(body.parts.length).toEqual(2);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].contentType()).toMatch(/^multipart\/alternate(;|$)/);
+      expect(body.parts[1].contentType()).toEqual("image/jpeg");
+      const inner = body.parts[0].parts;
+      expect(inner[0].contentType()).toEqual("text/plain");
+      expect(inner[1].contentType()).toEqual("text/enriched");
+      expect(inner[2].contentType()).toEqual("text/html");
+    });
+    it("should allow you to sort the parts recursively", () => {
+      const part = new Part("Content-Type: multipart/alternate");
+      part.addPart(new Part("content-type: text/enriched\r\nsubject: Enriched"));
+      part.addPart(new Part("content-type: text/plain\r\nsubject: Plain Text"));
+      part.addPart(new Part("content-type: text/html\r\nsubject: HTML"));
+      const body = new Body("");
+      body.push(part);
+      body.push(new Part("content-type: image/jpeg\r\nsubject: JPGEG\r\n\r\nsdkjskjdksjdkjsd"));
+      expect(body.parts.length).toEqual(2);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].contentType()).toMatch(/^multipart\/alternate(;|$)/);
+      expect(body.parts[1].contentType()).toEqual("image/jpeg");
+      const inner = body.parts[0].parts;
+      expect(inner[0].contentType()).toEqual("text/plain");
+      expect(inner[1].contentType()).toEqual("text/enriched");
+      expect(inner[2].contentType()).toEqual("text/html");
+    });
+    it("should maintain the relative order of the parts with the same content-type as they are added", () => {
+      const body = new Body("");
+      body.push(new Part("content-type: text/html\r\nsubject: HTML_1"));
+      body.push(new Part("content-type: image/jpeg\r\nsubject: JPGEG_1\r\n\r\nsdkjskjdksjdkjsd"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text_1"));
+      body.push(new Part("content-type: text/enriched\r\nsubject: Enriched_1"));
+      body.push(new Part("content-type: text/html\r\nsubject: HTML_2"));
+      body.push(new Part("content-type: text/plain\r\nsubject: Plain Text_2"));
+      body.push(new Part("content-type: image/jpeg\r\nsubject: JPGEG_2\r\n\r\nsdkjskjdksjdkjsd"));
+      body.push(new Part("content-type: text/enriched\r\nsubject: Enriched_2"));
+      expect(body.parts.length).toEqual(8);
+      expect(body.isMultipart()).toBeTruthy();
+      body.sortPartsBang();
+      expect(body.parts[0].subject()).toEqual("Plain Text_1");
+      expect(body.parts[1].subject()).toEqual("Plain Text_2");
+      expect(body.parts[2].subject()).toEqual("Enriched_1");
+      expect(body.parts[3].subject()).toEqual("Enriched_2");
+      expect(body.parts[4].subject()).toEqual("HTML_1");
+      expect(body.parts[5].subject()).toEqual("HTML_2");
+      expect(body.parts[6].subject()).toEqual("JPGEG_1");
+      expect(body.parts[7].subject()).toEqual("JPGEG_2");
+    });
+  });
+
   describe("matching", () => {
     it("should still equal itself", () => {
       const body = new Body("The body");

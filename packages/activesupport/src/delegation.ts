@@ -7,6 +7,7 @@ import {
   rbModName,
   rbModToS,
   rbObjClass,
+  rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
@@ -157,7 +158,9 @@ export namespace Delegation {
           const _ = resolve(this);
           if (_ == null) {
             if (nilable !== false) return;
-            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+            throw new NoMethodError(
+              `undefined method '${method}' for ${_ == null ? "nil" : `an instance of ${rbObjClassname(_)}`}`,
+            );
           }
           (_ as Record<string, unknown>)[attr] = arg;
         };
@@ -184,10 +187,22 @@ export namespace Delegation {
         if (_ == null && nilable !== false)
           return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
         if (!(method in Object(_))) {
-          throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+          throw new NoMethodError(
+            `undefined method '${method}' for ${_ == null ? "nil" : `an instance of ${rbObjClassname(_)}`}`,
+          );
+        }
+        let memberDescriptor: PropertyDescriptor | undefined;
+        for (
+          let o: object | null = Object(_);
+          o && !memberDescriptor;
+          o = Object.getPrototypeOf(o)
+        ) {
+          memberDescriptor = Object.getOwnPropertyDescriptor(o, method);
         }
         const member = (_ as Record<string, unknown>)[method];
-        return typeof member === "function" ? member.apply(_, args) : member;
+        return memberDescriptor && "value" in memberDescriptor && typeof member === "function"
+          ? member.apply(_, args)
+          : member;
       };
       let descriptor: PropertyDescriptor | undefined;
       if (signature == null && receiverClass != null) {
@@ -207,7 +222,9 @@ export namespace Delegation {
           const _ = resolve(this);
           if (_ == null && nilable !== false) return undefined;
           if (!(method in Object(_))) {
-            throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+            throw new NoMethodError(
+              `undefined method '${method}' for ${_ == null ? "nil" : `an instance of ${rbObjClassname(_)}`}`,
+            );
           }
           return (_ as Record<string, unknown>)[method];
         };
