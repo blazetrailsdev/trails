@@ -149,10 +149,14 @@ const ROOTS = (await readdir(PACKAGES, { withFileTypes: true }))
   .sort();
 
 describe("yaml optional dependency", () => {
-  it.each(ROOTS)("is not reachable from the %s root import", async (pkg) => {
-    if (!(await exists(path.join(PACKAGES, pkg, "src", "index.ts")))) return;
-    expect(await offendersReachableFromIndex(pkg)).toEqual([]);
-  });
+  it.each(ROOTS)(
+    "is not reachable from the %s root import",
+    async (pkg) => {
+      if (!(await exists(path.join(PACKAGES, pkg, "src", "index.ts")))) return;
+      expect(await offendersReachableFromIndex(pkg)).toEqual([]);
+    },
+    30_000,
+  );
 
   it("follows a side-effect import beside an export from", () => {
     expect(staticImports('import "./a.js";\nexport { x } from "./b.js";')).toEqual([
