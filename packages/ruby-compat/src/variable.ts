@@ -385,7 +385,6 @@ const _coreConstants: Record<string, unknown> = {
   Rational,
   Complex,
   Encoding,
-  // `Init_bigdecimal` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`), once required.
   BigDecimal,
 };
 for (const [name, value] of Object.entries(_coreConstants)) {
