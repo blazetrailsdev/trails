@@ -7,6 +7,7 @@ import {
   NullLogger,
   TopLevel,
 } from "@blazetrails/activesupport";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { ActiveRecord, Base, DatabaseTasks } from "@blazetrails/activerecord";
@@ -28,6 +29,7 @@ import { VideoPreviewer } from "../../previewer/video-previewer.js";
 import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
 import { Engine } from "../../engine.js";
+import { Current } from "../../current.js";
 import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
@@ -114,6 +116,14 @@ await ActiveStorageCreateUsers.migrate("up");
 await ActiveStorageCreateGroups.migrate("up");
 await ActiveStorage.Blob!.loadSchema();
 await Attachment.loadSchema();
+
+TestCase.setup(function () {
+  Current.urlOptions = { protocol: "https://", host: "example.com", port: null };
+});
+
+TestCase.teardown(function () {
+  Current.reset();
+});
 
 afterAll(async () => {
   await Base.establishConnection(configurations.configsFor({ envName: "arunit", name: "primary" }));

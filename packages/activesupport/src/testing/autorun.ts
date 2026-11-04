@@ -15,6 +15,7 @@ import {
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Isolation } from "./isolation.js";
+import { TestHelper as ExecutorTestHelper } from "../executor/test-helper.js";
 import { Assertion, Skip, Test, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
@@ -114,7 +115,7 @@ beforeEach(async (context: TestContext) => {
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
   const testCase = (context.testCase = new klass(testName));
-  if (isModuleIncluded(klass, Isolation)) {
+  if (isModuleIncluded(klass, Isolation) || isModuleIncluded(klass, ExecutorTestHelper)) {
     const body = getFn(context.task);
     const isolated = async (): Promise<void> => {
       try {
@@ -172,7 +173,12 @@ beforeEach(async (context: TestContext) => {
 
 afterEach(async (context: TestContext) => {
   const testCase = context.testCase;
-  if (testCase === undefined || isModuleIncluded(testCase.constructor, Isolation)) return;
+  if (
+    testCase === undefined ||
+    isModuleIncluded(testCase.constructor, Isolation) ||
+    isModuleIncluded(testCase.constructor, ExecutorTestHelper)
+  )
+    return;
   const task = context.task as {
     mode?: string;
     result?: { state?: string; errors?: unknown[] };
