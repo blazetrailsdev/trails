@@ -394,6 +394,11 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
 });
 
 describe("Trails.application integration (boot-app fixture)", () => {
+  beforeEach(async () => {
+    const { Base } = await import("@blazetrails/activerecord");
+    runLoadHooks("active_record", Base);
+  });
+
   afterEach(() => {
     Trails.application = null;
     Application.appClass = null;
