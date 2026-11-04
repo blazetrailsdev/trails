@@ -4,9 +4,12 @@ import { DeepMergeable } from "./deep-mergeable.js";
 import { ActiveSupport } from "./namespaces.js";
 import {
   ArgumentError,
+  type Block,
+  block as rbBlock,
   type DefaultProc,
+  fetch,
+  slice,
   Hash,
-  KeyError,
   TypeError,
   eachPair,
   include,
@@ -33,9 +36,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return "ActiveSupport::HashWithIndifferentAccess";
   }
 
-  constructor(
-    constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<string, V> | NoInfer<V>,
-  ) {
+  constructor(constructor?: AnyObject | Hash<string, V> | DefaultProc<string, V> | NoInfer<V>) {
     super();
     if (
       isPlainObject(constructor) ||
@@ -147,14 +148,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.isKey(key);
   }
 
-  fetch(key: string, ...extras: (V | DefaultBlock<V>)[]): V {
-    key = this.convertKey(key);
-    if (super.has(key)) return super.get(key)!;
-    if (extras.length > 0) {
-      const extra = extras[0];
-      return typeof extra === "function" ? (extra as DefaultBlock<V>)(key) : extra;
-    }
-    throw new KeyError(`key not found: "${key}"`);
+  fetch(key: string, ...extras: [] | [V | Block<V>]): V {
+    return fetch(this as Map<string, V>, this.convertKey(key), ...extras) as V;
   }
 
   valuesAt(...keys: string[]): (V | undefined)[] {
@@ -167,7 +162,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       typeof indices[indices.length - 1] === "function"
         ? (indices.pop() as DefaultBlock<V>)
         : undefined;
-    return (indices as string[]).map((key) => (block ? this.fetch(key, block) : this.fetch(key)));
+    return (indices as string[]).map((key) =>
+      block ? this.fetch(key, rbBlock(block)) : this.fetch(key),
+    );
   }
 
   merge(
@@ -245,8 +242,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   override replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
-    super.clear();
-    return this.update(new HashWithIndifferentAccess<V>(otherHash));
+    return super.replace(new HashWithIndifferentAccess<V>(otherHash));
   }
 
   deepMerge(
@@ -277,13 +273,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
 
   slice(...keys: string[]): HashWithIndifferentAccess<V> {
     keys = keys.map((key) => this.convertKey(key));
-    const result = new HashWithIndifferentAccess<V>();
-    for (const key of keys) {
-      if (super.has(key)) {
-        result.set(key, super.get(key)!);
-      }
-    }
-    return result;
+    return new HashWithIndifferentAccess<V>(slice(this as Map<string, V>, ...keys));
   }
 
   sliceBang(...keys: string[]): HashWithIndifferentAccess<V> {
