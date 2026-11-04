@@ -1,4 +1,11 @@
-import { eachKey, NoMethodError, rbObjId, rbObjRespondTo, toSym } from "@blazetrails/ruby-compat";
+import {
+  eachKey,
+  NoMethodError,
+  rbObjAsString,
+  rbObjId,
+  rbObjRespondTo,
+  toSym,
+} from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
@@ -29,7 +36,7 @@ export class InvalidKeyError extends Error {
 
   constructor(contentPath: string, key: unknown) {
     super(
-      `Key '${String(key)}' is invalid, it must respond to '#to_sym' from configuration in '${contentPath}'.`,
+      `Key '${rbObjAsString(key)}' is invalid, it must respond to '#to_sym' from configuration in '${contentPath}'.`,
     );
     this.name = "InvalidKeyError";
   }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { Psych } from "../psych.js";
+import { rbFloatTypeP } from "../numeric.js";
 
 describe("Psych::TestScalarScanner", () => {
   let ss: Psych.ScalarScanner;
@@ -25,7 +26,8 @@ describe("Psych::TestScalarScanner", () => {
   });
 
   it("scan float with exponent but no fraction", () => {
-    expect(ss.tokenize("0.E+0")).toBe(0.0);
+    expect(Number(ss.tokenize("0.E+0"))).toBe(0.0);
+    expect(rbFloatTypeP(ss.tokenize("0.E+0"))).toBe(true);
   });
 
   it("scan null", () => {
@@ -150,7 +152,8 @@ describe("Psych::ScalarScanner#tokenize arms", () => {
     expect(ss.tokenize("017")).toBe(15);
     expect(ss.tokenize("08")).toBe("08");
     expect(ss.tokenize("1e3")).toBe("1e3");
-    expect(ss.tokenize("1.")).toBe(1);
+    expect(Number(ss.tokenize("1."))).toBe(1);
+    expect(rbFloatTypeP(ss.tokenize("1."))).toBe(true);
     expect(ss.tokenize("1,000.5")).toBe(1000.5);
   });
 

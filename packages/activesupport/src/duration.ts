@@ -18,6 +18,7 @@ import {
   Rational,
   rbBigNorm,
   rbDbl2num,
+  toF,
   rbFloatTypeP,
   rbCNumeric,
   rbEql,
@@ -301,7 +302,7 @@ export class Duration {
   }
 
   toF(): number {
-    return this.value;
+    return toF(this.value);
   }
 
   isPositive(): boolean {
@@ -436,13 +437,13 @@ export class Duration {
     return rbHash(this.value);
   }
 
-  compareTo(other: Duration | number | unknown): number {
+  compareTo(other: Duration | number | unknown): number | null {
     if (other instanceof Duration) {
       return cmp(this.value, other.value) as number;
     } else if (rbObjIsKindOf(other, rbCNumeric)) {
       return cmp(this.value, other) as number;
     }
-    return NaN;
+    return null;
   }
 
   isA(klass: unknown): boolean {
@@ -734,7 +735,7 @@ export class Scalar {
   }
 
   toF(): number {
-    return this.value;
+    return toF(this.value);
   }
 
   toString(): string {
