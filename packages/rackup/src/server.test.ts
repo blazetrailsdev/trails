@@ -111,7 +111,7 @@ describe("Rackup::Server", () => {
     return async () => [200, { "content-type": "text/plain" }, ["success"]];
   }
 
-  async function newServer(klass: typeof Server = Server): Promise<Server> {
+  async function newServer(klass: new () => Server = Server): Promise<Server> {
     const server = new klass();
     await server._ready;
     return server;

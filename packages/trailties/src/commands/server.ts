@@ -66,7 +66,7 @@ export class Options {
   }
 }
 
-export class Server extends RackupServer {
+export class Server extends RackupServer<ServerOptions> {
   /** @internal */
   _defaultOptions: ServerOptions;
 
@@ -75,10 +75,6 @@ export class Server extends RackupServer {
     super(defaultOptions);
     this._defaultOptions = defaultOptions;
     this.setEnvironment();
-  }
-
-  override get options(): ServerOptions {
-    return super.options as ServerOptions;
   }
 
   override optParser(): Options {
