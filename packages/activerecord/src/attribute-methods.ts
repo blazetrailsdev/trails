@@ -230,22 +230,19 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-function instanceMethodNames(klass: { prototype: object }): Set<string> {
-  const names = new Set<string>();
-  for (let proto: object | null = klass.prototype; proto && proto !== Object.prototype; ) {
-    for (const key of Object.getOwnPropertyNames(proto)) {
-      if (key !== "constructor") names.add(key);
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-  return names;
-}
-
 /** @missingRailsCall map — PERMANENT */
 export function dangerousAttributeMethods(): Set<string> {
   if (_dangerousMethodsCache) return _dangerousMethodsCache;
-  const base = ActiveRecord.Base;
-  const names = instanceMethodNames(base);
+  const names = new Set<string>();
+  for (
+    let proto: object | null = ActiveRecord.Base.prototype;
+    proto && proto !== Object.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key !== "constructor") names.add(key);
+    }
+  }
   for (const name of ["dup", "freeze", "isFrozen", "clone", "hash", "objectId"]) names.add(name);
   return (_dangerousMethodsCache = names);
 }
