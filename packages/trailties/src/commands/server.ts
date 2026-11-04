@@ -86,19 +86,28 @@ export class Server extends RackupServer<ServerOptions> {
     if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", this.options.environment);
   }
 
-  /** @inventedArm atExit — PERMANENT */
+  /**
+   * @inventedArm atExit — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   override async start(afterStopCallback: (() => void) | null = null): Promise<unknown> {
+    let stopped = false;
+    const ensure = () => {
+      if (stopped || afterStopCallback == null) return;
+      stopped = true;
+      afterStopCallback();
+    };
+    atExit(ensure);
     try {
-      onSignal("SIGINT", () => exit());
+      const trap = onSignal("SIGINT", () => exit());
       this.createTmpDirectories();
       this.setupDevCaching();
       if (this.options.logStdout) await this.logToStdout();
 
-      const server = await super.start();
-      if (afterStopCallback != null) atExit(afterStopCallback);
-      return server;
+      trap();
+      return await super.start();
     } catch (error) {
-      afterStopCallback?.();
+      ensure();
       throw error;
     }
   }
