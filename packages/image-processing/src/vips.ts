@@ -229,7 +229,7 @@ class Processor extends BaseProcessor {
     24,
   );
 
-  /** @inventedArm delete — CONVERGEABLE image-processing-wasm-vips-handle-lifetime */
+  /** @inventedArm delete — PERMANENT */
   static loadImage(
     pathOrImage: string | Image,
     { loader = null, autorot = true, ...options }: Options = {},
@@ -289,7 +289,10 @@ class Processor extends BaseProcessor {
     return this.thumbnail(width, height, { crop: "centre", ...options });
   }
 
-  /** @missingRailsArgs gravity — PERMANENT */
+  /**
+   * @missingRailsArgs gravity — PERMANENT
+   * @inventedArm delete — PERMANENT
+   */
   resizeAndPad(
     width: number,
     height: number,
@@ -302,13 +305,20 @@ class Processor extends BaseProcessor {
     }: Options = {},
   ): Image {
     let image = this.thumbnail(width, height, options);
-    if (alpha != null && alpha !== false && !image.hasAlpha()) image = addAlpha(image);
-    return image.gravity(gravity as string, width, height, {
+    if (alpha != null && alpha !== false && !image.hasAlpha()) {
+      const thumbnail = image;
+      image = addAlpha(image);
+      thumbnail.delete();
+    }
+    const padded = image.gravity(gravity as string, width, height, {
       ...(extend != null ? { extend: extend as string } : {}),
       ...(background != null ? { background: background as number[] } : {}),
     });
+    image.delete();
+    return padded;
   }
 
+  /** @inventedArm delete — PERMANENT */
   resizeToCover(width: number, height: number, options: Options = {}): Image {
     const image =
       typeof this.image === "string"
@@ -317,6 +327,7 @@ class Processor extends BaseProcessor {
 
     const imageRatio = image.width / image.height;
     const thumbnailRatio = width / height;
+    if (image !== this.image) image.delete();
 
     if (imageRatio > thumbnailRatio) {
       width = MAX_COORD;
@@ -337,6 +348,7 @@ class Processor extends BaseProcessor {
     }
   }
 
+  /** @inventedArm delete — PERMANENT */
   composite(
     overlay: unknown,
     _mode: unknown = null,
@@ -353,11 +365,23 @@ class Processor extends BaseProcessor {
         this.convertToImage(object, "overlay"),
       );
 
-      return image.composite(overlays, _mode as Parameters<Image["composite"]>[1], options);
+      const composited = image.composite(
+        overlays,
+        _mode as Parameters<Image["composite"]>[1],
+        options,
+      );
+      overlays.forEach((object, index) => {
+        if (object !== (Array.isArray(overlay) ? overlay[index] : overlay)) object.delete();
+      });
+      return composited;
     }
 
     let overlayImage = this.convertToImage(overlay, "overlay");
-    if (!overlayImage.hasAlpha()) overlayImage = addAlpha(overlayImage);
+    const superseded: Image[] = [];
+    if (!overlayImage.hasAlpha()) {
+      superseded.push(overlayImage);
+      overlayImage = addAlpha(overlayImage);
+    }
 
     if (offset != null && offset !== false) {
       const opposite: Record<string, string> = {
@@ -368,6 +392,7 @@ class Processor extends BaseProcessor {
       };
       const oppositeGravity = String(gravity).replace(/\w+/g, (word) => opposite[word] ?? "");
       const [x, y] = offset as [number, number];
+      superseded.push(overlayImage);
       overlayImage = overlayImage.gravity(
         oppositeGravity,
         overlayImage.width + x,
@@ -375,9 +400,18 @@ class Processor extends BaseProcessor {
       );
     }
 
+    superseded.push(overlayImage);
     overlayImage = overlayImage.gravity(gravity as string, image.width, image.height);
 
-    return image.composite([overlayImage], mode as Parameters<Image["composite"]>[1], options);
+    const composited = image.composite(
+      [overlayImage],
+      mode as Parameters<Image["composite"]>[1],
+      options,
+    );
+    for (const intermediate of [...superseded, overlayImage]) {
+      if (intermediate !== overlay) intermediate.delete();
+    }
+    return composited;
   }
 
   set(...args: [string, unknown]): Image {
@@ -406,7 +440,7 @@ class Processor extends BaseProcessor {
 
   /**
    * @internal
-   * @inventedArm delete — CONVERGEABLE image-processing-wasm-vips-handle-lifetime
+   * @inventedArm delete — PERMANENT
    */
   private thumbnail(
     width: number,

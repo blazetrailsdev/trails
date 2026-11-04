@@ -29,7 +29,7 @@ export class Processor {
 
   declare protected _accumulator: unknown;
 
-  /** @inventedArm deleteAccumulator — CONVERGEABLE image-processing-wasm-vips-handle-lifetime */
+  /** @inventedArm deleteAccumulator — PERMANENT */
   static async call(
     this: ProcessorClass,
     {
