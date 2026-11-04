@@ -1,3 +1,4 @@
+import "./constants.excluded.generated.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecordError, StatementInvalid } from "./errors.js";
