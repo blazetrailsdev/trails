@@ -20,7 +20,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     active_storage_attachments: [Attachment, attachments],
   }) as never as { users: (name: string) => Promise<User> };
 
-  it("test_active_storage_blob", async () => {
+  it("active storage blob", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;
@@ -32,22 +32,22 @@ describe("ActiveStorage::FixtureSetTest", () => {
     expect(blob.service.name).toBe("local");
     await blob.open({}, async (file) => {
       const fixture = new FixtureSet().fileFixture("racecar.jpg");
-      expect(await FileUtils.isIdenticalAsync(file.path()!, fixture.toPath())).toBe(true);
+      expect(await FileUtils.isIdenticalAsync(file.path()!, fixture.toPath())).toBeTruthy();
     });
   }, 30_000);
 
-  it("test_active_storage_attachment", async () => {
+  it("active storage attachment", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;
     await avatar.load();
 
-    expect(avatar.isBlank()).toBe(false);
-    expect(avatar.isAttached()).toBe(true);
-    expect(isPresent(await avatar.attachment)).toBe(true);
+    expect(avatar.isBlank()).toBeFalsy();
+    expect(avatar.isAttached()).toBeTruthy();
+    expect(isPresent(await avatar.attachment)).toBeTruthy();
   });
 
-  it("test_active_storage_metadata", async () => {
+  it("active storage metadata", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;

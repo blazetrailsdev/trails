@@ -1,13 +1,14 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { assertChanges } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActiveStorage } from "./active-storage.js";
-import "./test-helpers/database/setup.js";
-import type { Blob } from "./blob.js";
-import { PreviewImageJob } from "./preview-image-job.js";
-import { createFileBlob } from "./test-helpers/test-helper.js";
-import { TransformJob } from "./transform-job.js";
+import { ActiveStorage } from "../active-storage.js";
+import "../test-helpers/database/setup.js";
+import type { Blob } from "../blob.js";
+import { PreviewImageJob } from "../preview-image-job.js";
+import { createFileBlob } from "../test-helpers/test-helper.js";
+import { TransformJob } from "../transform-job.js";
 
 class PreviewImageJobTest extends TestCase {
   previewImageJob(): void {}
@@ -26,10 +27,17 @@ describe("ActiveStorage::PreviewImageJobTest", () => {
   });
 
   it("creates preview", async () => {
-    await blob.previewImage.load();
-    expect(blob.previewImage.isAttached()).toBe(false);
-    await PreviewImageJob.performNow(blob, [transformation]);
-    expect(blob.previewImage.isAttached()).toBe(true);
+    await assertChanges(
+      async () => {
+        await blob.previewImage.load();
+        return blob.previewImage.isAttached();
+      },
+      null,
+      { from: false, to: true },
+      async () => {
+        await PreviewImageJob.performNow(blob, [transformation]);
+      },
+    );
   });
 
   it("enqueues transform variant jobs", async () => {

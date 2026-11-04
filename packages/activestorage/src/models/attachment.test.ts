@@ -1,22 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { currentTimeInstant, Duration, stub, travel, travelBack } from "@blazetrails/activesupport";
+import {
+  currentTimeInstant,
+  Duration,
+  stub,
+  travel,
+  travelBack,
+  assertNothingRaised,
+} from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Attachment } from "./attachment.js";
-import { Blob } from "./blob.js";
-import type { MirrorService } from "./service/mirror-service.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Attachment } from "../attachment.js";
+import { Blob } from "../blob.js";
+import type { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
   createBlobBeforeDirectUpload,
   directlyUploadFileBlob,
   User,
   withService,
-} from "./test-helpers/test-helper.js";
+} from "../test-helpers/test-helper.js";
 
 async function assertBlobIdentifiedBeforeOwnerValidated(
   owner: User,
@@ -246,15 +253,12 @@ describe("ActiveStorage::AttachmentTest", () => {
     await user.highlights.attach(blob);
     const attachment = (await user.highlights.findBy({ blob_id: blob.id }))!;
     await attachment.updateAttribute("name", "old_highlights");
-    await attachment.destroy();
+    await assertNothingRaised(() => attachment.destroy());
   });
 
   it("can create an attachment with the record having no attachment reflections", async () => {
-    const attachment = await Attachment.createBang({
-      name: "whatever",
-      record: user,
-      blob: await createBlob(),
-    });
-    expect(attachment.isPersisted()).toBe(true);
+    await assertNothingRaised(async () =>
+      Attachment.createBang({ name: "whatever", record: user, blob: await createBlob() }),
+    );
   });
 });

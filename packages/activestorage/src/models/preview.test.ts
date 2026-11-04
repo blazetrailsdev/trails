@@ -1,38 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { Base } from "@blazetrails/activerecord";
 import { readingRole } from "@blazetrails/activerecord/active-record";
-import { freezeTime, travelBack } from "@blazetrails/activesupport";
+import { assertChanges, assertRaises, freezeTime, travelBack } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActiveStorage } from "./active-storage.js";
-import type { Attachment } from "./attachment.js";
-import type { Blob } from "./blob.js";
-import { Current } from "./current.js";
-import { UnpreviewableError } from "./errors.js";
-import { Preview } from "./preview.js";
-import "./test-helpers/database/setup.js";
-import { createFileBlob, readImage } from "./test-helpers/test-helper.js";
+import { ActiveStorage } from "../active-storage.js";
+import type { Attachment } from "../attachment.js";
+import type { Blob } from "../blob.js";
+import { Current } from "../current.js";
+import { UnpreviewableError } from "../errors.js";
+import { Preview } from "../preview.js";
+import "../test-helpers/database/setup.js";
+import { createFileBlob, readImage } from "../test-helpers/test-helper.js";
 
 const resizeToLimit = { resizeToLimit: [640, 280] };
 
 function delegated(preview: Preview) {
   return preview.image as Preview["image"] &
     Blob & { variantRecords: { toArray(): Promise<unknown[]> } };
-}
-
-async function assertPreview(
-  preview: Preview,
-  filename: string,
-  contentType: string,
-  width: number,
-  height: number,
-) {
-  expect(preview.image.isAttached()).toBe(true);
-  expect(delegated(preview).filename.toString()).toEqual(filename);
-  expect(delegated(preview).contentType).toEqual(contentType);
-
-  const image = await readImage(delegated(preview));
-  expect(await image.width()).toEqual(width);
-  expect(await image.height()).toEqual(height);
 }
 
 describe("ActiveStorage::PreviewTest", () => {
@@ -53,14 +38,26 @@ describe("ActiveStorage::PreviewTest", () => {
     const blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
     const preview = await blob.preview(resizeToLimit).processed();
 
-    await assertPreview(preview, "report.png", "image/png", 612, 792);
+    expect(preview.image.isAttached()).toBeTruthy();
+    expect(delegated(preview).filename.toString()).toEqual("report.png");
+    expect(delegated(preview).contentType).toEqual("image/png");
+
+    const image = await readImage(delegated(preview));
+    expect(await image.width()).toEqual(612);
+    expect(await image.height()).toEqual(792);
   });
 
   it("previewing a cropped PDF", async () => {
     const blob = await createFileBlob({ filename: "cropped.pdf", contentType: "application/pdf" });
     const preview = await blob.preview(resizeToLimit).processed();
 
-    await assertPreview(preview, "cropped.png", "image/png", 430, 145);
+    expect(preview.image.isAttached()).toBeTruthy();
+    expect(delegated(preview).filename.toString()).toEqual("cropped.png");
+    expect(delegated(preview).contentType).toEqual("image/png");
+
+    const image = await readImage(delegated(preview));
+    expect(await image.width()).toEqual(430);
+    expect(await image.height()).toEqual(145);
   });
 
   it("previewing a PDF-based Illustrator file", async () => {
@@ -71,21 +68,34 @@ describe("ActiveStorage::PreviewTest", () => {
     });
     const preview = await blob.preview(resizeToLimit).processed();
 
-    await assertPreview(preview, "file.png", "image/png", 612, 792);
+    expect(preview.image.isAttached()).toBeTruthy();
+    expect(delegated(preview).filename.toString()).toEqual("file.png");
+    expect(delegated(preview).contentType).toEqual("image/png");
+
+    const image = await readImage(delegated(preview));
+    expect(await image.width()).toEqual(612);
+    expect(await image.height()).toEqual(792);
   });
 
   it("previewing an MP4 video", async () => {
     const blob = await createFileBlob({ filename: "video.mp4", contentType: "video/mp4" });
     const preview = await blob.preview(resizeToLimit).processed();
 
-    await assertPreview(preview, "video.jpg", "image/jpeg", 640, 480);
+    expect(preview.image.isAttached()).toBeTruthy();
+    expect(delegated(preview).filename.toString()).toEqual("video.jpg");
+    expect(delegated(preview).contentType).toEqual("image/jpeg");
+
+    const image = await readImage(delegated(preview));
+    expect(await image.width()).toEqual(640);
+    expect(await image.height()).toEqual(480);
   });
 
   it("previewing an unpreviewable blob", async () => {
     const blob = await createFileBlob();
-    expect(() => blob.preview(resizeToLimit)).toThrow(UnpreviewableError);
-    expect(() => blob.preview(resizeToLimit)).toThrow(
-      /blob with ID=\d+ and content_type=image\/jpeg/,
+    await assertRaises(
+      [UnpreviewableError],
+      { match: /blob with ID=\d+ and content_type=image\/jpeg/ },
+      () => blob.preview(resizeToLimit),
     );
   });
 
@@ -98,18 +108,29 @@ describe("ActiveStorage::PreviewTest", () => {
 
     await blob.reload();
     await blob.previewImage.load();
-    expect(blob.previewImage.isAttached()).toBe(true);
+    expect(blob.previewImage.isAttached()).toBeTruthy();
   });
 
   it("#processed also processes the preview's image variant", async () => {
     const blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
     const preview = blob.preview(resizeToLimit);
 
-    await preview.processed();
-
-    const variant = await (delegated(preview) as unknown as Attachment).variant(resizeToLimit);
-    expect(await (variant as unknown as { isProcessed(): Promise<boolean> }).isProcessed()).toBe(
-      true,
+    await assertChanges(
+      async () => {
+        await preview.image.load();
+        const variant = preview.image.isAttached()
+          ? await (delegated(preview) as unknown as Attachment).variant(resizeToLimit)
+          : null;
+        return !!(
+          variant &&
+          (await (variant as unknown as { isProcessed(): Promise<boolean> }).isProcessed())
+        );
+      },
+      null,
+      { to: true },
+      async () => {
+        await preview.processed();
+      },
     );
   });
 
@@ -137,7 +158,7 @@ describe("ActiveStorage::PreviewTest", () => {
     }
     expect(await preview.key()).toEqual(previewImage.key);
     expect(await preview.download()).toEqual(await previewImage.download());
-    expect(await delegated(preview).variantRecords.toArray()).toEqual([]);
+    expect(await delegated(preview).variantRecords.toArray()).toBeEmpty();
   });
 
   it("preview of PDF is created on the same service", async () => {

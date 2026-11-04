@@ -14,6 +14,7 @@ import { actionview } from "./assertion-receipts/actionview.js";
 import { activejob } from "./assertion-receipts/activejob.js";
 import { activemodel } from "./assertion-receipts/activemodel.js";
 import { activerecord } from "./assertion-receipts/activerecord.js";
+import { activestorage } from "./assertion-receipts/activestorage.js";
 import { activesupport } from "./assertion-receipts/activesupport.js";
 import { mail } from "./assertion-receipts/mail.js";
 import { msgpack } from "./assertion-receipts/msgpack.js";
@@ -52,6 +53,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   activejob,
   activemodel,
   activerecord,
+  activestorage,
   activesupport,
   mail,
   msgpack,

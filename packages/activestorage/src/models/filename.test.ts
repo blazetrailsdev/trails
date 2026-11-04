@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ActiveSupportJSON } from "@blazetrails/activesupport";
-import { Filename } from "./filename.js";
+import { ActiveSupportJSON, assertOperator } from "@blazetrails/activesupport";
+import { Filename } from "../filename.js";
 
 describe("ActiveStorage::FilenameTest", () => {
   it("base", () => {
@@ -40,11 +40,11 @@ describe("ActiveStorage::FilenameTest", () => {
   });
 
   it("compare case-insensitively", () => {
-    expect(new Filename("foobar.pdf").equals(new Filename("FooBar.PDF"))).toBe(true);
+    assertOperator(new Filename("foobar.pdf"), "==", new Filename("FooBar.PDF"));
   });
 
   it("compare sanitized", () => {
-    expect(new Filename("foo-bar.pdf").equals(new Filename("foo\tbar.pdf"))).toBe(true);
+    assertOperator(new Filename("foo-bar.pdf"), "==", new Filename("foo\tbar.pdf"));
   });
 
   it("encoding to json", () => {

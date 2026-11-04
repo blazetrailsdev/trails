@@ -1,10 +1,11 @@
-import "./test-helpers/database/setup.js";
+import "../test-helpers/database/setup.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActiveStorage } from "./active-storage.js";
-import { Current } from "./current.js";
-import { UnrepresentableError } from "./errors.js";
-import { createBlob, createFileBlob, readImage } from "./test-helpers/test-helper.js";
+import { assertRaises } from "@blazetrails/activesupport";
+import { ActiveStorage } from "../active-storage.js";
+import { Current } from "../current.js";
+import { UnrepresentableError } from "../errors.js";
+import { createBlob, createFileBlob, readImage } from "../test-helpers/test-helper.js";
 
 type Representation = {
   processed(): Promise<{ image: unknown }>;
@@ -73,9 +74,10 @@ describe("ActiveStorage::RepresentationTest", { timeout: 30_000 }, () => {
 
   it("representing an unrepresentable blob", async () => {
     const blob = await createBlob();
-    expect(() => blob.representation({ resizeToLimit: [100, 100] })).toThrow(UnrepresentableError);
-    expect(() => blob.representation({ resizeToLimit: [100, 100] })).toThrow(
-      /blob with ID=\d+ and content_type=text\/plain/,
+    await assertRaises(
+      [UnrepresentableError],
+      { match: /blob with ID=\d+ and content_type=text\/plain/ },
+      () => blob.representation({ resizeToLimit: [100, 100] }),
     );
   });
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   assertChanges,
   assertNoChanges,
+  assertNothingRaised,
   assertRaises,
   TopLevel,
   type Extended,
@@ -11,15 +12,15 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
-import "../test-helpers/database/setup.js";
-import { ActiveStorage } from "../active-storage.js";
-import { Blob } from "../blob.js";
-import type { Preview } from "../preview.js";
-import { PreviewImageJob } from "../preview-image-job.js";
-import { PurgeJob } from "../purge-job.js";
-import { TransformJob } from "../transform-job.js";
-import { DiskService } from "../service/disk-service.js";
-import { MirrorService } from "../service/mirror-service.js";
+import "../../test-helpers/database/setup.js";
+import { ActiveStorage } from "../../active-storage.js";
+import { Blob } from "../../blob.js";
+import type { Preview } from "../../preview.js";
+import { PreviewImageJob } from "../../preview-image-job.js";
+import { PurgeJob } from "../../purge-job.js";
+import { TransformJob } from "../../transform-job.js";
+import { DiskService } from "../../service/disk-service.js";
+import { MirrorService } from "../../service/mirror-service.js";
 import {
   createBlob,
   createFileBlob,
@@ -30,22 +31,16 @@ import {
   withService,
   Group,
   User,
-} from "../test-helpers/test-helper.js";
-import type { ClassMethods } from "./model.js";
-import type { Attachment } from "../attachment.js";
-import type { One } from "./one.js";
+} from "../../test-helpers/test-helper.js";
+import type { ClassMethods } from "../../attached/model.js";
+import type { Attachment } from "../../attachment.js";
+import type { One } from "../../attached/one.js";
 
 type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;
 
 const blobOf = async (one: One): Promise<Blob> => (await (await one.attachment)!.blob)!;
 const filename = async (one: One): Promise<string> => (await blobOf(one)).filename.toString();
-const expectAnalyzed = async (one: One): Promise<void> => {
-  const blob = await (await blobOf(one)).reload();
-  expect(blob.isAnalyzed()).toBeTruthy();
-  expect(blob.metadata.get("width")).toBe(4104);
-  expect(blob.metadata.get("height")).toBe(2736);
-};
 const exist = (key: string) => Blob.service!.isExist(key);
 const townHash = () => ({
   io: new StringIO("STUFF"),
@@ -92,7 +87,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   it("uploads the file when passing a File as attachable attribute", async () => {
     user = await User.createBang({ name: "Dorian", avatar: fileFixture("image.gif").open() });
-    await (await blobOf(user.avatar)).download();
+    await assertNothingRaised(async () => (await blobOf(user.avatar)).download());
   });
 
   it("creating a record with a Pathname as attachable attribute", async () => {
@@ -111,7 +106,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
       name: "Dorian",
       avatar: fileFixture("image.gif"),
     });
-    await (await blobOf(user.avatar)).download();
+    await assertNothingRaised(async () => (await blobOf(user.avatar)).download());
   });
 
   it("attaching an existing blob to an existing record", async () => {
@@ -193,7 +188,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   it("attaching a blob to a persisted, unchanged, and invalid record, returns nil", async () => {
     await user.updateAttribute("name", null);
-    expect(await user.isValid()).toBe(false);
+    expect(await user.isValid()).toBeFalsy();
 
     const returnValue = await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
     expect(returnValue).toBeNull();
@@ -211,37 +206,60 @@ describe("ActiveStorage::OneAttachedTest", () => {
     expect(returnValue).toBe(user.avatar);
   });
 
-  const attachToChanged = async (attachable: () => Promise<unknown> | unknown, name: string) => {
+  it("attaching an existing blob to an existing, changed record", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
-    await user.avatar.attach(await attachable());
-    expect(await filename(user.avatar)).toBe(name);
-    expect((await user.avatar.attachment)!.isPersisted()).toBe(false);
-    expect(user.isWillSaveChangeToAttribute("name")).toBe(true);
+    await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
+    expect(await filename(user.avatar)).toBe("funky.jpg");
+    expect((await user.avatar.attachment)!.isPersisted()).toBeFalsy();
+    expect(user.isWillSaveChangeToAttribute("name")).toBeTruthy();
 
     await user.saveBang();
     await user.reload();
-    expect(await filename(user.avatar)).toBe(name);
-  };
-
-  it("attaching an existing blob to an existing, changed record", async () => {
-    await attachToChanged(() => createBlob({ filename: "funky.jpg" }), "funky.jpg");
+    expect(await filename(user.avatar)).toBe("funky.jpg");
   });
 
   it("attaching an existing blob from a signed ID to an existing, changed record", async () => {
-    await attachToChanged(
-      async () => (await createBlob({ filename: "funky.jpg" })).signedId(),
-      "funky.jpg",
-    );
+    user.name = "Tina";
+    expect(user.isChanged).toBeTruthy();
+
+    await user.avatar.attach((await createBlob({ filename: "funky.jpg" })).signedId());
+    expect(await filename(user.avatar)).toBe("funky.jpg");
+    expect((await user.avatar.attachment)!.isPersisted()).toBeFalsy();
+    expect(user.isWillSaveChangeToAttribute("name")).toBeTruthy();
+
+    await user.saveBang();
+    await user.reload();
+    expect(await filename(user.avatar)).toBe("funky.jpg");
   });
 
   it("attaching a new blob from a Hash to an existing, changed record", async () => {
-    await attachToChanged(townHash, "town.jpg");
+    user.name = "Tina";
+    expect(user.isChanged).toBeTruthy();
+
+    await user.avatar.attach(townHash());
+    expect(await filename(user.avatar)).toBe("town.jpg");
+    expect((await user.avatar.attachment)!.isPersisted()).toBeFalsy();
+    expect(user.isWillSaveChangeToAttribute("name")).toBeTruthy();
+
+    await user.saveBang();
+    await user.reload();
+    expect(await filename(user.avatar)).toBe("town.jpg");
   });
 
   it("attaching a new blob from an uploaded file to an existing, changed record", async () => {
-    await attachToChanged(() => fixtureFileUpload("racecar.jpg"), "racecar.jpg");
+    user.name = "Tina";
+    expect(user.isChanged).toBeTruthy();
+
+    await user.avatar.attach(fixtureFileUpload("racecar.jpg"));
+    expect(await filename(user.avatar)).toBe("racecar.jpg");
+    expect((await user.avatar.attachment)!.isPersisted()).toBeFalsy();
+    expect(user.isWillSaveChangeToAttribute("name")).toBeTruthy();
+
+    await user.saveBang();
+    await user.reload();
+    expect(await filename(user.avatar)).toBe("racecar.jpg");
   });
 
   it("updating an existing record to attach an existing blob", async () => {
@@ -258,16 +276,16 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await user.setAvatar(fixtureFileUpload("racecar.jpg"));
     expect(await filename(user.avatar)).toBe("racecar.jpg");
     const { key } = await blobOf(user.avatar);
-    expect(await exist(key)).toBe(false);
+    expect(await exist(key)).toBeFalsy();
 
     await user.saveBang();
-    expect(await exist(key)).toBe(true);
+    expect(await exist(key)).toBeTruthy();
   });
 
   it("unsuccessfully updating an existing record to attach a new blob from an uploaded file", async () => {
-    expect(await user.update({ name: "", avatar: fixtureFileUpload("racecar.jpg") })).toBe(false);
+    expect(await user.update({ name: "", avatar: fixtureFileUpload("racecar.jpg") })).toBeFalsy();
     expect(await filename(user.avatar)).toBe("racecar.jpg");
-    expect(await exist((await blobOf(user.avatar)).key)).toBe(false);
+    expect(await exist((await blobOf(user.avatar)).key)).toBeFalsy();
   });
 
   it("successfully replacing an existing, dependent attachment on an existing record", async () => {
@@ -278,8 +296,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await performEnqueuedJobs(() => user.avatar.attach(blob));
 
     expect(await filename(user.avatar)).toBe("town.jpg");
-    expect(await Blob.isExists(oldBlob.id)).toBe(false);
-    expect(await exist(oldBlob.key)).toBe(false);
+    expect(await Blob.isExists(oldBlob.id)).toBeFalsy();
+    expect(await exist(oldBlob.key)).toBeFalsy();
   });
 
   it("replacing an existing, independent attachment on an existing record", async () => {
@@ -303,7 +321,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     );
 
     expect(await filename(user.avatar)).toBe("funky.jpg");
-    expect(await exist((await blobOf(user.avatar)).key)).toBe(true);
+    expect(await exist((await blobOf(user.avatar)).key)).toBeTruthy();
   });
 
   it("successfully updating an existing record to replace an existing, dependent attachment", async () => {
@@ -314,8 +332,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await performEnqueuedJobs(() => user.updateBang({ avatar: blob }));
 
     expect(await filename(user.avatar)).toBe("town.jpg");
-    expect(await Blob.isExists(oldBlob.id)).toBe(false);
-    expect(await exist(oldBlob.key)).toBe(false);
+    expect(await Blob.isExists(oldBlob.id)).toBeFalsy();
+    expect(await exist(oldBlob.key)).toBeFalsy();
   });
 
   it("successfully updating an existing record to replace an existing, independent attachment", async () => {
@@ -331,11 +349,11 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
 
     await assertNoEnqueuedJobs(async () => {
-      expect(await user.update({ name: "", avatar: fixtureFileUpload("racecar.jpg") })).toBe(false);
+      expect(await user.update({ name: "", avatar: fixtureFileUpload("racecar.jpg") })).toBeFalsy();
     });
 
     expect(await filename(user.avatar)).toBe("racecar.jpg");
-    expect(await exist((await blobOf(user.avatar)).key)).toBe(false);
+    expect(await exist((await blobOf(user.avatar)).key)).toBeFalsy();
   });
 
   it("updating an existing record to replace an attached blob with itself", async () => {
@@ -358,7 +376,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertPurgeEnqueued(blob, () => user.avatar.attach(null));
 
-    expect(await user.avatar.isAttached()).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
   });
 
   it("removing an independent attachment from an existing record", async () => {
@@ -366,7 +384,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertNoPurgeJobs(() => user.coverPhoto.attach(null));
 
-    expect(await user.coverPhoto.isAttached()).toBe(false);
+    expect(await user.coverPhoto.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record to nil to remove a dependent attachment", async () => {
@@ -375,7 +393,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertPurgeEnqueued(blob, () => user.updateBang({ avatar: null }));
 
-    expect(await user.avatar.isAttached()).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record to an empty string to remove a dependent attachment", async () => {
@@ -384,7 +402,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertPurgeEnqueued(blob, () => user.updateBang({ avatar: "" }));
 
-    expect(await user.avatar.isAttached()).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record to nil to remove an independent attachment", async () => {
@@ -392,7 +410,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertNoPurgeJobs(() => user.updateBang({ coverPhoto: null }));
 
-    expect(await user.coverPhoto.isAttached()).toBe(false);
+    expect(await user.coverPhoto.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record to an empty string to remove an independent attachment", async () => {
@@ -400,19 +418,25 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await assertNoPurgeJobs(() => user.updateBang({ coverPhoto: "" }));
 
-    expect(await user.coverPhoto.isAttached()).toBe(false);
+    expect(await user.coverPhoto.isAttached()).toBeFalsy();
   });
 
   it("analyzing a new blob from an uploaded file after attaching it to an existing record", async () => {
     await performEnqueuedJobs(() => user.avatar.attach(fixtureFileUpload("racecar.jpg")));
 
-    await expectAnalyzed(user.avatar);
+    const blob = await (await blobOf(user.avatar)).reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+    expect(blob.metadata.get("width")).toBe(4104);
+    expect(blob.metadata.get("height")).toBe(2736);
   });
 
   it("analyzing a new blob from an uploaded file after attaching it to an existing record via update", async () => {
     await performEnqueuedJobs(() => user.updateBang({ avatar: fixtureFileUpload("racecar.jpg") }));
 
-    await expectAnalyzed(user.avatar);
+    const blob = await (await blobOf(user.avatar)).reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+    expect(blob.metadata.get("width")).toBe(4104);
+    expect(blob.metadata.get("height")).toBe(2736);
   });
 
   it("analyzing a directly-uploaded blob after attaching it to an existing record", async () => {
@@ -420,7 +444,10 @@ describe("ActiveStorage::OneAttachedTest", () => {
       user.avatar.attach(await directlyUploadFileBlob({ filename: "racecar.jpg" })),
     );
 
-    await expectAnalyzed(user.avatar);
+    const blob = await (await blobOf(user.avatar)).reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+    expect(blob.metadata.get("width")).toBe(4104);
+    expect(blob.metadata.get("height")).toBe(2736);
   });
 
   it("analyzing a directly-uploaded blob after attaching it to an existing record via updates", async () => {
@@ -428,7 +455,10 @@ describe("ActiveStorage::OneAttachedTest", () => {
       user.updateBang({ avatar: await directlyUploadFileBlob({ filename: "racecar.jpg" }) }),
     );
 
-    await expectAnalyzed(user.avatar);
+    const blob = await (await blobOf(user.avatar)).reload();
+    expect(blob.isAnalyzed()).toBeTruthy();
+    expect(blob.metadata.get("width")).toBe(4104);
+    expect(blob.metadata.get("height")).toBe(2736);
   });
   it("creating an attachment as part of an autosave association through nested attributes", async () => {
     const group = await Group.createBang({
@@ -446,7 +476,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await group.saveBang();
     const newUser = (await User.findBy({ name: "John" })) as User;
     await newUser.avatar.load();
-    expect(newUser.avatar.isAttached()).toBe(true);
+    expect(newUser.avatar.isAttached()).toBeTruthy();
   });
 
   it("updating an attachment as part of an autosave association", async () => {
@@ -455,52 +485,65 @@ describe("ActiveStorage::OneAttachedTest", () => {
     await group.saveBang();
     await user.reload();
     await user.avatar.load();
-    expect(user.avatar.isAttached()).toBe(true);
+    expect(user.avatar.isAttached()).toBeTruthy();
   });
 
-  const attachToNew = async (attachable: unknown, name: string) => {
+  it("attaching an existing blob to a new record", async () => {
     const user = new User({ name: "Jason" });
-    await user.avatar.attach(attachable);
-    expect(user.isNewRecord()).toBe(true);
-    expect(await filename(user.avatar)).toBe(name);
+    await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
+    expect(user.isNewRecord()).toBeTruthy();
+    expect(await filename(user.avatar)).toBe("funky.jpg");
 
     await user.saveBang();
     await user.reload();
-    expect(await filename(user.avatar)).toBe(name);
-  };
-
-  it("attaching an existing blob to a new record", async () => {
-    await attachToNew(await createBlob({ filename: "funky.jpg" }), "funky.jpg");
+    expect(await filename(user.avatar)).toBe("funky.jpg");
   });
 
   it("attaching an existing blob from a signed ID to a new record", async () => {
-    await attachToNew((await createBlob({ filename: "funky.jpg" })).signedId(), "funky.jpg");
-  });
-
-  const attachNewBlobToNew = async (attachable: unknown, name: string) => {
     const user = new User({ name: "Jason" });
-    await user.avatar.attach(attachable);
-    expect(user.isNewRecord()).toBe(true);
-    expect((await user.avatar.attachment)!.isNewRecord()).toBe(true);
-    expect((await blobOf(user.avatar)).isNewRecord()).toBe(true);
-    expect(await filename(user.avatar)).toBe(name);
-    const { key } = await blobOf(user.avatar);
-    expect(await exist(key)).toBe(false);
+    await user.avatar.attach((await createBlob({ filename: "funky.jpg" })).signedId());
+    expect(user.isNewRecord()).toBeTruthy();
+    expect(await filename(user.avatar)).toBe("funky.jpg");
 
     await user.saveBang();
-    expect((await user.avatar.attachment)!.isPersisted()).toBe(true);
-    expect((await blobOf(user.avatar)).isPersisted()).toBe(true);
     await user.reload();
-    expect(await filename(user.avatar)).toBe(name);
-    expect(await exist(key)).toBe(true);
-  };
+    expect(await filename(user.avatar)).toBe("funky.jpg");
+  });
 
   it("attaching a new blob from a Hash to a new record", async () => {
-    await attachNewBlobToNew(townHash(), "town.jpg");
+    const user = new User({ name: "Jason" });
+    await user.avatar.attach(townHash());
+    expect(user.isNewRecord()).toBeTruthy();
+    expect((await user.avatar.attachment)!.isNewRecord()).toBeTruthy();
+    expect((await blobOf(user.avatar)).isNewRecord()).toBeTruthy();
+    expect(await filename(user.avatar)).toBe("town.jpg");
+    const { key } = await blobOf(user.avatar);
+    expect(await exist(key)).toBeFalsy();
+
+    await user.saveBang();
+    expect((await user.avatar.attachment)!.isPersisted()).toBeTruthy();
+    expect((await blobOf(user.avatar)).isPersisted()).toBeTruthy();
+    await user.reload();
+    expect(await filename(user.avatar)).toBe("town.jpg");
+    expect(await exist(key)).toBeTruthy();
   });
 
   it("attaching a new blob from an uploaded file to a new record", async () => {
-    await attachNewBlobToNew(fixtureFileUpload("racecar.jpg"), "racecar.jpg");
+    const user = new User({ name: "Jason" });
+    await user.avatar.attach(fixtureFileUpload("racecar.jpg"));
+    expect(user.isNewRecord()).toBeTruthy();
+    expect((await user.avatar.attachment)!.isNewRecord()).toBeTruthy();
+    expect((await blobOf(user.avatar)).isNewRecord()).toBeTruthy();
+    expect(await filename(user.avatar)).toBe("racecar.jpg");
+    const { key } = await blobOf(user.avatar);
+    expect(await exist(key)).toBeFalsy();
+
+    await user.saveBang();
+    expect((await user.avatar.attachment)!.isPersisted()).toBeTruthy();
+    expect((await blobOf(user.avatar)).isPersisted()).toBeTruthy();
+    await user.reload();
+    expect(await filename(user.avatar)).toBe("racecar.jpg");
+    expect(await exist(key)).toBeTruthy();
   });
 
   it("creating a record with an existing blob attached", async () => {
@@ -524,11 +567,11 @@ describe("ActiveStorage::OneAttachedTest", () => {
   it("creating a record with a new blob from an uploaded file attached", async () => {
     const user = new User({ name: "Jason" });
     await user.setAvatar(fixtureFileUpload("racecar.jpg"));
-    expect(user.isNewRecord()).toBe(true);
-    expect((await user.avatar.attachment)!.isNewRecord()).toBe(true);
-    expect((await blobOf(user.avatar)).isNewRecord()).toBe(true);
+    expect(user.isNewRecord()).toBeTruthy();
+    expect((await user.avatar.attachment)!.isNewRecord()).toBeTruthy();
+    expect((await blobOf(user.avatar)).isNewRecord()).toBeTruthy();
     expect(await filename(user.avatar)).toBe("racecar.jpg");
-    expect(await exist((await blobOf(user.avatar)).key)).toBe(false);
+    expect(await exist((await blobOf(user.avatar)).key)).toBeFalsy();
 
     await user.saveBang();
     await user.reload();
@@ -536,13 +579,10 @@ describe("ActiveStorage::OneAttachedTest", () => {
   });
 
   it("creating a record with an unexpected object attached", async () => {
-    const error = await User.createBang({ name: "Jason", avatar: Symbol.for("foo") }).catch(
-      (e: unknown) => e,
+    const error = await assertRaises([ArgumentError], {}, () =>
+      User.createBang({ name: "Jason", avatar: Symbol.for("foo") }),
     );
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect((error as Error).message).toMatch(
-      /^Could not find or build blob: expected attachable, got .*foo/,
-    );
+    expect(error.message).toMatch(/^Could not find or build blob: expected attachable, got .*foo/);
   });
 
   it("analyzing a new blob from an uploaded file after attaching it to a new record", async () => {
@@ -551,7 +591,10 @@ describe("ActiveStorage::OneAttachedTest", () => {
         name: "Jason",
         avatar: fixtureFileUpload("racecar.jpg"),
       });
-      await expectAnalyzed(user.avatar);
+      const blob = await (await blobOf(user.avatar)).reload();
+      expect(blob.isAnalyzed()).toBeTruthy();
+      expect(blob.metadata.get("width")).toBe(4104);
+      expect(blob.metadata.get("height")).toBe(2736);
     });
   });
 
@@ -561,39 +604,42 @@ describe("ActiveStorage::OneAttachedTest", () => {
         name: "Jason",
         avatar: await directlyUploadFileBlob({ filename: "racecar.jpg" }),
       });
-      await expectAnalyzed(user.avatar);
+      const blob = await (await blobOf(user.avatar)).reload();
+      expect(blob.isAnalyzed()).toBeTruthy();
+      expect(blob.metadata.get("width")).toBe(4104);
+      expect(blob.metadata.get("height")).toBe(2736);
     });
   });
 
   it("detaching", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.avatar.detach());
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(true);
-    expect(await exist(blob.key)).toBe(true);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeTruthy();
+    expect(await exist(blob.key)).toBeTruthy();
   });
 
   it("detaching when record is not persisted", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     const user = new User();
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.avatar.detach());
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(true);
-    expect(await exist(blob.key)).toBe(true);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeTruthy();
+    expect(await exist(blob.key)).toBeTruthy();
   });
 
   it("purging", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
     await user.updateColumn("updated_at", "2000-01-01 00:00:00");
 
     await assertChanges(
@@ -602,43 +648,39 @@ describe("ActiveStorage::OneAttachedTest", () => {
       {},
       () => user.avatar.purge(),
     );
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await exist(blob.key)).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await exist(blob.key)).toBeFalsy();
   });
-
-  const attachShared = async (blob: Blob) => {
-    await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
-
-    const anotherUser = await User.createBang({ name: "John" });
-    await anotherUser.avatar.attach(blob);
-    expect(await anotherUser.avatar.isAttached()).toBe(true);
-  };
 
   it("purging an attachment with a shared blob", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
-    await attachShared(blob);
+    await user.avatar.attach(blob);
+    expect(await user.avatar.isAttached()).toBeTruthy();
+
+    const anotherUser = await User.createBang({ name: "John" });
+    await anotherUser.avatar.attach(blob);
+    expect(await anotherUser.avatar.isAttached()).toBeTruthy();
 
     await user.avatar.purge();
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(true);
-    expect(await exist(blob.key)).toBe(true);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeTruthy();
+    expect(await exist(blob.key)).toBeTruthy();
   });
 
   it("purging when record is not persisted", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     const user = new User();
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
 
     const attachment = (await user.avatar.attachment)!;
     await user.avatar.purge();
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(attachment.isDestroyed()).toBe(true);
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await exist(blob.key)).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(attachment.isDestroyed()).toBeTruthy();
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await exist(blob.key)).toBeFalsy();
   });
 
   it("purging delete changes when record is not persisted", async () => {
@@ -653,7 +695,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
   it("purging later", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
     await user.updateColumn("updated_at", "2000-01-01 00:00:00");
 
     await performEnqueuedJobs(() =>
@@ -665,35 +707,40 @@ describe("ActiveStorage::OneAttachedTest", () => {
       ),
     );
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await exist(blob.key)).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await exist(blob.key)).toBeFalsy();
   });
 
   it("purging an attachment later with shared blob", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
-    await attachShared(blob);
+    await user.avatar.attach(blob);
+    expect(await user.avatar.isAttached()).toBeTruthy();
+
+    const anotherUser = await User.createBang({ name: "John" });
+    await anotherUser.avatar.attach(blob);
+    expect(await anotherUser.avatar.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.avatar.purgeLater());
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(await Blob.isExists(blob.id)).toBe(true);
-    expect(await exist(blob.key)).toBe(true);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(await Blob.isExists(blob.id)).toBeTruthy();
+    expect(await exist(blob.key)).toBeTruthy();
   });
 
   it("purging an attachment later when record is not persisted", async () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     const user = new User();
     await user.avatar.attach(blob);
-    expect(await user.avatar.isAttached()).toBe(true);
+    expect(await user.avatar.isAttached()).toBeTruthy();
 
     const attachment = (await user.avatar.attachment)!;
     await performEnqueuedJobs(() => user.avatar.purgeLater());
 
-    expect(await user.avatar.isAttached()).toBe(false);
-    expect(attachment.isDestroyed()).toBe(true);
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await exist(blob.key)).toBe(false);
+    expect(await user.avatar.isAttached()).toBeFalsy();
+    expect(attachment.isDestroyed()).toBeTruthy();
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await exist(blob.key)).toBeFalsy();
   });
 
   it("purging dependent attachment later on destroy", async () => {
@@ -702,8 +749,8 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     await performEnqueuedJobs(() => user.destroyBang());
 
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await exist(blob.key)).toBe(false);
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await exist(blob.key)).toBeFalsy();
   });
 
   it("not purging independent attachment on destroy", async () => {
@@ -721,20 +768,20 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
   it("duped record does not share attachment changes", async () => {
     await user.avatar.attach(await createBlob({ filename: "funky.jpg" }));
-    expect(user.changedForAutosave()).toBe(false);
+    expect(user.changedForAutosave()).toBeFalsy();
 
     await user.dup().avatar.attach(await createBlob({ filename: "town.jpg" }));
-    expect(user.changedForAutosave()).toBe(false);
+    expect(user.changedForAutosave()).toBeFalsy();
   });
 
   it("clearing change on reload", async () => {
     await user.setAvatar(await createBlob({ filename: "funky.jpg" }));
     await user.avatar.load();
-    expect(user.avatar.isAttached()).toBe(true);
+    expect(user.avatar.isAttached()).toBeTruthy();
 
     await user.reload();
     await user.avatar.load();
-    expect(user.avatar.isAttached()).toBe(false);
+    expect(user.avatar.isAttached()).toBeFalsy();
   });
 
   it("overriding attached reader", async () => {
@@ -820,25 +867,24 @@ describe("ActiveStorage::OneAttachedTest", () => {
     const service = activeStorage.service;
     activeStorage.service = null;
     try {
-      await assertRaises(
-        [RuntimeError],
-        {
-          match:
-            /Missing Active Storage service name. Specify Active Storage service name for config.active_storage.service in config\/environments\/test.rb/,
-        },
-        () => {
-          (User as unknown as Attachable).hasOneAttached("featuredPhoto");
-        },
+      const error = await assertRaises([RuntimeError], {}, () => {
+        (User as unknown as Attachable).hasOneAttached("featuredPhoto");
+      });
+
+      expect(error.message).toMatch(
+        /Missing Active Storage service name. Specify Active Storage service name for config.active_storage.service in config\/environments\/test.rb/,
       );
     } finally {
       activeStorage.service = service;
     }
   });
 
-  it("raises error when misconfigured service is passed", () => {
-    expect(() =>
+  it("raises error when misconfigured service is passed", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
       (User as unknown as Attachable).hasOneAttached("featuredPhoto", { service: "unknown" }),
-    ).toThrow(/Cannot configure service "unknown" for .*User#featuredPhoto/);
+    );
+
+    expect(error.message).toMatch(/Cannot configure service "unknown" for .*User#featuredPhoto/);
   });
 
   it("raises error when misconfigured service is defined at runtime", async () => {

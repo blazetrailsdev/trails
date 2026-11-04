@@ -40,7 +40,8 @@
   },
   "devDependencies": {
     "@blazetrails/mini-magick": "workspace:*",
-    "@blazetrails/image-processing": "workspace:*"
+    "@blazetrails/image-processing": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "peerDependencies": {
     "@blazetrails/image-processing": "workspace:*"

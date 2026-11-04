@@ -4,11 +4,11 @@ import { TopLevel, type HashWithIndifferentAccess } from "@blazetrails/activesup
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Base } from "@blazetrails/activerecord";
 import { OpenSSL } from "@blazetrails/ruby-compat";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Blob } from "./blob.js";
-import { Current } from "./current.js";
-import "./direct-uploads-controller.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Blob } from "../blob.js";
+import { Current } from "../current.js";
+import "../direct-uploads-controller.js";
 
 const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
 let session: IntegrationTest;
