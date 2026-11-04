@@ -83,21 +83,7 @@ export class Builder {
     const source =
       `(function (builder, topLevel) { with (topLevel) { return (function () { "use strict"; ${builderScript}\n})(); } })` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    let configFn: (b: Builder, topLevel: object) => void;
-    try {
-      configFn = (0, eval)(source) as (b: Builder, topLevel: object) => void;
-    } catch (err) {
-      throw new Error(`Error parsing config from ${path}: ${(err as Error).message}`, {
-        cause: err,
-      });
-    }
-    try {
-      configFn(binding, TopLevel);
-    } catch (err) {
-      throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
-        cause: err,
-      });
-    }
+    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(binding, TopLevel);
     return builder.toApp();
   }
 
