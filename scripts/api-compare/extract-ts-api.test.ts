@@ -6402,12 +6402,13 @@ function emitInventory(info: PackageInfo, file: string): EmitEntry[] {
 
 /**
  * The pinned inventory. Every entry has a tagged declaration behind it and so
- * expects `hasReason: true`, except three:
+ * expects `hasReason: true`, except these:
  *
  * - `<fileFunctions>#Attributes` — the mixin factory, left untagged so an
  *   untagged counted site is represented too.
- * - `<fileFunctions>#aliasTarget` / `#shorthandRef` — `extractFileLocalHelpers`
- *   output, always `internal: true`, so uncounted and never metadata-bearing.
+ * - `<fileFunctions>#aliasTarget` — `extractFileLocalHelpers` output, always
+ *   `internal: true`, so uncounted; it carries no tag. `#shorthandRef` is the
+ *   same shape tagged, and its receipt reaches the privates lane (RFC 0218).
  * - `<fileFunctions>#renamedExport` — an untagged `export { x as y }` alias
  *   drops the declaration's reason: the reason justifies the declared
  *   spelling, not the alias. `#taggedAlias` is the tagged form.
@@ -6417,7 +6418,7 @@ const EMIT_SITE_INVENTORY: EmitEntry[] = [
   { container: "<fileFunctions>", name: "aliasTarget", counted: false, hasReason: false },
   { container: "<fileFunctions>", name: "renameSource", counted: true, hasReason: true },
   { container: "<fileFunctions>", name: "renamedExport", counted: true, hasReason: false },
-  { container: "<fileFunctions>", name: "shorthandRef", counted: false, hasReason: false },
+  { container: "<fileFunctions>", name: "shorthandRef", counted: false, hasReason: true },
   { container: "<fileFunctions>", name: "taggedAlias", counted: true, hasReason: true },
   { container: "<fileFunctions>", name: "topLevel", counted: true, hasReason: true },
   {
