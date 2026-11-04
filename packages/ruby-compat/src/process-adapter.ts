@@ -435,17 +435,43 @@ export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
 }
 
-const traps = new Map<SignalName, () => void>();
+type TrapCommand =
+  | (() => void)
+  | ""
+  | "IGNORE"
+  | "SIG_IGN"
+  | "DEFAULT"
+  | "SIG_DFL"
+  | "SYSTEM_DEFAULT"
+  | "EXIT";
+
+const traps = new Map<SignalName, { command: TrapCommand; off: (() => void) | null }>();
 
 /**
- * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348), which replaces
- * the signal's previous handler.
+ * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348): installs
+ * `command` for `signal` in place of the previous one and answers the previous
+ * one. String commands follow `trap_handler` (signal.c:1158): `""`, `IGNORE`
+ * and `SIG_IGN` ignore the signal, `DEFAULT`, `SIG_DFL` and `SYSTEM_DEFAULT`
+ * restore the default, and `EXIT` exits. A signal never trapped answers
+ * `"DEFAULT"`, as `trap` (signal.c:1247) does for its own handler.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function trap(signal: SignalName, command: () => void): void {
-  traps.get(signal)?.();
-  traps.set(signal, onSignal(signal, command));
+export function trap(signal: SignalName, command: TrapCommand): TrapCommand {
+  const previous = traps.get(signal);
+  previous?.off?.();
+  let off: (() => void) | null;
+  if (typeof command === "function") {
+    off = onSignal(signal, command);
+  } else if (command === "" || command === "IGNORE" || command === "SIG_IGN") {
+    off = onSignal(signal, () => {});
+  } else if (command === "EXIT") {
+    off = onSignal(signal, () => exit());
+  } else {
+    off = null;
+  }
+  traps.set(signal, { command, off });
+  return previous?.command ?? "DEFAULT";
 }
 
 /** @noRailsEquivalent PERMANENT */

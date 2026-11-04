@@ -559,9 +559,16 @@ describe("trap", () => {
       }),
     );
     const calls: string[] = [];
-    trap("SIGINT", () => calls.push("rails"));
-    trap("SIGINT", () => calls.push("rackup"));
+    const rails = () => void calls.push("rails");
+    expect(trap("SIGINT", rails)).toBe("DEFAULT");
+    expect(trap("SIGINT", () => void calls.push("rackup"))).toBe(rails);
     for (const listener of listeners) listener();
     expect(calls).toEqual(["rackup"]);
+
+    expect(typeof trap("SIGINT", "IGNORE")).toBe("function");
+    for (const listener of listeners) listener();
+    expect(calls).toEqual(["rackup"]);
+    expect(trap("SIGINT", "DEFAULT")).toBe("IGNORE");
+    expect(listeners.size).toBe(0);
   });
 });
