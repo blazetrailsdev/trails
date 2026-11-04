@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/rack";
 import {
   abort,
-  argv,
+  ARGV,
   Errno,
   env,
   exit,
@@ -298,7 +298,7 @@ export class Server {
       if (options.app != null) this._app = options.app;
     } else {
       this._useDefaultOptions = true;
-      this._ready = this.parseOptions([...argv]).then((parsed) => {
+      this._ready = this.parseOptions(ARGV).then((parsed) => {
         this._options = parsed;
       });
     }

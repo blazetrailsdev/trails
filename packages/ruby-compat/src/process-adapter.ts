@@ -92,6 +92,15 @@ export function rbArgv(): string[] {
 }
 
 /**
+ * MRI's `ARGV` constant (`rb_argv`, vendor/ruby/v3.3.11/ruby.c:2980), the
+ * array `rbArgv` answers: one array for the life of the process, refilled in
+ * place when a process adapter is registered.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ARGV: string[] = rbArgvInternal;
+
+/**
  * MRI's `$PROGRAM_NAME` / `$0` (`rb_progname`,
  * vendor/ruby/v3.3.11/ruby.c:2970-2971): the name of the script being run.
  *

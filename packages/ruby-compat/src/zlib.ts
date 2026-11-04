@@ -166,9 +166,11 @@ class Inflate {
 
   constructor(private readonly windowBits = 15) {}
 
-  static inflate(src: string): Uint8Array {
+  static inflate(src: string | Uint8Array): Uint8Array {
     try {
-      return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
+      return getZlib().inflate(
+        typeof src === "string" ? Uint8Array.from(src, (c) => c.charCodeAt(0)) : src,
+      );
     } catch (error) {
       throw new ZError((error as Error).message);
     }
