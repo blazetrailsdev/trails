@@ -1229,6 +1229,8 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 // Once your application is ready to run with all new defaults, you can remove
 // this file and set the \`config.loadDefaults\` to \`${VERSION.MAJOR}.${VERSION.MINOR}\`.
 
+import { Trails } from "@blazetrails/trailties";
+
 ///
 // Specifies whether \`toTime\` methods preserve the UTC offset of their receivers or preserves the timezone.
 // If set to \`":zone"\`, \`toTime\` methods will use the timezone of their receivers.
