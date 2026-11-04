@@ -531,7 +531,10 @@ export class Server {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall read — PERMANENT
+   */
   private async checkPidBang(): Promise<void> {
     if (!(await File.isExistAsync(this.options.pid!))) return;
 

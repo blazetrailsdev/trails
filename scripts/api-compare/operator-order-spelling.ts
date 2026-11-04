@@ -106,6 +106,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
   "Rack::Multipart::ParamList": { "<<": ["push"] },
   "Rack::NullLogger": { "<<": ["append"] },
+  "Rackup::Stream": { "<<": ["append"] },
   // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts
   // `CookieJar#get`, :379 `def []=(name, options)` → `set`; :513 / :525 on
   // `AbstractCookieJar` likewise.
