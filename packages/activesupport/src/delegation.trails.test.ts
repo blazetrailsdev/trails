@@ -82,6 +82,17 @@ describe("Delegation.generate", () => {
     );
   });
 
+  it("names a class receiver as a class", () => {
+    class Customer {
+      declare greet: () => string;
+    }
+    Delegation.generate(Customer.prototype, ["greet"], { to: "class" });
+
+    expect(() => new Customer().greet()).toThrow(
+      new NoMethodError("undefined method 'greet' for class Customer"),
+    );
+  });
+
   it("returns a function-valued accessor's value without calling it", () => {
     class Job {}
     class Customer {

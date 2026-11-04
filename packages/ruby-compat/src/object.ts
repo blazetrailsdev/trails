@@ -99,6 +99,32 @@ export function rbObjClass(obj: unknown): Klass {
 }
 
 /**
+ * The receiver phrase of `name_err_mesg_to_str`
+ * (`vendor/ruby/v3.3.11/error.c:2325-2390`), the `%3$s%4$s` of an
+ * `undefined method '…' for …` message: `nil`, `true` or `false` for those
+ * receivers, `module M` / `class C` for a module or class, and
+ * `an instance of C` otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function nameErrMesgReceiver(obj: unknown): string {
+  switch (obj) {
+    case null:
+    case undefined:
+      return "nil";
+    case true:
+      return "true";
+    case false:
+      return "false";
+  }
+  if (typeof obj === "function") return `class ${rbModToS(obj as new () => unknown)}`;
+  if (typeof obj === "object" && isModuleObject(obj as object)) {
+    return `module ${rbModToS(obj as never)}`;
+  }
+  return `an instance of ${rbObjClassname(obj)}`;
+}
+
+/**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
  * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
  * interpolates `obj.class`.

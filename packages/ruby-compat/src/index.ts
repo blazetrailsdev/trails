@@ -103,6 +103,7 @@ export {
   rbClassAttachedObject,
   rbModToS,
   rbObjClassname,
+  nameErrMesgReceiver,
   rbObjRespondTo,
   rbObjSingletonClass,
   rbSetClassPathString,
