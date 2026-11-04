@@ -877,43 +877,14 @@ export default await Trails.initialize();
 `,
     );
 
-    await this.template("config/routes.ts");
+    if (!this.options.update) await this.template("config/routes.ts");
 
-    if (!this.skipActionCable()) {
-      await this.createFile(
-        "config/cable.ts",
-        `export default {
-  development: {
-    adapter: "async",
-  },
-  test: {
-    adapter: "test",
-  },
-  production: {
-    adapter: "redis",
-    url: process.env.REDIS_URL ?? "redis://localhost:6379/1",
-    channelPrefix: "${this.appName()}_production",
-  },
-};
-`,
-      );
+    if (!(this.options.update || this.skipActionCable())) {
+      await this.template("config/cable.ts");
     }
 
-    if (!this.skipActiveStorage()) {
-      await this.createFile(
-        "config/storage.ts",
-        `export default {
-  local: {
-    service: "Disk",
-    root: "storage",
-  },
-  test: {
-    service: "Disk",
-    root: "tmp/storage",
-  },
-};
-`,
-      );
+    if (!(this.options.update || this.skipActiveStorage())) {
+      await this.template("config/storage.ts");
     }
 
     await this.createFile(
@@ -1267,23 +1238,26 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
-    await this.createFile(
-      "config/locales/en.json",
-      JSON.stringify(
-        {
-          en: {
-            hello: "Hello world",
+    if (!this.options.update) {
+      await this.createFile(
+        "config/locales/en.json",
+        JSON.stringify(
+          {
+            en: {
+              hello: "Hello world",
+            },
           },
-        },
-        null,
-        2,
-      ) + "\n",
-    );
+          null,
+          2,
+        ) + "\n",
+      );
+    }
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async configWhenUpdating(): Promise<void> {
     const root = this.destinationRoot;
+    const actionCableConfigExist = await File.isExistAsync(File.join(root, "config/cable.ts"));
+    const activeStorageConfigExist = await File.isExistAsync(File.join(root, "config/storage.ts"));
     const rackCorsConfigExist = await File.isExistAsync(
       File.join(root, "config/initializers/cors.ts"),
     );
@@ -1300,6 +1274,14 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     this._configTargetVersion = String(Trails.application!.config.loadedConfigVersion ?? "5.0");
 
     await this.config();
+
+    if (!this.options.skipActionCable && !actionCableConfigExist) {
+      await this.template("config/cable.ts");
+    }
+
+    if (!this.skipActiveStorage() && !activeStorageConfigExist) {
+      await this.template("config/storage.ts");
+    }
 
     if (this.skipAssetPipeline() && !assetsConfigExist) {
       await this.removeFile("config/initializers/assets.ts");
@@ -1745,11 +1727,11 @@ export class AppGenerator extends AppBase {
     await this.build("config");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async updateConfigFiles(): Promise<void> {
     await this.build("configWhenUpdating");
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async createBootFile(): Promise<void> {
     await this.template("config/boot.ts", "config/boot.ts");
   }

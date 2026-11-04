@@ -31,6 +31,7 @@ export type AppBaseOptions = GeneratorOptions & {
   database?: DatabaseName;
   template?: string;
   api?: boolean;
+  update?: boolean;
   devcontainer?: boolean;
   dev?: boolean;
   edge?: boolean;
