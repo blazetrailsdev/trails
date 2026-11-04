@@ -76,7 +76,9 @@ async function sendBlobByteRangeData(
 /** @internal */
 async function sendBlobStream(
   this: StreamingHost,
-  blob: Pick<Blob, "forcedDispositionForServing" | "contentTypeForServing"> & {
+  blob: {
+    forcedDispositionForServing(): "attachment" | undefined | Promise<"attachment" | undefined>;
+    contentTypeForServing(): string | null | Promise<string | null>;
     filename: Filename | Promise<Filename>;
     download(block: (chunk: Uint8Array) => unknown): Promise<unknown>;
   },

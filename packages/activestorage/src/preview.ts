@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, StandardError, type Included } from "@blazetrails/ruby-compat";
+import { include, StandardError } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
@@ -19,13 +19,13 @@ interface Presented {
   contentType: string | null;
   key: string | null | Promise<string | null>;
   url(options?: Parameters<Blob["url"]>[0]): unknown;
+  contentTypeForServing(): string | null;
+  forcedDispositionForServing(): "attachment" | undefined;
+  forciblyServeAsBinary(): boolean;
+  isAllowedInline(): boolean;
   download(block?: (chunk: Uint8Array) => unknown): Promise<Uint8Array | void | null>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Preview extends Included<typeof Servable> {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Preview {
   static readonly UnprocessedError = UnprocessedError;
 
@@ -105,6 +105,24 @@ export class Preview {
   /** @internal */
   private variant(): Variant | VariantWithRecord {
     return (this.image as One & Attachment).variant(this.variation);
+  }
+
+  async contentTypeForServing(): Promise<string | null> {
+    return (await this.presentation()).contentTypeForServing();
+  }
+
+  async forcedDispositionForServing(): Promise<"attachment" | undefined> {
+    return (await this.presentation()).forcedDispositionForServing();
+  }
+
+  /** @internal */
+  async forciblyServeAsBinary(): Promise<boolean> {
+    return (await this.presentation()).forciblyServeAsBinary();
+  }
+
+  /** @internal */
+  async isAllowedInline(): Promise<boolean> {
+    return (await this.presentation()).isAllowedInline();
   }
 
   /** @internal */
