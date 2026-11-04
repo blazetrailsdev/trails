@@ -13,14 +13,10 @@ function buildMail(): Message {
 
 const DESTS = "-- marcel@test.lindsaar.net bob@test.lindsaar.net";
 
-function stubPopen(dm: Sendmail) {
-  return vi
+async function argvFor(dm: Sendmail, mail = buildMail()): Promise<unknown> {
+  const popen = vi
     .spyOn(dm as unknown as { popen(command: unknown): Promise<unknown> }, "popen")
     .mockResolvedValue(null);
-}
-
-async function argvFor(dm: Sendmail, mail = buildMail()): Promise<unknown> {
-  const popen = stubPopen(dm);
   await dm.deliverBang(mail);
   return popen.mock.calls[0][0];
 }

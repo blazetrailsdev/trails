@@ -12,7 +12,8 @@ export async function mockSmtp(): Promise<number> {
     closeTimeout: 50,
     onData(stream, session, callback) {
       let data = "";
-      stream.on("data", (chunk: Uint8Array) => (data += new TextDecoder().decode(chunk)));
+      stream.setEncoding("utf8");
+      stream.on("data", (chunk: string) => (data += chunk));
       stream.on("end", () => {
         deliveries.push([
           data,
@@ -23,6 +24,7 @@ export async function mockSmtp(): Promise<number> {
       });
     },
   });
+  server.on("error", () => {});
   servers.push(server);
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
   return (server.server.address() as { port: number }).port;

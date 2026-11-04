@@ -10,14 +10,10 @@ function buildMail(): Message {
   return mail;
 }
 
-function stubPopen(dm: Exim) {
-  return vi
+async function argvFor(dm: Exim, mail = buildMail()): Promise<unknown> {
+  const popen = vi
     .spyOn(dm as unknown as { popen(command: unknown): Promise<unknown> }, "popen")
     .mockResolvedValue(null);
-}
-
-async function argvFor(dm: Exim, mail = buildMail()): Promise<unknown> {
-  const popen = stubPopen(dm);
   await dm.deliverBang(mail);
   return popen.mock.calls[0][0];
 }
