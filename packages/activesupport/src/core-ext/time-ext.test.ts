@@ -32,7 +32,6 @@ import {
   toDate,
   daysInMonth,
   daysInYear,
-  nextWeek,
   nextMonth,
   prevMonth,
   nextYear,
@@ -55,6 +54,7 @@ type CalculationsTime = RubyTime & {
   tomorrow(): RubyTime;
   yesterday(): RubyTime;
   lastWeek(startDay?: string): RubyTime;
+  nextWeek(givenDayInNextWeek?: string): RubyTime;
 };
 
 expect.addEqualityTesters([
@@ -1425,17 +1425,17 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight start", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek.call(new Date(2006, 3, 2, 23, 1, 0), ":monday"));
-      expect(result.getDate()).toBe(3);
-      expect(result.getMonth()).toBe(3);
+      expect((RubyTime.local(2006, 4, 2, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 4, 3),
+      );
     });
   });
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek.call(new Date(2006, 9, 29, 23, 1, 0), ":monday"));
-      expect(result.getDate()).toBe(30);
-      expect(result.getMonth()).toBe(9);
+      expect((RubyTime.local(2006, 10, 29, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 10, 30),
+      );
     });
   });
 

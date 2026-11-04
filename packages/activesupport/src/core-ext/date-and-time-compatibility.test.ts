@@ -399,8 +399,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = "2016-04-23T15:11:12+01:00";
         const time = stringToTime(source)!;
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(utcOffsetValue);
       }),
     );
@@ -412,8 +414,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = "2016-04-23T15:11:12+01:00";
         const time = stringToTime(source)!;
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(systemOffset);
       }),
     );
@@ -425,8 +429,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = "2016-04-23T15:11:12+01:00";
         const time = stringToTime(source)!;
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(utcOffsetValue);
         assertNotPredicate(time, (t) => Object.isFrozen(t));
       }),
@@ -439,8 +445,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = "2016-04-23T15:11:12+01:00";
         const time = stringToTime(source)!;
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(systemOffset);
         assertNotPredicate(time, (t) => Object.isFrozen(t));
       }),

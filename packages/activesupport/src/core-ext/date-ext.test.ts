@@ -440,7 +440,7 @@ describe("DateExtCalculationsTest", () => {
   it("current returns date today when zone not set", () => {
     withEnvTz("US/Central", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(new Date(1999, 11, 31, 23));
+      vi.setSystemTime(RubyTime.local(1999, 12, 31, 23).toZonedDateTime().epochMilliseconds);
       try {
         expect(DateExt.current().toString()).toEqual(RubyDate.today().toString());
       } finally {

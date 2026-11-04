@@ -6,7 +6,7 @@ import "../time/compatibility.js";
 
 const USED_KEYS = ["year", "mon", "mday", "hour", "min", "sec", "secFraction", "offset"] as const;
 
-export function toTime(str: string, form: string = "local"): Temporal.ZonedDateTime | undefined {
+export function toTime(str: string, form: string = "local"): Time | undefined {
   const parts = RubyDate._parse(str, false) as Record<string, unknown>;
   const usedKeys = USED_KEYS;
   if (!usedKeys.some((key) => key in parts)) return undefined;
@@ -27,7 +27,7 @@ export function toTime(str: string, form: string = "local"): Temporal.ZonedDateT
     offset instanceof Rational ? offset.toF() : offset,
   );
 
-  return (form === "utc" ? time.utc() : time.toTime()).toZonedDateTime();
+  return form === "utc" ? time.utc() : time.toTime();
 }
 
 export function toDate(str: string): Temporal.PlainDate | undefined {

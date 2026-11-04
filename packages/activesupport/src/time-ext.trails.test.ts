@@ -93,15 +93,25 @@ describe("change over a ::Time receiver", () => {
 describe("advance over a JS Date receiver", () => {
   it("floors a negative fractional weeks like Ruby's divmod", () => {
     withEnvTz("US/Eastern", () => {
-      const advanced = advance(new Date(2005, 3, 13, 15, 15, 10), { weeks: -1.5 });
-      expect(new Date(advanced.epochMilliseconds)).toEqual(new Date(2005, 3, 3, 4, 15, 10));
+      const advanced = advance(
+        new Date(RubyTime.local(2005, 4, 13, 15, 15, 10).toZonedDateTime().epochMilliseconds),
+        { weeks: -1.5 },
+      );
+      expect(new Date(advanced.epochMilliseconds)).toEqual(
+        new Date(RubyTime.local(2005, 4, 3, 4, 15, 10).toZonedDateTime().epochMilliseconds),
+      );
     });
   });
 
   it("floors a negative fractional days like Ruby's divmod", () => {
     withEnvTz("US/Eastern", () => {
-      const advanced = advance(new Date(2005, 3, 8, 15, 15, 10), { days: -5.5 });
-      expect(new Date(advanced.epochMilliseconds)).toEqual(new Date(2005, 3, 3, 4, 15, 10));
+      const advanced = advance(
+        new Date(RubyTime.local(2005, 4, 8, 15, 15, 10).toZonedDateTime().epochMilliseconds),
+        { days: -5.5 },
+      );
+      expect(new Date(advanced.epochMilliseconds)).toEqual(
+        new Date(RubyTime.local(2005, 4, 3, 4, 15, 10).toZonedDateTime().epochMilliseconds),
+      );
     });
   });
 });
