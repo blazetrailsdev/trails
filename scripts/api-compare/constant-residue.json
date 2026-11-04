@@ -1092,10 +1092,13 @@
     "residue": { "test.ts::Test": "Rack::Test" }
   },
   "rackup": {
-    "rows": 4,
+    "rows": 6,
     "excluded": ["handler/node.ts::Node"],
     "unwalked": [],
-    "residue": { "server.ts::Options": "Rackup::Server::Options" }
+    "residue": {
+      "server.ts::Options": "Rackup::Server::Options",
+      "stream.ts::Reader": "Rackup::Stream::Reader"
+    }
   },
   "rake": {
     "rows": 33,
