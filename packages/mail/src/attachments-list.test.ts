@@ -1,7 +1,6 @@
 import { Encoding, IO, rbObjEncoding, regexpEscape } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Encodings } from "./encodings.js";
-import { Base64 } from "./encodings/base64.js";
 import { ContentIdField } from "./fields/content-id-field.js";
 import "./index.js";
 import { Mail } from "./mail.js";
@@ -15,7 +14,7 @@ const readRawFixture = async (...path: string[]) =>
 const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
 
 function encodeBase64(str: unknown) {
-  return Base64.encode(str as string);
+  return Encodings.Base64!.encode(str as string);
 }
 
 function checkDecoded(actual: unknown, expected: string | Uint8Array) {

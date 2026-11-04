@@ -72,6 +72,12 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
+declare module "@blazetrails/ruby-compat" {
+  interface TrailsConfiguration {
+    activeStorage: ActiveStorageConfig;
+  }
+}
+
 /**
  * @missingRailsCall parse — PERMANENT
  * @inventedArm import — PERMANENT
@@ -221,15 +227,12 @@ export class Engine extends TrailsEngine {
       const configFileExist = await File.isExistAsync(configFile);
       const mod: { default?: Record<string, Record<string, unknown>> } | null =
         configFileExist &&
-        (TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig })
-          .activeStorage.serviceConfigurations == null
+        TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations == null
           ? await import(getPath().pathToFileURL!(configFile).href)
           : null;
 
       onLoad("active_storage_blob", () => {
-        const activeStorage = (
-          TopLevel.Trails!.configuration as unknown as { activeStorage: ActiveStorageConfig }
-        ).activeStorage;
+        const activeStorage = TopLevel.Trails!.configuration!.activeStorage;
         const configs = (activeStorage.serviceConfigurations ||= (() => {
           if (!configFileExist)
             throw new RuntimeError(`Couldn't find Active Storage configuration in ${configFile}`);

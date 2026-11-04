@@ -74,6 +74,13 @@ interface ParametersInstance {
 export { TopLevel } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
+  interface TrailsConfiguration {
+    generators(): {
+      options: { get(namespace: unknown): Record<string, unknown> | undefined };
+      orm?(): unknown;
+    };
+  }
+
   interface TopLevelConstants {
     I18n?: typeof import("@blazetrails/i18n");
     ActiveSupport?: typeof ActiveSupport;
@@ -110,12 +117,7 @@ declare module "@blazetrails/ruby-compat" {
       Engine: abstract new (...args: never[]) => unknown;
       Trailtie: abstract new (...args: never[]) => unknown;
       root(): string | null | undefined;
-      configuration?: {
-        generators(): {
-          options: { get(namespace: unknown): Record<string, unknown> | undefined };
-          orm?(): unknown;
-        };
-      } | null;
+      configuration?: TrailsConfiguration | null;
     };
     ActionDispatch?: {
       Request: new (env: Record<string, unknown>) => {

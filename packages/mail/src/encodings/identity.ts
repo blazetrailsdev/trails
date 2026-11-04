@@ -1,3 +1,4 @@
+import { Encodings } from "../encodings.js";
 import { TransferEncoding } from "./transfer-encoding.js";
 
 export class Identity extends TransferEncoding {
@@ -11,5 +12,9 @@ export class Identity extends TransferEncoding {
 
   static override cost(_str: string): number {
     return 1.0;
+  }
+
+  static {
+    Encodings.Identity = this;
   }
 }

@@ -1,5 +1,10 @@
 import { Temporal } from "@blazetrails/date";
-import { STRING_METHOD_TABLE, rbDefineMethod } from "@blazetrails/ruby-compat";
+import {
+  OBJECT_METHOD_TABLE,
+  STRING_METHOD_TABLE,
+  rbDefineMethod,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { stripThenable } from "../../strip-thenable.js";
 
@@ -22,6 +27,15 @@ type TimeValue =
   | Temporal.PlainDate
   | Temporal.PlainDateTime
   | Temporal.PlainTime;
+
+OBJECT_METHOD_TABLE.isBlank = (self: object): boolean => {
+  if (rbObjRespondTo(self, "isEmpty")) {
+    const empty: unknown = (self as { isEmpty(): unknown }).isEmpty();
+    return empty != null && empty !== false;
+  } else {
+    return false;
+  }
+};
 
 export class NilClass {
   static toString(): string {

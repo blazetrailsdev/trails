@@ -5,6 +5,7 @@ export class Binary extends Identity {
   static override readonly NAME: string = "binary";
   static override readonly PRIORITY: number = 5;
   static {
+    Encodings.Binary = this;
     Encodings.register(this.NAME, this);
   }
 }

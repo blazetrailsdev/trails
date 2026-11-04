@@ -90,4 +90,8 @@ export class TransferEncoding {
 
     return best;
   }
+
+  static {
+    Encodings.TransferEncoding = this;
+  }
 }
