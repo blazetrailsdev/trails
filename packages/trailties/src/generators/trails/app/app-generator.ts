@@ -1228,11 +1228,14 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 // Uncomment each configuration one by one to switch to the new default.
 // Once your application is ready to run with all new defaults, you can remove
 // this file and set the \`config.loadDefaults\` to \`${VERSION.MAJOR}.${VERSION.MINOR}\`.
+//
+// Read the Guide for Upgrading Trails for more info on each option.
+// https://github.com/blazetrailsdev/blazetrails
 
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
-  ///
+  // ###
   // Specifies whether \`toTime\` methods preserve the UTC offset of their receivers or preserves the timezone.
   // If set to \`":zone"\`, \`toTime\` methods will use the timezone of their receivers.
   // If set to \`":offset"\`, \`toTime\` methods will use the UTC offset.
@@ -1240,7 +1243,7 @@ Trails.application.configure(function () {
   //++
   // this.config.activeSupport.toTimePreservesTimezone = ":zone";
 
-  ///
+  // ###
   // When both \`If-Modified-Since\` and \`If-None-Match\` are provided by the client
   // only consider \`If-None-Match\` as specified by RFC 7232 Section 6.
   // If set to \`false\` both conditions need to be satisfied.
