@@ -19,6 +19,7 @@
     { "path": "../mini-magick" },
     { "path": "../rack-test" },
     { "path": "../ruby-compat" },
-    { "path": "../trailties" }
+    { "path": "../trailties" },
+    { "path": "../vitest-matchers" }
   ]
 }

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { Base } from "@blazetrails/activerecord";
 import { readingRole } from "@blazetrails/activerecord/active-record";
 import { assertChanges, assertRaises, freezeTime, travelBack } from "@blazetrails/activesupport";

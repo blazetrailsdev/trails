@@ -489,6 +489,9 @@ importers:
       '@blazetrails/mini-magick':
         specifier: workspace:*
         version: link:../mini-magick
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/activesupport:
     dependencies:

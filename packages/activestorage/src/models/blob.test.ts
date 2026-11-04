@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import {
   assertCalledWith,
   assertChanges,
