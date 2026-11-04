@@ -548,6 +548,14 @@ export function _takeAssertions(): number {
   return count;
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function _addAssertions(n: number): void {
+  _assertions += n;
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function assert(value: unknown, message: string | (() => string) | null = null): true {
   _assertions += 1;

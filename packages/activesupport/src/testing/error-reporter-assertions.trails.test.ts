@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ActiveSupport } from "../index.js";
 import { assertErrorReported, assertNoErrorReported } from "./error-reporter-assertions.js";
+import { _takeAssertions } from "./assertions.js";
 
 class IOError extends Error {}
 
@@ -12,6 +13,14 @@ describe("ActiveSupport::Testing::ErrorReporterAssertions", () => {
     expect(report?.error.message).toBe("Oops");
     expect(report?.context.section).toBe("admin");
     expect(report?.isHandled()).toBe(true);
+  });
+
+  it("counts the matched report as an assertion", async () => {
+    _takeAssertions();
+    await assertErrorReported(IOError, () => {
+      ActiveSupport.errorReporter.report(new IOError("Oops"));
+    });
+    expect(_takeAssertions()).toBe(2);
   });
 
   it("fails when no error is reported", async () => {

@@ -1,7 +1,13 @@
 import { ActiveSupport } from "../index.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 import type { ErrorContext, ErrorSeverity } from "../error-reporter.js";
-import { assert, assertPredicate, Assertion, _assertNothingRaisedOrWarn } from "./assertions.js";
+import {
+  assert,
+  assertPredicate,
+  Assertion,
+  _addAssertions,
+  _assertNothingRaisedOrWarn,
+} from "./assertions.js";
 
 const RECORDERS = "active_support_error_reporter_assertions";
 
@@ -114,6 +120,7 @@ export async function assertErrorReported(
       `Expected a ${errorClass.name} to be reported, but there were no errors reported.`,
     );
   } else if ((report = reports.find((r) => r.error instanceof errorClass))) {
+    _addAssertions(1);
     return report;
   } else {
     const message =

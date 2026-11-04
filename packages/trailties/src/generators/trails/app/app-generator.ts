@@ -8,6 +8,7 @@ import { Trails } from "../../../trails.js";
 import { GeneratorError } from "../../generated-attribute.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
+import { VERSION } from "../../../gem-version.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -1218,6 +1219,40 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
+    await this.createFile(
+      `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
+      `// Be sure to restart your server when you modify this file.
+//
+// This file eases your Trails ${VERSION.MAJOR}.${VERSION.MINOR} framework defaults upgrade.
+//
+// Uncomment each configuration one by one to switch to the new default.
+// Once your application is ready to run with all new defaults, you can remove
+// this file and set the \`config.loadDefaults\` to \`${VERSION.MAJOR}.${VERSION.MINOR}\`.
+//
+// Read the Guide for Upgrading Trails for more info on each option.
+// https://github.com/blazetrailsdev/blazetrails
+
+import { Trails } from "@blazetrails/trailties";
+
+Trails.application.configure(function () {
+  // ###
+  // Specifies whether \`toTime\` methods preserve the UTC offset of their receivers or preserves the timezone.
+  // If set to \`":zone"\`, \`toTime\` methods will use the timezone of their receivers.
+  // If set to \`":offset"\`, \`toTime\` methods will use the UTC offset.
+  // If \`false\`, \`toTime\` methods will convert to the local system UTC offset instead.
+  //++
+  // this.config.activeSupport.toTimePreservesTimezone = ":zone";
+
+  // ###
+  // When both \`If-Modified-Since\` and \`If-None-Match\` are provided by the client
+  // only consider \`If-None-Match\` as specified by RFC 7232 Section 6.
+  // If set to \`false\` both conditions need to be satisfied.
+  //++
+  // this.config.actionDispatch.strictFreshness = true;
+});
+`,
+    );
+
     if (!this.options.update) {
       await this.createFile(
         "config/locales/en.json",
@@ -1601,6 +1636,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteActionMailerFilesSkippingActionMailer");
     this.methodAdded("deleteNonApiInitializersIfApiOption");
     this.methodAdded("deleteApiInitializers");
+    this.methodAdded("deleteNewFrameworkDefaults");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
   }
@@ -1800,6 +1836,14 @@ export class AppGenerator extends AppBase {
   async deleteApiInitializers(): Promise<void> {
     if (!this.options.api) {
       await this.removeFile("config/initializers/cors.ts");
+    }
+  }
+
+  async deleteNewFrameworkDefaults(): Promise<void> {
+    if (!this.options.update) {
+      await this.removeFile(
+        `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
+      );
     }
   }
 
