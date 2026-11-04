@@ -719,4 +719,10 @@ describe("dangerousAttributeMethods", () => {
     expect(names.has("constructor")).toBe(false);
     expect(names.has("hasOwnProperty")).toBe(false);
   });
+
+  it("leaves the primary key's id methods to PrimaryKey's override", () => {
+    class Widget extends Base {}
+    expect(dangerousAttributeMethods().has("id")).toBe(true);
+    expect(() => Widget.isInstanceMethodAlreadyImplemented("id")).not.toThrow();
+  });
 });

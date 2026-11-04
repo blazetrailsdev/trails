@@ -187,7 +187,7 @@ export interface AttributeMethodsHost {
   _generatedAttributeMethods?: GeneratedAttributeMethods;
   attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
-  isDangerousAttributeMethod?(name: string): boolean;
+  isDangerousAttributeMethod(name: string): boolean;
   _ignoredColumns?: string[];
   prototype: any;
   isBaseClass(): boolean;
@@ -243,7 +243,8 @@ export function dangerousAttributeMethods(): Set<string> {
       if (key !== "constructor") names.add(key);
     }
   }
-  for (const name of ["dup", "freeze", "isFrozen", "clone", "hash", "objectId"]) names.add(name);
+  for (const name of ["__id__", "dup", "freeze", "isFrozen", "hash", "class", "clone"])
+    names.add(name);
   return (_dangerousMethodsCache = names);
 }
 
@@ -413,10 +414,7 @@ export function isInstanceMethodAlreadyImplemented(
     ThisParameterType<typeof AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
-  const dangerous = this.isDangerousAttributeMethod
-    ? this.isDangerousAttributeMethod(methodName)
-    : isDangerousAttributeMethod.call(this, methodName);
-  if (dangerous) {
+  if (this.isDangerousAttributeMethod(methodName)) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
     );

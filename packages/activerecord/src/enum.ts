@@ -22,11 +22,7 @@ import {
   rbObjRespondTo,
   eachWithIndex,
 } from "@blazetrails/ruby-compat";
-import {
-  isDangerousAttributeMethod,
-  isDangerousClassMethod,
-  isMethodDefinedWithin,
-} from "./attribute-methods.js";
+import { isDangerousClassMethod, isMethodDefinedWithin } from "./attribute-methods.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
 import { Relation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
@@ -335,7 +331,7 @@ export function detectEnumConflictBang(
     });
   } else if (klassMethod && methodName === "id") {
     raiseConflictError.call(this, enumName, methodName);
-  } else if (!klassMethod && isDangerousAttributeMethod.call(this, methodName)) {
+  } else if (!klassMethod && this.isDangerousAttributeMethod(methodName)) {
     raiseConflictError.call(this, enumName, methodName);
   } else if (
     !klassMethod &&
