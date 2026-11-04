@@ -80,11 +80,15 @@ export class ExecutionWrapper {
     }
   }
 
+  /** @missingRailsCall delete — PERMANENT */
   static runBang({ reset = false }: { reset?: boolean } = {}):
     | CompletableExecution
     | Promise<CompletableExecution> {
     if (reset) {
-      const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
+      let lostInstance = IsolatedExecutionState.get<ExecutionWrapper>(this.activeKey());
+      while (lostInstance != null && lostInstance.#_fiber !== Fiber.current()) {
+        lostInstance = lostInstance.#_previous;
+      }
       const lostCompleted = lostInstance?.completeBang();
       if (isThenable(lostCompleted)) {
         return Promise.resolve(lostCompleted).then(() => this.runBang({ reset }));
@@ -115,6 +119,7 @@ export class ExecutionWrapper {
     return instance;
   }
 
+  /** @inventedArm resume — PERMANENT */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
@@ -204,7 +209,7 @@ export class ExecutionWrapper {
     const fiber = Fiber.current();
     let instance = IsolatedExecutionState.get<ExecutionWrapper>(this.activeKey());
     while (instance != null) {
-      if (instance.#_fiber == null || instance.#_fiber === fiber) return true;
+      if (instance.#_fiber === fiber) return true;
       instance = instance.#_previous;
     }
     return false;
@@ -218,7 +223,10 @@ export class ExecutionWrapper {
     return this.run();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   private _deactivate(activeKey: symbol): void {
     let instance = IsolatedExecutionState.get<ExecutionWrapper>(activeKey);
     if (instance === this) {

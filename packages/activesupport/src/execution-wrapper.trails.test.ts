@@ -87,3 +87,25 @@ describe("ExecutionWrapper.wrap on concurrent flows of one Thread", () => {
     expect(executor.active()).toBe(false);
   });
 });
+
+describe("ExecutionWrapper.run!(reset: true) on concurrent flows", () => {
+  it("completes only the current fiber's execution", async () => {
+    const { Fiber } = await import("@blazetrails/ruby-compat");
+    const executor = class extends ExecutionWrapper {};
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const other = executor.wrap(async () => {
+      await held;
+      return executor.active();
+    });
+    await new Fiber(async () => {
+      executor.runBang();
+      const replaced = await executor.runBang({ reset: true });
+      expect(executor.active()).toBe(true);
+      await replaced.completeBang();
+      expect(executor.active()).toBe(false);
+    }).resume();
+    release();
+    expect(await other).toBe(true);
+  });
+});

@@ -200,3 +200,23 @@ describe("Monitor#enter", () => {
     expect(() => new Monitor().exit()).toThrow("current fiber not owner");
   });
 });
+
+describe("Monitor#enter", () => {
+  it("is owned by the fiber, so two fibers on one thread exclude each other", async () => {
+    const { Fiber } = await import("./fiber.js");
+    const monitor = new Monitor();
+    const events: string[] = [];
+    const flow = (name: string) =>
+      new Fiber(async () => {
+        await monitor.enter();
+        await monitor.enter();
+        events.push(`${name} in`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push(`${name} out`);
+        monitor.exit();
+        monitor.exit();
+      }).resume();
+    await Promise.all([flow("a"), flow("b")]);
+    expect(events).toEqual(["a in", "a out", "b in", "b out"]);
+  });
+});
