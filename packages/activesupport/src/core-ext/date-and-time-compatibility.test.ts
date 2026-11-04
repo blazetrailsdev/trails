@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-import { toTime } from "./time/compatibility.js";
+import { toTime } from "./date-time/compatibility.js";
 import { toTime as stringToTime } from "./string/conversions.js";
 import { toTimePreservesTimezone, setToTimePreservesTimezone } from "../active-support.js";
 import { deprecator } from "../deprecator.js";
@@ -178,11 +178,13 @@ describe("DateAndTimeCompatibilityTest", () => {
         const foreignTime = foreignZone.tzinfo
           .utcToLocal(new RubyTime(2016, 4, 23, 15, 11, 12, "-0700"))
           .toZonedDateTime();
-        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );
 
-        expect(convertedTime.epochNanoseconds).toEqual(foreignTime.epochNanoseconds);
+        expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
+          foreignTime.epochNanoseconds,
+        );
         expect(utcOffset(convertedTime)).toEqual(systemOffset);
         expect(utcOffset(foreignTime)).not.toEqual(utcOffset(convertedTime));
       });
@@ -193,11 +195,13 @@ describe("DateAndTimeCompatibilityTest", () => {
         const foreignTime = foreignZone.tzinfo
           .utcToLocal(new RubyTime(2016, 11, 23, 15, 11, 12, "-0700"))
           .toZonedDateTime();
-        const convertedTime: Temporal.ZonedDateTime = await assertDeprecated(deprecator(), () =>
+        const convertedTime: RubyTime = await assertDeprecated(deprecator(), () =>
           toTime(foreignTime),
         );
 
-        expect(convertedTime.epochNanoseconds).toEqual(foreignTime.epochNanoseconds);
+        expect(convertedTime.toZonedDateTime().epochNanoseconds).toEqual(
+          foreignTime.epochNanoseconds,
+        );
         expect(utcOffset(convertedTime)).toEqual(systemDstOffset);
         expect(utcOffset(foreignTime)).not.toEqual(utcOffset(convertedTime));
       });
@@ -244,8 +248,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00");
         const time = toTime(source);
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(utcOffsetValue);
       }),
     );
@@ -257,8 +263,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         const source = Temporal.PlainDateTime.from("2016-04-23T15:11:12").toZonedDateTime("+01:00");
         const time = toTime(source);
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(systemOffset);
       }),
     );
@@ -272,8 +280,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         );
         const time = toTime(source);
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(utcOffsetValue);
         assertNotPredicate(time, (t) => Object.isFrozen(t));
       }),
@@ -288,8 +298,10 @@ describe("DateAndTimeCompatibilityTest", () => {
         );
         const time = toTime(source);
 
-        expect(time).toBeInstanceOf(Temporal.ZonedDateTime);
-        expect(getutc(time).epochNanoseconds).toEqual(utcTime.toZonedDateTime().epochNanoseconds);
+        expect(time).toBeInstanceOf(RubyTime);
+        expect(getutc(time.toZonedDateTime()).epochNanoseconds).toEqual(
+          utcTime.toZonedDateTime().epochNanoseconds,
+        );
         expect(utcOffset(time)).toEqual(systemOffset);
         assertNotPredicate(time, (t) => Object.isFrozen(t));
       }),

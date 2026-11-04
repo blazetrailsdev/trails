@@ -33,7 +33,7 @@ export function toFs(date: Temporal.PlainDate, format: string = "default"): stri
 
 export { toFs as toFormattedS };
 
-Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { toFs, toFormattedS: toFs });
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { toFs, toFormattedS: toFs, toTime });
 
 export function readableInspect(date: Temporal.PlainDate): string {
   return new RubyDate(date).strftime("%a, %d %b %Y");

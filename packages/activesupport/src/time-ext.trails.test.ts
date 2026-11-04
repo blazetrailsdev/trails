@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
-import { toTime } from "./core-ext/time/compatibility.js";
+import { toTime } from "./core-ext/date-time/compatibility.js";
 import { advance, change } from "./time-ext.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "./core-ext/date-time/conversions.js";
 import { setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
@@ -46,7 +46,7 @@ describe("to_time over a receiver that carries an offset", () => {
     setPreserveTimezone(true);
     const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
     const result = toTime(datetime);
-    expect(result.offset).toBe("+05:00");
+    expect(result.utcOffset).toBe(18000);
     expect(result.hour).toBe(10);
   });
 
@@ -54,14 +54,14 @@ describe("to_time over a receiver that carries an offset", () => {
     setPreserveTimezone(false);
     const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
     const result = toTime(datetime);
-    expect(result.timeZoneId).toBe(Temporal.Now.timeZoneId());
-    expect(result.epochNanoseconds).toBe(datetime.epochNanoseconds);
+    expect(result.zone).toBe(RubyTime.now().zone);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(datetime.epochNanoseconds);
   });
 
   it("DateTime#to_time reads a PlainDateTime as +00:00", () => {
     setPreserveTimezone(true);
     const result = toTime(Temporal.PlainDateTime.from("2005-02-21T10:11:12"));
-    expect(result.offset).toBe("+00:00");
+    expect(result.utcOffset).toBe(0);
     expect(result.hour).toBe(10);
   });
 });

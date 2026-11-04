@@ -1,15 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { preserveTimezone as compatibilityPreserveTimezone } from "../date-and-time/compatibility.js";
 
-export function toTime(
-  time: Temporal.PlainDateTime | Temporal.ZonedDateTime,
-): Temporal.ZonedDateTime {
-  const zoned = time instanceof Temporal.PlainDateTime ? time.toZonedDateTime("UTC") : time;
-  return compatibilityPreserveTimezone()
-    ? zoned.withTimeZone(zoned.offset)
-    : zoned.withTimeZone(Temporal.Now.timeZoneId());
-}
-
 Object.assign(RubyTime.prototype, {
   toTime(this: RubyTime): RubyTime {
     return preserveTimezone(this) ? this : this.getlocal();
