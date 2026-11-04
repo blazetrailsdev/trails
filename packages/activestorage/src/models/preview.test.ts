@@ -117,6 +117,7 @@ describe("ActiveStorage::PreviewTest", () => {
 
     await assertChanges(
       async () => {
+        await preview.image.load();
         const variant = preview.image.isAttached()
           ? await (delegated(preview) as unknown as Attachment).variant(resizeToLimit)
           : null;
