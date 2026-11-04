@@ -11,6 +11,8 @@ import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { Application } from "@blazetrails/trailties";
+import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
+import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
 import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
@@ -43,7 +45,13 @@ TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
   root: () => File.expandPath("..", import.meta.dirname),
-  application: { routes: () => app.routes(), envConfig: () => ({}) },
+  application: {
+    routes: () => app.routes(),
+    envConfig: () => ({}),
+    get executor() {
+      return app.executor;
+    },
+  },
   configuration: {
     generators: configuration.appGenerators.bind(configuration),
     activeStorage: {
@@ -72,10 +80,21 @@ class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
 app.config.loadDefaults("8.0");
-for (const railtie of [GlobalIDRailtie, ActionViewRailtie, ActionControllerRailtie, Engine]) {
+for (const railtie of [
+  ActiveSupportRailtie,
+  GlobalIDRailtie,
+  ActionViewRailtie,
+  ActionControllerRailtie,
+  Engine,
+]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
   }
+}
+
+for (const initializer of ActiveRecordRailtie.initializers) {
+  if (initializer.name !== "active_record.set_executor_hooks") continue;
+  await initializer.bind(ActiveRecordRailtie.instance()).run(app);
 }
 
 await import("../../config/routes.js");

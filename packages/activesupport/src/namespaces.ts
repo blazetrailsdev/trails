@@ -97,7 +97,7 @@ declare module "@blazetrails/ruby-compat" {
           urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
         };
         envConfig(): Record<string, unknown>;
-        executor: { wrap<T>(block: () => T): T; runBang(): unknown };
+        executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
         configFor(name: string): Promise<unknown>;
         migrationRailties(): Array<{
           railtieName: string;

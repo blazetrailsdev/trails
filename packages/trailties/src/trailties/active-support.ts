@@ -1,13 +1,18 @@
 import "./i18n.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
+  CurrentAttributes,
   deprecator,
+  ExecutorTestHelper,
+  include,
+  onLoad,
   TopLevel,
   type Deprecation,
   type DeprecationBehavior,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
+import type { TestCase } from "@blazetrails/activesupport/test-case";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 type HashDigestClass = typeof Digest.hashDigestClass;
@@ -41,6 +46,22 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("activeSupport", deprecator());
     });
+
+    this.initializer(
+      "active_support.reset_all_current_attributes_instances",
+      /** @missingRailsCall include — CONVERGEABLE active-support-railtie-test-helper-else-arm */
+      (app) => {
+        app.reloader.beforeClassUnload(() => CurrentAttributes.clearAll());
+        app.executor.toRun(() => CurrentAttributes.resetAll());
+        app.executor.toComplete(() => CurrentAttributes.resetAll());
+
+        onLoad("active_support_test_case", function (this: typeof TestCase) {
+          if (app.config.activeSupport.executorAroundTestCase) {
+            include(this, ExecutorTestHelper);
+          }
+        });
+      },
+    );
 
     this.initializer("active_support.deprecation_behavior", (app) => {
       const activeSupport = app.config.activeSupport;

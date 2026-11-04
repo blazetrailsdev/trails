@@ -24,7 +24,8 @@ export class CreateOne {
   readonly record: AttachedRecord;
   readonly attachable: unknown;
   private _blob!: Blob;
-  private _attachment!: Attachment;
+  private _attachment: Attachment | Promise<Attachment> | undefined;
+  private _unfurledAttachment!: Attachment;
 
   constructor(name: string, record: AttachedRecord, attachable: unknown) {
     this.name = name;
@@ -36,11 +37,21 @@ export class CreateOne {
   async unfurl(): Promise<void> {
     this._blob = await this.findOrBuildBlob();
     await this._blob.identifyWithoutSaving();
-    this._attachment = await this.findOrBuildAttachment();
+    if (this.record.isNewRecord()) {
+      this._unfurledAttachment = this.buildAttachment();
+    } else {
+      await this.attachment;
+    }
   }
 
-  get attachment(): Attachment {
-    return this._attachment;
+  /** @inventedArm if — PERMANENT */
+  get attachment(): Attachment | Promise<Attachment> {
+    if (this._attachment === undefined && this.record.isNewRecord()) {
+      return this._unfurledAttachment;
+    }
+    return (this._attachment ??= this.findOrBuildAttachment().then(
+      (attachment) => (this._attachment = attachment),
+    ));
   }
 
   get blob(): Blob {
@@ -74,7 +85,7 @@ export class CreateOne {
   async save(): Promise<void> {
     await (
       this.record.association(`${this.name}Attachment`) as unknown as AssociationWriter
-    ).writer(this.attachment);
+    ).writer(await this.attachment);
     await (this.record.association(`${this.name}Blob`) as unknown as AssociationWriter).writer(
       this.blob,
     );

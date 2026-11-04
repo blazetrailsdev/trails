@@ -633,6 +633,7 @@ export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
 export { Isolation } from "./testing/isolation.js";
+export { TestHelper as ExecutorTestHelper } from "./executor/test-helper.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
