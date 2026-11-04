@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { isAny } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -96,7 +97,7 @@ describe("HotCompatibilityTest", () => {
           expect(
             isAny(Object.entries(getPreparedStatementCache(adapter))),
             "expected prepared statement cache to have something in it",
-          ).toBe(true);
+          ).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -109,7 +110,7 @@ describe("HotCompatibilityTest", () => {
           expect(
             getPreparedStatementCache(adapter),
             "expected prepared statement cache to be empty but it wasn't",
-          ).toEqual({});
+          ).toBeEmpty();
         } finally {
           await adapter.dropTable("hot_compatibilities", { ifExists: true });
         }
@@ -132,7 +133,7 @@ describe("HotCompatibilityTest", () => {
           expect(
             isAny(Object.entries(getPreparedStatementCache(adapter))),
             "expected prepared statement cache to have something in it",
-          ).toBe(true);
+          ).toBeTruthy();
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -149,7 +150,7 @@ describe("HotCompatibilityTest", () => {
           expect(
             getPreparedStatementCache(adapter),
             "expected prepared statement cache to be empty but it wasn't",
-          ).toEqual({});
+          ).toBeEmpty();
         } finally {
           await adapter.dropTable("hot_compatibilities", { ifExists: true });
         }

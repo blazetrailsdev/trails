@@ -18,6 +18,7 @@
     { "path": "../msgpack" },
     { "path": "../actionview" },
     { "path": "../rack" },
-    { "path": "../activejob" }
+    { "path": "../activejob" },
+    { "path": "../vitest-matchers" }
   ]
 }

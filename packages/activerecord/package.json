@@ -111,6 +111,7 @@
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "engines": {
