@@ -1,6 +1,12 @@
 import { classpaths } from "../../classpath.js";
 import { Hash } from "../../hash.js";
+import { excSetBacktrace } from "../../backtrace-location.js";
+import { BigDecimal } from "../../big-decimal.js";
+import { complex } from "../../complex.js";
+import { Encoding } from "../../encoding.js";
+import { NotImplementedError } from "../../not-implemented-error.js";
 import { Range } from "../../range.js";
+import { rational } from "../../rational.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Struct, StructInstance } from "../../struct.js";
@@ -187,8 +193,18 @@ export class ToRuby extends Visitor {
     if (!o.tag) return this.ss.tokenize(o.value);
 
     switch (o.tag) {
+      case "!ruby/object:BigDecimal":
+        return (this.classLoader.bigDecimal() as typeof BigDecimal)._load(o.value);
       case "!ruby/object:DateTime":
         return (this.classLoader.dateTime() as { parse(s: string): unknown }).parse(o.value);
+      case "!ruby/encoding":
+        return Encoding.find(o.value);
+      case "!ruby/object:Complex":
+        this.classLoader.complex();
+        throw new NotImplementedError(`Complex() of a String is not implemented: ${o.value}`);
+      case "!ruby/object:Rational":
+        this.classLoader.rational();
+        throw new NotImplementedError(`Rational() of a String is not implemented: ${o.value}`);
       case "!ruby/class":
       case "!ruby/module":
         return this.resolveClass(o.value);
@@ -253,7 +269,15 @@ export class ToRuby extends Visitor {
     }
     if ((match = /^!ruby\/object:?(.*)?$/.exec(o.tag))) {
       const name = match[1] || "Object";
-      if (name === "Hash")
+      if (name === "Complex") {
+        this.classLoader.complex();
+        const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+        return this.register(o, complex(h["real"], h["image"]));
+      } else if (name === "Rational") {
+        this.classLoader.rational();
+        const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+        return this.register(o, rational(h["numerator"] as number, h["denominator"] as number));
+      } else if (name === "Hash")
         return this.reviveHash(this.register(o, new Hash<unknown, unknown>()), o);
       return this.revive(this.resolveClass(name) ?? this.classLoader.object(), o);
     }
@@ -261,6 +285,21 @@ export class ToRuby extends Visitor {
       const klass = this.classLoader.range() as typeof Range;
       const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
       return this.register(o, new klass(h["begin"], h["end"], h["excl"] === true));
+    }
+    if ((match = /^!ruby\/exception:?(.*)?$/.exec(o.tag))) {
+      const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+
+      const e = this.buildException(
+        this.resolveClass(match[1]) ?? (this.classLoader.exception() as RubyClass),
+        h["message"],
+      );
+      delete h["message"];
+
+      if (Object.hasOwn(h, "backtrace")) {
+        excSetBacktrace(e, h["backtrace"] as string[] | null);
+        delete h["backtrace"];
+      }
+      return this.initWith(e, h, o);
     }
     if ((match = /^!map:(.*)$/.exec(o.tag) ?? /^!ruby\/hash:(.*)$/.exec(o.tag))) {
       return this.reviveHash(
@@ -277,6 +316,19 @@ export class ToRuby extends Visitor {
       return map;
     }
     return this.reviveHash(this.register(o, new Hash<unknown, unknown>()), o);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/psych_to_ruby.c:9-16`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  buildException(klass: RubyClass, mesg: unknown): Error {
+    const e = allocate(klass) as Error;
+
+    e.message = mesg as string;
+
+    return e;
   }
 
   private register<T>(node: Node & { anchor?: string | null }, object: T): T {

@@ -1,7 +1,6 @@
 import {
   extend,
   kernelCatch,
-  Module,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
@@ -1192,10 +1191,13 @@ export const ClassMethods = {
   },
 };
 
-export const Callbacks = new Module() as Module<{
+export const Callbacks = {
+  runCallbacks,
+  haltedCallbackHook(_filter: unknown, _name: string): void {},
+} as {
   runCallbacks: typeof runCallbacks;
   haltedCallbackHook(_filter: unknown, _name: string): void;
-}> & { ClassMethods: typeof ClassMethods };
+} & { ClassMethods: typeof ClassMethods };
 extend(Callbacks, Concern);
 
 Concern.included.call(Callbacks, null, function (this: AnyClass) {
@@ -1207,13 +1209,7 @@ Concern.included.call(Callbacks, null, function (this: AnyClass) {
   });
 });
 
-Callbacks.ClassMethods = ClassMethods;
-
-Callbacks.moduleEval((mod) => {
-  mod.runCallbacks = runCallbacks;
-
-  mod.haltedCallbackHook = function (_filter: unknown, _name: string): void {};
-});
+Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
 
 function runCallbacks(
   this: object,

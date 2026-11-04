@@ -39,7 +39,6 @@ export class Thrown extends Error {
  * @noRailsEquivalent PERMANENT
  */
 export interface Serializer {
-  key: Format;
   format(): Format;
   dump(object: unknown): string | Uint8Array;
   _load(dumped: string | Uint8Array): unknown;
@@ -99,7 +98,6 @@ const MARSHAL_SIGNATURE = "\x04\x08";
 
 const marshalWithFallback: Serializer = {
   ...serializerWithFallback,
-  key: "marshal",
   format(): Format {
     return "marshal";
   },
@@ -121,7 +119,6 @@ const JSON_START_WITH = /^(?:[{["]|-?\d|true|false|null)/;
 
 const jsonWithFallback: Serializer = {
   ...serializerWithFallback,
-  key: "json",
   format(): Format {
     return "json";
   },
@@ -145,13 +142,11 @@ const jsonWithFallback: Serializer = {
 
 const jsonWithFallbackAllowMarshal: Serializer = {
   ...jsonWithFallback,
-  key: "json_allow_marshal",
   fallback: allowMarshalFallback,
 };
 
 const messagePackWithFallback: Serializer = {
   ...serializerWithFallback,
-  key: "message_pack",
   format(): Format {
     return "message_pack";
   },
@@ -179,7 +174,6 @@ function isAvailable(): boolean {
 
 const messagePackWithFallbackAllowMarshal: Serializer = {
   ...messagePackWithFallback,
-  key: "message_pack_allow_marshal",
   fallback: allowMarshalFallback,
 };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { isAny } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
@@ -93,7 +93,10 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(Object.keys(getPreparedStatementCache(adapter)).length > 0).toBeTruthy();
+          expect(
+            isAny(Object.entries(getPreparedStatementCache(adapter))),
+            "expected prepared statement cache to have something in it",
+          ).toBe(true);
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -103,7 +106,10 @@ describe("HotCompatibilityTest", () => {
             }),
           ).rejects.toThrow(PreparedStatementCacheExpired);
 
-          assertEmpty(getPreparedStatementCache(adapter));
+          expect(
+            getPreparedStatementCache(adapter),
+            "expected prepared statement cache to be empty but it wasn't",
+          ).toEqual({});
         } finally {
           await adapter.dropTable("hot_compatibilities", { ifExists: true });
         }
@@ -123,7 +129,10 @@ describe("HotCompatibilityTest", () => {
             await record.reload();
           });
 
-          expect(Object.keys(getPreparedStatementCache(adapter)).length > 0).toBeTruthy();
+          expect(
+            isAny(Object.entries(getPreparedStatementCache(adapter))),
+            "expected prepared statement cache to have something in it",
+          ).toBe(true);
 
           await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
 
@@ -137,7 +146,10 @@ describe("HotCompatibilityTest", () => {
             }),
           ).rejects.toThrow(PreparedStatementCacheExpired);
 
-          assertEmpty(getPreparedStatementCache(adapter));
+          expect(
+            getPreparedStatementCache(adapter),
+            "expected prepared statement cache to be empty but it wasn't",
+          ).toEqual({});
         } finally {
           await adapter.dropTable("hot_compatibilities", { ifExists: true });
         }

@@ -25,9 +25,9 @@
     "moduleImport": 12
   },
   "activesupport": {
-    "newModule": 3,
+    "newModule": 1,
     "superMethod": 0,
-    "moduleImport": 5
+    "moduleImport": 3
   },
   "trailties": {
     "newModule": 0,
