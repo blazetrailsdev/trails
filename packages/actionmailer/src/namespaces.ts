@@ -11,6 +11,7 @@ import type { Rescuable } from "./rescuable.js";
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 export const loadPath: Record<string, () => Promise<unknown>> = {
+  "action_mailer/base": () => import("./base.js"),
   "action_mailer/callbacks": () => import("./callbacks.js"),
   "action_mailer/inline_preview_interceptor": () => import("./inline-preview-interceptor.js"),
   "action_mailer/mail_helper": () => import("./mail-helper.js"),
@@ -29,6 +30,7 @@ export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule
 };
 constSet(TopLevel, "ActionMailer", ActionMailer);
 extend(ActionMailer, Autoload);
+ActionMailer.autoload("Base");
 ActionMailer.autoload("Callbacks");
 ActionMailer.autoload("InlinePreviewInterceptor");
 ActionMailer.autoload("MailHelper");

@@ -23,6 +23,7 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
+  declare static NullMail: typeof NullMail;
   declare static defaultParams: Readonly<Record<string, unknown>>;
 
   /** @internal */
@@ -217,6 +218,7 @@ export class NullMail {
   }
 }
 
+Base.NullMail = NullMail;
 include(Base, Callbacks);
 include(Base, Rescuable);
 Base.abstractBang();
