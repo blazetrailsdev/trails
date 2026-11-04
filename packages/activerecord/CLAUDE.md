@@ -798,3 +798,47 @@ As a consequence:
   `@inventedArm if — PERMANENT`.
 
 This is ratified repo-wide here by the repo owner.
+
+## A `ClassMethods#new` that runs after `super` (`Deduplicable`)
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+`Deduplicable::ClassMethods#new` is `super.deduplicate`
+(`activerecord/lib/active_record/connection_adapters/deduplicable.rb:13-15`),
+so it runs once, after the most-derived class's whole `initialize` chain.
+JS has no hook that runs after the most-derived constructor returns, and a
+static `Klass.new` is ruled out (§ "A record is built with `new Klass`
+only"). So each includer's or subclass's constructor ends with
+`if (new.target === X) return this.deduplicate();`, and a subclass with no
+Rails `initialize` (`MySQL::Column`) is named in its parent's guard rather
+than given a constructor. Each guard carries `@inventedArm if — PERMANENT`
+where the arm gate compares the declaration.
+Ruled by the repo owner on 2026-10-27.
+
+## SQLite's double-quoted-string setting
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+better-sqlite3 compiles with
+`SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
+`strict: false` cannot re-enable double-quoted string literals on that
+driver.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `relation/delegation.rb`'s Proxy sits once above `Relation.prototype`, so
+  only a lookup that missed the relation's class chain reaches it. Its `has`
+  trap has no receiver, so `in` answers neither a name the model's
+  `respond_to_missing?` claims before that relation method is generated nor
+  `Symbol.iterator`, which the `get` trap answers only once the records are
+  loaded synchronously. `rbObjRespondTo` answers `respond_to?`. The `set`
+  trap seats an `undefined` placeholder for each `_` field a relation first
+  writes on a private layer between `Relation.prototype` and the Proxy, so
+  later writes stop short of the Proxy and a member defined on
+  `Relation.prototype` later still shadows it.

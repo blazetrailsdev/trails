@@ -258,3 +258,16 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `action_dispatch/testing/integration.rb` holds two definers.
+  `Integration::Runner` is a module carrying `respondToMissing` /
+  `methodMissing` as named methods, so a class that includes it on its own
+  answers `respond_to?` for the session's names but has no trap.
+  `IntegrationTest` splices the Proxy into its own prototype chain above the
+  `Runner` link.

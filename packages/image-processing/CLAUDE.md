@@ -20,3 +20,16 @@ an intermediate it created deletes that intermediate, carrying
 `@inventedArm delete — PERMANENT` (`deleteAccumulator` in `processor.ts`).
 A handle the caller passed in is never deleted. Ruled by the repo owner on
 2026-11-04.
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `image_processing/chainable.rb`'s Proxy answers `then` with `call()`, so
+  `await builder` runs the pipeline. JS awaits anything with a `then`:
+  returning a builder from an `async` function, or resolving a promise with
+  one, runs it too, and with no source that raises "source file is not
+  provided" (`pipeline.rb:11`). `catch`, `finally`, `constructor`, `toJSON`
+  and every symbol are never queued.

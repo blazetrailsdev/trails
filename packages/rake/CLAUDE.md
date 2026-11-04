@@ -45,3 +45,13 @@ Rake's string and takes no `-I`, since `testrb` has no Node counterpart. The def
 `Array.isArray` arm: a JS Array answers no `toA`, a `FileList`'s is async
 (§ "FileList#to_ary reads a resolved list"), and `rbFArray` reads `to_ary`,
 which raises on a pending list, so no one call covers both receivers.
+
+## Ruby's `main` object (`Rake::DSL`)
+
+A runtime fact Node does not expose (root § "Runtime facts Node does not
+expose").
+
+`self.extend Rake::DSL`
+(`vendor/rake/v13.2.1/lib/rake/dsl_definition.rb:195`) extends the top-level
+`self`. An ES module's top-level `this` is `undefined`, so rake exports
+`main`, the object a `Rakefile.ts` imports in its place.
