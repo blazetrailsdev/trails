@@ -148,9 +148,53 @@ port a body:
   reports the helpers listed in its only-grow
   `ruby-compat-native-required.json` called on an Array, `string`, `number`
   or plain object. The Hash table and the Array / String / Enumerable table
-  in [packages/ruby-compat/CLAUDE.md](packages/ruby-compat/CLAUDE.md#native-forms-for-hash-array-and-string-calls)
-  are this rule applied: read them before writing any helper call on a plain
-  object, Array or `string`.
+  below are this rule applied.
+- **Hash calls on a plain object.** Where the receiver is a plain object, write
+  the JS form and not the ruby-compat helper. The call gates credit the form on
+  the receiver Rails names, and `parity:api:calls:args` checks a literal key.
+
+  | Ruby                              | Native form                               | Keeps the helper where                                                                                                    |
+  | --------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+  | `h.key?(:k)` / `has_key?`         | `"k" in h`; `Object.hasOwn(h, k)`         | the object can hold `{ k: undefined }` for an absent keyword                                                              |
+  | `h[k]` / `h[k] = v`               | `h[k]` / `h[k] = v`                       | a miss must read `null`; `k` is caller-supplied (`"__proto__"`, an `Object.prototype` name); a test asserts `FrozenError` |
+  | `h.delete(:k)`                    | `delete h.k`                              | the removed value is used, or a block is passed                                                                           |
+  | `h.merge!(other)` / `update`      | `Object.assign(h, other)`                 | a conflict block is passed                                                                                                |
+  | `h.merge(other)`                  | `{ ...h, ...other }`                      | a conflict block is passed; the result must have no prototype                                                             |
+  | `h.each_pair { \|k, v\| }`        | `for (const [k, v] of Object.entries(h))` | the call's return value is used                                                                                           |
+  | `h.fetch(:k, default)`            | `Object.hasOwn(h, "k") ? h.k : default`   | the key is computed; one argument (`KeyError`) or a block is passed                                                       |
+  | `delete_if`, `keep_if`, `replace` | none                                      | always                                                                                                                    |
+
+  `in` is for a literal key that is not an `Object.prototype` member name;
+  a computed or caller-supplied key is `Object.hasOwn(h, k)`, since `in` walks
+  the prototype chain and `"toString" in options` is true. Every row also keeps
+  the helper where the receiver may be a `Map`, a `Hash`, or an object that
+  answers the call itself (`isKey`, `get`, `set`, `each`), because the helper
+  dispatches and the form does not. A member call (`headers.hasKey(k)` for
+  `Rack::Headers#key?`) is a ported Rails method, not a helper, and stays.
+
+- **Array, String and Enumerable calls on a native value.** The same rule,
+  for the receivers JS already has. `ruby-compat-native-required` enforces
+  each row once its sweep adds the helper to the JSON list; until then it
+  is enforced by review.
+
+  | Ruby                               | Native form                            | Keeps the helper where                                                        |
+  | ---------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------- |
+  | `a.first` / `a.last` (no argument) | `a[0] ?? null` / `a.at(-1) ?? null`    | the receiver may be an Enumerable or a `Range`; a count argument is passed    |
+  | `a.include?(x)`                    | `a.includes(x)`                        | equality must be Ruby `==` (`rbEqual`) on objects, not `SameValueZero`        |
+  | `a.map` / `a.select` / `a.reject`  | `a.map` / `a.filter` / `!` in filter   | the block result is read with Ruby truthiness (`0`, `""` are truthy in Ruby)  |
+  | `a.join(sep)`                      | `a.join(sep)`                          | an element is a nested Array: Ruby joins it with `sep`, JS with `","`         |
+  | `a.compact`                        | `a.filter((x) => x != null)`           | the in-place `compact!` and its `nil`-when-unchanged result                   |
+  | `a.each_with_index`                | `a.forEach((x, i) => …)` / `entries`   | the receiver may be any `each` receiver, or the enumerator result is used     |
+  | `s.start_with?` / `s.end_with?`    | `startsWith` / `endsWith`              | a Regexp or several prefixes are passed                                       |
+  | `s.include?(t)`                    | `s.includes(t)`                        | never, on a `string` receiver                                                 |
+  | `s.strip` / `upcase` / `downcase`  | `trim` / `toUpperCase` / `toLowerCase` | Ruby's whitespace set (`strip` keeps `\u00A0`) or ASCII-only case mapping     |
+  | `s.split(sep)`                     | `s.split(sep)`                         | trailing empty fields are dropped, a limit is passed, or `sep` is `nil`/`" "` |
+
+  Enumerable helpers are free functions taking the receiver first,
+  `partition(enum, fn)`, never a method spliced onto `Array.prototype`. Keep
+  one only where the receiver is not an Array (`each` receiver, `Range`,
+  `Set`) or where it reads its block with Ruby truthiness.
+
 - **`present?` / `blank?` / `presence`.** Use the ActiveSupport analogues, not
   `!!x` or `x?.length`. `" "` is blank in Ruby and truthy in JS.
 - **kwargs.** A TS default parameter swallows an explicitly-passed `undefined`,
@@ -427,11 +471,14 @@ before you baseline, tighten or receipt anything. Write only `parity:*` script
 names: the old `api:*` / `test:compare` / `test:assertions:*` aliases are
 deprecated and never go in a doc, comment, script or CI step.
 
-Every gate below shares one contract: it is **only-shrink**, the fix is the
-code and never the mark, a converged row is deleted by hand and its mark
-narrowed with the gate's `:tighten` command, and there is **no reseed**
-(`--write` buries the one row you meant to retire). A receipt is
-`PERMANENT` or `CONVERGEABLE <story-id>`; a tag claiming neither is an error.
+Every ratchet gate below (`parity:api:calls`, `:calls:args`, `:params`,
+`:predicates`, `:extra:gate`) shares one contract: it is **only-shrink**, the
+fix is the code and never the mark, a converged row is deleted by hand and its
+mark narrowed with the gate's `:tighten` command, and there is **no reseed**
+(`--write` buries the one row you meant to retire). `:params` and
+`:predicates` keep marks with no rows; the lint rules in steps 5–6 have
+neither. A receipt is `PERMANENT` or `CONVERGEABLE <story-id>`; a tag claiming
+neither is an error.
 
 1. **Size.** `git diff --shortstat origin/main...HEAD -- ':!**/pnpm-lock.yaml' ':!**/__snapshots__/**' ':!**/*.md'`
    against the LOC ceiling in your prompt's "Hard rules" block.
