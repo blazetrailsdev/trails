@@ -332,7 +332,7 @@ export class Base extends AbstractController.Base {
     headers: Headers,
     block: (collector: Collector) => unknown,
   ): Response[] {
-    const templatesName = (headers.templateName as string | null) || this.actionName;
+    const templatesName = (headers.templateName as string | null) ?? this.actionName;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
     block(collector);
     return collector.responses;
@@ -345,15 +345,15 @@ export class Base extends AbstractController.Base {
     return [
       {
         body: body,
-        contentType: headers.contentType || "text/plain",
+        contentType: headers.contentType ?? "text/plain",
       },
     ];
   }
 
   /** @internal */
   protected collectResponsesFromTemplates(headers: Headers): Response[] {
-    const templatesPath = headers.templatePath || (this.constructor as typeof Base).mailerName();
-    const templatesName = (headers.templateName as string | null) || this.actionName;
+    const templatesPath = headers.templatePath ?? (this.constructor as typeof Base).mailerName();
+    const templatesName = (headers.templateName as string | null) ?? this.actionName;
 
     const responses: Response[] = [];
     this.eachTemplate([templatesPath].flat() as string[], templatesName, (template) => {
@@ -420,7 +420,7 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   protected insertPart(container: Message, response: Response, charset: string | null): void {
-    response.charset ||= charset;
+    response.charset ??= charset;
     const part = new Mail.Part(response);
     container.addPart(part);
   }
