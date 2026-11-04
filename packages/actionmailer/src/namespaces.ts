@@ -1,5 +1,6 @@
 import { Autoload, extend, type Extended, type Logger } from "@blazetrails/activesupport";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import type { Base } from "./base.js";
 import type { Callbacks } from "./callbacks.js";
 import type { FormBuilder } from "./form-builder.js";
 import type { InlinePreviewInterceptor } from "./inline-preview-interceptor.js";
@@ -17,7 +18,8 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule & {
-  Base: { logger: Logger | null };
+  Base: typeof Base & { logger: Logger | null };
+  MessageDelivery?: new (mailer: typeof Base, mailMethod: string, ...args: unknown[]) => unknown;
   Callbacks: typeof Callbacks;
   FormBuilder: typeof FormBuilder;
   InlinePreviewInterceptor: typeof InlinePreviewInterceptor;
