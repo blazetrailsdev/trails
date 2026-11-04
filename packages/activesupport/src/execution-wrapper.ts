@@ -115,7 +115,6 @@ export class ExecutionWrapper {
     return instance;
   }
 
-  /** @inventedArm Fiber — PERMANENT */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
@@ -222,7 +221,7 @@ export class ExecutionWrapper {
     return this.run();
   }
 
-  /** @inventedArm loop — PERMANENT */
+  /** @internal */
   private _deactivate(activeKey: symbol): void {
     let instance = IsolatedExecutionState.get<ExecutionWrapper>(activeKey);
     if (instance === this) {
