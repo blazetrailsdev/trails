@@ -26,6 +26,7 @@ import {
   StringIO,
   SystemExit,
 } from "@blazetrails/ruby-compat";
+import type {} from "@blazetrails/vitest-matchers";
 import { Handler } from "./handler.js";
 import { Server } from "./server.js";
 
@@ -57,6 +58,18 @@ async function withOutput(block: () => unknown): Promise<string> {
     output += "exited";
   } finally {
     [stdout.write, stderr.write] = writes;
+  }
+  return output;
+}
+
+async function withStderr(block: () => Promise<void>): Promise<string> {
+  let output = "";
+  const write = stderr.write;
+  stderr.write = (chunk: string) => ((output += chunk), true);
+  try {
+    await block();
+  } finally {
+    stderr.write = write;
   }
   return output;
 }
@@ -182,14 +195,16 @@ describe("Rackup::Server", () => {
     argv.splice(0, argv.length, "-swebrick", "non-existant.ru");
     const server = await newServer();
     let error: unknown;
-    await withOutput(() => {
-      try {
-        server.app();
-      } catch (e) {
-        error = e;
-      }
+    await withStderr(async () => {
+      expect(() => {
+        try {
+          server.app();
+        } catch (e) {
+          error = e;
+          throw e;
+        }
+      }).toThrow(SystemExit);
     });
-    expect(error).toBeInstanceOf(SystemExit);
     expect((error as Error).message).toMatch(/^configuration .* not found$/);
   });
 
@@ -218,7 +233,7 @@ describe("Rackup::Server", () => {
       setEnv("REQUEST_METHOD", "GET");
       argv.splice(0, argv.length, "-scgi", "config.ru");
       await newServer();
-      expect(argv).toEqual([]);
+      expect(argv).toBeEmpty();
     } finally {
       setEnv("REQUEST_METHOD", undefined);
     }
@@ -362,8 +377,10 @@ describe("Rackup::Server", () => {
     try {
       const server = await newServer();
       cgi.run = (app) => app;
+      let started: unknown;
+      await withOutput(async () => (started = await server.start()));
       const [s, h, b] = await (
-        (await withStderr(() => server.start())) as {
+        started as {
           call(env: object): Promise<[number, Record<string, string>, string[]]>;
         }
       ).call({ "rack.errors": new StringIO() });
@@ -374,12 +391,6 @@ describe("Rackup::Server", () => {
       delete top.Rack;
     }
   });
-
-  async function withStderr(block: () => unknown): Promise<unknown> {
-    let result: unknown;
-    await withOutput(async () => (result = await block()));
-    return result;
-  }
 
   it("support -e option to evaluate ruby code", async () => {
     argv.splice(0, argv.length, "-scgi", "-e", "globalThis.XYZ = 2");
@@ -456,8 +467,16 @@ describe("Rackup::Server", () => {
     argv.splice(0, argv.length, "-scgi");
     const server = await newServer();
     stubStart(server);
+    let exited = false;
     await server.start();
-    expect(() => signals["SIGINT"]()).toThrow(SystemExit);
+    expect(exited).toBe(false);
+    try {
+      signals["SIGINT"]();
+    } catch (error) {
+      if (!(error instanceof SystemExit)) throw error;
+      exited = true;
+    }
+    expect(exited).toBe(true);
   });
 
   it("support support Server.start for starting", async () => {
@@ -499,9 +518,12 @@ describe("Rackup::Server", () => {
   it("check pid file presence and running process", async () => {
     const pidfile = await tempPidfile(`${Process.pid}`);
     const server = new Server({ pid: pidfile });
-    const output = await withOutput(() => server["checkPidBang"]());
-    expect(output).toMatch(/exited$/);
-    expect(output).toContain(`already running (pid: ${Process.pid}, file: ${pidfile})`);
+    const output = await withStderr(async () => {
+      await expect(server["checkPidBang"]()).rejects.toThrow(SystemExit);
+    });
+    expect(output).toMatch(
+      new RegExp(`already running \\(pid: ${Process.pid}, file: ${pidfile}\\)`),
+    );
     await File.deleteAsync(pidfile);
   });
 
@@ -528,9 +550,10 @@ describe("Rackup::Server", () => {
     ctx.skip(ownsPid1, "cannot test if pid 1 owner matches current process (eg. docker/lxc)");
     const pidfile = await tempPidfile("1");
     const server = new Server({ pid: pidfile });
-    const output = await withOutput(() => server["checkPidBang"]());
-    expect(output).toMatch(/exited$/);
-    expect(output).toContain(`already running (pid: 1, file: ${pidfile})`);
+    const output = await withStderr(async () => {
+      await expect(server["checkPidBang"]()).rejects.toThrow(SystemExit);
+    });
+    expect(output).toMatch(new RegExp(`already running \\(pid: 1, file: ${pidfile}\\)`));
     await File.deleteAsync(pidfile);
   });
 
@@ -547,18 +570,20 @@ describe("Rackup::Server", () => {
     const pidfile = await tempPidfile();
     const server = new Server({ pid: pidfile });
     await File.writeAsync(pidfile, "1");
-    const output = await withOutput(() => server["writePid"]());
-    expect(output).toMatch(/exited$/);
-    expect(output).toContain(`already running (pid: 1, file: ${pidfile})`);
+    const output = await withStderr(async () => {
+      await expect(server["writePid"]()).rejects.toThrow(SystemExit);
+    });
+    expect(output).toMatch(new RegExp(`already running \\(pid: 1, file: ${pidfile}\\)`));
     await File.deleteAsync(pidfile);
   });
 
   it("inform the user about existing pidfiles with running processes", async () => {
     const pidfile = await tempPidfile("1");
     const server = new Server({ pid: pidfile });
-    const output = await withOutput(() => server.start());
-    expect(output).toMatch(/exited$/);
-    expect(output).toContain(`already running (pid: 1, file: ${pidfile})`);
+    const output = await withStderr(async () => {
+      await expect(server.start()).rejects.toThrow(SystemExit);
+    });
+    expect(output).toMatch(new RegExp(`already running \\(pid: 1, file: ${pidfile}\\)`));
     await File.deleteAsync(pidfile);
   });
 });

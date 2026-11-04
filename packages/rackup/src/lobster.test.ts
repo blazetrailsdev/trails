@@ -18,14 +18,14 @@ describe("Rackup::Lobster::LambdaLobster", () => {
 
   it("look like a lobster", async () => {
     const res = await lambdaLobster().get("/");
-    expect(res.isOk).toBe(true);
+    expect(res.isOk).toBeTruthy();
     expect(res.body).toContain("(,(,,(,,,(");
     expect(res.body).toContain("?flip");
   });
 
   it("be flippable", async () => {
     const res = await lambdaLobster().get("/?flip");
-    expect(res.isOk).toBe(true);
+    expect(res.isOk).toBeTruthy();
     expect(res.body).toContain("(,,,(,,(,(");
   });
 });
@@ -33,7 +33,7 @@ describe("Rackup::Lobster::LambdaLobster", () => {
 describe("Rackup::Lobster", () => {
   it("look like a lobster", async () => {
     const res = await lobster().get("/");
-    expect(res.isOk).toBe(true);
+    expect(res.isOk).toBeTruthy();
     expect(res.body).toContain("(,(,,(,,,(");
     expect(res.body).toContain("?flip");
     expect(res.body).toContain("crash");
@@ -41,7 +41,7 @@ describe("Rackup::Lobster", () => {
 
   it("be flippable", async () => {
     const res = await lobster().get("/?flip=left");
-    expect(res.isOk).toBe(true);
+    expect(res.isOk).toBeTruthy();
     expect(res.body).toContain("),,,),,),)");
   });
 
