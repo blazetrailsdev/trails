@@ -7,14 +7,12 @@ import { TypeError } from "./type-error.js";
 import { Exception } from "./exception.js";
 import { Range } from "./range.js";
 import {
-  isRegisteredConstant,
   rbConstGet,
   constGet,
   rbModConstMissing,
   rbModConstants,
   rbPathToClass,
   rbModRemoveConst,
-  registeredConstant,
   resetConstants,
 } from "./variable.js";
 import { Hash } from "./hash.js";
@@ -336,9 +334,9 @@ describe("TopLevel", () => {
       constSet(TopLevel, "Seated", klass);
       expect(tbl.Seated).toBe(klass);
       delete tbl.Seated;
-      expect(isRegisteredConstant("Seated")).toBe(false);
+      expect(constDefined(Object, "Seated")).toBe(false);
       tbl.Seated = klass;
-      expect(registeredConstant("Seated")).toBe(klass);
+      expect(constGet(Object, "Seated")).toBe(klass);
       expect(rbModRemoveConst(Object, "Seated")).toBe(klass);
       expect("Seated" in tbl).toBe(false);
     } finally {
@@ -359,8 +357,8 @@ describe("TopLevel", () => {
   });
 
   it("does not answer an Object.prototype member as a constant", () => {
-    expect(isRegisteredConstant("constructor")).toBe(false);
-    expect(registeredConstant("toString")).toBeUndefined();
+    expect(Object.hasOwn(TopLevel, "constructor")).toBe(false);
+    expect(Object.hasOwn(TopLevel, "toString")).toBe(false);
   });
 });
 
@@ -376,7 +374,7 @@ describe("resetConstants", () => {
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
     constSet(TopLevel, "TableReset", class TableReset {});
     resetConstants();
-    expect(isRegisteredConstant("TableReset")).toBe(false);
+    expect(constDefined(Object, "TableReset")).toBe(false);
     for (const [name, klass] of core) expect(rbPathToClass(name)).toBe(klass);
   });
 });

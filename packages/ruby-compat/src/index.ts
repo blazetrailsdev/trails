@@ -394,7 +394,6 @@ export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
 export {
   resetConstants,
-  isRegisteredConstant,
   rbConstGet,
   rbGvGet,
   rbGvSet,
@@ -405,7 +404,6 @@ export {
   rbConstMissing,
   rbModConstMissing,
   rbFBinding,
-  registeredConstant,
   rbModRemoveConst,
 } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";

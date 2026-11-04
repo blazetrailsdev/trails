@@ -36,7 +36,7 @@ import { type StructInstance, isStruct, rbStructInitialize, rstructGet } from ".
 import { isSymbol, symbolToS } from "./symbol.js";
 import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
-import { rbPathToClass, registeredConstant } from "./variable.js";
+import { constGet, rbPathToClass } from "./variable.js";
 import { verbose } from "./verbose.js";
 
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
@@ -408,7 +408,7 @@ function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
   }
   let klass = obj.constructor as AnyClass;
   if (temporalTag(obj) !== null) {
-    klass = registeredConstant(rbModToS(rbObjClass(obj))) as AnyClass;
+    klass = constGet(Object, rbModToS(rbObjClass(obj))) as AnyClass;
   }
   wExtended(obj, arg, check);
   wByte(type, arg);

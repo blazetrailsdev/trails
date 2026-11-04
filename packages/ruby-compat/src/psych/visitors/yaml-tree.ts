@@ -22,7 +22,6 @@ import { Range } from "../../range.js";
 import { type StructInstance, isStruct } from "../../struct.js";
 import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
-import { registeredConstant } from "../../variable.js";
 import { Psych } from "../../psych.js";
 import {
   Coder,
@@ -166,8 +165,16 @@ export class YAMLTree {
     }
     if (typeof target === "function") return this.visitClass(target);
     const tag = target == null ? null : temporalTag(target);
-    const dateTime = registeredConstant("DateTime");
-    if (typeof dateTime === "function" && target instanceof dateTime) {
+    // (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:74-78`, `:198`).
+    let dateTime = false;
+    for (
+      let k: unknown = target == null ? null : rbObjClass(target);
+      typeof k === "function";
+      k = Object.getPrototypeOf(k)
+    ) {
+      if (rbModName(k as new () => unknown) === "DateTime") dateTime = true;
+    }
+    if (dateTime) {
       return this.visitDateTime(target as DateTime);
     }
     if (target instanceof rbCDate) return this.visitDate(target as RubyDate);
