@@ -187,6 +187,7 @@ export interface AttributeMethodsHost {
   _generatedAttributeMethods?: GeneratedAttributeMethods;
   attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
+  isDangerousAttributeMethod?(name: string): boolean;
   _ignoredColumns?: string[];
   prototype: any;
   isBaseClass(): boolean;
@@ -229,9 +230,9 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-function instanceMethodNames(klass: any): Set<string> {
+function instanceMethodNames(klass: { prototype: object }): Set<string> {
   const names = new Set<string>();
-  for (let proto = klass?.prototype; proto && proto !== Object.prototype; ) {
+  for (let proto: object | null = klass.prototype; proto && proto !== Object.prototype; ) {
     for (const key of Object.getOwnPropertyNames(proto)) {
       if (key !== "constructor") names.add(key);
     }
@@ -414,10 +415,9 @@ export function isInstanceMethodAlreadyImplemented(
     ThisParameterType<typeof AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
-  const dangerous =
-    typeof (this as any).isDangerousAttributeMethod === "function"
-      ? (this as any).isDangerousAttributeMethod(methodName)
-      : isDangerousAttributeMethod.call(this, methodName);
+  const dangerous = this.isDangerousAttributeMethod
+    ? this.isDangerousAttributeMethod(methodName)
+    : isDangerousAttributeMethod.call(this, methodName);
   if (dangerous) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
