@@ -117,14 +117,12 @@ export class Server {
 
   /** @noRailsEquivalent CONVERGEABLE rails-server-extends-rackup-server */
   async server(): Promise<ServerHandler> {
-    let { server } = this.options;
-    if (server == null) {
-      const isVite = this.options.environment === "development" && (await hasViteConfig(Dir.pwd()));
-      server = isVite ? "vite" : "node";
-    }
-    const handler = await Handler.get(server);
-    if (handler == null) throw new LoadError(`cannot load such file -- rack/handler/${server}`);
-    return handler as ServerHandler;
+    return ((await Handler.get(this.options.server)) ??
+      (await Handler.get(
+        this.options.environment === "development" && (await hasViteConfig(Dir.pwd()))
+          ? "vite"
+          : "node",
+      ))) as ServerHandler;
   }
 
   middleware(): Hash<string, unknown[]> {
