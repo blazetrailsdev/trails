@@ -164,7 +164,7 @@ class Processor extends BaseProcessor {
     24,
   );
 
-  /** @inventedArm delete — PERMANENT */
+  /** @inventedArm delete — CONVERGEABLE image-processing-wasm-vips-handle-lifetime */
   static loadImage(
     pathOrImage: string | Image,
     { loader = null, autorot = true, ...options }: Options = {},
@@ -341,7 +341,7 @@ class Processor extends BaseProcessor {
 
   /**
    * @internal
-   * @inventedArm delete — PERMANENT
+   * @inventedArm delete — CONVERGEABLE image-processing-wasm-vips-handle-lifetime
    */
   private thumbnail(
     width: number,
