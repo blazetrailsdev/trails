@@ -80,9 +80,11 @@ describe("Mail::Part", () => {
   });
 
   describe("parts that have a missing header", () => {
-    it("should not try to init a header if there is none", () => {
-      new Part(
-        Utilities.toCrlf(`
+    it("should not try to init a header if there is none", async () => {
+      await expect(
+        () =>
+          new Part(
+            Utilities.toCrlf(`
 The original message was received at Mon, 24 Dec 2007 10:03:47 +1100
 from 60-0-0-146.static.tttttt.com.au [60.0.0.146]
 
@@ -104,7 +106,8 @@ This message has been scanned for viruses and
 dangerous content by MailScanner, and is
 believed to be clean.
 `),
-      );
+          ),
+      ).not.toOutput(undefined, "stderr");
     });
   });
 
