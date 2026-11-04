@@ -214,7 +214,7 @@ export class Base extends AbstractController.Base {
   }
 
   headers(args: Headers | null = null): Message | void {
-    if (args != null) {
+    if (args != null && (args as unknown) !== false) {
       return (this._message as Message).headers(args);
     } else {
       return this._message as Message;
@@ -366,7 +366,10 @@ export class Base extends AbstractController.Base {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm for — PERMANENT
+   */
   protected async collectResponsesFromBlock(
     headers: Headers,
     block: (collector: Collector) => unknown,
@@ -378,7 +381,6 @@ export class Base extends AbstractController.Base {
     ) as string;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
     await block(collector);
-    /** @inventedArm for — PERMANENT */
     for (const response of collector.responses) response.body = await response.body;
     return collector.responses;
   }

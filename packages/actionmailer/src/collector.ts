@@ -23,6 +23,7 @@ export class Collector {
     this._defaultRender = block;
   }
 
+  /** @inventedArm if — PERMANENT */
   any(...args: unknown[]): unknown[] {
     const block = typeof args[args.length - 1] === "function" ? (args.pop() as Block) : undefined;
     const options = extractOptionsBang(args);
@@ -33,6 +34,7 @@ export class Collector {
 
   declare all: Collector["any"];
 
+  /** @inventedArm if — PERMANENT */
   custom(
     mime: { toString(): string; toSym(): string | null },
     options: Record<string, unknown> | Block = {},

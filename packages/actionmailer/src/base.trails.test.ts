@@ -26,6 +26,14 @@ class TextMailer extends Base {
     return this.mail();
   }
 
+  bothDefaults() {
+    return this.mail({ templateName: "multi" }, (format) => {
+      const f = format as unknown as { text(): void; html(): void };
+      f.text();
+      f.html();
+    });
+  }
+
   fromBlock() {
     return this.mail({ templateName: "multi" }, (format) => {
       const f = format as unknown as { text(): void; html(b: () => string): void };
@@ -143,5 +151,12 @@ describe("Base#mail", () => {
     await expect(deliver("plain", { deliveryMethod: "bogus" })).rejects.toThrow(
       new RuntimeError("Invalid delivery method :bogus"),
     );
+  });
+  it("renders each blockless format with its own formats in the block form", async () => {
+    const email = await deliver("bothDefaults");
+    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+      ["text/plain", "Text"],
+      ["text/html", "<b>Html</b>"],
+    ]);
   });
 });
