@@ -117,7 +117,7 @@ export class Preview {
   }
 
   /** @internal */
-  private variant(): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
+  private variant(): Variant | VariantWithRecord {
     return (this.image as One & Attachment).variant(this.variation);
   }
 

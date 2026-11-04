@@ -82,26 +82,18 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  /** @inventedArm if — CONVERGEABLE attachment-variant-single-return-shape */
-  variant(
-    transformations: Transformations,
-  ): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
-    transformations = this.transformationsByName(transformations) as Transformations;
-    if (transformations instanceof Promise || this.blob instanceof Promise) {
-      return Promise.all([transformations, this.blob]).then(([transformations, blob]) =>
-        blob!.variant(transformations),
-      );
-    }
-    return this.blob!.variant(transformations);
+  variant(transformations: Transformations): Variant | VariantWithRecord {
+    transformations = this.transformationsByName(transformations);
+    return (this.blob as AttachedBlob).variant(transformations);
   }
 
   async preview(transformations: Transformations): Promise<unknown> {
-    transformations = await this.transformationsByName(transformations);
+    transformations = this.transformationsByName(transformations);
     return (await this.blob)!.preview(transformations);
   }
 
   async representation(transformations: Transformations): Promise<unknown> {
-    transformations = await this.transformationsByName(transformations);
+    transformations = this.transformationsByName(transformations);
     return (await this.blob)!.representation(transformations);
   }
 
@@ -119,7 +111,7 @@ export class Attachment extends Record {
   /** @internal */
   private async transformVariantsLater(): Promise<void> {
     const record = await this.record;
-    const preprocessedVariations = Object.values(await this.namedVariants())
+    const preprocessedVariations = Object.values(this.namedVariants())
       .filter((namedVariant) => namedVariant.isPreprocessed(record))
       .map((namedVariant) => namedVariant.transformations);
 
@@ -149,31 +141,27 @@ export class Attachment extends Record {
   }
 
   /** @internal */
-  private async namedVariants(): Promise<{ [k: string]: NamedVariant }> {
-    const record = (await this.record)!;
+  private namedVariants(): { [k: string]: NamedVariant } {
+    const record = this.record as AttachedRecord;
     return record.attachmentReflections[this.name]?.namedVariants ?? {};
   }
 
   /** @internal */
   private transformationsByName(
     transformations: Transformations,
-  ): Exclude<Transformations, string> | Promise<Exclude<Transformations, string>> {
+  ): Exclude<Transformations, string> {
     if (typeof transformations === "string") {
       const variantName = transformations;
-      return this.namedVariants().then(
-        (namedVariants) =>
-          fetch<NamedVariant>(
-            namedVariants,
-            variantName,
-            block(() => {
-              const record = this.association("record").target as AttachedRecord;
-              const recordModelName = record.toModel().modelName.name;
-              throw new ArgumentError(
-                `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
-              );
-            }),
-          ).transformations,
-      );
+      return fetch<NamedVariant>(
+        this.namedVariants(),
+        variantName,
+        block(() => {
+          const recordModelName = (this.record as AttachedRecord).toModel().modelName.name;
+          throw new ArgumentError(
+            `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
+          );
+        }),
+      ).transformations;
     } else {
       return transformations;
     }
