@@ -350,6 +350,7 @@ export { NotImplementedError } from "./not-implemented-error.js";
 export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
+  ARGV,
   SystemExit,
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   abort,

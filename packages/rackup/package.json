@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "description": "A general server command for Rack applications, mirroring Ruby's rackup",
   "type": "module",
+  "bin": {
+    "rackup": "./bin/rackup.js"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc"
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "license": "MIT",
   "dependencies": {
@@ -18,5 +22,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }
