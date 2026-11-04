@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBlank, presence } from "../../index.js";
+import { isBlank, mbChars, presence } from "../../index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {
   it("reads a String held as its bytes as String#blank? does", () => {
@@ -88,5 +88,12 @@ describe("Object#presence on a thenable with an async blank?", () => {
 
   it("answers nil when blank", async () => {
     expect(await presence(new Lazy(true))).toBeNull();
+  });
+});
+
+describe("Multibyte::Chars#blank?", () => {
+  it("finds Object#blank? before method_missing forwards to the String", () => {
+    expect(isBlank(mbChars("  "))).toBe(false);
+    expect(isBlank(mbChars(""))).toBe(true);
   });
 });

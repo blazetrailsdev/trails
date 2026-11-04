@@ -635,19 +635,22 @@ export abstract class Store {
     return this.namespaceKey(strKey, options);
   }
 
-  protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
-    const namespace =
-      options && "namespace" in options ? options.namespace : this.options.namespace;
+  protected keyMatcher(pattern: RegExp, options: StoreOptions): RegExp {
     const prefix =
-      typeof namespace === "function"
-        ? (namespace as () => string)()
-        : (namespace as string | undefined);
-    if (prefix) {
+      typeof options.namespace === "function"
+        ? (options.namespace as () => string)()
+        : (options.namespace as string | null | undefined | false);
+    if (prefix != null && prefix !== false) {
       let source = pattern.source;
-      source = source.startsWith("^") ? source.slice(1) : `.*${source}`;
+      if (source.startsWith("^")) {
+        source = source.slice(1, source.length);
+      } else {
+        source = `.*${source.slice(0, source.length)}`;
+      }
       return new RegExp(`^${regexpEscape(prefix)}:${source}`, pattern.flags);
+    } else {
+      return pattern;
     }
-    return pattern;
   }
 
   protected namespaceKey(key: string, callOptions?: StoreOptions): string {
