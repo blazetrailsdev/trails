@@ -1092,8 +1092,8 @@
     "residue": { "test.ts::Test": "Rack::Test" }
   },
   "rackup": {
-    "rows": 3,
-    "excluded": ["handler/node.ts::Node", "lobster.ts::Lobster"],
+    "rows": 4,
+    "excluded": ["handler/node.ts::Node"],
     "unwalked": [],
     "residue": { "server.ts::Options": "Rackup::Server::Options" }
   },
