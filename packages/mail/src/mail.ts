@@ -1,5 +1,7 @@
 import { Time } from "@blazetrails/date";
 import {
+  forceEncoding,
+  IO,
   kernelRand,
   Process,
   rbObjAsString,
@@ -18,6 +20,7 @@ interface MailConstants {
   Part: typeof Part;
   Parsers?: typeof import("./parsers.js");
   "new"(...args: unknown[]): Message;
+  read(filename: string): Promise<Message>;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -32,6 +35,15 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   new(...args: unknown[]) {
     const block = typeof args.at(-1) === "function" ? args.pop() : undefined;
     return new Mail.Message(args, block);
+  },
+
+  /**
+   * @missingRailsCall open — CONVERGEABLE ruby-compat-io-read-async-to-eof
+   * @missingRailsCall read — CONVERGEABLE ruby-compat-io-read-async-to-eof
+   * @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source
+   */
+  async read(filename: string): Promise<Message> {
+    return Mail.new(forceEncoding((await IO.binreadAsync(filename))!, "UTF-8"));
   },
 
   randomTag(): string {

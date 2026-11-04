@@ -771,6 +771,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
+    if (o === Uint8Array.prototype || o === Object.getPrototypeOf(Uint8Array.prototype)) continue;
     const entry = Object.hasOwn(o, mid) ? Object.getOwnPropertyDescriptor(o, mid) : undefined;
     if (UNDEF_HALVES.has(entry?.get as object)) return false;
     if (entry && !isAbsentHalf(entry.get)) {
@@ -1927,6 +1928,10 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     typeof value === "function" &&
     Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
   ) {
+    if (value.toString !== Function.prototype.toString) {
+      const str: unknown = value.toString();
+      if (typeof str === "string") return str;
+    }
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "object") {

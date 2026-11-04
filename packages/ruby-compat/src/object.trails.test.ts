@@ -1550,3 +1550,31 @@ describe("a Hash subclass", () => {
     expect(rbObjIsKindOf({}, Hash)).toBe(true);
   });
 });
+
+describe("rb_obj_as_string on a class", () => {
+  it("dispatches to a class's own to_s", () => {
+    class Encoding64 {
+      static toString(): string {
+        return "base64";
+      }
+    }
+    expect(toS(Encoding64)).toBe("base64");
+  });
+
+  it("answers the module name for a class with no to_s of its own", () => {
+    class Plain {}
+    expect(toS(Plain)).toBe(rbModToS(Plain));
+  });
+});
+
+describe("respond_to? on a binary String", () => {
+  it("does not answer an Array-only name", () => {
+    expect(rbObjRespondTo(new Uint8Array([1, 2]), "join")).toBe(false);
+  });
+
+  it("still answers String and Object names", () => {
+    const str = new Uint8Array([1, 2]);
+    expect(rbObjRespondTo(str, "bytesize")).toBe(true);
+    expect(rbObjRespondTo(str, "toString")).toBe(true);
+  });
+});
