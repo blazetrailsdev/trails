@@ -14,6 +14,7 @@ export class UnixToUnix extends TransferEncoding {
   }
 
   static {
+    Encodings.UnixToUnix = this;
     Encodings.register(this.NAME, this);
     Encodings.register("uuencode", this);
     Encodings.register("x-uue", this);

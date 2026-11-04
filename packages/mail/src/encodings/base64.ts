@@ -7,6 +7,7 @@ export class Base64 extends SevenBit {
   static override readonly NAME: string = "base64";
   static override readonly PRIORITY: number = 3;
   static {
+    Encodings.Base64 = this;
     Encodings.register(this.NAME, this);
   }
 
