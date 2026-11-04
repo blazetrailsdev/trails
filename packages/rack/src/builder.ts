@@ -66,9 +66,8 @@ export class Builder {
   ): RackApp {
     const builder = new this(null, options);
     const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Builder;
-    const constants = Object.keys(TopLevel).filter((name) => /^[A-Z][\w$]*$/.test(name));
     const source =
-      `(function () { "use strict"; return function (builder, { ${constants.join(", ")} }) { ${builderScript}\n}; })()` +
+      `(function (builder, topLevel) { with (topLevel) { return (function () { "use strict"; ${builderScript}\n})(); } })` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
     let configFn: (b: Builder, topLevel: object) => void;
     try {
