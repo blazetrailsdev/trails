@@ -601,6 +601,15 @@ describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
     expect([r.numerator, r.denominator]).toEqual([9007199254740993n, 2n]);
   });
 
+  it("parses a large hex, binary and octal integer at its radix", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.unsafeLoad("--- 0x20000000000001")).toBe(0x20000000000001n);
+    expect(Psych.unsafeLoad("--- -0b100000000000000000000000000000000000000000000000000001")).toBe(
+      -(2n ** 53n + 1n),
+    );
+    expect(Psych.unsafeLoad("--- 0400000000000000001")).toBe(0o400000000000000001n);
+  });
+
   it("round-trips a Complex as a !ruby/object:Complex mapping", async () => {
     const { Psych } = await import("./psych.js");
     const { Complex } = await import("./complex.js");

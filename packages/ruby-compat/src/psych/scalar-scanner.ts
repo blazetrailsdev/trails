@@ -160,8 +160,10 @@ export class ScalarScanner {
   parseInt(string: string): number | bigint {
     const digits = stringDelete(string, ",_");
     const n = kernelInteger(digits);
-    if (!Number.isSafeInteger(n) && /^[-+]?\d+$/.test(digits)) return BigInt(digits);
-    return n;
+    if (Number.isSafeInteger(n)) return n;
+    const [, sign, body] = /^([-+]?)(.*)$/s.exec(digits)!;
+    const big = BigInt(/^0[0-7]/.test(body) ? `0o${body.slice(1)}` : body);
+    return sign === "-" ? -big : big;
   }
 
   /**
