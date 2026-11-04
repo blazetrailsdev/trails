@@ -15,7 +15,7 @@ import {
   include,
   LoadError,
   NameError,
-  onSignal,
+  trap,
   setEnv,
   STDERR,
   STDOUT,
@@ -99,12 +99,11 @@ export class Server extends RackupServer<ServerOptions> {
     };
     atExit(ensure);
     try {
-      const trap = onSignal("SIGINT", () => exit());
+      trap("SIGINT", () => exit());
       this.createTmpDirectories();
       this.setupDevCaching();
       if (this.options.logStdout) await this.logToStdout();
 
-      trap();
       return await super.start();
     } catch (error) {
       ensure();

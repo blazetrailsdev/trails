@@ -435,6 +435,19 @@ export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
 }
 
+const traps = new Map<SignalName, () => void>();
+
+/**
+ * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348), which replaces
+ * the signal's previous handler.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function trap(signal: SignalName, command: () => void): void {
+  traps.get(signal)?.();
+  traps.set(signal, onSignal(signal, command));
+}
+
 /** @noRailsEquivalent PERMANENT */
 export class SystemExit extends Error {
   /** @noRailsEquivalent PERMANENT */

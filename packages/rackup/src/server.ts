@@ -18,7 +18,7 @@ import {
   Hash,
   NameError,
   LoadError,
-  onSignal,
+  trap,
   OptionParser,
   Process,
   rbFRequire,
@@ -404,7 +404,7 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
 
     if (options.pid != null) await this.writePid();
 
-    onSignal("SIGINT", () => {
+    trap("SIGINT", () => {
       if (typeof this._server!.shutdown === "function") {
         this._server!.shutdown();
       } else {

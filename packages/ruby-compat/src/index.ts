@@ -363,6 +363,7 @@ export {
   exitBang,
   getProcessAdapter,
   onSignal,
+  trap,
   processAdapterConfig,
   rbArgv,
   rbProgname,

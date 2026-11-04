@@ -12,6 +12,7 @@ import {
   env,
   getProcessAdapter,
   onSignal,
+  trap,
   processAdapterConfig,
   registerProcessAdapter,
   setEnv,
@@ -539,5 +540,28 @@ describe("processAdapter", () => {
         }
       }
     });
+  });
+});
+
+describe("trap", () => {
+  afterEach(() => {
+    __INTERNAL_resetProcessAdapter_TEST_ONLY();
+  });
+
+  it("replaces the signal's previous trap", () => {
+    const listeners = new Set<() => void>();
+    registerProcessAdapter(
+      makeFakeAdapter({
+        onSignal: (_name, handler) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        },
+      }),
+    );
+    const calls: string[] = [];
+    trap("SIGINT", () => calls.push("rails"));
+    trap("SIGINT", () => calls.push("rackup"));
+    for (const listener of listeners) listener();
+    expect(calls).toEqual(["rackup"]);
   });
 });
