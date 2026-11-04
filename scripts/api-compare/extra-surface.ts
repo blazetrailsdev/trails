@@ -3193,8 +3193,6 @@ export function buildReport(
       a.tsFile.localeCompare(b.tsFile),
   );
 
-  // A receipt on an internal or `_` declaration is the privates lane's to judge
-  // (RFC 0218, `privates-surface.ts`), which reports it STALE itself.
   const privatesRead = new Set(
     buildPrivatesReport(ruby, ts, { filterPkg: opts.filterPkg })
       .names.filter((n) => n.receipted === true)
