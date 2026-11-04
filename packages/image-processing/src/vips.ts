@@ -51,7 +51,7 @@ const INTROSPECT_OPTIONAL_INPUT: Record<string, string[]> = Object.fromEntries(
     heifload: `page n thumbnail unlimited ${LOAD_OPTIONS}`,
     jpegload: `shrink autorotate unlimited ${LOAD_OPTIONS}`,
     jxlload: `page n ${LOAD_OPTIONS}`,
-    magickload: `density page n ${LOAD_OPTIONS}`,
+    magickload: `density page ${LOAD_OPTIONS}`,
     matrixload: LOAD_OPTIONS,
     pngload: `unlimited ${LOAD_OPTIONS}`,
     ppmload: LOAD_OPTIONS,
@@ -104,12 +104,25 @@ const SAVER_SUFFIXES: Record<string, string> = {
 };
 
 /** @noRailsEquivalent PERMANENT */
-function vipsForeignLoadMagick(filename: string): Image | null {
+function isVipsForeignLoadUnknown(error: unknown): boolean {
+  return (
+    error instanceof WebAssembly.Exception &&
+    String((error as { message?: unknown }).message).includes("is not a known file format")
+  );
+}
+
+/** @noRailsEquivalent PERMANENT */
+function vipsForeignLoadMagick(
+  filename: string,
+  { page = 0, density = null }: Options = {},
+): Image | null {
   const tempfile = Tempfile.new(["magickload", ".png"]);
   try {
+    const args = density != null ? ["-density", String(density)] : [];
     for (const cmd of ["magick", "convert"]) {
       const { status, error } = getChildProcess().spawnSync(cmd, [
-        `${filename}[0]`,
+        ...args,
+        `${filename}[${String(page)}]`,
         `png:${tempfile.path()!}`,
       ]);
       if (error !== undefined) continue;
@@ -129,8 +142,8 @@ function vipsImageNewFromFile(filename: string, options: Options = {}): Image {
   try {
     return vips.Image.newFromFile(filename, options);
   } catch (error) {
-    if (!(error instanceof WebAssembly.Exception)) throw error;
-    const image = vipsForeignLoadMagick(filename);
+    if (!isVipsForeignLoadUnknown(error)) throw error;
+    const image = vipsForeignLoadMagick(filename, options);
     if (image === null) throw error;
     return image;
   }
@@ -139,9 +152,10 @@ function vipsImageNewFromFile(filename: string, options: Options = {}): Image {
 /** @noRailsEquivalent PERMANENT */
 function vipsForeignFindLoad(filename: string): string | null {
   try {
-    const loader = vipsImageNewFromFile(filename).getString("vips-loader");
+    const loader = vips.Image.newFromFile(filename).getString("vips-loader");
     return Object.hasOwn(INTROSPECT_OPTIONAL_INPUT, loader) ? loader : null;
   } catch (error) {
+    if (isVipsForeignLoadUnknown(error)) return "magickload";
     if (error instanceof WebAssembly.Exception) return null;
     throw error;
   }
