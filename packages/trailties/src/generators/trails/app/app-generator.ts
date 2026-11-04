@@ -1431,6 +1431,7 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
   async test(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/fixtures/files");
     await this.emptyDirectoryWithKeepFile("test/controllers");
+    await this.emptyDirectoryWithKeepFile("test/mailers");
     await this.emptyDirectoryWithKeepFile("test/models");
     await this.emptyDirectoryWithKeepFile("test/helpers");
     await this.emptyDirectoryWithKeepFile("test/integration");
@@ -1597,6 +1598,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteAppHelpersIfApiOption");
     this.methodAdded("deleteAppViewsIfApiOption");
     this.methodAdded("deletePublicFilesIfApiOption");
+    this.methodAdded("deleteActionMailerFilesSkippingActionMailer");
     this.methodAdded("deleteNonApiInitializersIfApiOption");
     this.methodAdded("deleteApiInitializers");
     this.methodAdded("applyTrailsTemplate");
@@ -1776,6 +1778,15 @@ export class AppGenerator extends AppBase {
       await this.removeFile("public/500.html");
       await this.removeFile("public/icon.png");
       await this.removeFile("public/icon.svg");
+    }
+  }
+
+  async deleteActionMailerFilesSkippingActionMailer(): Promise<void> {
+    if (this.options.skipActionMailer) {
+      await this.removeFile("app/views/layouts/mailer.html.tse");
+      await this.removeFile("app/views/layouts/mailer.text.tse");
+      await this.removeDir("app/mailers");
+      await this.removeDir("test/mailers");
     }
   }
 
