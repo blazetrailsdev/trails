@@ -92,13 +92,17 @@ export interface ChildProcessAdapter {
    * Runs `command` with `args` as its argv and no shell, as `IO.popen` execs
    * an Array command (`rb_io_popen`, `vendor/ruby/v3.3.11/io.c:7968-7983`),
    * with stdin inherited, stdout on a pipe and stderr on the `err` descriptor
-   * (inherited when `null`), and resolves with what it wrote to stdout.
+   * (inherited when `null`, merged into stdout when `"out"`), and resolves
+   * with what it wrote to stdout. A `stdinData` is written to a stdin pipe,
+   * which is then closed, as a `"w"` mode's write end is
+   * (`vendor/ruby/v3.3.11/io.c:7458-7463`).
    */
   popen?(
     command: string,
     args: string[],
     env: Record<string, string | undefined>,
-    err: number | null,
+    err: number | "out" | null,
+    stdinData?: string | Uint8Array,
   ): Promise<[stdout: Uint8Array, status: WaitStatus]>;
 }
 
@@ -317,15 +321,22 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       }
       return [stdout, stderr, status];
     },
-    async popen(command, args, env, err) {
+    async popen(command, args, env, err, stdinData) {
       const chunks: Uint8Array[] = [];
+      const sink = { bytes: (chunk: Uint8Array) => chunks.push(chunk) };
       const status = await spawnChild(
         cp,
         command,
         args,
         env,
-        ["inherit", "pipe", err ?? (STDERR.isClosed() ? "inherit" : STDERR.fileno())],
-        { bytes: (chunk) => chunks.push(chunk) },
+        [
+          stdinData === undefined ? "inherit" : "pipe",
+          "pipe",
+          err === "out" ? "pipe" : (err ?? (STDERR.isClosed() ? "inherit" : STDERR.fileno())),
+        ],
+        sink,
+        stdinData,
+        err === "out" ? sink : undefined,
       );
       const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
       let offset = 0;
