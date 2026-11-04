@@ -37,10 +37,12 @@
     }
   },
   "actionmailer": {
-    "rows": 9,
+    "rows": 11,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "base.ts::Base": "ActionMailer::Base",
+      "base.ts::NullMail": "ActionMailer::Base::NullMail",
       "callbacks.ts::Callbacks": "ActionMailer::Callbacks",
       "callbacks.ts::ClassMethods": "ActionMailer::Callbacks::ClassMethods",
       "form-builder.ts::ClassMethods": "ActionMailer::FormBuilder::ClassMethods",

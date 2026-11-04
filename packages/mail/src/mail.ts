@@ -27,7 +27,24 @@ interface MailConstants {
   randomTag(): string;
   somethingRandom(): number | bigint;
   uniq(): number | bigint;
+  registerObserver(observer: DeliveryObserver): void;
+  unregisterObserver(observer: DeliveryObserver): void;
+  registerInterceptor(interceptor: DeliveryInterceptor): void;
+  unregisterInterceptor(interceptor: DeliveryInterceptor): void;
+  informObservers(mail: Message): void;
+  informInterceptors(mail: Message): void;
 }
+
+export interface DeliveryObserver {
+  deliveredEmail(mail: Message): unknown;
+}
+
+export interface DeliveryInterceptor {
+  deliveringEmail(mail: Message): unknown;
+}
+
+const deliveryNotificationObservers: DeliveryObserver[] = [];
+const deliveryInterceptors: DeliveryInterceptor[] = [];
 
 type FieldConstant = new (...args: never[]) => CommonField;
 
@@ -41,6 +58,40 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
 
   defaults(block: (this: Configuration) => unknown) {
     return block.call(Configuration.instance());
+  },
+
+  registerObserver(observer: DeliveryObserver) {
+    if (!deliveryNotificationObservers.includes(observer)) {
+      deliveryNotificationObservers.push(observer);
+    }
+  },
+
+  unregisterObserver(observer: DeliveryObserver) {
+    for (let i = deliveryNotificationObservers.indexOf(observer); i !== -1; ) {
+      deliveryNotificationObservers.splice(i, 1);
+      i = deliveryNotificationObservers.indexOf(observer);
+    }
+  },
+
+  registerInterceptor(interceptor: DeliveryInterceptor) {
+    if (!deliveryInterceptors.includes(interceptor)) {
+      deliveryInterceptors.push(interceptor);
+    }
+  },
+
+  unregisterInterceptor(interceptor: DeliveryInterceptor) {
+    for (let i = deliveryInterceptors.indexOf(interceptor); i !== -1; ) {
+      deliveryInterceptors.splice(i, 1);
+      i = deliveryInterceptors.indexOf(interceptor);
+    }
+  },
+
+  informObservers(mail: Message) {
+    for (const observer of deliveryNotificationObservers) observer.deliveredEmail(mail);
+  },
+
+  informInterceptors(mail: Message) {
+    for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
   },
 
   /**

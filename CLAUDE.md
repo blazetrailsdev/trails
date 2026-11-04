@@ -1786,6 +1786,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/ordered_options.rb`                   | Proxy                 |
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
+| `action_mailer/base.rb`                               | Proxy (class chain)   |
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/engine/lazy_route_set.rb`                      | Proxy (module chain)  |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
@@ -1866,7 +1867,7 @@ Rules that apply across the table:
   answers `respond_to?` for the session's names but has no trap.
   `IntegrationTest` splices the Proxy into its own prototype chain above the
   `Runner` link.
-- A class-level pair `extend`ed onto a class (`dynamic_matchers.rb`,
+- A class-level pair `extend`ed onto a class (`dynamic_matchers.rb`, `action_mailer/base.rb`,
   `railtie.rb:216-230`) is a Proxy spliced into the static prototype chain
   directly above `Base` / `Trailtie`: it forwards only a read that missed every
   class below it, and only a name `respond_to_missing?` claims. The name is

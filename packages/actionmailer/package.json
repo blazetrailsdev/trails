@@ -22,6 +22,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/mail": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
