@@ -37,6 +37,7 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
     return new Mail.Message(args, block);
   },
 
+  /** @inventedArm forceEncoding — PERMANENT */
   async read(filename: string): Promise<Message> {
     return Mail.new(forceEncoding((await IO.binreadAsync(filename))!, "UTF-8"));
   },
