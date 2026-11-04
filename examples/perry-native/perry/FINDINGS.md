@@ -1949,3 +1949,77 @@ Perry does **not** require the package to exist: `dyn-missing.ts` shows a
 dynamic import of a nonexistent package compiles cleanly and fails at runtime,
 as it should. The route past this wall is therefore to keep the unused peer
 dependency out of the example app's resolution, not to change activerecord.
+
+## Wall 22, SOLVED, and the four preconditions a measurement needs (2026-11-04)
+
+**Compiler: perry 0.5.1663, built from `main` at `a1ae27ee5`.**
+
+### Wall 22: the expo-sqlite adapter is now opt-in
+
+Fixed in trails#9724. `expo-sqlite` is an optional peerDependency, and trails
+already reached its adapter correctly — `import type` plus a dynamic `import()`
+— so Node never loads it in production. That is not enough for AOT: a literal
+specifier in a dynamic `import()` is a **static edge** to a compiler that must
+emit everything reachable. Two sites carried one (`activerecord`'s
+`namespaces.ts` autoload map and `trailties/src/database.ts`), and the compile
+walked into `expo-sqlite` → `expo-modules-core` → `react-native/index.js`, whose
+Flow syntax the parser rejects.
+
+The adapter now requires an explicit import; `register("expo-sqlite", …)` stays
+so a misconfigured app still gets an actionable error naming the import, and
+trailties resolves the class through `ConnectionAdapters.resolve`. Result:
+react-native leaves the graph entirely and the boot graph grows **1874 → 1934
+modules**, with `dynamic reach: 0 dynamic edges`.
+
+Generalised into tasks RFC 0221 as a rule, with a sweep of all 20 optional peer
+dependencies: two literal-specifier sites remain (`import("vitest")` and
+`import("vite")` in actionpack's system-testing code) and both are latent — not
+reachable from `08-serve.ts` today.
+
+### Only three packages are read from `dist`; the rest from `src`
+
+Measured from `-v` collect records: **`ruby-compat` (224 modules), `trailties`
+(16) and `tse-compiler` (6)** resolve to `dist`. Every other `@blazetrails`
+package is read from `src` — `activesupport` 190, `activerecord` 317,
+`actionpack` 151, `actionview` 123, `i18n` 20, `nokogiri` 30, `rack-session` 7.
+
+This matters because **an edit to one of those three is invisible to the compile
+with no error and no warning.** It cost a wrong conclusion here: the expo fix
+looked like it had failed when the compile had never seen it —
+`trailties/dist/database.js` was four days old, and the only clue was a
+`stage=resolve-import module=.../dist/database.js` record. It also means the
+walls fixed in src-resolved packages (16–21) were measured against the edits, and
+are not in doubt.
+
+`perry-ladder-keep/check-dist-fresh.sh` guards the three. Note it must compare
+against the newest file *inside* `dist`, not the `dist` directory's own mtime:
+`tsc` leaves the directory alone when it only rewrites existing files, so a
+directory test reports "stale" forever.
+
+### A from-source compiler needs three more build steps than the docs imply
+
+Each of these fails in a way that looks like something else:
+
+1. **Sidecars.** `scripts/gc_call_effects/sidecars.sh $PSRC/target/release` is
+   mandatory, or every real compile refuses to start ("every runtime archive
+   must carry a sidecar computed from its bytes"). A hello-world still compiles,
+   so the toolchain looks healthy — a four-test validation suite ran and was
+   silently void for this reason.
+2. **`LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib`**, or `perry-gc-effects`
+   fails to link on `-lzstd`: brew's llvm@22 links brew's zstd, and rust-lld
+   does not search there.
+3. **The ext archives**, one discovered per failed compile (~17 min each at this
+   graph size). `perry target add --ext` cannot help — a from-source build has
+   no trusted CLI update keys, so self-update is disabled. Build all 16 at once:
+   `cargo build --release $(ls -d crates/perry-ext-* | sed 's|crates/|-p |')`.
+   Then `perry-wasm-host` and `perry-component-host` as well; the `perry-ui-*`
+   crates are platform targets a server app does not need.
+
+### Do not pin the compiler to the commit this file's header names
+
+`d74498b2` is **2614 commits** behind main. Pinning to it for reproducibility
+produced four findings that do not survive re-validation (see the retraction
+table in the previous entry), including a trails fix that was committed and
+reverted. The binary used by the earlier runs came from a scratchpad that was
+wiped, so its version was never recorded — which is the actual lesson: **record
+the compiler commit in every entry.** This file now does.
