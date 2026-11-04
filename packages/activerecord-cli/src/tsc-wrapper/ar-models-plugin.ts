@@ -17,7 +17,7 @@ export interface ArModelsPluginOptions {
   modelRegistry: ReadonlyMap<string, string>;
   schemaColumnsByTable?: Readonly<Record<string, Readonly<Record<string, SchemaColumnValue>>>>;
   schemaScopes?: SchemaScopes;
-  modelSuperNames?: ReadonlyMap<string, string>;
+  modelSuperKeys?: ReadonlyMap<string, string>;
   onModel?: (missing: ModelTable) => void;
   timeZoneAwareAttributes?: boolean;
 }
@@ -28,7 +28,7 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
     modelRegistry,
     schemaColumnsByTable,
     schemaScopes,
-    modelSuperNames,
+    modelSuperKeys,
     onModel,
     timeZoneAwareAttributes,
   } = opts;
@@ -62,7 +62,7 @@ export function createArModelsPlugin(opts: ArModelsPluginOptions): TscPlugin {
         prependImports,
         schemaColumnsByTable,
         schemaScopes,
-        modelSuperNames,
+        modelSuperKeys,
         onModel,
         timeZoneAwareAttributes,
       });

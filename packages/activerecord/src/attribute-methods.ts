@@ -229,53 +229,23 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-/** @missingRailsCall map — PERMANENT */
+function instanceMethodNames(klass: any): Set<string> {
+  const names = new Set<string>();
+  for (let proto = klass?.prototype; proto && proto !== Object.prototype; ) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key !== "constructor") names.add(key);
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return names;
+}
+
 export function dangerousAttributeMethods(): Set<string> {
-  return (_dangerousMethodsCache ||= new Set([
-    "save",
-    "saveBang",
-    "destroy",
-    "delete",
-    "reload",
-    "update",
-    "increment",
-    "decrement",
-    "toggle",
-    "touch",
-    "lock",
-    "freeze",
-    "dup",
-    "clone",
-    "becomes",
-    "createOrUpdate",
-    "changes",
-    "changed",
-    "changedAttributes",
-    "previousChanges",
-    "changesToSave",
-    "savedChanges",
-    "changesApplied",
-    "isFrozen",
-    "inspect",
-    "toJSON",
-    "isNewRecord",
-    "isPersisted",
-    "isDestroyed",
-    "isReadonly",
-    "isChanged",
-    "isValid",
-    "errors",
-    "validate",
-    "readAttribute",
-    "writeAttribute",
-    "assignAttributes",
-    "encrypt",
-    "decrypt",
-    "isEncryptedAttribute",
-    "ciphertextFor",
-    "attributes",
-    "logger",
-  ]));
+  if (_dangerousMethodsCache) return _dangerousMethodsCache;
+  const base = ActiveRecord.Base;
+  const names = instanceMethodNames(base);
+  for (const name of ["dup", "freeze", "isFrozen", "clone", "hash", "objectId"]) names.add(name);
+  return (_dangerousMethodsCache = names);
 }
 
 /** @missingRailsName generatedAttributeMethods — PERMANENT */
@@ -444,7 +414,11 @@ export function isInstanceMethodAlreadyImplemented(
     ThisParameterType<typeof AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
-  if (isDangerousAttributeMethod.call(this, methodName)) {
+  const dangerous =
+    typeof (this as any).isDangerousAttributeMethod === "function"
+      ? (this as any).isDangerousAttributeMethod(methodName)
+      : isDangerousAttributeMethod.call(this, methodName);
+  if (dangerous) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,
     );
