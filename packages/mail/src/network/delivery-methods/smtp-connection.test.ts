@@ -14,6 +14,7 @@ describe("SMTP Delivery Method", () => {
       mail.setSmtpEnvelopeFrom("smtp_from@example.com");
       mail.setSmtpEnvelopeTo("smtp_to@example.com");
       await new SMTPConnection({ connection: smtp }).deliverBang(mail);
+      expect(deliveries[0][0]).toBe(mail.encoded());
       expect(deliveries[0][1]).toBe("smtp_from@example.com");
       expect(deliveries[0][2]).toEqual(["smtp_to@example.com"]);
     } finally {

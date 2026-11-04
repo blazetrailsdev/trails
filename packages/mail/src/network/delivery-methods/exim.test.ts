@@ -10,12 +10,12 @@ function buildMail(): Message {
   return mail;
 }
 
-async function argvFor(dm: Exim, mail = buildMail()): Promise<unknown> {
+async function deliverWith(dm: Exim, mail = buildMail()) {
   const popen = vi
     .spyOn(dm as unknown as { popen(command: unknown): Promise<unknown> }, "popen")
     .mockResolvedValue(null);
   await dm.deliverBang(mail);
-  return popen.mock.calls[0][0];
+  return popen;
 }
 
 afterEach(() => vi.restoreAllMocks());
@@ -23,6 +23,9 @@ afterEach(() => vi.restoreAllMocks());
 describe("exim delivery agent", () => {
   it("should send an email using exim", async () => {
     const dm = new Exim({});
-    expect(await argvFor(dm)).toEqual("/usr/sbin/exim -i -t -f roger@test.lindsaar.net".split(" "));
+    expect(await deliverWith(dm)).toHaveBeenCalledWith(
+      "/usr/sbin/exim -i -t -f roger@test.lindsaar.net".split(" "),
+      expect.any(Function),
+    );
   });
 });

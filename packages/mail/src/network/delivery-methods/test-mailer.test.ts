@@ -8,7 +8,7 @@ describe("Mail::TestMailer", () => {
   });
 
   it("should have no deliveries when first initiated", () => {
-    expect(TestMailer.deliveries.length).toBe(0);
+    expect(TestMailer.deliveries).toBeEmpty();
   });
 
   it("should deliver an email to the Mail::TestMailer.deliveries array", async () => {
@@ -26,6 +26,7 @@ describe("Mail::TestMailer", () => {
     const mail = new Message();
     mail.setFrom("from@somemail.com");
     mail.setBody("body");
+    expect(mail.smtpEnvelopeTo()).toEqual([]);
     await expect(new TestMailer({}).deliverBang(mail)).rejects.toThrow(
       "SMTP To address may not be blank: []",
     );

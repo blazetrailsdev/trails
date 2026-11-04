@@ -13,9 +13,7 @@ describe("SMTP Delivery Method", () => {
       mail.setSubject("invalid RFC2822");
       await new FileDelivery({ location }).deliverBang(mail);
       const delivery = File.join(location, "marcel@amont.com");
-      expect(await File.readAsync(delivery)).toMatch(
-        /Subject: invalid RFC2822\r\n[\s\S]*\r\n\r\n$/,
-      );
+      expect(await File.readAsync(delivery)).toBe(`${mail.encoded()}\r\n\r\n`);
     });
   });
 });
