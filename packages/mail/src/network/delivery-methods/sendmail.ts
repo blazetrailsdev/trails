@@ -59,7 +59,7 @@ export class Sendmail {
     command: string[] | string,
     block: (io: StringIO<Uint8Array>) => unknown,
   ): Promise<unknown> {
-    const result = await IO.popen(command, "w+", { err: "out" }, block as never);
+    const result = await IO.popen(command, "w+", { err: "out" }, block);
     if (Process.lastStatus!.exitstatus() !== 0) {
       throw new DeliveryError(
         `Delivery failed with exitstatus ${Process.lastStatus!.exitstatus()}: ${rbInspect(command)}`,
