@@ -1,12 +1,13 @@
 import { camelize } from "@blazetrails/activesupport";
 import { BaseController } from "./base-controller.js";
-import { Blob } from "./blob.js";
+import { ActiveStorage } from "./active-storage.js";
+import type { Blob } from "./blob.js";
 
 type BlobArgs = Parameters<typeof Blob.createBeforeDirectUploadBang>[0];
 
 export class DirectUploadsController extends BaseController {
   async create(): Promise<void> {
-    const blob = await Blob.createBeforeDirectUploadBang(this.blobArgs());
+    const blob = await ActiveStorage.Blob!.createBeforeDirectUploadBang(this.blobArgs());
     await this.render({ json: await this.directUploadJson(blob) });
   }
 

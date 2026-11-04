@@ -51,7 +51,7 @@ const SUBPATH_ENTRIES: Record<string, string> = {
   activestorage: "transformers/image-processing-transformer.ts",
 };
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */
-const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = { activestorage: "variant-record.ts" };
+const SEPARATE_SUBPATH_ENTRIES: Record<string, string> = {};
 
 /** A directory or file whose files load one at a time, so each carries its own table and loads no sibling. */
 const LAZY_DIRS: Record<string, string[]> = {
@@ -66,6 +66,7 @@ const LAZY_DIRS: Record<string, string[]> = {
     "test-databases.ts",
     "testing/query-assertions.ts",
   ],
+  activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts"],
 };
 
@@ -812,9 +813,14 @@ async function main(): Promise<void> {
         process.exitCode = 1;
       }
       if (entries.length > 0) {
+        /** A row nested in a lazy file's constant resolves only once that file loads. */
+        const lazyOwners = entries.filter((e) => e.table).map((e) => `${e.fqn}::`);
         await checkSeatedPaths(
           dir,
-          entries.filter((e) => !e.excluded && !e.table).map((e) => e.fqn),
+          entries
+            .filter((e) => !e.excluded && !e.table)
+            .map((e) => e.fqn)
+            .filter((fqn) => !lazyOwners.some((owner) => fqn.startsWith(owner))),
         );
       }
     }

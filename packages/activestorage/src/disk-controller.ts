@@ -1,7 +1,6 @@
 import { Errno, include, rbEqual, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import { BaseController } from "./base-controller.js";
-import { Blob } from "./blob.js";
 import { IntegrityError } from "./errors.js";
 import { FileServer } from "./file-server.js";
 import type { DiskService } from "./service/disk-service.js";
@@ -71,8 +70,8 @@ export class DiskController extends BaseController {
 
   /** @internal */
   private namedDiskService(name: string): DiskService {
-    return Blob.services.fetch(name, () => {
-      return Blob.service;
+    return ActiveStorage.Blob!.services.fetch(name, () => {
+      return ActiveStorage.Blob!.service;
     }) as DiskService;
   }
 

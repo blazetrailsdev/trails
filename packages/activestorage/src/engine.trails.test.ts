@@ -6,10 +6,10 @@ import { RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "./engine.js";
 import { Model } from "./attached/model.js";
+import { app } from "./test-helpers/database/setup.js";
 import { Blob } from "./blob.js";
 import { VariantRecord } from "./variant-record.js";
 import { ActiveRecordExtensions } from "./reflection.js";
-import { app } from "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { TopLevel, constantize } from "@blazetrails/activesupport";
 import type { RouteSet } from "@blazetrails/actionpack";
@@ -115,6 +115,13 @@ describe("ActiveStorage::Engine", () => {
     const { Engine: freshEngine } = await import("./engine.js");
     const initializer = freshEngine.initializers.find((i) => i.name === "active_storage.app")!;
     expect(initializer.before).toBe("setup_main_autoloader");
+    expect(initializer.after).toBe("active_storage.reflection");
+    for (const name of ["active_storage.attached", "active_storage.reflection"]) {
+      await freshEngine.initializers
+        .find((i) => i.name === name)!
+        .bind(freshEngine.instance())
+        .run(app);
+    }
     await initializer.bind(freshEngine.instance()).run(app);
     expect(fresh.Blob).toBeDefined();
     expect(fresh.Attachment).toBeDefined();

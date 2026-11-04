@@ -1,4 +1,5 @@
-import { isPresent, onLoad, type Extended } from "@blazetrails/activesupport";
+import "../constants.representable.generated.js";
+import { isPresent, type Extended } from "@blazetrails/activesupport";
 import { Marcel } from "@blazetrails/marcel";
 import { included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
@@ -126,7 +127,6 @@ export const Representable = {
 };
 
 Object.defineProperty(Representable, included, {
-  /** @inventedArm onLoad — CONVERGEABLE active-storage-models-call-has-one-attached-directly */
   value(base: typeof Blob) {
     base.hasMany("variantRecords", {
       className: "ActiveStorage::VariantRecord",
@@ -136,8 +136,6 @@ Object.defineProperty(Representable, included, {
       if (ActiveStorage.trackVariants) await blob.variantRecords.destroyAll();
     });
 
-    onLoad("active_storage_reflection", () => {
-      (base as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage");
-    });
+    (base as unknown as Extended<typeof ClassMethods>).hasOneAttached("previewImage");
   },
 });
