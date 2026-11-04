@@ -139,7 +139,7 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
     Error.prepareStackTrace = prepareStackTrace;
     Error.stackTraceLimit = stackTraceLimit;
   }
-  if (stack == null) return [];
+  if (stack == null) return callerLocationsViaCallSites(start, length);
   const locations = stack
     .split("\n")
     .slice(2 + start)
@@ -166,7 +166,48 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
         },
       ];
     });
+  if (locations.length === 0) return callerLocationsViaCallSites(start, length);
   return length == null ? locations : locations.slice(0, length);
+}
+
+function callerLocationsViaCallSites(start: number, length?: number): CallerLocation[] {
+  const nodeUtil = (
+    globalThis as {
+      process?: { getBuiltinModule?: (id: string) => unknown };
+    }
+  ).process?.getBuiltinModule?.("node:util") as
+    | { getCallSites?: (frameCount?: number) => NodeCallSite[] }
+    | undefined;
+  const getCallSites = nodeUtil?.getCallSites;
+  if (typeof getCallSites !== "function") return [];
+  let sites: NodeCallSite[];
+  try {
+    sites = getCallSites(length == null ? 200 : 2 + start + length);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(sites)) return [];
+  const locations = sites.slice(2 + start).map((site) => {
+    const raw = typeof site?.scriptName === "string" ? site.scriptName : "";
+    const path = raw.startsWith("file://") ? decodeURIComponent(raw.slice("file://".length)) : raw;
+    const lineno = Number.isFinite(site?.lineNumber) ? Number(site.lineNumber) : 0;
+    const label = typeof site?.functionName === "string" ? site.functionName : "";
+    return {
+      path,
+      absolutePath: path === "" ? undefined : path,
+      lineno,
+      label,
+      toString: () => `${path}:${lineno}:in '${label}'`,
+    };
+  });
+  return length == null ? locations : locations.slice(0, length);
+}
+
+interface NodeCallSite {
+  functionName?: string;
+  scriptName?: string;
+  lineNumber?: number;
+  columnNumber?: number;
 }
 
 const TRAILS_GEM_ROOT = new URL(".", import.meta.url).pathname;
