@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { SMTP as NetSMTP } from "@blazetrails/net-smtp";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
@@ -20,3 +21,5 @@ export class SMTPConnection {
     return this.settings.returnResponse ? response : this;
   }
 }
+
+Mail.SMTPConnection = SMTPConnection;

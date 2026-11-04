@@ -9,6 +9,7 @@
   "references": [
     { "path": "../actionpack" },
     { "path": "../activesupport" },
+    { "path": "../i18n" },
     { "path": "../mail" },
     { "path": "../ruby-compat" }
   ]

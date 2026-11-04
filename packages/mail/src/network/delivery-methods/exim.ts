@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { Sendmail } from "./sendmail.js";
 import type { SmtpEnvelope } from "../../smtp-envelope.js";
 
@@ -11,3 +12,5 @@ export class Exim extends Sendmail {
     return null;
   }
 }
+
+Mail.Exim = Exim;

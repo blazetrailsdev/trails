@@ -221,6 +221,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../mail

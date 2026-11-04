@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { ArgumentError, block, rbInspect } from "@blazetrails/ruby-compat";
 import { SMTP as NetSMTP } from "@blazetrails/net-smtp";
 import { SMTPConnection } from "./smtp-connection.js";
@@ -120,3 +121,5 @@ export class SMTP {
     return context;
   }
 }
+
+Mail.SMTP = SMTP;

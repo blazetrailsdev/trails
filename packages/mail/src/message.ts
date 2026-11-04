@@ -3,6 +3,7 @@ import {
   flatten,
   NoMethodError,
   rbObjAsString,
+  rbObjDup,
   rbObjId,
   strip,
   stringSplit,
@@ -11,6 +12,7 @@ import {
   IO,
 } from "@blazetrails/ruby-compat";
 import { Body } from "./body.js";
+import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
 import type { AttachmentsList } from "./attachments-list.js";
 import { Encodings } from "./encodings.js";
@@ -61,6 +63,8 @@ export class Message {
   protected _attachment: unknown = undefined;
 
   deliveryHandler: unknown = null;
+  /** @internal */
+  _deliveryMethod: unknown = null;
   performDeliveries = true;
   raiseDeliveryErrors = true;
 
@@ -75,6 +79,8 @@ export class Message {
   constructor(...args: unknown[]) {
     const block = (typeof args.at(-1) === "function" ? args.pop() : undefined) as MessageBlock;
     this._charset = (this.constructor as typeof Message).defaultCharset;
+    this._deliveryMethod = rbObjDup(Mail.deliveryMethod());
+
     this._transportEncoding = Encodings.getEncoding("7bit");
 
     const first = flatten(args)[0];
@@ -90,6 +96,17 @@ export class Message {
       } else {
         block.call(this, this);
       }
+    }
+  }
+
+  deliveryMethod(method: unknown = null, settings: Record<string, unknown> = {}): unknown {
+    if (method == null || method === false) {
+      return this._deliveryMethod;
+    } else {
+      const klass = Configuration.instance().lookupDeliveryMethod(method) as new (
+        settings: Record<string, unknown>,
+      ) => unknown;
+      return (this._deliveryMethod = new klass(settings));
     }
   }
 

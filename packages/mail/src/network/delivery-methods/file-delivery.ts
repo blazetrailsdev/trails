@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import { File, FileUtils, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { SmtpEnvelope } from "../../smtp-envelope.js";
 import type { Message } from "../../message.js";
@@ -33,3 +34,5 @@ export class FileDelivery {
     }
   }
 }
+
+Mail.FileDelivery = FileDelivery;

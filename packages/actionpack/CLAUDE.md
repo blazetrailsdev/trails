@@ -57,6 +57,9 @@ name becomes a file name or a locale key, and each site carries
 - `AbstractController::Translation#translate`'s lazy-lookup scope
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
+- `ActionMailer::Base#collectResponsesFromTemplates`
+  (`actionmailer/src/base.ts`; `base.rb:991-1002`), which also dasherizes the
+  default `mailer_name` directory, as `localPrefixes` does
 
 The DIRECTORY a controller's templates are looked up in is kebab-case too.
 `ViewPaths::ClassMethods#localPrefixes` (`actionview/src/view-paths.ts`; Rails'
