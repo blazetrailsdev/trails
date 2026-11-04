@@ -2,6 +2,7 @@ import { onLoad, TopLevel, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
+  DetailsKey,
   deprecator,
   Resolver,
   RoutingUrlFor,
@@ -20,6 +21,8 @@ import {
   Template,
   ViewReloader,
 } from "@blazetrails/actionview";
+import { Dir } from "@blazetrails/ruby-compat";
+import type { Application } from "../application.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionViewConfig {
@@ -195,7 +198,38 @@ export class Trailtie extends BaseTrailtie {
         RoutingUrlFor.include(UrlFor);
       });
     });
+    this.server(watchViews);
   }
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionView::Railtie" });
+
+/** @noRailsEquivalent PERMANENT */
+async function watchViews(app: unknown): Promise<void> {
+  const { config } = app as Application;
+  const actionView = config.actionView;
+  const enableCaching =
+    actionView.cacheTemplateLoading == null
+      ? !config.isReloadingEnabled()
+      : actionView.cacheTemplateLoading;
+  if (enableCaching) return;
+
+  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
+  let started = false;
+  let initialError: Error | null = null;
+  const handle = await watchViewFiles({
+    cwd: Dir.pwd(),
+    onRebuild: ({ kind }) => {
+      if (kind === "change") DetailsKey.clear();
+    },
+    onError: (err, trigger) => {
+      if (!started) initialError ??= err;
+      TopLevel.Trails!.logger!.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+    },
+  });
+  started = true;
+  if (initialError !== null) {
+    handle.close();
+    throw initialError;
+  }
+}
