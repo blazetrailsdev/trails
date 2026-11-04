@@ -1,0 +1,30 @@
+/node_modules/
+/dist/
+/.trails/
+/.env*
+!/.env.example
+
+/log/*
+/tmp/*
+<% if (this.keeps()) { -%>
+!/log/.keep
+!/tmp/.keep
+
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+<% } -%>
+
+/storage/*
+<% if (this.keeps()) { -%>
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/
+!/tmp/storage/.keep
+<% } -%>
+<% if (!this.options.api) { -%>
+
+/public/assets
+<% } -%>
+
+*.tsbuildinfo

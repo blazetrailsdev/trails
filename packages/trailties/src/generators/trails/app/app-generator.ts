@@ -98,6 +98,11 @@ export class ActionMethods {
   }
 
   /** @internal */
+  protected keepFile(destination: string): Promise<unknown> {
+    return this.generator["keepFile"](destination);
+  }
+
+  /** @internal */
   protected createFile(...args: Parameters<AppGenerator["createFile"]>): unknown {
     return this.generator.createFile(...args);
   }
@@ -193,7 +198,7 @@ export class AppBuilder extends ActionMethods {
     );
   }
 
-  /** @missingRailsCall copy_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsCall copy_file — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async readme(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
@@ -244,17 +249,16 @@ built module raises \`LoadError\`.
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async nodeVersion(): Promise<void> {
-    await this.createFile(".node-version", "24.16.0\n");
+    await this.template("node-version", ".node-version");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsArgs template — PERMANENT */
   async rubyVersion(): Promise<void> {
-    await this.createFile(".node-version", "24.16.0\n");
+    await this.template("node-version", ".node-version");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsCall template — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async gemfile(): Promise<void> {
     const name = File.basename(this.appPath);
     const dep = this.database.pkgDependency;
@@ -383,22 +387,12 @@ built module raises \`LoadError\`.
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsArgs template — PERMANENT */
   async rakefile(): Promise<void> {
-    await this.createFile(
-      "Rakefile.ts",
-      `// Add your own tasks in files placed in lib/tasks ending in .ts, for example lib/tasks/capistrano.ts, and they will automatically be available to Rake.
-
-import { Trails } from "@blazetrails/trailties";
-
-import "./config/application.ts";
-
-await Trails.application.loadTasks();
-`,
-    );
+    await this.template("Rakefile.ts");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsCall template — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async configru(): Promise<void> {
     await this.createFile(
       "config.ts",
@@ -470,48 +464,17 @@ ${
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async gitignore(): Promise<void> {
-    await this.createFile(
-      ".gitignore",
-      `/node_modules/
-/dist/
-/.trails/
-/.env*
-!/.env.example
-
-/log/*
-!/log/.gitkeep
-
-/tmp/*
-!/tmp/.gitkeep
-!/tmp/pids/
-/tmp/pids/*
-!/tmp/pids/.gitkeep
-
-/storage/*
-!/storage/.gitkeep
-${this.options.api ? "" : "\n/public/assets\n"}
-*.tsbuildinfo
-`,
-    );
+    await this.template("gitignore", ".gitignore");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async gitattributes(): Promise<void> {
-    await this.createFile(
-      ".gitattributes",
-      `# Mark the database schema as having been generated.
-db/schema.ts linguist-generated
-
-*.ts diff=typescript
-`,
-    );
+    await this.template("gitattributes", ".gitattributes");
   }
 
   /**
-   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall chmod — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
+   * @missingRailsCall template — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
    */
   async dockerfiles(): Promise<void> {
     await this.createFile(
@@ -580,11 +543,7 @@ dist
     }
   }
 
-  /**
-   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
+  /** @missingRailsCall directory — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async app(): Promise<void> {
     const name = File.basename(this.appPath);
     await this.createFile(
@@ -601,8 +560,6 @@ dist
       }),
     );
 
-    await this.createFile("app/controllers/concerns/.gitkeep", "");
-
     await this.createFile(
       "app/models/application-record.ts",
       tsModule({
@@ -614,8 +571,6 @@ dist
         ],
       }),
     );
-
-    await this.createFile("app/models/concerns/.gitkeep", "");
 
     await this.createFile(
       "app/helpers/application-helper.ts",
@@ -715,13 +670,16 @@ dist
 `,
     );
 
-    await this.createFile("app/assets/images/.gitkeep", "");
+    await this.emptyDirectoryWithKeepFile("app/assets/images");
+
+    await this.keepFile("app/controllers/concerns");
+    await this.keepFile("app/models/concerns");
   }
 
   /**
-   * @missingRailsCall chmod — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall shebang — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall chmod — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
+   * @missingRailsCall directory — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
+   * @missingRailsCall shebang — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
    */
   async bin(): Promise<void> {
     const excludePattern = [this.skipEslint() ? /eslint/ : null].filter((p) => p != null);
@@ -807,9 +765,9 @@ process.exit(status ?? 1);
   }
 
   /**
-   * @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall inside — CONVERGEABLE app-builder-bodies-use-rails-file-actions
+   * @missingRailsCall directory — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
+   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
+   * @missingRailsCall inside — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions
    * @missingRailsArgs template — PERMANENT
    */
   async config(): Promise<void> {
@@ -1333,34 +1291,20 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     await this.template(this.database.template, "config/database.ts");
   }
 
-  /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async db(): Promise<void> {
-    await this.createFile("db/migrate/.gitkeep", "");
-
-    await this.createFile(
-      "db/seeds.ts",
-      `// Seed your database here.
-// Example:
-//   import { User } from "../app/models/user.ts";
-//   await User.create({ name: "Admin", email: "admin@example.com" });
-`,
-    );
+    await this.directory("db");
   }
 
-  /**
-   * @missingRailsCall empty_directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
   async lib(): Promise<void> {
-    await this.createFile("lib/tasks/.gitkeep", "");
+    await this.emptyDirectory("lib");
+    await this.emptyDirectoryWithKeepFile("lib/tasks");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async log(): Promise<void> {
-    await this.createFile("log/.gitkeep", "");
+    await this.emptyDirectoryWithKeepFile("log");
   }
 
-  /** @missingRailsCall directory — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  /** @missingRailsCall directory — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async publicDirectory(): Promise<void> {
     await this.createFile(
       "public/404.html",
@@ -1478,16 +1422,19 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     await this.createFile("public/favicon.ico", "");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async storage(): Promise<void> {
-    await this.createFile("storage/.gitkeep", "");
+    await this.emptyDirectoryWithKeepFile("storage");
+    await this.emptyDirectoryWithKeepFile("tmp/storage");
   }
 
-  /**
-   * @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   * @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions
-   */
+  /** @missingRailsCall template — CONVERGEABLE app-builder-remaining-bodies-use-rails-file-actions */
   async test(): Promise<void> {
+    await this.emptyDirectoryWithKeepFile("test/fixtures/files");
+    await this.emptyDirectoryWithKeepFile("test/controllers");
+    await this.emptyDirectoryWithKeepFile("test/models");
+    await this.emptyDirectoryWithKeepFile("test/helpers");
+    await this.emptyDirectoryWithKeepFile("test/integration");
+
     await this.createFile(
       "test/test-helper.ts",
       `import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -1520,12 +1467,6 @@ export async function teardown(): Promise<void> {
 }
 `,
     );
-
-    await this.createFile("test/models/.gitkeep", "");
-    await this.createFile("test/controllers/.gitkeep", "");
-    await this.createFile("test/helpers/.gitkeep", "");
-    await this.createFile("test/integration/.gitkeep", "");
-    await this.createFile("test/fixtures/files/.gitkeep", "");
   }
 
   /** @missingRailsArgs template — PERMANENT */
@@ -1535,15 +1476,13 @@ export async function teardown(): Promise<void> {
     await this.template("test/application-system-test-case.ts");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async tmp(): Promise<void> {
-    await this.createFile("tmp/.gitkeep", "");
-    await this.createFile("tmp/pids/.gitkeep", "");
+    await this.emptyDirectoryWithKeepFile("tmp");
+    await this.emptyDirectoryWithKeepFile("tmp/pids");
   }
 
-  /** @missingRailsCall empty_directory_with_keep_file — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
   async vendor(): Promise<void> {
-    await this.createFile("vendor/.gitkeep", "");
+    await this.emptyDirectoryWithKeepFile("vendor");
   }
 
   configTargetVersion(): string {
