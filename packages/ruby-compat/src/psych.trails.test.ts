@@ -592,6 +592,15 @@ describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
     expect([loaded.numerator, loaded.denominator]).toEqual([3n, 4n]);
   });
 
+  it("round-trips a Rational whose numerator is past 2**53", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Rational } = await import("./rational.js");
+    const r = Psych.unsafeLoad(Psych.dump(new Rational(9007199254740993n, 2n))) as InstanceType<
+      typeof Rational
+    >;
+    expect([r.numerator, r.denominator]).toEqual([9007199254740993n, 2n]);
+  });
+
   it("round-trips a Complex as a !ruby/object:Complex mapping", async () => {
     const { Psych } = await import("./psych.js");
     const { Complex } = await import("./complex.js");

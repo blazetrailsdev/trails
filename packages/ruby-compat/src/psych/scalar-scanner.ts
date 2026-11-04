@@ -153,9 +153,15 @@ export class ScalarScanner {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  parseInt(string: string): number {
-    return kernelInteger(stringDelete(string, ",_"));
+  /**
+   * @inventedArm if — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  parseInt(string: string): number | bigint {
+    const digits = stringDelete(string, ",_");
+    const n = kernelInteger(digits);
+    if (!Number.isSafeInteger(n) && /^[-+]?\d+$/.test(digits)) return BigInt(digits);
+    return n;
   }
 
   /**
