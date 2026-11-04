@@ -402,7 +402,6 @@ import { Trails } from "@blazetrails/trailties";
 import "./config/environment.ts";
 
 export const Config = Trails.application;
-export default Config;
 
 await Trails.application.loadServer();
 `,

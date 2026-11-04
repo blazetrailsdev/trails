@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  capitalize,
   constGet,
   File,
   RuntimeError,
@@ -46,7 +47,7 @@ export class Builder {
         TopLevel,
         File.basename(path, ".*")
           .split("_")
-          .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+          .map((s) => capitalize(s, []))
           .join(""),
       ) as RackApp;
     }
