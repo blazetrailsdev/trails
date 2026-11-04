@@ -22,7 +22,8 @@ export class ParameterHash extends IndifferentHash<unknown> {
     }
 
     if (pairs.length === 0) {
-      return super.get(exact ?? keyName);
+      const key = exact ?? keyName;
+      return this.has(key) ? super.get(key) : (this.default(key) ?? null);
     } else {
       let string = pairs
         .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
