@@ -12,7 +12,7 @@ type Chunk = Uint8Array;
 
 interface Input {
   read(): string | Uint8Array | null;
-  close?(): unknown;
+  close(): unknown;
 }
 
 interface Output {
@@ -186,7 +186,7 @@ export class Stream {
   flush(): void {}
 
   closeRead(): void {
-    this._input?.close?.();
+    this._input?.close();
     this._input = null;
   }
 
