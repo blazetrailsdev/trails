@@ -4,7 +4,6 @@ interface ServableHost {
   contentType?: string | null;
 }
 
-/** @inventedArm if — PERMANENT */
 function contentTypeForServing(this: ServableHost): string | null {
   const contentType = this.contentType as string | null | Promise<string | null>;
   if (contentType instanceof Promise) {
@@ -17,7 +16,6 @@ function contentTypeForServing(this: ServableHost): string | null {
     : contentType;
 }
 
-/** @inventedArm if — PERMANENT */
 function forcedDispositionForServing(this: ServableHost): "attachment" | undefined {
   const contentType = this.contentType as string | null | Promise<string | null>;
   if (contentType instanceof Promise) {
