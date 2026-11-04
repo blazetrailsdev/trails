@@ -867,10 +867,10 @@ describe("ActiveStorage::OneAttachedTest", () => {
       user.avatarWithVariants.attach(fixtureFileUpload("report.pdf")),
     );
     const preview = await (
-      (await (user.avatarWithVariants as unknown as Attachment).preview("thumb")) as Preview
+      (user.avatarWithVariants as unknown as Attachment).preview("thumb") as Preview
     ).processed();
 
-    const image = await readImage(await preview["variant"]());
+    const image = await readImage(preview["variant"]());
     expect(await image.type()).toBe("PNG");
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
@@ -881,7 +881,7 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     const error = await assertRaises([ArgumentError], {}, async () => {
       await (
-        (await (user.avatarWithVariants as unknown as Attachment).preview("unknown")) as Preview
+        (user.avatarWithVariants as unknown as Attachment).preview("unknown") as Preview
       ).processed();
     });
 

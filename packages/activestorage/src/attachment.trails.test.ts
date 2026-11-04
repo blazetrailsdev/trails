@@ -80,7 +80,7 @@ describe("Attachment", () => {
   });
 
   it("raises for an unknown named variant", async () => {
-    await expect(attachment.variant("thumb")).rejects.toThrow(
+    expect(() => attachment.variant("thumb")).toThrow(
       new ArgumentError("Cannot find variant :thumb for User#avatar"),
     );
   });
@@ -99,5 +99,16 @@ describe("Attachment#variant", () => {
     const variant = attachment.variant({ resizeToLimit: [100, 100] });
 
     expect(variant).toBeInstanceOf(VariantWithRecord);
+  });
+
+  it("raises TypeError before the blob is loaded", async () => {
+    const created = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    const attachment = await Attachment.find(created.id);
+
+    expect(() => attachment.variant({ resizeToLimit: [100, 100] })).toThrow(TypeError);
   });
 });

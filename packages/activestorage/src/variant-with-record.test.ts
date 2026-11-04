@@ -27,13 +27,15 @@ type Rep = {
   key: Promise<string | null> | string;
   url(): Promise<string>;
 };
-type Representable = { representation(transformations: unknown): Promise<unknown> };
+type Representable = { blob?: unknown; representation(transformations: unknown): unknown };
 
 const variantOf = (blob: Blob, transformations: unknown) =>
   blob.variant(transformations as never) as VariantWithRecord;
 
-const representationOf = async (attachable: unknown, transformations: unknown) =>
-  (await (attachable as Representable).representation(transformations)) as Rep;
+const representationOf = async (attachable: unknown, transformations: unknown) => {
+  await (attachable as Representable).blob;
+  return (attachable as Representable).representation(transformations) as Rep;
+};
 
 class VariantWithRecordTest extends TestCase {
   static {

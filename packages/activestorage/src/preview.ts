@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, RuntimeError, StandardError, type Included } from "@blazetrails/ruby-compat";
+import { include, StandardError, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
@@ -39,29 +39,17 @@ export class Preview {
 
   get filename(): Filename {
     const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    if (presentation instanceof Promise) {
-      void presentation.catch(() => {});
-      throw new RuntimeError(
-        `filename needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
-      );
-    }
     return presentation.filename;
   }
 
   get contentType(): string | null {
     const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
-    if (presentation instanceof Promise) {
-      void presentation.catch(() => {});
-      throw new RuntimeError(
-        `contentType needs ${this.image.name}'s attachment loaded; \`await ${this.image.name}.load()\` first.`,
-      );
-    }
     return presentation.contentType;
   }
 
   async processed(): Promise<this> {
     if (!(await this.isProcessed())) await this.process();
-    if (this.isVariant()) await (await this.variant()).processed();
+    if (this.isVariant()) await this.variant().processed();
     return this;
   }
 
@@ -117,7 +105,7 @@ export class Preview {
   }
 
   /** @internal */
-  private variant(): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
+  private variant(): Variant | VariantWithRecord {
     return (this.image as One & Attachment).variant(this.variation);
   }
 
@@ -128,9 +116,7 @@ export class Preview {
 
   /** @internal */
   private async presentation(): Promise<Presented> {
-    return this.isVariant()
-      ? await (await this.variant()).processed()
-      : (this.image as One & Presented);
+    return this.isVariant() ? await this.variant().processed() : (this.image as One & Presented);
   }
 
   /** @internal */
