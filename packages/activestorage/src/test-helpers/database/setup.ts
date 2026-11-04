@@ -27,7 +27,6 @@ import { PopplerPDFPreviewer } from "../../previewer/poppler-pdf-previewer.js";
 import { VideoPreviewer } from "../../previewer/video-previewer.js";
 import { Attachment } from "../../attachment.js";
 import { ActiveStorage } from "../../active-storage.js";
-import { Blob } from "../../blob.js";
 import { Engine } from "../../engine.js";
 import "../../service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
@@ -113,7 +112,7 @@ await Base.connectsTo({
 await Base.connectionPool().migrationContext.migrate();
 await ActiveStorageCreateUsers.migrate("up");
 await ActiveStorageCreateGroups.migrate("up");
-await Blob.loadSchema();
+await ActiveStorage.Blob!.loadSchema();
 await Attachment.loadSchema();
 
 afterAll(async () => {

@@ -1,3 +1,4 @@
+import "../constants.identifiable.generated.js";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { Marcel } from "@blazetrails/marcel";
 import { Range } from "@blazetrails/ruby-compat";

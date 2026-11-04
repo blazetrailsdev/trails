@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActiveStorage } from "./active-storage.js";
-import { Blob } from "./blob.js";
 import "./test-helpers/database/setup.js";
+import { Blob } from "./blob.js";
 import { createFileBlob } from "./test-helpers/test-helper.js";
 
 describe("Preview Servable", () => {

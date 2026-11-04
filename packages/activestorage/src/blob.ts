@@ -1,3 +1,4 @@
+import "./constants.blob.generated.js";
 import {
   base36,
   classAttribute,
@@ -32,7 +33,6 @@ import { Filename } from "./filename.js";
 import { PurgeJob } from "./purge-job.js";
 import { Record } from "./record.js";
 import type { Service } from "./service.js";
-import "./variant-record.js";
 import type { VariantRecord } from "./variant-record.js";
 import type { One } from "./attached/one.js";
 import type { Registry } from "./service/registry.js";
@@ -570,11 +570,11 @@ export class Blob extends Record {
   }
 }
 
+ActiveStorage.Blob = Blob;
+
 include(Blob, Analyzable);
 include(Blob, Identifiable);
 include(Blob, Representable);
 include(Blob, Servable);
-
-ActiveStorage.Blob = Blob;
 
 runLoadHooks("active_storage_blob", Blob);

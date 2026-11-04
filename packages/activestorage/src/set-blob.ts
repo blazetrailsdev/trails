@@ -1,7 +1,8 @@
 import type { ActionController } from "@blazetrails/actionpack";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
-import { Blob } from "./blob.js";
+import { ActiveStorage } from "./active-storage.js";
+import type { Blob } from "./blob.js";
 
 type ControllerClass = typeof ActionController.Base;
 
@@ -27,7 +28,7 @@ export const SetBlob = {
 
   /** @internal */
   blobScope(this: SetBlobHost): typeof Blob {
-    return Blob;
+    return ActiveStorage.Blob!;
   },
 };
 extend(SetBlob, Concern);

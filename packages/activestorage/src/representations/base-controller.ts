@@ -2,7 +2,7 @@ import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { include } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { BaseController as ActiveStorageBaseController } from "../base-controller.js";
-import { Blob } from "../blob.js";
+import type { Blob } from "../blob.js";
 import type { Preview } from "../preview.js";
 import type { Variant } from "../variant.js";
 import type { VariantWithRecord } from "../variant-with-record.js";
@@ -19,7 +19,7 @@ export class BaseController extends ActiveStorageBaseController {
 
   /** @internal */
   blobScope(): typeof Blob {
-    return Blob.scopeForStrictLoading() as unknown as typeof Blob;
+    return ActiveStorage.Blob!.scopeForStrictLoading() as unknown as typeof Blob;
   }
 
   /** @internal */

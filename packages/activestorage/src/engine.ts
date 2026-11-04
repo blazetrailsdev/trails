@@ -150,10 +150,6 @@ export class Engine extends TrailsEngine {
 
     this.config.eagerLoadNamespaces.push(ActiveStorage);
 
-    this.initializer("active_storage.app", { before: "setup_main_autoloader" }, async () => {
-      await import("./index.js");
-    });
-
     this.initializer("active_storage.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("activeStorage", ActiveStorage.deprecator());
     });
@@ -262,6 +258,12 @@ export class Engine extends TrailsEngine {
         prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
         runLoadHooks("active_storage_reflection", Reflection);
       });
+    });
+
+    this.initializer("active_storage.app", { before: "setup_main_autoloader" }, async () => {
+      await import("./index.js");
+      await import("./blob.js");
+      await import("./variant-record.js");
     });
 
     this.initializer("action_view.configuration", () => {
