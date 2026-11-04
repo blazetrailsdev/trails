@@ -251,13 +251,19 @@ export async function main(argv: string[]): Promise<string> {
   return args.json ? JSON.stringify(report, null, 2) : formatPrivatesReport(report);
 }
 
-const argv = (globalThis as { process?: { argv?: string[] } }).process?.argv;
+const host = (globalThis as { process?: { argv?: string[]; exitCode?: number } }).process;
+const argv = host?.argv;
 if (argv !== undefined && path.basename(argv[1] ?? "") === "privates-surface.ts") {
   void main(argv.slice(2)).then(
     (out) => console.log(out),
-    (error: unknown) =>
+    (error: unknown) => {
+      const missing = (error as { code?: unknown } | null)?.code === "ENOENT";
       console.error(
-        `${error instanceof Error ? error.message : String(error)}\nRun \`pnpm parity:api\` first to generate the manifests.`,
-      ),
+        missing
+          ? `${(error as Error).message}\nRun \`pnpm parity:api\` first to generate the manifests.`
+          : error,
+      );
+      if (host !== undefined) host.exitCode = 1;
+    },
   );
 }
