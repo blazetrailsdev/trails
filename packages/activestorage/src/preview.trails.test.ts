@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActiveStorage } from "./active-storage.js";
 import "./test-helpers/database/setup.js";
@@ -46,5 +47,14 @@ describe("Preview Servable", () => {
     )?.blob;
     expect(preview.filename.toString()).toBe("report.png");
     expect(preview.contentType).toBe("image/png");
+  });
+
+  it("raises on a delegated read before the preview image is loaded", async () => {
+    const blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
+    await blob.preview({ resizeToLimit: [640, 280] }).processed();
+
+    const preview = blob.preview({ resizeToLimit: [640, 280] });
+    expect(() => preview.filename).toThrow(RuntimeError);
+    expect(() => preview.contentType).toThrow(RuntimeError);
   });
 });

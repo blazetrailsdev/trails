@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { writingRole } from "@blazetrails/activerecord/active-record";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, StandardError, type Included } from "@blazetrails/ruby-compat";
+import { include, RuntimeError, StandardError, type Included } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Attachment } from "./attachment.js";
 import type { One } from "./attached/one.js";
@@ -38,11 +38,25 @@ export class Preview {
   }
 
   get filename(): Filename {
-    return ((this.isVariant() ? this.variant() : this.image) as Presented).filename;
+    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
+    if (presentation instanceof Promise) {
+      void presentation.catch(() => {});
+      throw new RuntimeError(
+        "filename needs the preview image's blob loaded; `await preview.image.load()` first.",
+      );
+    }
+    return presentation.filename;
   }
 
   get contentType(): string | null {
-    return ((this.isVariant() ? this.variant() : this.image) as Presented).contentType;
+    const presentation = this.isVariant() ? this.variant() : (this.image as One & Presented);
+    if (presentation instanceof Promise) {
+      void presentation.catch(() => {});
+      throw new RuntimeError(
+        "contentType needs the preview image's blob loaded; `await preview.image.load()` first.",
+      );
+    }
+    return presentation.contentType;
   }
 
   async processed(): Promise<this> {
