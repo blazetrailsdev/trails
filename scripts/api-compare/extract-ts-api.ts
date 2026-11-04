@@ -984,6 +984,7 @@ export function extractFromProgram(
           file: relPath,
           ...(internal ? { internal: true } : {}),
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+          ...perfTagOf(node),
           ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
           ...(fnOptionKeys != null && fnOptionReads !== undefined
@@ -4588,6 +4589,11 @@ function localCallableDeclaration(
  * population member like any other, so the tag that stands in for a baseline
  * row has to reach the artifact from here too.
  */
+/** `perf: true` when the declaration carries a `@perf` tag (`CLAUDE.md § "Speed"`). */
+function perfTagOf(node: ts.Node): Partial<MethodInfo> {
+  return ts.getJSDocTags(node).some((t) => t.tagName.text === "perf") ? { perf: true } : {};
+}
+
 function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   const calls = missingRailsCallTags(node);
   const args = missingRailsArgsTags(node);
@@ -4603,6 +4609,11 @@ function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
     ...(callReasons !== undefined ? { missingRailsCallReasons: callReasons } : {}),
     ...(argReasons !== undefined ? { missingRailsArgsReasons: argReasons } : {}),
   };
+}
+
+function fileLocalReceiptOf(node: ts.Node): Partial<MethodInfo> {
+  const noRailsEquivalent = noRailsEquivalentReason(node);
+  return noRailsEquivalent !== undefined ? { noRailsEquivalent } : {};
 }
 
 export function extractFileLocalHelpers(
@@ -4625,6 +4636,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4670,6 +4683,8 @@ export function extractFileLocalHelpers(
       line,
       file: relPath,
       internal: true,
+      ...fileLocalReceiptOf(node),
+      ...perfTagOf(node),
       ...(callArgs !== undefined ? { callArgs } : {}),
       ...(skeleton !== undefined ? { localSkeleton: skeleton } : {}),
       ...missingRailsTagsOf(node),
@@ -4866,6 +4881,7 @@ export function extractClass(
     const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...perfTagOf(member),
       ...(memberMissingRailsCalls !== undefined
         ? { missingRailsCalls: memberMissingRailsCalls }
         : {}),

@@ -116,6 +116,9 @@ export interface ParamInfo {
 // token changes and stale entries missing the field are evicted (see PR #4020).
 export interface MethodInfo {
   name: string;
+  /** TS side only (RFC 0218): the declaration carries `@perf`. Exempts nothing;
+   *  the privates lane prints it as a sub-count. */
+  perf?: boolean;
   visibility: "public" | "protected" | "private";
   params: ParamInfo[];
   line?: number;
