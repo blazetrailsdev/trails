@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Errno, SystemCallError } from "./errno.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { Interrupt } from "./signal-exception.js";
 import { RangeError } from "./range-error.js";
 import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
@@ -568,7 +569,11 @@ describe("trap", () => {
     expect(typeof trap("SIGINT", "IGNORE")).toBe("function");
     for (const listener of listeners) listener();
     expect(calls).toEqual(["rackup"]);
-    expect(trap("SIGINT", "DEFAULT")).toBe("IGNORE");
+    expect(trap("INT", "SIG_DFL")).toBe("IGNORE");
     expect(listeners.size).toBe(0);
+    expect(trap(2, "DEFAULT")).toBe("SYSTEM_DEFAULT");
+    expect(() => [...listeners][0]()).toThrow(Interrupt);
+    expect(() => trap("SIGFOO", "IGNORE")).toThrow("unsupported signal `SIGFOO'");
+    expect(() => trap(99, "IGNORE")).toThrow("invalid signal number (99)");
   });
 });

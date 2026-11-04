@@ -1,4 +1,6 @@
+import { ArgumentError } from "./argument-error.js";
 import { Errno, SystemCallError } from "./errno.js";
+import { Interrupt, SignalException } from "./signal-exception.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { RuntimeError } from "./runtime-error.js";
 import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
@@ -445,32 +447,62 @@ type TrapCommand =
   | "SYSTEM_DEFAULT"
   | "EXIT";
 
-const traps = new Map<SignalName, { command: TrapCommand; off: (() => void) | null }>();
+type TrapSignal = "SIGINT" | "SIGTERM" | "SIGQUIT";
+
+const SIGNOS: Record<number, TrapSignal> = { 2: "SIGINT", 3: "SIGQUIT", 15: "SIGTERM" };
+
+const traps = new Map<TrapSignal, { command: TrapCommand; off: (() => void) | null }>();
+
+function trapSignm(vsig: number | string): TrapSignal {
+  if (typeof vsig === "number") {
+    if (vsig < 0 || vsig >= 65) throw new ArgumentError(`invalid signal number (${vsig})`);
+    const signm = SIGNOS[vsig];
+    if (signm === undefined) throw new ArgumentError(`unsupported signal \`${vsig}'`);
+    return signm;
+  }
+  const signm = vsig.startsWith("SIG") ? vsig : `SIG${vsig}`;
+  if (signm === "SIGINT" || signm === "SIGTERM" || signm === "SIGQUIT") return signm;
+  throw new ArgumentError(`unsupported signal \`${signm}'`);
+}
 
 /**
  * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348): installs
- * `command` for `signal` in place of the previous one and answers the previous
- * one. String commands follow `trap_handler` (signal.c:1158): `""`, `IGNORE`
- * and `SIG_IGN` ignore the signal, `DEFAULT`, `SIG_DFL` and `SYSTEM_DEFAULT`
- * restore the default, and `EXIT` exits. A signal never trapped answers
- * `"DEFAULT"`, as `trap` (signal.c:1247) does for its own handler.
+ * `command` for `signal` (a name, with or without `SIG`, or a number, per
+ * `trap_signm`, signal.c:1230) in place of the previous one and answers the
+ * previous one, named as `trap` (signal.c:1247) names it. String commands
+ * follow `trap_handler` (signal.c:1158): `""`, `IGNORE` and `SIG_IGN` ignore
+ * the signal, `SIG_DFL` and `SYSTEM_DEFAULT` restore the system default,
+ * `DEFAULT` installs Ruby's own handler, which raises `Interrupt` for SIGINT
+ * and `SignalException` otherwise (`default_handler`, signal.c:1100), and
+ * `EXIT` exits. A signal never trapped answers `"DEFAULT"`.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function trap(signal: SignalName, command: TrapCommand): TrapCommand {
-  const previous = traps.get(signal);
+export function trap(signal: number | string, command: TrapCommand): TrapCommand {
+  const sig = trapSignm(signal);
+  const previous = traps.get(sig);
   previous?.off?.();
   let off: (() => void) | null;
+  let oldcmd: TrapCommand;
   if (typeof command === "function") {
-    off = onSignal(signal, command);
+    off = onSignal(sig, command);
+    oldcmd = command;
   } else if (command === "" || command === "IGNORE" || command === "SIG_IGN") {
-    off = onSignal(signal, () => {});
-  } else if (command === "EXIT") {
-    off = onSignal(signal, () => exit());
-  } else {
+    off = onSignal(sig, () => {});
+    oldcmd = "IGNORE";
+  } else if (command === "SIG_DFL" || command === "SYSTEM_DEFAULT") {
     off = null;
+    oldcmd = "SYSTEM_DEFAULT";
+  } else if (command === "DEFAULT") {
+    off = onSignal(sig, () => {
+      throw sig === "SIGINT" ? new Interrupt("") : new SignalException(sig);
+    });
+    oldcmd = "DEFAULT";
+  } else {
+    off = onSignal(sig, () => exit());
+    oldcmd = "EXIT";
   }
-  traps.set(signal, { command, off });
+  traps.set(sig, { command: oldcmd, off });
   return previous?.command ?? "DEFAULT";
 }
 
