@@ -187,6 +187,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -242,6 +245,9 @@ importers:
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -992,6 +998,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../rackup
       '@blazetrails/rake':
         specifier: workspace:*
         version: link:../rake

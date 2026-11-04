@@ -10,6 +10,9 @@ import {
 
 export class Handler {
   /** @noRailsEquivalent PERMANENT */
+  declare static Node: typeof import("./handler/node.js").Node;
+
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
   /** @internal */

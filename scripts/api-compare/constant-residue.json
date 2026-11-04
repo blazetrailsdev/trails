@@ -1050,7 +1050,7 @@
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
   "rack": {
     "rows": 59,
-    "excluded": ["handler/node.ts::Node"],
+    "excluded": [],
     "unwalked": ["bad-request.ts::BadRequest", "multipart.ts::Multipart"],
     "residue": {
       "etag.ts::ETag": "Rack::ETag",
@@ -1093,7 +1093,7 @@
   },
   "rackup": {
     "rows": 4,
-    "excluded": [],
+    "excluded": ["handler/node.ts::Node"],
     "unwalked": [],
     "residue": { "server.ts::Options": "Rackup::Server::Options" }
   },

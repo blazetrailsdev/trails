@@ -1,7 +1,8 @@
 import { getEnv, presence } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
-import { Handler, type RackEnv } from "@blazetrails/rack";
+import { type RackEnv } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../trails.js";
 

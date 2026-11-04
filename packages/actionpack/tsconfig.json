@@ -24,6 +24,7 @@
     { "path": "../did-you-mean" },
     { "path": "../i18n" },
     { "path": "../rack" },
+    { "path": "../rackup" },
     { "path": "../rack-session" },
     { "path": "../rack-test" },
     { "path": "../nokogiri" }

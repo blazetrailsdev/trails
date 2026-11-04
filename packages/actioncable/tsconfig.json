@@ -12,6 +12,7 @@
     { "path": "../activesupport" },
     { "path": "../date" },
     { "path": "../rack" },
+    { "path": "../rackup" },
     { "path": "../ruby-compat" }
   ]
 }
