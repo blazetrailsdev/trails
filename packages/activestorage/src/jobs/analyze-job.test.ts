@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
@@ -31,7 +32,9 @@ describe("ActiveStorage::AnalyzeJobTest", () => {
     await blob.purge();
 
     await t.performEnqueuedJobs({}, async () => {
-      await AnalyzeJob.performLater(blob);
+      await assertNothingRaised(async () => {
+        await AnalyzeJob.performLater(blob);
+      });
     });
   });
 });

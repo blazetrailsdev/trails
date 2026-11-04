@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertDifference } from "@blazetrails/activesupport";
+import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
@@ -38,15 +38,17 @@ describe("ActiveStorage::PurgeJobTest", () => {
       },
     );
 
-    expect(await Blob.isExists(blob.id)).toBe(false);
-    expect(await Blob.service!.isExist(blob.key)).toBe(false);
+    expect(await Blob.isExists(blob.id)).toBeFalsy();
+    expect(await Blob.service!.isExist(blob.key)).toBeFalsy();
   });
 
   it("ignores missing blob", async () => {
     await blob.purge();
 
     await t.performEnqueuedJobs({}, async () => {
-      await PurgeJob.performLater(blob);
+      await assertNothingRaised(async () => {
+        await PurgeJob.performLater(blob);
+      });
     });
   });
 });

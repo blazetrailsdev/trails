@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { assertChanges } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -26,10 +27,17 @@ describe("ActiveStorage::PreviewImageJobTest", () => {
   });
 
   it("creates preview", async () => {
-    await blob.previewImage.load();
-    expect(blob.previewImage.isAttached()).toBe(false);
-    await PreviewImageJob.performNow(blob, [transformation]);
-    expect(blob.previewImage.isAttached()).toBe(true);
+    await assertChanges(
+      async () => {
+        await blob.previewImage.load();
+        return blob.previewImage.isAttached();
+      },
+      null,
+      { from: false, to: true },
+      async () => {
+        await PreviewImageJob.performNow(blob, [transformation]);
+      },
+    );
   });
 
   it("enqueues transform variant jobs", async () => {

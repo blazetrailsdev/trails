@@ -32,7 +32,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     expect(blob.service.name).toBe("local");
     await blob.open({}, async (file) => {
       const fixture = new FixtureSet().fileFixture("racecar.jpg");
-      expect(await FileUtils.isIdenticalAsync(file.path()!, fixture.toPath())).toBe(true);
+      expect(await FileUtils.isIdenticalAsync(file.path()!, fixture.toPath())).toBeTruthy();
     });
   }, 30_000);
 
@@ -42,9 +42,9 @@ describe("ActiveStorage::FixtureSetTest", () => {
     const avatar = user.avatar;
     await avatar.load();
 
-    expect(avatar.isBlank()).toBe(false);
-    expect(avatar.isAttached()).toBe(true);
-    expect(isPresent(await avatar.attachment)).toBe(true);
+    expect(avatar.isBlank()).toBeFalsy();
+    expect(avatar.isAttached()).toBeTruthy();
+    expect(isPresent(await avatar.attachment)).toBeTruthy();
   });
 
   it("active storage metadata", async () => {

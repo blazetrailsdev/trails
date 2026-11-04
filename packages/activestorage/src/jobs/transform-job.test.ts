@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertChanges } from "@blazetrails/activesupport";
+import { assertChanges, assertNothingRaised } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
@@ -67,7 +67,7 @@ describe("ActiveStorage::TransformJobTest", { timeout: 30_000 }, () => {
     await image.load();
     expect(
       await ((await image.variant(transformations)) as unknown as Processable).isProcessed(),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("creates variant when untracked", async () => {
@@ -96,9 +96,9 @@ describe("ActiveStorage::TransformJobTest", { timeout: 30_000 }, () => {
     const transformations = { resizeToLimit: [100, 100] };
 
     await t.performEnqueuedJobs({}, async () => {
-      await expect(
-        TransformJob.performLater(unrepresentableBlob, transformations),
-      ).resolves.toBeDefined();
+      await assertNothingRaised(async () => {
+        await TransformJob.performLater(unrepresentableBlob, transformations);
+      });
     });
   });
 });

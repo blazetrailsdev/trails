@@ -421,7 +421,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
     const variant = await variantOf(blob, { resizeToLimit: [100, 100] }).processed();
 
     expect(await VariantRecord.count()).toBe(1);
-    expect(await blob.service.isExist((await variant.key)!)).toBe(true);
+    expect(await blob.service.isExist((await variant.key)!)).toBeTruthy();
 
     await variant.destroy();
 

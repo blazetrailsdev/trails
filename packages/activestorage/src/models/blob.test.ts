@@ -295,20 +295,20 @@ describe("ActiveStorage::BlobTest", () => {
 
   it("image?", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
-    expect(blob.isImage()).toBe(true);
-    expect(blob.isAudio()).toBe(false);
+    expect(blob.isImage()).toBeTruthy();
+    expect(blob.isAudio()).toBeFalsy();
   });
 
   it("video?", async () => {
     const blob = await createFileBlob({ filename: "video.mp4", contentType: "video/mp4" });
-    expect(blob.isVideo()).toBe(true);
-    expect(blob.isAudio()).toBe(false);
+    expect(blob.isVideo()).toBeTruthy();
+    expect(blob.isAudio()).toBeFalsy();
   });
 
   it("text?", async () => {
     const blob = await createBlob({ data: "Hello world!" });
-    expect(blob.isText()).toBe(true);
-    expect(blob.isAudio()).toBe(false);
+    expect(blob.isText()).toBeTruthy();
+    expect(blob.isAudio()).toBeFalsy();
   });
 
   it("download yields chunks", async () => {
@@ -328,10 +328,10 @@ describe("ActiveStorage::BlobTest", () => {
     const blob = await createFileBlob({ filename: "racecar.jpg" });
     const fixture = await IO.binreadAsync(fileFixture("racecar.jpg").toPath());
     await blob.open({}, (file) => {
-      expect(file.isBinmode()).toBe(true);
+      expect(file.isBinmode()).toBeTruthy();
       expect(file.pos).toBe(0);
-      expect(File.basename(file.path()!).startsWith(`ActiveStorage-${blob.id}-`)).toBe(true);
-      expect(file.path()!.endsWith(".jpg")).toBe(true);
+      expect(File.basename(file.path()!).startsWith(`ActiveStorage-${blob.id}-`)).toBeTruthy();
+      expect(file.path()!.endsWith(".jpg")).toBeTruthy();
       expect(binary(file.read())).toBe(binary(fixture));
     });
   });
@@ -353,10 +353,10 @@ describe("ActiveStorage::BlobTest", () => {
     await (
       await createFileBlob({ filename: "racecar.jpg" })
     ).open({ tmpdir: tmpdir }, (file) => {
-      expect(file.isBinmode()).toBe(true);
+      expect(file.isBinmode()).toBeTruthy();
       expect(file.pos).toBe(0);
       expect(file.path()).toMatch(/\.jpg$/);
-      expect(file.path()!.startsWith(tmpdir)).toBe(true);
+      expect(file.path()!.startsWith(tmpdir)).toBeTruthy();
       expect(binary(file.read())).toBe(binary(fixture));
     });
   });
@@ -426,7 +426,7 @@ describe("ActiveStorage::BlobTest", () => {
     const blob = await createBlob();
 
     await blob.purge();
-    expect(await Blob.service!.isExist(blob.key)).toBe(false);
+    expect(await Blob.service!.isExist(blob.key)).toBeFalsy();
   });
 
   it("purge deletes variants from external service with the purge_later", async () => {
@@ -451,13 +451,13 @@ describe("ActiveStorage::BlobTest", () => {
       null,
       () => blob.purge(),
     );
-    expect(await Blob.service!.isExist(blob.key)).toBe(true);
+    expect(await Blob.service!.isExist(blob.key)).toBeTruthy();
   });
 
   it("purge doesn't raise when blob is not persisted", async () => {
     const blob = buildBlobAfterUnfurling();
     await blob.purge();
-    expect(blob.isDestroyed()).toBe(true);
+    expect(blob.isDestroyed()).toBeTruthy();
   });
 
   it("uses service from blob when provided", async () => {
@@ -477,7 +477,7 @@ describe("ActiveStorage::BlobTest", () => {
     const blob = await createBlob({ filename: "funky.jpg" });
     await blob.update({ service_name: "unknown" });
 
-    expect(await blob.isValid()).toBe(false);
+    expect(await blob.isValid()).toBeFalsy();
     expect(blob.errors.get("service_name")).toEqual(["is invalid"]);
   });
 

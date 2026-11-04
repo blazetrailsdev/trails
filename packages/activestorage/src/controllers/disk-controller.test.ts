@@ -145,7 +145,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
 
     await session.put(await blob.serviceUrlForDirectUpload(), { params: data });
     session.assertResponse("unprocessable_entity");
-    expect(await blob.service.isExist(blob.key)).toBe(false);
+    expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
   it("directly uploading blob with mismatched content type", async () => {
@@ -160,7 +160,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       headers: { "Content-Type": "application/octet-stream" },
     });
     session.assertResponse("unprocessable_entity");
-    expect(await blob.service.isExist(blob.key)).toBe(false);
+    expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
   it("directly uploading blob with different but equivalent content type", async () => {
@@ -191,7 +191,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       headers: { "Content-Type": "text/plain" },
     });
     session.assertResponse("unprocessable_entity");
-    expect(await blob.service.isExist(blob.key)).toBe(false);
+    expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
   it("directly uploading blob with invalid token", async () => {

@@ -98,7 +98,7 @@ describe("ActiveStorage::PreviewTest", () => {
 
     await blob.reload();
     await blob.previewImage.load();
-    expect(blob.previewImage.isAttached()).toBe(true);
+    expect(blob.previewImage.isAttached()).toBeTruthy();
   });
 
   it("#processed also processes the preview's image variant", async () => {

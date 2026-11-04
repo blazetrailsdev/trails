@@ -172,7 +172,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching existing blobs to an existing, changed record", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
     await user.highlights.attach(...(await funkyAndTown()));
     await expectUnsavedUntilSave("funky.jpg", "town.jpg");
@@ -180,7 +180,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching existing blobs from signed IDs to an existing, changed record", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
     const [funky, town] = await funkyAndTown();
     await user.highlights.attach(funky.signedId(), town.signedId());
@@ -189,7 +189,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching new blobs from Hashes to an existing, changed record", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
     await user.highlights.attach(stuff(), things());
 
@@ -198,7 +198,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching new blobs from uploaded files to an existing, changed record", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
     await user.highlights.attach(fixtureFileUpload("racecar.jpg"), fixtureFileUpload("video.mp4"));
     await expectUnsavedUntilSave("racecar.jpg", "video.mp4");
@@ -206,22 +206,22 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching new blobs from uploaded files to an existing, changed record one at a time", async () => {
     user.name = "Tina";
-    expect(user.isChanged).toBe(true);
+    expect(user.isChanged).toBeTruthy();
 
     await user.highlights.attach(fixtureFileUpload("racecar.jpg"));
     await user.highlights.attach(fixtureFileUpload("video.mp4"));
     await expectOrder("racecar.jpg", "video.mp4");
-    expect((await attachmentAt(user.highlights, 0)).isPersisted()).toBe(false);
-    expect((await attachmentAt(user.highlights, 1)).isPersisted()).toBe(false);
-    expect(user.isWillSaveChangeToAttribute("name")).toBe(true);
-    expect(await existAt(user.highlights, 0)).toBe(false);
-    expect(await existAt(user.highlights, 1)).toBe(false);
+    expect((await attachmentAt(user.highlights, 0)).isPersisted()).toBeFalsy();
+    expect((await attachmentAt(user.highlights, 1)).isPersisted()).toBeFalsy();
+    expect(user.isWillSaveChangeToAttribute("name")).toBeTruthy();
+    expect(await existAt(user.highlights, 0)).toBeFalsy();
+    expect(await existAt(user.highlights, 1)).toBeFalsy();
 
     await user.saveBang();
     expect(await filename(await reloaded(user.highlights), 0)).toBe("racecar.jpg");
     expect(await filename(user.highlights, 1)).toBe("video.mp4");
-    expect(await existAt(user.highlights, 0)).toBe(true);
-    expect(await existAt(user.highlights, 1)).toBe(true);
+    expect(await existAt(user.highlights, 0)).toBeTruthy();
+    expect(await existAt(user.highlights, 1)).toBeTruthy();
   });
 
   it("attaching new blobs within a transaction uploads all the files", async () => {
@@ -270,8 +270,8 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     expect(await count(created.highlights)).toBe(2);
     expect(await filename(created.highlights, 0)).toBe("funky.jpg");
     expect(await filename(created.highlights, 1)).toBe("town.jpg");
-    expect(await existAt(created.highlights, 0)).toBe(true);
-    expect(await existAt(created.highlights, 1)).toBe(true);
+    expect(await existAt(created.highlights, 0)).toBeTruthy();
+    expect(await existAt(created.highlights, 1)).toBeTruthy();
   });
 
   it("attaching new blobs within a transaction create the exact amount of records", async () => {
@@ -289,8 +289,8 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     expect(await count(user.highlights)).toBe(2);
     await expectOrder("racecar.jpg", "video.mp4");
-    expect(await existAt(user.highlights, 0)).toBe(true);
-    expect(await existAt(user.highlights, 1)).toBe(true);
+    expect(await existAt(user.highlights, 0)).toBeTruthy();
+    expect(await existAt(user.highlights, 1)).toBeTruthy();
   });
 
   it("attaching existing blobs to an existing record one at a time", async () => {
@@ -321,12 +321,12 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("successfully updating an existing record to attach new blobs from uploaded files", async () => {
     await user.setHighlights([fixtureFileUpload("racecar.jpg"), fixtureFileUpload("video.mp4")]);
     await expectOrder("racecar.jpg", "video.mp4");
-    expect(await existAt(user.highlights, 0)).toBe(false);
-    expect(await existAt(user.highlights, 1)).toBe(false);
+    expect(await existAt(user.highlights, 0)).toBeFalsy();
+    expect(await existAt(user.highlights, 1)).toBeFalsy();
 
     await user.saveBang();
-    expect(await existAt(user.highlights, 0)).toBe(true);
-    expect(await existAt(user.highlights, 1)).toBe(true);
+    expect(await existAt(user.highlights, 0)).toBeTruthy();
+    expect(await existAt(user.highlights, 1)).toBeTruthy();
   });
 
   it("unsuccessfully updating an existing record to attach new blobs from uploaded files", async () => {
@@ -335,10 +335,10 @@ describe("ActiveStorage::ManyAttachedTest", () => {
         name: "",
         highlights: [fixtureFileUpload("racecar.jpg"), fixtureFileUpload("video.mp4")],
       }),
-    ).toBe(false);
+    ).toBeFalsy();
     await expectOrder("racecar.jpg", "video.mp4");
-    expect(await existAt(user.highlights, 0)).toBe(false);
-    expect(await existAt(user.highlights, 1)).toBe(false);
+    expect(await existAt(user.highlights, 0)).toBeFalsy();
+    expect(await existAt(user.highlights, 1)).toBeFalsy();
   });
 
   it("replacing existing, dependent attachments on an existing record via assign and attach", async () => {
@@ -346,7 +346,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     await user.highlights.attach(oldBlobs);
 
     await user.setHighlights([]);
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
 
     await performEnqueuedJobs(async () => {
       await user.highlights.attach(
@@ -364,7 +364,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     await user.vlogs.attach(...(await funkyAndTownVideos()));
 
     await user.setVlogs([]);
-    expect(await user.vlogs.isAttached()).toBe(false);
+    expect(await user.vlogs.isAttached()).toBeFalsy();
 
     await assertNoPurgeJobs(async () => {
       await user.vlogs.attach(
@@ -436,12 +436,12 @@ describe("ActiveStorage::ManyAttachedTest", () => {
           name: "",
           highlights: [fixtureFileUpload("racecar.jpg"), fixtureFileUpload("video.mp4")],
         }),
-      ).toBe(false);
+      ).toBeFalsy();
     });
 
     await expectOrder("racecar.jpg", "video.mp4");
-    expect(await existAt(user.highlights, 0)).toBe(false);
-    expect(await existAt(user.highlights, 1)).toBe(false);
+    expect(await existAt(user.highlights, 0)).toBeFalsy();
+    expect(await existAt(user.highlights, 1)).toBeFalsy();
   });
 
   it("updating an existing record to attach one new blob and one previously-attached blob", async () => {
@@ -460,7 +460,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     );
 
     await expectOrder("funky.jpg", "town.jpg");
-    expect(await existAt(user.highlights, 0)).toBe(true);
+    expect(await existAt(user.highlights, 0)).toBeTruthy();
   });
 
   it("updating an existing record to remove dependent attachments", async () => {
@@ -473,7 +473,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
       ),
     );
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record to remove independent attachments", async () => {
@@ -481,7 +481,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     await assertNoPurgeJobs(() => user.updateBang({ vlogs: [] }));
 
-    expect(await user.vlogs.isAttached()).toBe(false);
+    expect(await user.vlogs.isAttached()).toBeFalsy();
   });
 
   it("updating an existing record with attachments", async () => {
@@ -505,7 +505,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("attaching existing blobs to a new record", async () => {
     user = new User({ name: "Jason" });
     await user.highlights.attach(...(await funkyAndTown()));
-    expect(user.isNewRecord()).toBe(true);
+    expect(user.isNewRecord()).toBeTruthy();
     await expectOrder("funky.jpg", "town.jpg");
 
     await user.saveBang();
@@ -515,7 +515,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("attaching an existing blob from a signed ID to a new record", async () => {
     user = new User({ name: "Jason" });
     await user.highlights.attach((await createBlob({ filename: "funky.jpg" })).signedId());
-    expect(user.isNewRecord()).toBe(true);
+    expect(user.isNewRecord()).toBeTruthy();
     expect(await filename(user.highlights, 0)).toBe("funky.jpg");
 
     await user.saveBang();
@@ -594,11 +594,11 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("detaching", async () => {
     const blobs = await funkyAndTown();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.highlights.detach());
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     await expectKept(blobs[0]);
     await expectKept(blobs[1]);
   });
@@ -607,11 +607,11 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     const blobs = await funkyAndTown();
     user = new User();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.highlights.detach());
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     await expectKept(blobs[0]);
     await expectKept(blobs[1]);
   });
@@ -619,7 +619,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("purging", async () => {
     const blobs = await funkyAndTown();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await user.updateColumn("updated_at", "2000-01-01 00:00:00");
     await assertChanges(
@@ -628,7 +628,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
       {},
       () => user.highlights.purge(),
     );
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     await expectGone(blobs[0]);
     await expectGone(blobs[1]);
   });
@@ -648,7 +648,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     const blobs = await attachSharedBlobs();
 
     await user.highlights.purge();
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
 
     await expectGone(blobs[0]);
     await expectKept(blobs[1]);
@@ -659,13 +659,13 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     const blobs = await funkyAndTown();
     user = new User();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     const attachments = await user.highlights.attachments;
     await user.highlights.purge();
 
-    expect(await user.highlights.isAttached()).toBe(false);
-    expect(attachments.every((attachment) => attachment.isDestroyed())).toBe(true);
+    expect(await user.highlights.isAttached()).toBeFalsy();
+    expect(attachments.every((attachment) => attachment.isDestroyed())).toBeTruthy();
     for (const blob of blobs) await expectGone(blob);
   });
 
@@ -681,7 +681,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("purging later", async () => {
     const blobs = await funkyAndTown();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await user.updateColumn("updated_at", "2000-01-01 00:00:00");
     await performEnqueuedJobs(() =>
@@ -693,7 +693,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
       ),
     );
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     await expectGone(blobs[0]);
     await expectGone(blobs[1]);
   });
@@ -703,7 +703,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     await performEnqueuedJobs(() => user.highlights.purgeLater());
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     await expectGone(blobs[0]);
     await expectKept(blobs[1]);
     await expectKept(blobs[2]);
@@ -713,11 +713,11 @@ describe("ActiveStorage::ManyAttachedTest", () => {
     const blobs = await funkyAndTown();
     user = new User();
     await user.highlights.attach(blobs);
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await performEnqueuedJobs(() => user.highlights.purgeLater());
 
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
     for (const blob of blobs) await expectGone(blob);
   });
 
@@ -746,18 +746,18 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("duped record does not share attachment changes", async () => {
     await user.highlights.attach([await createBlob({ filename: "funky.jpg" })]);
-    expect(user.changedForAutosave()).toBe(false);
+    expect(user.changedForAutosave()).toBeFalsy();
 
     await user.dup().highlights.attach([await createBlob({ filename: "town.mp4" })]);
-    expect(user.changedForAutosave()).toBe(false);
+    expect(user.changedForAutosave()).toBeFalsy();
   });
 
   it("clearing change on reload", async () => {
     await user.setHighlights(await funkyAndTown());
-    expect(await user.highlights.isAttached()).toBe(true);
+    expect(await user.highlights.isAttached()).toBeTruthy();
 
     await user.reload();
-    expect(await user.highlights.isAttached()).toBe(false);
+    expect(await user.highlights.isAttached()).toBeFalsy();
   });
 
   it("overriding attached reader", async () => {
@@ -853,7 +853,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
   it("attaching blobs to a persisted, unchanged, and invalid record, returns nil", async () => {
     await user.updateAttribute("name", null);
-    expect(await user.isValid()).toBe(false);
+    expect(await user.isValid()).toBeFalsy();
 
     await user.highlights.attach(await createBlob({ filename: "racecar.jpg" }));
     const returnValue = await user.highlights.attach(...(await funkyAndTown()));
@@ -975,7 +975,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
       highlightsAttachmentsAttributes: [{ id: attachmentId, _destroy: true }],
     });
 
-    expect(await (await user.reload()).highlights.isAttached()).toBe(true);
+    expect(await (await user.reload()).highlights.isAttached()).toBeTruthy();
     expect(await count(user.highlights)).toBe(1);
     expect((await user.highlights.blobs)[0].filename.toString()).toBe("racecar.jpg");
   });
