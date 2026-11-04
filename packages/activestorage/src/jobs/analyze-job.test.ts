@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { AnalyzeJob } from "./analyze-job.js";
-import type { Blob } from "./blob.js";
-import { createBlob } from "./test-helpers/test-helper.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { AnalyzeJob } from "../analyze-job.js";
+import type { Blob } from "../blob.js";
+import { createBlob } from "../test-helpers/test-helper.js";
 
 class AnalyzeJobTest extends TestCase {
   ignoresMissingBlob(): void {}

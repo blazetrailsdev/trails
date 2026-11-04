@@ -11,15 +11,15 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
-import "../test-helpers/database/setup.js";
-import { ActiveStorage } from "../active-storage.js";
-import { Blob } from "../blob.js";
-import type { Preview } from "../preview.js";
-import { PreviewImageJob } from "../preview-image-job.js";
-import { PurgeJob } from "../purge-job.js";
-import { TransformJob } from "../transform-job.js";
-import { DiskService } from "../service/disk-service.js";
-import { MirrorService } from "../service/mirror-service.js";
+import "../../test-helpers/database/setup.js";
+import { ActiveStorage } from "../../active-storage.js";
+import { Blob } from "../../blob.js";
+import type { Preview } from "../../preview.js";
+import { PreviewImageJob } from "../../preview-image-job.js";
+import { PurgeJob } from "../../purge-job.js";
+import { TransformJob } from "../../transform-job.js";
+import { DiskService } from "../../service/disk-service.js";
+import { MirrorService } from "../../service/mirror-service.js";
 import {
   createBlob,
   createFileBlob,
@@ -30,10 +30,10 @@ import {
   withService,
   Group,
   User,
-} from "../test-helpers/test-helper.js";
-import type { ClassMethods } from "./model.js";
-import type { Attachment } from "../attachment.js";
-import type { One } from "./one.js";
+} from "../../test-helpers/test-helper.js";
+import type { ClassMethods } from "../model.js";
+import type { Attachment } from "../../attachment.js";
+import type { One } from "../one.js";
 
 type Attachable = Extended<typeof ClassMethods>;
 type Job = (block: () => unknown) => Promise<unknown>;

@@ -2,8 +2,8 @@ import { afterAll } from "vitest";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
   runLoadHooks,
+  setTrailsRoot,
   EnvironmentInquirer,
-  getEnv,
   NullLogger,
   TopLevel,
 } from "@blazetrails/activesupport";
@@ -30,6 +30,7 @@ import { ActiveStorage } from "../../active-storage.js";
 import { Blob } from "../../blob.js";
 import { Engine } from "../../engine.js";
 import "../../service/configurator.js";
+import database from "../config/database.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
 import { ActiveStorageCreateGroups } from "./create-groups-migration.js";
 
@@ -80,8 +81,14 @@ class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
 app.config.loadDefaults("8.0");
+setTrailsRoot(TopLevel.Trails!.root);
+const configurations = Base.configurations();
+DatabaseTasks.root = import.meta.dirname;
+await DatabaseTasks.purge(new HashConfig(envName, "primary", database[envName].primary));
+
 for (const railtie of [
   ActiveSupportRailtie,
+  ActiveRecordRailtie,
   GlobalIDRailtie,
   ActionViewRailtie,
   ActionControllerRailtie,
@@ -92,11 +99,6 @@ for (const railtie of [
   }
 }
 
-for (const initializer of ActiveRecordRailtie.initializers) {
-  if (initializer.name !== "active_record.set_executor_hooks") continue;
-  await initializer.bind(ActiveRecordRailtie.instance()).run(app);
-}
-
 await import("../../config/routes.js");
 
 runLoadHooks("after_initialize", app);
@@ -105,35 +107,8 @@ ActiveStorage.trackVariants = true;
 
 GlobalID.setApp("ActiveStorageExampleApp");
 
-const configurations = Base.configurations();
-const arunit = configurations.configsFor({ envName: "arunit", name: "primary" })!;
-
-function databaseName(): string {
-  const database = String(arunit.database);
-  if (database === ":memory:") {
-    const worker = getEnv("VITEST_POOL_ID") ?? "1";
-    return `${import.meta.dirname}/../../../tmp/test_activestorage_${worker}.sqlite3`;
-  }
-  const dot = database.lastIndexOf(".");
-  if (arunit.adapter !== "sqlite3" || dot < database.lastIndexOf("/")) {
-    return `${database}_activestorage`;
-  }
-  return `${database.slice(0, dot)}_activestorage${database.slice(dot)}`;
-}
-
-const dummy = {
-  ...arunit.configurationHash,
-  database: databaseName(),
-  migrationsPaths: `${import.meta.dirname}/../../db/migrate`,
-};
-const primary = new HashConfig(envName, "activestorage_primary", dummy);
-const replica = new HashConfig(envName, "activestorage_replica", { ...dummy, replica: true });
-Base.configurations([...configurations.configurations, primary, replica]);
-DatabaseTasks.root = import.meta.dirname;
-await DatabaseTasks.purge(primary);
-
 await Base.connectsTo({
-  database: { writing: ":activestorage_primary", reading: ":activestorage_replica" },
+  database: { writing: ":primary", reading: ":replica" },
 });
 await Base.connectionPool().migrationContext.migrate();
 await ActiveStorageCreateUsers.migrate("up");
@@ -142,6 +117,6 @@ await Blob.loadSchema();
 await Attachment.loadSchema();
 
 afterAll(async () => {
-  await Base.establishConnection(arunit);
+  await Base.establishConnection(configurations.configsFor({ envName: "arunit", name: "primary" }));
   Base.configurations(configurations);
 });

@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActiveStorage } from "./active-storage.js";
-import "./test-helpers/database/setup.js";
-import type { Blob } from "./blob.js";
-import { PreviewImageJob } from "./preview-image-job.js";
-import { createFileBlob } from "./test-helpers/test-helper.js";
-import { TransformJob } from "./transform-job.js";
+import { ActiveStorage } from "../active-storage.js";
+import "../test-helpers/database/setup.js";
+import type { Blob } from "../blob.js";
+import { PreviewImageJob } from "../preview-image-job.js";
+import { createFileBlob } from "../test-helpers/test-helper.js";
+import { TransformJob } from "../transform-job.js";
 
 class PreviewImageJobTest extends TestCase {
   previewImageJob(): void {}

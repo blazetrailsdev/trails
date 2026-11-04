@@ -1,4 +1,4 @@
-import "./test-helpers/database/setup.js";
+import "../test-helpers/database/setup.js";
 import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
@@ -8,19 +8,19 @@ import {
   assertQueriesMatch,
 } from "@blazetrails/activerecord/testing/query-assertions";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActiveStorage } from "./active-storage.js";
-import type { Attachment } from "./attachment.js";
-import type { Blob } from "./blob.js";
-import { Current } from "./current.js";
-import { PurgeJob } from "./purge-job.js";
+import { ActiveStorage } from "../active-storage.js";
+import type { Attachment } from "../attachment.js";
+import type { Blob } from "../blob.js";
+import { Current } from "../current.js";
+import { PurgeJob } from "../purge-job.js";
 import {
   User,
   createFileBlob,
   directlyUploadFileBlob,
   readImage,
-} from "./test-helpers/test-helper.js";
-import { VariantRecord } from "./variant-record.js";
-import type { VariantWithRecord } from "./variant-with-record.js";
+} from "../test-helpers/test-helper.js";
+import { VariantRecord } from "../variant-record.js";
+import type { VariantWithRecord } from "../variant-with-record.js";
 
 type Rep = {
   processed(): Promise<unknown>;

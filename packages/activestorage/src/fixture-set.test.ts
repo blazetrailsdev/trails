@@ -20,7 +20,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     active_storage_attachments: [Attachment, attachments],
   }) as never as { users: (name: string) => Promise<User> };
 
-  it("test_active_storage_blob", async () => {
+  it("active storage blob", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;
@@ -36,7 +36,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     });
   }, 30_000);
 
-  it("test_active_storage_attachment", async () => {
+  it("active storage attachment", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;
@@ -47,7 +47,7 @@ describe("ActiveStorage::FixtureSetTest", () => {
     expect(isPresent(await avatar.attachment)).toBe(true);
   });
 
-  it("test_active_storage_metadata", async () => {
+  it("active storage metadata", async () => {
     const user = await users("first");
 
     const avatar = user.avatar;

@@ -1,18 +1,18 @@
-import "./test-helpers/database/setup.js";
+import "../test-helpers/database/setup.js";
 import { assertChanges } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";
-import { ActiveStorage } from "./active-storage.js";
-import { Current } from "./current.js";
-import { Blob } from "./blob.js";
-import { InvariableError } from "./errors.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Current } from "../current.js";
+import { Blob } from "../blob.js";
+import { InvariableError } from "../errors.js";
 import {
   UnsupportedImageProcessingArgument,
   UnsupportedImageProcessingMethod,
-} from "./transformers/image-processing-transformer.js";
-import { createFileBlob, fileFixture, readImage } from "./test-helpers/test-helper.js";
-import type { Variant } from "./variant.js";
+} from "../transformers/image-processing-transformer.js";
+import { createFileBlob, fileFixture, readImage } from "../test-helpers/test-helper.js";
+import type { Variant } from "../variant.js";
 
 describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
   let wasTracking: boolean;

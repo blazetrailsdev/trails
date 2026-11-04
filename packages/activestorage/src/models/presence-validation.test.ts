@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import "./test-helpers/database/setup.js";
-import { createBlob, User } from "./test-helpers/test-helper.js";
+import "../test-helpers/database/setup.js";
+import { createBlob, User } from "../test-helpers/test-helper.js";
 
 describe("ActiveStorage::PresenceValidationTest", () => {
   class Admin extends User {}

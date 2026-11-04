@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Extended } from "@blazetrails/activesupport";
 import { StrictLoadingViolationError } from "@blazetrails/activerecord";
-import type { ClassMethods } from "./attached/model.js";
-import "./test-helpers/database/setup.js";
-import { User } from "./test-helpers/test-helper.js";
+import type { ClassMethods } from "../attached/model.js";
+import "../test-helpers/database/setup.js";
+import { User } from "../test-helpers/test-helper.js";
 
 describe("ActiveStorage::StrictLoadingTest", () => {
   class Admin extends User {

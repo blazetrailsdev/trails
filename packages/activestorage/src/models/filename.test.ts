@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
-import { Filename } from "./filename.js";
+import { Filename } from "../filename.js";
 
 describe("ActiveStorage::FilenameTest", () => {
   it("base", () => {

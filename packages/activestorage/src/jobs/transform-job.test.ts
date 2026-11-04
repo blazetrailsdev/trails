@@ -3,13 +3,13 @@ import { assertChanges } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import type { One } from "./attached/one.js";
-import type { Attachment } from "./attachment.js";
-import type { Blob } from "./blob.js";
-import { createBlob, createFileBlob } from "./test-helpers/test-helper.js";
-import { TransformJob } from "./transform-job.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import type { One } from "../attached/one.js";
+import type { Attachment } from "../attachment.js";
+import type { Blob } from "../blob.js";
+import { createBlob, createFileBlob } from "../test-helpers/test-helper.js";
+import { TransformJob } from "../transform-job.js";
 
 class TransformJobTest extends TestCase {
   createsVariant(): void {}

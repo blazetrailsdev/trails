@@ -1,10 +1,10 @@
-import "./test-helpers/database/setup.js";
+import "../test-helpers/database/setup.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActiveStorage } from "./active-storage.js";
-import { Current } from "./current.js";
-import { UnrepresentableError } from "./errors.js";
-import { createBlob, createFileBlob, readImage } from "./test-helpers/test-helper.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Current } from "../current.js";
+import { UnrepresentableError } from "../errors.js";
+import { createBlob, createFileBlob, readImage } from "../test-helpers/test-helper.js";
 
 type Representation = {
   processed(): Promise<{ image: unknown }>;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Extended } from "@blazetrails/activesupport";
-import "./test-helpers/database/setup.js";
-import type { HasAttachedReflection, ClassMethods } from "./reflection.js";
-import { Group, User } from "./test-helpers/test-helper.js";
+import "../test-helpers/database/setup.js";
+import type { HasAttachedReflection, ClassMethods } from "../reflection.js";
+import { Group, User } from "../test-helpers/test-helper.js";
 
 const UserReflect = User as unknown as Extended<typeof ClassMethods>;
 const GroupReflect = Group as unknown as Extended<typeof ClassMethods>;

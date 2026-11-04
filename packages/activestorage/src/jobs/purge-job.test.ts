@@ -3,11 +3,11 @@ import { assertDifference } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Blob } from "./blob.js";
-import { PurgeJob } from "./purge-job.js";
-import { createBlob } from "./test-helpers/test-helper.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Blob } from "../blob.js";
+import { PurgeJob } from "../purge-job.js";
+import { createBlob } from "../test-helpers/test-helper.js";
 
 class PurgeJobTest extends TestCase {
   purges(): void {}

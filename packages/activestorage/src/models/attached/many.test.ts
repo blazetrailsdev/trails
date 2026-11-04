@@ -12,16 +12,16 @@ import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { ArgumentError, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import { Base, type Relation } from "@blazetrails/activerecord";
-import "../test-helpers/database/setup.js";
-import { ActiveStorage } from "../active-storage.js";
-import type { Attachment } from "../attachment.js";
-import { Blob } from "../blob.js";
-import type { Preview } from "../preview.js";
-import { PreviewImageJob } from "../preview-image-job.js";
-import { PurgeJob } from "../purge-job.js";
-import { TransformJob } from "../transform-job.js";
-import { DiskService } from "../service/disk-service.js";
-import { MirrorService } from "../service/mirror-service.js";
+import "../../test-helpers/database/setup.js";
+import { ActiveStorage } from "../../active-storage.js";
+import type { Attachment } from "../../attachment.js";
+import { Blob } from "../../blob.js";
+import type { Preview } from "../../preview.js";
+import { PreviewImageJob } from "../../preview-image-job.js";
+import { PurgeJob } from "../../purge-job.js";
+import { TransformJob } from "../../transform-job.js";
+import { DiskService } from "../../service/disk-service.js";
+import { MirrorService } from "../../service/mirror-service.js";
 import {
   createBlob,
   createFileBlob,
@@ -29,9 +29,9 @@ import {
   readImage,
   withService,
   User,
-} from "../test-helpers/test-helper.js";
-import type { Many } from "./many.js";
-import type { ClassMethods } from "./model.js";
+} from "../../test-helpers/test-helper.js";
+import type { Many } from "../many.js";
+import type { ClassMethods } from "../model.js";
 
 // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, {

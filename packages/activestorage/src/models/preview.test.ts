@@ -3,14 +3,14 @@ import { Base } from "@blazetrails/activerecord";
 import { readingRole } from "@blazetrails/activerecord/active-record";
 import { freezeTime, travelBack } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActiveStorage } from "./active-storage.js";
-import type { Attachment } from "./attachment.js";
-import type { Blob } from "./blob.js";
-import { Current } from "./current.js";
-import { UnpreviewableError } from "./errors.js";
-import { Preview } from "./preview.js";
-import "./test-helpers/database/setup.js";
-import { createFileBlob, readImage } from "./test-helpers/test-helper.js";
+import { ActiveStorage } from "../active-storage.js";
+import type { Attachment } from "../attachment.js";
+import type { Blob } from "../blob.js";
+import { Current } from "../current.js";
+import { UnpreviewableError } from "../errors.js";
+import { Preview } from "../preview.js";
+import "../test-helpers/database/setup.js";
+import { createFileBlob, readImage } from "../test-helpers/test-helper.js";
 
 const resizeToLimit = { resizeToLimit: [640, 280] };
 

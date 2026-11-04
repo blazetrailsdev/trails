@@ -5,18 +5,18 @@ import { OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Attachment } from "./attachment.js";
-import { Blob } from "./blob.js";
-import type { MirrorService } from "./service/mirror-service.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Attachment } from "../attachment.js";
+import { Blob } from "../blob.js";
+import type { MirrorService } from "../service/mirror-service.js";
 import {
   createBlob,
   createBlobBeforeDirectUpload,
   directlyUploadFileBlob,
   User,
   withService,
-} from "./test-helpers/test-helper.js";
+} from "../test-helpers/test-helper.js";
 
 async function assertBlobIdentifiedBeforeOwnerValidated(
   owner: User,

@@ -17,15 +17,15 @@ import { RecordInvalid, RecordNotSaved, RecordNotUnique } from "@blazetrails/act
 import { ArgumentError, Dir, File, IO, OpenSSL } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Blob } from "./blob.js";
-import { Current } from "./current.js";
-import { IntegrityError } from "./errors.js";
-import { Filename } from "./filename.js";
-import { PurgeJob } from "./purge-job.js";
-import type { VariantWithRecord } from "./variant-with-record.js";
-import { DiskService } from "./service/disk-service.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Blob } from "../blob.js";
+import { Current } from "../current.js";
+import { IntegrityError } from "../errors.js";
+import { Filename } from "../filename.js";
+import { PurgeJob } from "../purge-job.js";
+import type { VariantWithRecord } from "../variant-with-record.js";
+import { DiskService } from "../service/disk-service.js";
 import {
   buildBlobAfterUnfurling,
   createBlob,
@@ -36,7 +36,7 @@ import {
   withService,
   withStrictLoadingByDefault,
   withoutVariantTracking,
-} from "./test-helpers/test-helper.js";
+} from "../test-helpers/test-helper.js";
 
 // BLOCKED: activestorage-attachment-test-and-fixture-set-attached-arms
 Object.assign(Blob.prototype, {

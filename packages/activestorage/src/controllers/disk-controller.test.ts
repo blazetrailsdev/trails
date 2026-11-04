@@ -3,16 +3,16 @@ import { IntegrationTest, type RouteSet } from "@blazetrails/actionpack";
 import { TopLevel } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { OpenSSL } from "@blazetrails/ruby-compat";
-import "./test-helpers/database/setup.js";
-import { ActiveStorage } from "./active-storage.js";
-import { Current } from "./current.js";
-import "./disk-controller.js";
+import "../test-helpers/database/setup.js";
+import { ActiveStorage } from "../active-storage.js";
+import { Current } from "../current.js";
+import "../disk-controller.js";
 import {
   createBlob,
   createBlobBeforeDirectUpload,
   createFileBlob,
   withService,
-} from "./test-helpers/test-helper.js";
+} from "../test-helpers/test-helper.js";
 
 const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
 let session: IntegrationTest;
