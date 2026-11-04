@@ -395,7 +395,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *
  *  if [ -z "$files" ]; then
  *  docs_only: any line NOT under `docs/`, `examples/`, and not the
- *  top-level `README.md` flips the switch. README is markdown-only
+ *  top-level `README.md` or a root/package `CLAUDE.md` flips the switch. README is markdown-only
  *  and only ever runs through prettier; `examples/` are standalone
  *  apps not built, type-checked, or tested by any CI job (the root
  *  `tsc --build` doesn't reference them and they have no `test`
