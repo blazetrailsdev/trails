@@ -50,6 +50,17 @@ export interface ServerOptions {
   SSLEnable?: boolean;
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface ServerHandler {
+  name: string;
+  run(
+    app: (env: RackEnv) => unknown,
+    options: { Port?: number; Host?: string },
+  ): Promise<{ on(event: string, cb: () => void): unknown } | null | undefined>;
+}
+
+Handler.loadPath["rackup/handler/vite"] = () => import("../server/dev-server.js");
+
 export class Options {
   parseBang(args: string[]): ServerOptions {
     return new ServerCommand([], args).serverOptions();
@@ -84,25 +95,19 @@ export class Server {
       if (this.options.logStdout) this.logToStdout();
 
       await app.loadServer();
-      const root = Dir.pwd();
       const trailsApp = (env: RackEnv) => app.call(env);
       const { Port: port, Host: host } = this.options;
-      if (this.options.environment !== "development" || !(await hasViteConfig(root))) {
-        const server = await Handler.Node.run(trailsApp, { Port: port, Host: host });
-        if (afterStopCallback != null) server.on("close", afterStopCallback);
-        return;
-      }
-      const { DevServer } = await import("../server/dev-server.js");
-      await new DevServer({ port: port!, host: host!, cwd: root, app: trailsApp }).start();
+      const server = await (await this.server()).run(trailsApp, { Port: port, Host: host });
+      if (afterStopCallback != null) server?.on("close", afterStopCallback);
     } catch (error) {
       afterStopCallback?.();
       throw error;
     }
   }
 
-  isServeable(): boolean {
+  async isServeable(): Promise<boolean> {
     try {
-      this.server();
+      await this.server();
       return true;
     } catch (error) {
       if (error instanceof LoadError || error instanceof NameError) return false;
@@ -111,10 +116,15 @@ export class Server {
   }
 
   /** @noRailsEquivalent CONVERGEABLE rails-server-extends-rackup-server */
-  server(): typeof Handler.Node {
-    const { server } = this.options;
-    if (server == null || server === "node") return Handler.Node;
-    throw new LoadError(`cannot load such file -- rack/handler/${server}`);
+  async server(): Promise<ServerHandler> {
+    let { server } = this.options;
+    if (server == null) {
+      const isVite = this.options.environment === "development" && (await hasViteConfig(Dir.pwd()));
+      server = isVite ? "vite" : "node";
+    }
+    const handler = await Handler.get(server);
+    if (handler == null) throw new LoadError(`cannot load such file -- rack/handler/${server}`);
+    return handler as ServerHandler;
   }
 
   middleware(): Hash<string, unknown[]> {
@@ -125,8 +135,8 @@ export class Server {
     return { ...this._defaultOptions };
   }
 
-  servedUrl(): string | undefined {
-    if (!this.isUsePuma()) {
+  async servedUrl(): Promise<string | undefined> {
+    if (!(await this.isUsePuma())) {
       return `${this.options.SSLEnable ? "https" : "http"}://${this.options.Host}:${this.options.Port}`;
     }
   }
@@ -157,8 +167,8 @@ export class Server {
   }
 
   /** @internal */
-  private isUsePuma(): boolean {
-    return this.server().name.endsWith("Handler::Puma");
+  private async isUsePuma(): Promise<boolean> {
+    return (await this.server()).name.endsWith("Handler::Puma");
   }
 }
 
@@ -285,8 +295,8 @@ export class ServerCommand extends Base {
     await requireApplicationBang();
     Dir.chdir(Trails.application!.root()!);
 
-    if (server.isServeable()) {
-      this.printBootInformation(server.server().name, server.servedUrl());
+    if (await server.isServeable()) {
+      this.printBootInformation((await server.server()).name, await server.servedUrl());
       const afterStopCallback = () => {
         if (!this.options.daemon) this.say("Exiting");
       };

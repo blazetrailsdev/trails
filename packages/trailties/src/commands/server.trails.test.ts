@@ -16,20 +16,18 @@ vi.mock("../command/actions.js", async (importOriginal) => ({
   requireApplicationBang: async () => {},
 }));
 const devServerLoads = vi.hoisted(() => [] as string[]);
-vi.mock(
-  "../server/dev-server.js",
-  () => (
-    devServerLoads.push("dev-server"),
-    {
-      DevServer: class {
-        constructor(options: unknown) {
-          devServerStarts.push(options);
-        }
-        async start(): Promise<void> {}
-      },
+vi.mock("../server/dev-server.js", async () => {
+  devServerLoads.push("dev-server");
+  const { Handler } = await import("@blazetrails/rackup");
+  class DevServer {
+    static async run(app: unknown, options: object) {
+      devServerStarts.push({ ...options, app });
+      return null;
     }
-  ),
-);
+  }
+  Handler.register("vite", DevServer);
+  return { DevServer };
+});
 
 vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {} }) }));
 
@@ -109,6 +107,13 @@ describe("trails server environment (trails)", () => {
     expect(runOptions).toEqual([]);
     expect(devServerStarts).toHaveLength(1);
     expect(env.TRAILS_ENV).toBe("development");
+  });
+
+  it("serves development through the Node handler under -u node", async () => {
+    await run("-u", "node");
+
+    expect(devServerStarts).toEqual([]);
+    expect(runOptions).toEqual([{ Port: 3000, Host: "localhost" }]);
   });
 
   it("broadcasts the Trails logger to stdout in development only", async () => {
