@@ -1,3 +1,4 @@
+import { classModule } from "./class-module.js";
 import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
@@ -96,6 +97,35 @@ export function rbObjClass(obj: unknown): Klass {
   const klass = (obj as object).constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;
   return typeof klass === "function" ? klass : Object;
+}
+
+/**
+ * The receiver phrase of `name_err_mesg_to_str`
+ * (`vendor/ruby/v3.3.11/error.c:2325-2390`), the `%3$s%4$s` of an
+ * `undefined method '…' for …` message: `nil`, `true` or `false` for those
+ * receivers, `module M` / `class C` for a module or class, and
+ * `an instance of C` otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function nameErrMesgReceiver(obj: unknown): string {
+  switch (obj) {
+    case null:
+    case undefined:
+      return "nil";
+    case true:
+      return "true";
+    case false:
+      return "false";
+  }
+  if (
+    (typeof obj === "object" && obj !== null && isModuleObject(obj)) ||
+    (typeof obj === "function" && Object.hasOwn(obj, classModule))
+  ) {
+    return `module ${rbModToS(obj as never)}`;
+  }
+  if (rbObjClass(obj) === rbCClass) return `class ${rbModToS(obj as new () => unknown)}`;
+  return `an instance of ${rbObjClassname(obj)}`;
 }
 
 /**
