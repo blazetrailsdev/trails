@@ -112,8 +112,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     expect(await image.height()).toBe(100);
   });
 
-  // BLOCKED: wasm-vips-magickload-for-psd-ico-bmp
-  it.skip("resized variation of PSD blob", async () => {
+  it("resized variation of PSD blob", async () => {
     const blob = await createFileBlob({
       filename: "icon.psd",
       contentType: "image/vnd.adobe.photoshop",
@@ -127,8 +126,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     expect(await image.height()).toBe(20);
   });
 
-  // BLOCKED: wasm-vips-magickload-for-psd-ico-bmp
-  it.skip("resized variation of ICO blob", async () => {
+  it("resized variation of ICO blob", async () => {
     const blob = await createFileBlob({
       filename: "favicon.ico",
       contentType: "image/vnd.microsoft.icon",
@@ -153,8 +151,7 @@ describe("ActiveStorage::VariantTest", { timeout: 30_000 }, () => {
     expect(await image.height()).toBe(33);
   });
 
-  // BLOCKED: wasm-vips-magickload-for-psd-ico-bmp
-  it.skip("resized variation of BMP blob", async () => {
+  it("resized variation of BMP blob", async () => {
     const blob = await createFileBlob({ filename: "colors.bmp", contentType: "image/bmp" });
     const variant = await variantOf(blob, { resizeToLimit: [15, 15] }).processed();
     expect(variant.url()).toMatch(/colors\.png/);
