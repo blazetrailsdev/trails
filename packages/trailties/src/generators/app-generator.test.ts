@@ -94,7 +94,10 @@ describe("AppGeneratorTest", () => {
       Trails.application = null;
     }
 
-    await assertFile(defaultsPath);
+    await assertFile(
+      defaultsPath,
+      /toTimePreservesTimezone = ":zone";[\s\S]*strictFreshness = true;/,
+    );
     assertNoFile("my-app/config/initializers/cors.ts");
   });
 
