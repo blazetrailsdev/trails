@@ -296,9 +296,8 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
           ).NodeSQLiteAdapter as unknown as SqliteCtor;
         }
         if (adapter === "expo-sqlite") {
-          return (
-            await import("@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js")
-          ).ExpoSQLiteAdapter as unknown as SqliteCtor;
+          const { ConnectionAdapters } = await import("@blazetrails/activerecord");
+          return ConnectionAdapters.resolve("expo-sqlite") as unknown as SqliteCtor;
         }
         return (
           await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
