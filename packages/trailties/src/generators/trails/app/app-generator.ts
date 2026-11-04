@@ -1276,6 +1276,10 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     }
   }
 
+  /**
+   * @missingRailsArgs template — PERMANENT
+   * @missingRailsArgs remove_file — PERMANENT
+   */
   async configWhenUpdating(): Promise<void> {
     const root = this.destinationRoot;
     const actionCableConfigExist = await File.isExistAsync(File.join(root, "config/cable.ts"));
@@ -1836,6 +1840,7 @@ export class AppGenerator extends AppBase {
     }
   }
 
+  /** @missingRailsArgs remove_file — PERMANENT */
   async deleteNonApiInitializersIfApiOption(): Promise<void> {
     if (this.options.api) {
       await this.removeFile("config/initializers/content-security-policy.ts");
