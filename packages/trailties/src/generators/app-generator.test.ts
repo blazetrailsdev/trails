@@ -7,6 +7,12 @@ import { assertNoMatch } from "@blazetrails/activesupport";
 import { execFile } from "node:child_process";
 import { AppGenerator, type AppDatabase } from "./trails/app/app-generator.js";
 import * as Assertions from "./testing/assertions.js";
+import { VERSION } from "../gem-version.js";
+import { Application } from "../application.js";
+import { Trails } from "../trails.js";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+
+class AppGeneratorApp extends Application {}
 
 let tmpDir: string;
 let lines: string[];
@@ -63,6 +69,33 @@ describe("AppGeneratorTest", () => {
   it("version control initializes git repo", async () => {
     await makeGen().invokeAll();
     await assertDirectory("my-app/.git");
+  });
+
+  it("app update", async () => {
+    await makeGen().invokeAll();
+
+    const defaultsPath = `my-app/config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
+
+    assertNoFile(defaultsPath);
+    assertNoFile("my-app/config/initializers/cors.ts");
+
+    const shell = new ThorBase.shell() as InstanceType<typeof ThorBase.shell> & {
+      _alwaysForce: boolean;
+    };
+    shell._alwaysForce = true;
+    Trails.application = AppGeneratorApp.instance();
+    try {
+      await new AppGenerator(
+        ["my-app"],
+        { database: "sqlite", skipInstall: true, update: true },
+        { destinationRoot: appPath(), shell },
+      ).updateConfigFiles();
+    } finally {
+      Trails.application = null;
+    }
+
+    await assertFile(defaultsPath);
+    assertNoFile("my-app/config/initializers/cors.ts");
   });
 
   it("skip git", async () => {

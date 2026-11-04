@@ -1219,6 +1219,18 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
 `,
     );
 
+    await this.createFile(
+      `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
+      `// Be sure to restart your server when you modify this file.
+//
+// This file eases your Trails ${VERSION.MAJOR}.${VERSION.MINOR} framework defaults upgrade.
+//
+// Uncomment each configuration one by one to switch to the new default.
+// Once your application is ready to run with all new defaults, you can remove
+// this file and set the \`config.loadDefaults\` to \`${VERSION.MAJOR}.${VERSION.MINOR}\`.
+`,
+    );
+
     if (!this.options.update) {
       await this.createFile(
         "config/locales/en.json",
