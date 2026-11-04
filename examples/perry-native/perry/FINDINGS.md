@@ -2023,3 +2023,78 @@ table in the previous entry), including a trails fix that was committed and
 reverted. The binary used by the earlier runs came from a scratchpad that was
 wiped, so its version was never recorded — which is the actual lesson: **record
 the compiler commit in every entry.** This file now does.
+
+## Wall 23, SOLVED, and the first full boot measurement (2026-11-04)
+
+**Compiler: perry 0.5.1663 from `main` at `a1ae27ee5`, plus a 19-line local
+patch (below).** With walls 16-23 all addressed, the boot graph compiles, links
+and *runs*:
+
+| | |
+| --- | --- |
+| compile + link | 1934 modules, 225,909,032-byte binary, 1384s |
+| `INIT:` lines | **1318** of 1934 |
+| activerecord inits | 232 |
+| last module reached | `examples/perry-native/config/environment.ts` |
+
+Execution is now inside **the application's own config**, past the whole
+framework. (Not comparable to the earlier 1355/1939: different compiler,
+different graph -- expo left it -- and that number was measured on a binary
+whose compiler commit was never recorded.)
+
+### Wall 23: the intrinsic atom is in the image twice
+
+Any `RegExp` in a stdlib-linked binary aborted the process:
+
+    panicked at crates/perry-runtime/src/regex/instance.rs:262:
+    realm has installed the RegExp intrinsic
+
+`IntrinsicPrivateReadSite::read` finds `RegExp.prototype` by **atom pointer
+identity** (`STRING_TAG | self.atom.string as u64`). The atom's `ImageString`
+lives in the `perry_strings` link section with `#[used(linker)]`, and
+`perry-stdlib` statically embeds its own copy of `perry-runtime` -- so linking
+`libperry_runtime.a` *and* `libperry_stdlib.a` puts that string in the binary
+twice. Counted in the two probe binaries: **1** copy runtime-only (works), **2**
+with stdlib (panics). The key recorded on the global object and the word the
+read site compares are then different pointers, the layout probe misses, and
+`.expect()` aborts. The archives share **8967** strong symbols; perry's
+`strip-dedup` addresses 20, all `js_ws_*` stubs.
+
+Ruled out with tests, not reasoning: a stale `~/.cache/perry/libs` (moved aside,
+identical panic), the auto-optimized feature set (`PERRY_NO_AUTO_OPTIMIZE=1`,
+identical), and the runtime's `stdlib` feature being behavioural (it gates one
+module, `stdlib_stubs`).
+
+**Unblocked by patching the read** to retry with the agent's interned atom for
+the same spelling when the pointer probe misses -- the hash is identical either
+way. 19 lines in `private_storage_cache.rs`; all four regex probes pass after
+it. The cleaner fix is upstream's to pick: do not link `libperry_runtime.a` when
+`libperry_stdlib.a` is linked, since stdlib already contains the runtime and
+that is the source of all 8967 collisions. Write-up and repro in
+`upstream/regexp-intrinsic-stdlib/`.
+
+The mechanism dates to `0ce7ab212` (2026-10-16, "intrinsic private reads compare
+a static atom"), 2366 commits before HEAD. Released prebuilt archives contain
+**zero** copies of the spelling -- they predate it -- so only a from-source or
+post-release build hits this.
+
+### Wall 24: a date/time value out of range in message_pack registration
+
+    RangeError: date/time value is outside of supported range
+        at fromEpochNanoseconds -> at -> atWithCoercion
+        at active_support/message_pack -> rbEnsure -> withWarnings -> silenceWarnings
+
+The suspect is `core-ext/time/calculations.ts:41`, where `current()` does
+`RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))`.
+
+**perry's native `Temporal` is not at fault** -- measured directly:
+`Temporal.Now.instant().epochNanoseconds` is `1793829332030344559` (19 digits,
+correct magnitude) and `Temporal.Instant.fromEpochNanoseconds` round-trips it.
+Node has no global `Temporal`, so trails uses `@blazetrails/date`'s own
+implementation; that, or the `Rational` arithmetic feeding it, is where to look.
+The next probe is the `Rational(ns, 1e9)` -> `Time.at` path against both
+runtimes.
+
+Note this is the first wall to present as an ordinary JavaScript exception with a
+named stack rather than a runtime panic or a silent stall, which makes it far
+cheaper to chase than walls 16-23 were.
