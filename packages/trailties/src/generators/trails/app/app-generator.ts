@@ -163,6 +163,12 @@ export class AppBuilder extends ActionMethods {
   /** @internal */
   declare private readonly run: (command: unknown, config?: object) => Promise<unknown>;
   /** @internal */
+  declare private readonly destinationRoot: string;
+  /** @internal */
+  declare private readonly removeFile: (path: string) => Promise<unknown>;
+  /** @internal */
+  declare private readonly skipAssetPipeline: () => boolean | undefined;
+  /** @internal */
   private _configTargetVersion: string | null = null;
 
   /** @internal */
@@ -1275,6 +1281,45 @@ Trails.application.config.filterParameters = Trails.application.config.filterPar
     );
   }
 
+  /** @missingRailsCall template — CONVERGEABLE app-builder-bodies-use-rails-file-actions */
+  async configWhenUpdating(): Promise<void> {
+    const root = this.destinationRoot;
+    const rackCorsConfigExist = await File.isExistAsync(
+      File.join(root, "config/initializers/cors.ts"),
+    );
+    const assetsConfigExist = await File.isExistAsync(
+      File.join(root, "config/initializers/assets.ts"),
+    );
+    const assetAppStylesheetExist = await File.isExistAsync(
+      File.join(root, "app/assets/stylesheets/application.css"),
+    );
+    const cspConfigExist = await File.isExistAsync(
+      File.join(root, "config/initializers/content-security-policy.ts"),
+    );
+
+    this._configTargetVersion = String(Trails.application!.config.loadedConfigVersion ?? "5.0");
+
+    await this.config();
+
+    if (this.skipAssetPipeline() && !assetsConfigExist) {
+      await this.removeFile("config/initializers/assets.ts");
+    }
+
+    if (this.skipAssetPipeline() && !assetAppStylesheetExist) {
+      await this.removeFile("app/assets/stylesheets/application.css");
+    }
+
+    if (!rackCorsConfigExist) {
+      await this.removeFile("config/initializers/cors.ts");
+    }
+
+    if (this.options.api) {
+      if (!cspConfigExist) {
+        await this.removeFile("config/initializers/content-security-policy.ts");
+      }
+    }
+  }
+
   /** @missingRailsArgs template — PERMANENT */
   async databaseYml(): Promise<void> {
     await this.template(this.database.template, "config/database.ts");
@@ -1588,6 +1633,8 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createEslintFile");
     this.methodAdded("createCifiles");
     this.methodAdded("createConfigFiles");
+    this.methodAdded("updateConfigFiles");
+    this.removeCommand("updateConfigFiles");
     this.methodAdded("createBootFile");
     this.methodAdded("createActiveRecordFiles");
     this.methodAdded("createDbFiles");
@@ -1603,6 +1650,8 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteAppHelpersIfApiOption");
     this.methodAdded("deleteAppViewsIfApiOption");
     this.methodAdded("deletePublicFilesIfApiOption");
+    this.methodAdded("deleteNonApiInitializersIfApiOption");
+    this.methodAdded("deleteApiInitializers");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
   }
@@ -1697,6 +1746,10 @@ export class AppGenerator extends AppBase {
   }
 
   /** @missingRailsArgs template — PERMANENT */
+  async updateConfigFiles(): Promise<void> {
+    await this.build("configWhenUpdating");
+  }
+
   async createBootFile(): Promise<void> {
     await this.template("config/boot.ts", "config/boot.ts");
   }
@@ -1776,6 +1829,18 @@ export class AppGenerator extends AppBase {
       await this.removeFile("public/500.html");
       await this.removeFile("public/icon.png");
       await this.removeFile("public/icon.svg");
+    }
+  }
+
+  async deleteNonApiInitializersIfApiOption(): Promise<void> {
+    if (this.options.api) {
+      await this.removeFile("config/initializers/content-security-policy.ts");
+    }
+  }
+
+  async deleteApiInitializers(): Promise<void> {
+    if (!this.options.api) {
+      await this.removeFile("config/initializers/cors.ts");
     }
   }
 

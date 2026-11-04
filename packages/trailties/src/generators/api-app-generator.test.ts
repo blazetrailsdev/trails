@@ -1,10 +1,14 @@
 import { Dir } from "@blazetrails/ruby-compat";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { beforeEach, describe, it } from "vitest";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+import { afterEach, beforeEach, describe, it } from "vitest";
+import { Application } from "../application.js";
+import { Trails } from "../trails.js";
 import { AppGenerator } from "./trails/app/app-generator.js";
 import { TestCase } from "./test-case.js";
 
+class ApiAppGeneratorApp extends Application {}
 const destinationRoot = Dir.mktmpdir();
 
 class ApiAppGeneratorTest extends TestCase {}
@@ -13,10 +17,19 @@ ApiAppGeneratorTest.tests(AppGenerator);
 ApiAppGeneratorTest.arguments([destinationRoot, "--api", "--skip-install"]);
 registerSpecType(/^ApiAppGeneratorTest$/, ApiAppGeneratorTest);
 let t: TestCase;
+let shell: InstanceType<typeof ThorBase.shell> & { _alwaysForce: boolean };
 
 beforeEach((context) => {
   t = context.testCase as TestCase;
   t.prepareDestination();
+  Trails.application = ApiAppGeneratorApp.instance();
+
+  shell = new ThorBase.shell() as typeof shell;
+  shell._alwaysForce = true;
+});
+
+afterEach(() => {
+  Trails.application = null;
 });
 
 const defaultFiles = [
@@ -136,5 +149,19 @@ describe("ApiAppGeneratorTest", () => {
       assertNoMatch(/tailwindcss/, content);
     });
     t.assertNoFile("app/views/layouts/application.html.tse");
+  });
+
+  it("app update does not generate unnecessary config files", async () => {
+    await t.runGenerator();
+
+    const generator = new AppGenerator(
+      ["trails"],
+      { api: true, update: true },
+      { destinationRoot: t.destinationRoot, shell: shell },
+    );
+    await generator.updateConfigFiles();
+
+    t.assertNoFile("config/initializers/assets.ts");
+    t.assertNoFile("config/initializers/content-security-policy.ts");
   });
 });
