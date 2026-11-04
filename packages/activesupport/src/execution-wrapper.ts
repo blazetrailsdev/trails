@@ -118,49 +118,46 @@ export class ExecutionWrapper {
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
-    return new Fiber(() => this._wrap(block, source)).resume();
-  }
-
-  /** @internal */
-  private static _wrap<T>(block: () => T, source: string): T {
-    const instance = this.runBang();
-    if (isThenable(instance)) {
-      return (async () => {
-        const ran = await instance;
-        try {
-          return await block();
-        } catch (error) {
-          this.errorReporter().report(error as Error, { handled: false, source });
-          throw error;
-        } finally {
-          await ran.completeBang();
-        }
-      })() as T;
-    }
-    let deferred = false;
-    try {
-      const result = block();
-      if (isThenable(result)) {
-        deferred = true;
-        return Promise.resolve(result).then(
-          async (value) => {
-            await instance.completeBang();
-            return value;
-          },
-          async (error: unknown) => {
+    return new Fiber(() => {
+      const instance = this.runBang();
+      if (isThenable(instance)) {
+        return (async () => {
+          const ran = await instance;
+          try {
+            return await block();
+          } catch (error) {
             this.errorReporter().report(error as Error, { handled: false, source });
-            await instance.completeBang();
             throw error;
-          },
-        ) as T;
+          } finally {
+            await ran.completeBang();
+          }
+        })() as T;
       }
-      return result;
-    } catch (error) {
-      this.errorReporter().report(error as Error, { handled: false, source });
-      throw error;
-    } finally {
-      if (!deferred) instance.completeBang();
-    }
+      let deferred = false;
+      try {
+        const result = block();
+        if (isThenable(result)) {
+          deferred = true;
+          return Promise.resolve(result).then(
+            async (value) => {
+              await instance.completeBang();
+              return value;
+            },
+            async (error: unknown) => {
+              this.errorReporter().report(error as Error, { handled: false, source });
+              await instance.completeBang();
+              throw error;
+            },
+          ) as T;
+        }
+        return result;
+      } catch (error) {
+        this.errorReporter().report(error as Error, { handled: false, source });
+        throw error;
+      } finally {
+        if (!deferred) instance.completeBang();
+      }
+    }).resume();
   }
 
   static perform<T>(block: () => T): T {
