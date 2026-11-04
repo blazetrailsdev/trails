@@ -246,3 +246,17 @@ sloppy-mode async function with `with (TopLevel)`, where constants resolve.
 Root § "Templates are precompiled" keeps eval out of what serves production; a
 CLI command evaluating the string its own operator passed is not that. Ruled by
 the repo owner on 2026-11-02 (trails#9630).
+
+## `method_missing` definers in this package
+
+Class-specific rules under root § "Ruby protocol methods with a different JS
+mechanism"; its cross-table rules and
+[docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
+
+- `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
+  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
+  `include()` copies a module's methods into each includer and a Proxy on the
+  module itself would reach no includer. That row is not converged: the reload
+  is async, so `respondToMissing` starts it and answers `super`, the in-line
+  re-send is unported, and test_help's integration `before_setup` awaits the
+  reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.

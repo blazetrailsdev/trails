@@ -48,7 +48,7 @@ concurrency:
 
 jobs:
   # Preflight that sets `docs_only=true` when every changed path is under
-  # top-level `docs/` or is the top-level `README.md`. Downstream jobs gate on this via `if:` so they're
+  # top-level `docs/`, the top-level `README.md`, or a root or package `CLAUDE.md`. Downstream jobs gate on this via `if:` so they're
   # reported as skipped on docs-only PRs. Skipped required checks in
   # branch protection DO block merges, so point branch protection at the
   # aggregate `CI` job at the bottom of this file instead of individual
@@ -246,7 +246,7 @@ jobs:
             fi
             if [ -z "$files" ]; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
-            elif grep -qvE '^docs/|^examples/|^README\.md$|^CLAUDE\.md$' <<<"$files"; then
+            elif grep -qvE '^docs/|^examples/|^README\.md$|^(packages/[^/]+/)?CLAUDE\.md$' <<<"$files"; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
             elif grep -qxF 'docs/ruby-ts-conventions.md' <<<"$files"; then
               echo "docs_only=false" >> "$GITHUB_OUTPUT"
