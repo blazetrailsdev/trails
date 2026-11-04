@@ -72,6 +72,9 @@ export class Thor {
     if (!rtest(rbGvGet("$thor_runner"))) rbGvSet("$thor_runner", false);
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  declare static start: BaseClass["start"];
+
   static Group = Group;
 
   static LineEditor = LineEditor;

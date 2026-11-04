@@ -12,6 +12,7 @@ import { Base, DangerousAttributeError, ReadonlyAttributeError } from "./index.j
 import { Model } from "@blazetrails/activemodel";
 import {
   attributesForCreate,
+  dangerousAttributeMethods,
   GeneratedAttributeMethods,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
@@ -699,5 +700,29 @@ describe("initialize_generated_modules", () => {
     expect(
       (Topic as unknown as { _generatedAssociationMethods: unknown })._generatedAssociationMethods,
     ).toBeInstanceOf(Module);
+  });
+});
+
+describe("dangerousAttributeMethods", () => {
+  it("derives the set from Base's prototype chain, covering every Base method", () => {
+    const names = dangerousAttributeMethods();
+    for (const name of [
+      "restoreAttributes",
+      "clearChangesInformation",
+      "savedChangeToAttribute",
+      "attributeInDatabase",
+      "save",
+      "dup",
+    ]) {
+      expect(names.has(name)).toBe(true);
+    }
+    expect(names.has("constructor")).toBe(false);
+    expect(names.has("hasOwnProperty")).toBe(false);
+  });
+
+  it("leaves the primary key's id methods to PrimaryKey's override", () => {
+    class Widget extends Base {}
+    expect(dangerousAttributeMethods().has("id")).toBe(true);
+    expect(() => Widget.isInstanceMethodAlreadyImplemented("id")).not.toThrow();
   });
 });

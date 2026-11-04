@@ -1264,7 +1264,16 @@ describe("schema scopes and non-model bases", () => {
       baseNames: ["Base", "StatsSyncRecord"],
       schemaColumnsByTable: { pull_requests: { other: "string" } },
       schemaScopes: scoped,
-      modelSuperNames: new Map([["StatsSyncRecord", "ApplicationRecord"]]),
+      modelSuperKeys: new Map([
+        [
+          "app/models/stats-sync/pull-request.ts#PullRequest",
+          "app/models/stats-sync-record.ts#StatsSyncRecord",
+        ],
+        [
+          "app/models/stats-sync-record.ts#StatsSyncRecord",
+          "app/models/application-record.ts#ApplicationRecord",
+        ],
+      ]),
     });
     expect(text).toContain("title");
     expect(text).not.toContain("other");
@@ -1313,4 +1322,34 @@ test("scopes each of two same-named models by its own superclass", () => {
   expect(
     missingTables(models, {}, new Set(["Base", "Stats"]), scopes).map((m) => m.fileName),
   ).toEqual(["a.ts"]);
+});
+
+test("resolves same-named intermediates to their own parents by class identity", () => {
+  const model = (
+    className: string,
+    fileName: string,
+    superName: string,
+    superKey: string,
+    abstract = false,
+  ) => ({
+    className,
+    superName,
+    superKey,
+    dynamicTableName: false,
+    abstract,
+    optedOut: false,
+    fileName,
+  });
+  const models = [
+    model("Record", "hub/record.ts", "Hub", "base.ts#Hub", true),
+    model("Record", "stats/record.ts", "StatsSyncRecord", "base.ts#StatsSyncRecord", true),
+    model("PullRequest", "hub/pull-request.ts", "Record", "hub/record.ts#Record"),
+    model("PullRequest", "stats/pull-request.ts", "Record", "stats/record.ts#Record"),
+  ];
+  const scopes = new Map([["StatsSyncRecord", { pull_requests: {} }]]);
+  expect(
+    missingTables(models, {}, new Set(["Base", "Hub", "StatsSyncRecord"]), scopes).map(
+      (m) => m.fileName,
+    ),
+  ).toEqual(["hub/pull-request.ts"]);
 });
