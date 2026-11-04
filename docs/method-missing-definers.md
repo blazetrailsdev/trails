@@ -28,7 +28,7 @@ Class-specific rules live in the owning package's `CLAUDE.md`, under
 | `multibyte/chars.rb`                                  | nothing (no file)     |
 | `active_support/option_merger.rb`                     | Proxy                 |
 | `active_support/ordered_options.rb`                   | Proxy                 |
-| `active_support/string_inquirer.rb`                   | Proxy                 |
+| `active_support/string_inquirer.rb`                   | Proxy (proto chain)   |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
 | `action_mailer/base.rb`                               | Proxy (class chain)   |
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
