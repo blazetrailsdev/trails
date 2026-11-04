@@ -331,10 +331,10 @@ export class Server {
     };
   }
 
-  app(): unknown {
+  async app(): Promise<unknown> {
     return (this._app ??= this.options.builder
       ? this.buildAppFromString()
-      : this.buildAppAndOptionsFromConfig());
+      : await this.buildAppAndOptionsFromConfig());
   }
 
   static loggingMiddleware(): (server: Server) => Promise<unknown[] | null> {
@@ -391,7 +391,7 @@ export class Server {
       rbGvSet("$DEBUG", true);
       STDOUT.puts(rbInspect(options.server));
       await PP.pp(await this.wrappedApp());
-      await PP.pp(this.app());
+      await PP.pp(await this.app());
     }
 
     if (options.pid != null) await this.checkPidBang();
@@ -421,7 +421,7 @@ export class Server {
   }
 
   /** @internal */
-  private buildAppAndOptionsFromConfig(): unknown {
+  private async buildAppAndOptionsFromConfig(): Promise<unknown> {
     if (!File.isExist(this.options.config!)) {
       abort(`configuration ${this.options.config} not found`);
     }
@@ -509,7 +509,7 @@ export class Server {
 
   /** @internal */
   private async wrappedApp(): Promise<unknown> {
-    return (this._wrappedApp ??= await this.buildApp(this.app()));
+    return (this._wrappedApp ??= await this.buildApp(await this.app()));
   }
 
   /** @internal */

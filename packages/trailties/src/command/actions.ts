@@ -5,8 +5,9 @@ import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
 
+/** @missingRailsArgs expand_path — PERMANENT */
 export function setApplicationDirectoryBang(): void {
-  if (!File.isExist(File.expandPath("config.ru"))) Dir.chdir(File.expandPath("../..", APP_PATH));
+  if (!File.isExist(File.expandPath("config.ts"))) Dir.chdir(File.expandPath("../..", APP_PATH));
 }
 
 export async function requireApplicationBang(): Promise<void> {

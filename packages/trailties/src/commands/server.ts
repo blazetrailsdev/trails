@@ -212,7 +212,7 @@ export class ServerCommand extends Base {
     klass.classOption("config", {
       aliases: "-c",
       type: "string",
-      default: "config.ru",
+      default: "config.ts",
       desc: "Use a custom rackup configuration.",
       banner: "file",
     });
