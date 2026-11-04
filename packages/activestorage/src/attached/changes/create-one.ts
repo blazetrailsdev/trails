@@ -25,7 +25,6 @@ export class CreateOne {
   readonly attachable: unknown;
   private _blob!: Blob;
   private _attachment: Attachment | Promise<Attachment> | undefined;
-  private _unfurledAttachment!: Attachment;
 
   constructor(name: string, record: AttachedRecord, attachable: unknown) {
     this.name = name;
@@ -37,21 +36,10 @@ export class CreateOne {
   async unfurl(): Promise<void> {
     this._blob = await this.findOrBuildBlob();
     await this._blob.identifyWithoutSaving();
-    if (this.record.isNewRecord()) {
-      this._unfurledAttachment = this.buildAttachment();
-    } else {
-      await this.attachment;
-    }
   }
 
-  /** @inventedArm if — PERMANENT */
   get attachment(): Attachment | Promise<Attachment> {
-    if (this._attachment === undefined && this.record.isNewRecord()) {
-      return this._unfurledAttachment;
-    }
-    return (this._attachment ??= this.findOrBuildAttachment().then(
-      (attachment) => (this._attachment = attachment),
-    ));
+    return (this._attachment ??= this.findOrBuildAttachment());
   }
 
   get blob(): Blob {
@@ -91,16 +79,38 @@ export class CreateOne {
     );
   }
 
-  /** @internal */
-  private async findOrBuildAttachment(): Promise<Attachment> {
-    return (await this.findAttachment()) || this.buildAttachment();
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  private findOrBuildAttachment(): Attachment | Promise<Attachment> {
+    const attachment = this.findAttachment();
+    if (attachment instanceof Promise) {
+      return attachment.then((found) => (this._attachment = found || this.buildAttachment()));
+    }
+    return attachment || this.buildAttachment();
   }
 
-  /** @internal */
-  protected async findAttachment(): Promise<Attachment | null | undefined> {
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
+  protected findAttachment():
+    | Attachment
+    | null
+    | undefined
+    | Promise<Attachment | null | undefined> {
     const record = this.record as unknown as { [k: string]: unknown };
-    if (rbEqual(await record[`${this.name}Blob`], this.blob)) {
-      return (await record[`${this.name}Attachment`]) as Attachment | null;
+    const blob = record[`${this.name}Blob`];
+    if (blob instanceof Promise) {
+      return blob.then((found) =>
+        rbEqual(found, this.blob)
+          ? (record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>)
+          : undefined,
+      );
+    }
+    if (rbEqual(blob, this.blob)) {
+      return record[`${this.name}Attachment`] as Attachment | null | Promise<Attachment | null>;
     }
   }
 

@@ -33,17 +33,16 @@ export class CreateMany {
 
   /** @noRailsEquivalent PERMANENT */
   async unfurl(): Promise<void> {
+    const attachments: Attachment[] = [];
     for (const subchange of this.subchanges) {
       await subchange.unfurl();
-      await subchange.attachment;
+      attachments.push(await subchange.attachment);
     }
-    void this.attachments;
+    this._attachments = attachments;
   }
 
   get attachments(): Attachment[] {
-    return (this._attachments ??= this.subchanges.map(
-      (subchange) => subchange.attachment as Attachment,
-    ));
+    return this._attachments!;
   }
 
   get blobs(): Blob[] {
