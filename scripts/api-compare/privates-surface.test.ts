@@ -134,6 +134,21 @@ describe("buildPrivatesReport", () => {
     });
   });
 
+  it("finds a moved owner past the public lane's owner cap", () => {
+    const ruby = structuredClone(RUBY);
+    for (let i = 0; i < 6; i++)
+      ruby.packages.activemodel.classes[`ActiveModel::Foo${i}`] = entity(`Foo${i}`, "foo.rb", {
+        instanceMethods: [m("crowded")],
+      });
+    ruby.packages.activemodel.classes["ActiveModel::Bar"].instanceMethods.push(
+      m("crowded", "private"),
+    );
+    const ts = tsFoo([m("crowded", "private")]);
+    expect(buildPrivatesReport(ruby, ts, { filterPkg: null }).names).toMatchObject([
+      { name: "crowded", kind: "moved" },
+    ]);
+  });
+
   it("strips a leading underscore once before matching", () => {
     expect(kinds(tsFoo([m("_performInner"), m("_publicOnly")]))).toEqual({
       _performInner: "credited",

@@ -9,7 +9,8 @@
  * (`collectAllowedNames` with `visibility: "private"`).
  *
  * Population, per Rails-matched or uncovered TS file:
- *   - `modifier`   a TS `private` / `protected` member, or a `#` member;
+ *   - `modifier`   a TS `private` / `protected` member, or a `#` member (the
+ *                  extractor reports one as `visibility: "private"`);
  *   - `internal`   an `@internal` member or exported function;
  *   - `fileLocal`  a module-private helper (`extractFileLocalHelpers`);
  *   - `underscore` any `_`-prefixed name, whatever its visibility.
@@ -75,7 +76,7 @@ its leading _ stripped once. Report-only: it never fails.`;
 
 function memberPopulation(m: MethodInfo): PopulationKind | null {
   if (m.name.startsWith("_")) return "underscore";
-  if (m.name.startsWith("#") || m.visibility !== "public") return "modifier";
+  if (m.visibility !== "public") return "modifier";
   if (m.internal === true) return "internal";
   return null;
 }
@@ -121,7 +122,7 @@ export function buildPrivatesReport(
   ts: ApiManifest,
   opts: { filterPkg: string | null },
 ): PrivatesReport {
-  const global = buildGlobalRubyCandidates(ruby);
+  const global = buildGlobalRubyCandidates(ruby, Infinity);
   const cross = buildCrossPackageModules(ruby);
   const packages: PrivatesTotals[] = [];
   const names: PrivateName[] = [];
@@ -252,5 +253,11 @@ export async function main(argv: string[]): Promise<string> {
 
 const argv = (globalThis as { process?: { argv?: string[] } }).process?.argv;
 if (argv !== undefined && path.basename(argv[1] ?? "") === "privates-surface.ts") {
-  void main(argv.slice(2)).then((out) => console.log(out));
+  void main(argv.slice(2)).then(
+    (out) => console.log(out),
+    (error: unknown) =>
+      console.error(
+        `${error instanceof Error ? error.message : String(error)}\nRun \`pnpm parity:api\` first to generate the manifests.`,
+      ),
+  );
 }

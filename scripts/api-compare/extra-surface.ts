@@ -1997,7 +1997,10 @@ function creditCandidates(
  * doesn't sit in its own file as novel-by-omission, which is exactly the
  * miscount this pass exists to remove.
  */
-export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOwner[]> {
+export function buildGlobalRubyCandidates(
+  ruby: ApiManifest,
+  maxOwners: number = MAX_OWNERS_PER_NAME,
+): Map<string, RubyOwner[]> {
   const all = new Map<string, RubyOwner[]>();
   const add = (candidate: string, owner: RubyOwner): void => {
     const owners = all.get(candidate);
@@ -2005,7 +2008,7 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOw
       all.set(candidate, [owner]);
       return;
     }
-    if (owners.length < MAX_OWNERS_PER_NAME) owners.push(owner);
+    if (owners.length < maxOwners) owners.push(owner);
   };
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
     for (const [file, consts] of Object.entries(pkg.fileConstants ?? {})) {
@@ -2429,7 +2432,6 @@ export function indexRubyFiles(
  * A factory rather than a shared constant: `foldClassMethodsModules` mutates
  * `rubyPkg.modules`.
  */
-
 function emptyRubyPackage(): PackageInfo {
   return { classes: {}, modules: {} };
 }
