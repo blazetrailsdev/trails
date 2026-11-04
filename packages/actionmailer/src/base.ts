@@ -377,10 +377,7 @@ export class Base extends AbstractController.Base {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm for — PERMANENT
-   */
+  /** @internal */
   protected async collectResponsesFromBlock(
     headers: Headers,
     block: (collector: Collector) => unknown,
