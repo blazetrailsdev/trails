@@ -612,6 +612,20 @@ describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
     expect(loaded.toString()).toBe("0.15e1");
   });
 
+  it("loads a Complex and a Rational mapping under symbolize_names", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Complex } = await import("./complex.js");
+    const { Rational } = await import("./rational.js");
+    const c = Psych.unsafeLoad(Psych.dump(new Complex(1, 2)), {
+      symbolizeNames: true,
+    }) as InstanceType<typeof Complex>;
+    expect([c.real, c.imag]).toEqual([1, 2]);
+    const r = Psych.unsafeLoad(Psych.dump(new Rational(3, 4)), {
+      symbolizeNames: true,
+    }) as InstanceType<typeof Rational>;
+    expect([r.numerator, r.denominator]).toEqual([3n, 4n]);
+  });
+
   it("round-trips an Encoding as !ruby/encoding", async () => {
     const { Psych } = await import("./psych.js");
     const { Encoding } = await import("./encoding.js");
@@ -628,12 +642,5 @@ describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
     const loaded = Psych.unsafeLoad(yaml) as Error;
     expect(loaded).toBeInstanceOf(RuntimeError);
     expect(loaded.message).toBe("boom");
-  });
-
-  it("raises on the scalar Rational and Complex forms", async () => {
-    const { Psych } = await import("./psych.js");
-    const { NotImplementedError } = await import("./not-implemented-error.js");
-    expect(() => Psych.unsafeLoad("--- !ruby/object:Rational 3/4\n")).toThrow(NotImplementedError);
-    expect(() => Psych.unsafeLoad("--- !ruby/object:Complex 1+2i\n")).toThrow(NotImplementedError);
   });
 });

@@ -4,7 +4,7 @@ import { excSetBacktrace } from "../../backtrace-location.js";
 import { BigDecimal } from "../../big-decimal.js";
 import { complex } from "../../complex.js";
 import { Encoding } from "../../encoding.js";
-import { NotImplementedError } from "../../not-implemented-error.js";
+import { eachSlice } from "../../enumerable.js";
 import { Range } from "../../range.js";
 import { rational } from "../../rational.js";
 import { rbGetAllocFunc } from "../../include.js";
@@ -199,12 +199,6 @@ export class ToRuby extends Visitor {
         return (this.classLoader.dateTime() as { parse(s: string): unknown }).parse(o.value);
       case "!ruby/encoding":
         return Encoding.find(o.value);
-      case "!ruby/object:Complex":
-        this.classLoader.complex();
-        throw new NotImplementedError(`Complex() of a String is not implemented: ${o.value}`);
-      case "!ruby/object:Rational":
-        this.classLoader.rational();
-        throw new NotImplementedError(`Rational() of a String is not implemented: ${o.value}`);
       case "!ruby/class":
       case "!ruby/module":
         return this.resolveClass(o.value);
@@ -271,11 +265,21 @@ export class ToRuby extends Visitor {
       const name = match[1] || "Object";
       if (name === "Complex") {
         this.classLoader.complex();
-        const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+        const h = Object.create(null) as Record<string, unknown>;
+        eachSlice(
+          o.children.map((c) => this.accept(c)),
+          2,
+          ([k, v]) => (h[String(k)] = v),
+        );
         return this.register(o, complex(h["real"], h["image"]));
       } else if (name === "Rational") {
         this.classLoader.rational();
-        const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+        const h = Object.create(null) as Record<string, unknown>;
+        eachSlice(
+          o.children.map((c) => this.accept(c)),
+          2,
+          ([k, v]) => (h[String(k)] = v),
+        );
         return this.register(o, rational(h["numerator"] as number, h["denominator"] as number));
       } else if (name === "Hash")
         return this.reviveHash(this.register(o, new Hash<unknown, unknown>()), o);
@@ -287,7 +291,12 @@ export class ToRuby extends Visitor {
       return this.register(o, new klass(h["begin"], h["end"], h["excl"] === true));
     }
     if ((match = /^!ruby\/exception:?(.*)?$/.exec(o.tag))) {
-      const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+      const h = Object.create(null) as Record<string, unknown>;
+      eachSlice(
+        o.children.map((c) => this.accept(c)),
+        2,
+        ([k, v]) => (h[String(k)] = v),
+      );
 
       const e = this.buildException(
         this.resolveClass(match[1]) ?? (this.classLoader.exception() as RubyClass),
