@@ -37,7 +37,11 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
     return new Mail.Message(args, block);
   },
 
-  /** @inventedArm forceEncoding — PERMANENT */
+  /**
+   * @missingRailsCall open — CONVERGEABLE ruby-compat-io-read-async-to-eof
+   * @missingRailsCall read — CONVERGEABLE ruby-compat-io-read-async-to-eof
+   * @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source
+   */
   async read(filename: string): Promise<Message> {
     return Mail.new(forceEncoding((await IO.binreadAsync(filename))!, "UTF-8"));
   },

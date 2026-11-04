@@ -41,7 +41,7 @@ export class Body {
     if (Utilities.isBlank(string)) {
       this._rawSource = "";
     } else {
-      if (!(string instanceof Uint8Array) && rbObjRespondTo(string, "join")) {
+      if (rbObjRespondTo(string, "join")) {
         this._rawSource = Utilities.toCrlf((string as string[]).join(""));
       } else if (rbObjRespondTo(string, "toString")) {
         this._rawSource = Utilities.toCrlf(rbObjAsString(string));

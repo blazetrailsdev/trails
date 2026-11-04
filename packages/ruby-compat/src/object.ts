@@ -729,6 +729,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     }
     if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
     if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
+    if (obj instanceof Uint8Array && mid !== "toString") return false;
     if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
     if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
     if (temporalMethod(obj, mid) !== undefined) return true;
