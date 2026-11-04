@@ -926,10 +926,10 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("creating preview by variation name", async () => {
     await user.highlightsWithVariants.attach(fixtureFileUpload("report.pdf"));
     const preview = await (
-      (await (await attachmentAt(user.highlightsWithVariants, 0)).preview("thumb")) as Preview
+      (await attachmentAt(user.highlightsWithVariants, 0)).preview("thumb") as Preview
     ).processed();
 
-    const image = await readImage(await preview["variant"]());
+    const image = await readImage(preview["variant"]());
     expect(await image.type()).toBe("PNG");
     expect(await image.width()).toBe(77);
     expect(await image.height()).toBe(100);
@@ -940,7 +940,7 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     const error = await assertRaises([ArgumentError], {}, async () => {
       await (
-        (await (await attachmentAt(user.highlightsWithVariants, 0)).preview("unknown")) as Preview
+        (await attachmentAt(user.highlightsWithVariants, 0)).preview("unknown") as Preview
       ).processed();
     });
 
