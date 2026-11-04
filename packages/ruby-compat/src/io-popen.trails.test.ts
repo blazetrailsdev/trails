@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Errno } from "./errno.js";
+import { File } from "./file.js";
 import { IO } from "./io.js";
 import { Process } from "./process.js";
 import { Tempfile } from "./tempfile.js";
@@ -62,5 +63,14 @@ describe("IO.popen", () => {
     const [a, b] = [run(1), run(2)];
     expect(await a.value()).toBe(1);
     expect(await b.value()).toBe(2);
+  });
+
+  it("writes a w+ block's output to the child's stdin and merges err into out", async () => {
+    const path = Tempfile.create("popen").path()!;
+    await IO.popen(`cat > ${path}; echo oops >&2`, "w+", { err: "out" }, (io) => {
+      io.puts("hello");
+    });
+    expect(Process.lastStatus!.exitstatus()).toBe(0);
+    expect(await File.readAsync(path)).toBe("hello\n");
   });
 });

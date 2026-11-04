@@ -940,6 +940,9 @@ export class IO {
    * then the pipe is closed and `$?` set (`popen_finish`, `io.c:8020-8022`;
    * `pipe_finalize`, `io.c:7302`), readable as {@link Process.lastStatus}.
    * With no block the IO itself is answered (`popen_finish`, `io.c:8024`).
+   * A `"w"` mode's block writes stdin, `err: "out"` is `:err => :out`, and a
+   * String `pname` runs under `/bin/sh -c` as `rb_exec_fillarg`
+   * (`vendor/ruby/v3.3.11/process.c:2425`) decides.
    * The child's stdout is read whole before the block runs, so the IO is a
    * binary `StringIO`, and `$?` is set once that read ends rather than at
    * `close`.
@@ -954,38 +957,68 @@ export class IO {
    * (`vendor/ruby/v3.3.11/io.c:7946`).
    */
   static async popen(
-    pname: readonly unknown[],
-    opt?: { err?: IO | null },
+    pname: string | readonly unknown[],
+    opt?: { err?: IO | "out" | null },
   ): Promise<StringIO<Uint8Array>>;
   static async popen<R>(
-    pname: readonly unknown[],
+    pname: string | readonly unknown[],
     block: (port: StringIO<Uint8Array>) => R | Promise<R>,
   ): Promise<R>;
   static async popen<R>(
-    pname: readonly unknown[],
-    opt: { err?: IO | null },
+    pname: string | readonly unknown[],
+    opt: { err?: IO | "out" | null },
     block: (port: StringIO<Uint8Array>) => R | Promise<R>,
   ): Promise<R>;
   static async popen<R>(
-    pname: readonly unknown[],
-    opt: { err?: IO | null } | ((port: StringIO<Uint8Array>) => R | Promise<R>) = {},
-    block?: (port: StringIO<Uint8Array>) => R | Promise<R>,
+    pname: string | readonly unknown[],
+    mode: string,
+    opt: { err?: IO | "out" | null },
+    block: (port: StringIO<Uint8Array>) => R | Promise<R>,
+  ): Promise<R>;
+  static async popen<R>(
+    pname: string | readonly unknown[],
+    ...rest: unknown[]
   ): Promise<R | StringIO<Uint8Array>> {
+    const mode = typeof rest[0] === "string" ? (rest.shift() as string) : "r";
+    let opt = (rest[0] ?? {}) as { err?: IO | "out" | null };
+    let block = rest[1] as ((port: StringIO<Uint8Array>) => R | Promise<R>) | undefined;
     if (typeof opt === "function") {
       block = opt;
       opt = {};
     }
-    const [command, env, args] = rbExecargNew(pname);
+    const execarg = rbExecargNew(typeof pname === "string" ? [pname] : pname);
+    const env = execarg[1];
+    let [command, , args] = execarg;
+    if (typeof pname === "string" && args === null) {
+      [command, args] = ["/bin/sh", ["-c", pname]];
+    }
     const { getChildProcess } = await import("./child-process-adapter.js");
     const adapter = getChildProcess();
     if (adapter.popen === undefined) {
       throw new NotImplementedError("fork() function is unimplemented on this machine");
     }
 
-    const [out, status] = await adapter.popen(command, args ?? [], env, opt.err?.fileno() ?? null);
+    const err = opt.err === "out" ? "out" : (opt.err?.fileno() ?? null);
+    let input: StringIO<Uint8Array> | undefined;
+    let value: R | undefined;
+    if (mode.includes("w")) {
+      input = new StringIO(new Uint8Array(0));
+      if (block !== undefined) value = await block(input);
+    }
+    const [out, status] = await adapter.popen(
+      command,
+      args ?? [],
+      env,
+      err,
+      input === undefined ? undefined : input.string(),
+    );
     if (status.error !== undefined) {
       rbLastStatusSet(new Process.Status({ pid: status.pid, status: 127, signal: null }));
       throw status.error;
+    }
+    if (input !== undefined && block !== undefined) {
+      rbLastStatusSet(new Process.Status(status));
+      return value as R;
     }
     const port = new StringIO(out);
     if (block === undefined) {

@@ -703,6 +703,9 @@ importers:
       '@blazetrails/mini-mime':
         specifier: workspace:*
         version: link:../mini-mime
+      '@blazetrails/net-smtp':
+        specifier: workspace:*
+        version: link:../net-smtp
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -710,6 +713,12 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/smtp-server':
+        specifier: ^3.5.13
+        version: 3.5.13
+      smtp-server:
+        specifier: ^3.21.2
+        version: 3.21.2
 
   packages/marcel:
     dependencies:
