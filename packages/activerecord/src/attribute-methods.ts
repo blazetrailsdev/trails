@@ -241,6 +241,7 @@ function instanceMethodNames(klass: { prototype: object }): Set<string> {
   return names;
 }
 
+/** @missingRailsCall map — PERMANENT */
 export function dangerousAttributeMethods(): Set<string> {
   if (_dangerousMethodsCache) return _dangerousMethodsCache;
   const base = ActiveRecord.Base;
