@@ -296,9 +296,8 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
           ).NodeSQLiteAdapter as unknown as SqliteCtor;
         }
         if (adapter === "expo-sqlite") {
-          return (
-            await import("@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js")
-          ).ExpoSQLiteAdapter as unknown as SqliteCtor;
+          const { ConnectionAdapters } = await import("@blazetrails/activerecord");
+          return ConnectionAdapters.resolve("expo-sqlite") as unknown as SqliteCtor;
         }
         return (
           await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
@@ -308,7 +307,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
         adapter === "node-sqlite"
           ? "Node 22.5+ with the built-in `node:sqlite` module"
           : adapter === "expo-sqlite"
-            ? "the `expo-sqlite` package (Expo / React Native runtimes)"
+            ? 'the `expo-sqlite` package (Expo / React Native runtimes), explicitly imported with `import "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js"`'
             : "the `better-sqlite3` package (e.g. `npm add better-sqlite3`)";
       let SQLiteAdapter: SqliteCtor;
       try {

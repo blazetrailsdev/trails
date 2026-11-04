@@ -158,8 +158,6 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./connection-adapters/better-sqlite3-adapter.js"),
   "active_record/connection_adapters/node_sqlite_adapter": () =>
     import("./connection-adapters/node-sqlite-adapter.js"),
-  "active_record/connection_adapters/expo_sqlite_adapter": () =>
-    import("./connection-adapters/expo-sqlite-adapter.js"),
   "active_record/connection_adapters/libsql_adapter": () =>
     import("./connection-adapters/libsql-adapter.js"),
   "active_record/connection_adapters/libsql_remote_adapter": () =>
