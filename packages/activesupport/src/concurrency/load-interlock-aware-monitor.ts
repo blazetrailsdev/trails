@@ -1,4 +1,4 @@
-import { Mutex, prepend, rbCallSuper, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { Fiber, Mutex, prepend, rbCallSuper, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import { Dependencies } from "../dependencies.js";
 import { Monitor, synchronize } from "./monitor.js";
 
@@ -48,7 +48,7 @@ export class ThreadLoadInterlockAwareMonitor {
     return "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor";
   }
 
-  private owner: Thread | null;
+  private owner: Fiber | null;
   private count: number;
   private mutex: Mutex;
 
@@ -62,23 +62,26 @@ export class ThreadLoadInterlockAwareMonitor {
 
   /** @internal */
   protected monTryEnter(): number | false {
-    if (this.owner !== Thread.current()) {
+    if (this.owner !== Fiber.current()) {
       if (!this.mutex.tryLock()) return false;
-      this.owner = Thread.current();
+      this.owner = Fiber.current();
     }
     return (this.count += 1);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs current — PERMANENT
+   */
   protected async monEnter(): Promise<number> {
-    if (this.owner !== Thread.current()) await this.mutex.lock();
-    this.owner = Thread.current();
+    if (this.owner !== Fiber.current()) await this.mutex.lock();
+    this.owner = Fiber.current();
     return (this.count += 1);
   }
 
   /** @internal */
   protected monExit(): void {
-    if (!(this.owner === Thread.current())) {
+    if (!(this.owner === Fiber.current())) {
       throw new ThreadError("current thread not owner");
     }
 

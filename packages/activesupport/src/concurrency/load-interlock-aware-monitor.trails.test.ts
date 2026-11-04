@@ -50,15 +50,22 @@ describe("ThreadLoadInterlockAwareMonitor", () => {
     expect(log).toEqual(["owner:nested", "other"]);
   });
 
-  it("raises as MRI does when the last exit runs in another fiber of the owner", async () => {
+  it("is owned by the fiber, so a second fiber of the thread waits for the owner", async () => {
     const monitor = new ThreadLoadInterlockAwareMonitor();
-    const fiber = new Fiber(() => monitor.synchronize(() => Fiber.yield()));
-
-    await monitor.synchronize(() => fiber.resume());
-
-    await expect(fiber.resume()).rejects.toThrow(
-      "Attempt to unlock a mutex which is locked by another thread/fiber",
-    );
+    const events: string[] = [];
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const owner = monitor.synchronize(async () => {
+      events.push("owner in");
+      await held;
+      events.push("owner out");
+    });
+    const waiter = new Fiber(() => monitor.synchronize(() => events.push("fiber in"))).resume();
+    await tick();
+    expect(events).toEqual(["owner in"]);
+    release();
+    await Promise.all([owner, waiter]);
+    expect(events).toEqual(["owner in", "owner out", "fiber in"]);
   });
 });
 

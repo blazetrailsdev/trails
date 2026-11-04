@@ -5,6 +5,7 @@ import type { ErrorReporter } from "./error-reporter.js";
 import { Callbacks } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import { Fiber } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -57,6 +58,10 @@ export class ExecutionWrapper {
 
   #_hookState?: Map<ExecutionHook, unknown>;
 
+  #_fiber?: Fiber;
+
+  #_previous?: ExecutionWrapper;
+
   static toRun(...args: FilterListEntry[]): void {
     this.setCallback("run", ...args);
   }
@@ -75,11 +80,15 @@ export class ExecutionWrapper {
     }
   }
 
+  /** @missingRailsCall delete — PERMANENT */
   static runBang({ reset = false }: { reset?: boolean } = {}):
     | CompletableExecution
     | Promise<CompletableExecution> {
     if (reset) {
-      const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
+      let lostInstance = IsolatedExecutionState.get<ExecutionWrapper>(this.activeKey());
+      while (lostInstance != null && lostInstance.#_fiber !== Fiber.current()) {
+        lostInstance = lostInstance.#_previous;
+      }
       const lostCompleted = lostInstance?.completeBang();
       if (isThenable(lostCompleted)) {
         return Promise.resolve(lostCompleted).then(() => this.runBang({ reset }));
@@ -110,47 +119,50 @@ export class ExecutionWrapper {
     return instance;
   }
 
+  /** @inventedArm resume — PERMANENT */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
-    const instance = this.runBang();
-    if (isThenable(instance)) {
-      return (async () => {
-        const ran = await instance;
-        try {
-          return await block();
-        } catch (error) {
-          this.errorReporter().report(error as Error, { handled: false, source });
-          throw error;
-        } finally {
-          await ran.completeBang();
-        }
-      })() as T;
-    }
-    let deferred = false;
-    try {
-      const result = block();
-      if (isThenable(result)) {
-        deferred = true;
-        return Promise.resolve(result).then(
-          async (value) => {
-            await instance.completeBang();
-            return value;
-          },
-          async (error: unknown) => {
+    return new Fiber(() => {
+      const instance = this.runBang();
+      if (isThenable(instance)) {
+        return (async () => {
+          const ran = await instance;
+          try {
+            return await block();
+          } catch (error) {
             this.errorReporter().report(error as Error, { handled: false, source });
-            await instance.completeBang();
             throw error;
-          },
-        ) as T;
+          } finally {
+            await ran.completeBang();
+          }
+        })() as T;
       }
-      return result;
-    } catch (error) {
-      this.errorReporter().report(error as Error, { handled: false, source });
-      throw error;
-    } finally {
-      if (!deferred) instance.completeBang();
-    }
+      let deferred = false;
+      try {
+        const result = block();
+        if (isThenable(result)) {
+          deferred = true;
+          return Promise.resolve(result).then(
+            async (value) => {
+              await instance.completeBang();
+              return value;
+            },
+            async (error: unknown) => {
+              this.errorReporter().report(error as Error, { handled: false, source });
+              await instance.completeBang();
+              throw error;
+            },
+          ) as T;
+        }
+        return result;
+      } catch (error) {
+        this.errorReporter().report(error as Error, { handled: false, source });
+        throw error;
+      } finally {
+        if (!deferred) instance.completeBang();
+      }
+    }).resume();
   }
 
   static perform<T>(block: () => T): T {
@@ -190,14 +202,42 @@ export class ExecutionWrapper {
     return this._activeKey as symbol;
   }
 
+  /** @inventedArm loop — PERMANENT */
   static active(): boolean {
-    return IsolatedExecutionState.isKey(this.activeKey());
+    if (!IsolatedExecutionState.isKey(this.activeKey())) return false;
+
+    const fiber = Fiber.current();
+    let instance = IsolatedExecutionState.get<ExecutionWrapper>(this.activeKey());
+    while (instance != null) {
+      if (instance.#_fiber === fiber) return true;
+      instance = instance.#_previous;
+    }
+    return false;
   }
 
   runBang(): unknown {
     const klass = this.constructor as typeof ExecutionWrapper;
+    this.#_previous = IsolatedExecutionState.get<ExecutionWrapper>(klass.activeKey());
+    this.#_fiber = Fiber.current();
     IsolatedExecutionState.set(klass.activeKey(), this);
     return this.run();
+  }
+
+  /** @internal */
+  private _deactivate(activeKey: symbol): void {
+    let instance = IsolatedExecutionState.get<ExecutionWrapper>(activeKey);
+    if (instance === this) {
+      if (this.#_previous == null) IsolatedExecutionState.delete(activeKey);
+      else IsolatedExecutionState.set(activeKey, this.#_previous);
+      return;
+    }
+    while (instance != null) {
+      if (instance.#_previous === this) {
+        instance.#_previous = this.#_previous;
+        return;
+      }
+      instance = instance.#_previous;
+    }
   }
 
   run(): unknown {
@@ -210,11 +250,11 @@ export class ExecutionWrapper {
     try {
       completed = this.complete();
       if (isThenable(completed)) {
-        return Promise.resolve(completed).finally(() => IsolatedExecutionState.delete(activeKey));
+        return Promise.resolve(completed).finally(() => this._deactivate(activeKey));
       }
       return completed;
     } finally {
-      if (!isThenable(completed)) IsolatedExecutionState.delete(activeKey);
+      if (!isThenable(completed)) this._deactivate(activeKey);
     }
   }
 

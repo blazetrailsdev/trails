@@ -122,3 +122,21 @@ before the synchronous reader.** As a consequence:
   raising load prints `message_pack.rb:3-10`'s warning and raises.
 - Code outside a booted application awaits the load itself, or imports
   `@blazetrails/activesupport/message-pack`.
+
+## A thread-owned lock is owned by the Fiber (`ThreadLoadInterlockAwareMonitor`)
+
+Rails' `ThreadLoadInterlockAwareMonitor` records `Thread.current` as its owner
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/concurrency/load_interlock_aware_monitor.rb:46-63`),
+and its `@mutex` is owned by the Fiber, as Ruby 3's `Mutex` is. Ruby runs one
+flow per Thread, so the Fiber that locks the mutex is the one whose exit
+unlocks it. JS can start two flows on one Thread, and `ExecutionWrapper.wrap`
+runs each on its own Fiber (story `executor-wrap-concurrent-flows-on-one-thread`).
+A Thread owner then shares one count between those Fibers, and the last exit
+unlocks the mutex from a Fiber that does not hold it.
+
+**`mon_try_enter`, `mon_enter` and `mon_exit` compare and record
+`Fiber.current`.** A Fiber nested under the owner waits for the lock where
+MRI's would re-enter. `ThreadError`'s message stays Rails' "current thread not
+owner". ruby-compat's `Monitor#enter` is owned by the Fiber as well, as MRI's
+is (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76-85`). Ruled by the repo
+owner on 2026-11-04 (trails#9706). Do not converge it back to `Thread`.

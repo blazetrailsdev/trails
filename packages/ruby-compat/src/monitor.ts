@@ -1,3 +1,4 @@
+import { Fiber } from "./fiber.js";
 import { Thread } from "./thread.js";
 import { ThreadError } from "./thread-error.js";
 import {
@@ -6,7 +7,7 @@ import {
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
 
-type Owner = symbol | Thread;
+type Owner = symbol | Fiber;
 
 interface MonEntry {
   owner: Owner;
@@ -46,7 +47,7 @@ function currentOwner(data: MonData): Owner {
   const store = data.storage!.getStore();
   const thread = Thread.current();
   if (data.entries.some((entry) => entry.owner === store && entry.thread === thread)) return store!;
-  return thread;
+  return Fiber.current();
 }
 
 function topOwner(data: MonData): Owner | null {
@@ -107,10 +108,8 @@ export function isMonOwned(this: object): boolean {
 
 /**
  * `monitor_enter` (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`). Answers a
- * promise only when it has to wait for the monitor. The entry is owned by the
- * `Thread`, not the fiber MRI records: `enter` has no block for
- * `AsyncContext#run` to scope. `ThreadPoolExecutor` workers and Rack requests
- * each run on their own `Thread`; flows sharing a `Thread` re-enter.
+ * promise only when it has to wait for the monitor. The entry is owned by
+ * `rb_fiber_current()`, as MRI records it; flows sharing a `Fiber` re-enter.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Monitor#enter`
  * (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76`).
