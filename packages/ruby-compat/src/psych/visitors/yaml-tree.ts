@@ -165,14 +165,16 @@ export class YAMLTree {
     }
     if (typeof target === "function") return this.visitClass(target);
     const tag = target == null ? null : temporalTag(target);
-    // (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:74-78`, `:198`).
     let dateTime = false;
     for (
       let k: unknown = target == null ? null : rbObjClass(target);
-      typeof k === "function";
+      typeof k === "function" && k !== Function.prototype;
       k = Object.getPrototypeOf(k)
     ) {
-      if (rbModName(k as new () => unknown) === "DateTime") dateTime = true;
+      if (rbModName(k as new () => unknown) === "DateTime") {
+        dateTime = true;
+        break;
+      }
     }
     if (dateTime) {
       return this.visitDateTime(target as DateTime);

@@ -357,8 +357,8 @@ describe("TopLevel", () => {
   });
 
   it("does not answer an Object.prototype member as a constant", () => {
-    expect(Object.hasOwn(TopLevel, "constructor")).toBe(false);
-    expect(Object.hasOwn(TopLevel, "toString")).toBe(false);
+    expect(constDefined(Object, "Constructor")).toBe(false);
+    expect(() => constDefined(Object, "toString")).toThrow(NameError);
   });
 });
 

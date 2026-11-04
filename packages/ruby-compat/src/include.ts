@@ -1215,7 +1215,12 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
       return true;
     }
-    if (p === globalThis.Set.prototype && c === constGet(Object, "Set")) return true;
+    if (
+      p === globalThis.Set.prototype &&
+      constDefined(Object, "Set") &&
+      c === constGet(Object, "Set")
+    )
+      return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;
