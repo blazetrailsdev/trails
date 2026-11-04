@@ -24,6 +24,7 @@
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/i18n": "workspace:*",
     "@blazetrails/mail": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },

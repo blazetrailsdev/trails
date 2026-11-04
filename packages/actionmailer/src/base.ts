@@ -1,7 +1,9 @@
-import { AbstractController } from "@blazetrails/actionpack";
+import { AbstractController, ActionView, Mime } from "@blazetrails/actionpack";
 import {
   camelize,
   classAttribute,
+  humanize,
+  isBlank,
   constantize,
   include,
   isAnonymous,
@@ -12,11 +14,17 @@ import {
   type EventPayload,
   type Included,
 } from "@blazetrails/activesupport";
-import { Address, Mail, type Message } from "@blazetrails/mail";
-import { NoMethodError, rbModName } from "@blazetrails/ruby-compat";
+import * as I18n from "@blazetrails/i18n";
+import { Address, Mail, type AttachmentsList, type Message, type Part } from "@blazetrails/mail";
+import { NoMethodError, RuntimeError, SimpleDelegator, rbModName } from "@blazetrails/ruby-compat";
+import { Collector } from "./collector.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
 import { Rescuable } from "./rescuable.js";
+
+type Headers = Record<string, unknown>;
+type Response = Record<string, unknown>;
+type Template = { format: string | null };
 
 type Observer = Parameters<typeof Mail.registerObserver>[0];
 type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
@@ -24,6 +32,7 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
+  declare static LateAttachmentsProxy: typeof LateAttachmentsProxy;
   declare static defaultParams: Readonly<Record<string, unknown>>;
 
   /** @internal */
@@ -190,14 +199,262 @@ export class Base extends AbstractController.Base {
     return (this.constructor as typeof Base).emailAddressWithName(address, name);
   }
 
+  headers(args: Headers | null = null): Message | void {
+    if (args != null) {
+      return (this._message as Message).headers(args);
+    } else {
+      return this._message as Message;
+    }
+  }
+
+  attachments(): AttachmentsList {
+    if (this._mailWasCalled) {
+      return new LateAttachmentsProxy((this._message as Message).attachments()) as never;
+    } else {
+      return (this._message as Message).attachments();
+    }
+  }
+
+  mail(headers: Headers = {}, block?: (collector: Collector) => unknown): Message {
+    if (this._mailWasCalled && isBlank(headers) && !block) return this.message as Message;
+    const message = this.message as Message;
+
+    const contentType = headers.contentType;
+
+    headers = this.applyDefaults(headers);
+
+    const charset = (message.charset = headers.charset as string | null);
+
+    /** @missingRailsCall wrap_delivery_behavior! — CONVERGEABLE actionmailer-delivery-methods-queued-delivery-and-eager-load */
+    this.assignHeadersToMessage(message, headers);
+
+    const responses = this.collectResponses(headers, block);
+    this._mailWasCalled = true;
+
+    this.createPartsFromResponses(message, responses);
+    this.wrapInlineAttachments(message);
+
+    message.setContentType(this.setContentType(message, contentType, headers.contentType));
+    message.charset = charset;
+
+    if (message.isMultipart()) {
+      message.body().setSortOrder(headers.partsOrder as string[]);
+      message.body().sortPartsBang();
+    }
+
+    return message;
+  }
+
+  /** @internal */
+  protected setContentType(m: Message, userContentType: unknown, classDefault: unknown): unknown {
+    const params = m.contentTypeParameters() ?? {};
+    if (isPresent(userContentType)) {
+      return userContentType;
+    } else if (m.hasAttachments()) {
+      if (m.attachments().every((a) => a.isInline())) {
+        return ["multipart", "related", params];
+      } else {
+        return ["multipart", "mixed", params];
+      }
+    } else if (m.isMultipart()) {
+      return ["multipart", "alternative", params];
+    } else {
+      return m.contentType() ?? classDefault;
+    }
+  }
+
+  /** @internal */
+  protected defaultI18nSubject(interpolations: Record<string, unknown> = {}): unknown {
+    const mailerScope = (this.constructor as typeof Base).mailerName().replaceAll("/", ".");
+    return I18n.t("subject", {
+      ...interpolations,
+      scope: [mailerScope, this.actionName],
+      default: humanize(this.actionName),
+    });
+  }
+
+  /** @internal */
+  protected applyDefaults(headers: Headers): Headers {
+    const defaultValues: Headers = {};
+    for (const [key, value] of Object.entries((this.constructor as typeof Base).default())) {
+      if (!Object.hasOwn(headers, key)) defaultValues[key] = this.computeDefault(value);
+    }
+
+    const headersWithDefaults: Headers = { ...defaultValues, ...headers };
+    if (headersWithDefaults.subject == null || headersWithDefaults.subject === false) {
+      headersWithDefaults.subject = this.defaultI18nSubject();
+    }
+    return headersWithDefaults;
+  }
+
+  /** @internal */
+  protected computeDefault(value: unknown): unknown {
+    if (typeof value !== "function") return value;
+
+    if (value.length === 1) {
+      return value.call(this, this);
+    } else {
+      return value.call(this);
+    }
+  }
+
+  /** @internal */
+  protected assignHeadersToMessage(message: Message, headers: Headers): void {
+    const {
+      partsOrder,
+      contentType,
+      body,
+      templateName,
+      templatePath,
+      deliveryMethod,
+      deliveryMethodOptions,
+      ...assignable
+    } = headers;
+    for (const [k, v] of Object.entries(assignable)) message.set(k, v);
+  }
+
+  /** @internal */
+  protected collectResponses(
+    headers: Headers,
+    block?: (collector: Collector) => unknown,
+  ): Response[] {
+    if (block) {
+      return this.collectResponsesFromBlock(headers, block);
+    } else if (headers.body != null && headers.body !== false) {
+      return this.collectResponsesFromText(headers);
+    } else {
+      return this.collectResponsesFromTemplates(headers);
+    }
+  }
+
+  /** @internal */
+  protected collectResponsesFromBlock(
+    headers: Headers,
+    block: (collector: Collector) => unknown,
+  ): Response[] {
+    const templatesName = (headers.templateName as string | null) || this.actionName;
+    const collector = new Collector(this.lookupContext, () => this.render(templatesName));
+    block(collector);
+    return collector.responses;
+  }
+
+  /** @internal */
+  protected collectResponsesFromText(headers: Headers): Response[] {
+    const body = headers.body;
+    delete headers.body;
+    return [
+      {
+        body: body,
+        contentType: headers.contentType || "text/plain",
+      },
+    ];
+  }
+
+  /** @internal */
+  protected collectResponsesFromTemplates(headers: Headers): Response[] {
+    const templatesPath = headers.templatePath || (this.constructor as typeof Base).mailerName();
+    const templatesName = (headers.templateName as string | null) || this.actionName;
+
+    const responses: Response[] = [];
+    this.eachTemplate([templatesPath].flat() as string[], templatesName, (template) => {
+      const format = template.format || (this.formats as string[])[0];
+      responses.push({
+        body: this.render({ template: template, formats: [format] }),
+        contentType: Mime.get(format)!.toString(),
+      });
+    });
+    return responses;
+  }
+
+  /** @internal */
+  protected eachTemplate(paths: string[], name: string, block: (template: Template) => void): void {
+    const templates = this.lookupContext.findAll(name, paths) as Template[];
+    if (templates.length === 0) {
+      throw new ActionView.MissingTemplate(paths as never, name, paths, false, "mailer");
+    } else {
+      const seen = new Set<string | null>();
+      for (const template of templates) {
+        if (seen.has(template.format)) continue;
+        seen.add(template.format);
+        block(template);
+      }
+    }
+  }
+
+  /** @internal */
+  protected wrapInlineAttachments(message: Message): void {
+    if (
+      message.attachments().find((a) => a.isInline()) &&
+      message.attachments().find((a) => !a.isInline())
+    ) {
+      const related = new Mail.Part();
+      related.setContentType("multipart/related");
+      const mixed: Part[] = [related];
+
+      for (const p of message.parts) {
+        if (p.isAttachment() && !p.isInline()) {
+          mixed.push(p);
+        } else {
+          related.addPart(p);
+        }
+      }
+
+      message.parts.length = 0;
+      for (const c of mixed) message.addPart(c);
+    }
+  }
+
+  /** @internal */
+  protected createPartsFromResponses(m: Message, responses: Response[]): void {
+    if (responses.length === 1 && !m.hasAttachments()) {
+      for (const [k, v] of Object.entries(responses[0])) m.set(k, v);
+    } else if (responses.length > 1 && m.hasAttachments()) {
+      const container = new Mail.Part();
+      container.setContentType("multipart/alternative");
+      for (const r of responses) this.insertPart(container, r, m.charset);
+      m.addPart(container);
+    } else {
+      for (const r of responses) this.insertPart(m, r, m.charset);
+    }
+  }
+
+  /** @internal */
+  protected insertPart(container: Message, response: Response, charset: string | null): void {
+    response.charset ||= charset;
+    const part = new Mail.Part(response);
+    container.addPart(part);
+  }
+
   /** @internal */
   static override supportsPath(): boolean {
     return false;
   }
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
-export interface Base extends Included<typeof Rescuable> {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
+export interface Base extends Included<typeof Rescuable> {
+  lookupContext: InstanceType<typeof ActionView.LookupContext>;
+  render(...args: unknown[]): unknown;
+}
+
+/** @internal */
+export class LateAttachmentsProxy extends SimpleDelegator {
+  inline(): this {
+    return this;
+  }
+
+  set(_name: string, _content: unknown): Promise<unknown> {
+    return this._raiseError();
+  }
+
+  /** @internal */
+  private _raiseError(): never {
+    throw new RuntimeError(
+      "Can't add attachments after `mail` was called.\n" +
+        "Make sure to use `attachments[]=` before calling `mail`.",
+    );
+  }
+}
 
 /** @internal */
 export class NullMail {
@@ -219,6 +476,7 @@ export class NullMail {
 }
 
 Base.NullMail = NullMail;
+Base.LateAttachmentsProxy = LateAttachmentsProxy;
 include(Base, Callbacks);
 include(Base, Rescuable);
 Base.abstractBang();

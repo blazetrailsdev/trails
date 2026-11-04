@@ -2,6 +2,7 @@ import { Autoload, extend, type Extended, type Logger } from "@blazetrails/activ
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { Callbacks } from "./callbacks.js";
+import type { Collector } from "./collector.js";
 import type { FormBuilder } from "./form-builder.js";
 import type { InlinePreviewInterceptor } from "./inline-preview-interceptor.js";
 import type { LogSubscriber } from "./log-subscriber.js";
@@ -13,6 +14,7 @@ export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 export const loadPath: Record<string, () => Promise<unknown>> = {
   "action_mailer/base": () => import("./base.js"),
   "action_mailer/callbacks": () => import("./callbacks.js"),
+  "action_mailer/collector": () => import("./collector.js"),
   "action_mailer/inline_preview_interceptor": () => import("./inline-preview-interceptor.js"),
   "action_mailer/mail_helper": () => import("./mail-helper.js"),
   "action_mailer/form_builder": () => import("./form-builder.js"),
@@ -22,6 +24,7 @@ export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule
   Base: typeof Base & { logger: Logger | null };
   MessageDelivery?: new (mailer: typeof Base, mailMethod: string, ...args: unknown[]) => unknown;
   Callbacks: typeof Callbacks;
+  Collector: typeof Collector;
   FormBuilder: typeof FormBuilder;
   InlinePreviewInterceptor: typeof InlinePreviewInterceptor;
   LogSubscriber: typeof LogSubscriber;
@@ -32,6 +35,7 @@ constSet(TopLevel, "ActionMailer", ActionMailer);
 extend(ActionMailer, Autoload);
 ActionMailer.autoload("Base");
 ActionMailer.autoload("Callbacks");
+ActionMailer.autoload("Collector");
 ActionMailer.autoload("InlinePreviewInterceptor");
 ActionMailer.autoload("MailHelper");
 ActionMailer.autoload("FormBuilder");
