@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Message } from "@blazetrails/mail";
+import { ActionView } from "@blazetrails/actionpack";
+import { TestMailer, type Message } from "@blazetrails/mail";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { Collector } from "./collector.js";
 
@@ -7,20 +9,43 @@ class TextMailer extends Base {
   static {
     this.setMailerName("text_mailer");
     this.default({ to: "system@test.lindsaar.net", from: "jose@test.plataformatec.com" });
+    this.prependViewPath(
+      new ActionView.FixtureResolver({
+        "text-mailer/plain.text.html": "Welcome",
+        "text-mailer/multi.text.html": "Text",
+        "text-mailer/multi.html.html": "<b>Html</b>",
+      }),
+    );
+  }
+
+  plain(hash: Record<string, unknown> = {}) {
+    return this.mail(hash);
+  }
+
+  multi() {
+    return this.mail();
+  }
+
+  fromBlock() {
+    return this.mail({ templateName: "multi" }, (format) => {
+      const f = format as unknown as { text(): void; html(b: () => string): void };
+      f.text();
+      f.html(() => "<p>Block</p>");
+    });
   }
 
   welcome(hash: Record<string, unknown> = {}) {
     (this.headers() as Message).set("X-SPAM", "Not SPAM");
-    this.mail({ subject: "The first email on new API!", ...hash });
+    return this.mail({ subject: "The first email on new API!", ...hash });
   }
 
   async withAttachment(hash: Record<string, unknown> = {}) {
     await this.attachments().set("invoice.pdf", "This is test File content");
-    this.mail(hash);
+    await this.mail(hash);
   }
 
-  lateAttachment() {
-    this.mail({ body: "yay" });
+  async lateAttachment() {
+    await this.mail({ body: "yay" });
     return this.attachments().set("invoice.pdf", "This is test File content");
   }
 }
@@ -76,5 +101,47 @@ describe("Base#mail", () => {
       { contentType: "text/html", body: "<p>Html</p>" },
       { contentType: "text/plain", body: "Block" },
     ]);
+  });
+  it("renders the action's template", async () => {
+    const email = await deliver("plain");
+    expect(email.mimeType()).toBe("text/plain");
+    expect(email.body().encoded()).toBe("Welcome");
+  });
+
+  it("renders one part per template format", async () => {
+    const email = await deliver("multi");
+    expect(email.mimeType()).toBe("multipart/alternative");
+    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+      ["text/plain", "Text"],
+      ["text/html", "<b>Html</b>"],
+    ]);
+  });
+
+  it("renders the default template for a blockless format in the block form", async () => {
+    const email = await deliver("fromBlock");
+    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+      ["text/plain", "Text"],
+      ["text/html", "<p>Block</p>"],
+    ]);
+  });
+
+  it("raises MissingTemplate when the action has no template", async () => {
+    await expect(deliver("welcome")).rejects.toBeInstanceOf(ActionView.MissingTemplate);
+  });
+
+  it("wraps the delivery method named in the headers", async () => {
+    const email = await deliver("plain", {
+      deliveryMethod: "test",
+      deliveryMethodOptions: { a: 1 },
+    });
+    expect(email.deliveryMethod()).toBeInstanceOf(TestMailer);
+    expect((email.deliveryMethod() as TestMailer).settings).toEqual({ a: 1 });
+    expect(email.deliveryHandler).toBe(TextMailer);
+  });
+
+  it("raises on an unknown delivery method", async () => {
+    await expect(deliver("plain", { deliveryMethod: "bogus" })).rejects.toThrow(
+      new RuntimeError("Invalid delivery method :bogus"),
+    );
   });
 });

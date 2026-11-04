@@ -31,9 +31,7 @@ export class Collector {
     return args;
   }
 
-  all(...args: unknown[]): unknown[] {
-    return this.any(...args);
-  }
+  declare all: Collector["any"];
 
   custom(
     mime: { toString(): string; toSym(): string | null },
@@ -51,6 +49,8 @@ export class Collector {
     return this._responses;
   }
 }
+
+Collector.prototype.all = Collector.prototype.any;
 
 include(Collector, AbstractController.Collector);
 

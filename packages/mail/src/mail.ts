@@ -23,6 +23,7 @@ interface MailConstants {
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
   defaults(block: (this: Configuration) => unknown): unknown;
+  deliveryMethod(): unknown;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -58,6 +59,10 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
 
   defaults(block: (this: Configuration) => unknown) {
     return block.call(Configuration.instance());
+  },
+
+  deliveryMethod() {
+    return Configuration.instance().deliveryMethod();
   },
 
   registerObserver(observer: DeliveryObserver) {

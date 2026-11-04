@@ -2,6 +2,7 @@ import { AbstractController, ActionView, Mime } from "@blazetrails/actionpack";
 import {
   camelize,
   classAttribute,
+  dasherize,
   humanize,
   isBlank,
   constantize,
@@ -18,6 +19,10 @@ import * as I18n from "@blazetrails/i18n";
 import { Address, Mail, type AttachmentsList, type Message, type Part } from "@blazetrails/mail";
 import { NoMethodError, RuntimeError, SimpleDelegator, rbModName } from "@blazetrails/ruby-compat";
 import { Collector } from "./collector.js";
+import {
+  DeliveryMethods,
+  type ClassMethods as DeliveryMethodsClassMethods,
+} from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
 import { Rescuable } from "./rescuable.js";
@@ -29,29 +34,19 @@ type Template = { format: string | null };
 type Observer = Parameters<typeof Mail.registerObserver>[0];
 type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 
-/** @internal */
-export class LateAttachmentsProxy extends SimpleDelegator {
-  inline(): this {
-    return this;
-  }
-
-  set(_name: string, _content: unknown): Promise<unknown> {
-    return this._raiseError();
-  }
-
-  /** @internal */
-  private _raiseError(): never {
-    throw new RuntimeError(
-      "Can't add attachments after `mail` was called.\n" +
-        "Make sure to use `attachments[]=` before calling `mail`.",
-    );
-  }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
-  declare static LateAttachmentsProxy: typeof LateAttachmentsProxy;
+  declare static prependViewPath: (path: unknown) => void;
+  declare static appendViewPath: (path: unknown) => void;
+  declare static deliveryMethod: unknown;
+  declare static deliveryMethods: Readonly<Record<string, unknown>>;
+  declare static performDeliveries: boolean;
+  declare static raiseDeliveryErrors: boolean;
+  declare static deliveries: Message[];
+  declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
+  /** @internal */
+  declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
   declare static defaultParams: Readonly<Record<string, unknown>>;
 
   /** @internal */
@@ -228,13 +223,31 @@ export class Base extends AbstractController.Base {
 
   attachments(): AttachmentsList {
     if (this._mailWasCalled) {
-      return new LateAttachmentsProxy((this._message as Message).attachments()) as never;
+      return new Base.LateAttachmentsProxy((this._message as Message).attachments()) as never;
     } else {
       return (this._message as Message).attachments();
     }
   }
 
-  mail(headers: Headers = {}, block?: (collector: Collector) => unknown): Message {
+  static LateAttachmentsProxy = class LateAttachmentsProxy extends SimpleDelegator {
+    inline(): this {
+      return this;
+    }
+
+    set(_name: string, _content: unknown): Promise<unknown> {
+      return this._raiseError();
+    }
+
+    /** @internal */
+    _raiseError(): never {
+      throw new RuntimeError(
+        "Can't add attachments after `mail` was called.\n" +
+          "Make sure to use `attachments[]=` before calling `mail`.",
+      );
+    }
+  };
+
+  async mail(headers: Headers = {}, block?: (collector: Collector) => unknown): Promise<Message> {
     if (this._mailWasCalled && isBlank(headers) && !block) return this.message as Message;
     const message = this.message as Message;
 
@@ -244,10 +257,11 @@ export class Base extends AbstractController.Base {
 
     const charset = (message.charset = headers.charset as string | null);
 
-    /** @missingRailsCall wrap_delivery_behavior! — CONVERGEABLE actionmailer-delivery-methods-queued-delivery-and-eager-load */
+    this.wrapDeliveryBehaviorBang(headers.deliveryMethod, headers.deliveryMethodOptions);
+
     this.assignHeadersToMessage(message, headers);
 
-    const responses = this.collectResponses(headers, block);
+    const responses = await this.collectResponses(headers, block);
     this._mailWasCalled = true;
 
     this.createPartsFromResponses(message, responses);
@@ -278,7 +292,8 @@ export class Base extends AbstractController.Base {
     } else if (m.isMultipart()) {
       return ["multipart", "alternative", params];
     } else {
-      return m.contentType() ?? classDefault;
+      const contentType = m.contentType();
+      return contentType != null && contentType !== false ? contentType : classDefault;
     }
   }
 
@@ -341,7 +356,7 @@ export class Base extends AbstractController.Base {
   protected collectResponses(
     headers: Headers,
     block?: (collector: Collector) => unknown,
-  ): Response[] {
+  ): Response[] | Promise<Response[]> {
     if (block) {
       return this.collectResponsesFromBlock(headers, block);
     } else if (headers.body != null && headers.body !== false) {
@@ -352,17 +367,19 @@ export class Base extends AbstractController.Base {
   }
 
   /** @internal */
-  protected collectResponsesFromBlock(
+  protected async collectResponsesFromBlock(
     headers: Headers,
     block: (collector: Collector) => unknown,
-  ): Response[] {
+  ): Promise<Response[]> {
     const templatesName = (
       headers.templateName != null && headers.templateName !== false
         ? headers.templateName
         : this.actionName
     ) as string;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
-    block(collector);
+    await block(collector);
+    /** @inventedArm for — PERMANENT */
+    for (const response of collector.responses) response.body = await response.body;
     return collector.responses;
   }
 
@@ -381,31 +398,35 @@ export class Base extends AbstractController.Base {
     ];
   }
 
-  /** @internal */
-  protected collectResponsesFromTemplates(headers: Headers): Response[] {
+  /**
+   * @internal
+   * @inventedArm underscore — PERMANENT
+   * @inventedArm dasherize — PERMANENT
+   */
+  protected async collectResponsesFromTemplates(headers: Headers): Promise<Response[]> {
     const templatesPath =
       headers.templatePath != null && headers.templatePath !== false
         ? headers.templatePath
-        : (this.constructor as typeof Base).mailerName();
+        : dasherize((this.constructor as typeof Base).mailerName());
     const templatesName = (
       headers.templateName != null && headers.templateName !== false
         ? headers.templateName
-        : this.actionName
+        : dasherize(underscore(this.actionName))
     ) as string;
 
     const responses: Response[] = [];
-    this.eachTemplate([templatesPath].flat() as string[], templatesName, (template) => {
+    for (const template of this.eachTemplate([templatesPath].flat() as string[], templatesName)) {
       const format = template.format || (this.formats as string[])[0];
       responses.push({
-        body: this.render({ template: template, formats: [format] }),
+        body: await this.render({ template: template, formats: [format] }),
         contentType: Mime.get(format)!.toString(),
       });
-    });
+    }
     return responses;
   }
 
   /** @internal */
-  protected eachTemplate(paths: string[], name: string, block: (template: Template) => void): void {
+  protected *eachTemplate(paths: string[], name: string): Generator<Template> {
     const templates = this.lookupContext.findAll(name, paths) as Template[];
     if (templates.length === 0) {
       throw new ActionView.MissingTemplate(paths as never, name, paths, false, "mailer");
@@ -414,7 +435,7 @@ export class Base extends AbstractController.Base {
       for (const template of templates) {
         if (seen.has(template.format)) continue;
         seen.add(template.format);
-        block(template);
+        yield template;
       }
     }
   }
@@ -465,7 +486,7 @@ export class Base extends AbstractController.Base {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
-export interface Base extends Included<typeof Rescuable> {
+export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
   lookupContext: InstanceType<typeof ActionView.LookupContext>;
   render(...args: unknown[]): unknown;
 }
@@ -490,10 +511,21 @@ export class NullMail {
 }
 
 Base.NullMail = NullMail;
-Base.LateAttachmentsProxy = LateAttachmentsProxy;
 include(Base, Callbacks);
+include(Base, DeliveryMethods);
 include(Base, Rescuable);
 Base.abstractBang();
+
+include(Base, AbstractController.Rendering);
+
+include(Base, AbstractController.Logger);
+include(Base, AbstractController.Helpers);
+include(Base, AbstractController.Translation);
+include(Base, AbstractController.AssetPaths);
+include(Base, AbstractController.Callbacks);
+include(Base, AbstractController.Caching);
+
+include(Base, ActionView.Layouts);
 classAttribute.call(Base, "defaultParams", {
   default: Object.freeze({
     mimeVersion: "1.0",
