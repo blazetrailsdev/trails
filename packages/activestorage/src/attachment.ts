@@ -82,9 +82,17 @@ export class Attachment extends Record {
     return blob.signedId(options);
   }
 
-  async variant(transformations: Transformations): Promise<Variant | VariantWithRecord> {
-    transformations = await this.transformationsByName(transformations);
-    return (await this.blob)!.variant(transformations);
+  /** @inventedArm if — CONVERGEABLE attachment-variant-single-return-shape */
+  variant(
+    transformations: Transformations,
+  ): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
+    transformations = this.transformationsByName(transformations) as Transformations;
+    if (transformations instanceof Promise || this.blob instanceof Promise) {
+      return Promise.all([transformations, this.blob]).then(([transformations, blob]) =>
+        blob!.variant(transformations),
+      );
+    }
+    return this.blob!.variant(transformations);
   }
 
   async preview(transformations: Transformations): Promise<unknown> {
@@ -147,20 +155,25 @@ export class Attachment extends Record {
   }
 
   /** @internal */
-  private async transformationsByName(transformations: Transformations) {
+  private transformationsByName(
+    transformations: Transformations,
+  ): Exclude<Transformations, string> | Promise<Exclude<Transformations, string>> {
     if (typeof transformations === "string") {
       const variantName = transformations;
-      return fetch<NamedVariant>(
-        await this.namedVariants(),
-        variantName,
-        block(() => {
-          const record = this.association("record").target as AttachedRecord;
-          const recordModelName = record.toModel().modelName.name;
-          throw new ArgumentError(
-            `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
-          );
-        }),
-      ).transformations;
+      return this.namedVariants().then(
+        (namedVariants) =>
+          fetch<NamedVariant>(
+            namedVariants,
+            variantName,
+            block(() => {
+              const record = this.association("record").target as AttachedRecord;
+              const recordModelName = record.toModel().modelName.name;
+              throw new ArgumentError(
+                `Cannot find variant :${variantName} for ${recordModelName}#${this.name}`,
+              );
+            }),
+          ).transformations,
+      );
     } else {
       return transformations;
     }

@@ -6,6 +6,7 @@ import "./test-helpers/database/setup.js";
 import { ActiveStorage } from "./active-storage.js";
 import { Attachment } from "./attachment.js";
 import { Blob } from "./blob.js";
+import { VariantWithRecord } from "./variant-with-record.js";
 import { createBlob, User } from "./test-helpers/test-helper.js";
 
 describe("Attachment", () => {
@@ -82,5 +83,21 @@ describe("Attachment", () => {
     await expect(attachment.variant("thumb")).rejects.toThrow(
       new ArgumentError("Cannot find variant :thumb for User#avatar"),
     );
+  });
+});
+
+describe("Attachment#variant", () => {
+  it("answers synchronously for a transformation hash once the blob is loaded", async () => {
+    ActiveStorage.verifier = new MessageVerifier("Testing");
+    const attachment = await Attachment.createBang({
+      name: "avatar",
+      record: await User.createBang({ name: "Josh" }),
+      blob: await createBlob({ filename: "racecar.jpg", contentType: "image/jpeg" }),
+    });
+    await attachment.blob;
+
+    const variant = attachment.variant({ resizeToLimit: [100, 100] });
+
+    expect(variant).toBeInstanceOf(VariantWithRecord);
   });
 });
