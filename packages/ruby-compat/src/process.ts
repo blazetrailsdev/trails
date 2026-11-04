@@ -5,6 +5,7 @@ import { IOError } from "./io-error.js";
 import { isPlainHash, rbBuiltinClassName, rbInspect } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
+import { Thread } from "./thread.js";
 
 interface SystemCallError extends Error {
   code?: string;
@@ -229,15 +230,16 @@ export class Process {
   /**
    * `Process.last_status` (`proc_s_last_status`,
    * `vendor/ruby/v3.3.11/process.c:638-642`), the `$?` a waited child leaves
-   * behind. Ruby keeps it per thread (`rb_last_status_set`, `process.c:681-685`);
-   * trails keeps it per async context, falling back to one process-wide seat
-   * outside any.
+   * behind. Ruby keeps it per thread (`rb_last_status_get`, `process.c:610-614`;
+   * `rb_last_status_set`, `process.c:681-685`), and so does trails: each
+   * {@link Thread} holds its own, and code outside any `Thread.new` reads
+   * `Thread.main`'s.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process.last_status`
    * (`vendor/ruby/v3.3.11/process.c:639`).
    */
   static get lastStatus(): Status | null {
-    return lastStatus;
+    return lastStatuses.get(Thread.current()) ?? null;
   }
 
   /**
@@ -368,7 +370,7 @@ function makeClockResult(milliseconds: number, unit: string): number {
   }
 }
 
-let lastStatus: Status | null = null;
+const lastStatuses = new WeakMap<Thread, Status>();
 
 /**
  * `rb_last_status_set` (`vendor/ruby/v3.3.11/process.c:681-685`).
@@ -377,5 +379,5 @@ let lastStatus: Status | null = null;
  * (`vendor/ruby/v3.3.11/process.c:681`).
  */
 export function rbLastStatusSet(status: Status): void {
-  lastStatus = status;
+  lastStatuses.set(Thread.current(), status);
 }

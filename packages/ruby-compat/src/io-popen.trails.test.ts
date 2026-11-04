@@ -3,6 +3,7 @@ import { Errno } from "./errno.js";
 import { IO } from "./io.js";
 import { Process } from "./process.js";
 import { Tempfile } from "./tempfile.js";
+import { Thread } from "./thread.js";
 
 describe("IO.popen", () => {
   it("yields the child's stdout and answers the block's value", async () => {
@@ -49,5 +50,17 @@ describe("IO.popen", () => {
       (o) => o.read(),
     );
     expect(new TextDecoder().decode(out)).toBe("yes");
+  });
+
+  it("keeps $? per thread when two children finish concurrently", async () => {
+    const run = (code: number) =>
+      new Thread(async () => {
+        await IO.popen(["sh", "-c", `sleep 0.0${code}; exit ${code}`], (out) => out.read());
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return Process.lastStatus!.exitstatus();
+      });
+    const [a, b] = [run(1), run(2)];
+    expect(await a.value()).toBe(1);
+    expect(await b.value()).toBe(2);
   });
 });
