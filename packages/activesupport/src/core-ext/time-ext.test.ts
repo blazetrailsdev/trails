@@ -4,7 +4,6 @@ import {
   DateTime as RubyDateTime,
   Temporal,
   Time as RubyTime,
-  resetLocalTimeZoneId,
 } from "@blazetrails/date";
 import { Range, Rational } from "@blazetrails/ruby-compat";
 import {
@@ -50,6 +49,7 @@ import {
   isTomorrow,
   isYesterday,
 } from "./date-and-time/calculations.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 type CalculationsTime = RubyTime & {
   tomorrow(): RubyTime;
@@ -117,22 +117,6 @@ function zoned(
   });
 }
 
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
-    resetLocalTimeZoneId();
-  }
-}
-
 function withTimeCurrent<T>(current: Date | TimeWithZone, fn: () => T): T {
   setFrozenTime(current instanceof Date ? current : new Date(current.toI() * 1000));
   try {
@@ -152,15 +136,8 @@ function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
   }
 }
 
-const savedTZ = process.env.TZ;
 afterEach(() => {
   vi.useRealTimers();
-  if (savedTZ === undefined) {
-    delete process.env.TZ;
-  } else {
-    process.env.TZ = savedTZ;
-  }
-  resetLocalTimeZoneId();
 });
 
 const NSEC_999999999_OVER_1000 = new Rational(999999999, 1000);

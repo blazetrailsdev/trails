@@ -43,25 +43,10 @@ import {
 } from "../testing/assertions.js";
 import { actsLike } from "./object/acts-like.js";
 import { ArgumentError, setZone, zone } from "../time-zone-config.js";
-import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { travelTo } from "../testing/time-helpers.js";
 import { TimeZone } from "../values/time-zone.js";
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
   const oldTz = zone();

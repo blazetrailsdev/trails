@@ -5,7 +5,7 @@ import { TimeZone } from "../values/time-zone.js";
 import { Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { DateTime, Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
@@ -42,36 +42,13 @@ import {
 } from "../testing/assertions.js";
 import { actsLike } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 type MethodMissing = TimeWithZone &
   Record<
     "yearsSince" | "yearsAgo" | "monthsSince" | "monthsAgo" | "weeksSince" | "weeksAgo",
     (n: number) => TimeWithZone
   >;
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  const restore = () => {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  };
-  let result: T;
-  try {
-    result = fn();
-  } catch (e) {
-    restore();
-    throw e;
-  }
-  if (result instanceof Promise) return result.finally(restore) as T;
-  restore();
-  return result;
-}
 
 function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
   const oldTz = timeZone();

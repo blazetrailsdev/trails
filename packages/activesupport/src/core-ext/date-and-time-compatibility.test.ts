@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { toTime } from "./date-time/compatibility.js";
@@ -8,22 +8,7 @@ import { toTimePreservesTimezone, setToTimePreservesTimezone } from "../active-s
 import { deprecator } from "../deprecator.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 import { assertNotPredicate, assertPredicate } from "../testing/assertions.js";
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 async function withPreserveTimezone<T>(
   value: boolean | string | null,

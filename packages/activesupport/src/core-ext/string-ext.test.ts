@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { toDate, toDatetime, toTime } from "./string/conversions.js";
-import { ArgumentError, DateTime, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { ArgumentError, DateTime, Temporal, Time } from "@blazetrails/date";
 import { at, from, to, first, last, indent, indentBang, exclude } from "../string-utils.js";
 import {
   registerConstantizeFixtures,
@@ -76,6 +76,7 @@ import { toTimePreservesTimezone } from "../active-support.js";
 import { actsLikeString } from "./string/behavior.js";
 import { isUtf8, mbChars } from "./string/multibyte.js";
 import { Multibyte } from "../multibyte.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 describe("StringAccessTest", () => {
   it("#at with Integer, returns a substring of one character at that position", () => {
@@ -199,19 +200,6 @@ describe("StringAccessTest", () => {
     expect(Object.keys(hash)).toEqual(["hello"]);
   });
 });
-
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) delete process.env.TZ;
-    else process.env.TZ = orig;
-    resetLocalTimeZoneId();
-  }
-}
 
 function epochNs(time: Temporal.ZonedDateTime | Time | undefined): bigint | undefined {
   if (time === undefined) return undefined;

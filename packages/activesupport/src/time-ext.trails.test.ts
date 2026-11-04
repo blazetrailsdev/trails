@@ -1,25 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { toTime } from "./core-ext/date-time/compatibility.js";
 import { advance, change } from "./time-ext.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "./core-ext/date-time/conversions.js";
 import { setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
-
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "./time-zone-test-helpers.js";
 
 describe("to_time over a receiver that carries an offset", () => {
   afterEach(() => {

@@ -1,34 +1,8 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { describe, expect, it } from "vitest";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import "./calculations.js";
-
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
-    resetLocalTimeZoneId();
-  }
-}
-
-const savedTZ = process.env.TZ;
-afterEach(() => {
-  if (savedTZ === undefined) {
-    delete process.env.TZ;
-  } else {
-    process.env.TZ = savedTZ;
-  }
-  resetLocalTimeZoneId();
-});
 
 function expectSameTime(actual: RubyTime, expected: RubyTime): void {
   expect(actual.toZonedDateTime().toInstant().epochNanoseconds).toBe(
