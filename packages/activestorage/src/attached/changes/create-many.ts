@@ -42,7 +42,9 @@ export class CreateMany {
   }
 
   get attachments(): Attachment[] {
-    return this._attachments!;
+    return (this._attachments ??= this.subchanges.map(
+      (subchange) => subchange.attachment as Attachment,
+    ));
   }
 
   get blobs(): Blob[] {
