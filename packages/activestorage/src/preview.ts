@@ -37,23 +37,17 @@ export class Preview {
     this.variation = Variation.wrap(variationOrVariationKey);
   }
 
-  private _presentation: Presented | null = null;
-
   get filename(): Filename {
-    if (this._presentation == null) throw new UnprocessedError();
-    return this._presentation.filename;
+    return ((this.isVariant() ? this.variant() : this.image) as Presented).filename;
   }
 
   get contentType(): string | null {
-    if (this._presentation == null) throw new UnprocessedError();
-    return this._presentation.contentType;
+    return ((this.isVariant() ? this.variant() : this.image) as Presented).contentType;
   }
 
-  /** @inventedArm presentation — PERMANENT */
   async processed(): Promise<this> {
     if (!(await this.isProcessed())) await this.process();
     if (this.isVariant()) await (await this.variant()).processed();
-    this._presentation = await this.presentation();
     return this;
   }
 
@@ -109,8 +103,8 @@ export class Preview {
   }
 
   /** @internal */
-  private async variant(): Promise<Variant | VariantWithRecord> {
-    return await (this.image as One & Attachment).variant(this.variation);
+  private variant(): Variant | VariantWithRecord | Promise<Variant | VariantWithRecord> {
+    return (this.image as One & Attachment).variant(this.variation);
   }
 
   /** @internal */

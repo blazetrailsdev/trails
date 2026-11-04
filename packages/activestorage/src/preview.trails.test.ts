@@ -34,4 +34,17 @@ describe("Preview Servable", () => {
     expect(preview.contentTypeForServing()).toBe(ActiveStorage.binaryContentType);
     expect(preview.forcedDispositionForServing()).toBe("attachment");
   });
+
+  it("delegates filename and content type without a prior processed", async () => {
+    const blob = await createFileBlob({ filename: "report.pdf", contentType: "application/pdf" });
+    await blob.preview({ resizeToLimit: [640, 280] }).processed();
+
+    const preview = blob.preview({ resizeToLimit: [640, 280] });
+    await preview.image.load();
+    await (
+      await preview.image.attachment
+    )?.blob;
+    expect(preview.filename.toString()).toBe("report.png");
+    expect(preview.contentType).toBe("image/png");
+  });
 });
