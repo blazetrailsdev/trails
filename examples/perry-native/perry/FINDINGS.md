@@ -1860,3 +1860,92 @@ and `cargo fmt --check` under the pinned `nightly-2026-10-04` rustfmt reports
 `gc_diagnostic_knobs_set_while_compiling_install_the_gc_diagnostics` panics
 while holding the process-environment lock, and the other 11 are `PoisonError`
 cascades from `test_env_lock.rs:29`.
+
+## Wall 21, SOLVED, and four findings retracted (2026-11-03)
+
+**Measured against perry 0.5.1663, built from `main` at `a1ae27ee5`.** Recording
+the compiler commit because the lack of one caused everything below.
+
+### Wall 21: a private field cannot be installed on a constructor-returned Proxy
+
+`StringInquirer`'s constructor ends in `return new Proxy(this, {...})`. A base
+constructor that returns an object makes that object the `this` of every derived
+constructor, so `EnvironmentInquirer`'s `#local` was being installed on the
+Proxy. Perry refuses: `TypeError: Cannot initialize #local on this object`. V8
+permits it, which is why it shipped, so **no test can assert the failure on
+Node** and the fix is not Node-observable.
+
+Fixed by deriving instead of storing -- `#local` was a pure function of an
+immutable string, so there was nothing to keep:
+
+```ts
+"local?"(): boolean { return isIn(String(this), LOCAL_ENVIRONMENTS); }
+```
+
+`String(this)` resolves through the get trap's existing `bind(target)` branch.
+Two single-file probes settle it, both run on 0.5.1663: `privfield-proxy2.ts`
+reproduces the TypeError, `derive-proxy.ts` prints output identical to Node.
+This is the first wall whose fix was verified *before* a full build rather than
+after -- the probe pair cost 7 minutes against ~25 for a ladder build.
+
+20 other sites use the constructor-returned-Proxy idiom and are latent; only a
+class that installs a private field after `super()` breaks. `setproto-proxy.ts`
+proves the alternative (installing the handler in the prototype chain, as
+`activerecord/src/base.ts:2023` already does) works under Perry, despite
+`docs/typescript-parity-gaps.md:51` listing Proxy as "Missing".
+
+### Retracted: the compiler pin invalidated four findings
+
+FINDINGS' header names `d74498b2` (0.5.1659) as the compiler. I rebuilt against
+it after a session scratchpad wipe destroyed the previous checkout and binary.
+**It is 2614 commits behind main.** The wiped binary's version was never
+recorded and was certainly far newer. Four findings came from that stale build
+and do not survive re-validation on main:
+
+| claimed | actual on 0.5.1663 |
+| --- | --- |
+| node_modules symlink cycle OOMs resolution before module #1 | fixed upstream; the cycle restored, main collects 1351 modules and never OOMs |
+| `export import YAML = Psych` is not surfaced as a named export | works; identical to the rewrite (`typeof YAML = object`, `has loadTags = true`). The trails fix was reverted |
+| whole-program lowering needs >40GB, OOM even at 1x1 jobs | artifact of the stale compiler |
+| codegen unit sizing is the lever for that OOM | never reached per-unit codegen at all |
+
+The symlink cycle was real on 0.5.1659 and the analysis is kept for diagnosing
+an old compiler: Tarjan over the `packages/*/node_modules/@blazetrails/*` graph
+finds exactly two cyclic components, `{actionpack, actionview, trails-tsc}` and
+`{activestorage, trailties}`, and one cut edge per component suffices. **Do not
+spot-check legs** -- checking two of them is what led me to call the graph
+acyclic while `actionview <-> actionpack` sat outside my sample.
+
+Two environment facts the wipe also took, both easy to lose again: the
+`scripts/gc_call_effects/sidecars.sh` step is **mandatory** after building the
+compiler (without it every real compile refuses to start, while hello-world
+still works, so the toolchain looks healthy), and it needs
+`LIBRARY_PATH=/home/linuxbrew/.linuxbrew/lib` or `perry-gc-effects` fails to
+link on `-lzstd`. `w8env.sh`, the wall-16 scaffolding patch and the build
+scripts now live in `/home/dean/github/blazetrailsdev/perry-ladder-keep/`, and
+the compiler checkout in `/home/dean/github/perrysrc`, outside any scratchpad.
+
+### Wall 22: an unused optional peer dependency is pulled into the AOT graph
+
+    Error: Failed to parse .../react-native/index.js:
+    Parse error: Expected("from", "typeOf")
+
+The chain is trails' own
+`activerecord/src/connection-adapters/expo-sqlite-adapter.ts` ->
+`sqlite/expo-sqlite.ts` -> `expo-modules-core/src/requireNativeModule.ts` ->
+`react-native/index.js`, whose Flow syntax perry's parser rejects.
+
+**trails is already written correctly here**, which is the point of the entry.
+`activerecord/src/namespaces.ts:31` imports the adapter as `import type`
+(erased) and line 114 reaches it through a *dynamic* `import()`, as does
+`trailties/src/database.ts:300`. `expo-sqlite` is a **peerDependency** of
+activerecord -- the app's choice to supply. Node never loads any of it in
+production. Being lazy is simply not enough for AOT, which must compile
+everything reachable, and pnpm has the package hoisted whether the app wants it
+or not. So there is nothing to fix in `packages/` and this must not be worked
+around there.
+
+Perry does **not** require the package to exist: `dyn-missing.ts` shows a
+dynamic import of a nonexistent package compiles cleanly and fails at runtime,
+as it should. The route past this wall is therefore to keep the unused peer
+dependency out of the example app's resolution, not to change activerecord.
