@@ -112,8 +112,15 @@ export class Preview {
     return isPresent(this.variation.transformations);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm load — PERMANENT
+   */
   private async presentation(): Promise<Presented> {
+    await this.image.load();
+    await (
+      await this.image.attachment
+    )?.blob;
     return this.isVariant() ? await this.variant().processed() : (this.image as One & Presented);
   }
 
