@@ -1,7 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { Base as ActiveJobBase, DeserializationError } from "@blazetrails/activejob";
 import { TestHelper } from "@blazetrails/activejob/test-helper";
-import { minutes, hours, constantize, travelTo } from "@blazetrails/activesupport";
+import {
+  assertNothingRaised,
+  minutes,
+  hours,
+  constantize,
+  travelTo,
+} from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Time } from "@blazetrails/date";
 import { Message } from "@blazetrails/mail";
@@ -12,7 +19,6 @@ import {
   constSet,
   block,
   include,
-  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { MailDeliveryJob } from "./mail-delivery-job.js";
@@ -128,19 +134,19 @@ describe("MessageDeliveryTest", () => {
   });
 
   it("should respond to .deliver_later", () => {
-    expect(rbObjRespondTo(mail, "deliverLater")).toBe(true);
+    expect(mail).toRespondTo("deliverLater");
   });
 
   it("should respond to .deliver_later!", () => {
-    expect(rbObjRespondTo(mail, "deliverLaterBang")).toBe(true);
+    expect(mail).toRespondTo("deliverLaterBang");
   });
 
   it("should respond to .deliver_now", () => {
-    expect(rbObjRespondTo(mail, "deliverNow")).toBe(true);
+    expect(mail).toRespondTo("deliverNow");
   });
 
   it("should respond to .deliver_now!", () => {
-    expect(rbObjRespondTo(mail, "deliverNowBang")).toBe(true);
+    expect(mail).toRespondTo("deliverNowBang");
   });
 
   it("should enqueue the email with :deliver_now delivery method", async ({ testCase }: Ctx) => {
@@ -272,7 +278,7 @@ describe("MessageDeliveryTest", () => {
     expect(DelayedMailer.lastRescueFromInstance).toBeNull();
 
     message = (DelayedMailer as Mailer).testRaise("DelayedMailerError");
-    await message.deliverLater();
+    await assertNothingRaised(() => message.deliverLater());
     expect((DelayedMailer.lastError as Error).message).toBe("boom");
     expect(DelayedMailer.lastRescueFromInstance).toBeInstanceOf(DelayedMailer);
   });

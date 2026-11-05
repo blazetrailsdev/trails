@@ -1,4 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { TestHelper } from "@blazetrails/activejob/test-helper";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -10,7 +11,6 @@ import {
   constSet,
   include,
   rbObjMethod,
-  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import type { Collector } from "./collector.js";
@@ -123,8 +123,8 @@ describe("ParameterizedTest", () => {
       invitee: "jason@basecamp.com",
     });
 
-    expect(rbObjRespondTo(mailer, "invitation")).toBe(true);
-    expect(rbObjRespondTo(mailer, "anything")).toBe(false);
+    expect(mailer).toRespondTo("invitation");
+    expect(mailer).not.toRespondTo("anything");
 
     const invitation = rbObjMethod(mailer, "invitation");
     expect(invitation.constructor).toBe(Method);
