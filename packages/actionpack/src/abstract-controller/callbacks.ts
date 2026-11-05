@@ -7,9 +7,7 @@ import {
   extend,
   include,
   type Extended,
-  type FilterListEntry,
   type Included,
-  type CallbackOptions as ASCallbackOptions,
 } from "@blazetrails/activesupport";
 import { ActionNotFound, type Base } from "./base.js";
 
@@ -162,12 +160,7 @@ export function beforeAction(
 ): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, options);
   });
 }
 
@@ -177,15 +170,10 @@ export function prependBeforeAction(
 ): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      {
-        ...options,
-        prepend: true,
-      } as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, {
+      ...options,
+      prepend: true,
+    });
   });
 }
 
@@ -195,12 +183,7 @@ export function skipBeforeAction(
 ): void {
   const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
-    this.skipCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.skipCallback("process_action", callback, name, options);
   });
 }
 
@@ -210,12 +193,7 @@ export function afterAction(
 ): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, options);
   });
 }
 
@@ -225,15 +203,10 @@ export function prependAfterAction(
 ): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      {
-        ...options,
-        prepend: true,
-      } as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, {
+      ...options,
+      prepend: true,
+    });
   });
 }
 
@@ -243,12 +216,7 @@ export function skipAfterAction(
 ): void {
   const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
-    this.skipCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.skipCallback("process_action", callback, name, options);
   });
 }
 
@@ -258,12 +226,7 @@ export function aroundAction(
 ): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, options);
   });
 }
 
@@ -273,15 +236,10 @@ export function prependAroundAction(
 ): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
-    this.setCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      {
-        ...options,
-        prepend: true,
-      } as ASCallbackOptions,
-    );
+    this.setCallback("process_action", callback, name, {
+      ...options,
+      prepend: true,
+    });
   });
 }
 
@@ -291,12 +249,7 @@ export function skipAroundAction(
 ): void {
   const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
-    this.skipCallback(
-      "process_action",
-      callback,
-      name as FilterListEntry,
-      options as ASCallbackOptions,
-    );
+    this.skipCallback("process_action", callback, name, options);
   });
 }
 
