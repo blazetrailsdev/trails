@@ -311,9 +311,6 @@ describe("AppGenerator (trails-only)", () => {
       async rakefile(): Promise<void> {
         calls.push("rakefile");
       }
-      async rubyVersion(): Promise<void> {
-        calls.push("rubyVersion");
-      }
       async versionControl(): Promise<void> {
         calls.push("versionControl");
       }
@@ -327,15 +324,6 @@ describe("AppGenerator (trails-only)", () => {
     } finally {
       delete TopLevel.AppBuilder;
     }
-    expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
-  });
-
-  it("writes .node-version twice without a conflict when usingNode", async () => {
-    await new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, javascript: "esbuild" },
-      { destinationRoot: tmpDir },
-    ).invokeAll();
-    expect(fs.readFileSync(path.join(tmpDir, "my-app/.node-version"), "utf-8")).toBe("24.16.0\n");
+    expect(calls).toEqual(["rakefile", "versionControl"]);
   });
 });

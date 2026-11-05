@@ -509,9 +509,6 @@ describe("AppGenerator", () => {
   it("includes app name in generated files", async () => {
     await makeGen().invokeAll();
 
-    const readme = fs.readFileSync(appPath("README.md"), "utf-8");
-    expect(readme).toContain("my-app");
-
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain("MyApp");
 

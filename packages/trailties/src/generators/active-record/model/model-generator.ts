@@ -59,10 +59,8 @@ export class ModelGenerator extends NamedBase {
 
   async createModelFile(): Promise<void> {
     if (this.database() != null && !this.isCustomParent()) await this.generateAbstractClass();
-    const regularClassPath = this.regularClassPath();
     const className = camelize(this.fileName);
-    const fileName = dasherize(this.filePath());
-    const relativeRoot = "../".repeat(regularClassPath.length);
+    const relativeRoot = "../".repeat(this.classPath().length);
     const attributes = this.attributes;
 
     const parentClassName = this.parentClassName();
@@ -101,7 +99,7 @@ export class ModelGenerator extends NamedBase {
     const ext = this.ext();
 
     await this.createFile(
-      `app/models/${fileName}${ext}`,
+      File.join("app/models", ...this.classPath(), `${dasherize(this.fileName)}${ext}`),
       `${importPath}
 
 export class ${className} extends ${parentClass} {
@@ -120,7 +118,7 @@ ${staticBlock}}
 
     if (this.behavior === "invoke") {
       await this.createFile(
-        `app/models/${regularClassPath.map((part) => dasherize(part)).join("/")}${ext}`,
+        File.join("app/models", `${this.classPath().join("/")}${ext}`),
         `export const ${camelize(regularClassPath.at(-1)!)} = {
   get tableNamePrefix(): string {
     return "${regularClassPath.join("_")}_";
