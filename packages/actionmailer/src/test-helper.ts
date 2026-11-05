@@ -101,10 +101,7 @@ export const TestHelper = {
     return ActionMailer.Base.deliveries.slice(newCount - diff);
   },
 
-  /**
-   * @internal
-   * @inventedArm Base — PERMANENT
-   */
+  /** @internal */
   deliveryJobFilter(this: TestHelper, job: unknown): boolean {
     const jobClass = isPlainHash(job) ? fetch(job, "job") : rbObjClass(job);
 
