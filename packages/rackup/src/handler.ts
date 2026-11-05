@@ -70,7 +70,7 @@ export class Handler {
   static readonly RACKUP_HANDLER = "RACKUP_HANDLER";
 
   /** @internal */
-  static readonly SERVER_NAMES = Object.freeze(["puma", "falcon", "webrick"]);
+  static readonly SERVER_NAMES = Object.freeze(["vite", "node"]);
 
   static async pick(serverNames: string | string[]): Promise<unknown> {
     serverNames = Array.isArray(serverNames) ? serverNames : [serverNames];

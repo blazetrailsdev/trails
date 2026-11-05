@@ -18,7 +18,7 @@ import {
   Hash,
   NameError,
   LoadError,
-  onSignal,
+  trap,
   OptionParser,
   Process,
   rbFRequire,
@@ -73,7 +73,7 @@ interface StackProfLike {
 }
 
 interface HandlerLike {
-  name?: string;
+  name: string;
   validOptions?(): Record<string, string>;
   run(app: unknown, options: ServerOptions, block?: unknown): unknown;
   shutdown?(): unknown;
@@ -267,7 +267,7 @@ export class Options {
   }
 }
 
-export class Server {
+export class Server<TOptions extends ServerOptions = ServerOptions> {
   static Options = Options;
 
   static async start(options: ServerOptions | null = null): Promise<unknown> {
@@ -308,13 +308,13 @@ export class Server {
     this._options = options;
   }
 
-  get options(): ServerOptions {
+  get options(): TOptions {
     const mergedOptions = this._useDefaultOptions
       ? { ...this.defaultOptions(), ...this._options }
       : this._options;
     return Object.fromEntries(
       Object.entries(mergedOptions).filter(([k]) => !this._ignoreOptions.includes(k)),
-    );
+    ) as TOptions;
   }
 
   defaultOptions(): ServerOptions {
@@ -339,7 +339,7 @@ export class Server {
 
   static loggingMiddleware(): (server: Server) => Promise<unknown[] | null> {
     return async (server: Server) =>
-      /CGI/.test((await server.server()).name ?? "") || server.options.quiet
+      /CGI/.test((await server.server()).name) || server.options.quiet
         ? null
         : [CommonLogger, STDERR];
   }
@@ -404,7 +404,7 @@ export class Server {
 
     if (options.pid != null) await this.writePid();
 
-    onSignal("SIGINT", () => {
+    trap("INT", () => {
       if (typeof this._server!.shutdown === "function") {
         this._server!.shutdown();
       } else {
@@ -490,7 +490,7 @@ export class Server {
   }
 
   /** @internal */
-  private optParser(): Options {
+  protected optParser(): { parseBang(args: string[]): ServerOptions | Promise<ServerOptions> } {
     return new Options();
   }
 
@@ -508,7 +508,7 @@ export class Server {
   }
 
   /** @internal */
-  private async wrappedApp(): Promise<unknown> {
+  protected async wrappedApp(): Promise<unknown> {
     return (this._wrappedApp ??= await this.buildApp(await this.app()));
   }
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Errno, SystemCallError } from "./errno.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { Interrupt } from "./signal-exception.js";
 import { RangeError } from "./range-error.js";
 import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
@@ -12,6 +13,7 @@ import {
   env,
   getProcessAdapter,
   onSignal,
+  trap,
   processAdapterConfig,
   registerProcessAdapter,
   setEnv,
@@ -539,5 +541,60 @@ describe("processAdapter", () => {
         }
       }
     });
+  });
+});
+
+describe("trap", () => {
+  afterEach(() => {
+    __INTERNAL_resetProcessAdapter_TEST_ONLY();
+  });
+
+  it("replaces the signal's previous trap", () => {
+    const listeners = new Set<() => void>();
+    registerProcessAdapter(
+      makeFakeAdapter({
+        onSignal: (_name, handler) => {
+          listeners.add(handler);
+          return () => listeners.delete(handler);
+        },
+      }),
+    );
+    const calls: string[] = [];
+    const rails = () => void calls.push("rails");
+    expect(trap("SIGINT", rails)).toBe("DEFAULT");
+    expect(trap("SIGINT", () => void calls.push("rackup"))).toBe(rails);
+    for (const listener of listeners) listener();
+    expect(calls).toEqual(["rackup"]);
+
+    expect(typeof trap("SIGINT", "IGNORE")).toBe("function");
+    for (const listener of listeners) listener();
+    expect(calls).toEqual(["rackup"]);
+    expect(trap("INT", "SYSTEM_DEFAULT")).toBe("IGNORE");
+    expect(listeners.size).toBe(0);
+    expect(trap(2, "SIG_DFL")).toBe("SYSTEM_DEFAULT");
+    expect(() => [...listeners][0]()).toThrow(Interrupt);
+    expect(trap("SIGINT", "DEFAULT")).toBe("DEFAULT");
+    expect(() => trap("SIGFOO", "IGNORE")).toThrow("unsupported signal `SIGFOO'");
+    expect(() => trap(99, "IGNORE")).toThrow("invalid signal number (99)");
+  });
+
+  it("traps every signal MRI's siglist names, and refuses the reserved ones", () => {
+    const names: string[] = [];
+    registerProcessAdapter(
+      makeFakeAdapter({
+        onSignal: (name) => {
+          names.push(name);
+          return () => {};
+        },
+      }),
+    );
+    trap("USR1", () => {});
+    trap(1, () => {});
+    trap("SIGWINCH", "IGNORE");
+    trap("CLD", "DEFAULT");
+    expect(names).toEqual(["SIGUSR1", "SIGHUP", "SIGWINCH", "SIGCHLD"]);
+    expect(() => trap("SEGV", "IGNORE")).toThrow("can't trap reserved signal: SIGSEGV");
+    expect(() => trap("KILL", () => {})).toThrow("Invalid argument - SIGKILL");
+    expect(() => trap("SIG", "IGNORE")).toThrow("unsupported signal `SIG'");
   });
 });
