@@ -1,6 +1,7 @@
 import { constSet, constDefined } from "../include.js";
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { ArgumentError } from "../argument-error.js";
+import { BigDecimal } from "../big-decimal.js";
 import { Exception } from "../exception.js";
 import { rbModName, TopLevel } from "../object.js";
 import { Psych } from "../psych.js";
@@ -65,7 +66,7 @@ describe("Psych::ClassLoader", () => {
     expect(loader.object()).toBe(Object);
     expect(loader.exception()).toBe(Exception);
     expect(loader.psychOmap()).toBe(Psych.Omap);
-    expect(() => loader.bigDecimal()).toThrow(ArgumentError);
+    expect(loader.bigDecimal()).toBe(BigDecimal);
   });
 
   it("symbolize answers the Symbol", () => {

@@ -154,12 +154,13 @@ export class ScalarScanner {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  parseInt(string: string): number {
+  parseInt(string: string): number | bigint {
     return kernelInteger(stringDelete(string, ",_"));
   }
 
   /**
    * @missingRailsArgs Rational — CONVERGEABLE kernel-rational-string-arm
+   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
    * @noRailsEquivalent PERMANENT
    */
   parseTime(string: string): unknown {
@@ -187,7 +188,7 @@ export class ScalarScanner {
       .exec(md[3])!
       .slice(1)
       .filter((digit) => digit != null)
-      .map((digit) => kernelInteger(digit, 10));
+      .map((digit) => Number(kernelInteger(digit, 10)));
     let offset = tz[0] * 3600;
 
     if (offset < 0) {

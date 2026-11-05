@@ -40,13 +40,13 @@ export class AudioAnalyzer extends Analyzer {
   }
 
   /** @internal */
-  protected async bitRate(): Promise<number | null> {
+  protected async bitRate(): Promise<number | bigint | null> {
     const bitRate = (await this.audioStream())["bit_rate"];
     return bitRate != null ? kernelInteger(bitRate) : null;
   }
 
   /** @internal */
-  protected async sampleRate(): Promise<number | null> {
+  protected async sampleRate(): Promise<number | bigint | null> {
     const sampleRate = (await this.audioStream())["sample_rate"];
     return sampleRate != null ? kernelInteger(sampleRate) : null;
   }

@@ -69,7 +69,7 @@ export class VideoAnalyzer extends Analyzer {
   }
 
   /** @internal */
-  protected async angle(): Promise<number | null> {
+  protected async angle(): Promise<number | bigint | null> {
     const tags = await this.tags();
     if (tags["rotate"] != null) {
       return kernelInteger(tags["rotate"]);
@@ -91,7 +91,7 @@ export class VideoAnalyzer extends Analyzer {
   }
 
   /** @internal */
-  protected async displayAspectRatio(): Promise<[number, number] | null> {
+  protected async displayAspectRatio(): Promise<[number | bigint, number | bigint] | null> {
     const descriptor = (await this.videoStream())["display_aspect_ratio"] as string | undefined;
     if (descriptor != null) {
       const terms = stringSplit(descriptor, ":", 2);
@@ -143,12 +143,15 @@ export class VideoAnalyzer extends Analyzer {
     return (this._encodedHeight ??= kernelFloat(videoStream["height"]));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
+   */
   protected async displayHeightScale(): Promise<number | null> {
     const displayAspectRatio = await this.displayAspectRatio();
     if (displayAspectRatio == null) return null;
     return (this._displayHeightScale ??=
-      kernelFloat(displayAspectRatio[1]) / displayAspectRatio[0]);
+      kernelFloat(displayAspectRatio[1]) / Number(displayAspectRatio[0]));
   }
 
   /** @internal */

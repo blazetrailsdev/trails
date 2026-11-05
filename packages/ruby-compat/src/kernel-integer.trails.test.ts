@@ -12,7 +12,7 @@ describe("kernelInteger", () => {
     expect(kernelInteger(10)).toBe(10);
     expect(kernelInteger(3.9)).toBe(3);
     expect(kernelInteger(-3.9)).toBe(-3);
-    expect(kernelInteger(10n)).toBe(10);
+    expect(kernelInteger(10n)).toBe(10n);
   });
 
   it("raises FloatDomainError for a non-finite Float, with the Float's to_s", () => {
@@ -138,8 +138,8 @@ describe("kernelInteger", () => {
   });
 
   it("takes a BigInt from to_int / to_i, as RB_INTEGER_TYPE_P covers bignums", () => {
-    expect(kernelInteger({ toInt: () => 7n })).toBe(7);
-    expect(kernelInteger({ toI: () => 9n })).toBe(9);
+    expect(kernelInteger({ toInt: () => 7n })).toBe(7n);
+    expect(kernelInteger({ toI: () => 9n })).toBe(9n);
     expect(kernelInteger("1f", { toInt: () => 16n })).toBe(31);
   });
 
@@ -161,5 +161,14 @@ describe("kernelInteger", () => {
     expect(() => kernelInteger(foo({ toI: () => "q" }))).toThrow(
       "can't convert Foo to Integer (Foo#to_i gives String)",
     );
+  });
+
+  it("answers a bignum past 2**53 at the string's radix", () => {
+    expect(kernelInteger("9007199254740993")).toBe(9007199254740993n);
+    expect(kernelInteger("-0x20000000000001")).toBe(-0x20000000000001n);
+    expect(kernelInteger("0400000000000000001")).toBe(0o400000000000000001n);
+    expect(kernelInteger("12")).toBe(12);
+    expect(kernelInteger(9007199254740993n)).toBe(9007199254740993n);
+    expect(kernelInteger({ toInt: () => 9007199254740993n })).toBe(9007199254740993n);
   });
 });

@@ -557,7 +557,7 @@ export interface AbstractAdapter
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   dataSources(): Promise<string[]>;
   dataSourceExists(name: string): Promise<boolean | null>;
-  sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
+  sanitizeLimit(limit: unknown): number | bigint | Nodes.SqlLiteral;
   resetTransaction(): void;
   resetTransaction(
     options: { restore?: boolean },

@@ -89,10 +89,10 @@ describe("Psych::TestScalarScanner", () => {
     expect(ss.tokenize("01234567")).toBe(0o1234567);
     expect(ss.tokenize("0_,,,1_2,_34567")).toBe(0o1234567);
 
-    expect(ss.tokenize("0x123456789abcdef")).toBe(Number(0x123456789abcdefn));
-    expect(ss.tokenize("0x12_,34,_56,_789abcdef")).toBe(Number(0x123456789abcdefn));
-    expect(ss.tokenize("0x_12_,34,_56,_789abcdef")).toBe(Number(0x123456789abcdefn));
-    expect(ss.tokenize("0x12_,34,_56,_789abcdef__")).toBe(Number(0x123456789abcdefn));
+    expect(ss.tokenize("0x123456789abcdef")).toBe(0x123456789abcdefn);
+    expect(ss.tokenize("0x12_,34,_56,_789abcdef")).toBe(0x123456789abcdefn);
+    expect(ss.tokenize("0x_12_,34,_56,_789abcdef")).toBe(0x123456789abcdefn);
+    expect(ss.tokenize("0x12_,34,_56,_789abcdef__")).toBe(0x123456789abcdefn);
   });
 
   it("scan strict int commas and underscores", () => {
@@ -112,8 +112,8 @@ describe("Psych::TestScalarScanner", () => {
     expect(scanner.tokenize("01234567")).toBe(0o1234567);
     expect(scanner.tokenize("0_,,,1_2,_34567")).toBe("0_,,,1_2,_34567");
 
-    expect(scanner.tokenize("0x123456789abcdef")).toBe(Number(0x123456789abcdefn));
-    expect(scanner.tokenize("0x12_34_56_789abcdef")).toBe(Number(0x123456789abcdefn));
+    expect(scanner.tokenize("0x123456789abcdef")).toBe(0x123456789abcdefn);
+    expect(scanner.tokenize("0x12_34_56_789abcdef")).toBe(0x123456789abcdefn);
     expect(scanner.tokenize("0x12_,34,_56,_789abcdef")).toBe("0x12_,34,_56,_789abcdef");
     expect(scanner.tokenize("0x_12_,34,_56,_789abcdef")).toBe("0x_12_,34,_56,_789abcdef");
     expect(scanner.tokenize("0x12_,34,_56,_789abcdef__")).toBe("0x12_,34,_56,_789abcdef__");

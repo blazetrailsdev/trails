@@ -28,6 +28,9 @@ import { TopLevel, classpaths, rbCBasicObject, rbCSymbol, rbModName, rbModToS } 
 import { Range } from "./range.js";
 import { rbConstTableGet } from "./classpath.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
+import { Complex } from "./complex.js";
+import { Encoding } from "./encoding.js";
+import { BigDecimal } from "./big-decimal.js";
 import { Struct } from "./struct.js";
 import { TypeError } from "./type-error.js";
 
@@ -380,6 +383,9 @@ const _coreConstants: Record<string, unknown> = {
   Struct,
   Symbol: rbCSymbol,
   Rational,
+  Complex,
+  Encoding,
+  BigDecimal,
 };
 for (const [name, value] of Object.entries(_coreConstants)) {
   tbl[name] = value;

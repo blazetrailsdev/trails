@@ -21,6 +21,13 @@ describe("Logger", () => {
     expect(() => (logger.level = ":nope")).toThrow("invalid log level: nope");
   });
 
+  it("renders a non-String progname with %s through the default Formatter", () => {
+    const io = new StringIO();
+    const logger = new Logger(io);
+    logger.add(Logger.INFO, "m", 42);
+    expect(io.string()).toMatch(/ INFO -- 42: m\n$/);
+  });
+
   it("with_level overrides the level for the block", () => {
     const logger = new Logger(null);
     expect(logger.withLevel(":fatal", () => logger.level)).toBe(Logger.FATAL);
