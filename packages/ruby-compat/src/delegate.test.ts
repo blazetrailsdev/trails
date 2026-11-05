@@ -110,3 +110,14 @@ describe("DelegateClass(Array)", () => {
     expect(parts).toEqual([]);
   });
 });
+
+describe("Delegator Kernel names", () => {
+  it("forwards a Kernel name the delegate answers and leaves an unanswered one unread", () => {
+    const answering = new SimpleDelegator({ caseEquals: (other: unknown) => other === 1 });
+    expect((answering as unknown as { caseEquals(o: unknown): boolean }).caseEquals(1)).toBe(true);
+
+    const silent = new SimpleDelegator({});
+    expect((silent as unknown as { caseEquals?: unknown }).caseEquals).toBeUndefined();
+    expect(() => (silent as unknown as { other(): void }).other()).toThrow(/undefined method/);
+  });
+});
