@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import type { ViteDevServer } from "vite";
+import { createServer, type ViteDevServer } from "vite";
 import { assert, assertNotEqual } from "@blazetrails/activesupport";
 import { Server, vite } from "../../system-testing/server.js";
 
@@ -8,6 +8,7 @@ describe("ServerTest", () => {
 
   beforeEach(() => {
     oldVitestServer = vite.server;
+    vite.createServer = createServer;
     vite.app = { call: async () => [200, {}, ["ok"]] };
   });
 

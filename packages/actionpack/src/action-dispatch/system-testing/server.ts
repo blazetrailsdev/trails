@@ -1,4 +1,4 @@
-import type { InlineConfig, ViteDevServer } from "vite";
+import type { createServer, InlineConfig, ViteDevServer } from "vite";
 import { type RackMiddleware } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
 import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
@@ -9,6 +9,7 @@ export const vite: {
   appHost: string | undefined;
   config: InlineConfig & { server: NonNullable<InlineConfig["server"]> };
   server: ViteDevServer | undefined;
+  createServer: typeof createServer | undefined;
   url: string | undefined;
   drivers: Record<string, (app: RackMiddleware | undefined) => Promise<unknown>>;
   currentDriver: string;
@@ -17,12 +18,11 @@ export const vite: {
   appHost: undefined,
   config: { server: { host: "127.0.0.1", port: 0 } },
   server: undefined,
+  createServer: undefined,
   url: undefined,
   drivers: {},
   currentDriver: "rack_test",
 };
-
-const VITE_MODULE = "vite";
 
 export class Server {
   static silencePuma = false;
@@ -40,9 +40,8 @@ export class Server {
   /** @internal */
   private async setServer(): Promise<void> {
     if (vite.server === undefined) {
-      const { createServer } = (await import(VITE_MODULE)) as typeof import("vite");
       const node = (await Handler.get("node")) as typeof Handler.Node;
-      const server = await createServer({
+      const server = await vite.createServer!({
         configFile: false,
         appType: "custom",
         ...vite.config,
