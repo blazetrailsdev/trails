@@ -11,7 +11,7 @@ import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/repo
 import { Trails } from "../trails.js";
 import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
 import { createFile } from "@blazetrails/thor/actions/create-file";
-import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
+import type { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
 
 export interface ActionsHost {
   options: { quiet?: boolean };
@@ -20,6 +20,7 @@ export interface ActionsHost {
   sayStatus(status: unknown, message: unknown, logStatus?: string | boolean): void;
   inRoot<T>(block: () => T | Promise<T>): Promise<T>;
   injectIntoFile(destination: string, ...args: unknown[]): unknown;
+  gsubFile: OmitThisParameter<typeof gsubFile>;
   findInSourcePaths(file: string): Promise<string>;
 }
 
@@ -239,8 +240,7 @@ export async function route(
       const emptyBlockPattern = new RegExp(
         `(${namespacePattern.source})((?:\\s*\\}\\);\\n){1,${namespaces.length}})`,
       );
-      await gsubFile.call(
-        this as unknown as ThorActionsHost,
+      await this.gsubFile(
         "config/routes.ts",
         emptyBlockPattern,
         { verbose: false, force: true },
