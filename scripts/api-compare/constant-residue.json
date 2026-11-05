@@ -781,7 +781,7 @@
     }
   },
   "activesupport": {
-    "rows": 185,
+    "rows": 186,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -898,6 +898,7 @@
       "concurrency/load-interlock-aware-monitor.ts::ThreadLoadInterlockAwareMonitor": "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor",
       "core-ext/big-decimal/conversions.ts::BigDecimalWithDefaultFormat": "ActiveSupport::BigDecimalWithDefaultFormat",
       "core-ext/date-and-time/calculations.ts::Calculations": "DateAndTime::Calculations",
+      "core-ext/date-and-time/zones.ts::Zones": "DateAndTime::Zones",
       "core-ext/enumerable.ts::SoleItemExpectedError": "Enumerable::SoleItemExpectedError",
       "core-ext/hash/conversions.ts::DisallowedType": "ActiveSupport::XMLConverter::DisallowedType",
       "core-ext/hash/conversions.ts::XMLConverter": "ActiveSupport::XMLConverter",

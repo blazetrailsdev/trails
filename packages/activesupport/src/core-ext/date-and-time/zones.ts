@@ -6,6 +6,7 @@ import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
 import { instantFrom } from "../../temporal.js";
 import { toTime } from "../date/conversions.js";
 import { actsLike } from "../object/acts-like.js";
+import * as DateAndTimeZones from "./zones.js";
 
 export type DateOrTime =
   | Temporal.PlainDate
@@ -67,4 +68,4 @@ declare module "@blazetrails/date" {
   }
 }
 
-include(RubyTime, { inTimeZone });
+include(RubyTime, DateAndTimeZones);

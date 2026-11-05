@@ -870,7 +870,7 @@ describe("Module#ancestors", () => {
     expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
     expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
     expect(names(new Date(0))).toBe(
-      "Time DateAndTime::Calculations Comparable Object Kernel BasicObject",
+      "Time DateAndTime::Calculations DateAndTime::Zones Comparable Object Kernel BasicObject",
     );
     expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
   });
