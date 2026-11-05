@@ -1,9 +1,21 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
-import { I18n, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  I18n,
+  assertCalledWith,
+  assertNotCalled,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import type { Field, Message } from "@blazetrails/mail";
-import { ArgumentError, RuntimeError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  RuntimeError,
+  TopLevel,
+  constSet,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import type { MessageDelivery } from "./message-delivery.js";
 import { BaseMailer as BaseMailerClass } from "./test-helpers/mailers/base-mailer.js";
@@ -49,6 +61,29 @@ async function swap(klass: typeof I18n, newValues: { locale: string }, block: ()
     klass.setLocale(old);
   }
 }
+
+class MyObserver {
+  static deliveredEmail(_mail: Message): void {}
+}
+
+class MySecondObserver {
+  static deliveredEmail(_mail: Message): void {}
+}
+
+class MyInterceptor {
+  static deliveringEmail(_mail: Message): void {}
+  static previewingEmail(_mail: Message): void {}
+}
+
+class MySecondInterceptor {
+  static deliveringEmail(_mail: Message): void {}
+  static previewingEmail(_mail: Message): void {}
+}
+
+const BaseTestNamespace = {};
+constSet(TopLevel, "BaseTest", BaseTestNamespace);
+constSet(BaseTestNamespace, "MyObserver", MyObserver);
+constSet(BaseTestNamespace, "MyInterceptor", MyInterceptor);
 
 describe("BaseTest", () => {
   let originalDeliveryMethod: typeof Base.deliveryMethod;
@@ -534,6 +569,128 @@ describe("BaseTest", () => {
     const mail = BaseMailer.withNilAsReturnValue();
     expect((await mail.message()).body().toString().trim()).toBe("Welcome");
     await mail.deliverNow();
+  });
+
+  it("you can register and unregister an observer to the mail object that gets informed on email delivery", async () => {
+    Base.registerObserver(MyObserver);
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyObserver, "deliveredEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterObserver(MyObserver);
+    await assertNotCalled(MyObserver, "deliveredEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister an observer using its stringified name to the mail object that gets informed on email delivery", async () => {
+    Base.registerObserver("BaseTest::MyObserver");
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyObserver, "deliveredEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterObserver("BaseTest::MyObserver");
+    await assertNotCalled(MyObserver, "deliveredEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister an observer using its symbolized underscored name to the mail object that gets informed on email delivery", async () => {
+    Base.registerObserver("base_test/my_observer");
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyObserver, "deliveredEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterObserver("base_test/my_observer");
+    await assertNotCalled(MyObserver, "deliveredEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister multiple observers to the mail object that both get informed on email delivery", async () => {
+    Base.registerObservers("BaseTest::MyObserver", MySecondObserver);
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyObserver, "deliveredEmail", [message], {}, async () => {
+      await assertCalledWith(MySecondObserver, "deliveredEmail", [message], {}, async () => {
+        await mail.deliverNow();
+      });
+    });
+
+    Base.unregisterObservers("BaseTest::MyObserver", MySecondObserver);
+    await assertNotCalled(MyObserver, "deliveredEmail", null, async () => {
+      await mail.deliverNow();
+    });
+    await assertNotCalled(MySecondObserver, "deliveredEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister an interceptor to the mail object that gets passed the mail object before delivery", async () => {
+    Base.registerInterceptor(MyInterceptor);
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyInterceptor, "deliveringEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterInterceptor(MyInterceptor);
+    await assertNotCalled(MyInterceptor, "deliveringEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister an interceptor using its stringified name to the mail object that gets passed the mail object before delivery", async () => {
+    Base.registerInterceptor("BaseTest::MyInterceptor");
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyInterceptor, "deliveringEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterInterceptor("BaseTest::MyInterceptor");
+    await assertNotCalled(MyInterceptor, "deliveringEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister an interceptor using its symbolized underscored name to the mail object that gets passed the mail object before delivery", async () => {
+    Base.registerInterceptor("base_test/my_interceptor");
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyInterceptor, "deliveringEmail", [message], {}, async () => {
+      await mail.deliverNow();
+    });
+
+    Base.unregisterInterceptor("base_test/my_interceptor");
+    await assertNotCalled(MyInterceptor, "deliveringEmail", null, async () => {
+      await mail.deliverNow();
+    });
+  });
+
+  it("you can register and unregister multiple interceptors to the mail object that both get passed the mail object before delivery", async () => {
+    Base.registerInterceptors("BaseTest::MyInterceptor", MySecondInterceptor);
+    const mail = BaseMailer.welcome();
+    const message = await mail.message();
+    await assertCalledWith(MyInterceptor, "deliveringEmail", [message], {}, async () => {
+      await assertCalledWith(MySecondInterceptor, "deliveringEmail", [message], {}, async () => {
+        await mail.deliverNow();
+      });
+    });
+
+    Base.unregisterInterceptors("BaseTest::MyInterceptor", MySecondInterceptor);
+    await assertNotCalled(MyInterceptor, "deliveringEmail", null, async () => {
+      await mail.deliverNow();
+    });
+    await assertNotCalled(MySecondInterceptor, "deliveringEmail", null, async () => {
+      await mail.deliverNow();
+    });
   });
 
   it("action methods should be refreshed after defining new method", () => {
