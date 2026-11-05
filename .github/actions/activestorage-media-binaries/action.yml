@@ -39,7 +39,6 @@ runs:
         APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120
           -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true)
         for attempt in 1 2 3; do
-          # shellcheck disable=SC2086
           sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
             && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $PACKAGES \
             && break
