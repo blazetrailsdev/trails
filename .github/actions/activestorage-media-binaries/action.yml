@@ -7,7 +7,8 @@ description: >-
   Installed without Recommends; librsvg2-bin (rsvg-convert) and ghostscript are
   the two recommended delegates ImageMagick needs to read the icon.svg and
   report.pdf fixtures. The .debs are cached per OS/arch and package list, so a
-  warm run downloads only packages whose mirror version moved.
+  warm run downloads only packages whose mirror version moved; the key rotates
+  weekly and falls back to the previous week, so the cache tracks the mirror.
 runs:
   using: composite
   steps:
@@ -23,12 +24,14 @@ runs:
         fi
         echo "packages=ffmpeg mupdf-tools poppler-utils imagemagick librsvg2-bin ghostscript" >> "$GITHUB_OUTPUT"
         echo "debs=$RUNNER_TEMP/activestorage-media-debs" >> "$GITHUB_OUTPUT"
+        echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
     - id: restore
       if: steps.probe.outputs.present != 'true'
       uses: actions/cache/restore@v4
       with:
         path: ${{ steps.probe.outputs.debs }}
-        key: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}
+        key: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}-${{ steps.probe.outputs.week }}
+        restore-keys: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}-
     - if: steps.probe.outputs.present != 'true'
       shell: bash
       env:
@@ -37,7 +40,7 @@ runs:
       run: |
         mkdir -p "$DEBS/partial"
         APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120
-          -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true)
+          -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true -o APT::Sandbox::User=root)
         for attempt in 1 2 3; do
           sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
             && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $PACKAGES \
@@ -49,7 +52,7 @@ runs:
         done
         sudo rm -rf "$DEBS/partial" "$DEBS/lock"
         sudo chmod -R a+rX "$DEBS"
-        ls "$DEBS"/*.deb | wc -l
+        find "$DEBS" -name "*.deb" | wc -l
     - if: steps.probe.outputs.present != 'true' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       continue-on-error: true
