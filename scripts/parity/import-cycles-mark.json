@@ -11,7 +11,6 @@
     "packages/activesupport/src/i18n.ts -> packages/activesupport/src/locale/en.ts [en]",
     "packages/activesupport/src/inflector.ts -> packages/activesupport/src/inflector.ts [Inflector]",
     "packages/activesupport/src/logger.ts -> packages/activesupport/src/logger-thread-safe-level.ts [LoggerThreadSafeLevel]",
-    "packages/activesupport/src/time-zone-config.ts -> packages/activesupport/src/core-ext/date-and-time/zones.ts [inTimeZone]",
     "packages/activesupport/src/xml-mini.ts -> packages/activesupport/src/xml-mini/rexml.ts [XmlMini_REXML]",
     "packages/et-orbi/src/et-orbi.ts -> packages/et-orbi/src/info.ts [_makeInfo, platformInfo, renderNozoneTime]",
     "packages/et-orbi/src/et-orbi.ts -> packages/et-orbi/src/make.ts [isChronicEnabled, make, makeTime, now, parse, setChronicEnabled]",
