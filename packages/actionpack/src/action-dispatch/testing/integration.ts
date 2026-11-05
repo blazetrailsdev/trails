@@ -692,27 +692,19 @@ export class IntegrationTest extends TestCase {
       | [...ConstructorParameters<typeof TestCase>, () => unknown]
   ) {
     super(...(args as ConstructorParameters<typeof TestCase>));
-    this._routesOverride = undefined;
+    (this as Record<symbol, unknown>)[urlForMod._routesIvar] = null;
     this._integrationSession = null;
   }
 
   /** @internal */
   get _routes(): UrlForRoutes {
-    if (this._routesOverride) return this._routesOverride;
+    const routesIvar = (this as unknown as Record<symbol, UrlForRoutes | null>)[
+      urlForMod._routesIvar
+    ];
+    if (routesIvar) return routesIvar;
     const app = this.app as { routes?: unknown } | null;
     return app?.routes instanceof RouteSet ? app.routes._routes : this.routes._routes;
   }
-
-  set _routes(value: UrlForRoutes | null) {
-    if (value == null || value === this.routes._routes) {
-      this._routesOverride = undefined;
-    } else {
-      this._routesOverride = value;
-    }
-  }
-
-  /** @internal */
-  _routesOverride?: UrlForRoutes;
 
   controller!: Metal;
 

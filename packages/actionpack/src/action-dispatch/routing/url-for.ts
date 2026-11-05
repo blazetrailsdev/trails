@@ -129,8 +129,9 @@ export function _withRoutes<T>(
       "_withRoutes block must be synchronous; got an AsyncFunction. Use an async-aware helper instead.",
     );
   }
-  const old = this._routes;
-  this._routes = routes;
+  const host = this as unknown as Record<symbol, unknown>;
+  const old = host[_routesIvar];
+  host[_routesIvar] = routes;
   try {
     const result = block();
     if (result != null && typeof (result as { then?: unknown }).then === "function") {
@@ -140,7 +141,7 @@ export function _withRoutes<T>(
     }
     return result;
   } finally {
-    this._routes = old;
+    host[_routesIvar] = old;
   }
 }
 
