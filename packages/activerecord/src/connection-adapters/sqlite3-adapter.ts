@@ -1,14 +1,7 @@
 import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import {
-  sortByBang,
-  anybits,
-  fetch,
-  rbRegMatchP,
-  rbObjAsString,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
@@ -173,6 +166,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   declare static strictStringsByDefault: boolean;
+  declare static SQLite3Integer: typeof SQLite3Integer;
   declare static isStrictStringsByDefault: () => boolean;
 
   static {
@@ -1394,4 +1388,4 @@ export interface SQLite3Adapter {
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
 
 ConnectionAdapters.SQLite3Adapter = SQLite3Adapter;
-constSet(SQLite3Adapter, "SQLite3Integer", SQLite3Integer);
+SQLite3Adapter.SQLite3Integer = SQLite3Integer;
