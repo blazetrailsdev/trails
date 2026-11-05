@@ -10,5 +10,6 @@
     { "path": "../activesupport" },
     { "path": "../nokogiri" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts"]
 }

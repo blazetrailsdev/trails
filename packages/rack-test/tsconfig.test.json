@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test"
+  },
+  "exclude": [],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*", "src/fixtures/**/*"],
+  "references": [{ "path": "./tsconfig.json" }]
+}

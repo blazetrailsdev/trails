@@ -26,13 +26,14 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@blazetrails/ruby-compat": "workspace:*",
-    "@blazetrails/activesupport": "workspace:*"
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/activemodel": "workspace:*"
+    "@blazetrails/activemodel": "workspace:*",
+    "@types/node": "25.3.5"
   }
 }

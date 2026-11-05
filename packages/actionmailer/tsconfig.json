@@ -15,5 +15,6 @@
     { "path": "../i18n" },
     { "path": "../mail" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

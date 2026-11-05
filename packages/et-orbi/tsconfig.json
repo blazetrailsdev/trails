@@ -7,20 +7,11 @@
   },
   "include": ["src"],
   "references": [
-    {
-      "path": "../chronic"
-    },
-    {
-      "path": "../date"
-    },
-    {
-      "path": "../ruby-compat"
-    },
-    {
-      "path": "../tzinfo"
-    },
-    {
-      "path": "../vitest-matchers"
-    }
-  ]
+    { "path": "../chronic" },
+    { "path": "../date" },
+    { "path": "../ruby-compat" },
+    { "path": "../tzinfo" },
+    { "path": "../vitest-matchers" }
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

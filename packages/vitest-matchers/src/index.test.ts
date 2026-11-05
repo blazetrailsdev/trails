@@ -1,5 +1,6 @@
 import { stderr } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
+import type {} from "./index.js";
 
 class Money {
   constructor(readonly cents: number) {}

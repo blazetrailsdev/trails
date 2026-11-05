@@ -43,4 +43,6 @@ runs:
         path: |
           packages/*/dist
           packages/*/tsconfig.tsbuildinfo
-        key: build-v2-${{ runner.os }}-${{ hashFiles('packages/**/src/**', 'tsconfig*.json', 'packages/*/tsconfig.json', 'pnpm-lock.yaml') }}
+          packages/*/dist-test
+          packages/*/tsconfig.test.tsbuildinfo
+        key: build-v2-${{ runner.os }}-${{ hashFiles('packages/**/src/**', 'tsconfig*.json', 'packages/*/tsconfig*.json', 'pnpm-lock.yaml') }}

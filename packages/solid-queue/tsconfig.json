@@ -18,5 +18,6 @@
     { "path": "../ruby-compat" },
     { "path": "../thor" },
     { "path": "../trailties" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

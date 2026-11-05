@@ -12,5 +12,6 @@
     { "path": "../did-you-mean" },
     { "path": "../activesupport" },
     { "path": "../vitest-matchers" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

@@ -6,9 +6,6 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [
-    {
-      "path": "../ruby-compat"
-    }
-  ]
+  "references": [{ "path": "../ruby-compat" }],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

@@ -3,12 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["node"]
   },
   "include": ["src"],
   "references": [
     { "path": "../activesupport" },
     { "path": "../activemodel" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts"]
 }
