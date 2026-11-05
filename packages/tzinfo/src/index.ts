@@ -54,7 +54,6 @@ function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
   return date;
 }
 
-const abbreviationFormatters = new Map<string, Intl.DateTimeFormat>();
 const localFormatters = new Map<string, Intl.DateTimeFormat>();
 
 const fixedZoneInfos = new Map<string, { abbreviation: string; utcOffsetSeconds: number } | null>();
@@ -128,16 +127,7 @@ function lookupZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
-  let abbreviation = tzdataAbbreviation(ianaName, Math.floor(date.getTime() / 1000));
-  if (abbreviation === undefined) {
-    let formatter = abbreviationFormatters.get(ianaName);
-    if (!formatter) {
-      formatter = new Intl.DateTimeFormat("en-US", { timeZone: ianaName, timeZoneName: "short" });
-      abbreviationFormatters.set(ianaName, formatter);
-    }
-    const parts = formatter.formatToParts(date);
-    abbreviation = parts.find((p) => p.type === "timeZoneName")?.value ?? ianaName;
-  }
+  const abbreviation = tzdataAbbreviation(ianaName, Math.floor(date.getTime() / 1000))!;
 
   const roundedDate = new Date(Math.floor(date.getTime() / 60000) * 60000);
 

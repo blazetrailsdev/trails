@@ -199,7 +199,7 @@ export class Base {
         (name) => !internalMethods.has(name),
       );
       methods.push(...ownPublicMethodNames(this.prototype));
-      this._actionMethodCache = Object.freeze(new Set(methods));
+      this._actionMethodCache = new Set(methods);
     }
     return this._actionMethodCache;
   }

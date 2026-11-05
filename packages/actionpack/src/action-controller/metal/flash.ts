@@ -69,9 +69,7 @@ export function actionMethods(this: FlashClassHost): ReadonlySet<string> {
   if (!Object.hasOwn(host, "_actionMethodCache") || !host._actionMethodCache) {
     const flashTypes = new Set(host._flashTypes.map(String));
     const methods = rbCallSuper(this, actionMethods) as ReadonlySet<string>;
-    host._actionMethodCache = Object.freeze(
-      new Set([...methods].filter((name) => !flashTypes.has(name))),
-    );
+    host._actionMethodCache = new Set([...methods].filter((name) => !flashTypes.has(name)));
   }
   return host._actionMethodCache;
 }
