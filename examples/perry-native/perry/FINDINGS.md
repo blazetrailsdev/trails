@@ -1589,14 +1589,14 @@ V8-specific `Error.prepareStackTrace` hook and parses `new Error().stack` for
 `(file:line:col)`. A 1-module probe (`perry/probe/stack-positions.ts`) measures
 all of it against Node:
 
-| | Node | perry |
-| --- | --- | --- |
-| `prepareStackTrace` invoked | true | **false** |
-| callSites handed to the hook | 4 | never called |
-| `.stack` is the hook's return | true | **false** |
-| frame lines | 5 | **2** |
-| lines matching `callerLocations`' regex | 4 | **0** |
-| frame text | `at <anonymous> (/…/probe.ts:23:15)` | `at <anonymous>` |
+|                                         | Node                                 | perry            |
+| --------------------------------------- | ------------------------------------ | ---------------- |
+| `prepareStackTrace` invoked             | true                                 | **false**        |
+| callSites handed to the hook            | 4                                    | never called     |
+| `.stack` is the hook's return           | true                                 | **false**        |
+| frame lines                             | 5                                    | **2**            |
+| lines matching `callerLocations`' regex | 4                                    | **0**            |
+| frame text                              | `at <anonymous> (/…/probe.ts:23:15)` | `at <anonymous>` |
 
 Three independent deficiencies, each sufficient on its own:
 
@@ -1605,14 +1605,14 @@ Three independent deficiencies, each sufficient on its own:
    regex instead of throwing on assignment. Nothing calls the hook.
 2. **Frame text carries no file, line or column.** The regex cannot match.
 3. **There is only one frame.** `lineCount=2` is the message plus a single
-   `at <anonymous>`, so `callerLocations(1, 1)` — which asks for the *caller* —
+   `at <anonymous>`, so `callerLocations(1, 1)` — which asks for the _caller_ —
    has no caller frame to return even if 1 and 2 were fixed.
 
 **`--debug-symbols` does not fix it**, and that is worth recording because the
 flag looked promising: `object_cache.rs:431` says it flips per-call
 `js_set_call_location` emission. A full `--debug-symbols` build still dies at
 the same 416 modules with the same `PROP=path`. What it does buy is DWARF line
-info on the *native* frames — the `delegation.ts:100` / `controller-helper.ts:67`
+info on the _native_ frames — the `delegation.ts:100` / `controller-helper.ts:67`
 positions above come from that build. Native line info and JS-visible stack
 positions are separate mechanisms in perry.
 
@@ -1665,11 +1665,11 @@ The boot graph has exactly three of them — `i18n/src/backend/simple.ts:120`,
 `chain.ts:142` and `key-value.ts:181` — and they fail in chain order, one at a
 time. The measurements, each a full 1937-module build:
 
-| change | `INIT:` lines | stderr |
-| --- | --- | --- |
-| none | 249 | `Cannot access '_allocation' before initialization` at `new Base` |
-| `simple.ts` → concrete subclass | 251 | same error, now at `chain.ts` |
-| `chain.ts` + `key-value.ts` too | **494** | wall 17's `reading 'path'` instead |
+| change                          | `INIT:` lines | stderr                                                            |
+| ------------------------------- | ------------- | ----------------------------------------------------------------- |
+| none                            | 249           | `Cannot access '_allocation' before initialization` at `new Base` |
+| `simple.ts` → concrete subclass | 251           | same error, now at `chain.ts`                                     |
+| `chain.ts` + `key-value.ts` too | **494**       | wall 17's `reading 'path'` instead                                |
 
 Replacing the cast with `class _Probe extends Base {}` and `new _Probe()` is
 what fixes each site. **i18n's `Base` has no abstract members**, so that
@@ -1722,11 +1722,11 @@ With wall 17's `callerLocations` fallback in place the eager chain reached 416
 and then hit three more defects in a row. All three are now fixed in trails, and
 two of them have 1-module minimal repros under `perry/probe/`.
 
-| wall | init lines after the fix | error it threw |
-| --- | --- | --- |
-| 18 | 514 -> 545 -> **842** | `TypeError: Cannot convert undefined or null to object` in `rbModAppendFeatures` |
-| 19 | **869** | `ReferenceError: Base64 is not defined` |
-| 20 | (next build) | `TypeError: Cannot set properties of undefined (setting 'withRouting')` |
+| wall | init lines after the fix | error it threw                                                                   |
+| ---- | ------------------------ | -------------------------------------------------------------------------------- |
+| 18   | 514 -> 545 -> **842**    | `TypeError: Cannot convert undefined or null to object` in `rbModAppendFeatures` |
+| 19   | **869**                  | `ReferenceError: Base64 is not defined`                                          |
+| 20   | (next build)             | `TypeError: Cannot set properties of undefined (setting 'withRouting')`          |
 
 ### Wall 18 - a mixin namespace read while its module was half-built
 
@@ -1740,12 +1740,12 @@ whichever of its five `include(X, Searchable)` consumers initialised first could
 read its namespace mid-build. Three shapes were refuted with probes first (6-10s
 each): a plain 2-module cycle, a 3-module cycle with a separate importer, and
 the namespace of an in-progress module - perry handles all three correctly, and
-on the third it is *more* permissive than Node, which throws a TDZ
+on the third it is _more_ permissive than Node, which throws a TDZ
 `ReferenceError`.
 
 What found the cut was a Tarjan SCC pass over nokogiri's runtime imports (type-only
 imports excluded). `searchable.ts`'s only out-edge into the knot was
-`xpath-context.ts`, and the failing reads were all of *searchable's* namespace,
+`xpath-context.ts`, and the failing reads were all of _searchable's_ namespace,
 so the knot never needed untangling - one edge did. `NodeSet` and `XPathContext`
 are now resolved through a late-binding holder (`xml/node-set-ctor.ts`) at query
 time, which is always after boot.
@@ -1766,10 +1766,10 @@ binds its name inside its own body; perry does not create that binding.
 `perry/probe/named-class-expr.ts` (15 lines) and
 `perry/probe/named-class-decl.ts` isolate it exactly:
 
-| shape | Node | perry |
-| --- | --- | --- |
-| `class Base64 {}` **declaration**, self-reference in a static initialiser | works | **works** |
-| `= class Base64 {}` **expression**, same self-reference | works | **ReferenceError** |
+| shape                                                                     | Node  | perry              |
+| ------------------------------------------------------------------------- | ----- | ------------------ |
+| `class Base64 {}` **declaration**, self-reference in a static initialiser | works | **works**          |
+| `= class Base64 {}` **expression**, same self-reference                   | works | **ReferenceError** |
 
 Fixed by hoisting to a module-level declaration, keeping the name `Base64` so
 `.name` and the `Rack::Session::Cookie::Base64` class path are unchanged
@@ -1844,8 +1844,8 @@ value — and silently compiling one module instead of several hundred is exactl
 the failure that looks like a passing rung.
 
 **Filed and narrowed (2026-11-02).** Most of this is already #11576, which
-hard-errors a *value-used* named or default import of an uninstalled bare
-package and *deliberately* keeps `typeof`-only and type-only uses compiling —
+hard-errors a _value-used_ named or default import of an uninstalled bare
+package and _deliberately_ keeps `typeof`-only and type-only uses compiling —
 which is exactly what the headline probe above does, so that probe is not a new
 defect. The one real gap was `new`: constructing such an import compiled
 silently, because `Expr::New`/`JsNew` fed only the generic reference set and
@@ -1885,7 +1885,7 @@ immutable string, so there was nothing to keep:
 `String(this)` resolves through the get trap's existing `bind(target)` branch.
 Two single-file probes settle it, both run on 0.5.1663: `privfield-proxy2.ts`
 reproduces the TypeError, `derive-proxy.ts` prints output identical to Node.
-This is the first wall whose fix was verified *before* a full build rather than
+This is the first wall whose fix was verified _before_ a full build rather than
 after -- the probe pair cost 7 minutes against ~25 for a ladder build.
 
 20 other sites use the constructor-returned-Proxy idiom and are latent; only a
@@ -1902,12 +1902,12 @@ it after a session scratchpad wipe destroyed the previous checkout and binary.
 recorded and was certainly far newer. Four findings came from that stale build
 and do not survive re-validation on main:
 
-| claimed | actual on 0.5.1663 |
-| --- | --- |
-| node_modules symlink cycle OOMs resolution before module #1 | fixed upstream; the cycle restored, main collects 1351 modules and never OOMs |
+| claimed                                                        | actual on 0.5.1663                                                                                           |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| node_modules symlink cycle OOMs resolution before module #1    | fixed upstream; the cycle restored, main collects 1351 modules and never OOMs                                |
 | `export import YAML = Psych` is not surfaced as a named export | works; identical to the rewrite (`typeof YAML = object`, `has loadTags = true`). The trails fix was reverted |
-| whole-program lowering needs >40GB, OOM even at 1x1 jobs | artifact of the stale compiler |
-| codegen unit sizing is the lever for that OOM | never reached per-unit codegen at all |
+| whole-program lowering needs >40GB, OOM even at 1x1 jobs       | artifact of the stale compiler                                                                               |
+| codegen unit sizing is the lever for that OOM                  | never reached per-unit codegen at all                                                                        |
 
 The symlink cycle was real on 0.5.1659 and the analysis is kept for diagnosing
 an old compiler: Tarjan over the `packages/*/node_modules/@blazetrails/*` graph
@@ -1937,7 +1937,7 @@ The chain is trails' own
 
 **trails is already written correctly here**, which is the point of the entry.
 `activerecord/src/namespaces.ts:31` imports the adapter as `import type`
-(erased) and line 114 reaches it through a *dynamic* `import()`, as does
+(erased) and line 114 reaches it through a _dynamic_ `import()`, as does
 `trailties/src/database.ts:300`. `expo-sqlite` is a **peerDependency** of
 activerecord -- the app's choice to supply. Node never loads any of it in
 production. Being lazy is simply not enough for AOT, which must compile
@@ -1992,7 +1992,7 @@ walls fixed in src-resolved packages (16–21) were measured against the edits, 
 are not in doubt.
 
 `perry-ladder-keep/check-dist-fresh.sh` guards the three. Note it must compare
-against the newest file *inside* `dist`, not the `dist` directory's own mtime:
+against the newest file _inside_ `dist`, not the `dist` directory's own mtime:
 `tsc` leaves the directory alone when it only rewrites existing files, so a
 directory test reports "stale" forever.
 
@@ -2028,13 +2028,13 @@ the compiler commit in every entry.** This file now does.
 
 **Compiler: perry 0.5.1663 from `main` at `a1ae27ee5`, plus a 19-line local
 patch (below).** With walls 16-23 all addressed, the boot graph compiles, links
-and *runs*:
+and _runs_:
 
-| | |
-| --- | --- |
-| compile + link | 1934 modules, 225,909,032-byte binary, 1384s |
-| `INIT:` lines | **1318** of 1934 |
-| activerecord inits | 232 |
+|                     |                                               |
+| ------------------- | --------------------------------------------- |
+| compile + link      | 1934 modules, 225,909,032-byte binary, 1384s  |
+| `INIT:` lines       | **1318** of 1934                              |
+| activerecord inits  | 232                                           |
 | last module reached | `examples/perry-native/config/environment.ts` |
 
 Execution is now inside **the application's own config**, past the whole
@@ -2053,7 +2053,7 @@ Any `RegExp` in a stdlib-linked binary aborted the process:
 identity** (`STRING_TAG | self.atom.string as u64`). The atom's `ImageString`
 lives in the `perry_strings` link section with `#[used(linker)]`, and
 `perry-stdlib` statically embeds its own copy of `perry-runtime` -- so linking
-`libperry_runtime.a` *and* `libperry_stdlib.a` puts that string in the binary
+`libperry_runtime.a` _and_ `libperry_stdlib.a` puts that string in the binary
 twice. Counted in the two probe binaries: **1** copy runtime-only (works), **2**
 with stdlib (panics). The key recorded on the global object and the word the
 read site compares are then different pointers, the layout probe misses, and
@@ -2135,7 +2135,7 @@ Verified, all against node:
 It does NOT clear the ladder. `Time.at` still throws, for an unrelated reason
 recorded as wall 25 (`upstream/temporal-range-limit/`): the polyfill's epoch
 range limit measures `837292312000000` instead of `8640000000000000000000`.
-Wall 24 was *a* cause of that `RangeError`, not the only one.
+Wall 24 was _a_ cause of that `RangeError`, not the only one.
 
 ### Two probe hazards worth re-reading before measuring
 
@@ -2183,3 +2183,48 @@ Method note: the wrong value is often unwritten memory and differs per run of
 the same binary, and **adding a `console.log` to a function introduces
 condition 3**. Instrumentation must capture values and print them afterwards,
 never print from inside the wrapped callee.
+
+## Perry fixes live on a fork branch, and nothing is filed until the ladder clears
+
+Every perry-side fix the ladder needs is a commit on `ladder/perry-native` in
+the perry checkout, branched from `a1ae27ee5`. Nothing goes upstream until the
+graph boots end to end; then the whole stack goes up together.
+
+| commit      | wall                                          | crate         |
+| ----------- | --------------------------------------------- | ------------- |
+| `8f3abf116` | 23 — RegExp aborts a stdlib-linked binary     | perry-runtime |
+| `a12e09d30` | 24 — `toString` override on an Array subclass | perry-runtime |
+| `64e6fadb8` | 25 — out-of-range i32 constant arithmetic     | perry-codegen |
+| `73b556b1e` | — LLVM unit workers ignore the cgroup cap     | perry-codegen |
+
+The `perry/upstream/` directories stay as they are: they are the written-up
+reproductions and measurement matrices, which are what makes the eventual
+filing possible. They are no longer queued to be sent.
+
+Two consequences for the runner scripts:
+
+- **A precondition that asserts a fix is an uncommitted diff inverts the
+  moment that fix is committed.** r46–r48 aborted unless
+  `git diff --quiet` _failed_ on the wall-23 file. `r49-fork.sh` checks the
+  branch name and greps the commit subjects over `a1ae27ee5..HEAD` instead.
+- Patch copies under `perry-ladder-keep/` are now duplicates of commits.
+  They stay as a recovery path if the branch is ever lost, but the branch is
+  the source of truth.
+
+## Wall 25's fix exposed a second defect: the compile OOMs on the merged graph
+
+The merge took the graph from 1934 to **2300 modules**, and the compile was
+OOM-killed at a 40G cgroup cap (2019s) and again at 44G (1666s) — _sooner_
+with more memory, which is what says the worker count scales with something
+other than the cap. Tarjan over the 216 workspace symlinks reports no cycles,
+so the module growth is real and not a reintroduced resolution cycle.
+
+`unit_workers()` returned the budget's CPU slots and read no memory figure at
+all, so 12 physical cores meant 12 LLVM unit workers at ~1-2 GiB each
+regardless of the cap. `PERRY_CODEGEN_MEMORY_MB` sets the budget's _memory_,
+which that path never consulted — so lowering it changes nothing, and raising
+the cap only lets the overcommit run longer. Fixed in `73b556b1e`.
+
+**Raising the memory cap is the wrong first move when a compile OOMs.** Check
+what the worker count is actually derived from first; here more memory made it
+fail faster.

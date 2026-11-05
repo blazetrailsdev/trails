@@ -140,6 +140,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/rackup':
+        specifier: workspace:*
+        version: link:../../packages/rackup
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
