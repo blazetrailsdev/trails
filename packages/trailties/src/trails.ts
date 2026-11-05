@@ -11,6 +11,9 @@ import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import type { Autoloaders } from "./autoloaders.js";
+import type { Generators } from "./generators.js";
+import type { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
+import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
@@ -45,6 +48,10 @@ export class Trails {
   declare static Configuration: typeof TrailsConfiguration;
   declare static Paths: typeof Paths;
   declare static Rack?: typeof import("./rack.js");
+  declare static Generators?: typeof Generators;
+  declare static SourceAnnotationExtractor?: typeof SourceAnnotationExtractor;
+  /** @noRailsEquivalent PERMANENT */
+  declare static TrailsTsc?: typeof TrailsTsc;
 
   declare static eagerLoadBang: () => Promise<void>;
 

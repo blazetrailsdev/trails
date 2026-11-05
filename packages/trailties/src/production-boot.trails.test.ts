@@ -13,11 +13,6 @@ const FORBIDDEN_PACKAGES = new Set([
 ]);
 const FORBIDDEN_MODULES =
   /\/action-dispatch\/system-t|\/server\/dev-server\.ts$|\/trailties\/src\/(?:command|commands|generators)(?:\/|\.ts$)|\/trailties\/src\/test-unit\/(?:runner|test-parser)\.ts$/;
-const KNOWN_EDGES = new Set([
-  "trailties/src/engine.ts -> trailties/src/generators.ts",
-  "trailties/src/source-annotation-extractor.ts -> typescript",
-  "trailties/src/trailties/action-view.ts -> trails-tsc/src/index.ts",
-]);
 const SPECIFIER =
   /^\s*(?:import|export)\b(?!\s+type\b)[^;]*?from\s+"([^"]+)"|^\s*import\s+"([^"]+)"|\bimport\(\s*"([^"]+)"\s*\)/gm;
 
@@ -46,10 +41,7 @@ async function reachableFrom(
   const bare = new Set<string>();
   const parent = new Map<string, string>();
   const queue = [...entries];
-  const known = (to: string, from: string): boolean =>
-    KNOWN_EDGES.has(`${fromRoot(from)} -> ${fromRoot(to)}`);
   const visit = (to: string, from: string): void => {
-    if (known(to, from)) return;
     if (!parent.has(to)) parent.set(to, from);
     queue.push(to);
   };
@@ -69,7 +61,6 @@ async function reachableFrom(
       if (workspace !== null) visit(workspace, file);
       else {
         const name = specifier.split("/")[0];
-        if (known(name, file)) continue;
         bare.add(name);
         if (!parent.has(name)) parent.set(name, file);
       }

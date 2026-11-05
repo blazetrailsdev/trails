@@ -115,6 +115,7 @@ declare module "@blazetrails/ruby-compat" {
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
       } | null;
       Application: abstract new (...args: never[]) => unknown;
+      Generators?: { configureBang(config: unknown): void };
       Engine: abstract new (...args: never[]) => unknown;
       Trailtie: abstract new (...args: never[]) => unknown;
       root(): string | null | undefined;
