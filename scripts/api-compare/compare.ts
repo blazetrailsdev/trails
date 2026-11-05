@@ -1655,6 +1655,29 @@ export function rubyCallToTsForReceivers(
 }
 
 /**
+ * `significant` less the calls an instance body cannot make to a same-file
+ * method defined only on the singleton: every site's receiver is an
+ * expression, so `shift.split(":", 2)` (`thor/parser/arguments.rb:98`) is
+ * `String#split`, not `Arguments.split` (`arguments.rb:8-17`).
+ */
+export function unreachableSingletonCallsDropped(
+  significant: { has(value: string): boolean },
+  level: OwnerSeat,
+  receivers: Record<string, readonly string[]> | undefined,
+  isSingletonOnly: (rc: string) => boolean,
+): { has(value: string): boolean } {
+  if (level !== "instance") return significant;
+  return {
+    has: (value) => {
+      if (!significant.has(value)) return false;
+      const kinds = receivers?.[value];
+      if (kinds === undefined || kinds.length === 0 || kinds.some((k) => k !== "expr")) return true;
+      return !isSingletonOnly(value);
+    },
+  };
+}
+
+/**
  * The same-file methods a TS body reaches transitively, up to `depth` hops.
  *
  * `sameFileCalls` resolves a method name to its call-set ONLY when that method
@@ -5770,11 +5793,16 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
-          significantCallsForReceivers(
+          unreachableSingletonCallsDropped(
+            significantCallsForReceivers(
+              rubyOwned?.receivers,
+              callsSignificant,
+              tsNativeForms,
+              rubyOwned?.receiverNames,
+            ),
+            level,
             rubyOwned?.receivers,
-            callsSignificant,
-            tsNativeForms,
-            rubyOwned?.receiverNames,
+            (rc) => seen.has(rubyLevelKey("class", rc)) && !seen.has(rubyLevelKey("instance", rc)),
           ),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,

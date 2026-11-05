@@ -3501,6 +3501,7 @@ class ApiExtractor
 
     name = ident_name(call_node[3])
     return "expr" if name.nil?
+    return "class" if name == "class"
     return "array" if CORE_ARRAY_RETURNING_CHAIN_METHODS.include?(name)
     return "array" if HASH_TO_ARRAY_CHAIN_METHODS.include?(name) && hash_receiver_kind_no_chain?(call_node[1])
 

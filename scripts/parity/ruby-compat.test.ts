@@ -115,6 +115,11 @@ describe("rubyCompatExport", () => {
     expect(jsEnumerableAliases("rm_rf")).toContain("rmRfAsync");
   });
 
+  it("credits ruby-compat's async File predicates", () => {
+    expect(jsEnumerableAliases("directory?")).toContain("isDirectoryAsync");
+    expect(jsEnumerableAliases("exist?")).toContain("isExistAsync");
+  });
+
   it("forwards the receiver through jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("merge", ["hash"])).toEqual(["merge"]);
     expect(jsEnumerableAliases("merge")).toEqual([]);
@@ -128,6 +133,6 @@ describe("rubyCompatExport", () => {
 
   it("unions with the Enumerable table, and leaves the fs-adapter one alone", () => {
     expect(jsEnumerableAliases("key?")).toEqual(["has", "hasKey"]);
-    expect(jsEnumerableAliases("exist?")).toEqual(["existsSync", "exists"]);
+    expect(jsEnumerableAliases("exist?")).toEqual(["existsSync", "exists", "isExistAsync"]);
   });
 });
