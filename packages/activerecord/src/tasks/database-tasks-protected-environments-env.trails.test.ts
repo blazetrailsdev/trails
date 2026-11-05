@@ -279,7 +279,7 @@ describe("PendingMigrationError message", () => {
   fixtures({}, { useTransactionalTests: false });
   const pendingMigrations = [{ filename: "db/migrate/1_create_people.ts" }] as never;
   const command =
-    "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
+    "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db:migrate";
   const tail = "\n\nYou have 1 pending migration:\n\ndb/migrate/1_create_people.ts\n";
   const trails = TopLevel.Trails;
 

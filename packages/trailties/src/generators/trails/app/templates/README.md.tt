@@ -20,7 +20,7 @@ To reach a CLI command with no script of its own, use the `bin/trails` binstub:
 | `bin/trails generate model NAME` | Generate a new model |
 | `bin/trails generate controller NAME` | Generate a new controller |
 | `bin/trails generate scaffold NAME` | Generate a full CRUD resource |
-| `bin/trails db migrate` | Run pending database migrations |
+| `bin/trails db:migrate` | Run pending database migrations |
 | `bin/trails db seed` | Seed the database |
 | `bin/trails test` | Run the test suite |
 

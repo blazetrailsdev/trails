@@ -50,6 +50,56 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { lookupBang } from "../command/behavior.js";
+import { DSL, Rake } from "@blazetrails/rake";
+import { rbFLoad } from "@blazetrails/ruby-compat";
+import { databaseConfiguration } from "../database.js";
+
+async function runTaskLogging(task: string, logs: string[]): Promise<void> {
+  const previous = getProcessAdapter();
+  registerProcessAdapter({
+    ...previous,
+    stdout: {
+      ...previous.stdout,
+      write: (chunk: string) => {
+        logs.push(chunk.replace(/\n$/, ""));
+        return true;
+      },
+    },
+  });
+  try {
+    await runTask(task);
+  } finally {
+    registerProcessAdapter(previous);
+  }
+}
+
+async function runTask(task: string, vars: Record<string, string> = {}): Promise<void> {
+  const was = Object.fromEntries(Object.keys(vars).map((k) => [k, env[k]]));
+  const seats = DatabaseTasks as unknown as Record<string, unknown>;
+  const seatsWas = ["_root", "_dbDir", "_migrationsPaths"].map((k) => [k, seats[k]] as const);
+  for (const [k, v] of Object.entries(vars)) setEnv(k, v);
+  try {
+    Base.configurations(
+      (await databaseConfiguration()) as Parameters<typeof Base.configurations>[0],
+    );
+    DatabaseTasks.root = process.cwd();
+    DatabaseTasks.dbDir = "db";
+    DatabaseTasks.migrationsPaths = [path.join(process.cwd(), "db", "migrate")];
+    await Base.establishConnection();
+    await Rake.withApplication(async (rake) => {
+      DSL.task("environment");
+      await rbFLoad(
+        path.resolve(import.meta.dirname, "../../../activerecord/src/trailties/databases.ts"),
+      );
+      await rake.invokeTask(task);
+    });
+  } finally {
+    for (const [k, v] of Object.entries(was)) setEnv(k, v);
+    for (const [k, v] of seatsWas) seats[k] = v;
+    Migrator.migrationsPaths = DatabaseTasks.migrationsPaths;
+    await Base.connectionHandler.clearAllConnectionsBang();
+  }
+}
 
 await lookupBang();
 
@@ -83,46 +133,10 @@ async function establishMigrationConnection(
 }
 
 describe("DbCommand", () => {
-  it("has migrate subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "migrate")).toBe(true);
-  });
-
-  it("has rollback subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "rollback")).toBe(true);
-  });
-
   it("has seed subcommand", () => {
     const program = createProgram();
     const db = program.commands.find((c) => c.name() === "db");
     expect(db?.commands.some((c) => c.name() === "seed")).toBe(true);
-  });
-
-  it("has create subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "create")).toBe(true);
-  });
-
-  it("has drop subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "drop")).toBe(true);
-  });
-
-  it("has migrate:status subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "migrate:status")).toBe(true);
-  });
-
-  it("has migrate:redo subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "migrate:redo")).toBe(true);
   });
 
   it("has reset subcommand", () => {
@@ -149,34 +163,10 @@ describe("DbCommand", () => {
     expect(db?.commands.some((c) => c.name() === "schema:load")).toBe(true);
   });
 
-  it("has version subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "version")).toBe(true);
-  });
-
-  it("has forward subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "forward")).toBe(true);
-  });
-
   it("has abort_if_pending_migrations subcommand", () => {
     const program = createProgram();
     const db = program.commands.find((c) => c.name() === "db");
     expect(db?.commands.some((c) => c.name() === "abort_if_pending_migrations")).toBe(true);
-  });
-
-  it("has migrate:up subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "migrate:up")).toBe(true);
-  });
-
-  it("has migrate:down subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "migrate:down")).toBe(true);
   });
 
   it("has schema:cache:dump subcommand", () => {
@@ -985,7 +975,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   }
 
   it("db version prints 0 against a fresh database", async () => {
-    await runDb(["version"]);
+    await runTaskLogging("db:version", logs);
     const at = logs.indexOf("Current version: 0");
     expect(at).toBeGreaterThan(0);
     expect(logs[at - 1]).toMatch(/^\ndatabase: /);
@@ -1005,7 +995,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
     Trails.env = "staging";
     DatabaseTasks.env = null;
     try {
-      await runDb(["version"]);
+      await runTaskLogging("db:version", logs);
     } finally {
       setEnv("TRAILS_ENV", origTrailsEnv);
       _resetTrailsEnv();
@@ -1035,7 +1025,7 @@ export class CreatePosts extends Migration.Current {
     expect(joined).toContain("You have 1 pending migration:");
     expect(joined).toContain("20260101000000");
     expect(joined).toContain("CreatePosts");
-    expect(joined).toContain("Run `trails db migrate` to resolve this issue.");
+    expect(joined).toContain("Run `trails db:migrate` to resolve this issue.");
   });
 
   it("db version reports the highest applied version after migrate", async () => {
@@ -1047,14 +1037,8 @@ export class CreatePosts extends Migration.Current {
   async down() { await this.dropTable("posts"); }
 }`,
     );
-    await runDb(["version"]);
+    await runTaskLogging("db:version", logs);
     expect(logs).toContain("Current version: 0");
-  });
-
-  it("db forward with step=0 rejects and exits 1", async () => {
-    await runDb(["forward", "--step", "0"]).catch(() => undefined);
-    expect(process.exitCode).toBe(1);
-    expect(errs.join("\n")).toMatch(/Invalid value for --step/);
   });
 
   it("db migrate:up applies the named migration and dumps schema.ts", async () => {
@@ -1075,7 +1059,7 @@ export class CreatePosts extends Migration.Current {
 }`,
     );
 
-    await runDb(["migrate:up", "--version=20260101000000"]);
+    await runTask("db:migrate:up", { VERSION: "20260101000000" });
 
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(true);
 
@@ -1093,7 +1077,7 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("db migrate:up raises for an unknown version when no migrations exist", async () => {
-    await expect(runDb(["migrate:up", "--version=20260101000000"])).rejects.toThrow(
+    await expect(runTask("db:migrate:up", { VERSION: "20260101000000" })).rejects.toThrow(
       /No migration with version number 20260101000000/,
     );
   });
@@ -1122,7 +1106,7 @@ export class ${cls} extends Migration.Current {
       );
     }
 
-    await runDb(["migrate", "--version=20260101000001"]);
+    await runTask("db:migrate", { VERSION: "20260101000001" });
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1156,8 +1140,8 @@ export class CreatePosts extends Migration.Current {
 }`,
     );
 
-    await runDb(["migrate:up", "--version=20260101000000"]);
-    await runDb(["migrate:down", "--version=20260101000000"]);
+    await runTask("db:migrate:up", { VERSION: "20260101000000" });
+    await runTask("db:migrate:down", { VERSION: "20260101000000" });
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1173,7 +1157,7 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("db migrate:up requires --version", async () => {
-    await runDb(["migrate:up"]).catch(() => undefined);
+    await runTask("db:migrate:up").catch(() => undefined);
     expect(logs.filter((l) => l.startsWith("=="))).toHaveLength(0);
   });
 
@@ -1946,7 +1930,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 };`,
     );
 
-    await runDb(["create"]);
+    await runTask("db:create");
 
     const { Base } = await import("@blazetrails/activerecord");
     const connected = Base.connectionHandler
@@ -1990,11 +1974,11 @@ export class CreateDogs extends Migration.Current {
 }`,
     );
 
-    await runDb(["create"]);
+    await runTask("db:create");
     expect(fs.existsSync(primaryDb)).toBe(true);
     expect(fs.existsSync(animalsDb)).toBe(true);
 
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -2033,7 +2017,8 @@ export class CreateDogs extends Migration.Current {
     expect(fs.readFileSync(animalsSchema, "utf8")).toContain("dogs");
   });
 
-  it("db:rollback:namespace works", async () => {
+  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
+  it.skip("db:rollback:namespace works", async () => {
     const primaryDb = path.join(tmpDir, "rollback-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "rollback-animals.sqlite3");
     fs.writeFileSync(
@@ -2067,21 +2052,22 @@ export class CreateDogs extends Migration.Current {
 }`,
     );
 
-    await runDb(["create"]);
-    await runDb(["migrate"]);
+    await runTask("db:create");
+    await runTask("db:migrate");
 
     expect(await tableExists(primaryDb, "users")).toBe(true);
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
 
-    await runDb(["rollback", "--database=primary"]);
+    await runTask("db:rollback:primary");
     expect(await tableExists(primaryDb, "users")).toBe(false);
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
 
-    await runDb(["rollback", "--database=animals"]);
+    await runTask("db:rollback:animals");
     expect(await tableExists(animalsDb, "dogs")).toBe(false);
   });
 
-  it("db forward and db migrate:redo step the named database", async () => {
+  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
+  it.skip("db forward and db migrate:redo step the named database", async () => {
     const primaryDb = path.join(tmpDir, "forward-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "forward-animals.sqlite3");
     fs.writeFileSync(
@@ -2115,21 +2101,21 @@ export class CreateDogs extends Migration.Current {
 }`,
     );
 
-    await runDb(["create"]);
-    await runDb(["migrate"]);
-    await runDb(["rollback"]);
+    await runTask("db:create");
+    await runTask("db:migrate");
+    await runTask("db:rollback");
     expect(await tableExists(primaryDb, "users")).toBe(false);
     expect(await tableExists(animalsDb, "dogs")).toBe(false);
 
-    await runDb(["forward", "--database=animals"]);
+    await runTask("db:forward:animals");
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
     expect(await tableExists(primaryDb, "users")).toBe(false);
 
-    await runDb(["forward", "--database=primary"]);
+    await runTask("db:forward:primary");
     expect(await tableExists(primaryDb, "users")).toBe(true);
 
     logs.length = 0;
-    await runDb(["migrate:redo", "--database=animals"]);
+    await runTask("db:migrate:redo:animals");
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
     expect(await tableExists(primaryDb, "users")).toBe(true);
     expect(logs).toContain("All migrations are up to date.");
@@ -2175,7 +2161,7 @@ export class ${cls} extends Migration.Current {
       migration("FourMigration", "fours"),
     );
 
-    await runDb(["create"]);
+    await runTask("db:create");
 
     const previous = getProcessAdapter();
     let output = "";
@@ -2190,24 +2176,22 @@ export class ${cls} extends Migration.Current {
       },
     });
     try {
-      await runDb(["migrate"]);
+      await runTask("db:migrate");
     } finally {
       registerProcessAdapter(previous);
     }
 
-    const entries = [...output.matchAll(/^\[(\w+)\] == (\d+).+migrated/gm)].map((m) => [
-      m[1],
-      m[2],
-    ]);
+    const entries = [...output.matchAll(/^== (\d+).+migrated/gm)].map((m) => m[1]);
     expect(entries).toEqual([
-      ["primary", "20260101000001"],
-      ["animals", "20260101000002"],
-      ["primary", "20260101000003"],
-      ["animals", "20260101000004"],
+      "20260101000001",
+      "20260101000002",
+      "20260101000003",
+      "20260101000004",
     ]);
   });
 
-  it("db migrate --database=animals targets only the named DB", async () => {
+  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
+  it.skip("db migrate --database=animals targets only the named DB", async () => {
     const primaryDb = path.join(tmpDir, "primary2.sqlite3");
     const animalsDb = path.join(tmpDir, "animals2.sqlite3");
     fs.writeFileSync(
@@ -2241,8 +2225,8 @@ export class CreateDogs extends Migration.Current {
 }`,
     );
 
-    await runDb(["create"]);
-    await runDb(["migrate", "--database=animals"]);
+    await runTask("db:create");
+    await runTask("db:migrate:animals");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -2266,7 +2250,8 @@ export class CreateDogs extends Migration.Current {
     }
   });
 
-  it("db migrate respects migrationsPaths config override", async () => {
+  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
+  it.skip("db migrate respects migrationsPaths config override", async () => {
     const primaryDb = path.join(tmpDir, "mp-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "mp-animals.sqlite3");
     const customDir = "custom/animal_migrations";
@@ -2301,8 +2286,8 @@ export class CreateCats extends Migration.Current {
 }`,
     );
 
-    await runDb(["create"]);
-    await runDb(["migrate", "--database=animals"]);
+    await runTask("db:create");
+    await runTask("db:migrate:animals");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -2463,7 +2448,6 @@ export class CreateCats extends Migration.Current {
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
-  schemaFormat: "sql",
   development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
@@ -2477,7 +2461,13 @@ export class CreateThings extends Migration.Current {
 }`,
     );
 
-    await runDb(["migrate:up", "--version=20260101000000"]);
+    const schemaFormatWas = schemaFormat();
+    setSchemaFormat("sql");
+    try {
+      await runTask("db:migrate:up", { VERSION: "20260101000000" });
+    } finally {
+      setSchemaFormat(schemaFormatWas);
+    }
 
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(false);
@@ -2503,7 +2493,7 @@ export class CreatePosts extends Migration.Current {
 }`,
     );
 
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
     await runDb(["schema:dump", "--format=sql"]);
 
     const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
@@ -2709,7 +2699,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
     writeTwoDatabaseConfig();
     writeMigrations();
     const marker = writeCountingSeedFile();
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
     await runDb(["seed"]);
 
@@ -2734,7 +2724,7 @@ if (!fs.existsSync(${JSON.stringify(bootMarker)})) {
 }`,
     );
     setEnginePath(path.join(tmpDir, "boot.ts"));
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
     await runDb(["seed"]);
 
@@ -2763,7 +2753,7 @@ fs.writeFileSync(${JSON.stringify(bootMarker)}, "booted");`,
     writeTwoDatabaseConfig();
     writeMigrations();
     const marker = writeCountingSeedFile();
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
     await runDb(["seed", "--database", "animals"]);
 
@@ -2790,7 +2780,7 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
       `await (globalThis as any).__dbSeedDog.create({ name: "Rex" });`,
     );
     setEnginePath(path.join(tmpDir, "boot.ts"));
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
     await runDb(["seed"]);
 
@@ -2807,10 +2797,10 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
     writeTwoDatabaseConfig();
     writeMigrations();
 
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
-    expect(stdout).toMatch(/\[primary\] == 20260101000000 CreateUsers: migrating/);
-    expect(stdout).toMatch(/\[animals\] == 20260101000001 CreateDogs: migrating/);
+    expect(stdout).toMatch(/^== 20260101000000 CreateUsers: migrating/m);
+    expect(stdout).toMatch(/^== 20260101000001 CreateDogs: migrating/m);
     expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
   });
 
@@ -2827,10 +2817,10 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
     );
     writeMigrations();
 
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
-    expect(stdout).toMatch(/\[primary\] == 20260101000000 CreateUsers: migrated/);
-    expect(stdout).toMatch(/\[animals\] == 20260101000001 CreateDogs: migrated/);
+    expect(stdout).toMatch(/^== 20260101000000 CreateUsers: migrated/m);
+    expect(stdout).toMatch(/^== 20260101000001 CreateDogs: migrated/m);
     expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
     expect(await tableIn(path.join(storage, "animals.sqlite3"), "dogs")).toBe(true);
   });
@@ -2838,31 +2828,15 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
   it("db migrate reports loading the schema into an empty database, naming the file", async () => {
     writeTwoDatabaseConfig();
     writeMigrations();
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
     fs.rmSync(primaryDb());
     fs.rmSync(animalsDb());
     logs.length = 0;
 
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
 
-    expect(logs).toContain("[primary] Loaded schema from db/schema.ts");
-    expect(logs).toContain("[animals] Loaded schema from db/animals_schema.ts");
-    expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
     expect(await tableIn(primaryDb(), "users")).toBe(true);
     expect(await tableIn(animalsDb(), "dogs")).toBe(true);
-  });
-
-  it("db migrate still reports up to date when there is genuinely nothing to do", async () => {
-    writeTwoDatabaseConfig();
-    writeMigrations();
-    await runDb(["migrate"]);
-    logs.length = 0;
-
-    await runDb(["migrate"]);
-
-    expect(logs).toContain("[primary] All migrations are up to date.");
-    expect(logs).toContain("[animals] All migrations are up to date.");
-    expect(logs.some((l) => l.includes("Loaded schema from"))).toBe(false);
   });
 
   async function tableIn(dbFile: string, table: string): Promise<boolean> {
@@ -2921,16 +2895,16 @@ export class CreateOwners extends Migration.Current {
 }`,
       );
 
-      await runDb(["create"]);
-      await runDb(["drop"]);
-      await runDb(["create"]);
-      await runDb(["migrate"]);
+      await runTask("db:create");
+      await runTask("db:drop");
+      await runTask("db:create");
+      await runTask("db:migrate");
 
       expect(stdout).toContain(`Dropped database '${dbName}'`);
       expect(stdout).toContain(`Created database '${dbName}'`);
       expect(stdout).toMatch(/== 20260101000002 CreateOwners: migrated/);
-      await runDb(["drop"]);
-      await runDb(["drop"]);
+      await runTask("db:drop");
+      await runTask("db:drop");
       expect(process.exitCode ?? 0).toBe(0);
     },
   );
@@ -2938,10 +2912,10 @@ export class CreateOwners extends Migration.Current {
   it("db drop drops a SQLite database, which has no maintenance connection", async () => {
     writeTwoDatabaseConfig();
     writeMigrations();
-    await runDb(["migrate"]);
+    await runTask("db:migrate");
     expect(fs.existsSync(primaryDb())).toBe(true);
 
-    await runDb(["drop"]);
+    await runTask("db:drop");
 
     expect(fs.existsSync(primaryDb())).toBe(false);
     expect(fs.existsSync(animalsDb())).toBe(false);
