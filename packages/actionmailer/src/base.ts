@@ -59,7 +59,6 @@ export class Base extends AbstractController.Base {
   declare static deliveryJob: unknown;
   declare static deliverLaterQueueName: unknown;
   declare static with: typeof ParameterizedClassMethods.with;
-  declare params: Record<string, unknown>;
 
   /** @internal */
   protected static _mailerName?: string;
@@ -511,6 +510,7 @@ export class Base extends AbstractController.Base {
 export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
   lookupContext: InstanceType<typeof ActionView.LookupContext>;
   render(...args: unknown[]): unknown;
+  params: Record<string, unknown>;
 }
 
 /** @internal */
