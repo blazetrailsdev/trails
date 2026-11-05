@@ -53,9 +53,10 @@ runs:
           echo "apt attempt $attempt failed; retrying"
           sleep 10
           sudo dpkg --configure -a || true
-          if [ -f /etc/apt/apt-mirrors.txt ] && grep -qv azure.archive.ubuntu.com /etc/apt/apt-mirrors.txt; then
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -qvE 'azure\.archive\.ubuntu\.com|^[[:space:]]*$' /etc/apt/apt-mirrors.txt; then
             sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
           fi
+          cat /etc/apt/apt-mirrors.txt 2>/dev/null || true
         done
         sudo apt-get "${APT_OPTS[@]}" autoclean -q
     - if: always() && steps.probe.outputs.present != 'true'
