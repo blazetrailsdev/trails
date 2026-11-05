@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
-import { assertCalled, assertNothingRaised } from "@blazetrails/activesupport";
+import { assertCalled, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { Message, SMTP, TestMailer } from "@blazetrails/mail";
-import { Dir, NoMethodError, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
+import { Dir, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base as ActionMailerBase } from "./base.js";
 import type { DeliveryMethodsClass } from "./delivery-methods.js";
 import type { MessageDelivery } from "./message-delivery.js";
@@ -85,14 +85,13 @@ describe("CustomDeliveryMethodsTest", () => {
 
   it("respond to custom settings", () => {
     expect(Base).toRespondTo("customSettings");
-    expect(Object.getOwnPropertyDescriptor(Base, "customSettings")?.set).toBeTypeOf("function");
+    expect(Base).toRespondTo("customSettings=");
   });
 
   it("does not respond to unknown settings", () => {
     expect(() => (Base as unknown as { anotherSettings(): unknown }).anotherSettings()).toThrow(
       TypeError,
     );
-    expect(NoMethodError).toBeDefined();
   });
 });
 
@@ -199,20 +198,14 @@ describe("MailDeliveryTest", () => {
 
   it("non registered delivery methods raises errors", async () => {
     DeliveryMailer.deliveryMethod = "unknown";
-    const error = await Mailer.welcome()
-      .deliverNow()
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(RuntimeError);
-    expect((error as Error).message).toBe("Invalid delivery method :unknown");
+    const error = await assertRaises([RuntimeError], {}, () => Mailer.welcome().deliverNow());
+    expect(error.message).toBe("Invalid delivery method :unknown");
   });
 
   it("undefined delivery methods raises errors", async () => {
     DeliveryMailer.deliveryMethod = null;
-    const error = await Mailer.welcome()
-      .deliverNow()
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(RuntimeError);
-    expect((error as Error).message).toBe("Delivery method cannot be nil");
+    const error = await assertRaises([RuntimeError], {}, () => Mailer.welcome().deliverNow());
+    expect(error.message).toBe("Delivery method cannot be nil");
   });
 
   // BLOCKED: stub-any-instance-does-not-intercept-js-new
