@@ -161,7 +161,7 @@ Files to migrate:
 (`database_tasks.rb:317-325`) that the `db:migrate:up` / `:down` rake tasks
 read and require directly (`databases.rake:170`), and RFC 0051 converges that
 pair on Rails' shape. The prefixed name lost to Rails fidelity here; `VERSION`
-is the only key `targetVersion()` reads, and it is what `trails db migrate:up`
+is the only key `targetVersion()` reads, and it is what `trails db:migrate:up`
 / `:down` and `ar db:migrate --version` publish. This is a per-variable
 exception, not a reversal of the `TRAILS_` policy — `TRAILS_ENV` and
 `TRAILS_DISABLE_DATABASE_ENVIRONMENT_CHECK` are unaffected.

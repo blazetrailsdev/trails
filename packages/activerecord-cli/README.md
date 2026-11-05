@@ -9,7 +9,7 @@ that types models from `db/schema.ts`.
 
 It is the tooling layer on top of `@blazetrails/activerecord`. The runtime
 package carries no CLI dependency. A full trails application (`trails new`)
-does not need this package's commands. It uses `bin/trails db ...` and
+does not need this package's commands. It uses `bin/trails db:...` and
 `bin/trails generate ...`, and takes only `trails-tsc` from here.
 
 ## Install

@@ -466,15 +466,13 @@ DSL.namespace("db", (dbNamespace) => {
   DSL.task(
     { abort_if_pending_migrations: "load_config" },
     block(async () => {
-      let pendingMigrations: MigrationProxy[] | MigrationProxy[][] = [];
+      const pendingMigrationsByPool: MigrationProxy[][] = [];
 
       await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
-        (pendingMigrations as MigrationProxy[][]).push(
-          await pool.migrationContext.open().pendingMigrations(),
-        );
+        pendingMigrationsByPool.push(await pool.migrationContext.open().pendingMigrations());
       });
 
-      pendingMigrations = pendingMigrations.flat();
+      const pendingMigrations = pendingMigrationsByPool.flat();
 
       if (pendingMigrations.length > 0) {
         STDOUT.puts(

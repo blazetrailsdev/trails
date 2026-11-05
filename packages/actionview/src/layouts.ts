@@ -210,15 +210,15 @@ export function _defaultLayout(
   keys: readonly string[],
   requireLayout = false,
 ): LayoutValue {
-  const subclasses: LayoutsClass[] = [];
+  const klasses: LayoutsClass[] = [];
   for (
     let klass = this.constructor as unknown as LayoutsClass;
     !Object.hasOwn(klass.prototype, "_layout");
     klass = Object.getPrototypeOf(klass) as LayoutsClass
   ) {
-    subclasses.unshift(klass);
+    klasses.unshift(klass);
   }
-  for (const klass of subclasses) klass._writeLayoutMethod();
+  for (const klass of klasses) klass._writeLayoutMethod();
 
   let value: LayoutValue;
   try {
