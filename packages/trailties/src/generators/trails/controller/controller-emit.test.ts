@@ -42,4 +42,15 @@ describe("ControllerGenerator emit", () => {
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
   });
+
+  it("keeps an underscored namespace segment as Rails' class_path has it", async () => {
+    await runController("blog_admin/posts", ["index"]);
+    expect(fs.existsSync(path.join(tmpDir, "app/controllers/blog_admin/posts-controller.ts"))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/blog_admin/posts-helper.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/blog-admin/posts/index.html.tse"))).toBe(
+      true,
+    );
+  });
 });

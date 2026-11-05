@@ -140,6 +140,10 @@ export class AppBuilder extends ActionMethods {
   /** @internal */
   declare private readonly skipEslint: () => boolean | undefined;
   /** @internal */
+  declare private readonly skipThruster: () => boolean | undefined;
+  /** @internal */
+  declare private readonly skipBrakeman: () => boolean | undefined;
+  /** @internal */
   declare private readonly gitInitCommand: () => Promise<string>;
   /** @internal */
   declare private readonly run: (command: unknown, config?: object) => Promise<unknown>;
@@ -162,6 +166,7 @@ export class AppBuilder extends ActionMethods {
 
   /**
    * @inventedArm if — PERMANENT
+   * @inventedArm template — PERMANENT
    * @missingRailsArgs template — PERMANENT
    */
   async gemfile(): Promise<void> {
@@ -176,7 +181,10 @@ export class AppBuilder extends ActionMethods {
     await this.template("Rakefile.ts");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
+  /**
+   * @inventedArm template — PERMANENT
+   * @missingRailsArgs template — PERMANENT
+   */
   async configru(): Promise<void> {
     await this.template("config.ts");
     await this.template("vite.config.ts");
@@ -229,7 +237,11 @@ export class AppBuilder extends ActionMethods {
 
   async bin(): Promise<void> {
     const excludePattern = rbRegSUnion(
-      [this.skipEslint() ? /eslint/ : null].filter((p) => p != null),
+      [
+        this.skipThruster() ? /thrust/ : null,
+        this.skipEslint() ? /eslint/ : null,
+        this.skipBrakeman() ? /brakeman/ : null,
+      ].filter((p) => p != null),
     );
     await this.directory(
       "bin",
@@ -337,7 +349,10 @@ export class AppBuilder extends ActionMethods {
     await this.emptyDirectoryWithKeepFile("tmp/storage");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
+  /**
+   * @inventedArm template — PERMANENT
+   * @missingRailsArgs template — PERMANENT
+   */
   async test(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/fixtures/files");
     await this.emptyDirectoryWithKeepFile("test/controllers");

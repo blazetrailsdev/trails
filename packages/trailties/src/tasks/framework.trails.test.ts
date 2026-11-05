@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
 import { Dir, File, FileUtils, RuntimeError, rbFLoad } from "@blazetrails/ruby-compat";
+import { Application } from "../application.js";
 import { Trails } from "../trails.js";
+
+class FrameworkTaskTestApp extends Application {}
 
 describe("tasks/framework", () => {
   let root: string;
@@ -27,6 +30,24 @@ describe("tasks/framework", () => {
         await task.invoke();
       }),
     ).rejects.toBeInstanceOf(RuntimeError);
+  });
+
+  it("applies the template at LOCATION, running its generate in line", async () => {
+    const previous = Trails.application;
+    Trails.application = FrameworkTaskTestApp.instance();
+    File.write(File.join(root, "tsconfig.json"), "{}");
+    const tmpl = File.join(root, "template.mjs");
+    File.write(tmpl, 'export default (g) => g.generate("helper", "Post", { inline: true });\n');
+    vi.stubEnv("LOCATION", tmpl);
+    await Rake.withApplication(async (rake) => {
+      await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
+      const task = rake.lookup("app:template")!;
+      task.clearPrerequisites();
+      await task.invoke();
+    }).finally(() => {
+      Trails.application = previous;
+    });
+    expect(File.isExist(File.join(root, "app/helpers/post-helper.ts"))).toBe(true);
   });
 
   it("copies the default templates", async () => {
