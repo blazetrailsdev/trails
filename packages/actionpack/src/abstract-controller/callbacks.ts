@@ -160,10 +160,11 @@ export function beforeAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "before",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
@@ -174,10 +175,11 @@ export function prependBeforeAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "before",
+      callback,
       name as FilterListEntry,
       {
         ...options,
@@ -191,10 +193,11 @@ export function skipBeforeAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "before";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback(
       "process_action",
-      "before",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
@@ -205,10 +208,11 @@ export function afterAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "after",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
@@ -219,10 +223,11 @@ export function prependAfterAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "after",
+      callback,
       name as FilterListEntry,
       {
         ...options,
@@ -236,10 +241,11 @@ export function skipAfterAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
+  const callback = "after";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback(
       "process_action",
-      "after",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
@@ -250,10 +256,11 @@ export function aroundAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
+  const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "around",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
@@ -264,10 +271,11 @@ export function prependAroundAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
+  const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.setCallback(
       "process_action",
-      "around",
+      callback,
       name as FilterListEntry,
       {
         ...options,
@@ -281,10 +289,11 @@ export function skipAroundAction(
   this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
+  const callback = "around";
   _insertCallbacks(names, null, (name, options) => {
     this.skipCallback(
       "process_action",
-      "around",
+      callback,
       name as FilterListEntry,
       options as ASCallbackOptions,
     );
