@@ -646,7 +646,6 @@ export class TimeWithZone {
     return this.plus(other);
   }
 
-  /** @missingRailsArgs in_time_zone — PERMANENT */
   advance(options: AdvanceOptions): TimeWithZone {
     if ([options.years, options.weeks, options.months, options.days].some((v) => v != null)) {
       return this._wrapWithTimeZone(
