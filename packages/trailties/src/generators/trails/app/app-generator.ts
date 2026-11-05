@@ -231,10 +231,6 @@ export class AppBuilder extends ActionMethods {
     await this.keepFile("app/models/concerns");
   }
 
-  async binWhenUpdating(): Promise<void> {
-    await this.bin();
-  }
-
   async bin(): Promise<void> {
     const excludePattern = rbRegSUnion(
       [
@@ -249,6 +245,9 @@ export class AppBuilder extends ActionMethods {
       (content: string) => `${this.shebang()}\n` + content,
     );
     await this.chmod("bin", 0o755 & ~File.umask(), { verbose: false });
+  }
+  async binWhenUpdating(): Promise<void> {
+    await this.bin();
   }
 
   /** @missingRailsArgs template — PERMANENT */

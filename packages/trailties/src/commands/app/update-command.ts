@@ -4,9 +4,9 @@ import {
   TopLevel,
   constDefined,
   include,
-  merge,
   Pathname,
   rbModName,
+  chomp,
 } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 import type { ThorClass } from "@blazetrails/thor";
@@ -16,10 +16,14 @@ import { Trails } from "../../trails.js";
 import { AppGenerator } from "../../generators/trails/app/app-generator.js";
 
 export class UpdateCommand extends Base {
+  declare static addRuntimeOptionsBang: OmitThisParameter<
+    typeof ThorActions.ClassMethods.addRuntimeOptionsBang
+  >;
+
   static {
     const klass = this as unknown as ThorClass;
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
-    (klass as unknown as { addRuntimeOptionsBang(): void }).addRuntimeOptionsBang();
+    this.addRuntimeOptionsBang();
 
     klass.desc(
       "update",
@@ -44,6 +48,15 @@ export class UpdateCommand extends Base {
 
   /** @internal */
   private _appGenerator?: AppGenerator;
+
+  /** @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85 */
+  constructor(
+    args: unknown[] = [],
+    options: Record<string, unknown> = {},
+    config: Record<string, unknown> = {},
+  ) {
+    super(args as string[], options as never, config);
+  }
 
   async perform(): Promise<void> {
     await this.requireApplicationBang();
@@ -95,7 +108,7 @@ export class UpdateCommand extends Base {
           new Pathname(Trails.root()!).join("config", "application.ts").toString(),
         ))
       ) {
-        (gen as unknown as { isValidConst(): void }).isValidConst();
+        gen.isValidConst();
       }
       this._appGenerator = gen;
     }
@@ -106,14 +119,11 @@ export class UpdateCommand extends Base {
   private async generatorOptions(): Promise<Record<string, unknown>> {
     const config = Trails.application!.config;
 
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options is a Thor HashWithIndifferentAccess, read through to_hash
-    return merge(
-      {
+    return {
+      ...{
         api: !!config.apiOnly,
         update: true,
-        name: underscore(
-          String(rbModName(Trails.application!.constructor)).replace(/::Application$/, ""),
-        ),
+        name: underscore(chomp(rbModName(Trails.application!.constructor)!, "::Application")),
         skipActiveJob: !constDefined(TopLevel, "ActiveJob::Railtie"),
         skipActiveRecord: !constDefined(TopLevel, "ActiveRecord::Railtie"),
         skipActiveStorage: !constDefined(TopLevel, "ActiveStorage::Engine"),
@@ -130,8 +140,8 @@ export class UpdateCommand extends Base {
         skipAssetPipeline: this.assetPipeline() == null,
         skipBootsnap: !constDefined(TopLevel, "Bootsnap"),
       },
-      this.options,
-    );
+      ...Object.fromEntries(this.options.toHash()),
+    };
   }
 
   /** @internal */
@@ -141,9 +151,7 @@ export class UpdateCommand extends Base {
 
   /** @inventedArm readAsync — PERMANENT */
   private async isSkipGem(gemName: string): Promise<boolean> {
-    const packageJson = File.join(Trails.root()!, "package.json");
-    if (!(await File.isExistAsync(packageJson))) return true;
-    const pkg = JSON.parse(await File.readAsync(packageJson)) as {
+    const pkg = JSON.parse(await File.readAsync(File.join(Trails.root()!, "package.json"))) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };

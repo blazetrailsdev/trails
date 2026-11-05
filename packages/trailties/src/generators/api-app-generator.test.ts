@@ -9,11 +9,7 @@ import { AppGenerator } from "./trails/app/app-generator.js";
 import { TestCase } from "./test-case.js";
 import { runAppUpdate } from "./generators-test-helper.js";
 
-class ApiAppGeneratorApp extends Application {
-  static {
-    this.config.apiOnly = true;
-  }
-}
+class ApiAppGeneratorApp extends Application {}
 const destinationRoot = Dir.mktmpdir();
 
 class ApiAppGeneratorTest extends TestCase {}
@@ -173,7 +169,12 @@ describe("ApiAppGeneratorTest", () => {
 
   it("app update does not generate public files", async () => {
     await t.runGenerator();
-    await runAppUpdate.call(t);
+    Trails.application!.config.apiOnly = true;
+    try {
+      await runAppUpdate.call(t);
+    } finally {
+      Trails.application!.config.apiOnly = false;
+    }
 
     t.assertNoFile("public/406-unsupported-browser.html");
   });
