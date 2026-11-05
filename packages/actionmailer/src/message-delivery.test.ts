@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Time } from "@blazetrails/date";
-import { Identification, toGlobalId } from "@blazetrails/globalid";
+import { GlobalID, Identification } from "@blazetrails/globalid";
 import { Message } from "@blazetrails/mail";
 import {
   RuntimeError,
@@ -101,7 +101,7 @@ class DeserializationErrorFixture {
   }
 
   toGlobalId(_options = {}) {
-    return toGlobalId.call(this, { app: "foo" });
+    return GlobalID.create(this, { app: "foo" });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
