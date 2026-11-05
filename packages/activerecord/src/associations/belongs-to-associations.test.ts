@@ -560,8 +560,8 @@ describe("BelongsToAssociationsTest", () => {
         /^Region\([^)]+\) expected, got "wrong value" which is an instance of String\([^)]+\)$/,
       );
     } finally {
-      if (constDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
-      if (constDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
+      if (constDefined(Admin, "Region")) rbModRemoveConst(Admin, "Region");
+      if (constDefined(Admin, "RegionalUser")) rbModRemoveConst(Admin, "RegionalUser");
       rbModRemoveConst(TopLevel, "AdminRegion");
       rbModRemoveConst(TopLevel, "AdminRegionalUser");
 
