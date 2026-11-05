@@ -11,6 +11,7 @@ import {
 import type { Message } from "@blazetrails/mail";
 import {
   Dir,
+  aryDelete,
   rbFRequireFile,
   rbModName,
   rbFSend,
@@ -47,9 +48,7 @@ export const ClassMethods = {
   },
 
   unregisterPreviewInterceptor(this: PreviewsClass, interceptor: unknown): void {
-    const previewInterceptor = ClassMethods.interceptorClassFor.call(this, interceptor);
-    const index = this.previewInterceptors.indexOf(previewInterceptor);
-    if (index !== -1) this.previewInterceptors.splice(index, 1);
+    aryDelete(this.previewInterceptors, ClassMethods.interceptorClassFor.call(this, interceptor));
   },
 
   /** @internal */
