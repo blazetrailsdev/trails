@@ -308,7 +308,7 @@ defineConstants([
   [() => m103, "ActiveSupport::XmlMini"],
   [() => m103.FileLike, "ActiveSupport::XmlMini::FileLike"],
   [() => m20, "DateAndTime::Calculations"],
-  [() => m21, "DateAndTime::Zones"],
+  [() => m21.Zones, "DateAndTime::Zones"],
   [() => m22.SoleItemExpectedError, "Enumerable::SoleItemExpectedError"],
   [() => m27.Util, "TSE::Util"],
   [() => m24.Generic, "URI::Generic"],
