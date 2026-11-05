@@ -101,6 +101,9 @@ describe("AuthenticationGenerator", () => {
     expect(combined.join("\n")).toMatchSnapshot();
     expect(exists("test/models/user.test.ts")).toBe(true);
     expect(exists("test/fixtures/users.yml")).toBe(true);
+    expect(read("test/fixtures/users.yml")).toMatch(
+      /<% const passwordDigest = BCrypt\.Password\.create\("password"\) %>[\s\S]*password_digest: <%= passwordDigest %>/,
+    );
   });
 
   it("--api still templates the mailer, its views and its preview", async () => {

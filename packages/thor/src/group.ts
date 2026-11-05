@@ -1,5 +1,4 @@
 import {
-  rbStrSend,
   kebabCase,
   ArgumentError,
   fetch,
@@ -11,6 +10,7 @@ import {
   rbObjClone,
   rbObjIsKindOf,
   rbObjRespondTo,
+  rbStrSend,
   rtest,
   toS,
   Hash,
