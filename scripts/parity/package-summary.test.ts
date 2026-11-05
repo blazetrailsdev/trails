@@ -107,12 +107,84 @@ beforeEach(async () => {
           paramNames: { compared: 10 },
           predicatesCompared: 4,
           predicateKindMismatches: [{}],
+          files: [
+            {
+              rubyFile: "base.rb",
+              expectedTsFile: "base.ts",
+              tsFileExists: true,
+              matched: 5,
+              missing: 1,
+            },
+            {
+              rubyFile: "core.rb",
+              expectedTsFile: "core.ts",
+              tsFileExists: false,
+              matched: 0,
+              missing: 3,
+            },
+            {
+              rubyFile: "lonely.rb",
+              expectedTsFile: "lonely.ts",
+              tsFileExists: true,
+              matched: 2,
+              missing: 0,
+            },
+          ],
+        },
+        {
+          package: "actiondispatch",
+          files: [
+            {
+              rubyFile: "routing.rb",
+              expectedTsFile: "routing.ts",
+              tsFileExists: true,
+              matched: 1,
+              missing: 1,
+            },
+          ],
         },
         {
           package: "sqlite3",
           paramNames: { compared: 2 },
           predicatesCompared: 0,
           predicateKindMismatches: [],
+        },
+      ],
+    }),
+  );
+  await write(
+    "scripts/test-compare/output/convention-comparison.json",
+    JSON.stringify({
+      results: [
+        {
+          package: "activerecord",
+          files: [
+            {
+              rubyFile: "base_test.rb",
+              conventionTsFile: "base.test.ts",
+              rubyTestCount: 8,
+              matched: 6,
+            },
+            {
+              rubyFile: "core_test.rb",
+              conventionTsFile: "core.test.ts",
+              rubyTestCount: 4,
+              matched: 0,
+            },
+            {
+              rubyFile: "base/more_test.rb",
+              conventionTsFile: "base.test.ts",
+              rubyTestCount: 2,
+              matched: 1,
+            },
+            {
+              rubyFile: "routing_test.rb",
+              conventionTsFile: "routing.test.ts",
+              conventionTsPackage: "actionpack",
+              rubyTestCount: 3,
+              matched: 2,
+            },
+          ],
         },
       ],
     }),
@@ -234,11 +306,53 @@ describe("package-summary", () => {
     await expect(summarize(root)).rejects.toThrow(/cites CLAUDE.md, "No such section"/);
   });
 
+  it("joins each api-compare file to the test file mapped onto its TS path", async () => {
+    const { files } = await summarize(root);
+    expect(files).toEqual([
+      {
+        package: "activerecord",
+        rubyFile: "base.rb",
+        tsFile: "base.ts",
+        methodsMatched: 5,
+        methodsMissing: 1,
+        testsMatched: 7,
+        testsTotal: 10,
+      },
+      {
+        package: "activerecord",
+        rubyFile: "core.rb",
+        tsFile: null,
+        methodsMatched: 0,
+        methodsMissing: 3,
+        testsMatched: 0,
+        testsTotal: 4,
+      },
+      {
+        package: "activerecord",
+        rubyFile: "lonely.rb",
+        tsFile: "lonely.ts",
+        methodsMatched: 2,
+        methodsMissing: 0,
+        testsMatched: 0,
+        testsTotal: 0,
+      },
+      {
+        package: "actionpack",
+        rubyFile: "routing.rb",
+        tsFile: "routing.ts",
+        methodsMatched: 1,
+        methodsMissing: 1,
+        testsMatched: 2,
+        testsTotal: 3,
+      },
+    ]);
+  });
+
   it("writes the summary file", async () => {
-    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 4 CLAUDE.md sections/);
+    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
     const out = JSON.parse(
       await fs.readFile(path.join(root, "scripts/parity/output/package-summary.json"), "utf-8"),
     );
-    expect(Object.keys(out)).toEqual(["packages", "tagSites", "claudeSections"]);
+    expect(Object.keys(out)).toEqual(["packages", "tagSites", "files", "claudeSections"]);
   });
 });
