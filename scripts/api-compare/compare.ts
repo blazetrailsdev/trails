@@ -1856,6 +1856,8 @@ interface PackageResult {
   optionKeys: OptionKeyResult;
   /** Report-only (RFC 0156): predicates matched by a non-boolean getter or property. */
   predicateKindMismatches: PredicateKindMismatch[];
+  /** Name-matched pairs whose Ruby side is a predicate — the denominator of `predicateKindMismatches` (RFC 0222). */
+  predicatesCompared: number;
   /** Report-only (RFC 0156): where Rails' definitions went — see `rubyDefinitionBreakdown`. */
   denominator: DenominatorBreakdown;
   literals: LiteralResult;
@@ -5207,6 +5209,7 @@ export function main() {
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
     const predicateKindMismatches: PredicateKindMismatch[] = [];
+    let predicatesCompared = 0;
     let literalsCompared = 0;
     let literalsSkipped = 0;
     const literalMismatches: LiteralMismatch[] = [];
@@ -6353,6 +6356,7 @@ export function main() {
         );
         const notePredicateKind = (tsFile: string, tsName: string) => {
           const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
+          if (rubyName.endsWith("?")) predicatesCompared++;
           if (predicateKindMismatch(rubyName, tsName, admits)) {
             predicateKindMismatches.push({ rubyFile, rubyName, rubyModule, tsFile, tsName });
           }
@@ -6864,6 +6868,7 @@ export function main() {
       },
       blockParams: { compared: blockParamsCompared, mismatches: blockParamMismatches },
       predicateKindMismatches,
+      predicatesCompared,
       denominator,
       optionKeys: {
         compared: optionKeysCompared,
