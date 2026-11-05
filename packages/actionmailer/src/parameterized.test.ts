@@ -151,7 +151,10 @@ describe("ParameterizedTest", () => {
     );
   });
 
-  async function withDeliveryJob(job: unknown, fn: () => Promise<unknown>): Promise<void> {
+  async function withDeliveryJob(
+    job: typeof MailDeliveryJob,
+    fn: () => Promise<unknown>,
+  ): Promise<void> {
     const oldDeliveryJob = ParamsMailer.deliveryJob;
     try {
       ParamsMailer.deliveryJob = job;

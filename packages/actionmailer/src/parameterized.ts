@@ -1,5 +1,10 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import { NoMethodError, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  PROTOCOL_PROBES,
+  rbModName,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import {
   MessageDelivery as BaseMessageDelivery,
   type MailerClass,
@@ -33,7 +38,7 @@ export class Mailer {
     this._params = params;
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "symbol" || Reflect.has(target, prop)) {
+        if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || Reflect.has(target, prop)) {
           return Reflect.get(target, prop, receiver);
         }
         if (!target.respondToMissing(prop)) return undefined;
@@ -67,7 +72,7 @@ export class Mailer {
 /** @internal */
 export class MessageDelivery extends BaseMessageDelivery {
   /** @internal */
-  protected _params: Record<string, unknown>;
+  declare protected _params: Record<string, unknown>;
 
   constructor(
     mailerClass: MailerClass,

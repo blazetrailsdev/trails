@@ -33,6 +33,7 @@ import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
 import { Parameterized, type ClassMethods as ParameterizedClassMethods } from "./parameterized.js";
 import { QueuedDelivery } from "./queued-delivery.js";
+import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import { Rescuable } from "./rescuable.js";
 
 type Headers = Record<string, unknown>;
@@ -56,7 +57,7 @@ export class Base extends AbstractController.Base {
   /** @internal */
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
   declare static defaultParams: Readonly<Record<string, unknown>>;
-  declare static deliveryJob: unknown;
+  declare static deliveryJob: typeof MailDeliveryJob;
   declare static deliverLaterQueueName: unknown;
   declare static with: typeof ParameterizedClassMethods.with;
 
@@ -168,7 +169,7 @@ export class Base extends AbstractController.Base {
   /** @internal */
   static methodMissing(methodName: string, ...args: unknown[]): unknown {
     if (this.actionMethods().includes(methodName)) {
-      return new ActionMailer.MessageDelivery(this as never, methodName, ...args);
+      return new ActionMailer.MessageDelivery(this, methodName, ...args);
     } else {
       throw new NoMethodError(
         `undefined method \`${methodName}' for class ${rbModName(this)}`,
@@ -511,6 +512,7 @@ export interface Base extends Included<typeof Rescuable>, Included<typeof Delive
   lookupContext: InstanceType<typeof ActionView.LookupContext>;
   render(...args: unknown[]): unknown;
   params: Record<string, unknown>;
+  runCallbacks(kind: string, block?: () => unknown): unknown;
 }
 
 /** @internal */

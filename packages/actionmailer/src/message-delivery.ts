@@ -1,37 +1,27 @@
-import { RuntimeError, rbModName } from "@blazetrails/ruby-compat";
+import { Delegator, RuntimeError, rbModName } from "@blazetrails/ruby-compat";
 import type { Message } from "@blazetrails/mail";
+import type { Base } from "./base.js";
 import { ActionMailer } from "./namespaces.js";
 
 /** @internal */
-export interface ProcessedMailer {
-  process(action: string, ...args: unknown[]): Promise<unknown>;
-  handleExceptions<T>(block: () => T | Promise<T>): Promise<unknown>;
-  runCallbacks(kind: string, block: () => unknown): unknown;
-  message: unknown;
-  params?: unknown;
-}
-
+export type MailerClass = typeof Base;
 /** @internal */
-export interface MailerClass {
-  new (): ProcessedMailer;
-  deliveryJob: {
-    set(options: Record<string, unknown>): { performLater(...args: unknown[]): Promise<unknown> };
-  };
-}
+export type ProcessedMailer = Base;
 
-export class MessageDelivery {
+export class MessageDelivery extends Delegator {
   /** @internal */
-  protected _mailerClass: MailerClass;
+  declare protected _mailerClass: MailerClass;
   /** @internal */
-  protected _action: string;
+  declare protected _action: string;
   /** @internal */
-  protected _args: unknown[];
+  declare protected _args: unknown[];
   /** @internal */
-  protected _processedMailer: ProcessedMailer | null;
+  declare protected _processedMailer: ProcessedMailer | null;
   /** @internal */
-  protected _mailMessage: Message | null;
+  declare protected _mailMessage: Message | null;
 
   constructor(mailerClass: MailerClass, action: string, ...args: unknown[]) {
+    super(null);
     this._mailerClass = mailerClass;
     this._action = action;
     this._args = args;
@@ -40,18 +30,22 @@ export class MessageDelivery {
     this._mailMessage = null;
   }
 
-  /** @internal */
-  async __getobj__(): Promise<Message> {
-    return (this._mailMessage ||= (await this.processedMailer()).message as Message);
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
+  override __getobj__(block?: () => unknown): unknown {
+    if (this._mailMessage == null && block) return block();
+    return this._mailMessage;
   }
 
   /** @internal */
-  __setobj__(mailMessage: Message): void {
-    this._mailMessage = mailMessage;
+  override __setobj__(mailMessage: unknown): void {
+    this._mailMessage = mailMessage as Message | null;
   }
 
   async message(): Promise<Message> {
-    return await this.__getobj__();
+    return (this._mailMessage ||= (await this.processedMailer()).message as Message);
   }
 
   isProcessed(): ProcessedMailer | Message | null {
@@ -116,4 +110,4 @@ export class MessageDelivery {
   }
 }
 
-ActionMailer.MessageDelivery = MessageDelivery as never;
+ActionMailer.MessageDelivery = MessageDelivery;

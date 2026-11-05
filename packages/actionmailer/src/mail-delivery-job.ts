@@ -1,6 +1,6 @@
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { constantize } from "@blazetrails/activesupport";
-import { StandardError, rbFSend } from "@blazetrails/ruby-compat";
+import { StandardError, rbFArray, rbFSend, rtest } from "@blazetrails/ruby-compat";
 import { ActionMailer } from "./namespaces.js";
 
 interface MailerClass {
@@ -36,8 +36,9 @@ export class MailDeliveryJob extends ActiveJobBase {
 
   /** @internal */
   private get mailerClass(): MailerClass | null {
-    const mailer = [this._serializedArguments ?? []].flat()[0] ?? [this.arguments ?? []].flat()[0];
-    if (mailer != null && mailer !== false) {
+    const serialized = rbFArray(this._serializedArguments)[0];
+    const mailer = rtest(serialized) ? serialized : rbFArray(this.arguments)[0];
+    if (rtest(mailer)) {
       return constantize(mailer as string) as MailerClass;
     }
     return null;

@@ -1234,7 +1234,6 @@ export class Message {
   }
 
   /** @internal */
-  /** @internal */
   private async doDelivery(): Promise<void> {
     try {
       if (this.performDeliveries) {
@@ -1248,6 +1247,7 @@ export class Message {
     }
   }
 
+  /** @internal */
   private decodeBodyAsText(): unknown {
     return Encodings.transcodeCharset(this.decodeBody() as string, this.charset, "UTF-8");
   }
