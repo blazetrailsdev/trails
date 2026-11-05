@@ -8,7 +8,9 @@
   "include": ["src"],
   "references": [
     { "path": "../actionpack" },
+    { "path": "../activejob" },
     { "path": "../activesupport" },
+    { "path": "../date" },
     { "path": "../i18n" },
     { "path": "../mail" },
     { "path": "../ruby-compat" }
