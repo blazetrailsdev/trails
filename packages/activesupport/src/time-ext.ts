@@ -300,7 +300,9 @@ export function change(
   if (date instanceof RubyTime) return date.change(options);
 
   const self =
-    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
+    date instanceof Date
+      ? RubyTime.at(new Rational(BigInt(date.getTime()), 1000n)).toZonedDateTime()
+      : date;
   const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
 
   const newYear = options.year ?? self.year;

@@ -21,28 +21,12 @@ import {
   assertNil,
 } from "./testing/assertions.js";
 import { ArgumentError } from "./hash-utils.js";
-import { resetLocalTimeZoneId } from "@blazetrails/date";
 import { setZone, useZone, zone as timeZone } from "./time-zone-config.js";
 import { midnight } from "./core-ext/date/calculations.js";
 import * as DateExt from "./core-ext/date/calculations.js";
 import { current } from "./time-ext.js";
 import { toF } from "./core-ext/date-time/conversions.js";
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "./time-zone-test-helpers.js";
 
 function withUtcToLocalReturnsUtcOffsetTimes(value: boolean, block: () => void): void {
   const oldTzinfo2Format = utcToLocalReturnsUtcOffsetTimes();

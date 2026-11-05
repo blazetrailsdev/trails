@@ -4,6 +4,7 @@ import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { Time, actsLikeDate, actsLikeTime } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import {
+  block as rbBlock,
   Hash,
   IO,
   Rational,
@@ -477,14 +478,17 @@ export class Parameters {
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
     return this.convertValueToParameters(
-      this.parameters.fetch(key, () => {
-        if (blockGiven) {
-          return blockGiven();
-        } else {
-          if (args.length > 0) return args[0];
-          throw new ParameterMissing(key, [...this.parameters.keys()]);
-        }
-      }),
+      this.parameters.fetch(
+        key,
+        rbBlock(() => {
+          if (blockGiven) {
+            return blockGiven();
+          } else {
+            if (args.length > 0) return args[0];
+            throw new ParameterMissing(key, [...this.parameters.keys()]);
+          }
+        }),
+      ),
     );
   }
 

@@ -4,7 +4,6 @@ import {
   DateTime as RubyDateTime,
   Temporal,
   Time as RubyTime,
-  resetLocalTimeZoneId,
 } from "@blazetrails/date";
 import { Range, Rational } from "@blazetrails/ruby-compat";
 import {
@@ -33,7 +32,6 @@ import {
   toDate,
   daysInMonth,
   daysInYear,
-  nextWeek,
   nextMonth,
   prevMonth,
   nextYear,
@@ -50,11 +48,13 @@ import {
   isTomorrow,
   isYesterday,
 } from "./date-and-time/calculations.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 type CalculationsTime = RubyTime & {
   tomorrow(): RubyTime;
   yesterday(): RubyTime;
   lastWeek(startDay?: string): RubyTime;
+  nextWeek(givenDayInNextWeek?: string): RubyTime;
 };
 
 expect.addEqualityTesters([
@@ -75,7 +75,10 @@ function asDate(instant: unknown): Date {
 }
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
-  return new Date(year, month - 1, day, hour, min, sec, ms);
+  return new Date(
+    RubyTime.local(year, month, day, hour, min, sec + ms / 1000).toZonedDateTime()
+      .epochMilliseconds,
+  );
 }
 
 function dateTimeInit(
@@ -117,22 +120,6 @@ function zoned(
   });
 }
 
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
-    resetLocalTimeZoneId();
-  }
-}
-
 function withTimeCurrent<T>(current: Date | TimeWithZone, fn: () => T): T {
   setFrozenTime(current instanceof Date ? current : new Date(current.toI() * 1000));
   try {
@@ -152,15 +139,8 @@ function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
   }
 }
 
-const savedTZ = process.env.TZ;
 afterEach(() => {
   vi.useRealTimers();
-  if (savedTZ === undefined) {
-    delete process.env.TZ;
-  } else {
-    process.env.TZ = savedTZ;
-  }
-  resetLocalTimeZoneId();
 });
 
 const NSEC_999999999_OVER_1000 = new Rational(999999999, 1000);
@@ -1448,17 +1428,27 @@ describe("TimeExtCalculationsTest", () => {
 
   it("next week near daylight start", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek.call(new Date(2006, 3, 2, 23, 1, 0), ":monday"));
-      expect(result.getDate()).toBe(3);
-      expect(result.getMonth()).toBe(3);
+      expect((RubyTime.local(2006, 4, 2, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 4, 3),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect((RubyTime.local(2006, 10, 1, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 10, 2),
+      );
     });
   });
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
-      const result = asDate(nextWeek.call(new Date(2006, 9, 29, 23, 1, 0), ":monday"));
-      expect(result.getDate()).toBe(30);
-      expect(result.getMonth()).toBe(9);
+      expect((RubyTime.local(2006, 10, 29, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 10, 30),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect((RubyTime.local(2006, 3, 19, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 3, 20),
+      );
     });
   });
 

@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import type { Time } from "@blazetrails/date";
 import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { findZoneBang, zone as timeZone } from "../../time-zone-config.js";
 import { TimeWithZone } from "../../time-with-zone.js";
@@ -8,7 +8,7 @@ import { toTime as stringToTime } from "./conversions.js";
 export function inTimeZone(
   str: string,
   zone: unknown = timeZone(),
-): TimeWithZone | Temporal.ZonedDateTime | undefined {
+): TimeWithZone | Time | undefined {
   if (zone != null && zone !== false) {
     return (findZoneBang(zone) as TimeZone).parse(str);
   } else {

@@ -2,11 +2,11 @@ import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { fetch } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
-import { preserveTimezone } from "../time/compatibility.js";
+import "../time/compatibility.js";
 
 const USED_KEYS = ["year", "mon", "mday", "hour", "min", "sec", "secFraction", "offset"] as const;
 
-export function toTime(str: string, form: string = "local"): Temporal.ZonedDateTime | undefined {
+export function toTime(str: string, form: string = "local"): Time | undefined {
   const parts = RubyDate._parse(str, false) as Record<string, unknown>;
   const usedKeys = USED_KEYS;
   if (!usedKeys.some((key) => key in parts)) return undefined;
@@ -27,9 +27,7 @@ export function toTime(str: string, form: string = "local"): Temporal.ZonedDateT
     offset instanceof Rational ? offset.toF() : offset,
   );
 
-  if (form === "utc") return time.getutc().toZonedDateTime();
-  const local = time.toZonedDateTime();
-  return preserveTimezone(time) ? local : local.withTimeZone(Temporal.Now.timeZoneId());
+  return form === "utc" ? time.utc() : time.toTime();
 }
 
 export function toDate(str: string): Temporal.PlainDate | undefined {

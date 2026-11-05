@@ -1,25 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import "./calculations.js";
-
-function withEnvTz<T>(tz: string, fn: () => T): T {
-  const orig = process.env.TZ;
-  process.env.TZ = tz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (orig === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = orig;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "../../time-zone-test-helpers.js";
 
 describe("TimeExtCalculationsTest (trails)", () => {
   it("minus accepts a TimeWithZone without a cast", () => {

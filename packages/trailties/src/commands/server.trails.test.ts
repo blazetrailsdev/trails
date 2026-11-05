@@ -34,6 +34,12 @@ vi.mock("@blazetrails/trails-tsc", () => ({ watchViews: async () => ({ close() {
 
 const { ServerCommand } = await import("./server.js");
 
+const reseatLoadedVite = async (): Promise<void> => {
+  if (devServerLoads.length > 0) {
+    Handler.register("vite", (await import("../server/dev-server.js")).DevServer);
+  }
+};
+
 const run = (...args: string[]): Promise<void> => ServerCommand.perform("server", args, {});
 
 describe("trails server environment (trails)", () => {
@@ -94,6 +100,7 @@ describe("trails server environment (trails)", () => {
   });
 
   afterEach(() => {
+    delete Handler._handlers["vite"];
     vi.restoreAllMocks();
     process.chdir(origCwd);
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -115,6 +122,7 @@ describe("trails server environment (trails)", () => {
   });
 
   it("starts the dev server in development", async () => {
+    await reseatLoadedVite();
     await run();
 
     expect(runOptions).toEqual([]);
@@ -130,7 +138,9 @@ describe("trails server environment (trails)", () => {
   });
 
   it("broadcasts the Trails logger to stdout in development only", async () => {
+    await reseatLoadedVite();
     await run();
+    delete Handler._handlers["vite"];
     expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(2);
 
     Trails.logger = new BroadcastLogger(new Logger(null));
@@ -232,6 +242,7 @@ describe("trails server environment (trails)", () => {
     });
 
     it("hands the dev server Engine#call, which seeds the request env with env_config", async () => {
+      await reseatLoadedVite();
       await run();
 
       expect(devServerStarts).toHaveLength(1);

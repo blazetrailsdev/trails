@@ -52,7 +52,8 @@ function updateTz(): void {
   localTimeZoneId = null;
 }
 
-function nowTimeZoneId(): string {
+/** @noRailsEquivalent PERMANENT */
+export function nowTimeZoneId(): string {
   updateTz();
   return (localTimeZoneId ??= Temporal.Now.timeZoneId());
 }

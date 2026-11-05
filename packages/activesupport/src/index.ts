@@ -368,6 +368,7 @@ export * from "./time-ext.js";
 import "./core-ext/date/calculations.js";
 import "./core-ext/time/calculations.js";
 import "./core-ext/date-time/calculations.js";
+import "./core-ext/date-time/compatibility.js";
 import "./core-ext/date/zones.js";
 import "./core-ext/array/access.js";
 import "./core-ext/enumerable.js";

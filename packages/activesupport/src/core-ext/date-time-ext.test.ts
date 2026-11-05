@@ -65,7 +65,7 @@ import { preserveTimezone } from "./date-and-time/compatibility.js";
 import { isBlank } from "./object/blank.js";
 import { assertNotPredicate, assertPredicate, assertNil } from "../testing/assertions.js";
 import { DATE_FORMATS } from "./time/conversions.js";
-import { toTime } from "./time/compatibility.js";
+import { toTime } from "./date-time/compatibility.js";
 
 afterEach(() => {
   setFrozenTime(null);
@@ -229,31 +229,31 @@ describe("DateTimeExtCalculationsTest", () => {
   it("to datetime", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(
+      dt.toZonedDateTime("UTC").epochNanoseconds,
+    );
   });
 
   it("to time", () => {
     withEnvTz("US/Eastern", () => {
-      expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBeInstanceOf(
-        Temporal.ZonedDateTime,
-      );
+      expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0))).toBeInstanceOf(Time);
 
       if (preserveTimezone()) {
         sameInstant(
           Time.local(2005, 2, 21, 5, 11, 12).getlocal(0),
-          toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)),
+          toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).toZonedDateTime(),
         );
         // eslint-disable-next-line vitest/no-conditional-expect
-        expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).offsetNanoseconds / 1e9).toBe(
+        expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).utcOffset).toBe(
           Time.local(2005, 2, 21, 5, 11, 12).getlocal(0).utcOffset,
         );
       } else {
         sameInstant(
           Time.local(2005, 2, 21, 5, 11, 12),
-          toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)),
+          toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).toZonedDateTime(),
         );
         // eslint-disable-next-line vitest/no-conditional-expect
-        expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).offsetNanoseconds / 1e9).toBe(
+        expect(toTime(DateTime.civil(2005, 2, 21, 10, 11, 12, 0)).utcOffset).toBe(
           Time.local(2005, 2, 21, 5, 11, 12).utcOffset,
         );
       }
@@ -263,7 +263,7 @@ describe("DateTimeExtCalculationsTest", () => {
   it("to time preserves fractional seconds", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
     const result = toTime(dt);
-    expect(result.millisecond).toBe(500);
+    expect(result.usec).toBe(500000);
   });
 
   it("civil from format", () => {

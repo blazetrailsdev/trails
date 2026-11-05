@@ -43,25 +43,10 @@ import {
 } from "../testing/assertions.js";
 import { actsLike } from "./object/acts-like.js";
 import { ArgumentError, setZone, zone } from "../time-zone-config.js";
-import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { travelTo } from "../testing/time-helpers.js";
 import { TimeZone } from "../values/time-zone.js";
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
   const oldTz = zone();
@@ -73,7 +58,10 @@ function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
   }
 }
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
-  return new Date(year, month - 1, day, hour, min, sec, ms);
+  return new Date(
+    RubyTime.local(year, month, day, hour, min, sec + ms / 1000).toZonedDateTime()
+      .epochMilliseconds,
+  );
 }
 
 function pd(year: number, month: number, day: number): Temporal.PlainDate {
@@ -455,7 +443,7 @@ describe("DateExtCalculationsTest", () => {
   it("current returns date today when zone not set", () => {
     withEnvTz("US/Central", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(new Date(1999, 11, 31, 23));
+      vi.setSystemTime(RubyTime.local(1999, 12, 31, 23).toZonedDateTime().epochMilliseconds);
       try {
         expect(DateExt.current().toString()).toEqual(RubyDate.today().toString());
       } finally {
