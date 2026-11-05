@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n, include, isHtmlSafe, stub, type Included } from "@blazetrails/activesupport";
