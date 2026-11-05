@@ -78,11 +78,6 @@ export function layout(
   this._writeLayoutMethod();
 }
 
-/** @internal */
-function inherited(this: LayoutsClass, klass: LayoutsClass): void {
-  klass._writeLayoutMethod();
-}
-
 export function _writeLayoutMethod(this: LayoutsClass): void {
   const prototype = this.prototype;
   const _super: LayoutMethod = function (lookupContext, formats, keys) {
@@ -223,7 +218,7 @@ export function _defaultLayout(
   ) {
     subclasses.unshift(klass);
   }
-  for (const klass of subclasses) inherited.call(Object.getPrototypeOf(klass), klass);
+  for (const klass of subclasses) klass._writeLayoutMethod();
 
   let value: LayoutValue;
   try {
