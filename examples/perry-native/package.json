@@ -27,6 +27,7 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",

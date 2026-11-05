@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { Trails } from "@blazetrails/trailties";
 import "../../config/environment.js";
 

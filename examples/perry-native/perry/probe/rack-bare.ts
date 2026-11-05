@@ -1,5 +1,5 @@
 import { appendFileSync } from "node:fs";
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 
 const LOG = process.env.PROBE_LOG!;
 const log = (m: string) => appendFileSync(LOG, `${new Date().toISOString()} ${m}\n`);

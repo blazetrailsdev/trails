@@ -5,11 +5,19 @@
 // never opens a socket. This rung asks the question the ladder is actually
 // climbing towards: can a compiled trails application answer an HTTP request?
 //
-// This IS `trails server`'s own code path, in every environment but
-// development. `commands/server.js` branches: outside development (or with no
-// vite config) it calls `Handler.Node.run(railsApp, { Port, Host })` and
-// returns — Vite is never constructed. So nothing is being skipped here to
-// make the rung pass: this is what a deployed trails server actually runs.
+// This runs the handler a deployed trails server ends at. RFC 0217 moved
+// `Handler` out of `@blazetrails/rack` into `@blazetrails/rackup`, matching
+// Ruby, where `Rackup::Handler` is its own gem, and `commands/server.ts` now
+// reaches it through `Handler.get("node")` rather than naming `Handler.Node`:
+// outside development (or with no vite config) that is the branch taken, and
+// Vite is never constructed.
+//
+// The rung calls `Handler.Node.run` DIRECTLY, so it is not byte-for-byte that
+// path. `Handler.get` resolves through `Handler.loadPath` with a dynamic
+// `import()`, and the wall-22 measurement that this graph has `0 dynamic
+// edges` holds only because the rung does not go through it. Dynamic handler
+// resolution under AOT is therefore an open question this rung does not ask,
+// not one it has answered.
 //
 // It does NOT follow that the binary is free of Vite. Taking the production
 // branch changes what executes, not what the module graph reaches, and this
@@ -21,7 +29,7 @@
 // to come from the process, not from an assignment in this file: the
 // `config/environment.js` import is hoisted and boots the application before
 // any statement here could set it.
-import { Handler } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import { Trails } from "@blazetrails/trailties";
 import "../../config/environment.js";
 
