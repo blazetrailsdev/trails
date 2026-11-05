@@ -1,4 +1,5 @@
 import {
+  rbStrSend,
   kebabCase,
   ArgumentError,
   fetch,
@@ -207,7 +208,7 @@ export class Group {
 
       value = toS(value);
       const humanName = (
-        rbObjRespondTo(value, "classify") ? (value as { classify(): string }).classify() : value
+        rbObjRespondTo(value, "classify") ? rbStrSend(value as string, "classify")[0] : value
       ) as string;
 
       if (!rtest(groupOptions.get(humanName))) groupOptions.set(humanName, []);

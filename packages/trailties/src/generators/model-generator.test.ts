@@ -3,13 +3,13 @@ import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport"
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
-import { Base } from "@blazetrails/activerecord";
+import { Base, setTimestampedMigrations } from "@blazetrails/activerecord";
 import { ModelHelpers } from "./model-helpers.js";
 import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { copyRoutes } from "./generators-test-helper.js";
+import { copyRoutes, withDatabaseConfiguration } from "./generators-test-helper.js";
 import { TestCase } from "./test-case.js";
 
 class ModelGeneratorApp extends Application {}
@@ -49,7 +49,11 @@ function assertGeneratedFixture(relative: string, parsedContents: unknown): void
 }
 
 describe("ModelGeneratorTest", () => {
-  it.skip("help shows invoked generators options", () => {});
+  it("help shows invoked generators options", async () => {
+    const content = String(await t.runGenerator(["--help"]));
+    assertMatch(/ActiveRecord options:/, content);
+    assertMatch(/TestUnit options:/, content);
+  });
 
   it("model with missing attribute type", async () => {
     await t.runGenerator(["post", "title", "body:text", "author"]);
@@ -76,11 +80,39 @@ describe("ModelGeneratorTest", () => {
     t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
-  it.skip("model with database option", () => {});
+  it("model with database option", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["account", "--database", "secondary"]);
+      await t.assertFile(
+        "app/models/secondary-record.ts",
+        /class SecondaryRecord extends ApplicationRecord/,
+      );
+      await t.assertFile("app/models/account.ts", /class Account extends SecondaryRecord/);
+      await t.assertMigration(
+        "db/secondary_migrate/create_accounts.ts",
+        /class CreateAccounts extends Migration\.get\([0-9.]+\)/,
+      );
+    });
+  });
 
-  it.skip("model with parent and database option", () => {});
+  it("model with parent and database option", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["account", "--parent", "Admin::Account", "--database", "secondary"]);
+      await t.assertFile("app/models/account.ts", /class Account extends AdminAccount/);
+      await t.assertMigration(
+        "db/secondary_migrate/create_accounts.ts",
+        /class CreateAccounts extends Migration\.get\([0-9.]+\)/,
+      );
+    });
+  });
 
-  it.skip("model with no migration and database option", () => {});
+  it("model with no migration and database option", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["account", "--migration", "false", "--database", "secondary"]);
+      await t.assertFile("app/models/account.ts", /class Account extends SecondaryRecord/);
+      t.assertNoMigration("db/secondary_migrate/create_accounts.ts");
+    });
+  });
 
   it("model with no migration option", async () => {
     await t.runGenerator(["account", "--no-migration"]);
@@ -88,9 +120,38 @@ describe("ModelGeneratorTest", () => {
     t.assertNoMigration("db/migrate/create_accounts.ts");
   });
 
-  it.skip("model with parent option database option and no migration option", () => {});
+  it("model with parent option database option and no migration option", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator([
+        "account",
+        "--migration",
+        "false",
+        "--database",
+        "secondary",
+        "--migration",
+        "false",
+        "--parent",
+        "Admin::Account",
+      ]);
+      await t.assertFile("app/models/account.ts", /class Account extends AdminAccount/);
+      t.assertNoMigration("db/secondary_migrate/create_accounts.ts");
+    });
+  });
 
-  it.skip("model with underscored database option", () => {});
+  it("model with underscored database option", async () => {
+    await withDatabaseConfiguration("admin_accounts", async () => {
+      await t.runGenerator(["account", "--database", "admin_accounts"]);
+      await t.assertFile(
+        "app/models/admin-accounts-record.ts",
+        /class AdminAccountsRecord extends ApplicationRecord/,
+      );
+      await t.assertFile("app/models/account.ts", /class Account extends AdminAccountsRecord/);
+      await t.assertMigration(
+        "db/admin_accounts_migrate/create_accounts.ts",
+        /class CreateAccounts extends Migration\.get\([0-9.]+\)/,
+      );
+    });
+  });
 
   it("plural names are singularized", async () => {
     const content = String(await t.runGenerator(["accounts"]));
@@ -308,9 +369,40 @@ describe("ModelGeneratorTest", () => {
     });
   });
 
-  it.skip("migration without timestamps", () => {});
+  it("migration without timestamps", async () => {
+    try {
+      setTimestampedMigrations(false);
+      await t.runGenerator(["account"]);
+      await t.assertFile(
+        "db/migrate/001_create_accounts.ts",
+        /class CreateAccounts extends Migration\.get\([0-9.]+\)/,
+      );
 
-  it.skip("migration with configured path", () => {});
+      await t.runGenerator(["project"]);
+      await t.assertFile(
+        "db/migrate/002_create_projects.ts",
+        /class CreateProjects extends Migration\.get\([0-9.]+\)/,
+      );
+    } finally {
+      setTimestampedMigrations(true);
+    }
+  });
+
+  it("migration with configured path", async () => {
+    const oldPaths = Trails.application!.config.paths().get("db/migrate");
+    Trails.application!.config.paths().add("db/migrate", { with: "db2/migrate" });
+
+    try {
+      await t.runGenerator();
+
+      await t.assertMigration(
+        "db2/migrate/create_accounts.ts",
+        /class CreateAccounts extends Migration\.get\([0-9.]+\)/,
+      );
+    } finally {
+      Trails.application!.config.paths()._entries.set("db/migrate", oldPaths!);
+    }
+  });
 
   it("migration with timestamps", async () => {
     await t.runGenerator(["Account", "name:string", "age:integer"]);
@@ -471,9 +563,27 @@ describe("ModelGeneratorTest", () => {
     );
   });
 
-  it.skip("database puts migrations in configured folder", () => {});
+  it("database puts migrations in configured folder", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["account", "--database=secondary"]);
+      await t.assertMigration("db/secondary_migrate/create_accounts.ts", (content) =>
+        t.assertMethod("change", content, (change) => {
+          assertMatch(/createTable\("accounts"/, change);
+        }),
+      );
+    });
+  });
 
-  it.skip("database puts migrations in configured folder with aliases", () => {});
+  it("database puts migrations in configured folder with aliases", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["account", "--db=secondary"]);
+      await t.assertMigration("db/secondary_migrate/create_accounts.ts", (content) =>
+        t.assertMethod("change", content, (change) => {
+          assertMatch(/createTable\("accounts"/, change);
+        }),
+      );
+    });
+  });
 
   it("model with references attribute generates belongs to associations", async () => {
     await t.runGenerator(["product", "name:string", "supplier:references"]);

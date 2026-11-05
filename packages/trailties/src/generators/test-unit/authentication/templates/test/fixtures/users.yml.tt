@@ -1,0 +1,9 @@
+<%% const passwordDigest = BCrypt.Password.create("password") %>
+
+one:
+  email_address: one@example.com
+  password_digest: <%%= passwordDigest %>
+
+two:
+  email_address: two@example.com
+  password_digest: <%%= passwordDigest %>

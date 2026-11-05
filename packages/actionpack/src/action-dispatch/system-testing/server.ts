@@ -39,6 +39,7 @@ export class Server {
   private async setServer(): Promise<void> {
     if (vite.server === undefined) {
       const { createServer } = await import("vite");
+      const node = (await Handler.get("node")) as typeof Handler.Node;
       const server = await createServer({
         configFile: false,
         appType: "custom",
@@ -52,7 +53,7 @@ export class Server {
               return () => {
                 server.middlewares.use(async (req, res, next) => {
                   try {
-                    await new Handler.Node(vite.app!).service(
+                    await new node(vite.app!).service(
                       req as unknown as HttpRequest,
                       res as unknown as HttpResponse,
                     );

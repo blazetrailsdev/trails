@@ -7,6 +7,8 @@ import { Trails } from "../trails.js";
 import { Application } from "../application.js";
 import { assertOutput } from "../support/console-helpers.js";
 
+await Handler.get("node");
+
 vi.mock("../command/actions.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../command/actions.js")>()),
   requireApplicationBang: async () => {},
