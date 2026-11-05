@@ -49,3 +49,13 @@ describe("Timezone offsets tzinfo's ZoneinfoReader generates", () => {
     ).toBe("2594-07-01 13:00:00 +0100");
   });
 });
+
+describe("Timezone abbreviations answer tzdata's, as TZInfo does", () => {
+  it("answers -05 for Etc/GMT+5 and GMT for Etc/GMT", () => {
+    const at = new Date(1_700_000_000_000);
+    expect(Timezone.get("Etc/GMT+5").abbr(at)).toBe("-05");
+    expect(Timezone.get("Etc/GMT").abbr(at)).toBe("GMT");
+    expect(Timezone.get("Etc/GMT+5").periodForUtc(Time.at(1_700_000_000)).abbreviation).toBe("-05");
+    expect(Timezone.get("Etc/GMT").periodForUtc(Time.at(1_700_000_000)).abbreviation).toBe("GMT");
+  });
+});

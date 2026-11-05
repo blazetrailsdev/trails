@@ -18,4 +18,4 @@ export {
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "./tzdata-isdst.js";
-export { tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";
+export { tzdataAbbreviation, tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";

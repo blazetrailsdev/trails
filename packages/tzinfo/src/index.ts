@@ -12,6 +12,7 @@ import {
   Temporal,
   Time,
   Timezone as DateTimezone,
+  tzdataAbbreviation,
   tzdataAbbreviationChanges,
   tzdataBaseOffsets,
   tzdataIsdst,
@@ -52,19 +53,6 @@ function ignoringOffset(time: Date | Temporal.Instant | Time): Date {
   if (time.year < 100) date.setUTCFullYear(time.year);
   return date;
 }
-
-const ETC_GMT_LINKS = new Set([
-  "Etc/GMT",
-  "Etc/GMT+0",
-  "Etc/GMT-0",
-  "Etc/GMT0",
-  "Etc/Greenwich",
-  "GMT",
-  "GMT+0",
-  "GMT-0",
-  "GMT0",
-  "Greenwich",
-]);
 
 const abbreviationFormatters = new Map<string, Intl.DateTimeFormat>();
 const localFormatters = new Map<string, Intl.DateTimeFormat>();
@@ -140,15 +128,16 @@ function lookupZoneInfo(
   ianaName: string,
   date: Date,
 ): { abbreviation: string; utcOffsetSeconds: number } {
-  let formatter = abbreviationFormatters.get(ianaName);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat("en-US", { timeZone: ianaName, timeZoneName: "short" });
-    abbreviationFormatters.set(ianaName, formatter);
+  let abbreviation = tzdataAbbreviation(ianaName, Math.floor(date.getTime() / 1000));
+  if (abbreviation === undefined) {
+    let formatter = abbreviationFormatters.get(ianaName);
+    if (!formatter) {
+      formatter = new Intl.DateTimeFormat("en-US", { timeZone: ianaName, timeZoneName: "short" });
+      abbreviationFormatters.set(ianaName, formatter);
+    }
+    const parts = formatter.formatToParts(date);
+    abbreviation = parts.find((p) => p.type === "timeZoneName")?.value ?? ianaName;
   }
-  const parts = formatter.formatToParts(date);
-  const tzPart = parts.find((p) => p.type === "timeZoneName");
-  let abbreviation = tzPart?.value ?? ianaName;
-  if (abbreviation === "UTC" && ETC_GMT_LINKS.has(ianaName)) abbreviation = "GMT";
 
   const roundedDate = new Date(Math.floor(date.getTime() / 60000) * 60000);
 
@@ -549,11 +538,9 @@ export class Timezone {
     if (fixed !== undefined) return fixed;
     const interval = zoneInterval(this.identifier, toDate(time));
     if (interval?.abbr !== undefined) return interval.abbr;
-    const abbreviation = new DateTimezone(this.identifier).abbr(
+    const result = new DateTimezone(this.identifier).abbr(
       Time.at(new Rational(toDate(time).getTime(), 1000)),
     );
-    const result =
-      abbreviation === "UTC" && ETC_GMT_LINKS.has(this.identifier) ? "GMT" : abbreviation;
     getZoneInfo(this.identifier, toDate(time));
     if (fixedZoneInfos.get(this.identifier) != null)
       fixedZoneAbbreviations.set(this.identifier, result);
