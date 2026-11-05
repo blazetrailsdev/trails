@@ -464,7 +464,7 @@ const traps = new Map<TrapSignal, { command: TrapCommand; off: (() => void) | nu
  * and `SignalException` otherwise (`default_handler`, signal.c:1100), and
  * `EXIT` exits. A signal never trapped answers `"DEFAULT"`.
  *
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE trap-accepts-every-mri-signal
  */
 export function trap(signal: number | string, command: TrapCommand): TrapCommand {
   let sig: TrapSignal;

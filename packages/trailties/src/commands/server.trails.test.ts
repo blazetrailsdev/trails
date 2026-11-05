@@ -103,6 +103,8 @@ describe("trails server environment (trails)", () => {
   });
 
   it("serves production through the Node handler, not the dev server, with a vite.config.ts present", async () => {
+    vi.mocked(Handler.aref).mockRestore();
+
     await run("-e", "production");
 
     expect(devServerStarts).toEqual([]);
@@ -181,6 +183,15 @@ describe("trails server environment (trails)", () => {
 
     await expect(run("-e", "production")).rejects.toThrow("no database");
     expect(runOptions).toEqual([]);
+  });
+
+  it("says Exiting once per failed start", async () => {
+    vi.mocked(Handler.Node.run).mockRejectedValue(new Error("EADDRINUSE"));
+
+    await expect(run("-e", "production")).rejects.toThrow("EADDRINUSE");
+    await expect(run("-e", "production")).rejects.toThrow("EADDRINUSE");
+
+    expect(said.filter((message) => message === "Exiting")).toHaveLength(2);
   });
 
   describe("serves the application, not its middleware stack", () => {

@@ -94,7 +94,7 @@ export class Server extends RackupServer<ServerOptions> {
       stopped = true;
       afterStopCallback();
     };
-    atExit(ensure);
+    const off = atExit(ensure);
     try {
       trap("INT", () => exit());
       this.createTmpDirectories();
@@ -103,6 +103,7 @@ export class Server extends RackupServer<ServerOptions> {
 
       return await super.start();
     } catch (error) {
+      off();
       ensure();
       throw error;
     }
@@ -161,7 +162,7 @@ export class Server extends RackupServer<ServerOptions> {
 
   /** @internal */
   private async isUsePuma(): Promise<boolean> {
-    return ((await this.server()).name ?? "").endsWith("Handler::Puma");
+    return (await this.server()).name.endsWith("Handler::Puma");
   }
 }
 
@@ -289,7 +290,7 @@ export class ServerCommand extends Base {
     Dir.chdir(Trails.application!.root()!);
 
     if (await server.isServeable()) {
-      this.printBootInformation((await server.server()).name!, await server.servedUrl());
+      this.printBootInformation((await server.server()).name, await server.servedUrl());
       const afterStopCallback = () => {
         if (!this.options.daemon) this.say("Exiting");
       };

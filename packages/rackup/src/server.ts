@@ -73,7 +73,7 @@ interface StackProfLike {
 }
 
 interface HandlerLike {
-  name?: string;
+  name: string;
   validOptions?(): Record<string, string>;
   run(app: unknown, options: ServerOptions, block?: unknown): unknown;
   shutdown?(): unknown;
@@ -339,7 +339,7 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
 
   static loggingMiddleware(): (server: Server) => Promise<unknown[] | null> {
     return async (server: Server) =>
-      /CGI/.test((await server.server()).name ?? "") || server.options.quiet
+      /CGI/.test((await server.server()).name) || server.options.quiet
         ? null
         : [CommonLogger, STDERR];
   }
