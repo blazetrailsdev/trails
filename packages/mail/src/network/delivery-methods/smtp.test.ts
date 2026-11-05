@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SMTP as NetSMTP } from "@blazetrails/net-smtp";
 import { buildMail, closeMockSmtp, deliveries, mockSmtp } from "../../test-helpers/mock-smtp.js";
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import { Message } from "../../message.js";
@@ -36,6 +37,52 @@ describe("SMTP Delivery Method", () => {
         returnResponse: true,
       }).deliverBang(buildMail());
       expect((response as { message: string }).message.slice(4).trim()).toBe("OK");
+    });
+  });
+
+  describe("enabling STARTTLS", () => {
+    const deliveredStarttls = async (settings: Record<string, unknown>) => {
+      let starttls: boolean | string | undefined;
+      vi.spyOn(NetSMTP.prototype, "start").mockImplementation(function (this: NetSMTP) {
+        starttls = this.isStarttls();
+        return Promise.resolve(null);
+      });
+      const message = new Message();
+      message.setFrom("mikel@test.lindsaar.net");
+      message.setTo("ada@test.lindsaar.net");
+      message.setSubject("Re: No way!");
+      message.setBody("Yeah sure");
+      await new SMTP({
+        address: "localhost",
+        port: 25,
+        domain: "localhost.localdomain",
+        userName: null,
+        password: null,
+        authentication: null,
+        ...settings,
+      }).deliverBang(message);
+      vi.restoreAllMocks();
+      return starttls;
+    };
+
+    it("should default to automatically detecting STARTTLS", async () => {
+      expect(await deliveredStarttls({})).toBe("auto");
+    });
+
+    it("should allow forcing STARTTLS", async () => {
+      expect(await deliveredStarttls({ enableStarttls: true })).toBe("always");
+    });
+
+    it("should allow disabling automatic STARTTLS", async () => {
+      expect(await deliveredStarttls({ enableStarttls: false })).toBe(false);
+    });
+
+    it("should allow forcing STARTTLS auto", async () => {
+      expect(await deliveredStarttls({ enableStarttlsAuto: true })).toBe("auto");
+    });
+
+    it("should allow disabling automatic STARTTLS auto", async () => {
+      expect(await deliveredStarttls({ enableStarttlsAuto: false })).toBe(false);
     });
   });
 
