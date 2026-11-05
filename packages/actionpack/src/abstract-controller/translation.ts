@@ -6,7 +6,7 @@ import {
   kernelArray,
   underscore,
 } from "@blazetrails/activesupport";
-import { flatten, rtest } from "@blazetrails/ruby-compat";
+import { flatten, rtest, symbolToS } from "@blazetrails/ruby-compat";
 
 export interface TranslationHost {
   actionName: string;
@@ -21,13 +21,15 @@ export interface TranslateOptions {
 /**
  * @inventedArm underscore — PERMANENT
  * @inventedArm dasherize — PERMANENT
+ * @inventedArm symbolToS — PERMANENT
  */
 export function translate(
   this: TranslationHost,
-  key: string,
+  key: string | null,
   options: TranslateOptions = {},
 ): unknown {
   options = { ...options };
+  if (key?.startsWith(":.")) key = symbolToS(key);
   if (key?.startsWith(".")) {
     const path = this.constructor.controllerPath().replace(/\//g, ".");
     const defaults: unknown[] = [`:${path}${key}`];

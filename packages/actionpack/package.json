@@ -60,6 +60,7 @@
   },
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*",
     "vite": "^7.0.0"
   }
 }

@@ -298,6 +298,9 @@ importers:
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       vite:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
