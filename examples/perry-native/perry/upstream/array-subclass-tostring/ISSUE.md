@@ -91,3 +91,70 @@ Found while building these probes, and worth its own look. `import JSBI from
 `0` at runtime. Node refuses the same program outright
 (`ERR_MODULE_NOT_FOUND`). Two of my probes looked like they ran and were
 measuring nothing.
+
+## Root cause
+
+`crates/perry-runtime/src/value/to_string_array.rs`. Both entry points that
+resolve which `toString` an array receiver should run ask for it on the
+**intrinsic** prototype:
+
+```rust
+let proto = crate::object::builtin_prototype_value("Array");
+```
+
+- `array_prototype_to_string_override` — `String(arr)`, `` `${arr}` ``
+- `call_array_prototype_to_string_method` — a source-level `arr.toString()`
+
+So both see only `Array.prototype`. They detect a global monkey-patch of
+`Array.prototype.toString` (which is what they were written for, test262
+`S15.5.1.1_A1_T8`) and are blind to the two chains that shadow it: a
+`class X extends Array` whose override lives on `X.prototype`, and an own
+`toString` on the array itself.
+
+The file header states the assumption behind this:
+
+> Arrays are `GC_TYPE_ARRAY`, not `ObjectHeader`s, so unlike ordinary objects
+> their `toString` can't be looked up as an "own/inherited field" on the array
+> value itself.
+
+That is true of a raw `ObjectHeader` field read, but not of property lookup in
+general: `js_get_property` does resolve a `GC_TYPE_ARRAY` receiver's chain.
+The sibling function `array_prototype_to_string` in the same file already
+depends on exactly that for its live `join` lookup.
+
+## What the measurements eliminate
+
+The property **lookup** is correct; only the **call** diverges:
+
+| form | node | perry |
+| --- | --- | --- |
+| `a.toString` (read) | the override | **the override** |
+| `Reflect.get(a, "toString")` | the override | **the override** |
+| `a.toString()` | `OVERRIDE` | `1,2,3` |
+| `(a.toString)()` | `OVERRIDE` | `1,2,3` |
+| `String(a)` / `` `${a}` `` | `OVERRIDE` | `1,2,3` |
+| `f.call(a)` (extracted) | `OVERRIDE` | `OVERRIDE` |
+| `a + ""` | `OVERRIDE` | `OVERRIDE` |
+
+`a + ""` passing proves runtime `ToPrimitive` is correct; `f.call(a)` passing
+proves the closure and `this`-binding are correct. Only the two resolution
+sites above are wrong. `forms.ts` is this table.
+
+Ruled out by measurement, each with its own probe:
+
+- **the codegen method-site fast path** — `PERRY_METHOD_SITE=0` does not change
+  the result.
+- **an HIR fold** — `--print-hir` keeps the call as a generic
+  `Call { callee: PropertyGet { property: "toString" } }`; nothing folds it.
+- **own-property storage on an array** — `Object.defineProperty(c, "zzz", …)`
+  reads back `42`, and an own `toString` reads back as its own function. The
+  value is stored and found; it is simply not the one called.
+
+## Fix
+
+Resolve `toString` on the receiver's own chain first, and fall back to the
+intrinsic lookup. `receiver_chain_to_string_method` returns `None` for the
+installed noop thunk, which keeps a plain array on the hardcoded `join(",")`
+path and keeps `array_prototype_to_string` (the generic algorithm, reached by
+`Array.prototype.toString.call(arr)`) free to run on an array receiver without
+re-entering an override — which would otherwise recurse forever.

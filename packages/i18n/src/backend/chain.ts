@@ -139,7 +139,12 @@ export class Chain {
   }
 }
 
-for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
+// WALL 16 SCAFFOLDING (not a fix, not for commit): perry mis-lowers a top-level
+// `new` whose callee is a cast to an anonymous constructor type, throwing
+// "Cannot access '_allocation' before initialization". i18n's Base has no
+// abstract members, so this subclass runs the byte-identical constructor.
+class _ChainProbe extends Base {}
+for (const source of [Base.prototype, new _ChainProbe()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     if (Object.hasOwn(Chain.prototype, key)) continue;
