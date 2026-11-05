@@ -30,6 +30,9 @@ import { fileURLToPath } from "url";
 import ts from "typescript-5";
 import { lineLeadingTag } from "../../eslint/jsdoc-tag-line.mjs";
 import { SOURCES } from "../../vendor/sources.js";
+import * as callMismatchBaselineModule from "../api-compare/call-mismatch-baseline.js";
+import type { RowKind } from "../api-compare/call-mismatch-baseline.js";
+import * as apiCompareConfigModule from "../api-compare/config.js";
 import { measure as measureSends } from "./send-count.js";
 import { measure as measureModules, KINDS as MODULE_KINDS } from "./module-count.js";
 
@@ -50,22 +53,14 @@ export type Tag = (typeof TAGS)[number];
 export type Receipt = "PERMANENT" | "CONVERGEABLE" | null;
 
 /**
- * `scripts/api-compare/config.ts`'s map of api-compare keys to the package
- * directory they live in. That module is CommonJS (`__dirname`), which a
- * `tsx -e` ESM entry cannot take named exports from, so the map is restated
- * here and `package-summary.test.ts` pins it equal to the original.
+ * The api-compare modules are CommonJS (`__dirname`); under a `tsx -e` ESM entry
+ * their exports arrive on `default`, under vitest as named exports.
  */
-export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
-  actiondispatch: "actionpack",
-  actioncontroller: "actionpack",
-  abstractcontroller: "actionpack",
-  actionpackversion: "actionpack",
-  "activerecord-test-support": "activerecord",
-  "rails-dom-testing": "actionview",
-  mysql2: "activerecord",
-  pg: "activerecord",
-  sqlite3: "activerecord",
-};
+function cjs<T extends object>(ns: T): T {
+  return "default" in ns ? (ns.default as T) : ns;
+}
+const { rowsOfKind } = cjs(callMismatchBaselineModule);
+const { PACKAGE_DIR_OVERRIDES } = cjs(apiCompareConfigModule);
 
 export function packageDirOf(key: string): string {
   return PACKAGE_DIR_OVERRIDES[key] ?? key;
@@ -108,6 +103,7 @@ export interface PackageSummary {
   marks: {
     callMismatchesExclude: number;
     callArgsBaseline: number;
+    rubyCompatBaseline: number;
     extraSurfaceNovel: number | null;
     extraSurfaceTotal: number | null;
     modules: Record<(typeof MODULE_KINDS)[number], number>;
@@ -337,7 +333,13 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
   }
 
   const apiDir = path.join(root, "scripts/api-compare");
-  const baseline: { package: string; kind?: string }[] = [];
+  const baseline: {
+    package: string;
+    tsFile: string;
+    rubyName: string;
+    call: string;
+    kind?: RowKind;
+  }[] = [];
   for (const f of await listFiles(path.join(apiDir, "call-mismatches-exclude"), (n) =>
     n.endsWith(".json"),
   )) {
@@ -410,8 +412,9 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
       claudeMd,
       tags,
       marks: {
-        callMismatchesExclude: ownRows.filter((r) => r.kind !== "args").length,
-        callArgsBaseline: ownRows.filter((r) => r.kind === "args").length,
+        callMismatchesExclude: rowsOfKind(ownRows, "calls").length,
+        callArgsBaseline: rowsOfKind(ownRows, "args").length,
+        rubyCompatBaseline: rowsOfKind(ownRows, "rubyCompat").length,
         extraSurfaceNovel: extra.length > 0 ? extra.reduce((n, [, m]) => n + m.novel, 0) : null,
         extraSurfaceTotal: extra.length > 0 ? extra.reduce((n, [, m]) => n + m.total, 0) : null,
         modules:

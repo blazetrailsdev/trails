@@ -2,8 +2,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { PACKAGE_DIR_OVERRIDES as CONFIG_OVERRIDES } from "../api-compare/config.js";
-import { PACKAGE_DIR_OVERRIDES, githubAnchor, main, summarize } from "./package-summary.js";
+import { githubAnchor, main, summarize } from "./package-summary.js";
 
 let root: string;
 
@@ -91,6 +90,7 @@ beforeEach(async () => {
     JSON.stringify([
       { package: "activerecord", tsFile: "a.ts" },
       { package: "activerecord", tsFile: "a.ts", kind: "args" },
+      { package: "activerecord", tsFile: "a.ts", kind: "rubyCompat" },
       { package: "sqlite3", tsFile: "s.ts" },
     ]),
   );
@@ -135,10 +135,6 @@ afterEach(async () => {
 });
 
 describe("package-summary", () => {
-  it("restates api-compare's package directory map exactly", () => {
-    expect(PACKAGE_DIR_OVERRIDES).toEqual(CONFIG_OVERRIDES);
-  });
-
   it("spells GitHub's heading anchors", () => {
     expect(githubAnchor("Method visibility is compile-time only (`Module#private`, `pub`)")).toBe(
       "method-visibility-is-compile-time-only-moduleprivate-pub",
@@ -186,6 +182,7 @@ describe("package-summary", () => {
     expect(ar.marks).toEqual({
       callMismatchesExclude: 2,
       callArgsBaseline: 1,
+      rubyCompatBaseline: 1,
       extraSurfaceNovel: 3,
       extraSurfaceTotal: 6,
       modules: { newModule: 1, superMethod: 0, moduleImport: 1 },
