@@ -84,7 +84,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
       templateFile,
       File.join(
         "app/controllers",
-        ...this.controllerClassPath().map((p) => dasherize(p)),
+        ...this.controllerClassPath(),
         `${dasherize(this.controllerFileName)}-controller${this.ext()}`,
       ),
     );

@@ -26,7 +26,7 @@ function controllerClassPath(this: ResourceHelpersHost): string[] {
   if (this.options.modelName != null) {
     return this._controllerClassPath;
   } else {
-    return this.classPathParts;
+    return this.classPath();
   }
 }
 

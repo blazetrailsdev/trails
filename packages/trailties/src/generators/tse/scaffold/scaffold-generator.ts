@@ -73,11 +73,16 @@ export class ScaffoldGenerator extends Base {
   }
 
   async createRootFolder(): Promise<void> {
-    await this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
+    await this.emptyDirectory(
+      File.join("app/views", ...this.controllerClassPath(), dasherize(this.controllerFileName)),
+    );
   }
 
   async copyViewFiles(): Promise<void> {
-    const viewDirectory = dasherize(this.controllerFilePath());
+    const viewDirectory = File.join(
+      ...this.controllerClassPath(),
+      dasherize(this.controllerFileName),
+    );
     for (const view of this.availableViews()) {
       for (const format of this.formats()) {
         const filename = this.filenameWithExtensions(view, format);
