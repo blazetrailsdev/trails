@@ -65,6 +65,7 @@ ActionMailer.autoload("Parameterized");
 ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
 
+/** @missingRailsCall eagerAutoloadBang — PERMANENT */
 Object.defineProperty(ActionMailer, "eagerLoadBang", {
   value: async function eagerLoadBang(this: typeof ActionMailer): Promise<void> {
     await Autoload.eagerLoadBang.call(this);

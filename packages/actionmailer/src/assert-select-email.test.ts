@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Assertion } from "@blazetrails/activesupport";
 import { Assertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import { block, include } from "@blazetrails/ruby-compat";
@@ -51,13 +51,19 @@ include(AssertSelectEmailTest, Assertions);
 describe("AssertSelectEmailTest", () => {
   const t = new AssertSelectEmailTest();
 
-  afterEach(() => {
-    Base.deliveryMethod = "smtp";
+  let oldDeliveryMethod: typeof Base.deliveryMethod;
+
+  beforeEach(() => {
+    oldDeliveryMethod = Base.deliveryMethod;
+    Base.deliveryMethod = "test";
     Base.deliveries.length = 0;
   });
 
+  afterEach(() => {
+    Base.deliveryMethod = oldDeliveryMethod;
+  });
+
   it("assert select email", async () => {
-    Base.deliveryMethod = "test";
     expect(() => t.assertSelectEmail({}, () => {})).toThrow(Assertion);
 
     await (AssertSelectMailer as unknown as Mailer<string>)
@@ -75,7 +81,6 @@ describe("AssertSelectEmailTest", () => {
   });
 
   it("assert select email multipart", async () => {
-    Base.deliveryMethod = "test";
     await (AssertMultipartSelectMailer as unknown as Mailer<{ text: string; html: string }>)
       .test({ html: "<div><p>foo</p><p>bar</p></div>", text: "foo bar" })
       .deliverNow();

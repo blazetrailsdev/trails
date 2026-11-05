@@ -119,7 +119,7 @@ export function assertDomEmail(
 ): void {
   const deliveries = (TopLevel as { ActionMailer?: { Base: { deliveries: MailPart[] } } })
     .ActionMailer!.Base.deliveries;
-  assert(!(deliveries.length === 0), "No e-mail in delivery list");
+  assert(deliveries.length !== 0, "No e-mail in delivery list");
 
   for (const delivery of deliveries) {
     for (const part of delivery.parts.length === 0 ? [delivery] : delivery.parts) {

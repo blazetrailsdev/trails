@@ -141,6 +141,9 @@ describe("MailDeliveryTest", () => {
     );
   });
 
+  // BLOCKED: stub-any-instance-does-not-intercept-js-new
+  it.skip("delivery method can be customized per instance", () => {});
+
   it("delivery method can be customized in subclasses not changing the parent", async () => {
     DeliveryMailer.deliveryMethod = "test";
     expect(Base.deliveryMethod).toBe("smtp");
@@ -211,6 +214,9 @@ describe("MailDeliveryTest", () => {
     expect(error).toBeInstanceOf(RuntimeError);
     expect((error as Error).message).toBe("Delivery method cannot be nil");
   });
+
+  // BLOCKED: stub-any-instance-does-not-intercept-js-new
+  it.skip("does not perform deliveries if requested", () => {});
 
   it("does not append the deliveries collection if told not to perform the delivery", async () => {
     const oldPerformDeliveries = DeliveryMailer.performDeliveries;
