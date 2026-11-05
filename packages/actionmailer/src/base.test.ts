@@ -1,6 +1,7 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
-import { I18n, assertNothingRaised } from "@blazetrails/activesupport";
+import { I18n, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import type { Field, Message } from "@blazetrails/mail";
 import { ArgumentError, RuntimeError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
@@ -273,12 +274,10 @@ describe("BaseTest", () => {
       }
     }
 
-    const e = await (LateAttachmentMailer as Mailer<typeof LateAttachmentMailer>)
-      .welcome()
-      .message()
-      .catch((error: unknown) => error);
-    expect(e).toBeInstanceOf(RuntimeError);
-    expect((e as Error).message).toMatch(/Can't add attachments after `mail` was called./);
+    const e = await assertRaises([RuntimeError], {}, () =>
+      (LateAttachmentMailer as Mailer<typeof LateAttachmentMailer>).welcome().message(),
+    );
+    expect(e.message).toMatch(/Can't add attachments after `mail` was called./);
   });
 
   it("adding inline attachments after mail was called raises exception", async () => {
@@ -289,12 +288,10 @@ describe("BaseTest", () => {
       }
     }
 
-    const e = await (LateInlineAttachmentMailer as Mailer<typeof LateInlineAttachmentMailer>)
-      .welcome()
-      .message()
-      .catch((error: unknown) => error);
-    expect(e).toBeInstanceOf(RuntimeError);
-    expect((e as Error).message).toMatch(/Can't add attachments after `mail` was called./);
+    const e = await assertRaises([RuntimeError], {}, () =>
+      (LateInlineAttachmentMailer as Mailer<typeof LateInlineAttachmentMailer>).welcome().message(),
+    );
+    expect(e.message).toMatch(/Can't add attachments after `mail` was called./);
   });
 
   it("accessing inline attachments after mail was called works", async () => {
@@ -305,11 +302,11 @@ describe("BaseTest", () => {
       }
     }
 
-    await expect(
+    await assertNothingRaised(() =>
       (LateInlineAttachmentAccessorMailer as Mailer<typeof LateInlineAttachmentAccessorMailer>)
         .welcome()
         .message(),
-    ).resolves.toBeDefined();
+    );
   });
 
   it("implicit multipart", async () => {
@@ -442,11 +439,10 @@ describe("BaseTest", () => {
   });
 
   it("explicit without specifying format with format.any", async () => {
-    const error = await BaseMailer.explicitWithoutSpecifyingFormatWithAny()
-      .message()
-      .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ArgumentError);
-    expect((error as Error).message).toBe("You have to supply at least one format");
+    const error = await assertRaises([ArgumentError], {}, () =>
+      BaseMailer.explicitWithoutSpecifyingFormatWithAny().message(),
+    );
+    expect(error.message).toBe("You have to supply at least one format");
   });
 
   // BLOCKED: mailer-collector-renders-each-format-before-the-next-is-set
@@ -474,10 +470,10 @@ describe("BaseTest", () => {
   });
 
   it("should respond to action methods", () => {
-    expect(rbObjRespondTo(BaseMailer, "welcome")).toBe(true);
-    expect(rbObjRespondTo(BaseMailer, "implicitMultipart")).toBe(true);
-    expect(rbObjRespondTo(BaseMailer, "mail")).toBe(false);
-    expect(rbObjRespondTo(BaseMailer, "headers")).toBe(false);
+    expect(BaseMailer).toRespondTo("welcome");
+    expect(BaseMailer).toRespondTo("implicitMultipart");
+    expect(BaseMailer).not.toRespondTo("mail");
+    expect(BaseMailer).not.toRespondTo("headers");
   });
 
   it("calling just the action should return the generated mail object", async () => {
@@ -508,9 +504,9 @@ describe("BaseTest", () => {
   });
 
   it("should raise if missing template in implicit render", async () => {
-    await expect(
+    await assertRaises([ActionView.MissingTemplate], {}, () =>
       BaseMailer.implicitDifferentTemplate("missing-template").deliverNow(),
-    ).rejects.toBeInstanceOf(ActionView.MissingTemplate);
+    );
     expect(BaseMailer.deliveries.length).toBe(0);
   });
 
