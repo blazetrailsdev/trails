@@ -2,6 +2,8 @@ import "../constants.test.generated.js";
 import { LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
+import { UnrecognizedCommandError } from "../command.js";
+import { RakeCommand } from "./rake.js";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
 
@@ -55,6 +57,9 @@ export class TestCommand extends Base {
 
   async perform(...args: string[]): Promise<void> {
     Runner.parseOptions(args);
+    if (!(this.args as string[]).some((arg) => TestCommand.EXACT_TEST_ARGUMENT_PATTERN.test(arg))) {
+      await this.runPrepareTask();
+    }
     await Runner.run(args);
   }
 
@@ -83,4 +88,15 @@ export class TestCommand extends Base {
     `^-n|^--name\\b|${Runner.PATH_ARGUMENT_PATTERN.source}`,
     "m",
   );
+
+  /** @internal */
+  private async runPrepareTask(): Promise<void> {
+    try {
+      await RakeCommand.perform("test:prepare", [], {});
+    } catch (error) {
+      if (!(error instanceof UnrecognizedCommandError && error.name === "test:prepare")) {
+        throw error;
+      }
+    }
+  }
 }

@@ -3,6 +3,8 @@ import { Dir, File, getFs, rbFSystem } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
+import { UnrecognizedCommandError } from "../command.js";
+import { RakeCommand } from "./rake.js";
 import { TestCommand } from "./test.js";
 
 vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
@@ -28,6 +30,29 @@ describe("TestCommand", () => {
     } finally {
       run.mockRestore();
       parse.mockRestore();
+    }
+  });
+
+  it("runs test:prepare unless an exact test argument was given", async () => {
+    const run = vi.spyOn(Runner, "run").mockResolvedValue();
+    const parse = vi.spyOn(Runner, "parseOptions").mockImplementation(() => {});
+    const rake = vi.spyOn(RakeCommand, "perform");
+    try {
+      rake.mockRejectedValueOnce(new UnrecognizedCommandError("test:prepare", []));
+      await TestCommand.perform("test", [], {});
+      expect(rake).toHaveBeenCalledWith("test:prepare", [], {});
+      expect(run).toHaveBeenCalled();
+
+      rake.mockClear();
+      await TestCommand.perform("test", ["-n", "x"], {});
+      expect(rake).not.toHaveBeenCalled();
+
+      rake.mockRejectedValueOnce(new UnrecognizedCommandError("db:prepare", []));
+      await expect(TestCommand.perform("test", [], {})).rejects.toThrow(UnrecognizedCommandError);
+    } finally {
+      run.mockRestore();
+      parse.mockRestore();
+      rake.mockRestore();
     }
   });
 
