@@ -40,7 +40,7 @@ import {
 import { advance as timeAdvance } from "./time-ext.js";
 import { since as datetimeSince } from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
-import { inTimeZone } from "./core-ext/date-and-time/zones.js";
+import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
@@ -581,9 +581,9 @@ export class TimeWithZone {
           `Adding an instance of ${rbObjClassname(other)} to an instance of ${rbObjClassname(this)} is deprecated. This behavior will raise ` +
             "a `TypeError` in Rails 8.1.",
         );
-        inTimeZone(result as Time, this.timeZone);
+        inTimeZone.call(result as DateOrTime, this.timeZone);
       }
-      return inTimeZone(result as Time, this.timeZone) as TimeWithZone;
+      return inTimeZone.call(result as DateOrTime, this.timeZone) as TimeWithZone;
     }
   }
 
@@ -646,14 +646,13 @@ export class TimeWithZone {
     return this.plus(other);
   }
 
-  /** @missingRailsArgs in_time_zone — PERMANENT */
   advance(options: AdvanceOptions): TimeWithZone {
     if ([options.years, options.weeks, options.months, options.days].some((v) => v != null)) {
       return this._wrapWithTimeZone(
         timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
       ) as TimeWithZone;
     } else {
-      return inTimeZone(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
+      return timeAdvance(this.utc(), options).inTimeZone(this.timeZone) as TimeWithZone;
     }
   }
 

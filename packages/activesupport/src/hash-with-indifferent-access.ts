@@ -352,18 +352,21 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return dup;
   }
 
+  transformKeysBang(): Enumerator;
   transformKeysBang(block: (key: string) => string): this;
   transformKeysBang(hash: AnyObject | null, block?: (key: string) => string): this;
   transformKeysBang(
-    hash: AnyObject | null | ((key: string) => string),
+    hash?: AnyObject | null | ((key: string) => string),
     block?: (key: string) => string,
-  ): this {
+  ): this | Enumerator {
+    if (arguments.length === 0) hash = NOT_GIVEN;
     if (typeof hash === "function") {
       block = hash;
       hash = NOT_GIVEN;
     }
+    if (NOT_GIVEN === hash && !block) return toEnum(this, "transformKeysBang");
 
-    if (hash === null) {
+    if (hash == null) {
       throw new TypeError("no implicit conversion of nil into Hash");
     } else if (NOT_GIVEN === hash) {
       for (const key of [...this.keys()]) this.set(block!(key), this.delete(key));

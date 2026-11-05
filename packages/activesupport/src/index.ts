@@ -370,6 +370,7 @@ import "./core-ext/time/calculations.js";
 import "./core-ext/date-time/calculations.js";
 import "./core-ext/date-time/compatibility.js";
 import "./core-ext/date/zones.js";
+import "./core-ext/date-and-time/zones.js";
 import "./core-ext/array/access.js";
 import "./core-ext/enumerable.js";
 export * from "./core-ext/time/conversions.js";

@@ -161,40 +161,11 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   // ---------------------------------------------------------------------------
   {
     testFile: "share_lock_test.rb",
-    tests: [
-      "reentrancy",
-      "sharing doesnt block",
-      "sharing blocks exclusive",
-      "exclusive blocks sharing",
-      "multiple exclusives are able to progress",
-      "sharing is upgradeable to exclusive",
-      "exclusive upgrade waits for other sharers to leave",
-      "exclusive matching purpose",
-      "killed thread loses lock",
-      "exclusive conflicting purpose",
-      "exclusive ordering",
-      "new share attempts block on waiting exclusive",
-      "share remains reentrant ignoring a waiting exclusive",
-      "compatible exclusives cooperate to both proceed",
-      "manual yield",
-      "manual incompatible yield",
-      "manual recursive yield",
-      "manual recursive yield cannot expand outer compatible",
-      "manual recursive yield restores previous compatible",
-      "in shared section incompatible non upgrading threads cannot preempt upgrading threads",
-      "happy path",
-      "detects stuck thread",
-      "detects free thread",
-      "detects already released",
-      "detects remains latched",
-    ],
+    tests: ["killed thread loses lock"],
     reason:
-      "Every case drives ActiveSupport::Concurrency::ShareLock from several `Thread.new` " +
-      "workers through the file's own `assert_threads_stuck` / `assert_threads_not_stuck` " +
-      "helpers (share_lock_test.rb:495-513), asserting Monitor/ConditionVariable blocking, thread " +
-      "ownership and `Thread#kill` unwind. JS is single-threaded and has no preemptible " +
-      "thread, no Monitor and no way to observe a blocked one, so the assertions have no " +
-      "meaning; the lock's non-blocking bookkeeping is covered by the file's other cases.",
+      "Asserts that `Thread#kill` unwinds a thread holding a share so its `ensure` " +
+      "releases the lock. ruby-compat's Thread#kill cannot unwind a JS body awaiting a " +
+      "promise, so the killed thread's share is never released.",
   },
   {
     testFile: "dependencies_test.rb",

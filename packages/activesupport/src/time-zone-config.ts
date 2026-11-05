@@ -1,22 +1,12 @@
-import { Time as RubyTime } from "@blazetrails/date";
 import { TEMPORAL_METHOD_TABLE, rbEnsure } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import { inTimeZone } from "./core-ext/date-and-time/zones.js";
-import type { TimeWithZone } from "./time-with-zone.js";
+import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import { TimeZone } from "./values/time-zone.js";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
 
-declare module "@blazetrails/date" {
-  interface Time {
-    inTimeZone(zone?: unknown): TimeWithZone | Time;
-  }
-}
-
-RubyTime.prototype.inTimeZone = function (this: RubyTime, zone?: unknown) {
-  return inTimeZone(this, zone);
-};
-(TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).inTimeZone = inTimeZone;
+(TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).inTimeZone = (self: unknown, zone?: unknown) =>
+  inTimeZone.call(self as DateOrTime, zone);
 
 let _zoneDefault: TimeZone | null = null;
 

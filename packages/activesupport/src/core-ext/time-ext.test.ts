@@ -1696,7 +1696,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("past with time current as time with zone", () => {
     withEnvTz("US/Eastern", () => {
-      const twz = inTimeZone(
+      const twz = inTimeZone.call(
         RubyTime.utc(2005, 2, 10, 15, 30, 45),
         "Central Time (US & Canada)",
       ) as TimeWithZone;
@@ -1726,7 +1726,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("future with time current as time with zone", () => {
     withEnvTz("US/Eastern", () => {
-      const twz = inTimeZone(
+      const twz = inTimeZone.call(
         RubyTime.utc(2005, 2, 10, 15, 30, 45),
         "Central Time (US & Canada)",
       ) as TimeWithZone;

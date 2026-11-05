@@ -1,4 +1,4 @@
-import { describe, it, beforeEach, afterEach } from "vitest";
+import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { Concurrent, Mutex, Thread } from "@blazetrails/ruby-compat";
 import { assert, Assertion, assertEmpty, assertEqual, assertRaises } from "./testing/assertions.js";
 import { ShareLock } from "./concurrency/share-lock.js";
@@ -84,9 +84,7 @@ describe("ShareLockTest", () => {
 
   it("sharing blocks exclusive", async () => {
     await withThreadWaitingInLockSection("sharing", async (sharingThreadReleaseLatch) => {
-      await new Thread(() =>
-        lock.exclusive({ noWait: true }, () => assert(false, "Epic Fail!")),
-      ).join();
+      await lock.exclusive({ noWait: true }, () => expect.unreachable("flunk"));
       const exclusiveThread = new Thread(() => lock.exclusive({}, () => {}));
       await assertThreadsStuckButReleasableByLatch(exclusiveThread, sharingThreadReleaseLatch);
     });
