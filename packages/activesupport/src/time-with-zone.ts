@@ -652,7 +652,7 @@ export class TimeWithZone {
         timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
       ) as TimeWithZone;
     } else {
-      return inTimeZone.call(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
+      return timeAdvance(this.utc(), options).inTimeZone(this.timeZone) as TimeWithZone;
     }
   }
 
