@@ -203,7 +203,7 @@ class PrependProtectForgeryBaseController extends Base {
     this.addCalledCallback("verify_authenticity_token");
   }
 }
-PrependProtectForgeryBaseController.beforeAction("customAction");
+PrependProtectForgeryBaseController.beforeAction(":customAction");
 
 class FreeCookieController extends RequestForgeryProtectionControllerUsingResetSession {
   async index(): Promise<void> {
@@ -275,7 +275,7 @@ class CookieCsrfTokenStorageStrategyController extends Base {
   }
 }
 include(CookieCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
-CookieCsrfTokenStorageStrategyController.afterAction("commitToken", { only: "cookie" });
+CookieCsrfTokenStorageStrategyController.afterAction(":commitToken", { only: "cookie" });
 CookieCsrfTokenStorageStrategyController.protectFromForgery({
   only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
   with: "exception",

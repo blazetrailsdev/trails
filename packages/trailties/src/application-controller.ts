@@ -30,7 +30,7 @@ export class ApplicationController extends ActionController.Base {
 }
 
 ApplicationController.prependViewPath(new URL("./templates", import.meta.url).href);
-ApplicationController.beforeAction("disableContentSecurityPolicyNonceBang");
+ApplicationController.beforeAction(":disableContentSecurityPolicyNonceBang");
 ApplicationController.contentSecurityPolicy(undefined, undefined, (policy) => {
   policy.scriptSrc(":self", ":unsafe_inline");
   policy.styleSrc(":self", ":unsafe_inline");

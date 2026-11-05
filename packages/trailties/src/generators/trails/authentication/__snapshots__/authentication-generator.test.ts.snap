@@ -79,7 +79,7 @@ import { Session } from "../../models/session.ts";
 /** Rails' \`class_methods do ... end\` block. */
 export const ClassMethods = {
   allowUnauthenticatedAccess(this: any, options: Record<string, unknown> = {}): void {
-    this.skipBeforeAction("requireAuthentication", options);
+    this.skipBeforeAction(":requireAuthentication", options);
   },
 };
 
@@ -87,7 +87,7 @@ export const Authentication = defineModule(
   {
     [included](base: any): void {
       extend(base, ClassMethods);
-      base.beforeAction("requireAuthentication");
+      base.beforeAction(":requireAuthentication");
       base.helperMethod("authenticated");
     },
   },
@@ -151,7 +151,7 @@ import { PasswordsMailer } from "../mailers/passwords-mailer.ts";
 export class PasswordsController extends ApplicationController {
   static {
     this.allowUnauthenticatedAccess();
-    this.beforeAction("setUserByToken", { only: ["edit", "update"] });
+    this.beforeAction(":setUserByToken", { only: ["edit", "update"] });
   }
 
   declare user: any;

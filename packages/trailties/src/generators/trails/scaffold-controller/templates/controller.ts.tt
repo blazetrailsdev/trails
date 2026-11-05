@@ -9,7 +9,7 @@ import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath
 export class <%= this.controllerClassName().split("::").pop() %>Controller extends ApplicationController {
 <% const sig = ts ? ": Promise<void>" : ""; -%>
   static {
-    this.beforeAction("set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "edit", "update", "destroy"] });
+    this.beforeAction(":set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "edit", "update", "destroy"] });
   }
 <% if (ts) { -%>
 

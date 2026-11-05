@@ -9,10 +9,10 @@ class DummyController extends Base {
   declare loggedIn: boolean;
 
   static {
-    this.beforeAction("authenticate", { only: "index" });
-    this.beforeAction("authenticateWithRequest", { only: "display" });
-    this.beforeAction("authenticateLongCredentials", { only: "show" });
-    this.beforeAction("authWithSpecialChars", { only: "specialCreds" });
+    this.beforeAction(":authenticate", { only: "index" });
+    this.beforeAction(":authenticateWithRequest", { only: "display" });
+    this.beforeAction(":authenticateLongCredentials", { only: "show" });
+    this.beforeAction(":authWithSpecialChars", { only: "specialCreds" });
 
     this.httpBasicAuthenticateWith({ name: "David", password: "Goliath", only: "search" });
   }

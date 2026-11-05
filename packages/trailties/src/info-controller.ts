@@ -74,4 +74,4 @@ export class InfoController extends ApplicationController {
 }
 
 InfoController.prependViewPath(DebugView.RESCUES_TEMPLATE_PATHS);
-InfoController.beforeAction("requireLocalBang");
+InfoController.beforeAction(":requireLocalBang");

@@ -12,4 +12,4 @@ export class WelcomeController extends ApplicationController {
   index(): void {}
 }
 
-WelcomeController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
+WelcomeController.skipBeforeAction(":verifyAuthenticityToken", { raise: false });

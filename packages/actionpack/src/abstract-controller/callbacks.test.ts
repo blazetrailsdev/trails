@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import { Base, ActionNotFound } from "./base.js";
 import {
   ActionFilter,
@@ -7,7 +8,6 @@ import {
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
-  type ActionCallbackHost,
   type aroundAction,
   Callbacks,
   type CallbackOptions,
@@ -18,8 +18,8 @@ import {
 import { assertIncludes, assertNot, assertRaises, include } from "@blazetrails/activesupport";
 
 class ControllerWithCallbacks extends Base {
-  declare static setCallback: ActionCallbackHost["setCallback"];
-  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
   declare static _normalizeCallbackOptions: typeof _normalizeCallbackOptions;
   declare static _normalizeCallbackOption: typeof _normalizeCallbackOption;
@@ -71,12 +71,12 @@ class Callback2 extends ControllerWithCallbacks {
     this.responseBody = this.text ?? "";
   }
 }
-Callback2.beforeAction("first");
-Callback2.afterAction("second");
-Callback2.aroundAction("aroundz");
+Callback2.beforeAction(":first");
+Callback2.afterAction(":second");
+Callback2.aroundAction(":aroundz");
 
 class Callback2Overwrite extends Callback2 {}
-Callback2Overwrite.beforeAction("first", { except: "index" });
+Callback2Overwrite.beforeAction(":first", { except: "index" });
 
 describe("TestCallbacks2", () => {
   let controller: Callback2;
@@ -154,8 +154,8 @@ class CallbacksWithConditions extends ControllerWithCallbacks {
     this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
   }
 }
-CallbacksWithConditions.beforeAction("_list", { only: "index" });
-CallbacksWithConditions.beforeAction("_authenticate", { except: "index" });
+CallbacksWithConditions.beforeAction(":_list", { only: "index" });
+CallbacksWithConditions.beforeAction(":_authenticate", { except: "index" });
 
 describe("TestCallbacksWithConditions", () => {
   let controller: CallbacksWithConditions;
@@ -242,8 +242,8 @@ class CallbacksWithArrayConditions extends ControllerWithCallbacks {
     this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
   }
 }
-CallbacksWithArrayConditions.beforeAction("_list", { only: ["index", "listy"] });
-CallbacksWithArrayConditions.beforeAction("_authenticate", { except: ["index", "listy"] });
+CallbacksWithArrayConditions.beforeAction(":_list", { only: ["index", "listy"] });
+CallbacksWithArrayConditions.beforeAction(":_authenticate", { except: ["index", "listy"] });
 
 describe("TestCallbacksWithArrayConditions", () => {
   let controller: CallbacksWithArrayConditions;
@@ -272,7 +272,7 @@ class ChangedConditions extends Callback2 {
     this.responseBody = this.text ?? "";
   }
 }
-ChangedConditions.beforeAction("first", { only: "index" });
+ChangedConditions.beforeAction(":first", { only: "index" });
 
 describe("TestCallbacksWithChangedConditions", () => {
   let controller: ChangedConditions;
@@ -299,7 +299,7 @@ class SetsResponseBody extends ControllerWithCallbacks {
     this.responseBody = "Success";
   }
 }
-SetsResponseBody.beforeAction("setBody");
+SetsResponseBody.beforeAction(":setBody");
 
 describe("TestHalting", () => {
   it("when a callback sets the response body, the action should not be invoked", async () => {
@@ -375,7 +375,7 @@ describe("TestCallbacksWithMissingConditions", () => {
 
   it("raised exception message includes the names of callback actions and missing conditional action", async () => {
     const C = makeController((k) => {
-      k.beforeAction("callback1", "callback2", () => {}, { only: "showw" });
+      k.beforeAction(":callback1", ":callback2", () => {}, { only: "showw" });
     });
     const controller = new C();
     const error = await assertRaises([ActionNotFound], {}, () => controller.process("index"));

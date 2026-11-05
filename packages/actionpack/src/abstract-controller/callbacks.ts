@@ -9,8 +9,6 @@ import {
   type Extended,
   type FilterListEntry,
   type Included,
-  type CallbackKind,
-  type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
 } from "@blazetrails/activesupport";
 import { ActionNotFound, type Base } from "./base.js";
@@ -156,138 +154,140 @@ function _inspectFilter(filter: CallbackFilter): string {
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
 }
 
-/** @internal */
-function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | undefined {
-  if (pred === undefined) return undefined;
-  const list = Array.isArray(pred) ? pred : [pred];
-  return list.map((item) =>
-    typeof item === "string"
-      ? item
-      : typeof item === "function"
-        ? (item as unknown as CallbackCondition)
-        : (c: object) => item.isMatch(c as Base),
-  );
-}
-
-/** @internal */
-export function _registerActionCallback(
-  klass: ActionCallbackHost,
-  kind: CallbackKind,
-  callback: CallbackFilter,
-  options: CallbackOptions,
-): void {
-  const asOpts: ASCallbackOptions = {};
-  if (options.prepend) asOpts.prepend = true;
-  const ifFns = _toConditionFns(options.if);
-  const unlessFns = _toConditionFns(options.unless);
-  if (ifFns) asOpts.if = ifFns;
-  if (unlessFns) asOpts.unless = unlessFns;
-  const filter = typeof callback === "string" ? `:${callback}` : callback;
-  klass.setCallback("process_action", kind, filter as FilterListEntry, asOpts);
-}
-
-/** @internal */
-export function _skipActionCallback(
-  klass: ActionCallbackHost,
-  kind: CallbackKind,
-  filter: CallbackFilter,
-  options: CallbackOptions,
-): void {
-  const asOpts: ASCallbackOptions & { raise?: boolean } = {};
-  const ifFns = _toConditionFns(options.if);
-  const unlessFns = _toConditionFns(options.unless);
-  if (ifFns) asOpts.if = ifFns;
-  if (unlessFns) asOpts.unless = unlessFns;
-  if (options.raise !== undefined) asOpts.raise = options.raise;
-  const name = typeof filter === "string" ? `:${filter}` : filter;
-  klass.skipCallback("process_action", kind, name as FilterListEntry, asOpts);
-}
-
-export type ActionCallbackHost = Pick<
-  Extended<typeof ASCallbacks.ClassMethods>,
-  "defineCallbacks" | "setCallback" | "skipCallback"
->;
-
 type ActionCallbackArgs<T> = Array<T | string | CallbackObject | CallbackOptions>;
 
 export function beforeAction(
-  this: ActionCallbackHost,
+  this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "before", name, options);
+    this.setCallback(
+      "process_action",
+      "before",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
   });
 }
 
 export function prependBeforeAction(
-  this: ActionCallbackHost,
+  this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "before", name, { ...options, prepend: true });
-  });
-}
-
-export function afterAction(
-  this: ActionCallbackHost,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
-  _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "after", name, options);
-  });
-}
-
-export function prependAfterAction(
-  this: ActionCallbackHost,
-  ...names: ActionCallbackArgs<ActionCallback>
-): void {
-  _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "after", name, { ...options, prepend: true });
-  });
-}
-
-export function aroundAction(
-  this: ActionCallbackHost,
-  ...names: ActionCallbackArgs<AroundCallback>
-): void {
-  _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "around", name, options);
-  });
-}
-
-export function prependAroundAction(
-  this: ActionCallbackHost,
-  ...names: ActionCallbackArgs<AroundCallback>
-): void {
-  _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this, "around", name, { ...options, prepend: true });
+    this.setCallback(
+      "process_action",
+      "before",
+      name as FilterListEntry,
+      {
+        ...options,
+        prepend: true,
+      } as ASCallbackOptions,
+    );
   });
 }
 
 export function skipBeforeAction(
-  this: ActionCallbackHost,
+  this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this, "before", name, options);
+    this.skipCallback(
+      "process_action",
+      "before",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
+  });
+}
+
+export function afterAction(
+  this: Extended<typeof ASCallbacks.ClassMethods>,
+  ...names: ActionCallbackArgs<ActionCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    this.setCallback(
+      "process_action",
+      "after",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
+  });
+}
+
+export function prependAfterAction(
+  this: Extended<typeof ASCallbacks.ClassMethods>,
+  ...names: ActionCallbackArgs<ActionCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    this.setCallback(
+      "process_action",
+      "after",
+      name as FilterListEntry,
+      {
+        ...options,
+        prepend: true,
+      } as ASCallbackOptions,
+    );
   });
 }
 
 export function skipAfterAction(
-  this: ActionCallbackHost,
+  this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this, "after", name, options);
+    this.skipCallback(
+      "process_action",
+      "after",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
+  });
+}
+
+export function aroundAction(
+  this: Extended<typeof ASCallbacks.ClassMethods>,
+  ...names: ActionCallbackArgs<AroundCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    this.setCallback(
+      "process_action",
+      "around",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
+  });
+}
+
+export function prependAroundAction(
+  this: Extended<typeof ASCallbacks.ClassMethods>,
+  ...names: ActionCallbackArgs<AroundCallback>
+): void {
+  _insertCallbacks(names, null, (name, options) => {
+    this.setCallback(
+      "process_action",
+      "around",
+      name as FilterListEntry,
+      {
+        ...options,
+        prepend: true,
+      } as ASCallbackOptions,
+    );
   });
 }
 
 export function skipAroundAction(
-  this: ActionCallbackHost,
+  this: Extended<typeof ASCallbacks.ClassMethods>,
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this, "around", name, options);
+    this.skipCallback(
+      "process_action",
+      "around",
+      name as FilterListEntry,
+      options as ASCallbackOptions,
+    );
   });
 }
 
@@ -321,7 +321,7 @@ export async function processAction(
   return this.runCallbacks("process_action", () => rbCallSuper(this, processAction, ...args));
 }
 
-type CallbacksIncludingClass = typeof Base & ActionCallbackHost;
+type CallbacksIncludingClass = typeof Base & Extended<typeof ASCallbacks.ClassMethods>;
 
 export const Callbacks = { ClassMethods, processAction };
 extend(Callbacks, Concern);

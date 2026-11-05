@@ -12,7 +12,7 @@ constSet(constGet(Object, "Dispatching") as object, "Submodule", {
 
 class SimpleController extends Base {
   static {
-    this.beforeAction("authenticate");
+    this.beforeAction(":authenticate");
   }
 
   async index(): Promise<void> {
