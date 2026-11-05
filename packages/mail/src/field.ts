@@ -28,7 +28,11 @@ import type { CommonField } from "./fields/common-field.js";
 import { Mail } from "./mail.js";
 import { Utilities } from "./utilities.js";
 
-type FieldClass = { NAME: string; isSingular(): boolean; parse(...args: unknown[]): CommonField };
+type FieldClass = {
+  NAME: string;
+  isSingular(): boolean;
+  parse(value?: unknown, charset?: unknown): CommonField;
+};
 
 const STRUCTURED_FIELDS =
   "bcc cc content-description content-disposition content-id content-location content-transfer-encoding content-type date from in-reply-to keywords message-id mime-version received references reply-to resent-bcc resent-cc resent-date resent-from resent-message-id resent-sender resent-to return-path sender to".split(
@@ -54,8 +58,7 @@ export class Field implements Comparable {
   static readonly KNOWN_FIELDS = [...STRUCTURED_FIELDS, "comments", "subject"];
 
   static get FIELDS_MAP(): Record<string, FieldClass> {
-    return (_fieldsMap ??= {
-      __proto__: null,
+    return (_fieldsMap ??= Object.assign(Object.create(null) as Record<string, FieldClass>, {
       to: Mail.ToField,
       cc: Mail.CcField,
       bcc: Mail.BccField,
@@ -85,7 +88,7 @@ export class Field implements Comparable {
       "content-id": Mail.ContentIdField,
       "content-description": Mail.ContentDescriptionField,
       "content-location": Mail.ContentLocationField,
-    } as unknown as Record<string, FieldClass>);
+    }));
   }
 
   static get FIELD_NAME_MAP(): Record<string, string> {
@@ -289,9 +292,7 @@ export class Field implements Comparable {
       return this.parseField(name, value, charset);
     } catch (e) {
       if (!(e instanceof Field.ParseError)) throw e;
-      const field = new (Mail.UnstructuredField as unknown as new (
-        ...args: unknown[]
-      ) => CommonField)(name, value);
+      const field = new Mail.UnstructuredField(name, value);
       field.errors.push([name, value, e]);
       return field;
     }
@@ -305,7 +306,7 @@ export class Field implements Comparable {
     if (klass != null) {
       return klass.parse(value, charset);
     } else {
-      return (Mail.OptionalField as unknown as FieldClass).parse(name, value, charset);
+      return Mail.OptionalField.parse(name, value, charset as string | Encoding | null);
     }
   }
 
