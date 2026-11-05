@@ -1025,7 +1025,7 @@ export class CreatePosts extends Migration.Current {
     expect(joined).toContain("You have 1 pending migration:");
     expect(joined).toContain("20260101000000");
     expect(joined).toContain("CreatePosts");
-    expect(joined).toContain("Run `trails db migrate` to resolve this issue.");
+    expect(joined).toContain("Run `trails db:migrate` to resolve this issue.");
   });
 
   it("db version reports the highest applied version after migrate", async () => {

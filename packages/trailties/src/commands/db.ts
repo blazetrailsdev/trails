@@ -570,7 +570,7 @@ export function dbCommand(): Command {
             const version = String(BigInt(m.version));
             console.error(`${prefix}  ${version.padStart(4, " ")} ${m.name}`);
           }
-          console.error(`${prefix}Run \`trails db migrate\` to resolve this issue.`);
+          console.error(`${prefix}Run \`trails db:migrate\` to resolve this issue.`);
           setExitCode(1);
         }
       });
