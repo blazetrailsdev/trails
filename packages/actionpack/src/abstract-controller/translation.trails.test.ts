@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
-import { translate, type TranslationHost } from "./translation.js";
+import "../test-helpers/abstract-unit.js";
+import { translate, type TranslateOptions, type TranslationHost } from "./translation.js";
 
 class TranslationController {
   static controllerPath(): string {
     return "abstract_controller/testing/translation";
   }
   actionName = "";
-  translate = translate;
-  t = translate;
+  translate(key: string, options: TranslateOptions = {}): unknown {
+    return translate.call(this as unknown as TranslationHost, key, options);
+  }
+  t(key: string, options: TranslateOptions = {}): unknown {
+    return this.translate(key, options);
+  }
 }
-
-I18n.setEnforceAvailableLocales(false);
 
 describe("TranslationControllerTest — trails-only", () => {
   let controller: TranslationController;

@@ -3,6 +3,7 @@ import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n, include, isHtmlSafe, stub, type Included } from "@blazetrails/activesupport";
 import { constSet } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../namespaces.js";
+import "../test-helpers/abstract-unit.js";
 import { Base } from "./base.js";
 import { Translation } from "./translation.js";
 
@@ -15,8 +16,6 @@ include(TranslationController, Translation);
 const Testing = {};
 constSet(AbstractController, "Testing", Testing);
 constSet(Testing, "TranslationController", TranslationController);
-
-I18n.setEnforceAvailableLocales(false);
 
 describe("TranslationControllerTest", () => {
   let controller: TranslationController;
@@ -77,15 +76,13 @@ describe("TranslationControllerTest", () => {
     expect(controller.t(null, { default: default_ })).toEqual(default_);
   });
 
-  // BLOCKED: translate-reads-a-symbol-key-for-lazy-lookup
-  it.skip("lazy lookup with symbol", () => {
+  it("lazy lookup with symbol", () => {
     stub(controller, "actionName", "index", [], () => {
       expect(controller.t(":.foo")).toEqual("bar");
     });
   });
 
-  // BLOCKED: translate-reads-a-symbol-key-for-lazy-lookup
-  it.skip("lazy lookup fallback", () => {
+  it("lazy lookup fallback", () => {
     stub(controller, "actionName", "index", [], () => {
       expect(controller.t(":.no_action")).toEqual("no_action_tr");
     });
