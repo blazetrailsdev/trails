@@ -37,8 +37,11 @@ export class Console {
   readonly options: ConsoleOptions;
   readonly app: ConsoleApp;
   readonly console: ConsoleRunner;
-  /** @internal */
-  private _loadConsole: unknown;
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private _loadConsole: Promise<unknown>;
 
   constructor(app: ConsoleApp, options: ConsoleOptions = {}) {
     this.app = app;
@@ -53,7 +56,8 @@ export class Console {
       exit(1);
     }
 
-    this._loadConsole = app.loadConsole();
+    this._loadConsole = Promise.resolve(app.loadConsole());
+    this._loadConsole.catch(() => {});
 
     this.console = app.config.console || new IRBConsole(app);
   }

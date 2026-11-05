@@ -147,6 +147,7 @@ describe("AppGenerator (trails-only)", () => {
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.dependencies["@blazetrails/trailties"]).toBe("*");
+    expect(pkg.dependencies["@blazetrails/rackup"]).toBe("*");
     expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
   });
 

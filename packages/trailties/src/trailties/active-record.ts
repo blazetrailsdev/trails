@@ -49,6 +49,7 @@ import {
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
+import type { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { databaseConfiguration } from "../database.js";
@@ -184,13 +185,13 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.console(async (app) => {
-      if ((app as { isSandbox(): boolean }).isSandbox()) {
+      if ((app as Application).isSandbox()) {
         await import("@blazetrails/activerecord/trailties/console-sandbox");
       }
       if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
         const console = new Logger(STDERR);
         console.level = Trails.logger!.level;
-        (Trails.logger as unknown as BroadcastLogger).broadcastTo(console);
+        (Trails.logger as BroadcastLogger).broadcastTo(console);
       }
       ActiveRecord.setVerboseQueryLogs(false);
       ActiveRecord.Base.attributesForInspect = ":all";

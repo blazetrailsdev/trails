@@ -1,5 +1,5 @@
 import "../../constants.console-irb-console.generated.js";
-import { ActionDispatch } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import {
   Dir,
   STDERR,
@@ -17,7 +17,7 @@ export class RailsHelperBase {}
 
 export class ControllerHelper extends RailsHelperBase {
   execute(): unknown {
-    return (constGet(TopLevel, "ApplicationController") as { helpers(): unknown }).helpers();
+    return (constGet(TopLevel, "ApplicationController") as typeof ActionController.Base).helpers();
   }
 }
 
@@ -29,7 +29,7 @@ export class ControllerInstance extends RailsHelperBase {
     return (this._controller ??= new (constGet(
       TopLevel,
       "ApplicationController",
-    ) as new () => unknown)());
+    ) as typeof ActionController.Base)());
   }
 }
 
