@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { Timezone } from "./index.js";
+import { InvalidTimezoneIdentifier, Timezone } from "./index.js";
 
 describe("Timezone offsets and abbreviations from the cached transition interval", () => {
   afterEach(() => {
@@ -57,5 +57,9 @@ describe("Timezone abbreviations answer tzdata's, as TZInfo does", () => {
     expect(Timezone.get("Etc/GMT").abbr(at)).toBe("GMT");
     expect(Timezone.get("Etc/GMT+5").periodForUtc(Time.at(1_700_000_000)).abbreviation).toBe("-05");
     expect(Timezone.get("Etc/GMT").periodForUtc(Time.at(1_700_000_000)).abbreviation).toBe("GMT");
+  });
+
+  it("rejects an identifier Intl accepts but tzdata has no zone for", () => {
+    expect(() => Timezone.get("+05:00")).toThrow(InvalidTimezoneIdentifier);
   });
 });

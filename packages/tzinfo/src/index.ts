@@ -474,6 +474,9 @@ export class Timezone {
         if (!(error instanceof RangeError)) throw error;
         throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
       }
+      if (tzdataAbbreviation(identifier, 0) === undefined) {
+        throw new InvalidTimezoneIdentifier(`Invalid identifier: ${identifier}`);
+      }
       loadedTimezoneIdentifiers.add(identifier);
     }
     return new Timezone(identifier);
