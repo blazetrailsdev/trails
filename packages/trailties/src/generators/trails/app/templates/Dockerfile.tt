@@ -27,4 +27,4 @@ COPY --from=build /app /app
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
 
 EXPOSE 3000
-CMD ["npx", "trails", "server"]
+CMD ["npx", "rackup", "config.ts"]
