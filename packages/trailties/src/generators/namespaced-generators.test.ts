@@ -114,12 +114,12 @@ describe("NamespacedControllerGeneratorTest", () => {
   it("invokes default template engine", async () => {
     await t.runGenerator();
     await t.assertFile(
-      "app/views/test_app/account/foo.html.tse",
-      /app\/views\/test_app\/account\/foo\.html\.tse/,
+      "app/views/test-app/account/foo.html.tse",
+      /app\/views\/test-app\/account\/foo\.html\.tse/,
     );
     await t.assertFile(
-      "app/views/test_app/account/bar.html.tse",
-      /app\/views\/test_app\/account\/bar\.html\.tse/,
+      "app/views/test-app/account/bar.html.tse",
+      /app\/views\/test-app\/account\/bar\.html\.tse/,
     );
   });
 
@@ -130,7 +130,7 @@ describe("NamespacedControllerGeneratorTest", () => {
 
   it("invokes default template engine even with no action", async () => {
     await t.runGenerator(["account"]);
-    await t.assertFile("app/views/test_app/account");
+    await t.assertFile("app/views/test-app/account");
   });
 
   it.skip("namespaced controller dont indent blank lines", async () => {
@@ -263,20 +263,20 @@ describe("NamespacedMailerGeneratorTest", () => {
 
   it.skip("invokes default template engine", async () => {
     await t.runGenerator();
-    await t.assertFile("app/views/test_app/notifier-mailer/foo.text.tse", (view: string) => {
-      expect(view).toMatch(/app\/views\/test_app\/notifier-mailer\/foo\.text\.tse/);
+    await t.assertFile("app/views/test-app/notifier-mailer/foo.text.tse", (view: string) => {
+      expect(view).toMatch(/app\/views\/test-app\/notifier-mailer\/foo\.text\.tse/);
       expect(view).toMatch(/<%= this\.greeting %>/);
     });
 
-    await t.assertFile("app/views/test_app/notifier-mailer/bar.text.tse", (view: string) => {
-      expect(view).toMatch(/app\/views\/test_app\/notifier-mailer\/bar\.text\.tse/);
+    await t.assertFile("app/views/test-app/notifier-mailer/bar.text.tse", (view: string) => {
+      expect(view).toMatch(/app\/views\/test-app\/notifier-mailer\/bar\.text\.tse/);
       expect(view).toMatch(/<%= this\.greeting %>/);
     });
   });
 
   it.skip("invokes default template engine even with no action", async () => {
     await t.runGenerator(["notifier"]);
-    await t.assertFile("app/views/test_app/notifier-mailer");
+    await t.assertFile("app/views/test-app/notifier-mailer");
   });
 });
 
@@ -311,9 +311,9 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     );
 
     for (const view of ["index", "edit", "new", "show", "_form"]) {
-      await t.assertFile(`app/views/test_app/product-lines/${view}.html.tse`);
+      await t.assertFile(`app/views/test-app/product-lines/${view}.html.tse`);
     }
-    t.assertNoFile("app/views/layouts/test_app/product-lines.html.tse");
+    t.assertNoFile("app/views/layouts/test-app/product-lines.html.tse");
 
     await t.assertFile("app/helpers/test_app/product-lines-helper.ts");
   });
@@ -334,8 +334,8 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     t.assertNoFile("app/controllers/test_app/product-lines-controller.ts");
     t.assertNoFile("test/controllers/test_app/product-lines-controller.test.ts");
 
-    t.assertNoFile("app/views/test_app/product-lines");
-    t.assertNoFile("app/views/test_app/layouts/product-lines.html.tse");
+    t.assertNoFile("app/views/test-app/product-lines");
+    t.assertNoFile("app/views/test-app/layouts/product-lines.html.tse");
 
     t.assertNoFile("app/helpers/test_app/product-lines-helper.ts");
   });
@@ -369,7 +369,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
       /namespace TestApp \{\n {2}class Admin::RolesControllerTest extends IntegrationTest/,
     );
     for (const view of ["index", "edit", "new", "show", "_form"]) {
-      await t.assertFile(`app/views/test_app/admin/roles/${view}.html.tse`);
+      await t.assertFile(`app/views/test-app/admin/roles/${view}.html.tse`);
     }
     t.assertNoFile("app/views/layouts/admin/roles.html.tse");
     await t.assertFile("app/helpers/test_app/admin/roles-helper.ts");
@@ -389,7 +389,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     });
     t.assertNoFile("app/controllers/test_app/admin/roles-controller.ts");
     t.assertNoFile("test/controllers/test_app/admin/roles-controller.test.ts");
-    t.assertNoFile("app/views/test_app/admin/roles");
+    t.assertNoFile("app/views/test-app/admin/roles");
     t.assertNoFile("app/helpers/test_app/admin/roles-helper.ts");
   });
 
@@ -428,7 +428,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
       /namespace TestApp \{\n {2}class Admin::User::Special::RolesControllerTest extends IntegrationTest/,
     );
     for (const view of ["index", "edit", "new", "show", "_form"]) {
-      await t.assertFile(`app/views/test_app/admin/user/special/roles/${view}.html.tse`);
+      await t.assertFile(`app/views/test-app/admin/user/special/roles/${view}.html.tse`);
     }
     t.assertNoFile("app/views/layouts/admin/user/special/roles.html.tse");
     await t.assertFile("app/helpers/test_app/admin/user/special/roles-helper.ts");
@@ -448,7 +448,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     });
     t.assertNoFile("app/controllers/test_app/admin/user/special/roles-controller.ts");
     t.assertNoFile("test/controllers/test_app/admin/user/special/roles-controller.test.ts");
-    t.assertNoFile("app/views/test_app/admin/user/special/roles");
+    t.assertNoFile("app/views/test-app/admin/user/special/roles");
     t.assertNoFile("app/helpers/test_app/admin/user/special/roles-helper.ts");
   });
 
