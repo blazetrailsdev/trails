@@ -1014,6 +1014,9 @@ importers:
       '@blazetrails/actioncable':
         specifier: workspace:*
         version: link:../actioncable
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack

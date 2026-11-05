@@ -1,0 +1,15 @@
+import { ActionMailer } from "@blazetrails/actionmailer";
+import { <%= this.className().split("::").pop() %>Mailer } from "<%= "../".repeat(this.classPathParts.length + 3) %>app/mailers/<%= this.classPathParts.map((p) => p + "/").join("") %><%= ActiveSupport.Inflector.dasherize(this.fileName) %>-mailer<%= this.ext() %>";
+
+// Preview all emails at http://localhost:3000/trails/mailers/<%= this.filePath() %>_mailer
+export class <%= this.className().split("::").pop() %>MailerPreview extends ActionMailer.Preview {
+<% this.actions.forEach((action, index) => { -%>
+<% if (index !== 0) { -%>
+
+<% } -%>
+  // Preview this email at http://localhost:3000/trails/mailers/<%= this.filePath() %>_mailer/<%= action %>
+  <%= action %>(): unknown {
+    return (<%= this.className().split("::").pop() %>Mailer as any).<%= action %>();
+  }
+<% }); -%>
+}
