@@ -69,6 +69,10 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * forwarder Ruby generates. A data property that is not a function — an
  * Array's `length` — is Ruby's `length` method, so it forwards as an accessor,
  * and a symbol-keyed method (`Symbol.iterator`, Ruby's `each`) forwards too.
+ * A symbol-keyed data property is skipped: `Symbol.unscopables` and
+ * ruby-compat's own brands (the include records) are not Ruby methods, and a
+ * forwarding accessor would read `__getobj__` off the prototype and break
+ * `include()` on a subclass.
  *
  * `block` is Ruby's `&block`, `module_eval`'d on the generated class
  * (`:394,442`); `call` supplies the class as `this`, which is the `self`
