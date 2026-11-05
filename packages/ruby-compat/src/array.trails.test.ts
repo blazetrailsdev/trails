@@ -4,6 +4,7 @@ import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
   aryCount,
+  rbAryReplace,
   aryReject,
   rbFArray,
   toH,
@@ -753,5 +754,13 @@ describe("each", () => {
     const hash = { each: "data" };
     each(hash, (i) => seen.push(i));
     expect(seen.at(-1)).toEqual(["each", "data"]);
+  });
+});
+
+describe("rbAryReplace", () => {
+  it("replaces the receiver's contents in place and returns it", () => {
+    const copy = ["a", "b", "c"];
+    expect(rbAryReplace(copy, ["x"])).toBe(copy);
+    expect(copy).toEqual(["x"]);
   });
 });

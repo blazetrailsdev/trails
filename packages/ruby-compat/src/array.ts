@@ -356,6 +356,18 @@ export function rbAryFetch<T>(ary: readonly T[], pos: number): T {
 }
 
 /**
+ * `rb_ary_replace` (`vendor/ruby/v3.3.11/array.c:4531`): `copy`'s contents
+ * become `orig`'s, in place, and `copy` is returned.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#replace`.
+ */
+export function rbAryReplace<T>(copy: T[], orig: readonly T[]): T[] {
+  if (copy === orig) return copy;
+  copy.splice(0, copy.length, ...orig);
+  return copy;
+}
+
+/**
  * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `h` and `H`
  * directives (`vendor/ruby/v3.3.11/pack.c:1125,1145`).
  */

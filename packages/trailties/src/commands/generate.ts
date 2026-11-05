@@ -1,5 +1,5 @@
 import "../constants.generate.generated.js";
-import { rbArgv } from "@blazetrails/ruby-compat";
+import { rbAryReplace, rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
@@ -26,7 +26,7 @@ export class GenerateCommand extends Base {
     await this.bootApplicationBang();
     await this.loadGenerators();
 
-    rbArgv().splice(0, rbArgv().length, ...(this.args as string[]));
+    rbAryReplace(rbArgv(), this.args as string[]);
 
     await Generators.invoke(generator, this.args as string[], {
       behavior: "invoke",

@@ -207,6 +207,9 @@ DSL.namespace("db", (dbNamespace) => {
       });
     });
 
+    DSL.desc("Resets your database using your migrations for the current environment");
+    DSL.task({ reset: ["db:drop", "db:create", "db:schema:dump", "db:migrate"] });
+
     DSL.desc('Run the "up" for a given migration VERSION.');
     DSL.task(
       { up: "load_config" },

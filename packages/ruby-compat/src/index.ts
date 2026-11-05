@@ -244,6 +244,7 @@ export {
   unpack,
   unpack1,
   rbAryFetch,
+  rbAryReplace,
   sortByBang,
   ARRAY_METHOD_TABLE,
 } from "./array.js";
