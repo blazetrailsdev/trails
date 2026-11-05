@@ -44,19 +44,19 @@ describe("TranslationControllerTest", () => {
   });
 
   it("action controller base responds to translate", () => {
-    expect(typeof controller.translate).toBe("function");
+    expect(controller).toRespondTo("translate");
   });
 
   it("action controller base responds to t", () => {
-    expect(typeof controller.t).toBe("function");
+    expect(controller).toRespondTo("t");
   });
 
   it("action controller base responds to localize", () => {
-    expect(typeof controller.localize).toBe("function");
+    expect(controller).toRespondTo("localize");
   });
 
   it("action controller base responds to l", () => {
-    expect(typeof controller.l).toBe("function");
+    expect(controller).toRespondTo("l");
   });
 
   it("raises missing translation message with raise option", () => {
