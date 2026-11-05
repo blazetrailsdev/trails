@@ -171,6 +171,17 @@ describe("TestHelperMailerTest", () => {
     });
   });
 
+  it("assert emails with custom parameterized delivery job", async ({ testCase }: TestContext) => {
+    const t = testCase as T;
+    await assertNothingRaised(async () => {
+      await t.assertEmails(1, () =>
+        (CustomDeliveryMailer.with({ foo: "bar" }) as unknown as Mailer)
+          .testParameterArgs()
+          .deliverLater(),
+      );
+    });
+  });
+
   it("assert emails with enqueued emails", async ({ testCase }: TestContext) => {
     const t = testCase as T;
     await assertNothingRaised(async () => {
@@ -250,8 +261,8 @@ describe("TestHelperMailerTest", () => {
     const error = await assertRaise([Assertion], {}, async () => {
       await t.assertEmails(2, () => testHelperMailer.test().deliverNow());
     });
-    expect(error.message).toContain("Expected: 2");
-    expect(error.message).toContain("Actual: 1");
+    expect(error.message).toMatch("Expected: 2");
+    expect(error.message).toMatch("Actual: 1");
   });
 
   it("assert no emails failure", async ({ testCase }: TestContext) => {
