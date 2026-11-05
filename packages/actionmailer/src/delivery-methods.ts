@@ -11,7 +11,7 @@ import { ActionMailer } from "./namespaces.js";
 
 type Settings = Record<string, unknown>;
 
-interface DeliveryMethodsClass {
+export interface DeliveryMethodsClass {
   deliveryMethods: Readonly<Record<string, unknown>>;
   deliveryMethod: unknown;
   performDeliveries: boolean;

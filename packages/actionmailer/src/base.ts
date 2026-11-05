@@ -28,6 +28,7 @@ import { Collector } from "./collector.js";
 import {
   DeliveryMethods,
   type ClassMethods as DeliveryMethodsClassMethods,
+  type DeliveryMethodsClass,
 } from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
@@ -46,13 +47,17 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
-  declare static prependViewPath: (path: unknown) => void;
-  declare static appendViewPath: (path: unknown) => void;
-  declare static deliveryMethod: unknown;
-  declare static deliveryMethods: Readonly<Record<string, unknown>>;
+  declare static prependViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.prependViewPath
+  >;
+  declare static appendViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.appendViewPath
+  >;
+  declare static deliveryMethod: DeliveryMethodsClass["deliveryMethod"];
+  declare static deliveryMethods: DeliveryMethodsClass["deliveryMethods"];
   declare static isDeliveryMethods: () => boolean;
-  declare static performDeliveries: boolean;
-  declare static raiseDeliveryErrors: boolean;
+  declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
+  declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
   declare static deliveries: Message[];
   declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
   /** @internal */
@@ -511,8 +516,8 @@ export class Base extends AbstractController.Base {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
 export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
-  lookupContext: InstanceType<typeof ActionView.LookupContext>;
-  render(...args: unknown[]): unknown;
+  readonly lookupContext: ReturnType<typeof ActionView.lookupContext>;
+  render: OmitThisParameter<typeof AbstractController.render>;
   params: Record<string, unknown>;
   runCallbacks(kind: string, block?: () => unknown): unknown;
 }
