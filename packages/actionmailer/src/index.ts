@@ -13,6 +13,7 @@ export { MailDeliveryJob } from "./mail-delivery-job.js";
 export { MailHelper } from "./mail-helper.js";
 export { MessageDelivery } from "./message-delivery.js";
 export { Parameterized } from "./parameterized.js";
+export { Preview } from "./preview.js";
 export { QueuedDelivery } from "./queued-delivery.js";
 export { Rescuable } from "./rescuable.js";
 

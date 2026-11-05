@@ -17,8 +17,11 @@ import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import type { MailHelper } from "./mail-helper.js";
 import type { MessageDelivery } from "./message-delivery.js";
 import type { Parameterized } from "./parameterized.js";
+import type { Preview, Previews } from "./preview.js";
 import type { QueuedDelivery } from "./queued-delivery.js";
 import type { Rescuable } from "./rescuable.js";
+import type { NonInferrableMailerError, TestCase } from "./test-case.js";
+import type { TestHelper } from "./test-helper.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -32,8 +35,11 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "action_mailer/mail_delivery_job": () => import("./mail-delivery-job.js"),
   "action_mailer/message_delivery": () => import("./message-delivery.js"),
   "action_mailer/parameterized": () => import("./parameterized.js"),
+  "action_mailer/preview": () => import("./preview.js"),
   "action_mailer/queued_delivery": () => import("./queued-delivery.js"),
   "action_mailer/form_builder": () => import("./form-builder.js"),
+  "action_mailer/test_case": () => import("./test-case.js"),
+  "action_mailer/test_helper": () => import("./test-helper.js"),
 };
 
 export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule & {
@@ -50,6 +56,11 @@ export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule
   LogSubscriber: typeof LogSubscriber;
   MailHelper: typeof MailHelper;
   Rescuable: typeof Rescuable;
+  Preview: typeof Preview;
+  Previews: typeof Previews;
+  NonInferrableMailerError: typeof NonInferrableMailerError;
+  TestCase: typeof TestCase;
+  TestHelper: typeof TestHelper;
 };
 constSet(TopLevel, "ActionMailer", ActionMailer);
 extend(ActionMailer, Autoload);
@@ -64,6 +75,11 @@ ActionMailer.autoload("MessageDelivery");
 ActionMailer.autoload("Parameterized");
 ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
+ActionMailer.autoload("NonInferrableMailerError", "action_mailer/test_case");
+ActionMailer.autoload("TestCase");
+ActionMailer.autoload("TestHelper");
+ActionMailer.autoload("Preview", "action_mailer/preview");
+ActionMailer.autoload("Previews", "action_mailer/preview");
 
 /** @missingRailsCall eagerAutoloadBang — PERMANENT */
 Object.defineProperty(ActionMailer, "eagerLoadBang", {

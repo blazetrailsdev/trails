@@ -45,6 +45,7 @@ import {
   type ClassMethods as ParameterizedClassMethods,
   type ParameterizedIncluded,
 } from "./parameterized.js";
+import { Previews, type ClassMethods as PreviewsClassMethods } from "./preview.js";
 import { QueuedDelivery } from "./queued-delivery.js";
 import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import { Rescuable } from "./rescuable.js";
@@ -80,6 +81,13 @@ export class Base extends AbstractController.Base {
   declare static isDeliveryJob: () => boolean;
   declare static deliverLaterQueueName: unknown;
   declare static with: typeof ParameterizedClassMethods.with;
+  declare static previewPaths: string[];
+  declare static showPreviews: boolean | null;
+  declare static previewInterceptors: unknown[];
+  declare static registerPreviewInterceptors: typeof PreviewsClassMethods.registerPreviewInterceptors;
+  declare static unregisterPreviewInterceptors: typeof PreviewsClassMethods.unregisterPreviewInterceptors;
+  declare static registerPreviewInterceptor: typeof PreviewsClassMethods.registerPreviewInterceptor;
+  declare static unregisterPreviewInterceptor: typeof PreviewsClassMethods.unregisterPreviewInterceptor;
 
   /** @internal */
   protected static _mailerName?: string;
@@ -571,6 +579,7 @@ include(Base, DeliveryMethods);
 include(Base, QueuedDelivery);
 include(Base, Rescuable);
 include(Base, Parameterized);
+include(Base, Previews);
 Base.abstractBang();
 
 include(Base, AbstractController.Rendering);

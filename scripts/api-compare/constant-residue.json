@@ -37,7 +37,7 @@
     }
   },
   "actionmailer": {
-    "rows": 22,
+    "rows": 25,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -61,6 +61,9 @@
       "parameterized.ts::Mailer": "ActionMailer::Parameterized::Mailer",
       "parameterized.ts::MessageDelivery": "ActionMailer::Parameterized::MessageDelivery",
       "parameterized.ts::Parameterized": "ActionMailer::Parameterized",
+      "preview.ts::ClassMethods": "ActionMailer::Previews::ClassMethods",
+      "preview.ts::Preview": "ActionMailer::Preview",
+      "preview.ts::Previews": "ActionMailer::Previews",
       "queued-delivery.ts::QueuedDelivery": "ActionMailer::QueuedDelivery",
       "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
     }

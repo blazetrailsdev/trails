@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
@@ -34,7 +35,6 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/actionview": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   }

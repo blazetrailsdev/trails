@@ -843,6 +843,18 @@ export class IO {
   }
 
   /**
+   * {@link IO.readlines} over the backend's async `readFile`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.readlines`
+   * (`vendor/ruby/v3.3.11/io.c:12121`).
+   */
+  static async readlinesAsync(name: string): Promise<string[]> {
+    const lines = (await getFs().readFile(name, "utf-8")).split(/(?<=\n)/);
+    if (lines[lines.length - 1] === "") lines.pop();
+    return lines;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:12242` `rb_io_s_binread`, which opens the stream
    * `FMODE_BINMODE` under `rb_ascii8bit_encoding()` (`io.c:12257`) and so
    * answers the file's BYTES, an ASCII-8BIT `Uint8Array`, never a decoded
