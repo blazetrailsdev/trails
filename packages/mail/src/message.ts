@@ -587,6 +587,9 @@ export class Message {
   }
 
   set(name: unknown, value: unknown): void {
+    if (typeof name === "string" && /^[a-z][A-Za-z\d]*$/.test(name)) {
+      name = name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+    }
     if (rbObjAsString(name) === "body") {
       this.setBody(value);
     } else if (/content[-_]type/i.test(rbObjAsString(name))) {

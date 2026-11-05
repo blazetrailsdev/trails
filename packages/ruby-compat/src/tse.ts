@@ -11,6 +11,7 @@ export interface TSECompiler {
 type Compiled = { default: (this: object) => string };
 
 let loads = 0;
+const loaded = new Set<string>();
 
 /**
  * Ruby's `ERB` (`vendor/ruby/v3.3.11/lib/erb.rb:335`). `@src` is compiled at build
@@ -57,7 +58,8 @@ export class TSE {
     if (this.filename == null) throw new LoadError("cannot load such file -- (erb)");
     const compiled = `${this.filename}.js`;
     const url = new URL(compiled.replace(/[%#?]/g, encodeURIComponent), "file:///");
-    url.search = `?${(loads += 1)}`;
+    if (loaded.has(url.href)) url.search = `?${(loads += 1)}`;
+    else loaded.add(url.href);
     let mod: Compiled;
     try {
       mod = (await import(url.href)) as Compiled;
