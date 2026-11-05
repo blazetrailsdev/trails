@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
