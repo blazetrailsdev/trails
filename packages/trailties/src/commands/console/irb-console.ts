@@ -69,7 +69,7 @@ const HELPER_METHODS: Record<string, RailsHelperBase & { execute(...args: unknow
   controller: new ControllerInstance(),
   newSession: new NewSession(),
   app: new AppInstance(),
-  reload: new ReloadHelper(),
+  reloadBang: new ReloadHelper(),
 };
 
 const BLUE = "\u001b[34m";
