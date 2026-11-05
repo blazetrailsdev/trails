@@ -1,5 +1,13 @@
 import "../../constants.app-update-command.generated.js";
-import { File, TopLevel, constDefined, include, merge, Pathname } from "@blazetrails/ruby-compat";
+import {
+  File,
+  TopLevel,
+  constDefined,
+  include,
+  merge,
+  Pathname,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 import type { ThorClass } from "@blazetrails/thor";
 import * as ThorActions from "@blazetrails/thor/actions";
@@ -104,7 +112,7 @@ export class UpdateCommand extends Base {
         api: !!config.apiOnly,
         update: true,
         name: underscore(
-          (Trails.application!.constructor as { name: string }).name.replace(/::Application$/, ""),
+          String(rbModName(Trails.application!.constructor)).replace(/::Application$/, ""),
         ),
         skipActiveJob: !constDefined(TopLevel, "ActiveJob::Railtie"),
         skipActiveRecord: !constDefined(TopLevel, "ActiveRecord::Railtie"),
