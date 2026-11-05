@@ -166,7 +166,6 @@ export class AppBuilder extends ActionMethods {
 
   /**
    * @inventedArm if — PERMANENT
-   * @inventedArm template — PERMANENT
    * @missingRailsArgs template — PERMANENT
    */
   async gemfile(): Promise<void> {
@@ -181,10 +180,7 @@ export class AppBuilder extends ActionMethods {
     await this.template("Rakefile.ts");
   }
 
-  /**
-   * @inventedArm template — PERMANENT
-   * @missingRailsArgs template — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async configru(): Promise<void> {
     await this.template("config.ts");
     await this.template("vite.config.ts");
@@ -349,10 +345,7 @@ export class AppBuilder extends ActionMethods {
     await this.emptyDirectoryWithKeepFile("tmp/storage");
   }
 
-  /**
-   * @inventedArm template — PERMANENT
-   * @missingRailsArgs template — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async test(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/fixtures/files");
     await this.emptyDirectoryWithKeepFile("test/controllers");
