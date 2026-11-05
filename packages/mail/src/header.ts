@@ -1,4 +1,5 @@
 import {
+  type Encoding,
   ArgumentError,
   Enumerable,
   type Hash,
@@ -16,7 +17,7 @@ import { Field } from "./field.js";
 import { FieldList } from "./field-list.js";
 import { Utilities } from "./utilities.js";
 
-type ContentTypeParameters = Hash<string, unknown>;
+type ContentTypeParameters = Hash<string, string | Encoding>;
 type HasParameters = { parameters(): ContentTypeParameters | null };
 
 let maximumAmount = 1000;
@@ -34,11 +35,11 @@ export class Header {
   /** @internal */
   private _rawSource: string;
   /** @internal */
-  private _charset: unknown;
+  private _charset: string | Encoding | null;
   /** @internal */
   private _fields: FieldList | null = null;
 
-  constructor(headerText: string | null = null, charset: unknown = null) {
+  constructor(headerText: string | null = null, charset: string | Encoding | null = null) {
     this._charset = charset;
     this._rawSource = Utilities.toCrlf(headerText as string).replace(/^[\0\t\n\v\f\r ]+/, "");
     if (headerText != null) this.splitHeader();
@@ -106,16 +107,16 @@ export class Header {
           params = null;
         }
         const charset = params?.get("charset");
-        if (params != null && charset != null && charset !== false) this._charset = charset;
+        if (params != null && charset != null) this._charset = charset;
       }
     }
   }
 
-  get charset(): unknown {
+  get charset(): string | Encoding | null {
     return this._charset;
   }
 
-  set charset(val: unknown) {
+  set charset(val: string | Encoding | null) {
     let params: ContentTypeParameters | null;
     try {
       params = (this.get("content_type") as unknown as HasParameters).parameters();
@@ -123,7 +124,7 @@ export class Header {
       params = null;
     }
     if (params != null) {
-      if (val != null && val !== false) {
+      if (val != null) {
         params.set("charset", val);
       } else {
         params.delete("charset");
