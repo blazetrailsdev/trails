@@ -6,6 +6,7 @@ import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetr
 import { TopLevel } from "@blazetrails/activesupport";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 import { Application } from "../../../application.js";
+import "../../../generators.js";
 import { Trails } from "../../../trails.js";
 import "../../../trailties/active-record.js";
 import "../../../test-unit/trailtie.js";

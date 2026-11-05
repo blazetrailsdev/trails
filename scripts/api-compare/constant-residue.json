@@ -1217,7 +1217,7 @@
     }
   },
   "trailties": {
-    "rows": 67,
+    "rows": 68,
     "excluded": [
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
