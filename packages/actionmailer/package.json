@@ -34,6 +34,7 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@blazetrails/actionview": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

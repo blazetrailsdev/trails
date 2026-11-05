@@ -1,4 +1,10 @@
-import { Autoload, extend, type Extended, type Logger } from "@blazetrails/activesupport";
+import {
+  Autoload,
+  descendants,
+  extend,
+  type Extended,
+  type Logger,
+} from "@blazetrails/activesupport";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { Callbacks } from "./callbacks.js";
@@ -58,3 +64,15 @@ ActionMailer.autoload("MessageDelivery");
 ActionMailer.autoload("Parameterized");
 ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
+
+Object.defineProperty(ActionMailer, "eagerLoadBang", {
+  value: async function eagerLoadBang(this: typeof ActionMailer): Promise<void> {
+    await Autoload.eagerLoadBang.call(this);
+
+    for (const mailer of descendants(this.Base) as (typeof Base)[]) {
+      if (!mailer.isAbstract()) mailer.eagerLoadBang();
+    }
+  },
+  writable: true,
+  configurable: true,
+});
