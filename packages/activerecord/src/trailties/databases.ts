@@ -14,7 +14,7 @@ import { Base } from "../base.js";
 import { Migration, Migrator, type MigrationProxy } from "../migration.js";
 import { DatabaseTasks, type SchemaFormat } from "../tasks/database-tasks.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
-import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
+import * as ActiveRecord from "../active-record.js";
 
 const databases = DatabaseTasks.setupInitialDatabaseYaml();
 
@@ -122,7 +122,7 @@ DSL.namespace("db", (dbNamespace) => {
   DSL.task(
     "_dump",
     block(async () => {
-      if (dumpSchemaAfterMigration()) {
+      if (ActiveRecord.dumpSchemaAfterMigration()) {
         await dbNamespace.get("schema:dump")!.invoke();
       }
       dbNamespace.get("_dump")!.reenable();
@@ -134,7 +134,7 @@ DSL.namespace("db", (dbNamespace) => {
       DSL.task(
         name,
         block(async () => {
-          if (dumpSchemaAfterMigration()) {
+          if (ActiveRecord.dumpSchemaAfterMigration()) {
             await dbNamespace.get(`schema:dump:${name}`)!.invoke();
           }
           dbNamespace.get(`_dump:${name}`)!.reenable();
@@ -416,8 +416,9 @@ DSL.namespace("db", (dbNamespace) => {
       block(async () => {
         await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
           const dbConfig = pool.dbConfig;
-          const schemaFormat_ = (ENV["SCHEMA_FORMAT"] ?? schemaFormat()) as SchemaFormat;
-          await DatabaseTasks.dumpSchema(dbConfig, schemaFormat_);
+          const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
+            ActiveRecord.schemaFormat()) as SchemaFormat;
+          await DatabaseTasks.dumpSchema(dbConfig, schemaFormat);
         });
 
         dbNamespace.get("schema:dump")!.reenable();
@@ -434,8 +435,9 @@ DSL.namespace("db", (dbNamespace) => {
           block(async () => {
             await DatabaseTasks.withTemporaryPoolForEach({ name }, async (pool) => {
               const dbConfig = pool.dbConfig;
-              const schemaFormat_ = (ENV["SCHEMA_FORMAT"] ?? schemaFormat()) as SchemaFormat;
-              await DatabaseTasks.dumpSchema(dbConfig, schemaFormat_);
+              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
+                ActiveRecord.schemaFormat()) as SchemaFormat;
+              await DatabaseTasks.dumpSchema(dbConfig, schemaFormat);
             });
 
             dbNamespace.get(`schema:dump:${name}`)!.reenable();
