@@ -1646,12 +1646,46 @@ export function rubyCallToTsForReceivers(
   receivers: Record<string, string[]> | undefined,
   fileDefinesInstanceNew: boolean,
 ): string[] | null {
-  const mapped = rubyCallToTs(rc, pkg);
+  const mapped = asyncPredicateTwins(rubyCallToTs(rc, pkg), rc);
   const kinds = receivers?.[rc];
   if (rc !== "new" || !fileDefinesInstanceNew || kinds === undefined || kinds.includes("const")) {
     return mapped;
   }
   return [...(mapped ?? []), "new"];
+}
+
+/**
+ * A Ruby predicate's TS spellings plus ruby-compat's async twin of each
+ * `is*` one: Thor actions use async fs only, so `File.directory?` is
+ * `File.isDirectoryAsync` (`packages/ruby-compat/src/file.ts`).
+ */
+export function asyncPredicateTwins(mapped: string[] | null, rc: string): string[] | null {
+  if (mapped === null || !rc.endsWith("?")) return mapped;
+  const twins = mapped.filter((n) => /^is[A-Z]/.test(n)).map((n) => `${n}Async`);
+  return twins.length === 0 ? mapped : [...mapped, ...twins];
+}
+
+/**
+ * `significant` less the calls an instance body cannot make to a same-file
+ * method defined only on the singleton: every site's receiver is an
+ * expression, so `shift.split(":", 2)` (`thor/parser/arguments.rb:98`) is
+ * `String#split`, not `Arguments.split` (`arguments.rb:8-17`).
+ */
+export function unreachableSingletonCallsDropped(
+  significant: { has(value: string): boolean },
+  level: OwnerSeat,
+  receivers: Record<string, readonly string[]> | undefined,
+  isSingletonOnly: (rc: string) => boolean,
+): { has(value: string): boolean } {
+  if (level !== "instance") return significant;
+  return {
+    has: (value) => {
+      if (!significant.has(value)) return false;
+      const kinds = receivers?.[value];
+      if (kinds === undefined || kinds.length === 0 || kinds.some((k) => k !== "expr")) return true;
+      return !isSingletonOnly(value);
+    },
+  };
 }
 
 /**
@@ -5770,11 +5804,16 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
-          significantCallsForReceivers(
+          unreachableSingletonCallsDropped(
+            significantCallsForReceivers(
+              rubyOwned?.receivers,
+              callsSignificant,
+              tsNativeForms,
+              rubyOwned?.receiverNames,
+            ),
+            level,
             rubyOwned?.receivers,
-            callsSignificant,
-            tsNativeForms,
-            rubyOwned?.receiverNames,
+            (rc) => seen.has(rubyLevelKey("class", rc)) && !seen.has(rubyLevelKey("instance", rc)),
           ),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
