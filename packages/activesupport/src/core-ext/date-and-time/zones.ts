@@ -1,4 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { include } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
@@ -15,33 +16,24 @@ export type DateOrTime =
   | RubyTime
   | TimeWithZone;
 
-export function inTimeZone(dateOrTime: Temporal.PlainDate, zone?: unknown): TimeWithZone | RubyTime;
-export function inTimeZone(dateOrTime: Date, zone?: unknown): TimeWithZone | Date;
-export function inTimeZone(
-  dateOrTime: Temporal.Instant,
-  zone?: unknown,
-): TimeWithZone | Temporal.Instant;
-export function inTimeZone(dateOrTime: RubyTime, zone?: unknown): TimeWithZone | RubyTime;
-export function inTimeZone(dateOrTime: TimeWithZone, zone?: unknown): TimeWithZone;
-export function inTimeZone(
-  dateOrTime: Temporal.PlainDateTime,
-  zone?: unknown,
-): TimeWithZone | Temporal.PlainDateTime;
-export function inTimeZone(
-  dateOrTime: Temporal.ZonedDateTime,
-  zone?: unknown,
-): TimeWithZone | Temporal.ZonedDateTime;
-export function inTimeZone(dateOrTime: DateOrTime, zone?: unknown): DateOrTime;
-export function inTimeZone(dateOrTime: DateOrTime, zone: unknown = currentZone()): DateOrTime {
-  if (dateOrTime instanceof TimeWithZone) return dateOrTime.inTimeZone(zone);
+type InTimeZoneResult<T> = T extends TimeWithZone
+  ? TimeWithZone
+  : TimeWithZone | (T extends Temporal.PlainDate ? RubyTime : T);
+
+export function inTimeZone<T extends DateOrTime>(
+  this: T,
+  zone: unknown = currentZone(),
+): InTimeZoneResult<T> {
+  type Result = InTimeZoneResult<T>;
+  if (this instanceof TimeWithZone) return this.inTimeZone(zone) as Result;
 
   const timeZone = findZoneBang(zone);
-  const time = actsLike.call(dateOrTime, "time") ? (dateOrTime as TimeLike) : null;
+  const time = actsLike.call(this, "time") ? (this as TimeLike) : null;
 
   if (timeZone) {
-    return timeWithZone(dateOrTime, time, timeZone);
+    return timeWithZone(this, time, timeZone) as Result;
   }
-  return time !== null ? time : toTime(dateOrTime as Temporal.PlainDate);
+  return (time !== null ? time : toTime(this as Temporal.PlainDate)) as Result;
 }
 
 /** @internal */
@@ -68,3 +60,11 @@ type TimeLike =
   | Temporal.PlainDateTime
   | Temporal.ZonedDateTime
   | RubyTime;
+
+declare module "@blazetrails/date" {
+  interface Time {
+    inTimeZone(zone?: unknown): TimeWithZone | Time;
+  }
+}
+
+include(RubyTime, { inTimeZone });

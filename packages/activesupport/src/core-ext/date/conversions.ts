@@ -3,6 +3,7 @@ import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date"
 import { ordinalize } from "../../inflector.js";
 import { ArgumentError } from "../../time-zone-config.js";
 import { inTimeZone } from "../date-and-time/zones.js";
+import type { TimeWithZone } from "../../time-with-zone.js";
 
 export const DATE_FORMATS: Record<string, string | ((date: Temporal.PlainDate) => string)> = {
   short: "%d %b",
@@ -53,5 +54,5 @@ export function toTime(date: Temporal.PlainDate, form: string = "local"): RubyTi
 }
 
 export function xmlschema(date: Temporal.PlainDate): string {
-  return inTimeZone(date).xmlschema();
+  return (inTimeZone.call(date) as RubyTime | TimeWithZone).xmlschema();
 }

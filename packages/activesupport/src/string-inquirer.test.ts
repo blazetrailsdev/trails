@@ -24,7 +24,7 @@ describe("StringInquirerTest", () => {
   });
 
   it("missing question mark", () => {
-    expect(() => (stringInquirer as any).production()).toThrow(/undefined method 'production'/);
+    expect(() => (stringInquirer as any).production()).toThrow(TypeError);
   });
 
   it("respond to", () => {
@@ -84,7 +84,7 @@ describe("StringInquirer", () => {
     const s = inquiry.call("blank") as any;
     expect("isBlank" in s).toBe(false);
     expect("isNil" in s).toBe(false);
-    expect(() => s.isNil()).toThrow(/undefined method .isNil./);
+    expect(() => s.isNil()).toThrow(TypeError);
   });
 
   it("valueOf returns original string", () => {

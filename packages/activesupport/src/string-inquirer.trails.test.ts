@@ -13,4 +13,11 @@ describe("StringInquirer method_missing in the prototype chain", () => {
     expect(new EnvironmentInquirer("production")["local?"]()).toBe(false);
     expect(new EnvironmentInquirer("test")["local?"]()).toBe(true);
   });
+
+  it("reads undefined for JS protocol probes Ruby never answers", async () => {
+    const inquirer = new StringInquirer("x");
+    expect((inquirer as any).then).toBeUndefined();
+    expect(await inquirer).toBe(inquirer);
+    expect(JSON.stringify(inquirer)).toBe('"x"');
+  });
 });

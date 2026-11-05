@@ -1,9 +1,4 @@
-import {
-  KERNEL_METHODS,
-  NoMethodError,
-  PROTOCOL_PROBES,
-  rbMethodName,
-} from "@blazetrails/ruby-compat";
+import { KERNEL_METHODS, PROTOCOL_PROBES, rbMethodName } from "@blazetrails/ruby-compat";
 
 function isPredicateSpelling(prop: string): boolean {
   return /^is[A-Z]/.test(prop) && !KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop);
@@ -28,11 +23,7 @@ Object.setPrototypeOf(
           return String.prototype.valueOf.call(this) === expected;
         };
       }
-      return function (this: unknown): never {
-        throw new NoMethodError(
-          `undefined method '${prop}' for an instance of ${(this as object).constructor.name}`,
-        );
-      };
+      return undefined;
     },
     has(target, prop) {
       if (typeof prop === "string" && (prop.endsWith("?") || isPredicateSpelling(prop)))

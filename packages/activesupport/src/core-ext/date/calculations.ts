@@ -55,17 +55,17 @@ export function current(): Temporal.PlainDate {
 }
 
 export function ago(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {
-  return inTimeZone(date).since(-seconds);
+  return (inTimeZone.call(date) as RubyTime | TimeWithZone).since(-seconds);
 }
 
 export function since(date: Temporal.PlainDate, seconds: number): TimeWithZone | RubyTime {
-  return inTimeZone(date).since(seconds);
+  return (inTimeZone.call(date) as RubyTime | TimeWithZone).since(seconds);
 }
 
 export { since as in };
 
 export function beginningOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
-  return inTimeZone(date);
+  return inTimeZone.call(date) as RubyTime | TimeWithZone;
 }
 
 export const midnight = beginningOfDay;
@@ -75,7 +75,7 @@ export const atMidnight = beginningOfDay;
 export const atBeginningOfDay = beginningOfDay;
 
 export function middleOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
-  return inTimeZone(date).middleOfDay();
+  return (inTimeZone.call(date) as RubyTime | TimeWithZone).middleOfDay();
 }
 
 export const midday = middleOfDay;
@@ -89,7 +89,7 @@ export const atNoon = middleOfDay;
 export const atMiddleOfDay = middleOfDay;
 
 export function endOfDay(date: Temporal.PlainDate): TimeWithZone | RubyTime {
-  return inTimeZone(date).endOfDay();
+  return (inTimeZone.call(date) as RubyTime | TimeWithZone).endOfDay();
 }
 
 export const atEndOfDay = endOfDay;

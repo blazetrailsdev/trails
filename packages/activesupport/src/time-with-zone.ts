@@ -581,9 +581,9 @@ export class TimeWithZone {
           `Adding an instance of ${rbObjClassname(other)} to an instance of ${rbObjClassname(this)} is deprecated. This behavior will raise ` +
             "a `TypeError` in Rails 8.1.",
         );
-        inTimeZone(result as Time, this.timeZone);
+        inTimeZone.call(result as Time, this.timeZone);
       }
-      return inTimeZone(result as Time, this.timeZone) as TimeWithZone;
+      return inTimeZone.call(result as Time, this.timeZone) as TimeWithZone;
     }
   }
 
@@ -653,7 +653,7 @@ export class TimeWithZone {
         timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
       ) as TimeWithZone;
     } else {
-      return inTimeZone(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
+      return inTimeZone.call(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
     }
   }
 
