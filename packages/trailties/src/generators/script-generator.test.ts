@@ -1,8 +1,8 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ScriptGenerator } from "./script-generator.js";
-import { TestCase } from "../../test-case.js";
+import { ScriptGenerator } from "./trails/script/script-generator.js";
+import { TestCase } from "./test-case.js";
 
 class ScriptGeneratorTest extends TestCase {}
 ScriptGeneratorTest.destination(Dir.mktmpdir());

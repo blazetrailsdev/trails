@@ -3,8 +3,8 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { HelperGenerator } from "./helper-generator.js";
-import { TestCase } from "../../test-case.js";
+import { HelperGenerator } from "./trails/helper/helper-generator.js";
+import { TestCase } from "./test-case.js";
 
 class HelperGeneratorTest extends TestCase {}
 HelperGeneratorTest.destination(Dir.mktmpdir());
