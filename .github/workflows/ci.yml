@@ -2455,13 +2455,17 @@ jobs:
         # written by the step above — --no-regen because CI must not pay for the
         # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
+      - name: Package summary
+        if: ${{ !cancelled() }}
+        run: pnpm parity:packages
       - name: Stage parity outputs
         if: ${{ !cancelled() && github.event_name == 'push' }}
         run: |
           set -euo pipefail
           dir=$RUNNER_TEMP/parity-outputs
-          mkdir -p "$dir/scripts/test-compare/output"
+          mkdir -p "$dir/scripts/test-compare/output" "$dir/scripts/parity/output"
           cp scripts/test-compare/output/convention-comparison.json "$dir/scripts/test-compare/output/"
+          cp scripts/parity/output/package-summary.json "$dir/scripts/parity/output/"
       - name: Upload parity outputs
         if: ${{ !cancelled() && github.event_name == 'push' }}
         uses: actions/upload-artifact@v4
