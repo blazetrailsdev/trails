@@ -9,6 +9,9 @@
  *     params / predicates gates as `matched` / `total`, and its `PERMANENT-SKIP`
  *     tests grouped by the `CLAUDE.md` section they cite;
  *   - `tagSites[]` — every counted tag at its `file:line`;
+ *   - `files[]` — one row per Rails `.rb` file api-compare pairs with a
+ *     package, its method counts beside the counts of the Rails test file
+ *     test-compare maps onto the same TS path (`x.test.ts` for `x.ts`);
  *   - `claudeSections[]` — every `##` / `###` heading of the root and package
  *     `CLAUDE.md` files, with its GitHub anchor and first paragraph.
  *
@@ -114,9 +117,20 @@ export interface PackageSummary {
   permanentSkips: Record<string, SkipTest[]>;
 }
 
+export interface FileRow {
+  package: string;
+  rubyFile: string;
+  tsFile: string | null;
+  methodsMatched: number;
+  methodsMissing: number;
+  testsMatched: number;
+  testsTotal: number;
+}
+
 export interface Summary {
   packages: PackageSummary[];
   tagSites: TagSite[];
+  files: FileRow[];
   claudeSections: ClaudeSection[];
 }
 
@@ -314,7 +328,56 @@ interface ApiComparison {
     paramNames?: { compared: number };
     predicatesCompared?: number;
     predicateKindMismatches?: unknown[];
+    files?: {
+      rubyFile: string;
+      expectedTsFile: string;
+      tsFileExists: boolean;
+      matched: number;
+      missing: number;
+    }[];
   }[];
+}
+
+interface TestComparison {
+  results: {
+    package: string;
+    files: { conventionTsFile: string; rubyTestCount: number; matched: number }[];
+  }[];
+}
+
+/**
+ * One row per api-compare file. Its tests are those of every Rails test file
+ * test-compare maps onto the row's `x.test.ts`; none leaves `testsTotal` 0.
+ */
+export function fileRows(api: ApiComparison | null, tests: TestComparison | null): FileRow[] {
+  const byTsTest = new Map<string, { matched: number; total: number }>();
+  for (const r of tests?.results ?? []) {
+    for (const f of r.files) {
+      const key = `${packageDirOf(r.package)} ${f.conventionTsFile}`;
+      const t = byTsTest.get(key) ?? { matched: 0, total: 0 };
+      t.matched += f.matched;
+      t.total += f.rubyTestCount;
+      byTsTest.set(key, t);
+    }
+  }
+  const out: FileRow[] = [];
+  for (const r of api?.results ?? []) {
+    for (const f of r.files ?? []) {
+      const t = byTsTest.get(
+        `${packageDirOf(r.package)} ${f.expectedTsFile.replace(/\.ts$/, ".test.ts")}`,
+      );
+      out.push({
+        package: packageDirOf(r.package),
+        rubyFile: f.rubyFile,
+        tsFile: f.tsFileExists ? f.expectedTsFile : null,
+        methodsMatched: f.matched,
+        methodsMissing: f.missing,
+        testsMatched: t?.matched ?? 0,
+        testsTotal: t?.total ?? 0,
+      });
+    }
+  }
+  return out;
 }
 
 export async function summarize(root = ROOT_DIR): Promise<Summary> {
@@ -350,6 +413,9 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
       path.join(apiDir, "extra-surface-mark.json"),
     )) ?? {};
   const comparison = await readJson<ApiComparison>(path.join(apiDir, "output/api-comparison.json"));
+  const testComparison = await readJson<TestComparison>(
+    path.join(root, "scripts/test-compare/output/convention-comparison.json"),
+  );
   const paramArtifact = await readJson<{
     mismatches: { package: string; rubyFile: string; rubyName: string }[];
   }>(path.join(apiDir, "output/param-name-mismatches.json"));
@@ -436,7 +502,7 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
       permanentSkips,
     });
   }
-  return { packages, tagSites, claudeSections };
+  return { packages, tagSites, files: fileRows(comparison, testComparison), claudeSections };
 }
 
 export async function main(root = ROOT_DIR): Promise<string> {
@@ -446,6 +512,6 @@ export async function main(root = ROOT_DIR): Promise<string> {
   await fs.writeFile(out, JSON.stringify(summary, null, 2) + "\n");
   return (
     `package-summary: wrote ${OUTPUT_PATH} — ${summary.packages.length} packages, ` +
-    `${summary.tagSites.length} tag sites, ${summary.claudeSections.length} CLAUDE.md sections`
+    `${summary.tagSites.length} tag sites, ${summary.files.length} files, ${summary.claudeSections.length} CLAUDE.md sections`
   );
 }
