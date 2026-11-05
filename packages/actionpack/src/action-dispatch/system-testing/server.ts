@@ -22,6 +22,8 @@ export const vite: {
   currentDriver: "rack_test",
 };
 
+const VITE_MODULE = "vite";
+
 export class Server {
   static silencePuma = false;
 
@@ -38,7 +40,7 @@ export class Server {
   /** @internal */
   private async setServer(): Promise<void> {
     if (vite.server === undefined) {
-      const { createServer } = await import("vite");
+      const { createServer } = (await import(VITE_MODULE)) as typeof import("vite");
       const node = (await Handler.get("node")) as typeof Handler.Node;
       const server = await createServer({
         configFile: false,

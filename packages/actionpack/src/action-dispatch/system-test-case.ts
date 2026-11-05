@@ -37,6 +37,8 @@ declare module "vitest" {
   }
 }
 
+const VITEST_MODULE = "vitest";
+
 /** @internal */
 const sessions = new Map<string, Promise<{ browser: Browser; options: Record<string, unknown> }>>();
 
@@ -77,7 +79,7 @@ export class SystemTestCase extends TestCase {
     });
 
     await new Server().run();
-    const { afterAll, expect, inject } = await import("vitest");
+    const { afterAll, expect, inject } = (await import(VITEST_MODULE)) as typeof import("vitest");
     ScreenshotHelper.screenshotDirectory ??= inject("screenshotDirectory");
     expect.element = (locator, options) => ({
       toBeVisible: () => expect.poll(() => locator.isVisible(), options).toBe(true),
