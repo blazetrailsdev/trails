@@ -1,11 +1,6 @@
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import {
-  DescendantsTracker,
-  assertEqual,
-  extractOptionsBang,
-  kernelArray,
-} from "@blazetrails/activesupport";
+import { assertEqual, extractOptionsBang, kernelArray } from "@blazetrails/activesupport";
 import type { Message } from "@blazetrails/mail";
 import {
   fetch,
@@ -113,7 +108,7 @@ export const TestHelper = {
   deliveryJobFilter(this: TestHelper, job: unknown): boolean {
     const jobClass = isPlainHash(job) ? fetch(job, "job") : rbObjClass(job);
 
-    return [Base, ...(DescendantsTracker.descendants(Base) as (typeof Base)[])]
+    return [Base, ...(Base as typeof Base & { descendants: (typeof Base)[] }).descendants]
       .map((klass) => klass.deliveryJob)
       .includes(jobClass as typeof Base.deliveryJob);
   },
