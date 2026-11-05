@@ -19,7 +19,6 @@ export class MailerGenerator extends NamedBase {
     this.classCollisions(`${this.className()}MailerTest`, `${this.className()}MailerPreview`);
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
     await this.template(
       "functional_test.ts",
@@ -31,7 +30,6 @@ export class MailerGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createPreviewFiles(): Promise<void> {
     await this.template(
       "preview.ts",
