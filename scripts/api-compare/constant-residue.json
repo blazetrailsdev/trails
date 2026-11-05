@@ -37,7 +37,7 @@
     }
   },
   "actionmailer": {
-    "rows": 15,
+    "rows": 22,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -54,7 +54,14 @@
       "gem-version.ts::VERSION": "ActionMailer::VERSION",
       "inline-preview-interceptor.ts::InlinePreviewInterceptor": "ActionMailer::InlinePreviewInterceptor",
       "log-subscriber.ts::LogSubscriber": "ActionMailer::LogSubscriber",
+      "mail-delivery-job.ts::MailDeliveryJob": "ActionMailer::MailDeliveryJob",
       "mail-helper.ts::MailHelper": "ActionMailer::MailHelper",
+      "message-delivery.ts::MessageDelivery": "ActionMailer::MessageDelivery",
+      "parameterized.ts::ClassMethods": "ActionMailer::Parameterized::ClassMethods",
+      "parameterized.ts::Mailer": "ActionMailer::Parameterized::Mailer",
+      "parameterized.ts::MessageDelivery": "ActionMailer::Parameterized::MessageDelivery",
+      "parameterized.ts::Parameterized": "ActionMailer::Parameterized",
+      "queued-delivery.ts::QueuedDelivery": "ActionMailer::QueuedDelivery",
       "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
     }
   },

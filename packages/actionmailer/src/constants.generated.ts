@@ -11,7 +11,8 @@ import * as m8 from "./mail-delivery-job.js";
 import * as m9 from "./mail-helper.js";
 import * as m10 from "./message-delivery.js";
 import * as m11 from "./parameterized.js";
-import * as m12 from "./rescuable.js";
+import * as m12 from "./queued-delivery.js";
+import * as m13 from "./rescuable.js";
 
 defineConstants([
   [() => m0.Base, "ActionMailer::Base"],
@@ -26,11 +27,14 @@ defineConstants([
   [() => m4.ClassMethods, "ActionMailer::FormBuilder::ClassMethods"],
   [() => m6.InlinePreviewInterceptor, "ActionMailer::InlinePreviewInterceptor"],
   [() => m7.LogSubscriber, "ActionMailer::LogSubscriber"],
-  [() => m9.MailHelper, "ActionMailer::MailHelper"],
-  [() => m12.Rescuable, "ActionMailer::Rescuable"],
-  [() => m5.VERSION, "ActionMailer::VERSION"],
   [() => m8.MailDeliveryJob, "ActionMailer::MailDeliveryJob"],
+  [() => m9.MailHelper, "ActionMailer::MailHelper"],
   [() => m10.MessageDelivery, "ActionMailer::MessageDelivery"],
+  [() => m11.Parameterized, "ActionMailer::Parameterized"],
+  [() => m11.ClassMethods, "ActionMailer::Parameterized::ClassMethods"],
   [() => m11.Mailer, "ActionMailer::Parameterized::Mailer"],
   [() => m11.MessageDelivery, "ActionMailer::Parameterized::MessageDelivery"],
+  [() => m12.QueuedDelivery, "ActionMailer::QueuedDelivery"],
+  [() => m13.Rescuable, "ActionMailer::Rescuable"],
+  [() => m5.VERSION, "ActionMailer::VERSION"],
 ]);
