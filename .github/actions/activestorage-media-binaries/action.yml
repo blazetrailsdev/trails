@@ -4,24 +4,61 @@ description: >-
   ffprobe / ffmpeg (video_analyzer.rb, audio_analyzer.rb, video_previewer.rb),
   mutool (mupdf_previewer.rb), pdftoppm (poppler_pdf_previewer.rb) and
   ImageMagick (image_analyzer/image_magick.rb, image_processing_transformer.rb).
+  Installed without Recommends; librsvg2-bin (rsvg-convert) and ghostscript are
+  the two recommended delegates ImageMagick needs to read the icon.svg and
+  report.pdf fixtures. The .debs are cached per OS/arch and package list, so a
+  warm run downloads only packages whose mirror version moved.
 runs:
   using: composite
   steps:
+    - id: probe
+      shell: bash
+      run: |
+        if command -v ffprobe >/dev/null && command -v ffmpeg >/dev/null && command -v mutool >/dev/null \
+          && command -v pdftoppm >/dev/null && command -v rsvg-convert >/dev/null && command -v gs >/dev/null \
+          && { command -v magick >/dev/null || command -v convert >/dev/null; }; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+        fi
+        echo "packages=ffmpeg mupdf-tools poppler-utils imagemagick librsvg2-bin ghostscript" >> "$GITHUB_OUTPUT"
+        echo "debs=$RUNNER_TEMP/activestorage-media-debs" >> "$GITHUB_OUTPUT"
+    - id: restore
+      if: steps.probe.outputs.present != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.probe.outputs.debs }}
+        key: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}
+    - if: steps.probe.outputs.present != 'true'
+      shell: bash
+      env:
+        DEBS: ${{ steps.probe.outputs.debs }}
+        PACKAGES: ${{ steps.probe.outputs.packages }}
+      run: |
+        mkdir -p "$DEBS/partial"
+        APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120
+          -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true)
+        for attempt in 1 2 3; do
+          # shellcheck disable=SC2086
+          sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
+            && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $PACKAGES \
+            && break
+          [ "$attempt" = 3 ] && exit 1
+          echo "apt attempt $attempt failed; retrying"
+          sleep 10
+          sudo dpkg --configure -a || true
+        done
+        sudo rm -rf "$DEBS/partial" "$DEBS/lock"
+        sudo chmod -R a+rX "$DEBS"
+        ls "$DEBS"/*.deb | wc -l
+    - if: steps.probe.outputs.present != 'true' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      continue-on-error: true
+      with:
+        path: ${{ steps.probe.outputs.debs }}
+        key: ${{ steps.restore.outputs.cache-primary-key }}
     - shell: bash
       run: |
-        command -v ffprobe >/dev/null && command -v ffmpeg >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null && { command -v magick >/dev/null || command -v convert >/dev/null; } \
-          || {
-            APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120)
-            for attempt in 1 2 3; do
-              sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
-                && sudo timeout -k 10 180 apt-get "${APT_OPTS[@]}" install -y ffmpeg mupdf-tools poppler-utils imagemagick \
-                && break
-              [ "$attempt" = 3 ] && exit 1
-              echo "apt attempt $attempt failed; retrying"
-              sleep 10
-              sudo dpkg --configure -a || true
-            done
-          }
         ffprobe -version | head -1 || true
         ffmpeg -version | head -1 || true
         mutool -v 2>&1 | head -1 || true
