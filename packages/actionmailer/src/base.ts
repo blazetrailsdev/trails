@@ -17,7 +17,14 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import * as I18n from "@blazetrails/i18n";
-import { Address, Mail, type AttachmentsList, type Message, type Part } from "@blazetrails/mail";
+import {
+  Address,
+  Mail,
+  type AttachmentsList,
+  type Message,
+  type Part,
+  type TestMailer,
+} from "@blazetrails/mail";
 import {
   NoMethodError,
   PROTOCOL_PROBES,
@@ -63,7 +70,7 @@ export class Base extends AbstractController.Base {
   declare static isDeliveryMethods: () => boolean;
   declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
   declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
-  declare static deliveries: Message[];
+  declare static deliveries: typeof TestMailer.deliveries;
   declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
   /** @internal */
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
