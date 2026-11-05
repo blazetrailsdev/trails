@@ -9,36 +9,72 @@ import {
   registerReplAdapter,
   replAdapterConfig,
 } from "@blazetrails/ruby-compat";
-import { Console } from "../commands/console.js";
+import { Console, ConsoleCommand } from "../commands/console.js";
 import { Trails } from "../trails.js";
 
-const io = vi.hoisted(() => ({ server: null as REPLServer | null, output: "" }));
+interface Primary {
+  output: string;
+  read: number;
+  server: REPLServer | null;
+}
+
+const primary = vi.hoisted((): Primary => ({ output: "", read: 0, server: null }));
 
 const actual = await import("node:repl");
 registerReplAdapter("full-stack-console", {
   start(options) {
     const input = new PassThrough();
     const output = new PassThrough();
-    output.on("data", (chunk) => (io.output += String(chunk)));
-    io.server = actual.start({ ...options, input, output, terminal: false });
-    return io.server;
+    input.on("data", (chunk) => (primary.output += String(chunk)));
+    output.on("data", (chunk) => (primary.output += String(chunk)));
+    primary.server = actual.start({ ...options, input, output, terminal: false });
+    return primary.server;
   },
 });
 
-const g = globalThis as Record<string, unknown>;
+async function assertOutput(expected: string, io: Primary, timeout = 10): Promise<void> {
+  let output = "";
+  await vi
+    .waitFor(
+      () => {
+        output = io.output.slice(io.read);
+        if (!output.includes(expected)) throw new Error("waiting");
+      },
+      { timeout: timeout * 1000, interval: 10 },
+    )
+    .catch(() => {});
+  expect(output, `${JSON.stringify(expected)} expected, but got:\n\n${output}`).toContain(expected);
+  io.read += output.indexOf(expected) + expected.length;
+}
 
-async function writePrompt(command: string): Promise<unknown> {
-  const before = io.output.length;
-  io.server!.input.emit("data", `globalThis.consolePromptResult = await (${command})\n`);
-  await vi.waitFor(() => expect(io.output.slice(before)).toContain("> "));
-  return g.consolePromptResult;
+let started: Promise<void> | null = null;
+
+async function spawnConsole(options: string, { waitForPrompt = true } = {}): Promise<void> {
+  started = Console.start(
+    Trails.application as never,
+    new ConsoleCommand([], options.split(" ")).options,
+  );
+
+  if (waitForPrompt) {
+    await assertOutput("> ", primary, 30);
+  }
+}
+
+async function writePrompt(
+  command: string,
+  expectedOutput: string | null = null,
+  { prompt = "> " } = {},
+): Promise<void> {
+  primary.server!.input.write(`${command}\n`);
+  await assertOutput(command, primary);
+  if (expectedOutput) await assertOutput(expectedOutput, primary, 100);
+  await assertOutput(prompt, primary);
 }
 
 describe("FullStackConsoleTest", () => {
-  let started: Promise<void>;
   let previousAdapter: string | undefined;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     class ApplicationController {
       static helpers() {
@@ -60,32 +96,36 @@ describe("FullStackConsoleTest", () => {
     } as never;
     previousAdapter = replAdapterConfig.adapter;
     replAdapterConfig.adapter = "full-stack-console";
-    io.server = null;
-    started = Console.start(Trails.application, { environment: "development" });
-    await vi.waitFor(() => expect(io.server).not.toBeNull());
+    Object.assign(primary, { output: "", read: 0, server: null });
   });
 
   afterEach(async () => {
-    io.server!.close();
+    primary.server?.close();
     await started;
     replAdapterConfig.adapter = previousAdapter!;
     Trails.application = null;
     rbModRemoveConst(TopLevel, "ApplicationController");
-    delete g.consolePromptResult;
     vi.restoreAllMocks();
   });
 
   it("helper helper method", async () => {
-    expect(await writePrompt(`helper().truncate('Once upon a time in a world far far away')`)).toBe(
+    await spawnConsole("-e development");
+
+    await writePrompt(
+      "helper().truncate('Once upon a time in a world far far away')",
       "Once upon a time in a world...",
     );
   });
 
   it("controller helper method", async () => {
-    expect(await writePrompt(`controller().constructor.name`)).toBe("ApplicationController");
+    await spawnConsole("-e development");
+
+    await writePrompt("controller().constructor.name", "ApplicationController");
   });
 
   it("new session helper method", async () => {
-    expect(await writePrompt(`newSession().then((s) => s.constructor.name)`)).toBe("Session");
+    await spawnConsole("-e development");
+
+    await writePrompt("(await newSession()).constructor.name", "Session");
   });
 });
