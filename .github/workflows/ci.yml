@@ -2456,9 +2456,6 @@ jobs:
         # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
       - name: Package summary
-        # Per-package receipt, mark and PERMANENT-SKIP counts for trailmap's
-        # package pages (RFC 0222). Reads the api-compare outputs above, and
-        # fails on a CLAUDE.md citation that resolves to no heading.
         if: ${{ !cancelled() }}
         run: pnpm parity:packages
       - name: Stage parity outputs
