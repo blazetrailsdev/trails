@@ -1,9 +1,10 @@
 import { Dir, File, getFs } from "@blazetrails/ruby-compat";
-import { compileJs } from "@blazetrails/tse-compiler";
+import { compileJs, decodeLineMappings, generateSourceMap } from "@blazetrails/tse-compiler";
 import ts from "typescript-5";
+import { chainLineMappings } from "./build-views.js";
 import { freeIdentifiers, tseLookupTransformer } from "./plugins/tse.js";
 
-const IMPORTED = new Set(["StringIO", "rbObjAsString"]);
+const IMPORTED = new Set(["StringIO", "rbObjAsString", "NameError", "rbObjClassname"]);
 
 /** @noRailsEquivalent PERMANENT */
 export async function buildTemplates(paths: readonly string[]): Promise<string[]> {
@@ -11,7 +12,7 @@ export async function buildTemplates(paths: readonly string[]): Promise<string[]
   for (const path of paths) {
     for (const template of await templatesIn(path)) {
       const source = await getFs().readFile(template, "utf8");
-      await getFs().writeFile!(`${template}.js`, compileTemplate(source));
+      await getFs().writeFile!(`${template}.js`, compileTemplate(source, File.basename(template)));
       built.push(template);
     }
   }
@@ -29,7 +30,7 @@ async function templatesIn(path: string): Promise<string[]> {
   return found;
 }
 
-function compileTemplate(source: string): string {
+function compileTemplate(source: string, base: string): string {
   const options = {
     trim: true,
     erb: true,
@@ -41,15 +42,21 @@ function compileTemplate(source: string): string {
   const free = freeIdentifiers(render.split("\n")).filter((name) => !IMPORTED.has(name));
   const preamble = [
     "const __own = Object.create(null);",
-    'const __lookup = (name, guarded = false) => { for (const scope of [__own, this, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(`${name} is not defined`); };',
+    "const __lookup = (name, guarded = false) => { for (const scope of [__own, this, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === \"function\" ? value.bind(this) : value; } if (guarded) return undefined; throw new NameError(`undefined local variable or method '${name}' for an instance of ${rbObjClassname(this)}`, name, { receiver: this }); };",
     "const __assign = (name, value) => { __own[name] = value; return value; };",
     "const __sink = new Proxy({}, { set: (_target, name, value) => (__assign(name, value), true) });",
     ...free.map((name) => `let ${name} = __lookup(${JSON.stringify(name)});`),
   ].join(" ");
-  const body = compileJs(source, { ...options, preamble: free.length === 0 ? "" : preamble }).code;
-  const { outputText } = ts.transpileModule(
+  const compiled = compileJs(source, {
+    ...options,
+    preamble: free.length === 0 ? "" : preamble,
+    fileName: `${base}.js`,
+    sourceFileName: base,
+  });
+  const body = compiled.code;
+  const { outputText, sourceMapText } = ts.transpileModule(
     [
-      'import { StringIO, rbObjAsString } from "@blazetrails/ruby-compat";',
+      'import { StringIO, rbObjAsString, NameError, rbObjClassname } from "@blazetrails/ruby-compat";',
       body.replace(/^export default /u, ""),
       "export default function () {",
       "  this.outputBuffer = new StringIO();",
@@ -59,9 +66,24 @@ function compileTemplate(source: string): string {
       "",
     ].join("\n"),
     {
-      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ESNext,
+        sourceMap: true,
+      },
+      fileName: `${base}.ts`,
       transformers: { before: [tseLookupTransformer] },
     },
   );
-  return outputText;
+  const templateMappings = decodeLineMappings(compiled.sourceMap!.mappings).map((m) => ({
+    ...m,
+    genLine: m.genLine + 1,
+  }));
+  const mappings = chainLineMappings(
+    decodeLineMappings((JSON.parse(sourceMapText!) as { mappings: string }).mappings),
+    templateMappings,
+  );
+  const map = generateSourceMap(`${base}.js`, base, source, mappings);
+  const inline = btoa(unescape(encodeURIComponent(JSON.stringify(map))));
+  return `${outputText.replace(/^\/\/# sourceMappingURL=.*\n?/gmu, "")}//# sourceMappingURL=data:application/json;base64,${inline}\n`;
 }
