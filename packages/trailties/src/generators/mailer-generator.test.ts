@@ -84,13 +84,13 @@ describe("MailerGeneratorTest", () => {
         /\/\/ Preview this email at http:\/\/localhost:3000\/trails\/mailers\/notifier_mailer\/foo/,
       );
       await assertInstanceMethod("foo", preview, (foo) => {
-        expect(foo).toMatch(/NotifierMailer as any\)\.foo/);
+        expect(foo).toMatch(/NotifierMailer\b.*\.foo\(\)/);
       });
       expect(preview).toMatch(
         /\/\/ Preview this email at http:\/\/localhost:3000\/trails\/mailers\/notifier_mailer\/bar/,
       );
       await assertInstanceMethod("bar", preview, (bar) => {
-        expect(bar).toMatch(/NotifierMailer as any\)\.bar/);
+        expect(bar).toMatch(/NotifierMailer\b.*\.bar\(\)/);
       });
     });
   });

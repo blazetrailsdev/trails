@@ -9,7 +9,7 @@ export class <%= this.className().split("::").pop() %>MailerPreview extends Acti
 <% } -%>
   // Preview this email at http://localhost:3000/trails/mailers/<%= this.filePath() %>_mailer/<%= action %>
   <%= action %>(): unknown {
-    return (<%= this.className().split("::").pop() %>Mailer as any).<%= action %>();
+    return (<%= this.className().split("::").pop() %>Mailer as unknown as Record<string, () => unknown>).<%= action %>();
   }
 <% }); -%>
 }
