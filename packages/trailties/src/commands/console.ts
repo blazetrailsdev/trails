@@ -78,7 +78,6 @@ export class Console {
     Trails.env = this.environment()!;
   }
 
-  /** @inventedArm _loadConsole — PERMANENT */
   async start(): Promise<void> {
     await this._loadConsole;
     if (this.isEnvironment()) this.setEnvironmentBang();
