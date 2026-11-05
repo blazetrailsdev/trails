@@ -106,6 +106,12 @@ export function assertDomEncoded(
 
 export const assertSelectEncoded = assertDomEncoded;
 
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ActionMailer?: { Base: { deliveries: MailPart[] } };
+  }
+}
+
 interface MailPart {
   parts: MailPart[];
   get(name: string): unknown;
@@ -117,8 +123,7 @@ export function assertDomEmail(
   { htmlVersion = null }: { htmlVersion?: string | null } = {},
   block?: (selected: NodeSet | Html5DocumentFragment) => void,
 ): void {
-  const deliveries = (TopLevel as { ActionMailer?: { Base: { deliveries: MailPart[] } } })
-    .ActionMailer!.Base.deliveries;
+  const deliveries = TopLevel.ActionMailer!.Base.deliveries;
   assert(deliveries.length !== 0, "No e-mail in delivery list");
 
   for (const delivery of deliveries) {
@@ -127,7 +132,7 @@ export function assertDomEmail(
         const root = Testing.htmlDocumentFragment({ htmlVersion }).parse(String(part.body()));
         assertDom.call(
           this,
-          root as never,
+          root,
           ":root",
           ...((block ? [rbBlock(block)] : []) as [AssertDomBlock] | []),
         );
