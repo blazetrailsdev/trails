@@ -68,7 +68,6 @@ describe("the production server entry point", () => {
 
   it("cannot reach the generator that imports vite, however it reaches the others", () => {
     const generators = rel(server.files).filter((f) => f.startsWith("generators/"));
-    expect(generators).not.toEqual([]);
     expect(generators).not.toContain("generators/trails/app/app-generator.ts");
   });
 

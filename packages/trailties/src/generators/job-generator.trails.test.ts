@@ -1,6 +1,7 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { expect, it } from "vitest";
 import { Application } from "../application.js";
+import "../generators.js";
 import { Trails } from "../trails.js";
 import "../test-unit/trailtie.js";
 

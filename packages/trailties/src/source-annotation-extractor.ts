@@ -1,4 +1,5 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
+import { Trails } from "./trails.js";
 import type { Node } from "typescript/unstable/ast";
 import type { API } from "typescript/unstable/sync";
 
@@ -189,6 +190,8 @@ function registerDefaults(): void {
 registerDefaults();
 
 export class SourceAnnotationExtractor {
+  static Annotation = Annotation;
+
   /** @inventedArm requireTokenizer — PERMANENT */
   static async enumerate(
     tag: string | null = null,
@@ -248,3 +251,5 @@ export class SourceAnnotationExtractor {
     return lines.map((l) => `${l}\n`).join("");
   }
 }
+
+Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;

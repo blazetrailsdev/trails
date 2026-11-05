@@ -1,13 +1,6 @@
 import "../constants.console.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
-import {
-  NotImplementedError,
-  STDOUT,
-  exit,
-  include,
-  rbArgv,
-  type Included,
-} from "@blazetrails/ruby-compat";
+import { STDOUT, exit, include, rbArgv, type Included } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
@@ -44,6 +37,11 @@ export class Console {
   readonly options: ConsoleOptions;
   readonly app: ConsoleApp;
   readonly console: ConsoleRunner;
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private _loadConsole: Promise<unknown>;
 
   constructor(app: ConsoleApp, options: ConsoleOptions = {}) {
     this.app = app;
@@ -58,7 +56,8 @@ export class Console {
       exit(1);
     }
 
-    app.loadConsole();
+    this._loadConsole = Promise.resolve(app.loadConsole());
+    this._loadConsole.catch(() => {});
 
     this.console = app.config.console || new IRBConsole(app);
   }
@@ -84,6 +83,7 @@ export class Console {
   }
 
   async start(): Promise<void> {
+    await this._loadConsole;
     if (this.isEnvironment()) this.setEnvironmentBang();
 
     if (this.isSandbox()) {
@@ -150,17 +150,8 @@ export class ConsoleCommand extends Base {
     }
   }
 
-  /**
-   * @missingRailsArgs start — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
-   * @inventedArm if — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
-   * @inventedArm throw — CONVERGEABLE console-sandbox-rollback-and-irb-helpers
-   */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
-    const trailsConsole = new Console(Trails.application as unknown as ConsoleApp, this.options);
-    if (trailsConsole.isSandbox()) {
-      throw new NotImplementedError("console sandbox rollback is not ported");
-    }
-    await trailsConsole.start();
+    await Console.start(Trails.application as unknown as ConsoleApp, this.options);
   }
 }

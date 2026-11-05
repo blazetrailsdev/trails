@@ -2,6 +2,7 @@ import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import type { GeneratorBase, GeneratorConfig } from "./generators/base.js";
+import { Trails } from "./trails.js";
 import type {
   AfterGenerateCallback,
   Generators as GeneratorsConfiguration,
@@ -353,3 +354,5 @@ async function requireGenerator(base: URL, path: string): Promise<void> {
     }
   }
 }
+
+Trails.Generators = Generators;

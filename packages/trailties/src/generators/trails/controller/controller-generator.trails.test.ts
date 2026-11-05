@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { Application } from "../../../application.js";
+import "../../../generators.js";
 import "../../../test-unit/trailtie.js";
 
 class ControllerGeneratorTestApp extends Application {}

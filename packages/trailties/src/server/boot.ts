@@ -1,9 +1,9 @@
 import { getEnv, presence } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { getPath, setEnv } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
 import { type RackEnv } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
-import { requireApplicationBang } from "../command/actions.js";
+import { APP_PATH } from "../app-path.js";
 import { Trails } from "../trails.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -43,7 +43,7 @@ export function serverPort(options: ServeOptions = {}): number {
 export async function serve(options: ServeOptions = {}): Promise<HttpServer> {
   if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", serverEnvironment(options));
 
-  await requireApplicationBang();
+  if (APP_PATH != null) await import(getPath().pathToFileURL!(APP_PATH).href);
   const app = await Trails.initialize();
   const host = serverHost(options);
   const port = serverPort(options);

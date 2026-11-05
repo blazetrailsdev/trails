@@ -27,4 +27,5 @@ COPY --from=build /app /app
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
 
 EXPOSE 3000
-CMD ["npx", "trails", "server"]
+# Start the server through config.ts, so production never loads the trails command dispatcher
+CMD ["npx", "rackup", "config.ts"]
