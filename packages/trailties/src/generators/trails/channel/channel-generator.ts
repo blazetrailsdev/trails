@@ -82,7 +82,7 @@ export class ChannelGenerator extends NamedBase {
       "channel.ts",
       File.join(
         "app/channels",
-        ...this.classPathParts,
+        ...this.classPath(),
         `${dasherize(this.fileName)}-channel${this.ext()}`,
       ),
     );
@@ -98,7 +98,7 @@ export class ChannelGenerator extends NamedBase {
   private async createChannelJavascriptFile(): Promise<void> {
     const channelJsPath = File.join(
       "app/javascript/channels",
-      ...this.classPathParts,
+      ...this.classPath(),
       `${dasherize(this.fileName)}-channel`,
     );
     await this.jsTemplate("javascript/channel", channelJsPath);

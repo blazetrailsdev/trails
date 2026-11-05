@@ -17,7 +17,7 @@ export class HelperGenerator extends NamedBase {
       "helper.ts",
       File.join(
         "app/helpers",
-        ...this.classPathParts.map((p) => dasherize(p)),
+        ...this.classPath(),
         `${dasherize(this.fileName)}-helper${this.ext()}`,
       ),
     );

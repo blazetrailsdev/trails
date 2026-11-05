@@ -1,0 +1,29 @@
+// Be sure to restart your server when you modify this file.
+//
+// This file eases your Trails 0.1 framework defaults upgrade.
+//
+// Uncomment each configuration one by one to switch to the new default.
+// Once your application is ready to run with all new defaults, you can remove
+// this file and set the `config.loadDefaults` to `0.1`.
+//
+// Read the Guide for Upgrading Trails for more info on each option.
+// https://github.com/blazetrailsdev/blazetrails
+
+import { Trails } from "@blazetrails/trailties";
+
+Trails.application.configure(function () {
+  // ###
+  // Specifies whether `toTime` methods preserve the UTC offset of their receivers or preserves the timezone.
+  // If set to `":zone"`, `toTime` methods will use the timezone of their receivers.
+  // If set to `":offset"`, `toTime` methods will use the UTC offset.
+  // If `false`, `toTime` methods will convert to the local system UTC offset instead.
+  //++
+  // this.config.activeSupport.toTimePreservesTimezone = ":zone";
+
+  // ###
+  // When both `If-Modified-Since` and `If-None-Match` are provided by the client
+  // only consider `If-None-Match` as specified by RFC 7232 Section 6.
+  // If set to `false` both conditions need to be satisfied.
+  //++
+  // this.config.actionDispatch.strictFreshness = true;
+});

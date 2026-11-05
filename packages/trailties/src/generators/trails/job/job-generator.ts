@@ -37,7 +37,7 @@ export class JobGenerator extends NamedBase {
   async createJobFile(): Promise<void> {
     await this.template(
       "job.ts",
-      File.join("app/jobs", ...this.classPathParts, `${dasherize(this.fileName)}-job${this.ext()}`),
+      File.join("app/jobs", ...this.classPath(), `${dasherize(this.fileName)}-job${this.ext()}`),
     );
 
     await this.inRoot(async () => {

@@ -16,7 +16,7 @@ export class JobGenerator extends NamedBase {
       "unit_test.ts",
       File.join(
         "test/jobs",
-        ...this.classPathParts,
+        ...this.classPath(),
         `${dasherize(this.fileName)}-job.test${this.ext()}`,
       ),
     );

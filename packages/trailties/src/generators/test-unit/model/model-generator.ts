@@ -37,7 +37,7 @@ export class ModelGenerator extends NamedBase {
       "unit_test.ts",
       File.join(
         "test/models",
-        ...this.classPathParts,
+        ...this.classPath(),
         `${dasherize(this.fileName)}.test${this.ext()}`,
       ),
     );
@@ -50,7 +50,7 @@ export class ModelGenerator extends NamedBase {
     ) {
       await this.template(
         "fixtures.yml",
-        File.join("test/fixtures", ...this.classPathParts, `${this.fixtureFileName()}.yml`),
+        File.join("test/fixtures", ...this.classPath(), `${this.fixtureFileName()}.yml`),
       );
     }
   }

@@ -106,12 +106,12 @@ describe("NamespacedControllerGeneratorTest", () => {
     );
   });
 
-  it.skip("invokes default test framework", async () => {
+  it("invokes default test framework", async () => {
     await t.runGenerator();
     await t.assertFile("test/controllers/test_app/account-controller.test.ts");
   });
 
-  it.skip("invokes default template engine", async () => {
+  it("invokes default template engine", async () => {
     await t.runGenerator();
     await t.assertFile(
       "app/views/test_app/account/foo.html.tse",
@@ -128,7 +128,7 @@ describe("NamespacedControllerGeneratorTest", () => {
     await t.assertFile("config/routes.ts", /get\("account\/foo"\)/, /get\("account\/bar"\)/);
   });
 
-  it.skip("invokes default template engine even with no action", async () => {
+  it("invokes default template engine even with no action", async () => {
     await t.runGenerator(["account"]);
     await t.assertFile("app/views/test_app/account");
   });
