@@ -23,10 +23,6 @@ export interface ActionsHost {
   findInSourcePaths(file: string): Promise<string>;
 }
 
-export interface GeneratorActionsState {
-  afterInstallCallbacks: Array<() => void | Promise<void>>;
-}
-
 export interface EnvironmentOptions {
   env?: string | string[] | null;
 }
@@ -150,13 +146,6 @@ export function generate(
   options.abortOnFailure = !options.inline;
 
   return trailsCommand.call(this, `generate ${what} ${args.join(" ")}`, options);
-}
-
-export function afterInstall(
-  this: GeneratorActionsState,
-  callback: () => void | Promise<void>,
-): void {
-  this.afterInstallCallbacks.push(callback);
 }
 
 export interface RakeOptions {

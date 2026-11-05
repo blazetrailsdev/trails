@@ -28,7 +28,10 @@ import type { CommonField } from "./fields/common-field.js";
 import { Mail } from "./mail.js";
 import { Utilities } from "./utilities.js";
 
-type FieldClass = { NAME: string; isSingular(): boolean; parse(...args: unknown[]): CommonField };
+type FieldClass = (typeof Mail)[Exclude<
+  Extract<keyof typeof Mail, `${string}Field`>,
+  "OptionalField" | "UnstructuredField"
+>];
 
 const STRUCTURED_FIELDS =
   "bcc cc content-description content-disposition content-id content-location content-transfer-encoding content-type date from in-reply-to keywords message-id mime-version received references reply-to resent-bcc resent-cc resent-date resent-from resent-message-id resent-sender resent-to return-path sender to".split(
@@ -54,8 +57,7 @@ export class Field implements Comparable {
   static readonly KNOWN_FIELDS = [...STRUCTURED_FIELDS, "comments", "subject"];
 
   static get FIELDS_MAP(): Record<string, FieldClass> {
-    return (_fieldsMap ??= {
-      __proto__: null,
+    return (_fieldsMap ??= Object.assign(Object.create(null) as Record<string, FieldClass>, {
       to: Mail.ToField,
       cc: Mail.CcField,
       bcc: Mail.BccField,
@@ -85,7 +87,7 @@ export class Field implements Comparable {
       "content-id": Mail.ContentIdField,
       "content-description": Mail.ContentDescriptionField,
       "content-location": Mail.ContentLocationField,
-    } as unknown as Record<string, FieldClass>);
+    }));
   }
 
   static get FIELD_NAME_MAP(): Record<string, string> {
@@ -146,7 +148,7 @@ export class Field implements Comparable {
 
   static SyntaxError = class SyntaxError extends Field.FieldError {};
 
-  static parse(field: string, charset: unknown = "utf-8"): Field | null {
+  static parse(field: string, charset: string | Encoding | null = "utf-8"): Field | null {
     const split = Field.split(field);
     const [name, value] = Array.isArray(split) ? split : [split, null];
     if (name != null && value != null) {
@@ -191,13 +193,13 @@ export class Field implements Comparable {
   /** @internal */
   private _unparsedValue: unknown;
   /** @internal */
-  private _charset: unknown;
+  private _charset: string | Encoding | null;
   /** @internal */
   private _field: CommonField | null = null;
   /** @internal */
   private _fieldOrderId: number | null = null;
 
-  constructor(name: string, value: unknown = null, charset: unknown = "utf-8") {
+  constructor(name: string, value: unknown = null, charset: string | Encoding | null = "utf-8") {
     if (name.includes(Constants.COLON)) {
       throw new ArgumentError(
         "Passing an unparsed header field to Mail::Field.new is not supported in Mail 2.8.0+. Use Mail::Field.parse instead.",
@@ -284,28 +286,30 @@ export class Field implements Comparable {
   }
 
   /** @internal */
-  private createField(name: string, value: unknown, charset: unknown): CommonField {
+  private createField(
+    name: string,
+    value: unknown,
+    charset: string | Encoding | null,
+  ): CommonField {
     try {
       return this.parseField(name, value, charset);
     } catch (e) {
       if (!(e instanceof Field.ParseError)) throw e;
-      const field = new (Mail.UnstructuredField as unknown as new (
-        ...args: unknown[]
-      ) => CommonField)(name, value);
+      const field = new Mail.UnstructuredField(name, value);
       field.errors.push([name, value, e]);
       return field;
     }
   }
 
   /** @internal */
-  private parseField(name: string, value: unknown, charset: unknown): CommonField {
+  private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
     if (typeof value === "string") value = this.unfold(value);
 
     const klass = (this.constructor as typeof Field).fieldClassFor(name);
     if (klass != null) {
       return klass.parse(value, charset);
     } else {
-      return (Mail.OptionalField as unknown as FieldClass).parse(name, value, charset);
+      return Mail.OptionalField.parse(name, value, charset);
     }
   }
 
