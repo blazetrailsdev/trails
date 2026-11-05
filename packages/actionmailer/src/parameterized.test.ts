@@ -64,7 +64,7 @@ type Ctx = { testCase: unknown };
 
 describe("ParameterizedTest", () => {
   let previousLogger: unknown;
-  let previousDeliveryMethod: unknown;
+  let previousDeliveryMethod: typeof Base.deliveryMethod;
   let mail: MessageDelivery;
 
   beforeEach(() => {

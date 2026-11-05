@@ -12,11 +12,19 @@ import {
   Notifications,
   presence,
   underscore,
+  type Callbacks as ActiveSupportCallbacks,
   type EventPayload,
   type Included,
 } from "@blazetrails/activesupport";
 import * as I18n from "@blazetrails/i18n";
-import { Address, Mail, type AttachmentsList, type Message, type Part } from "@blazetrails/mail";
+import {
+  Address,
+  Mail,
+  type AttachmentsList,
+  type Message,
+  type Part,
+  type TestMailer,
+} from "@blazetrails/mail";
 import {
   NoMethodError,
   PROTOCOL_PROBES,
@@ -28,10 +36,15 @@ import { Collector } from "./collector.js";
 import {
   DeliveryMethods,
   type ClassMethods as DeliveryMethodsClassMethods,
+  type DeliveryMethodsClass,
 } from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
-import { Parameterized, type ClassMethods as ParameterizedClassMethods } from "./parameterized.js";
+import {
+  Parameterized,
+  type ClassMethods as ParameterizedClassMethods,
+  type ParameterizedIncluded,
+} from "./parameterized.js";
 import { QueuedDelivery } from "./queued-delivery.js";
 import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import { Rescuable } from "./rescuable.js";
@@ -46,14 +59,19 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
-  declare static prependViewPath: (path: unknown) => void;
-  declare static appendViewPath: (path: unknown) => void;
-  declare static deliveryMethod: unknown;
-  declare static deliveryMethods: Readonly<Record<string, unknown>>;
+  declare static prependViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.prependViewPath
+  >;
+  declare static appendViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.appendViewPath
+  >;
+  declare static deliveryMethod: DeliveryMethodsClass["deliveryMethod"];
+  declare static deliveryMethods: DeliveryMethodsClass["deliveryMethods"];
+  declare static isDeliveryMethod: () => boolean;
   declare static isDeliveryMethods: () => boolean;
-  declare static performDeliveries: boolean;
-  declare static raiseDeliveryErrors: boolean;
-  declare static deliveries: Message[];
+  declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
+  declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
+  declare static deliveries: typeof TestMailer.deliveries;
   declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
   /** @internal */
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
@@ -510,11 +528,11 @@ export class Base extends AbstractController.Base {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
-export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
-  lookupContext: InstanceType<typeof ActionView.LookupContext>;
-  render(...args: unknown[]): unknown;
-  params: Record<string, unknown>;
-  runCallbacks(kind: string, block?: () => unknown): unknown;
+export interface Base
+  extends Included<typeof Rescuable>, Included<typeof DeliveryMethods>, ParameterizedIncluded {
+  readonly lookupContext: ReturnType<typeof ActionView.lookupContext>;
+  render: OmitThisParameter<typeof AbstractController.render>;
+  runCallbacks: OmitThisParameter<(typeof ActiveSupportCallbacks)["runCallbacks"]>;
 }
 
 /** @internal */

@@ -91,7 +91,7 @@ type Ctx = { testCase: unknown };
 
 describe("MessageDeliveryTest", () => {
   let previousLogger: unknown;
-  let previousDeliveryMethod: unknown;
+  let previousDeliveryMethod: typeof Base.deliveryMethod;
   let mail: MessageDelivery;
 
   beforeEach(({ testCase }: Ctx) => {

@@ -36,7 +36,7 @@ describe("ResourceGeneratorTest", () => {
     assertMatch(/Generates a new resource/, content as string);
   });
 
-  it.skip("help with inherited options", async () => {
+  it("help with inherited options", async () => {
     const content = await t.runGenerator(["--help"]);
     assertMatch(/ActiveRecord options:/, content as string);
     assertMatch(/TestUnit options:/, content as string);

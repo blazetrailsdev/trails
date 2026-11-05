@@ -69,7 +69,11 @@ export class SystemTestCase extends TestCase {
    * @inventedArm inject — PERMANENT
    * @inventedArm poll — PERMANENT
    */
-  static async startApplication(): Promise<void> {
+  static async startApplication(
+    vitest: Pick<typeof import("vitest"), "afterAll" | "expect" | "inject">,
+    viteModule: Pick<typeof import("vite"), "createServer">,
+  ): Promise<void> {
+    vite.createServer = viteModule.createServer;
     vite.app = new Builder(null, {}, (builder) => {
       builder.map("/", (builder) => {
         builder.run(TopLevel.Trails!.application!);
@@ -77,7 +81,7 @@ export class SystemTestCase extends TestCase {
     });
 
     await new Server().run();
-    const { afterAll, expect, inject } = await import("vitest");
+    const { afterAll, expect, inject } = vitest;
     ScreenshotHelper.screenshotDirectory ??= inject("screenshotDirectory");
     expect.element = (locator, options) => ({
       toBeVisible: () => expect.poll(() => locator.isVisible(), options).toBe(true),
