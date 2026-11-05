@@ -1,7 +1,9 @@
-import { File, FileUtils, TSE, rbFBinding } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, TSE, rbFBinding } from "@blazetrails/ruby-compat";
 import { Base } from "@blazetrails/activerecord";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import type { TestCase } from "./test-case.js";
+import { Trails } from "../trails.js";
+import { invoke } from "../command.js";
 
 export async function copyRoutes(this: TestCase): Promise<void> {
   const routes = await evaluateTemplate(
@@ -41,4 +43,16 @@ export async function evaluateTemplate(
   const erb = new TSE(await File.readAsync(file), { trimMode: "-" });
   erb.filename = file;
   return erb.result(rbFBinding(locals));
+}
+
+/** @missingRailsCall system — PERMANENT */
+export async function runAppUpdate(
+  this: TestCase,
+  appRoot: string = this.destinationRoot,
+  { flags = "--force" }: { flags?: string } = {},
+): Promise<void> {
+  await Dir.chdir(appRoot, async () => {
+    Trails.application!.config.setRoot(appRoot);
+    await invoke("app:update", flags.split(" "));
+  });
 }

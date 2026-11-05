@@ -246,6 +246,9 @@ export class AppBuilder extends ActionMethods {
     );
     await this.chmod("bin", 0o755 & ~File.umask(), { verbose: false });
   }
+  async binWhenUpdating(): Promise<void> {
+    await this.bin();
+  }
 
   /** @missingRailsArgs template — PERMANENT */
   async config(): Promise<void> {
@@ -465,6 +468,10 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createRootFiles");
     this.methodAdded("createAppFiles");
     this.methodAdded("createBinFiles");
+    this.methodAdded("updateBinFiles");
+    this.removeCommand("updateBinFiles");
+    this.methodAdded("updateActiveStorage");
+    this.removeCommand("updateActiveStorage");
     this.methodAdded("createDockerfiles");
     this.methodAdded("createEslintFile");
     this.methodAdded("createCifiles");
@@ -590,6 +597,16 @@ export class AppGenerator extends AppBase {
   /** @missingRailsArgs template — PERMANENT */
   async createBootFile(): Promise<void> {
     await this.template("config/boot.ts", "config/boot.ts");
+  }
+
+  async updateBinFiles(): Promise<void> {
+    await this.build("binWhenUpdating");
+  }
+
+  async updateActiveStorage(): Promise<void> {
+    if (!this.skipActiveStorage()) {
+      await this.trailsCommand("active_storage:update", { inline: true });
+    }
   }
 
   async createActiveRecordFiles(): Promise<void> {
