@@ -577,4 +577,24 @@ describe("trap", () => {
     expect(() => trap("SIGFOO", "IGNORE")).toThrow("unsupported signal `SIGFOO'");
     expect(() => trap(99, "IGNORE")).toThrow("invalid signal number (99)");
   });
+
+  it("traps every signal MRI's siglist names, and refuses the reserved ones", () => {
+    const names: string[] = [];
+    registerProcessAdapter(
+      makeFakeAdapter({
+        onSignal: (name) => {
+          names.push(name);
+          return () => {};
+        },
+      }),
+    );
+    trap("USR1", () => {});
+    trap(1, () => {});
+    trap("SIGWINCH", "IGNORE");
+    trap("CLD", "DEFAULT");
+    expect(names).toEqual(["SIGUSR1", "SIGHUP", "SIGWINCH", "SIGCHLD"]);
+    expect(() => trap("SEGV", "IGNORE")).toThrow("can't trap reserved signal: SIGSEGV");
+    expect(() => trap("KILL", () => {})).toThrow("Invalid argument - SIGKILL");
+    expect(() => trap("SIG", "IGNORE")).toThrow("unsupported signal `SIG'");
+  });
 });

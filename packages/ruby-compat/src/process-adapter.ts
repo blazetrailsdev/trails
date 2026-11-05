@@ -24,7 +24,7 @@ export interface ReadStream {
   setNoecho?(): void;
 }
 
-export type SignalName = "SIGINT" | "SIGTERM" | "SIGQUIT" | "exit";
+export type SignalName = `SIG${string}` | "exit";
 
 /** @noRailsEquivalent PERMANENT */
 export interface ModuleHooks {
@@ -447,60 +447,144 @@ type TrapCommand =
   | "SYSTEM_DEFAULT"
   | "EXIT";
 
-type TrapSignal = "SIGINT" | "SIGTERM" | "SIGQUIT";
+const SIGLIST: Record<string, number> = {
+  EXIT: 0,
+  HUP: 1,
+  INT: 2,
+  QUIT: 3,
+  ILL: 4,
+  TRAP: 5,
+  ABRT: 6,
+  IOT: 6,
+  FPE: 8,
+  KILL: 9,
+  BUS: 7,
+  SEGV: 11,
+  SYS: 31,
+  PIPE: 13,
+  ALRM: 14,
+  TERM: 15,
+  URG: 23,
+  STOP: 19,
+  TSTP: 20,
+  CONT: 18,
+  CHLD: 17,
+  CLD: 17,
+  TTIN: 21,
+  TTOU: 22,
+  IO: 29,
+  XCPU: 24,
+  XFSZ: 25,
+  VTALRM: 26,
+  PROF: 27,
+  WINCH: 28,
+  USR1: 10,
+  USR2: 12,
+  PWR: 30,
+  POLL: 29,
+};
 
-const SIGNOS: Record<number, TrapSignal> = { 2: "SIGINT", 3: "SIGQUIT", 15: "SIGTERM" };
+const NSIG = 65;
 
-const traps = new Map<TrapSignal, { command: TrapCommand; off: (() => void) | null }>();
+const traps = new Map<number, { command: TrapCommand; off: (() => void) | null }>();
+
+/**
+ * MRI's `signo2signm` (vendor/ruby/v3.3.11/signal.c:283): a signal number's `siglist` name.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function signo2signm(no: number): string | undefined {
+  for (const [signm, signo] of Object.entries(SIGLIST)) if (signo === no) return signm;
+  return undefined;
+}
+
+/**
+ * MRI's `trap_signm` (vendor/ruby/v3.3.11/signal.c:1230-1243): a signal
+ * number is range-checked against `NSIG`, and a name, with or without `SIG`,
+ * is looked up in `siglist` by `signm2signo` (signal.c:210-281).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function trapSignm(vsig: number | string): number {
+  if (typeof vsig === "number") {
+    if (vsig < 0 || vsig >= NSIG) throw new ArgumentError(`invalid signal number (${vsig})`);
+    return vsig;
+  }
+  const nm = vsig.startsWith("SIG") ? vsig.slice(3) : vsig;
+  if (nm !== "" && Object.hasOwn(SIGLIST, nm)) return SIGLIST[nm];
+  throw new ArgumentError(`unsupported signal \`SIG${nm}'`);
+}
+
+/**
+ * MRI's `reserved_signal_p` (vendor/ruby/v3.3.11/signal.c:1287): the signals `trap` refuses.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function reservedSignalP(signo: number): boolean {
+  return signo === 11 || signo === 7 || signo === 4 || signo === 8 || signo === 26;
+}
 
 /**
  * MRI's `trap` (`sig_trap`, vendor/ruby/v3.3.11/signal.c:1348): installs
  * `command` for `signal` (a name, with or without `SIG`, or a number, per
- * `trap_signm`, signal.c:1230, inlined) in place of the previous one and answers the
- * previous one, named as `trap` (signal.c:1247) names it. String commands
- * follow `trap_handler` (signal.c:1158): `""`, `IGNORE` and `SIG_IGN` ignore
- * the signal, `SYSTEM_DEFAULT` restores the system default,
- * `DEFAULT` and `SIG_DFL` install Ruby's own handler, which raises `Interrupt` for SIGINT
- * and `SignalException` otherwise (`default_handler`, signal.c:1100), and
- * `EXIT` exits. A signal never trapped answers `"DEFAULT"`.
+ * {@link trapSignm}) in place of the previous one and answers the previous
+ * one, named as `trap` (signal.c:1247) names it. A reserved signal raises
+ * (`reserved_signal_p`, signal.c:1287), and `EXIT` (signal 0) runs its
+ * command at exit. String commands follow `trap_handler` (signal.c:1158):
+ * `""`, `IGNORE` and `SIG_IGN` ignore the signal, `SYSTEM_DEFAULT` restores
+ * the system default, `DEFAULT` and `SIG_DFL` install Ruby's own handler
+ * (`default_handler`, signal.c:1100), which raises `Interrupt` for SIGINT and
+ * `SignalException` for the other signals Ruby handles, and `EXIT` exits. A
+ * signal never trapped answers `"DEFAULT"`.
  *
- * @noRailsEquivalent CONVERGEABLE trap-accepts-every-mri-signal
- * @noRailsEquivalent CONVERGEABLE trap-signm-is-its-own-function
+ * @noRailsEquivalent PERMANENT
  */
 export function trap(signal: number | string, command: TrapCommand): TrapCommand {
-  let sig: TrapSignal;
-  if (typeof signal === "number") {
-    if (signal < 0 || signal >= 65) throw new ArgumentError(`invalid signal number (${signal})`);
-    const signm = SIGNOS[signal];
-    if (signm === undefined) throw new ArgumentError(`unsupported signal \`${signal}'`);
-    sig = signm;
-  } else {
-    const signm = signal.startsWith("SIG") ? signal : `SIG${signal}`;
-    if (signm !== "SIGINT" && signm !== "SIGTERM" && signm !== "SIGQUIT") {
-      throw new ArgumentError(`unsupported signal \`${signm}'`);
-    }
-    sig = signm;
+  const sig = trapSignm(signal);
+  if (reservedSignalP(sig)) {
+    throw new ArgumentError(`can't trap reserved signal: SIG${signo2signm(sig)}`);
   }
+  const signm = `SIG${signo2signm(sig)}` as SignalName;
+  const install = (handler: () => void): (() => void) => {
+    if (sig === 0) return atExit(handler);
+    if (sig === 9 || sig === 19) throw new Errno.EINVAL(signm);
+    return onSignal(signm, handler);
+  };
   const previous = traps.get(sig);
   previous?.off?.();
   let off: (() => void) | null;
   let oldcmd: TrapCommand;
   if (typeof command === "function") {
-    off = onSignal(sig, command);
+    off = install(command);
     oldcmd = command;
   } else if (command === "" || command === "IGNORE" || command === "SIG_IGN") {
-    off = onSignal(sig, () => {});
+    off = sig === 0 ? null : install(() => {});
     oldcmd = "IGNORE";
   } else if (command === "SYSTEM_DEFAULT") {
     off = null;
     oldcmd = "SYSTEM_DEFAULT";
   } else if (command === "DEFAULT" || command === "SIG_DFL") {
-    off = onSignal(sig, () => {
-      throw sig === "SIGINT" ? new Interrupt("") : new SignalException(sig);
-    });
+    if (
+      sig === 2 ||
+      sig === 1 ||
+      sig === 3 ||
+      sig === 15 ||
+      sig === 14 ||
+      sig === 10 ||
+      sig === 12 ||
+      sig === 17
+    ) {
+      off = install(() => {
+        throw sig === 2 ? new Interrupt("") : new SignalException(signm);
+      });
+    } else if (sig === 13 || sig === 31) {
+      off = install(() => {});
+    } else {
+      off = null;
+    }
     oldcmd = "DEFAULT";
   } else {
-    off = onSignal(sig, () => exit());
+    off = install(() => exit());
     oldcmd = "EXIT";
   }
   traps.set(sig, { command: oldcmd, off });

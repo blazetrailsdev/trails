@@ -71,7 +71,7 @@ export class Handler {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE rackup-server-names-exact-constant
+   * @noRailsEquivalent PERMANENT
    */
   static readonly SERVER_NAMES = Object.freeze(["vite", "node"]);
 
