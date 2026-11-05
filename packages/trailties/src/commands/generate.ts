@@ -1,8 +1,9 @@
 import "../constants.generate.generated.js";
-import { Dir } from "@blazetrails/ruby-compat";
+import { rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
+import { root } from "../command.js";
 
 export class GenerateCommand extends Base {
   static {
@@ -25,9 +26,11 @@ export class GenerateCommand extends Base {
     await this.bootApplicationBang();
     await this.loadGenerators();
 
+    rbArgv().splice(0, rbArgv().length, ...(this.args as string[]));
+
     await Generators.invoke(generator, this.args as string[], {
       behavior: "invoke",
-      destinationRoot: Dir.pwd(),
+      destinationRoot: root()?.toString(),
     });
   }
 }

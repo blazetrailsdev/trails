@@ -44,10 +44,6 @@ describe("CLI", () => {
     const program = createProgram();
     const db = program.commands.find((c) => c.name() === "db");
     const subNames = db?.commands.map((c) => c.name());
-    expect(subNames).toContain("migrate");
-    expect(subNames).toContain("rollback");
     expect(subNames).toContain("seed");
-    expect(subNames).toContain("create");
-    expect(subNames).toContain("drop");
   });
 });

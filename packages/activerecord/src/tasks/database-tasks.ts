@@ -783,7 +783,7 @@ export class DatabaseTasks {
     return hash.digest("hex");
   }
 
-  static setupInitialDatabaseYaml(): Record<string, unknown> {
+  static setupInitialDatabaseYaml(): RawConfigurations {
     return {};
   }
 

@@ -1,14 +1,8 @@
 import { Command } from "commander";
-import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 import { Actions } from "../command/actions.js";
-import {
-  env,
-  setExitCode,
-  getProcessAdapter,
-  registerProcessAdapter,
-} from "@blazetrails/ruby-compat";
+import { setExitCode, getProcessAdapter, registerProcessAdapter } from "@blazetrails/ruby-compat";
 import {
   loadDatabaseConfig,
   loadDatabaseConfigModule,
@@ -505,66 +499,6 @@ async function withMigrationTasksForDb(
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
-async function withTargetVersionEnv(
-  targetVersion: string | null,
-  fn: () => Promise<void>,
-): Promise<void> {
-  if (targetVersion === null) return fn();
-  const was = env.VERSION;
-  setEnv("VERSION", targetVersion);
-  try {
-    await fn();
-  } finally {
-    setEnv("VERSION", was);
-  }
-}
-
-async function runMigrateAll(): Promise<void> {
-  const envName = DatabaseTasks.env.toString();
-  const entries = await taskableDatabaseEntries({}, envName);
-  const migrationsDirsFor = new Map<string, string[]>();
-  for (const { name, raw } of entries) {
-    migrationsDirsFor.set(name, await migrationsDirsForConfig(raw));
-  }
-
-  const primary = entries.find((e) => e.name === "primary") ?? entries[0];
-  const configs = entries.map((e) => e.hashConfig);
-  const multiDb = entries.length > 1;
-  const { Base } = await import("@blazetrails/activerecord");
-  const currentDbPrefix = (): string => {
-    if (!multiDb) return "";
-    try {
-      const name = Base.connectionDbConfig()?.name;
-      return name ? `[${name}] ` : "";
-    } catch {
-      return "";
-    }
-  };
-
-  await withRegisteredConfigurations(configs, envName, () =>
-    DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
-      const stateBefore = new Map<string, MigrateStateBefore>();
-      for (const { name, hashConfig } of entries) {
-        stateBefore.set(
-          name,
-          await captureMigrateState(hashConfig, migrationsDirsFor.get(name) ?? []),
-        );
-      }
-      await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll());
-      for (const { name, raw, hashConfig } of entries) {
-        const prefix = multiDb ? `[${name}] ` : "";
-        await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
-          const adapter = await pool.leaseConnection();
-          const migrationContext = migrationContextFor(adapter, migrationsDirsFor.get(name) ?? []);
-          const pending = await migrationContext.open().pendingMigrations();
-          reportMigrateOutcome(prefix, stateBefore.get(name)!, pending.length);
-          await dumpSchemaAfterMigrate(raw, hashConfig);
-        });
-      }
-    }),
-  );
-}
-
 async function establishTaskConnection(): Promise<void> {
   const envName = DatabaseTasks.env.toString();
   const loaded = await loadDatabaseConfigModule();
@@ -584,76 +518,6 @@ export function dbCommand(): Command {
   cmd.description("Database management commands");
   cmd.hook("preSubcommand", establishTaskConnection);
   cmd.hook("postAction", releaseTaskConnections);
-
-  cmd
-    .command("migrate")
-    .description("Run pending migrations for all databases (or a specific one via --database)")
-    .option("--version <version>", "Migrate to a specific version (also reads VERSION env)")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
-      const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
-      await withTargetVersionEnv(targetVersion, async () => {
-        if (opts.database === undefined) {
-          await runMigrateAll();
-          return;
-        }
-        await forEachDatabase(opts, async (ctx) => {
-          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), { report: true });
-        });
-      });
-    });
-
-  cmd
-    .command("rollback")
-    .description("Rollback migrations")
-    .option("--step <n>", "Number of migrations to rollback", "1")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      const step = Number(opts.step);
-      if (!Number.isInteger(step) || step < 1) {
-        console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        setExitCode(1);
-        return;
-      }
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, async () => {
-          await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
-        });
-      });
-    });
-
-  cmd
-    .command("forward")
-    .description("Move the schema forward N migrations (inverse of rollback)")
-    .option("--step <n>", "Number of migrations to apply", "1")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      const step = Number(opts.step);
-      if (!Number.isInteger(step) || step < 1) {
-        console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        setExitCode(1);
-        return;
-      }
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, async () => {
-          await DatabaseTasks.migrationConnectionPool().migrationContext.forward(step);
-        });
-      });
-    });
-
-  cmd
-    .command("version")
-    .description("Print the current schema version")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
-        const version = (await migrationContextFor(adapter, []).currentVersion()) ?? "";
-        console.log(`\n${prefix}database: ${config.database}`);
-        console.log(`${prefix}Current version: ${version}`);
-        console.log();
-      });
-    });
 
   cmd
     .command("environment:set")
@@ -709,44 +573,6 @@ export function dbCommand(): Command {
           console.error(`${prefix}Run \`trails db migrate\` to resolve this issue.`);
           setExitCode(1);
         }
-      });
-    });
-
-  cmd
-    .command("migrate:up")
-    .description("Run a specific migration up (by version)")
-    .requiredOption("--version <version>", "Migration version to run up")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, async () => {
-          await withTargetVersionEnv(opts.version, async () => {
-            DatabaseTasks.checkTargetVersion();
-            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
-              "up",
-              DatabaseTasks.targetVersion()!,
-            );
-          });
-        });
-      });
-    });
-
-  cmd
-    .command("migrate:down")
-    .description("Run a specific migration down (by version)")
-    .requiredOption("--version <version>", "Migration version to run down")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(ctx, async () => {
-          await withTargetVersionEnv(opts.version, async () => {
-            DatabaseTasks.checkTargetVersion();
-            await DatabaseTasks.migrationConnectionPool().migrationContext.run(
-              "down",
-              DatabaseTasks.targetVersion()!,
-            );
-          });
-        });
       });
     });
 
@@ -848,52 +674,6 @@ export function dbCommand(): Command {
     .description("Prepare the test database (Rails parallel to db:test:prepare)")
     .action(async () => {
       await runTestLoadSchema({ successMessage: (_d, f) => `Test database prepared (${f})` });
-    });
-
-  cmd
-    .command("create")
-    .description("Create database(s) — all in the env, or a specific one via --database")
-    .option("--database <name>", "Target a specific named database (e.g. primary, animals)")
-    .action(async (opts) => runCreate(opts));
-
-  cmd
-    .command("drop")
-    .description("Drop database(s) — all in the env, or a specific one via --database")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => runDrop(opts));
-
-  cmd
-    .command("migrate:status")
-    .description("Show migration status")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async (ctx) => {
-        await withPrefixedStdout(ctx.prefix, () => DatabaseTasks.migrateStatus());
-      });
-    });
-
-  cmd
-    .command("migrate:redo")
-    .description("Rollback and re-run the last migration")
-    .option("--step <n>", "Number of migrations to redo", "1")
-    .option("--database <name>", "Target a specific named database")
-    .action(async (opts) => {
-      const step = Number(opts.step);
-      if (!Number.isInteger(step) || step < 1) {
-        console.error(`Invalid value for --step: "${opts.step}". Expected a positive integer.`);
-        setExitCode(1);
-        return;
-      }
-      await forEachDatabase(opts, async (ctx) => {
-        await withMigrationTasksForDb(
-          ctx,
-          async () => {
-            await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
-            await DatabaseTasks.migrate();
-          },
-          { report: true },
-        );
-      });
     });
 
   cmd
