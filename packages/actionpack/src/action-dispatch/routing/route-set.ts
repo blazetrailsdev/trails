@@ -54,6 +54,7 @@ import {
   type UrlForOptions,
   type UrlForRoutes,
   UrlFor,
+  _routesIvar,
 } from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
@@ -959,7 +960,6 @@ export class RouteSet {
         Object.defineProperty(this, "_routes", { get: () => routes, configurable: true });
       });
 
-      const _routesIvar = Symbol("@_routes");
       self.moduleEval((m) => {
         Object.defineProperty(m, "_routes", {
           get(this: Record<symbol, RouteSet | null | undefined>): RouteSet {

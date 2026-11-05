@@ -46,6 +46,12 @@ export type UrlForRoutes = Pick<RouteSet, "urlFor" | "isOptimizeRoutesGeneration
   polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
 };
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const _routesIvar = Symbol("@_routes");
+
 export interface UrlForHost {
   /** @internal */
   _routes: UrlForRoutes | null;

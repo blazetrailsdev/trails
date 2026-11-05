@@ -240,7 +240,7 @@ export class Session {
 
   /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
   constructor(app: unknown) {
-    (this as { _routes?: unknown })._routes = null;
+    (this as Record<symbol, unknown>)[urlForMod._routesIvar] = null;
     this._app = app;
 
     this.resetBang();
