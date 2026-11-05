@@ -67,6 +67,7 @@ export class Base extends AbstractController.Base {
   >;
   declare static deliveryMethod: DeliveryMethodsClass["deliveryMethod"];
   declare static deliveryMethods: DeliveryMethodsClass["deliveryMethods"];
+  declare static isDeliveryMethod: () => boolean;
   declare static isDeliveryMethods: () => boolean;
   declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
   declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
