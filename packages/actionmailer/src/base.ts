@@ -50,6 +50,7 @@ export class Base extends AbstractController.Base {
   declare static appendViewPath: (path: unknown) => void;
   declare static deliveryMethod: unknown;
   declare static deliveryMethods: Readonly<Record<string, unknown>>;
+  declare static isDeliveryMethods: () => boolean;
   declare static performDeliveries: boolean;
   declare static raiseDeliveryErrors: boolean;
   declare static deliveries: Message[];
@@ -58,6 +59,7 @@ export class Base extends AbstractController.Base {
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
   declare static defaultParams: Readonly<Record<string, unknown>>;
   declare static deliveryJob: typeof MailDeliveryJob;
+  declare static isDeliveryJob: () => boolean;
   declare static deliverLaterQueueName: unknown;
   declare static with: typeof ParameterizedClassMethods.with;
 
