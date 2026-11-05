@@ -32,15 +32,6 @@ afterEach(() => {
   Trails.application = null;
 });
 
-async function withConstant(name: string, block: () => Promise<void>): Promise<void> {
-  constSet(TopLevel, name, class {});
-  try {
-    await block();
-  } finally {
-    delete (TopLevel as Record<string, unknown>)[name];
-  }
-}
-
 describe("MailerGeneratorTest", () => {
   it("mailer skeleton is created", async () => {
     await t.runGenerator();
@@ -66,12 +57,15 @@ describe("MailerGeneratorTest", () => {
   });
 
   it("check class collision", async () => {
-    await withConstant("NotifierMailer", async () => {
+    constSet(TopLevel, "NotifierMailer", class {});
+    try {
       const content = await capture("stderr", () => t.runGenerator());
       expect(content).toMatch(
         /The name 'NotifierMailer' is either already used in your application or reserved/,
       );
-    });
+    } finally {
+      delete (TopLevel as Record<string, unknown>)["NotifierMailer"];
+    }
   });
 
   it("invokes default test framework", async () => {
@@ -102,21 +96,27 @@ describe("MailerGeneratorTest", () => {
   });
 
   it("check test class collision", async () => {
-    await withConstant("NotifierMailerTest", async () => {
+    constSet(TopLevel, "NotifierMailerTest", class {});
+    try {
       const content = await capture("stderr", () => t.runGenerator());
       expect(content).toMatch(
         /The name 'NotifierMailerTest' is either already used in your application or reserved/,
       );
-    });
+    } finally {
+      delete (TopLevel as Record<string, unknown>)["NotifierMailerTest"];
+    }
   });
 
   it("check preview class collision", async () => {
-    await withConstant("NotifierMailerPreview", async () => {
+    constSet(TopLevel, "NotifierMailerPreview", class {});
+    try {
       const content = await capture("stderr", () => t.runGenerator());
       expect(content).toMatch(
         /The name 'NotifierMailerPreview' is either already used in your application or reserved/,
       );
-    });
+    } finally {
+      delete (TopLevel as Record<string, unknown>)["NotifierMailerPreview"];
+    }
   });
 
   it("invokes default text template engine", async () => {

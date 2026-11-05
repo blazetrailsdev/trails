@@ -77,11 +77,9 @@ export class Trailtie extends BaseTrailtie {
         AbstractController.Trailties.RoutesHelpers.with(routes, false)(this as never);
         include(this as never, routes.mountedHelpers() as never);
 
-        this.registerInterceptors(...((options.delete("interceptors") as unknown[]) ?? []));
-        this.registerPreviewInterceptors(
-          ...((options.delete("previewInterceptors") as unknown[]) ?? []),
-        );
-        this.registerObservers(...((options.delete("observers") as unknown[]) ?? []));
+        this.registerInterceptors(options.delete("interceptors"));
+        this.registerPreviewInterceptors(options.delete("previewInterceptors"));
+        this.registerObservers(options.delete("observers"));
         this.previewPaths = [...new Set([...this.previewPaths, ...options.previewPaths])];
 
         const deliveryJob = options.delete("deliveryJob") as string | null | undefined;
