@@ -84,6 +84,6 @@ function compileTemplate(source: string, base: string): string {
     templateMappings,
   );
   const map = generateSourceMap(`${base}.js`, base, source, mappings);
-  const inline = btoa(unescape(encodeURIComponent(JSON.stringify(map))));
+  const inline = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(map))));
   return `${outputText.replace(/^\/\/# sourceMappingURL=.*\n?/gmu, "")}//# sourceMappingURL=data:application/json;base64,${inline}\n`;
 }

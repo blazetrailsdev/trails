@@ -7,7 +7,7 @@ import type { Collector } from "../../collector.js";
 type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
 type Hash = Record<string, unknown>;
 
-export const FIXTURES: Record<string, string> = {
+const FIXTURES: Record<string, string> = {
   "base-mailer/attachment-with-content.tse": "Attachment with content",
   "base-mailer/different-layout.html.tse": "HTML",
   "base-mailer/different-layout.text.tse": "PLAIN",
