@@ -22,7 +22,7 @@ export class CredentialsGenerator extends GeneratorBase {
 
   async addCredentialsFile(): Promise<void> {
     await this.inRoot(async () => {
-      if (File.isExist(File.join(this.destinationRoot, this.contentPath))) return;
+      if (File.isExist(this.contentPath)) return;
       this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
       this.say("");
       const content = this.renderTemplate();
@@ -37,11 +37,11 @@ export class CredentialsGenerator extends GeneratorBase {
   }
 
   private encryptedFile(): EncryptedFile {
-    const contentPath = File.join(this.destinationRoot, this.contentPath);
+    const contentPath = this.contentPath;
     FileUtils.mkdirP(File.dirname(contentPath));
     return new EncryptedFile({
       contentPath,
-      keyPath: File.join(this.destinationRoot, this.keyPath),
+      keyPath: this.keyPath,
       envKey: "TRAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });
