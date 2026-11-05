@@ -13,13 +13,7 @@
     }
   },
   "exclude": [],
-  "include": [
-    "src/**/*.test.ts",
-    "src/test-helpers/**/*",
-    "src/test/**/*",
-    "src/test-helpers/**/*.ts",
-    "src/test/**/*.ts"
-  ],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*", "src/test/**/*"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../builder" },

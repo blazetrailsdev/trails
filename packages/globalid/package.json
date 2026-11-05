@@ -26,8 +26,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@blazetrails/activesupport": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*"
   },
   "engines": {
     "node": ">=24"
