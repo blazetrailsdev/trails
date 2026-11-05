@@ -341,19 +341,25 @@ interface ApiComparison {
 interface TestComparison {
   results: {
     package: string;
-    files: { conventionTsFile: string; rubyTestCount: number; matched: number }[];
+    files: {
+      conventionTsFile: string;
+      conventionTsPackage?: string;
+      rubyTestCount: number;
+      matched: number;
+    }[];
   }[];
 }
 
 /**
  * One row per api-compare file. Its tests are those of every Rails test file
- * test-compare maps onto the row's `x.test.ts`; none leaves `testsTotal` 0.
+ * test-compare maps onto the row's `x.test.ts` in the package owning that
+ * path; none, or no test-compare output, leaves `testsTotal` 0.
  */
 export function fileRows(api: ApiComparison | null, tests: TestComparison | null): FileRow[] {
   const byTsTest = new Map<string, { matched: number; total: number }>();
   for (const r of tests?.results ?? []) {
     for (const f of r.files) {
-      const key = `${packageDirOf(r.package)} ${f.conventionTsFile}`;
+      const key = `${packageDirOf(f.conventionTsPackage ?? r.package)} ${f.conventionTsFile}`;
       const t = byTsTest.get(key) ?? { matched: 0, total: 0 };
       t.matched += f.matched;
       t.total += f.rubyTestCount;

@@ -132,6 +132,18 @@ beforeEach(async () => {
           ],
         },
         {
+          package: "actiondispatch",
+          files: [
+            {
+              rubyFile: "routing.rb",
+              expectedTsFile: "routing.ts",
+              tsFileExists: true,
+              matched: 1,
+              missing: 1,
+            },
+          ],
+        },
+        {
           package: "sqlite3",
           paramNames: { compared: 2 },
           predicatesCompared: 0,
@@ -158,6 +170,19 @@ beforeEach(async () => {
               conventionTsFile: "core.test.ts",
               rubyTestCount: 4,
               matched: 0,
+            },
+            {
+              rubyFile: "base/more_test.rb",
+              conventionTsFile: "base.test.ts",
+              rubyTestCount: 2,
+              matched: 1,
+            },
+            {
+              rubyFile: "routing_test.rb",
+              conventionTsFile: "routing.test.ts",
+              conventionTsPackage: "actionpack",
+              rubyTestCount: 3,
+              matched: 2,
             },
           ],
         },
@@ -290,8 +315,8 @@ describe("package-summary", () => {
         tsFile: "base.ts",
         methodsMatched: 5,
         methodsMissing: 1,
-        testsMatched: 6,
-        testsTotal: 8,
+        testsMatched: 7,
+        testsTotal: 10,
       },
       {
         package: "activerecord",
@@ -311,11 +336,20 @@ describe("package-summary", () => {
         testsMatched: 0,
         testsTotal: 0,
       },
+      {
+        package: "actionpack",
+        rubyFile: "routing.rb",
+        tsFile: "routing.ts",
+        methodsMatched: 1,
+        methodsMissing: 1,
+        testsMatched: 2,
+        testsTotal: 3,
+      },
     ]);
   });
 
   it("writes the summary file", async () => {
-    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 3 files, 4 CLAUDE.md sections/);
+    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
     const out = JSON.parse(
       await fs.readFile(path.join(root, "scripts/parity/output/package-summary.json"), "utf-8"),
     );
