@@ -87,7 +87,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.route(`this.resource("session");`);
   }
 
-  /** @missingRailsCall execute_command — PERMANENT */
+  /** @missingRailsCall execute_command — CONVERGEABLE authentication-enable-bcrypt-through-execute-command */
   async enableBcrypt(): Promise<void> {
     if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
     const full = File.join(this.destinationRoot, "package.json");
