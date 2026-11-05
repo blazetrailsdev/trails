@@ -12,6 +12,7 @@ import {
   Notifications,
   presence,
   underscore,
+  type Callbacks as ActiveSupportCallbacks,
   type EventPayload,
   type Included,
 } from "@blazetrails/activesupport";
@@ -32,7 +33,11 @@ import {
 } from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
-import { Parameterized, type ClassMethods as ParameterizedClassMethods } from "./parameterized.js";
+import {
+  Parameterized,
+  type ClassMethods as ParameterizedClassMethods,
+  type ParameterizedIncluded,
+} from "./parameterized.js";
 import { QueuedDelivery } from "./queued-delivery.js";
 import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import { Rescuable } from "./rescuable.js";
@@ -515,11 +520,11 @@ export class Base extends AbstractController.Base {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
-export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
+export interface Base
+  extends Included<typeof Rescuable>, Included<typeof DeliveryMethods>, ParameterizedIncluded {
   readonly lookupContext: ReturnType<typeof ActionView.lookupContext>;
   render: OmitThisParameter<typeof AbstractController.render>;
-  params: Record<string, unknown>;
-  runCallbacks(kind: string, block?: () => unknown): unknown;
+  runCallbacks: OmitThisParameter<(typeof ActiveSupportCallbacks)["runCallbacks"]>;
 }
 
 /** @internal */

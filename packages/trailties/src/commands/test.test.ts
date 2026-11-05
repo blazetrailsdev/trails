@@ -1,36 +1,51 @@
+import { capture } from "@blazetrails/activesupport";
+import { stdout as STDOUT } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { setAppPath } from "../app-path.js";
 import { UnrecognizedCommandError } from "../command.js";
 import { Runner } from "../test-unit/runner.js";
 import { RakeCommand } from "./rake.js";
 import { TestCommand } from "./test.js";
 
-describe("TestTest", () => {
+describe("Trails::Command::TestTest", () => {
   let prepare: MockInstance<typeof RakeCommand.perform>;
 
   beforeEach(() => {
-    vi.spyOn(Runner, "run").mockResolvedValue();
+    setAppPath("/app/config/application");
+    vi.spyOn(Runner, "run").mockImplementation(async () => {
+      STDOUT.write("0 runs, 0 failures, 0 errors, 0 skips\n");
+    });
     vi.spyOn(Runner, "parseOptions").mockImplementation(() => {});
     prepare = vi.spyOn(RakeCommand, "perform").mockResolvedValue();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    setAppPath(undefined);
   });
 
-  function runTestCommand(subcommand = "test", ...args: string[]): Promise<void> {
-    return TestCommand.perform(subcommand, args, {});
+  function runTestCommand(subcommand = "test", ...args: string[]): Promise<string> {
+    return capture("stdout", () => TestCommand.perform(subcommand, args, {}));
   }
 
-  async function assertRunsPrepareTask(block: () => Promise<void>): Promise<void> {
+  function assertSuccessfulRun(testCommandOutput: string): void {
+    expect(testCommandOutput).toMatch("0 failures, 0 errors");
+  }
+
+  async function assertRunsPrepareTask(block: () => Promise<string>): Promise<string> {
     prepare.mockClear();
-    await block();
+    const output = await block();
+    assertSuccessfulRun(output);
     expect(prepare).toHaveBeenCalledWith("test:prepare", [], {});
+    return output;
   }
 
-  async function assertSkipsPrepareTask(block: () => Promise<void>): Promise<void> {
+  async function assertSkipsPrepareTask(block: () => Promise<string>): Promise<string> {
     prepare.mockClear();
-    await block();
+    const output = await block();
+    assertSuccessfulRun(output);
     expect(prepare).not.toHaveBeenCalled();
+    return output;
   }
 
   it("test command with no args runs test:prepare task", async () => {
@@ -60,7 +75,7 @@ describe("TestTest", () => {
 
   it("test command runs successfully when no tasks defined", async () => {
     prepare.mockRejectedValueOnce(new UnrecognizedCommandError("test:prepare", []));
-    await expect(runTestCommand("test")).resolves.toBeUndefined();
+    assertSuccessfulRun(await runTestCommand("test"));
   });
 
   it("test:all runs test:prepare task", async () => {

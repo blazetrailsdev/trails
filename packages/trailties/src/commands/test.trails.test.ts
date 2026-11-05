@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, getFs, rbFSystem } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
+import { setAppPath } from "../app-path.js";
 import { UnrecognizedCommandError } from "../command.js";
 import { RakeCommand } from "./rake.js";
 import { TestCommand } from "./test.js";
@@ -13,6 +14,9 @@ vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
 }));
 
 describe("TestCommand", () => {
+  beforeEach(() => setAppPath("/app/config/application"));
+  afterEach(() => setAppPath(undefined));
+
   it("is found under the test namespace with the reporter's executable", () => {
     expect(TestCommand.namespace()).toBe("trails:test");
     expect(TestCommand.executable()).toBe(TestUnitReporter.executable);

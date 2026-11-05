@@ -20,6 +20,10 @@ interface ParameterizedHost {
   _params?: Record<string, unknown>;
 }
 
+export interface ParameterizedIncluded {
+  params: Record<string, unknown>;
+}
+
 export const ClassMethods = {
   with(this: unknown, params: Record<string, unknown>): Mailer {
     return new Parameterized.Mailer(this as ParameterizedMailerClass, params);

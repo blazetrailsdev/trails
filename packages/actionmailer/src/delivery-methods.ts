@@ -13,7 +13,7 @@ type Settings = Record<string, unknown>;
 
 export interface DeliveryMethodsClass {
   deliveryMethods: Readonly<Record<string, unknown>>;
-  deliveryMethod: unknown;
+  deliveryMethod: string | object | null;
   performDeliveries: boolean;
   raiseDeliveryErrors: boolean;
   [settings: `${string}Settings`]: Settings | null | undefined;
