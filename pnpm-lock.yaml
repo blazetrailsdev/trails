@@ -240,6 +240,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

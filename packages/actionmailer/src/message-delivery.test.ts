@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Time } from "@blazetrails/date";
+import { Identification, toGlobalId } from "@blazetrails/globalid";
 import { Message } from "@blazetrails/mail";
 import {
   RuntimeError,
@@ -19,6 +20,7 @@ import {
   constSet,
   block,
   include,
+  type Included,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { MailDeliveryJob } from "./mail-delivery-job.js";
@@ -86,6 +88,26 @@ constSet(TopLevel, "MessageDeliveryTest", MessageDeliveryTest);
 
 class DummyJob extends MailDeliveryJob {}
 constSet(MessageDeliveryTest, "DummyJob", DummyJob);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class DeserializationErrorFixture {
+  static find(_id: unknown): never {
+    throw new RuntimeError("boom, missing find");
+  }
+
+  readonly id: unknown;
+  constructor(id: unknown = 1) {
+    this.id = id;
+  }
+
+  toGlobalId(_options = {}) {
+    return toGlobalId.call(this, { app: "foo" });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+interface DeserializationErrorFixture extends Included<typeof Identification> {}
+include(DeserializationErrorFixture, Identification);
+constSet(MessageDeliveryTest, "DeserializationErrorFixture", DeserializationErrorFixture);
 
 type Ctx = { testCase: unknown };
 
@@ -281,6 +303,16 @@ describe("MessageDeliveryTest", () => {
     await assertNothingRaised(() => message.deliverLater());
     expect((DelayedMailer.lastError as Error).message).toBe("boom");
     expect(DelayedMailer.lastRescueFromInstance).toBeInstanceOf(DelayedMailer);
+  });
+
+  it("job delegates deserialization errors to mailer class", async () => {
+    const message = (DelayedMailer as Mailer).testMessage(new DeserializationErrorFixture());
+
+    await assertNothingRaised(() => message.deliverLater());
+    expect(DelayedMailer.lastRescueFromInstance).toBe(DelayedMailer);
+    expect((DelayedMailer.lastError as Error).message).toBe(
+      "Error while trying to deserialize arguments: boom, missing find",
+    );
   });
 
   it("allows for keyword arguments", async ({ testCase }: Ctx) => {
