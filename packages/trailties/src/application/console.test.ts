@@ -16,9 +16,10 @@ interface Primary {
   output: string;
   read: number;
   server: REPLServer | null;
+  input: PassThrough | null;
 }
 
-const primary = vi.hoisted((): Primary => ({ output: "", read: 0, server: null }));
+const primary = vi.hoisted((): Primary => ({ output: "", read: 0, server: null, input: null }));
 
 const actual = await import("node:repl");
 registerReplAdapter("full-stack-console", {
@@ -27,6 +28,7 @@ registerReplAdapter("full-stack-console", {
     const output = new PassThrough();
     input.on("data", (chunk) => (primary.output += String(chunk)));
     output.on("data", (chunk) => (primary.output += String(chunk)));
+    primary.input = input;
     primary.server = actual.start({ ...options, input, output, terminal: false });
     return primary.server;
   },
@@ -65,7 +67,7 @@ async function writePrompt(
   expectedOutput: string | null = null,
   { prompt = "> " } = {},
 ): Promise<void> {
-  primary.server!.input.write(`${command}\n`);
+  primary.input!.write(`${command}\n`);
   await assertOutput(command, primary);
   if (expectedOutput) await assertOutput(expectedOutput, primary, 100);
   await assertOutput(prompt, primary);
@@ -96,7 +98,7 @@ describe("FullStackConsoleTest", () => {
     } as never;
     previousAdapter = replAdapterConfig.adapter;
     replAdapterConfig.adapter = "full-stack-console";
-    Object.assign(primary, { output: "", read: 0, server: null });
+    Object.assign(primary, { output: "", read: 0, server: null, input: null });
   });
 
   afterEach(async () => {
