@@ -89,7 +89,6 @@ import {
   rubyMethodToTsForFqn,
   copyHookClaimed,
   rubyCallToTsForReceivers,
-  asyncPredicateTwins,
   unreachableSingletonCallsDropped,
 } from "./compare.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
@@ -5017,21 +5016,28 @@ describe("rubyCallToTsForReceivers", () => {
   });
 });
 
-describe("asyncPredicateTwins", () => {
-  it("credits ruby-compat's async twin of an is* predicate", () => {
-    expect(asyncPredicateTwins(["isDirectory", "directory"], "directory?")).toContain(
-      "isDirectoryAsync",
-    );
-    expect(asyncPredicateTwins(["split"], "split")).toEqual(["split"]);
-  });
-});
-
 describe("unreachableSingletonCallsDropped", () => {
   const all = { has: () => true };
   it("drops an expr-receiver call to a singleton-only method from an instance body", () => {
     const s = unreachableSingletonCallsDropped(all, "instance", { split: ["expr"] }, () => true);
     expect(s.has("split")).toBe(false);
   });
+  it("keeps a self.class call", () => {
+    expect(
+      unreachableSingletonCallsDropped(all, "instance", { split: ["class"] }, () => true).has(
+        "split",
+      ),
+    ).toBe(true);
+    expect(
+      unreachableSingletonCallsDropped(
+        all,
+        "instance",
+        { split: ["expr", "class"] },
+        () => true,
+      ).has("split"),
+    ).toBe(true);
+  });
+
   it("keeps a self call, a class body, and an instance-defined method", () => {
     expect(
       unreachableSingletonCallsDropped(all, "instance", { split: ["self"] }, () => true).has(

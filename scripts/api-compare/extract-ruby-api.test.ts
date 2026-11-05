@@ -4683,6 +4683,20 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("records an x.class chain as a class receiver", () => {
+    const c = rubyCallReceivers({
+      "lib/thor/parser/class_chain.rb": `
+        class ClassChain
+          def parse_hash(shift)
+            self.class.split(shift)
+            shift.split(":", 2)
+          end
+        end
+      `,
+    });
+    expect(c["ClassChain#parse_hash"]).toEqual({ split: ["class", "local"] });
+  });
+
   it("does not chase Hash#keys/#values through ANOTHER chain hop (one hop only)", () => {
     const c = rubyCallReceivers({
       "lib/active_record/chain_deep.rb": `

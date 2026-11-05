@@ -103,9 +103,19 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  * `mkdir_p` and `rm_rf` are `FileUtils` statics rather than adapter members:
  * the fs is async, so each one's port is ruby-compat's async spelling
  * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365,1328`).
+ *
+ * The `File` predicates' rows name ruby-compat's async statics
+ * (`packages/ruby-compat/src/file.ts`), for the bodies that use async fs only:
+ * `File.directory?` in `Thor::Actions::Directory#execute!`
+ * (`vendor/thor/v1.3.2/lib/thor/actions/directory.rb:82`) is
+ * `File.isDirectoryAsync`.
  */
 export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
-  ["exist?", ["existsSync", "exists"]],
+  ["exist?", ["existsSync", "exists", "isExistAsync"]],
+  ["directory?", ["isDirectoryAsync"]],
+  ["file?", ["isFileAsync"]],
+  ["identical?", ["isIdenticalAsync"]],
+  ["symlink?", ["isSymlinkAsync"]],
   ["stat", ["statSync"]],
   ["rename", ["renameSync"]],
   ["unlink", ["unlinkSync"]],

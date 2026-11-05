@@ -1646,23 +1646,12 @@ export function rubyCallToTsForReceivers(
   receivers: Record<string, string[]> | undefined,
   fileDefinesInstanceNew: boolean,
 ): string[] | null {
-  const mapped = asyncPredicateTwins(rubyCallToTs(rc, pkg), rc);
+  const mapped = rubyCallToTs(rc, pkg);
   const kinds = receivers?.[rc];
   if (rc !== "new" || !fileDefinesInstanceNew || kinds === undefined || kinds.includes("const")) {
     return mapped;
   }
   return [...(mapped ?? []), "new"];
-}
-
-/**
- * A Ruby predicate's TS spellings plus ruby-compat's async twin of each
- * `is*` one: Thor actions use async fs only, so `File.directory?` is
- * `File.isDirectoryAsync` (`packages/ruby-compat/src/file.ts`).
- */
-export function asyncPredicateTwins(mapped: string[] | null, rc: string): string[] | null {
-  if (mapped === null || !rc.endsWith("?")) return mapped;
-  const twins = mapped.filter((n) => /^is[A-Z]/.test(n)).map((n) => `${n}Async`);
-  return twins.length === 0 ? mapped : [...mapped, ...twins];
 }
 
 /**

@@ -43,7 +43,9 @@ describe("SMTP Delivery Method", () => {
   describe("enabling STARTTLS", () => {
     const deliveredStarttls = async (settings: Record<string, unknown>) => {
       let starttls: boolean | string | undefined;
-      vi.spyOn(NetSMTP.prototype, "start").mockImplementation(function (this: NetSMTP) {
+      const start = vi.spyOn(NetSMTP.prototype, "start").mockImplementation(function (
+        this: NetSMTP,
+      ) {
         starttls = this.isStarttls();
         return Promise.resolve(null);
       });
@@ -52,16 +54,19 @@ describe("SMTP Delivery Method", () => {
       message.setTo("ada@test.lindsaar.net");
       message.setSubject("Re: No way!");
       message.setBody("Yeah sure");
-      await new SMTP({
-        address: "localhost",
-        port: 25,
-        domain: "localhost.localdomain",
-        userName: null,
-        password: null,
-        authentication: null,
-        ...settings,
-      }).deliverBang(message);
-      vi.restoreAllMocks();
+      try {
+        await new SMTP({
+          address: "localhost",
+          port: 25,
+          domain: "localhost.localdomain",
+          userName: null,
+          password: null,
+          authentication: null,
+          ...settings,
+        }).deliverBang(message);
+      } finally {
+        start.mockRestore();
+      }
       return starttls;
     };
 
