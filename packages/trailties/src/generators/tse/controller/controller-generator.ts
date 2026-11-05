@@ -18,10 +18,7 @@ export class ControllerGenerator extends Base {
   /** @internal */
   _path?: string;
 
-  /**
-   * @missingRailsArgs template — PERMANENT
-   * @missingRailsArgs join — PERMANENT
-   */
+  /** @missingRailsArgs template — PERMANENT */
   async copyViewFiles(): Promise<void> {
     const basePath = File.join("app/views", ...this.classPath(), dasherize(this.fileName));
     await this.emptyDirectory(basePath);

@@ -160,7 +160,10 @@ export class AppBuilder extends ActionMethods {
     await this.template("node-version", ".node-version");
   }
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @missingRailsArgs template — PERMANENT
+   */
   async gemfile(): Promise<void> {
     await this.template("package.json");
     if (this.options.dev && this.packageManager === "pnpm")
@@ -173,6 +176,7 @@ export class AppBuilder extends ActionMethods {
     await this.template("Rakefile.ts");
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async configru(): Promise<void> {
     await this.template("config.ts");
     await this.template("vite.config.ts");
@@ -235,6 +239,7 @@ export class AppBuilder extends ActionMethods {
     await this.chmod("bin", 0o755 & ~File.umask(), { verbose: false });
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async config(): Promise<void> {
     await this.emptyDirectory("config");
 
@@ -332,6 +337,7 @@ export class AppBuilder extends ActionMethods {
     await this.emptyDirectoryWithKeepFile("tmp/storage");
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async test(): Promise<void> {
     await this.emptyDirectoryWithKeepFile("test/fixtures/files");
     await this.emptyDirectoryWithKeepFile("test/controllers");
@@ -527,7 +533,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** @missingRailsCall using_node? — PERMANENT */
   async createRootFiles(): Promise<void> {
     await this.build("readme");
     await this.build("rakefile");
