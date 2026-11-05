@@ -43,10 +43,9 @@ Delivery follows the same rule (RFC `0204-actionmailer-and-mail-port`,
 method's `deliver!`, and `ActionMailer::MessageDelivery#deliver_now`,
 `deliver_now!`, `deliver_later` and `deliver_later!` are `async`: SMTP and
 sendmail are I/O, and `deliver_later` awaits `MailDeliveryJob`'s
-`perform_later`. Because `MessageDelivery#__getobj__` processes the mailer,
-which awaits the action, the message is reached through an awaited
-`message()`, and `MessageDelivery` does not forward members as Ruby's
-`Delegator` does.
+`perform_later`. Building the message processes the mailer, and that awaits the
+action, so `MessageDelivery#message` is async. Its `__getobj__` answers only
+a message already built, so a `Delegator` read never starts the mailer.
 
 This is a genuine language shortcoming, ratified repo-wide here. Every async
 job member cites this section; a new instance is not a new decision to argue.
