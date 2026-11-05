@@ -9,6 +9,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("createUserTestFiles");
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async createUserTestFiles(): Promise<void> {
     await this.template("test/fixtures/users.yml");
     await this.template("test/models/user.test.ts");
