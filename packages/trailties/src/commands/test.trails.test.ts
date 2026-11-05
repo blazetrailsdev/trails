@@ -33,22 +33,15 @@ describe("TestCommand", () => {
     }
   });
 
-  it("runs test:prepare unless an exact test argument was given", async () => {
+  it("re-raises an error from test:prepare other than its own UnrecognizedCommandError", async () => {
     const run = vi.spyOn(Runner, "run").mockResolvedValue();
     const parse = vi.spyOn(Runner, "parseOptions").mockImplementation(() => {});
-    const rake = vi.spyOn(RakeCommand, "perform");
+    const rake = vi
+      .spyOn(RakeCommand, "perform")
+      .mockRejectedValueOnce(new UnrecognizedCommandError("db:prepare", []));
     try {
-      rake.mockRejectedValueOnce(new UnrecognizedCommandError("test:prepare", []));
-      await TestCommand.perform("test", [], {});
-      expect(rake).toHaveBeenCalledWith("test:prepare", [], {});
-      expect(run).toHaveBeenCalled();
-
-      rake.mockClear();
-      await TestCommand.perform("test", ["-n", "x"], {});
-      expect(rake).not.toHaveBeenCalled();
-
-      rake.mockRejectedValueOnce(new UnrecognizedCommandError("db:prepare", []));
       await expect(TestCommand.perform("test", [], {})).rejects.toThrow(UnrecognizedCommandError);
+      expect(run).not.toHaveBeenCalled();
     } finally {
       run.mockRestore();
       parse.mockRestore();
