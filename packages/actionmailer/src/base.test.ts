@@ -1125,12 +1125,11 @@ describe("BasePreviewTest", () => {
     }
   }
 
-  // BLOCKED: preview-call-awaits-message-delivery-before-interceptors
-  it.skip("has access to params", async () => {
+  it("has access to params", async () => {
     const params = { name: "World" };
 
-    const message = BaseMailerPreview.call("welcome", params) as unknown as MessageDelivery;
-    expect(((await message.message()).get("name") as Field).decoded()).toBe("World");
+    const message = await BaseMailerPreview.call("welcome", params);
+    expect((message.get("name") as Field).decoded()).toBe("World");
   });
 });
 

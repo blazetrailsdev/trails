@@ -18,6 +18,7 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/ruby-compat";
 import { InlinePreviewInterceptor } from "./inline-preview-interceptor.js";
+import { MessageDelivery } from "./message-delivery.js";
 import { ActionMailer } from "./namespaces.js";
 
 export interface PreviewsClass {
@@ -90,9 +91,11 @@ export class Preview {
     });
   }
 
-  static call(email: string, params: Record<string, unknown> = {}): Message {
+  /** @inventedArm if — PERMANENT */
+  static async call(email: string, params: Record<string, unknown> = {}): Promise<Message> {
     const preview = new this(params);
     const message = rbFSend(preview, email) as Message;
+    if (message instanceof MessageDelivery) await message.message();
     this.informPreviewInterceptors(message);
     return message;
   }
