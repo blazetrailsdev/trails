@@ -89,3 +89,22 @@ describe("Rendering#render types", () => {
     expect(typed).toBeTypeOf("function");
   });
 });
+
+describe("Rendering#render_to_string types", () => {
+  it("takes render's argument list and answers a string", () => {
+    const typed = (controller: Base): void => {
+      controller.renderToString();
+      controller.renderToString("new");
+      controller.renderToString({ action: "new", status: "unprocessable_entity" });
+      controller.renderToString({ partial: "render_types/post", locals: { post: "Hello" } });
+      // @ts-expect-error a misspelled option key
+      controller.renderToString({ acton: "new" });
+      // @ts-expect-error not a Rack status symbol
+      controller.renderToString({ action: "new", status: "unprocessable" });
+      // @ts-expect-error a registered partial's local of the wrong type
+      controller.renderToString({ partial: "render_types/post", locals: { post: 1 } });
+      expectTypeOf(controller.renderToString).returns.toEqualTypeOf<string | Promise<string>>();
+    };
+    expect(typed).toBeTypeOf("function");
+  });
+});
