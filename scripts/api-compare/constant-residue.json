@@ -1136,7 +1136,7 @@
   },
   "rackup": {
     "rows": 6,
-    "excluded": ["handler/node.ts::Node"],
+    "excluded": [],
     "unwalked": [],
     "residue": {
       "server.ts::Options": "Rackup::Server::Options",
