@@ -9,6 +9,7 @@ import {
   NotImplementedError,
   rbBlockGivenP,
   rbInspect,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import {
   HTML5,
@@ -104,6 +105,43 @@ export function assertDomEncoded(
 }
 
 export const assertSelectEncoded = assertDomEncoded;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ActionMailer?: { Base: { deliveries: MailPart[] } };
+  }
+}
+
+interface MailPart {
+  parts: MailPart[];
+  get(name: string): unknown;
+  body(): unknown;
+}
+
+export function assertDomEmail(
+  this: SelectorAssertionsHost,
+  { htmlVersion = null }: { htmlVersion?: string | null } = {},
+  block?: (selected: NodeSet | Html5DocumentFragment) => void,
+): void {
+  const deliveries = TopLevel.ActionMailer!.Base.deliveries;
+  assert(deliveries.length !== 0, "No e-mail in delivery list");
+
+  for (const delivery of deliveries) {
+    for (const part of delivery.parts.length === 0 ? [delivery] : delivery.parts) {
+      if (/^text\/html\W/.test(String(part.get("Content-Type") ?? ""))) {
+        const root = Testing.htmlDocumentFragment({ htmlVersion }).parse(String(part.body()));
+        assertDom.call(
+          this,
+          root,
+          ":root",
+          ...((block ? [rbBlock(block)] : []) as [AssertDomBlock] | []),
+        );
+      }
+    }
+  }
+}
+
+export const assertSelectEmail = assertDomEmail;
 
 /** @internal */
 export function documentRootElement(): never {

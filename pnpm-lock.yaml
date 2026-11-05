@@ -237,6 +237,9 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers

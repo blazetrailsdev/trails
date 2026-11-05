@@ -29,6 +29,8 @@ export type Assertions = ResponseAssertions &
     assertSelect: OmitThisParameter<typeof SelectorAssertions.assertSelect>;
     assertDomEncoded: OmitThisParameter<typeof SelectorAssertions.assertDomEncoded>;
     assertSelectEncoded: OmitThisParameter<typeof SelectorAssertions.assertSelectEncoded>;
+    assertDomEmail: OmitThisParameter<typeof SelectorAssertions.assertDomEmail>;
+    assertSelectEmail: OmitThisParameter<typeof SelectorAssertions.assertSelectEmail>;
     /** @internal */
     _htmlDocument?: XmlDocument | Html5Document | null;
     readonly htmlDocument: XmlDocument | Html5Document;
