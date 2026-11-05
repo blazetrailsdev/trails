@@ -76,13 +76,23 @@ a callee containing a `console` call can itself receive a garbage argument.
 The table above was re-measured with the wrappers storing values and printing
 them afterwards, so the instrumentation cannot be the cause.
 
-## Still open
+## Trigger — minimized, in `../toplevel-arg-over-int31/`
 
-The mechanism that leaves `ke` uninitialized inside this module is not
-minimized. The sibling bug in `../toplevel-call-garbage-arg/` is the same
-*class* — a top-level call whose argument arrives as unwritten memory — and is
-reduced to 13 lines, but its trigger (a `console` call in the callee) is not
-present in the polyfill's `xo`, so they are not yet proven to be one defect.
+No longer open. The mechanism is a 9-line defect with three conditions, all of
+which this module satisfies:
+
+1. the call is at **module top level** — `Ne=xo(ke)`;
+2. the argument is a **variable holding a computed value above 2^31−1** —
+   `ke = 1e8 * Re` is `8.64e15` (the constant itself reads back correctly; only
+   passing it corrupts);
+3. the **callee makes a dynamic method call** — `xo` calls `e.BigInt(t)` and
+   `e.multiply(...)` on the imported `jsbi` default.
+
+Remove any one and the value arrives intact. That is why four earlier attempts
+to reproduce this failed: every test callee used `Number.isInteger` or a bare
+`return t`, and neither emits the dynamic method call condition 3 needs —
+`Math.max`, `String`, `JSON.stringify` and `Date.now` are folded and are all
+safe in that position.
 
 ## Two unrelated defects found while probing
 

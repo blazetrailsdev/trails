@@ -2147,3 +2147,39 @@ Wall 24 was *a* cause of that `RangeError`, not the only one.
   (`actionview -> actionpack`, `trailties -> activestorage`) that make module
   resolution OOM at 40GB. It did so three times in one session. Re-cut them
   after every install; `r46-postmerge.sh` aborts if they are back.
+
+## Wall 25 — trigger minimized (compiler a1ae27ee5)
+
+The garbage epoch bound is not a Temporal, JSBI or BigInt defect. It is a
+9-line codegen bug, `upstream/toplevel-arg-over-int31/`:
+
+    const o = { m(): void {} };
+    const v = 65536 * 65536;
+    console.log(v);        // 4294967296  correct
+    console.log(probe(v)); // 0           WRONG
+    function probe(t: number): number { o.m(); return t; }
+
+Three conditions, each necessary and established by its own matrix:
+
+1. the call site is at **module top level** (inside a function it is correct);
+2. the argument is a **variable** whose value was **computed** and exceeds
+   2^31−1 — the boundary is signed-int32 (`46340*46340` passes,
+   `46341*46341` fails), the stored constant reads back correctly, and the same
+   expression passed **inline** as a literal argument is correct;
+3. the **callee's body makes a dynamic method call** — a local object's method,
+   `console.log`, or a method on an imported default. A free function call is
+   safe, and so are `Math.max`, `String`, `Number.isInteger`,
+   `JSON.stringify` and `Date.now`, which are folded and emit no dynamic call.
+
+The polyfill satisfies all three: `Ne=xo(ke)` at top level, `ke = 1e8*864e5`
+= 8.64e15, and `xo` calling `e.BigInt`/`e.multiply` on the imported jsbi.
+
+Four earlier repro attempts failed because their callees used
+`Number.isInteger` or a bare `return t` — neither emits condition 3. The
+earlier `console.log` filing was this same bug seen through one instance, and
+is superseded.
+
+Method note: the wrong value is often unwritten memory and differs per run of
+the same binary, and **adding a `console.log` to a function introduces
+condition 3**. Instrumentation must capture values and print them afterwards,
+never print from inside the wrapped callee.
