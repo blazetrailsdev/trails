@@ -125,9 +125,11 @@ Two rules bound it:
 - **Each block is awaited before the next.** Ruby's `each` is sequential, so
   the port is a `for` loop, never `Promise.all`; railties' blocks settle before
   the application's.
-- **The other block kinds stay synchronous.** `console`, `runner`, `generators`
-  and `rake_tasks` blocks have no async caller yet; widening them is its own
-  decision when one appears.
+- **`console` blocks are awaited the same way.** ActiveRecord's block
+  `require`s `console_sandbox` (`active_record/railtie.rb:63-74`), an awaited
+  `import()`, so `Engine#loadConsole` is async and `Console#start` awaits the
+  load its constructor started. `runner` and `generators` blocks have no async
+  caller yet; widening them is its own decision when one appears.
 
 `trails server` reaches the blocks through `config.ts`, as Rails reaches them
 through `config.ru` (`server_command.rb:32-41`): `Server#start` is `super()`,

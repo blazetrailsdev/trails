@@ -1,8 +1,24 @@
 import "./active-model.js";
 import "./action-controller.js";
-import { include, isPresent, onLoad, TopLevel, upcaseFirst } from "@blazetrails/activesupport";
+import {
+  type BroadcastLogger,
+  include,
+  isPresent,
+  Logger,
+  onLoad,
+  TopLevel,
+  upcaseFirst,
+} from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import { except, Process, block, rbFLoad, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  except,
+  Process,
+  block,
+  rbFLoad,
+  rbObjRespondTo,
+  STDERR,
+  STDOUT,
+} from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
@@ -165,6 +181,19 @@ export class Trailtie extends BaseTrailtie {
       await rbFLoad(
         new URL(import.meta.resolve("@blazetrails/activerecord/trailties/databases")).pathname,
       );
+    });
+
+    this.console(async (app) => {
+      if ((app as { isSandbox(): boolean }).isSandbox()) {
+        await import("@blazetrails/activerecord/trailties/console-sandbox");
+      }
+      if (!Logger.isLoggerOutputsTo(Trails.logger!, STDERR, STDOUT)) {
+        const console = new Logger(STDERR);
+        console.level = Trails.logger!.level;
+        (Trails.logger as unknown as BroadcastLogger).broadcastTo(console);
+      }
+      ActiveRecord.setVerboseQueryLogs(false);
+      ActiveRecord.Base.attributesForInspect = ":all";
     });
 
     Object.assign(this.config.actionDispatch.rescueResponses, {

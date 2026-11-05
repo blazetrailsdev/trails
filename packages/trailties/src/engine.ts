@@ -258,8 +258,8 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
-  loadConsole(app: unknown = this): this {
-    this.runConsoleBlocks(app);
+  async loadConsole(app: unknown = this): Promise<this> {
+    await this.runConsoleBlocks(app);
     return this;
   }
 

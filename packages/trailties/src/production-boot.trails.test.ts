@@ -36,6 +36,9 @@ async function workspaceModule(specifier: string): Promise<string | null> {
   return getPath().join(root, built.replace(/^(\.\/)?dist\//, "src/").replace(/\.js$/, ".ts"));
 }
 
+const fromRoot = (file: string): string =>
+  file.startsWith(`${packagesRoot}/`) ? file.slice(packagesRoot.length + 1) : file;
+
 async function reachableFrom(
   entries: string[],
 ): Promise<{ files: Set<string>; bare: Set<string>; chain: (to: string) => string }> {
@@ -44,9 +47,7 @@ async function reachableFrom(
   const parent = new Map<string, string>();
   const queue = [...entries];
   const known = (to: string, from: string): boolean =>
-    KNOWN_EDGES.has(
-      `${getPath().relative(packagesRoot, from)} -> ${getPath().isAbsolute(to) ? getPath().relative(packagesRoot, to) : to}`,
-    );
+    KNOWN_EDGES.has(`${fromRoot(from)} -> ${fromRoot(to)}`);
   const visit = (to: string, from: string): void => {
     if (known(to, from)) return;
     if (!parent.has(to)) parent.set(to, from);
@@ -77,9 +78,7 @@ async function reachableFrom(
   const chain = (to: string): string => {
     const links = [to];
     while (parent.has(links[0])) links.unshift(parent.get(links[0])!);
-    return links
-      .map((link) => (getPath().isAbsolute(link) ? getPath().relative(packagesRoot, link) : link))
-      .join("\n -> ");
+    return links.map(fromRoot).join("\n -> ");
   };
   return { files, bare, chain };
 }
