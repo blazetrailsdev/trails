@@ -465,6 +465,7 @@ const traps = new Map<TrapSignal, { command: TrapCommand; off: (() => void) | nu
  * `EXIT` exits. A signal never trapped answers `"DEFAULT"`.
  *
  * @noRailsEquivalent CONVERGEABLE trap-accepts-every-mri-signal
+ * @noRailsEquivalent CONVERGEABLE trap-signm-is-its-own-function
  */
 export function trap(signal: number | string, command: TrapCommand): TrapCommand {
   let sig: TrapSignal;
