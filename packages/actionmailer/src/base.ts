@@ -62,6 +62,7 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
+  declare static helper: (...args: unknown[]) => void;
   declare static prependViewPath: OmitThisParameter<
     typeof ActionView.ViewPaths.ClassMethods.prependViewPath
   >;
@@ -594,7 +595,7 @@ include(Base, AbstractController.Caching);
 
 include(Base, ActionView.Layouts);
 
-(Base as unknown as { helper(mod: unknown): void }).helper(MailHelper);
+Base.helper(MailHelper);
 
 classAttribute.call(Base, "defaultParams", {
   default: Object.freeze({
