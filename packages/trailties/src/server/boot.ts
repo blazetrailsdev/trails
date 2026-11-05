@@ -47,7 +47,8 @@ export async function serve(options: ServeOptions = {}): Promise<HttpServer> {
   const app = await Trails.initialize();
   const host = serverHost(options);
   const port = serverPort(options);
-  const server = await Handler.Node.run((env: RackEnv) => app.call(env), {
+  const node = (await Handler.get("node")) as typeof Handler.Node;
+  const server = await node.run((env: RackEnv) => app.call(env), {
     Port: port,
     Host: host,
   });

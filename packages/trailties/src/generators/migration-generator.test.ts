@@ -8,7 +8,7 @@ import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { copyRoutes } from "./generators-test-helper.js";
+import { copyRoutes, withDatabaseConfiguration } from "./generators-test-helper.js";
 import { TestCase } from "./test-case.js";
 
 class MigrationGeneratorApp extends Application {}
@@ -331,22 +331,26 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("database puts migrations in configured folder", async () => {
-    await t.runGenerator(["create_books", "--database=secondary"]);
-    await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
-      t.assertMethod("change", content, (change) => {
-        assertMatch(/createTable\("books"/, change);
-      }),
-    );
+  it("database puts migrations in configured folder", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["create_books", "--database=secondary"]);
+      await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
+        t.assertMethod("change", content, (change) => {
+          assertMatch(/createTable\("books"/, change);
+        }),
+      );
+    });
   });
 
-  it.skip("database puts migrations in configured folder with aliases", async () => {
-    await t.runGenerator(["create_books", "--db=secondary"]);
-    await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
-      t.assertMethod("change", content, (change) => {
-        assertMatch(/createTable\("books"/, change);
-      }),
-    );
+  it("database puts migrations in configured folder with aliases", async () => {
+    await withDatabaseConfiguration(undefined, async () => {
+      await t.runGenerator(["create_books", "--db=secondary"]);
+      await t.assertMigration("db/secondary_migrate/create_books.ts", (content) =>
+        t.assertMethod("change", content, (change) => {
+          assertMatch(/createTable\("books"/, change);
+        }),
+      );
+    });
   });
 
   it("should create empty migrations if name not start with add or remove or create", async () => {
@@ -360,7 +364,7 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("properly identifies usage file", async () => {
+  it("properly identifies usage file", async () => {
     expect(
       await (t.generatorClass as unknown as { usagePath(): unknown }).usagePath(),
     ).toBeTruthy();
@@ -430,10 +434,17 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("add migration to configured path", async () => {
-    const migration = "migration_in_custom_path";
-    await t.runGenerator([migration]);
-    await t.assertMigration(`db2/migrate/${migration}.ts`, /.*/);
+  it("add migration to configured path", async () => {
+    const oldPaths = Trails.application!.config.paths().get("db/migrate");
+    Trails.application!.config.paths().add("db/migrate", { with: "db2/migrate" });
+
+    try {
+      const migration = "migration_in_custom_path";
+      await t.runGenerator([migration]);
+      await t.assertMigration(`db2/migrate/${migration}.ts`, /.*/);
+    } finally {
+      Trails.application!.config.paths()._entries.set("db/migrate", oldPaths!);
+    }
   });
 
   it("add migration ignores virtual attributes", async () => {

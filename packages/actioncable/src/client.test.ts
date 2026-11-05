@@ -16,6 +16,8 @@ import { ActionCable } from "./namespaces.js";
 import type { Base as ServerBase } from "./server/base.js";
 import { TestCase } from "./test-helpers/test-helper.js";
 
+await Handler.get("node");
+
 const WAIT_WHEN_EXPECTING_EVENT = 2;
 const WAIT_WHEN_NOT_EXPECTING_EVENT = 0.5;
 

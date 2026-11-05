@@ -5,6 +5,8 @@ import { getHttpAsync } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
 import { Base } from "@blazetrails/activerecord";
 
+await Handler.get("node");
+
 function connectionLease(): object {
   return (Base.connectionPool() as unknown as { connectionLease(): object }).connectionLease();
 }

@@ -9,6 +9,8 @@ import { ActionCable } from "./namespaces.js";
 import type { Base as ServerBase } from "./server/base.js";
 import "./test-helpers/test-helper.js";
 
+await Handler.get("node");
+
 type Message = Record<string, unknown>;
 
 const PublishedClientTest = { name: "PublishedClientTest" };

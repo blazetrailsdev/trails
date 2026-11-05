@@ -10,6 +10,8 @@ import { Builder } from "@blazetrails/rack";
 import { Trails, _resetTrailsEnv } from "../trails.js";
 import { Application } from "../application.js";
 
+await Handler.get("node");
+
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
 vi.mock("../command/actions.js", async (importOriginal) => ({

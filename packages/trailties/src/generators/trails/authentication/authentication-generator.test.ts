@@ -1,16 +1,23 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
-import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 import { Application } from "../../../application.js";
 import { Trails } from "../../../trails.js";
 import "../../../trailties/active-record.js";
+import "../../../test-unit/trailtie.js";
 
 class AuthenticationGeneratorApp extends Application {}
+
+let AuthenticationGenerator: typeof import("./authentication-generator.js").AuthenticationGenerator;
+
+beforeAll(async () => {
+  await AuthenticationGeneratorApp.instance().loadGenerators();
+  ({ AuthenticationGenerator } = await import("./authentication-generator.js"));
+});
 
 beforeEach(() => {
   Trails.application = AuthenticationGeneratorApp.instance();
@@ -92,6 +99,11 @@ describe("AuthenticationGenerator", () => {
       combined.push(`=== ${rel} ===\n${src}`);
     }
     expect(combined.join("\n")).toMatchSnapshot();
+    expect(exists("test/models/user.test.ts")).toBe(true);
+    expect(exists("test/fixtures/users.yml")).toBe(true);
+    expect(read("test/fixtures/users.yml")).toMatch(
+      /<% const passwordDigest = BCrypt\.Password\.create\("password"\) %>[\s\S]*password_digest: <%= passwordDigest %>/,
+    );
   });
 
   it("--api still templates the mailer, its views and its preview", async () => {
@@ -100,6 +112,8 @@ describe("AuthenticationGenerator", () => {
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     for (const rel of TEMPLATE_ENGINE_VIEWS) expect(exists(rel), rel).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(true);
+    expect(exists("test/models/user.test.ts")).toBe(true);
+    expect(exists("test/fixtures/users.yml")).toBe(true);
   });
 
   it("connection_class_skipped_without_action_cable", async () => {
