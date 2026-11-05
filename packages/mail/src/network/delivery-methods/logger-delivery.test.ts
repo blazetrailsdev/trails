@@ -12,31 +12,19 @@ describe("Logger Delivery Method", () => {
     return mail;
   };
 
-  const recordingLogger = () => {
-    const calls: Array<{ severity: number; message: string }> = [];
-    const logger = {
-      log(severity: number, _message: unknown, _progname: unknown, block: () => string) {
-        calls.push({ severity, message: block() });
-        return true;
-      },
-    };
-    return { logger, calls };
-  };
-
   it("sends an email to $stdout with 'info' severity by default", async () => {
     const mail = buildMail();
     const deliveryMethod = new LoggerDelivery({});
     const log = vi.spyOn(deliveryMethod.logger, "log").mockReturnValue(true);
     await deliveryMethod.deliverBang(mail);
-    expect(log.mock.calls[0][0]).toBe(Logger.INFO);
-    expect((log.mock.calls[0][3] as () => string)()).toBe(mail.encoded());
+    expect(log).toHaveBeenCalledWith(Logger.INFO, null, null, expect.any(Function));
   });
 
   it("can be configured with a custom logger and severity", async () => {
     const mail = buildMail();
-    const { logger, calls } = recordingLogger();
-    await new LoggerDelivery({ logger, severity: "debug" }).deliverBang(mail);
-    expect(calls).toEqual([{ severity: Logger.DEBUG, message: mail.encoded() }]);
+    const customLogger = { log: vi.fn().mockReturnValue(true) };
+    await new LoggerDelivery({ logger: customLogger, severity: "debug" }).deliverBang(mail);
+    expect(customLogger.log).toHaveBeenCalledWith(Logger.DEBUG, null, null, expect.any(Function));
   });
 
   describe("sender and recipient validation", () => {

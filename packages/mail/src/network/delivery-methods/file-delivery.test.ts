@@ -52,7 +52,7 @@ describe("SMTP Delivery Method", () => {
         '"Long, stupid email address" <mikel@test.lindsaar.net>',
         "invalid RFC2822",
       );
-      expect(await File.isExistAsync(File.join(location, "mikel@test.lindsaar.net"))).toBe(true);
+      expect(await File.isExistAsync(File.join(location, "mikel@test.lindsaar.net"))).toBeTruthy();
     });
 
     it("should use the base name of the file name to prevent file system traversal", async () => {
@@ -63,7 +63,7 @@ describe("SMTP Delivery Method", () => {
         "../../../../../../../../../../../tmp/pwn",
         "evil hacker",
       );
-      expect(await File.isExistAsync(File.join(location, "pwn"))).toBe(true);
+      expect(await File.isExistAsync(File.join(location, "pwn"))).toBeTruthy();
     });
 
     it("should not raise errors if no sender is defined", async () => {

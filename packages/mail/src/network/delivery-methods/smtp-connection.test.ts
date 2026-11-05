@@ -65,7 +65,7 @@ describe("SMTP Delivery Method", () => {
         buildMail(),
       ),
     );
-    expect(String((response as { status: string }).status)).toBe("250");
+    expect((response as { message: string }).message.slice(4).trim()).toBe("OK");
   });
 
   it("should not raise errors if no sender is defined", async () => {

@@ -20,7 +20,7 @@ export async function mockSmtp(): Promise<number> {
           session.envelope.mailFrom === false ? "<>" : session.envelope.mailFrom.address,
           session.envelope.rcptTo.map((r) => r.address),
         ]);
-        callback();
+        callback(null, "OK");
       });
     },
   });

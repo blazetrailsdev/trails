@@ -56,6 +56,6 @@ describe("Mail::TestMailer", () => {
   });
 
   it("should save settings passed to initialize", () => {
-    expect(new TestMailer({ setting: true }).settings).toMatchObject({ setting: true });
+    expect(new TestMailer({ setting: true }).settings).toHaveProperty("setting", true);
   });
 });
