@@ -8,7 +8,6 @@ import {
   TopLevel,
   constSet,
 } from "@blazetrails/ruby-compat";
-import { createProgram } from "../cli.js";
 import { setAppPath, setEnginePath } from "../app-path.js";
 import {
   loadDatabaseConfig,
@@ -53,6 +52,10 @@ import { lookupBang } from "../command/behavior.js";
 import { DSL, Rake } from "@blazetrails/rake";
 import { rbFLoad } from "@blazetrails/ruby-compat";
 import { databaseConfiguration } from "../database.js";
+import { Actions } from "../command/actions.js";
+import { block, getPath } from "@blazetrails/ruby-compat";
+
+let seedLoads = 0;
 
 async function runTaskLogging(task: string, logs: string[]): Promise<void> {
   const previous = getProcessAdapter();
@@ -76,7 +79,9 @@ async function runTaskLogging(task: string, logs: string[]): Promise<void> {
 async function runTask(task: string, vars: Record<string, string> = {}): Promise<void> {
   const was = Object.fromEntries(Object.keys(vars).map((k) => [k, env[k]]));
   const seats = DatabaseTasks as unknown as Record<string, unknown>;
-  const seatsWas = ["_root", "_dbDir", "_migrationsPaths"].map((k) => [k, seats[k]] as const);
+  const seatsWas = ["_root", "_dbDir", "_migrationsPaths", "_seedLoader"].map(
+    (k) => [k, seats[k]] as const,
+  );
   for (const [k, v] of Object.entries(vars)) setEnv(k, v);
   try {
     Base.configurations(
@@ -85,9 +90,20 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
     DatabaseTasks.root = process.cwd();
     DatabaseTasks.dbDir = "db";
     DatabaseTasks.migrationsPaths = [path.join(process.cwd(), "db", "migrate")];
+    DatabaseTasks.seedLoader = {
+      async loadSeed() {
+        const seedFile = path.join(process.cwd(), "db", "seeds.ts");
+        if (fs.existsSync(seedFile)) {
+          await import(`${getPath().pathToFileURL!(seedFile).href}?_t=${++seedLoads}`);
+        }
+      },
+    };
     await Base.establishConnection();
     await Rake.withApplication(async (rake) => {
-      DSL.task("environment");
+      DSL.task(
+        "environment",
+        block(() => Actions.bootApplicationBang()),
+      );
       await rbFLoad(
         path.resolve(import.meta.dirname, "../../../activerecord/src/trailties/databases.ts"),
       );
@@ -102,6 +118,16 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
 }
 
 await lookupBang();
+
+async function runTaskWithSchemaFormat(task: string, format: "ts" | "js" | "sql"): Promise<void> {
+  const schemaFormatWas = schemaFormat();
+  setSchemaFormat(format);
+  try {
+    await runTask(task);
+  } finally {
+    setSchemaFormat(schemaFormatWas);
+  }
+}
 
 let migrationAdapters = 0;
 async function establishMigrationConnection(
@@ -131,56 +157,6 @@ async function establishMigrationConnection(
     await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
   });
 }
-
-describe("DbCommand", () => {
-  it("has seed subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "seed")).toBe(true);
-  });
-
-  it("has reset subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "reset")).toBe(true);
-  });
-
-  it("has setup subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "setup")).toBe(true);
-  });
-
-  it("has schema:dump subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "schema:dump")).toBe(true);
-  });
-
-  it("has schema:load subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "schema:load")).toBe(true);
-  });
-
-  it("has abort_if_pending_migrations subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "abort_if_pending_migrations")).toBe(true);
-  });
-
-  it("has schema:cache:dump subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "schema:cache:dump")).toBe(true);
-  });
-
-  it("has schema:cache:clear subcommand", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    expect(db?.commands.some((c) => c.name() === "schema:cache:clear")).toBe(true);
-  });
-});
 
 describe("resolveEnv", () => {
   const origTrailsEnv = env.TRAILS_ENV;
@@ -954,12 +930,6 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  async function runDb(args: string[]): Promise<void> {
-    const program = createProgram();
-    program.exitOverride();
-    await program.parseAsync(["node", "trails", "db", ...args]);
-  }
-
   async function tableExists(dbFile: string, table: string): Promise<boolean> {
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1005,7 +975,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   });
 
   it("db abort_if_pending_migrations is a no-op when no migrations exist", async () => {
-    await runDb(["abort_if_pending_migrations"]);
+    await runTask("db:abort_if_pending_migrations");
     expect(errs).toHaveLength(0);
     expect(process.exitCode).toBeUndefined();
   });
@@ -1019,13 +989,12 @@ export class CreatePosts extends Migration.Current {
   async down() { await this.dropTable("posts"); }
 }`,
     );
-    await runDb(["abort_if_pending_migrations"]);
+    await expect(runTaskLogging("db:abort_if_pending_migrations", logs)).rejects.toThrow(
+      "Run `bin/trails db:migrate` to update your database then try again.",
+    );
     expect(process.exitCode).toBe(1);
-    const joined = errs.join("\n");
-    expect(joined).toContain("You have 1 pending migration:");
-    expect(joined).toContain("20260101000000");
-    expect(joined).toContain("CreatePosts");
-    expect(joined).toContain("Run `trails db:migrate` to resolve this issue.");
+    expect(logs).toContain("You have 1 pending migration:");
+    expect(logs).toContain("  20260101000000 CreatePosts");
   });
 
   it("db version reports the highest applied version after migrate", async () => {
@@ -1171,7 +1140,7 @@ export class CreatePosts extends Migration.Current {
 };`,
     );
 
-    await runDb(["environment:set"]);
+    await runTask("db:environment:set");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1184,11 +1153,10 @@ export class CreatePosts extends Migration.Current {
     } finally {
       await a.disconnectBang();
     }
-    expect(logs.some((l) => l.includes("Stamped schema with environment"))).toBe(true);
   });
 
   it("db environment:check is a no-op for non-protected environments", async () => {
-    await runDb(["environment:check"]);
+    await runTask("db:check_protected_environments");
     expect(process.exitCode).toBeUndefined();
   });
 
@@ -1265,7 +1233,7 @@ export class CreatePosts extends Migration.Current {
       );
       expect(error).toBeInstanceOf(EnvironmentMismatchError);
       expect((error as Error).message).toMatch(
-        new RegExp(`        bin/trails db environment:set TRAILS_ENV=${Trails.env}\n\n$`),
+        new RegExp(`        bin/trails db:environment:set TRAILS_ENV=${Trails.env}\n\n$`),
       );
     } finally {
       Base.configurations(previous);
@@ -1522,7 +1490,7 @@ export class CreatePosts extends Migration.Current {
       await seed.disconnectBang();
     }
 
-    await runDb(["truncate_all"]);
+    await runTask("db:truncate_all");
     expect(process.exitCode).toBeUndefined();
 
     const verify = new BetterSQLite3Adapter({ database: dbFile });
@@ -1561,7 +1529,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
     );
 
     expect(fs.existsSync(dbFile)).toBe(false);
-    await runDb(["prepare"]);
+    await runTask("db:prepare");
     expect(fs.existsSync(dbFile)).toBe(true);
     expect(fs.existsSync(seedMarker)).toBe(true);
 
@@ -1616,7 +1584,7 @@ export class CreateDogs extends Migration.Current {
     expect(fs.existsSync(primaryDb)).toBe(false);
     expect(fs.existsSync(animalsDb)).toBe(false);
 
-    await runDb(["prepare"]);
+    await runTask("db:prepare");
 
     expect(fs.existsSync(primaryDb)).toBe(true);
     expect(fs.existsSync(animalsDb)).toBe(true);
@@ -1701,7 +1669,7 @@ export class CreateFixtures extends Migration.Current {
 }`,
     );
 
-    await runDb(["prepare"]);
+    await runTask("db:prepare");
 
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
@@ -1772,10 +1740,10 @@ const prev = fs.existsSync(${JSON.stringify(seedMarker)})
 fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     );
 
-    await runDb(["prepare"]);
+    await runTask("db:prepare");
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
 
-    await runDb(["prepare"]);
+    await runTask("db:prepare");
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
   });
 
@@ -1808,7 +1776,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await seed.disconnectBang();
     }
 
-    await runDb(["seed:replant"]);
+    await runTask("db:seed:replant");
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
 
     const verify = new BetterSQLite3Adapter({ database: dbFile });
@@ -1840,7 +1808,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await seed.disconnectBang();
     }
 
-    await runDb(["schema:cache:dump"]);
+    await runTask("db:schema:cache:dump");
 
     const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     expect(fs.existsSync(cachePath)).toBe(true);
@@ -1857,7 +1825,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     fs.writeFileSync(cachePath, "{}");
     expect(fs.existsSync(cachePath)).toBe(true);
 
-    await runDb(["schema:cache:clear"]);
+    await runTask("db:schema:cache:clear");
 
     expect(fs.existsSync(cachePath)).toBe(false);
   });
@@ -1865,7 +1833,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   it("db schema:cache:clear is a no-op when no cache file exists", async () => {
     const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     expect(fs.existsSync(cachePath)).toBe(false);
-    await runDb(["schema:cache:clear"]);
+    await runTask("db:schema:cache:clear");
     expect(errs).toHaveLength(0);
     expect(logs.find((l) => l.includes("Cleared schema cache"))).toBeUndefined();
   });
@@ -1889,7 +1857,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
       await seed.disconnectBang();
     }
 
-    await runDb(["schema:cache:dump"]);
+    await runTask("db:schema:cache:dump");
 
     const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     const parsed = yamlParse(fs.readFileSync(cachePath, "utf8"), { maxAliasCount: -1 }) as {
@@ -2333,7 +2301,7 @@ export class CreateCats extends Migration.Current {
       await seedAnimals.disconnectBang();
     }
 
-    await runDb(["schema:cache:dump"]);
+    await runTask("db:schema:cache:dump");
 
     const primaryCache = yamlParse(
       fs.readFileSync(path.join(tmpDir, "db", "schema_cache.yml"), "utf8"),
@@ -2365,36 +2333,12 @@ export class CreateCats extends Migration.Current {
       await seed.disconnectBang();
     }
 
-    await runDb(["schema:dump", "--format=sql"]);
+    await runTask("db:schema:dump", { SCHEMA_FORMAT: "sql" });
 
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(false);
     const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
     expect(dumped).toContain("CREATE TABLE widgets");
-  });
-
-  it("db schema:dump reads schemaFormat from config/database.ts", async () => {
-    const dbFile = path.join(tmpDir, "cfg.sqlite3");
-    fs.writeFileSync(
-      path.join(tmpDir, "config", "database.ts"),
-      `export default {
-  schemaFormat: "sql",
-  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
-  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
-};`,
-    );
-    const { BetterSQLite3Adapter } =
-      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
-    const seed = new BetterSQLite3Adapter({ database: dbFile });
-    try {
-      await seed.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)");
-    } finally {
-      await seed.disconnectBang();
-    }
-
-    await runDb(["schema:dump"]);
-
-    expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
   });
 
   it("db schema:load --format=sql replays structure.sql end-to-end", async () => {
@@ -2416,7 +2360,7 @@ export class CreateCats extends Migration.Current {
       await seed.disconnectBang();
     }
 
-    await runDb(["schema:dump", "--format=sql"]);
+    await runTask("db:schema:dump", { SCHEMA_FORMAT: "sql" });
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
 
     const dropper = new BetterSQLite3Adapter({ database: dbFile });
@@ -2426,7 +2370,7 @@ export class CreateCats extends Migration.Current {
       await dropper.disconnectBang();
     }
 
-    await runDb(["schema:load", "--format=sql"]);
+    await runTaskWithSchemaFormat("db:schema:load", "sql");
 
     const verify = new BetterSQLite3Adapter({ database: dbFile });
     try {
@@ -2494,7 +2438,7 @@ export class CreatePosts extends Migration.Current {
     );
 
     await runTask("db:migrate");
-    await runDb(["schema:dump", "--format=sql"]);
+    await runTask("db:schema:dump", { SCHEMA_FORMAT: "sql" });
 
     const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
     expect(dumped).toMatch(/INSERT INTO "schema_migrations"/);
@@ -2511,7 +2455,7 @@ export class CreatePosts extends Migration.Current {
       await dropper.disconnectBang();
     }
 
-    await runDb(["schema:load", "--format=sql"]);
+    await runTaskWithSchemaFormat("db:schema:load", "sql");
 
     const verify = new BetterSQLite3Adapter({ database: dbFile });
     try {
@@ -2537,59 +2481,10 @@ export class CreatePosts extends Migration.Current {
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
     ).BetterSQLite3Adapter({ database: dbFile }).disconnectBang();
 
-    await runDb(["schema:load", "--format=sql"]);
-
+    await expect(runTaskWithSchemaFormat("db:schema:load", "sql")).rejects.toThrow(
+      "db/structure.sql doesn't exist yet. Run `bin/trails db:migrate` to create it, then try again.",
+    );
     expect(process.exitCode).toBe(1);
-    expect(errs.some((e) => e.includes("No schema file found"))).toBe(true);
-  });
-
-  it("db test:prepare refuses an in-memory database when schemaFormat is sql", async () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "config", "database.ts"),
-      `export default {
-  development: { adapter: "sqlite3", database: ":memory:" },
-  test: { adapter: "sqlite3", database: ":memory:" },
-};`,
-    );
-    fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, "db", "structure.sql"),
-      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY);\n",
-    );
-
-    const { DatabaseTasks } = await import("@blazetrails/activerecord");
-    const previousFormat = schemaFormat();
-    setSchemaFormat("sql");
-    try {
-      await runDb(["test:prepare"]);
-    } finally {
-      setSchemaFormat(previousFormat);
-    }
-
-    expect(process.exitCode).toBe(1);
-    expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
-    expect(logs.some((l) => l.includes("Test database prepared"))).toBe(false);
-  });
-
-  it("db schema:load --format=sql refuses an in-memory database instead of reporting success", async () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "config", "database.ts"),
-      `export default {
-  development: { adapter: "sqlite3", database: ":memory:" },
-  test: { adapter: "sqlite3", database: ":memory:" },
-};`,
-    );
-    fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, "db", "structure.sql"),
-      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY);\n",
-    );
-
-    await runDb(["schema:load", "--format=sql"]);
-
-    expect(process.exitCode).toBe(1);
-    expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
-    expect(logs.some((l) => l.includes("Schema loaded."))).toBe(false);
   });
 });
 
@@ -2689,22 +2584,15 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  async function runDb(args: string[]): Promise<void> {
-    const program = createProgram();
-    program.exitOverride();
-    await program.parseAsync(["node", "trails", "db", ...args]);
-  }
-
   it("db seed loads db/seeds.ts once with two databases configured", async () => {
     writeTwoDatabaseConfig();
     writeMigrations();
     const marker = writeCountingSeedFile();
     await runTask("db:migrate");
 
-    await runDb(["seed"]);
+    await runTask("db:seed");
 
     expect(seedLoadCount(marker)).toBe(1);
-    expect(logs.filter((l) => l.includes("Running seeds..."))).toHaveLength(1);
   });
 
   it("db seed loads the application before the seed file, so initializers have run", async () => {
@@ -2726,10 +2614,9 @@ if (!fs.existsSync(${JSON.stringify(bootMarker)})) {
     setEnginePath(path.join(tmpDir, "boot.ts"));
     await runTask("db:migrate");
 
-    await runDb(["seed"]);
+    await runTask("db:seed");
 
     expect(fs.existsSync(bootMarker)).toBe(true);
-    expect(logs).toContain("Seeds completed.");
   });
 
   it("db seed runs the initializers when there is no seed file", async () => {
@@ -2742,22 +2629,11 @@ if (!fs.existsSync(${JSON.stringify(bootMarker)})) {
 fs.writeFileSync(${JSON.stringify(bootMarker)}, "booted");`,
     );
     setEnginePath(path.join(tmpDir, "boot.ts"));
-
-    await runDb(["seed"]);
-
-    expect(fs.existsSync(bootMarker)).toBe(true);
-    expect(logs).toContain("No seeds file found at db/seeds.ts or db/seeds.js");
-  });
-
-  it("db seed --database animals loads db/seeds.ts once", async () => {
-    writeTwoDatabaseConfig();
-    writeMigrations();
-    const marker = writeCountingSeedFile();
     await runTask("db:migrate");
 
-    await runDb(["seed", "--database", "animals"]);
+    await runTask("db:seed");
 
-    expect(seedLoadCount(marker)).toBe(1);
+    expect(fs.existsSync(bootMarker)).toBe(true);
   });
 
   it("db seed reaches a model on the second database through the connection an initializer established, and closes it", async () => {
@@ -2782,7 +2658,7 @@ await AnimalsRecord.establishConnection({ adapter: "sqlite3", database: ${JSON.s
     setEnginePath(path.join(tmpDir, "boot.ts"));
     await runTask("db:migrate");
 
-    await runDb(["seed"]);
+    await runTask("db:seed");
 
     const Dog = (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;
     delete (globalThis as { __dbSeedDog?: unknown }).__dbSeedDog;

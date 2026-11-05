@@ -94,7 +94,15 @@ export class DatabaseTasks {
     this._root = value;
   }
 
-  static seedLoader: { loadSeed(): void | Promise<void> } | null = null;
+  private static _seedLoader: { loadSeed(): void | Promise<void> } | null = null;
+
+  static get seedLoader(): { loadSeed(): void | Promise<void> } | null {
+    return (this._seedLoader ??= TopLevel.Trails!.application ?? null);
+  }
+
+  static set seedLoader(value: { loadSeed(): void | Promise<void> } | null) {
+    this._seedLoader = value;
+  }
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
 
@@ -668,7 +676,7 @@ export class DatabaseTasks {
       }
     }
 
-    if (seed && this.seedLoader) await this.loadSeed();
+    if (seed) await this.loadSeed();
   }
 
   static async dbConfigsWithVersions(

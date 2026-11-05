@@ -10,7 +10,7 @@ console.log("== Installing dependencies ==");
 system("<%= this.packageManager %> install");
 
 console.log("\n== Preparing database ==");
-system("bin/trails db setup");
+system("bin/trails db:prepare");
 
 console.log("\n== Removing old logs and tempfiles ==");
 for (const dir of ["log", "tmp"]) {

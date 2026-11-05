@@ -33,17 +33,9 @@ describe("CLI", () => {
     const program = createProgram();
     const names = program.commands.map((c) => c.name());
     expect(names).toContain("new");
-    expect(names).toContain("db");
   });
 
   it("server command has alias s", () => {
     expect(aliases.s).toBe("server");
-  });
-
-  it("db command has subcommands", () => {
-    const program = createProgram();
-    const db = program.commands.find((c) => c.name() === "db");
-    const subNames = db?.commands.map((c) => c.name());
-    expect(subNames).toContain("seed");
   });
 });

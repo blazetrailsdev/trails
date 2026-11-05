@@ -134,7 +134,6 @@ export class Metal extends AbstractControllerBase {
 
   constructor() {
     super();
-    fireInherited(new.target, Metal);
   }
 
   get params(): Parameters | Record<string, unknown> {
@@ -327,27 +326,5 @@ export class Metal extends AbstractControllerBase {
 
   toA(): RackResponse {
     return this.response.toA() as RackResponse;
-  }
-}
-
-const fired = new WeakSet<object>();
-
-/** @noRailsEquivalent CONVERGEABLE layouts-inherited-writes-layout-method-at-first-construction */
-function fireInherited(klass: object, metal: object): void {
-  const chain: object[] = [];
-  for (
-    let k: object | null = klass;
-    k && k !== metal && Object.getPrototypeOf(k) !== metal;
-    k = Object.getPrototypeOf(k) as object | null
-  ) {
-    chain.unshift(k);
-  }
-
-  for (const k of chain) {
-    if (fired.has(k)) continue;
-    fired.add(k);
-    if (rbObjRespondTo(k, "_writeLayoutMethod")) {
-      (k as { _writeLayoutMethod(): void })._writeLayoutMethod();
-    }
   }
 }

@@ -106,6 +106,7 @@ declare module "@blazetrails/ruby-compat" {
         envConfig(): Record<string, unknown>;
         executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
         configFor(name: string): Promise<unknown>;
+        loadSeed(): Promise<void>;
         migrationRailties(): Array<{
           railtieName: string;
           root(): string | null;

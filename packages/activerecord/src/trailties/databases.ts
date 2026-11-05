@@ -4,6 +4,8 @@ import {
   File,
   RuntimeError,
   STDOUT,
+  abort,
+  sprintf,
   TopLevel,
   block,
   env as ENV,
@@ -11,7 +13,8 @@ import {
   rbStrToI,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { Migration, Migrator, type MigrationProxy } from "../migration.js";
+import { EnvironmentStorageError, Migration, Migrator, type MigrationProxy } from "../migration.js";
+import { Schema } from "../schema.js";
 import { DatabaseTasks, type SchemaFormat } from "../tasks/database-tasks.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import * as ActiveRecord from "../active-record.js";
@@ -19,6 +22,17 @@ import * as ActiveRecord from "../active-record.js";
 const databases = DatabaseTasks.setupInitialDatabaseYaml();
 
 DSL.namespace("db", (dbNamespace) => {
+  DSL.desc("Set the environment value for the database");
+  DSL.task(
+    { "environment:set": "load_config" },
+    block(async () => {
+      const pool = DatabaseTasks.migrationConnectionPool();
+      if (!pool.internalMetadata.enabled) throw new EnvironmentStorageError();
+
+      await pool.internalMetadata.createTableAndSetFlags(pool.migrationContext.currentEnvironment);
+    }),
+  );
+
   DSL.task(
     { check_protected_environments: "load_config" },
     block(async () => {
@@ -107,6 +121,29 @@ DSL.namespace("db", (dbNamespace) => {
     { "drop:_unsafe": ["load_config"] },
     block(async () => {
       await DatabaseTasks.dropCurrent();
+    }),
+  );
+
+  DSL.namespace("purge", () => {
+    DSL.task(
+      { all: ["load_config", "check_protected_environments"] },
+      block(async () => {
+        await DatabaseTasks.purgeAll();
+      }),
+    );
+  });
+
+  DSL.task(
+    { truncate_all: ["load_config", "check_protected_environments"] },
+    block(async () => {
+      await DatabaseTasks.truncateAll();
+    }),
+  );
+
+  DSL.task(
+    { purge: ["load_config", "check_protected_environments"] },
+    block(async () => {
+      await DatabaseTasks.purgeCurrent();
     }),
   );
 
@@ -377,6 +414,22 @@ DSL.namespace("db", (dbNamespace) => {
     }),
   );
 
+  DSL.namespace("reset", () => {
+    DSL.task({ all: ["db:drop", "db:setup"] });
+
+    DatabaseTasks.forEach(databases, (name) => {
+      DSL.desc(
+        `Drop and recreate the ${name} database from its schema for the current environment and load the seeds.`,
+      );
+      DSL.task({ [name]: [`db:drop:${name}`, `db:setup:${name}`] });
+    });
+  });
+
+  DSL.desc(
+    "Drop and recreate all databases from their schema for the current environment and load the seeds.",
+  );
+  DSL.task({ reset: ["db:drop", "db:setup"] });
+
   DSL.desc("Retrieve the current schema version number");
   DSL.task(
     { version: "load_config" },
@@ -410,6 +463,103 @@ DSL.namespace("db", (dbNamespace) => {
     });
   });
 
+  DSL.task(
+    { abort_if_pending_migrations: "load_config" },
+    block(async () => {
+      let pendingMigrations: MigrationProxy[] | MigrationProxy[][] = [];
+
+      await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
+        (pendingMigrations as MigrationProxy[][]).push(
+          await pool.migrationContext.open().pendingMigrations(),
+        );
+      });
+
+      pendingMigrations = pendingMigrations.flat();
+
+      if (pendingMigrations.length > 0) {
+        STDOUT.puts(
+          `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}`,
+        );
+
+        for (const pendingMigration of pendingMigrations) {
+          STDOUT.puts(sprintf("  %4d %s", pendingMigration.version, pendingMigration.name));
+        }
+
+        abort("Run `bin/trails db:migrate` to update your database then try again.");
+      }
+    }),
+  );
+
+  DSL.namespace("abort_if_pending_migrations", () => {
+    DatabaseTasks.forEach(databases, (name) => {
+      DSL.task(
+        { [name]: "load_config" },
+        block(async () => {
+          await DatabaseTasks.withTemporaryPoolForEach(
+            { env: TopLevel.Trails!.env, name },
+            async (pool) => {
+              const pendingMigrations = await pool.migrationContext.open().pendingMigrations();
+
+              if (pendingMigrations.length > 0) {
+                STDOUT.puts(
+                  `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}`,
+                );
+
+                for (const pendingMigration of pendingMigrations) {
+                  STDOUT.puts(sprintf("  %4d %s", pendingMigration.version, pendingMigration.name));
+                }
+
+                abort(
+                  `Run \`bin/trails db:migrate:${name}\` to update your database then try again.`,
+                );
+              }
+            },
+          );
+        }),
+      );
+    });
+  });
+
+  DSL.namespace("setup", () => {
+    DSL.task({ all: ["db:create", "environment", "db:schema:load", "seed"] });
+
+    DatabaseTasks.forEach(databases, (name) => {
+      DSL.desc(
+        `Create the ${name} database, load the schema, and initialize with the seed data (use db:reset:${name} to also drop the database first)`,
+      );
+      DSL.task({
+        [name]: [`db:create:${name}`, "environment", `db:schema:load:${name}`, "db:seed"],
+      });
+    });
+  });
+
+  DSL.desc(
+    "Create all databases, load all schemas, and initialize with the seed data (use db:reset to also drop all databases first)",
+  );
+  DSL.task({ setup: ["db:create", "environment", "db:schema:load", "seed"] });
+
+  DSL.desc("Run setup if database does not exist, or run migrations if it does");
+  DSL.task(
+    { prepare: "load_config" },
+    block(async () => {
+      await DatabaseTasks.prepareAll();
+    }),
+  );
+
+  DSL.desc("Load the seed data from db/seeds.rb");
+  DSL.task(
+    { seed: "load_config" },
+    block(async () => {
+      await dbNamespace.get("abort_if_pending_migrations")!.invoke();
+      await DatabaseTasks.loadSeed();
+    }),
+  );
+
+  DSL.namespace("seed", () => {
+    DSL.desc("Truncate tables of each database for current environment and load the seeds");
+    DSL.task({ replant: ["load_config", "truncate_all", "seed"] });
+  });
+
   DSL.namespace("schema", () => {
     DSL.desc(
       "Create a database schema file (either db/schema.rb or db/structure.sql, depending on `ENV['SCHEMA_FORMAT']` or `config.active_record.schema_format`)",
@@ -425,6 +575,16 @@ DSL.namespace("db", (dbNamespace) => {
         });
 
         dbNamespace.get("schema:dump")!.reenable();
+      }),
+    );
+
+    DSL.desc(
+      "Load a database schema file (either db/schema.rb or db/structure.sql, depending on `ENV['SCHEMA_FORMAT']` or `config.active_record.schema_format`) into the database",
+    );
+    DSL.task(
+      { load: ["load_config", "check_protected_environments"] },
+      block(async () => {
+        await DatabaseTasks.loadSchemaCurrent(ActiveRecord.schemaFormat(), ENV["SCHEMA"]);
       }),
     );
 
@@ -444,6 +604,124 @@ DSL.namespace("db", (dbNamespace) => {
             });
 
             dbNamespace.get(`schema:dump:${name}`)!.reenable();
+          }),
+        );
+      });
+    });
+
+    DSL.namespace("load", () => {
+      DatabaseTasks.forEach(databases, (name) => {
+        DSL.desc(
+          `Load a database schema file (either db/schema.rb or db/structure.sql, depending on \`ENV['SCHEMA_FORMAT']\` or \`config.active_record.schema_format\`) into the ${name} database`,
+        );
+        DSL.task(
+          { [name]: `db:test:purge:${name}` },
+          block(async () => {
+            await DatabaseTasks.withTemporaryPoolForEach({ name }, async (pool) => {
+              const dbConfig = pool.dbConfig;
+              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
+                ActiveRecord.schemaFormat()) as SchemaFormat;
+              await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+            });
+          }),
+        );
+      });
+    });
+
+    DSL.namespace("cache", () => {
+      DSL.desc("Create a db/schema_cache.yml file.");
+      DSL.task(
+        { dump: "load_config" },
+        block(async () => {
+          await DatabaseTasks.withTemporaryPoolForEach({}, async (pool) => {
+            const dbConfig = pool.dbConfig;
+            const filename = DatabaseTasks.cacheDumpFilename(dbConfig);
+
+            await DatabaseTasks.dumpSchemaCache(pool, filename);
+          });
+        }),
+      );
+
+      DSL.desc("Clear a db/schema_cache.yml file.");
+      DSL.task(
+        { clear: "load_config" },
+        block(() => {
+          for (const dbConfig of Base.configurations().configsFor({
+            envName: DatabaseTasks.env,
+          })) {
+            const filename = DatabaseTasks.cacheDumpFilename(dbConfig);
+            DatabaseTasks.clearSchemaCache(filename);
+          }
+        }),
+      );
+    });
+  });
+
+  DSL.namespace("test", () => {
+    DSL.task(
+      { load_schema: ["db:test:purge"] },
+      block(async () => {
+        await DatabaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
+          const dbConfig = pool.dbConfig;
+          Schema.verbose = false;
+          const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
+            ActiveRecord.schemaFormat()) as SchemaFormat;
+          await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+        });
+      }),
+    );
+
+    DSL.task(
+      { purge: ["load_config", "check_protected_environments"] },
+      block(async () => {
+        for (const dbConfig of Base.configurations().configsFor({ envName: "test" })) {
+          await DatabaseTasks.purge(dbConfig);
+        }
+      }),
+    );
+
+    DSL.task(
+      { prepare: "load_config" },
+      block(async () => {
+        if (!isBlank(Base.configurations())) {
+          await dbNamespace.get("test:load_schema")!.invoke();
+        }
+      }),
+    );
+
+    DatabaseTasks.forEach(databases, (name) => {
+      DSL.namespace("load_schema", () => {
+        DSL.task(
+          { [name]: `db:test:purge:${name}` },
+          block(async () => {
+            await DatabaseTasks.withTemporaryPoolForEach({ env: "test", name }, async (pool) => {
+              const dbConfig = pool.dbConfig;
+              Schema.verbose = false;
+              const schemaFormat = (ENV["SCHEMA_FORMAT"] ??
+                ActiveRecord.schemaFormat()) as SchemaFormat;
+              await DatabaseTasks.loadSchema(dbConfig, schemaFormat);
+            });
+          }),
+        );
+      });
+
+      DSL.namespace("purge", () => {
+        DSL.task(
+          { [name]: ["load_config", "check_protected_environments"] },
+          block(async () => {
+            await DatabaseTasks.withTemporaryPoolForEach({ env: "test", name }, async (pool) => {
+              const dbConfig = pool.dbConfig;
+              await DatabaseTasks.purge(dbConfig);
+            });
+          }),
+        );
+      });
+
+      DSL.namespace("prepare", () => {
+        DSL.task(
+          { [name]: "load_config" },
+          block(async () => {
+            await dbNamespace.get(`test:load_schema:${name}`)!.invoke();
           }),
         );
       });

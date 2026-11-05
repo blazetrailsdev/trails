@@ -78,6 +78,11 @@ export function layout(
   this._writeLayoutMethod();
 }
 
+/** @internal */
+function inherited(this: LayoutsClass, klass: LayoutsClass): void {
+  klass._writeLayoutMethod();
+}
+
 export function _writeLayoutMethod(this: LayoutsClass): void {
   const prototype = this.prototype;
   const _super: LayoutMethod = function (lookupContext, formats, keys) {
@@ -210,6 +215,16 @@ export function _defaultLayout(
   keys: readonly string[],
   requireLayout = false,
 ): LayoutValue {
+  const subclasses: LayoutsClass[] = [];
+  for (
+    let klass = this.constructor as unknown as LayoutsClass;
+    !Object.hasOwn(klass.prototype, "_layout");
+    klass = Object.getPrototypeOf(klass) as LayoutsClass
+  ) {
+    subclasses.unshift(klass);
+  }
+  for (const klass of subclasses) inherited.call(Object.getPrototypeOf(klass), klass);
+
   let value: LayoutValue;
   try {
     if (this.isActionHasLayout()) value = this._layout(lookupContext, formats, keys) as LayoutValue;

@@ -3,7 +3,7 @@
 <% if (!this.skipActiveRecord()) { -%>
 # If running the trails server then create or migrate existing database
 if [ "${@: -2:1}" == "trails" ] && [ "${@: -1:1}" == "server" ]; then
-  npx trails db prepare
+  npx trails db:prepare
 fi
 
 <% } -%>
