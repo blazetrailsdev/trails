@@ -1432,12 +1432,22 @@ describe("TimeExtCalculationsTest", () => {
         RubyTime.local(2006, 4, 3),
       );
     });
+    withEnvTz("NZ", () => {
+      expect((RubyTime.local(2006, 10, 1, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 10, 2),
+      );
+    });
   });
 
   it("next week near daylight end", () => {
     withEnvTz("America/New_York", () => {
       expect((RubyTime.local(2006, 10, 29, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
         RubyTime.local(2006, 10, 30),
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect((RubyTime.local(2006, 3, 19, 23, 1, 0) as CalculationsTime).nextWeek()).toEqual(
+        RubyTime.local(2006, 3, 20),
       );
     });
   });
