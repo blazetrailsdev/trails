@@ -2098,3 +2098,52 @@ runtimes.
 Note this is the first wall to present as an ordinary JavaScript exception with a
 named stack rather than a runtime panic or a silent stall, which makes it far
 cheaper to chase than walls 16-23 were.
+
+## Wall 24 — FIXED and verified (compiler a1ae27ee5, trails c576e7f9f2)
+
+An override of `toString` on `class X extends Array` was not dispatched;
+`Array.prototype.toString` ran instead, which per spec delegates to the
+receiver's `join`. JSBI is `class JSBI extends Array`, so every JSBI value
+stringified as its internal digit array, and `@js-temporal/polyfill`'s range
+checks — built on JSBI — failed, taking down every `Time.at` / `Time.now` and
+with them `config/environment.ts`.
+
+Root cause: `crates/perry-runtime/src/value/to_string_array.rs`. Both sites
+that decide which `toString` an array receiver runs asked
+`builtin_prototype_value("Array")` for the method, so they saw only the
+intrinsic `Array.prototype`. They detect a global monkey-patch — what they were
+written for — and are blind to a subclass override and to an own property.
+
+Fix: resolve the key on the receiver's own chain first via `js_get_property`,
+falling back to the intrinsic lookup, returning `None` for the installed noop
+thunk. 68 lines, saved as `perry-ladder-keep/wall24-array-tostring.patch`.
+`array_prototype_to_string` is deliberately NOT patched: it is the generic
+algorithm reached by `Array.prototype.toString.call(arr)`, and consulting the
+receiver there would recurse forever.
+
+Verified, all against node:
+
+- all 7 call forms return the override (`array-subclass-tostring/forms.ts`)
+- 5 regressions match: a plain array still joins; a subclass with no override
+  joins; `Array.prototype.toString.call(m)` joins and does not recurse;
+  `Object.prototype.toString.call(m)` is `[object Array]`; a global
+  monkey-patch still wins
+- standalone `jsbi@4.3.2` agrees with node on 9 operations, including the
+  two values that were wrong before (`8640000000000000000000` and
+  `3600000000000`)
+
+It does NOT clear the ladder. `Time.at` still throws, for an unrelated reason
+recorded as wall 25 (`upstream/temporal-range-limit/`): the polyfill's epoch
+range limit measures `837292312000000` instead of `8640000000000000000000`.
+Wall 24 was *a* cause of that `RangeError`, not the only one.
+
+### Two probe hazards worth re-reading before measuring
+
+- A bare `jsbi` import does not resolve from `examples/perry-native`, and
+  perry compiles it anyway — `Found 1 module`, no diagnostic — with every
+  call returning `0`. The first wall-24 verification run "measured" exactly
+  this and looked like a failure. Always check `Found N module`.
+- `pnpm install` restores the two cycle-closing symlinks
+  (`actionview -> actionpack`, `trailties -> activestorage`) that make module
+  resolution OOM at 40GB. It did so three times in one session. Re-cut them
+  after every install; `r46-postmerge.sh` aborts if they are back.

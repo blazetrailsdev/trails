@@ -1,0 +1,17 @@
+import JSBI from "../../node_modules/.pnpm/jsbi@4.3.2/node_modules/jsbi/dist/jsbi.mjs";
+const J = JSBI as any;
+console.log("BigInt(8.64e15) :", J.BigInt(8.64e15).toString());
+console.log("BigInt(1e9)     :", J.BigInt(1e9).toString());
+console.log("BigInt(123456789012345):", J.BigInt(123456789012345).toString());
+console.log("BigInt(255)     :", J.BigInt(255).toString());
+const ne = J.multiply(J.BigInt(8.64e15), J.BigInt(1e6));
+console.log("Ne = 8.64e15*1e6:", ne.toString());
+console.log("  expected      : 8640000000000000000000");
+console.log("=== typed-array aliasing, which __fromDouble relies on ===");
+const buf = new ArrayBuffer(8);
+const f64 = new Float64Array(buf);
+const i32 = new Int32Array(buf);
+f64[0] = 8.64e15;
+console.log("i32 pair        :", i32[0], i32[1]);
+f64[0] = -0;
+console.log("big-endian probe:", i32[0] !== 0);

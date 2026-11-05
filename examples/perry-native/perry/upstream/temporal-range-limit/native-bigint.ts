@@ -1,0 +1,11 @@
+const ns = 1793829332000000000n;
+console.log("typeof ns      :", typeof ns);
+console.log("ns.toString()  :", ns.toString());
+console.log("String(ns)     :", String(ns));
+console.log("`${ns}`        :", `${ns}`);
+console.log("ns === 1793829332000000000n:", ns === 1793829332000000000n);
+console.log("BigInt('17938'):", BigInt("17938").toString());
+console.log("ns / 1000000000n:", (ns / 1000000000n).toString());
+console.log("Number(ns)     :", Number(ns));
+console.log("ns > 0n        :", ns > 0n);
+console.log("BigInt.asIntN  :", BigInt.asIntN(64, ns).toString());
