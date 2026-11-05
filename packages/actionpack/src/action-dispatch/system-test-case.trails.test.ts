@@ -24,7 +24,7 @@ afterAll(() => {
   TopLevel.Trails = trails;
 });
 try {
-  await SystemTestCase.startApplication();
+  await SystemTestCase.startApplication(await import("vitest"), await import("vite"));
 } finally {
   Server.silencePuma = false;
 }
