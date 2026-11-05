@@ -407,6 +407,7 @@ describe("BaseTest", () => {
     expect(email.parts[0].parts[0].parts[0].mimeType()).toBe("text/plain");
     expect(email.parts[0].parts[0].parts[1].mimeType()).toBe("text/html");
     expect(email.parts[0].parts[1].filename()).toBe("logo.png");
+    expect(email.parts[1].filename()).toBe("certificate.pdf");
   });
 
   it("accessing inline attachments after mail was called works", async () => {
@@ -859,14 +860,14 @@ describe("BaseTest", () => {
     const yesterday = days(1).ago(Time.now());
     await stub(Time, "now", yesterday, [], async () => {
       const mail2 = (await ProcMailer.welcome().message()).get("X-Proc-Method");
-      expect(Number(String(mail1)) > Number(String(mail2))).toBe(true);
+      expect(Number(String(mail1)) > Number(String(mail2))).toBeTruthy();
     });
   });
 
   it("default values which have to_proc (e.g. symbols) should not be considered procs", async () => {
-    expect(String((await ProcMailer.welcome().message()).get("x-has-to-proc")) === "symbol").toBe(
-      true,
-    );
+    expect(
+      String((await ProcMailer.welcome().message()).get("x-has-to-proc")) === "symbol",
+    ).toBeTruthy();
   });
 
   it("proc default values can have arity of 1 where arg is a mailer instance", async () => {
