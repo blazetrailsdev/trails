@@ -50,7 +50,7 @@ async function swap(klass: typeof I18n, newValues: { locale: string }, block: ()
 }
 
 describe("BaseTest", () => {
-  let originalDeliveryMethod: unknown;
+  let originalDeliveryMethod: typeof Base.deliveryMethod;
 
   beforeEach(() => {
     originalDeliveryMethod = Base.deliveryMethod;
