@@ -174,7 +174,9 @@ export function methodMissingProxy<T extends object>(
           ? value.bind(delegate)
           : value;
       }
-      if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
+      if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) {
+        return undefined;
+      }
       return (...args: unknown[]) => {
         throw new NoMethodError(
           `undefined method '${prop}' for an instance of ${(proxyTarget as object).constructor.name}`,

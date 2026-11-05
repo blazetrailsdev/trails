@@ -152,7 +152,7 @@ describe("Base#mail", () => {
   it("renders one part per template format", async () => {
     const email = await deliver("multi");
     expect(email.mimeType()).toBe("multipart/alternative");
-    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+    expect([...email.parts.map((p) => [p.mimeType(), p.decoded()])]).toEqual([
       ["text/plain", "Text"],
       ["text/html", "<b>Html</b>"],
     ]);
@@ -160,7 +160,7 @@ describe("Base#mail", () => {
 
   it("renders the default template for a blockless format in the block form", async () => {
     const email = await deliver("fromBlock");
-    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+    expect([...email.parts.map((p) => [p.mimeType(), p.decoded()])]).toEqual([
       ["text/plain", "Text"],
       ["text/html", "<p>Block</p>"],
     ]);
@@ -187,7 +187,7 @@ describe("Base#mail", () => {
   });
   it("renders each blockless format with its own formats in the block form", async () => {
     const email = await deliver("bothDefaults");
-    expect(email.parts.map((p) => [p.mimeType(), p.decoded()])).toEqual([
+    expect([...email.parts.map((p) => [p.mimeType(), p.decoded()])]).toEqual([
       ["text/plain", "Text"],
       ["text/html", "<b>Html</b>"],
     ]);

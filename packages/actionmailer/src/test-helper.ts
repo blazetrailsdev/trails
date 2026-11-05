@@ -69,8 +69,8 @@ export const TestHelper = {
 
       return (
         rbEqual([rbModName(mailerClass), String(method), "deliverNow"], jobArgs) &&
-        rbEqq(params, jobKwargs.params) &&
-        rbEqq(args, jobKwargs.args)
+        rbEqq(params, jobKwargs.params ?? null) &&
+        rbEqq(args, jobKwargs.args ?? null)
       );
     };
 
@@ -103,7 +103,7 @@ export const TestHelper = {
 
   /** @internal */
   deliveryJobFilter(this: TestHelper, job: unknown): boolean {
-    const jobClass = isPlainHash(job) ? fetch(job, "job") : rbObjClass(job);
+    const jobClass = isPlainHash(job) ? fetch(job, ":job") : rbObjClass(job);
 
     return [Base, ...(Base as typeof Base & { descendants: (typeof Base)[] }).descendants]
       .map((klass) => klass.deliveryJob)

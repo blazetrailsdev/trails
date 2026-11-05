@@ -1,5 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
 import {
   I18n,
@@ -7,6 +7,7 @@ import {
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
+  stub,
 } from "@blazetrails/activesupport";
 import type { Field, Message } from "@blazetrails/mail";
 import {
@@ -18,6 +19,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import type { MessageDelivery } from "./message-delivery.js";
+import { Preview } from "./preview.js";
 import { BaseMailer as BaseMailerClass } from "./test-helpers/mailers/base-mailer.js";
 
 I18n.setEnforceAvailableLocales(false);
@@ -379,7 +381,7 @@ describe("BaseTest", () => {
 
   it("implicit multipart with attachments creates nested parts", async () => {
     const email = await BaseMailer.implicitMultipart({ attachments: true }).message();
-    expect(email.parts.map((p) => p.mimeType()).sort()).toEqual([
+    expect([...email.parts.map((p) => p.mimeType()).sort()]).toEqual([
       "application/pdf",
       "multipart/alternative",
     ]);
@@ -394,12 +396,15 @@ describe("BaseTest", () => {
     const order = ["text/html", "text/plain"];
     await withDefault(BaseMailer, { partsOrder: order }, async () => {
       const email = await BaseMailer.implicitMultipart({ attachments: true }).message();
-      expect(email.parts.map((p) => p.mimeType()).sort()).toEqual([
+      expect([...email.parts.map((p) => p.mimeType()).sort()]).toEqual([
         "application/pdf",
         "multipart/alternative",
       ]);
       const multipart = email.parts.find((p) => p.mimeType() === "multipart/alternative")!;
-      expect(multipart.parts.map((p) => p.mimeType()).sort()).toEqual(["text/html", "text/plain"]);
+      expect([...multipart.parts.map((p) => p.mimeType()).sort()]).toEqual([
+        "text/html",
+        "text/plain",
+      ]);
     });
   });
 
@@ -442,7 +447,7 @@ describe("BaseTest", () => {
 
   it("explicit multipart with attachments creates nested parts", async () => {
     const email = await BaseMailer.explicitMultipart({ attachments: true }).message();
-    expect(email.parts.map((p) => p.mimeType()).sort()).toEqual([
+    expect([...email.parts.map((p) => p.mimeType()).sort()]).toEqual([
       "application/pdf",
       "multipart/alternative",
     ]);
@@ -740,5 +745,117 @@ describe("BaseTest", () => {
   it("email_address_with_name escapes", () => {
     const address = BaseMailer.emailAddressWithName("test@example.org", 'I "<3" email');
     expect(address).toBe('"I \\"<3\\" email" <test@example.org>');
+  });
+});
+
+class BaseMailerPreview extends Preview {
+  welcome() {
+    return BaseMailer.welcome();
+  }
+}
+
+const BasePreviewInterceptorsTest = {
+  MyInterceptor: class MyInterceptor {
+    static deliveringEmail(_mail: unknown): void {}
+    static previewingEmail(_mail: unknown): void {}
+  },
+  MySecondInterceptor: class MySecondInterceptor {
+    static deliveringEmail(_mail: unknown): void {}
+    static previewingEmail(_mail: unknown): void {}
+  },
+};
+constSet(TopLevel, "BasePreviewInterceptorsTest", BasePreviewInterceptorsTest);
+constSet(BasePreviewInterceptorsTest, "BaseMailerPreview", BaseMailerPreview);
+constSet(BasePreviewInterceptorsTest, "MyInterceptor", BasePreviewInterceptorsTest.MyInterceptor);
+constSet(
+  BasePreviewInterceptorsTest,
+  "MySecondInterceptor",
+  BasePreviewInterceptorsTest.MySecondInterceptor,
+);
+
+describe("BasePreviewInterceptorsTest", () => {
+  const { MyInterceptor, MySecondInterceptor } = BasePreviewInterceptorsTest;
+
+  beforeAll(() => {
+    Base.previewInterceptors.length = 0;
+  });
+
+  afterEach(() => {
+    Base.previewInterceptors.length = 0;
+  });
+
+  it("you can register and unregister a preview interceptor to the mail object that gets passed the mail object before previewing", async () => {
+    Base.registerPreviewInterceptor(MyInterceptor);
+    const mail = BaseMailer.welcome();
+    await mail.message();
+    await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
+        BaseMailerPreview.call("welcome");
+      });
+    });
+
+    Base.unregisterPreviewInterceptor(MyInterceptor);
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
+      BaseMailerPreview.call("welcome");
+    });
+  });
+
+  it("you can register and unregister a preview interceptor using its stringified name to the mail object that gets passed the mail object before previewing", async () => {
+    Base.registerPreviewInterceptor("BasePreviewInterceptorsTest::MyInterceptor");
+    const mail = BaseMailer.welcome();
+    await mail.message();
+    await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
+        BaseMailerPreview.call("welcome");
+      });
+    });
+
+    Base.unregisterPreviewInterceptor("BasePreviewInterceptorsTest::MyInterceptor");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
+      BaseMailerPreview.call("welcome");
+    });
+  });
+
+  it("you can register and unregister a preview interceptor using its symbolized underscored name to the mail object that gets passed the mail object before previewing", async () => {
+    Base.registerPreviewInterceptor("base_preview_interceptors_test/my_interceptor");
+    const mail = BaseMailer.welcome();
+    await mail.message();
+    await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
+        BaseMailerPreview.call("welcome");
+      });
+    });
+
+    Base.unregisterPreviewInterceptor("base_preview_interceptors_test/my_interceptor");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
+      BaseMailerPreview.call("welcome");
+    });
+  });
+
+  it("you can register and unregister multiple preview interceptors to the mail object that both get passed the mail object before previewing", async () => {
+    Base.registerPreviewInterceptors(
+      "BasePreviewInterceptorsTest::MyInterceptor",
+      MySecondInterceptor,
+    );
+    const mail = BaseMailer.welcome();
+    await mail.message();
+    await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await assertCalledWith(MySecondInterceptor, "previewingEmail", [mail], {}, () => {
+          BaseMailerPreview.call("welcome");
+        });
+      });
+    });
+
+    Base.unregisterPreviewInterceptors(
+      "BasePreviewInterceptorsTest::MyInterceptor",
+      MySecondInterceptor,
+    );
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
+      BaseMailerPreview.call("welcome");
+    });
+    await assertNotCalled(MySecondInterceptor, "previewingEmail", null, () => {
+      BaseMailerPreview.call("welcome");
+    });
   });
 });
