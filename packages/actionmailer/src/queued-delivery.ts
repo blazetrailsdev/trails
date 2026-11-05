@@ -8,13 +8,15 @@ extend(QueuedDelivery, Concern);
 Concern.included.call(QueuedDelivery as never, null, function (this: object) {
   classAttribute.call(this, "deliveryJob", { default: MailDeliveryJob });
   const deliveryJob = Object.getOwnPropertyDescriptor(this, "deliveryJob")!;
+  const host = this as Parameters<typeof DescendantsTracker.registerSubclass>[1];
   Object.defineProperty(this, "deliveryJob", {
     ...deliveryJob,
-    set(this: object, value: unknown) {
+    /** @inventedArm registerSubclass — PERMANENT */
+    set(this: typeof host, value: unknown) {
       deliveryJob.set!.call(this, value);
-      let klass = this as Parameters<typeof DescendantsTracker.registerSubclass>[1];
-      for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
-        DescendantsTracker.registerSubclass(superclass, klass);
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      for (let klass = this; klass !== host; klass = rbClassSuperclass(klass)!) {
+        DescendantsTracker.registerSubclass(rbClassSuperclass(klass)!, klass);
       }
     },
   });

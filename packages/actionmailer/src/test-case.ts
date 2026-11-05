@@ -9,9 +9,10 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
+import * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
+import * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";
 import { Encodings, Mail, type Message } from "@blazetrails/mail";
-import { File, StandardError, TopLevel, include, rbModName } from "@blazetrails/ruby-compat";
+import { File, IO, StandardError, TopLevel, include, rbModName } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
@@ -98,14 +99,15 @@ export const Behavior = {
 
   async readFixture(this: Behavior, action: string): Promise<string[]> {
     const klass = this.constructor as unknown as typeof ClassMethods;
-    const path = File.join(
-      TopLevel.Trails!.root() as string,
-      "test",
-      "fixtures",
-      underscore(rbModName(klass.mailerClass.call(klass as never))!),
-      action,
+    return await IO.readlinesAsync(
+      File.join(
+        TopLevel.Trails!.root() as string,
+        "test",
+        "fixtures",
+        underscore(rbModName(klass.mailerClass.call(klass as never))!),
+        action,
+      ),
     );
-    return (await File.readAsync(path)).split(/(?<=\n)/);
   },
 
   /** @internal */
@@ -154,7 +156,8 @@ export const Behavior = {
 extend(Behavior, Concern);
 include(Behavior, ConstantLookup);
 include(Behavior, TestHelper);
-include(Behavior, DomTestingAssertions);
+include(Behavior, SelectorAssertions);
+include(Behavior, DomAssertions);
 Concern.included.call(Behavior as never, null, function (this: BehaviorClass) {
   classAttribute.call(this, "_mailerClass", { default: null });
   this.setup(":initializeTestDeliveries");
@@ -177,6 +180,7 @@ export class TestCase extends ActiveSupportTestCase {
   static ClearTestDeliveries = ClearTestDeliveries;
   static Behavior = Behavior;
 
+  /** @noRailsEquivalent CONVERGEABLE test-case-constant-table-rows */
   static override toString(): string {
     return "ActionMailer::TestCase";
   }
