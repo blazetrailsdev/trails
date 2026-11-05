@@ -39,8 +39,8 @@ class ParamsMailer extends Base {
   }
 
   invitation() {
-    return this.mail({ subject: "Welcome to the project!" }, (format: Collector) => {
-      (format as unknown as { text(b: () => unknown): void }).text(() =>
+    return this.mail({ subject: "Welcome to the project!" }, async (format: Collector) => {
+      await (format as unknown as { text(b: () => unknown): Promise<void> }).text(() =>
         this.render({ plain: `So says ${this.inviter}` }),
       );
     });

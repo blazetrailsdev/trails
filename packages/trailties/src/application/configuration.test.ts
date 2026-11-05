@@ -190,6 +190,17 @@ describe("ConfigurationTest", () => {
     expect(config.get("some_key")).toBe("default");
   });
 
+  it("config_for makes all hash methods available", async () => {
+    await setCustomConfig(`export default { development: { foo: 0, bar: { baz: 1 } } };`);
+    const actual = (await (await app("development")).configFor("custom")) as OrderedOptions;
+    expect(actual.toH()).toEqual({ foo: 0, bar: { baz: 1 } });
+    expect(actual.keys()).toEqual(["foo", "bar"]);
+    expect(actual.values()).toEqual([0, { baz: 1 }]);
+    expect(actual.toH()).toEqual({ foo: 0, bar: { baz: 1 } });
+    expect(actual.get("foo")).toBe(0);
+    expect(actual.get("bar")).toEqual({ baz: 1 });
+  });
+
   it("config.action_view.cache_template_loading with config.enable_reloading default", async () => {
     const application = await app("development");
     application.config.enableReloading = false;

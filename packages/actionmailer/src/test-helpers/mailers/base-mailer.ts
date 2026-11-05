@@ -1,4 +1,5 @@
 import { ActionView } from "@blazetrails/actionpack";
+import { Base64 } from "@blazetrails/ruby-compat";
 import { dasherize } from "@blazetrails/activesupport";
 import type { Message } from "@blazetrails/mail";
 import { Base } from "../../base.js";
@@ -9,6 +10,14 @@ type Hash = Record<string, unknown>;
 
 const FIXTURES: Record<string, string> = {
   "base-mailer/attachment-with-content.tse": "Attachment with content",
+  "base-mailer/attachment-with-hash.html.tse": "",
+  "base-mailer/attachment-with-hash-default-encoding.html.tse": "",
+  "base-mailer/inline-attachment.html.tse":
+    "<h1>Inline Image</h1>\n\n<%= imageTag(attachments().get('logo.png').url()) %>\n\n<p>This is an image that is inline</p>",
+  "base-mailer/inline-attachment.text.tse": "Inline Image\n\nNo image for you\n",
+  "base-mailer/inline-and-other-attachments.html.tse":
+    "<h1>Inline Image</h1>\n\n<%= imageTag(attachments().get('logo.png').url()) %>\n\n<p>This is an image that is inline</p>",
+  "base-mailer/inline-and-other-attachments.text.tse": "Inline Image\n\nNo image for you\n",
   "base-mailer/different-layout.html.tse": "HTML",
   "base-mailer/different-layout.text.tse": "PLAIN",
   "base-mailer/email-with-translations.html.tse": "<%= t('.greet_user', { name: 'lifo' }) %>",
@@ -76,9 +85,41 @@ export class BaseMailer extends Base {
     return this.mail(hash);
   }
 
+  async inlineAttachment() {
+    await this.attachments()
+      .inline()
+      .set("logo.png", new Uint8Array([0xca, 0x8b, 0xac, 0x9a]));
+    return this.mail();
+  }
+
+  async inlineAndOtherAttachments() {
+    await this.attachments()
+      .inline()
+      .set("logo.png", new Uint8Array([0xca, 0x8b, 0xac, 0x9a]));
+    await this.attachments().set("certificate.pdf", "This is test File content");
+    return this.mail();
+  }
+
   async attachmentWithContent(hash: Hash = {}) {
     await this.attachments().set("invoice.pdf", "This is test File content");
     return this.mail(hash);
+  }
+
+  async attachmentWithHash() {
+    await this.attachments().set("invoice.jpg", {
+      data: Base64.encode64(new Uint8Array([0xca, 0x8b, 0xac, 0x9a, 0x29, 0x62])),
+      mimeType: "image/x-jpg",
+      transferEncoding: "base64",
+    });
+    return this.mail();
+  }
+
+  async attachmentWithHashDefaultEncoding() {
+    await this.attachments().set("invoice.jpg", {
+      data: new Uint8Array([0xca, 0x8b, 0xac, 0x9a, 0x29, 0x62]),
+      mimeType: "image/x-jpg",
+    });
+    return this.mail();
   }
 
   async implicitMultipart(hash: Hash = {}) {
@@ -100,38 +141,46 @@ export class BaseMailer extends Base {
     if (hash.attachments != null && delete hash.attachments) {
       await this.attachments().set("invoice.pdf", "This is test File content");
     }
-    return this.mail(hash, (format) => {
+    return this.mail(hash, async (format) => {
       const f = format as Format;
-      f.text(() => this.render({ plain: "TEXT Explicit Multipart" }));
-      f.html(() => this.render({ plain: "HTML Explicit Multipart" }));
+      await f.text(() => this.render({ plain: "TEXT Explicit Multipart" }));
+      await f.html(() => this.render({ plain: "HTML Explicit Multipart" }));
     });
   }
 
   explicitMultipartTemplates(hash: Hash = {}) {
-    return this.mail(hash, (format) => {
+    return this.mail(hash, async (format) => {
       const f = format as Format;
-      f.html();
-      f.text();
+      await f.html();
+      await f.text();
     });
   }
 
   explicitMultipartWithAny(hash: Hash = {}) {
-    return this.mail(hash, (format) => {
-      format.any("text", "html", () => this.render({ plain: "Format with any!" }));
+    return this.mail(hash, async (format) => {
+      await format.any("text", "html", () => this.render({ plain: "Format with any!" }));
     });
   }
 
   explicitWithoutSpecifyingFormatWithAny(hash: Hash = {}) {
-    return this.mail(hash, (format) => {
-      format.any();
+    return this.mail(hash, async (format) => {
+      await format.any();
+    });
+  }
+
+  explicitMultipartWithOptions(includeHtml = false) {
+    return this.mail({}, async (format) => {
+      const f = format as Format;
+      await f.text({ contentTransferEncoding: "base64" }, () => this.render("welcome"));
+      if (includeHtml) await f.html(() => this.render("welcome"));
     });
   }
 
   explicitMultipartWithOneTemplate(hash: Hash = {}) {
-    return this.mail(hash, (format) => {
+    return this.mail(hash, async (format) => {
       const f = format as Format;
-      f.html();
-      f.text();
+      await f.html();
+      await f.text();
     });
   }
 
@@ -140,26 +189,30 @@ export class BaseMailer extends Base {
   }
 
   implicitDifferentTemplateWithBlock(templateName = "") {
-    return this.mail({ templateName: templateName }, (format) => {
+    return this.mail({ templateName: templateName }, async (format) => {
       const f = format as Format;
-      f.text();
-      f.html();
+      await f.text();
+      await f.html();
     });
   }
 
   explicitDifferentTemplate(templateName = "") {
-    return this.mail({}, (format) => {
+    return this.mail({}, async (format) => {
       const f = format as Format;
-      f.text(() => this.render({ template: `${dasherize(this.mailerName())}/${templateName}` }));
-      f.html(() => this.render({ template: `${dasherize(this.mailerName())}/${templateName}` }));
+      await f.text(() =>
+        this.render({ template: `${dasherize(this.mailerName())}/${templateName}` }),
+      );
+      await f.html(() =>
+        this.render({ template: `${dasherize(this.mailerName())}/${templateName}` }),
+      );
     });
   }
 
   differentLayout(layoutName = "") {
-    return this.mail({}, (format) => {
+    return this.mail({}, async (format) => {
       const f = format as Format;
-      f.text(() => this.render({ layout: layoutName }));
-      f.html(() => this.render({ layout: layoutName }));
+      await f.text(() => this.render({ layout: layoutName }));
+      await f.html(() => this.render({ layout: layoutName }));
     });
   }
 

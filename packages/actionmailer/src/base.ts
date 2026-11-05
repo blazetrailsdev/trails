@@ -34,6 +34,7 @@ import {
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { Collector } from "./collector.js";
+import { MailHelper } from "./mail-helper.js";
 import {
   DeliveryMethods,
   type ClassMethods as DeliveryMethodsClassMethods,
@@ -430,7 +431,6 @@ export class Base extends AbstractController.Base {
     ) as string;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
     await block(collector);
-    for (const response of collector.responses) response.body = await response.body;
     return collector.responses;
   }
 
@@ -593,6 +593,9 @@ include(Base, AbstractController.Callbacks);
 include(Base, AbstractController.Caching);
 
 include(Base, ActionView.Layouts);
+
+(Base as unknown as { helper(mod: unknown): void }).helper(MailHelper);
+
 classAttribute.call(Base, "defaultParams", {
   default: Object.freeze({
     mimeVersion: "1.0",

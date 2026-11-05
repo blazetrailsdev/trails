@@ -21,13 +21,13 @@ class AssertMultipartSelectMailer extends Base {
   test(options: { text: string; html: string }) {
     return this.mail(
       { subject: "Test e-mail", from: "test@test.host", to: "test <test@test.host>" },
-      (format) => {
+      async (format) => {
         const f = format as unknown as {
-          text(b: () => unknown): void;
-          html(b: () => unknown): void;
+          text(b: () => unknown): Promise<void>;
+          html(b: () => unknown): Promise<void>;
         };
-        f.text(() => this.render({ plain: options.text }));
-        f.html(() => this.render({ plain: options.html }));
+        await f.text(() => this.render({ plain: options.text }));
+        await f.html(() => this.render({ plain: options.html }));
       },
     );
   }

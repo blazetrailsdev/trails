@@ -60,18 +60,21 @@ class TextMailer extends Base {
   }
 
   bothDefaults() {
-    return this.mail({ templateName: "multi" }, (format) => {
-      const f = format as unknown as { text(): void; html(): void };
-      f.text();
-      f.html();
+    return this.mail({ templateName: "multi" }, async (format) => {
+      const f = format as unknown as { text(): Promise<void>; html(): Promise<void> };
+      await f.text();
+      await f.html();
     });
   }
 
   fromBlock() {
-    return this.mail({ templateName: "multi" }, (format) => {
-      const f = format as unknown as { text(): void; html(b: () => string): void };
-      f.text();
-      f.html(() => "<p>Block</p>");
+    return this.mail({ templateName: "multi" }, async (format) => {
+      const f = format as unknown as {
+        text(): Promise<void>;
+        html(b: () => string): Promise<void>;
+      };
+      await f.text();
+      await f.html(() => "<p>Block</p>");
     });
   }
 
@@ -128,14 +131,14 @@ describe("Base#mail", () => {
     );
   });
 
-  it("collects formats from a Collector", () => {
+  it("collects formats from a Collector", async () => {
     const context = { formats: null as unknown };
     const collector = new Collector(context, () => "default") as Collector & {
       text(o?: object | (() => string), b?: () => string): unknown;
     };
-    collector.text();
-    collector.any("html", () => "<p>Html</p>");
-    collector.text(() => "Block");
+    await collector.text();
+    await collector.any("html", () => "<p>Html</p>");
+    await collector.text(() => "Block");
     expect(context.formats).toEqual([":text"]);
     expect(collector.responses).toEqual([
       { contentType: "text/plain", body: "default" },

@@ -148,6 +148,10 @@ export class OrderedOptions {
     return [...this.data.keys()];
   }
 
+  values(): unknown[] {
+    return [...this.data.values()];
+  }
+
   entries(): [string, unknown][] {
     const out: [string, unknown][] = [];
     this.each((key, value) => out.push([key, value]));

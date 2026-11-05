@@ -3,9 +3,9 @@ import { chomp, stringSplit, strip } from "@blazetrails/ruby-compat";
 import { ActionMailer } from "./namespaces.js";
 
 interface MailHelperHost {
-  _controller: { attachments: unknown } | null;
+  _controller: { attachments(): unknown } | null;
   _message: unknown;
-  mailer(): { attachments: unknown } | null;
+  mailer(): { attachments(): unknown } | null;
   formatParagraph(text: string, len?: number, indent?: number): string;
 }
 
@@ -30,7 +30,7 @@ export const MailHelper = {
     return output;
   },
 
-  mailer(this: MailHelperHost): { attachments: unknown } | null {
+  mailer(this: MailHelperHost): { attachments(): unknown } | null {
     return this._controller;
   },
 
@@ -39,7 +39,7 @@ export const MailHelper = {
   },
 
   attachments(this: MailHelperHost): unknown {
-    return this.mailer()!.attachments;
+    return this.mailer()!.attachments();
   },
 
   formatParagraph(this: MailHelperHost, text: string, len = 72, indent = 2): string {
