@@ -10,7 +10,18 @@ runs:
     - shell: bash
       run: |
         command -v ffprobe >/dev/null && command -v ffmpeg >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null && { command -v magick >/dev/null || command -v convert >/dev/null; } \
-          || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg mupdf-tools poppler-utils imagemagick; }
+          || {
+            # A stalled mirror or held dpkg lock otherwise blocks until the job timeout cancels it.
+            APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120)
+            for attempt in 1 2 3; do
+              sudo timeout 300 apt-get "${APT_OPTS[@]}" update -q \
+                && sudo timeout 300 apt-get "${APT_OPTS[@]}" install -y ffmpeg mupdf-tools poppler-utils imagemagick \
+                && break
+              [ "$attempt" = 3 ] && exit 1
+              echo "apt attempt $attempt failed; retrying"
+              sleep 10
+            done
+          }
         ffprobe -version | head -1 || true
         ffmpeg -version | head -1 || true
         mutool -v 2>&1 | head -1 || true
