@@ -50,6 +50,7 @@ runs:
           sleep 10
           sudo dpkg --configure -a || true
         done
+        sudo apt-get "${APT_OPTS[@]}" autoclean -q
         sudo rm -rf "$DEBS/partial" "$DEBS/lock"
         sudo chmod -R a+rX "$DEBS"
         find "$DEBS" -name "*.deb" | wc -l
