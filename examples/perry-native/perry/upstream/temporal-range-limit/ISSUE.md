@@ -1,65 +1,94 @@
-# Wall 25 — Temporal's epoch range limit is ~10.3 million times too small
+# Wall 25 — the Temporal polyfill's epoch limit is uninitialized memory
 
 Found by fixing wall 24. The array-subclass `toString` patch makes JSBI
 correct, but `Time.at` still throws, so wall 24 was *a* cause of the ladder's
 `RangeError` and not the only one.
 
-## Symptom
+## What is actually wrong
 
-`@js-temporal/polyfill@0.5.1` rejects any instant past ~1996-07-xx:
-
-    Temporal.Instant.fromEpochNanoseconds(1793829332000000000n)
-    RangeError: date/time value is outside of supported range
-
-## Measurement
-
-`limit-bisect.ts` bisects the highest accepted epoch-nanosecond value:
-
-| | highest accepted |
-| --- | --- |
-| node | `8639999999999999999999` |
-| perry | `837292312000000` |
-| spec limit (`Ne`) | `8640000000000000000000` |
-
-A factor of about `1.03e7`. The polyfill computes that limit as
-`JSBI.multiply(JSBI.BigInt(1e8 * 86400000), JSBI.BigInt(1e6))` — 8.64e15 ns/ms
-scaled by 1e6 — inside `function Fr(t)`:
+`@js-temporal/polyfill@0.5.1` holds its epoch bounds in two module-level
+constants and checks them in:
 
 ```js
 function Fr(t){if(e.lessThan(t,xe)||e.greaterThan(t,Ne))
   throw new RangeError("date/time value is outside of supported range")}
 ```
 
-## Not the cause (each measured)
+`observe-limit.ts` wraps `JSBI.lessThan`/`greaterThan` and reads the real
+operands. Three runs of the **same binary**:
 
-- **JSBI itself.** After the wall-24 patch, the standalone `jsbi@4.3.2` agrees
-  with node on all of: `BigInt(string)`, `BigInt(8.64e15)` (the `__fromDouble`
-  path), `multiply`, `divide`, `remainder`, `lessThan`, `greaterThan`,
-  `unaryMinus` and `toNumber`. `jsbi-fromdouble.ts` computes the limit itself
-  and gets `8640000000000000000000`, correct. So the standalone package is
-  right and the polyfill's bundled copy is not.
+| run | `xe` | `Ne` |
+| --- | --- | --- |
+| 1 | `175631752000000` | `-175631752000000` |
+| 2 | `1079504264000000` | `-1079504264000000` |
+| 3 | `1951919496000000` | `-1951919496000000` |
+| expected | `-8640000000000000000000` | `+8640000000000000000000` |
+
+So `Ne` is **negative**, ~7 orders of magnitude too small, and **different on
+every run of the same binary**. It is uninitialized memory, not a miscomputed
+constant. `xe = unaryMinus(Ne)`, so one bad `Ne` explains the sign swap too.
+
+Every observed value is an integer times `1e6`, which fits
+`Ne = multiply(BigInt(ke), c)` with `c = BigInt(1e6)` correct and `ke`
+garbage. `ke = 1e8 * Re`, and the garbage always divides cleanly by `1e8`
+(`1.20066624`, `18.31390488`, `4.52456024`), so what is read as garbage is the
+operand, not the multiplication: `1e8 * 864e5` evaluated in the same program
+is correct.
+
+## Ruled out, each by measurement
+
+- **JSBI.** After the wall-24 patch the standalone `jsbi@4.3.2` matches node on
+  `BigInt(string)`, `BigInt(8.64e15)` (the `__fromDouble` path), `multiply`,
+  `divide`, `remainder`, `lessThan`, `greaterThan`, `unaryMinus`, `toNumber`.
+- **The comparison and the limit arithmetic.** `replicate-check.ts` computes
+  `Ne` and runs `Fr`'s exact comparison in its own module, against the same
+  JSBI instance the polyfill imports: it gets `8640000000000000000000` and
+  says IN for every value the polyfill rejects.
 - **Native `BigInt`.** `native-bigint.ts`: `toString()`, `toString(10)`,
-  `toString(16)`, `toString(2)`, division, comparison and `Number()` all
-  match. The conversion the polyfill uses is `BigInt.toString(10)`, which is
-  correct.
-- **Typed-array aliasing.** `__fromDouble` reads a double through overlaid
-  `Float64Array`/`Int32Array` views; perry returns the same int pair as node
-  and the same big-endian answer.
-- **An uninitialised limit.** A zero `Ne` would reject every positive value;
-  `per-value.ts` shows `0n`, `1n`, `-1n` and `1000000000n` all pass the range
-  check. The limit is wrong, not absent.
-- **A 30-bit digit truncation.** JSBI stores 30-bit digits, so the obvious
-  guess is that one digit survived: `8640000000000000 mod 2^30` is `47972352`,
-  but the observed limit over 1e6 is `837292312`. They do not match, so this
-  is NOT a single-digit truncation. The real mechanism is still unidentified.
+  `toString(16)`, division, comparison, `Number()` all match. `Lo`, the
+  polyfill's converter, is `JSBI.BigInt(v.toString(10))`, which is correct.
+- **Literal vs computed bigints** — identical, and `===` agrees.
+- **Typed-array aliasing**, which `__fromDouble` uses — same int pair as node.
+- **Float multiplication** — `1e8 * 864e5`, `1e9 * 1e9` etc. all exact.
+- **jsbi's static tables being unassigned at polyfill init** — a 3-module
+  repro of that shape initializes them correctly and gets the right answer.
+- **A large `const` declarator list** — 400 declarators with the same
+  dependency chain is correct.
 
-## Also found, separately
+## Three of my own earlier claims, retracted
 
-Two independent defects turned up while probing and are not this wall:
+- **"The limit is `837292312000000`."** Wrong. That came from bisecting, which
+  assumes the accepted set is an interval. It is not: a later scan found
+  values both above and below that point accepted, and three bisections over
+  different ranges returned three different "limits". The limit is not a
+  threshold at all — it is garbage that varies per run.
+- **"The polyfill bundles its own JSBI that differs from the standalone."**
+  Wrong. It does `import e from "jsbi"` and declares no class; it is the same
+  instance, which is what makes `replicate-check.ts` a valid comparison.
+- **"The behaviour is deterministic."** Wrong, and wrongly reasoned: I called
+  the range check 12 times inside one process, but `Ne` is computed once at
+  module init, so stability within a run was guaranteed and proved nothing.
+  Re-running the same binary shows a different value every time.
+
+A further caution: the first version of `observe-limit.ts` called
+`console.log` inside its wrapper, and `toplevel-call-garbage-arg/` shows that
+a callee containing a `console` call can itself receive a garbage argument.
+The table above was re-measured with the wrappers storing values and printing
+them afterwards, so the instrumentation cannot be the cause.
+
+## Still open
+
+The mechanism that leaves `ke` uninitialized inside this module is not
+minimized. The sibling bug in `../toplevel-call-garbage-arg/` is the same
+*class* — a top-level call whose argument arrives as unwritten memory — and is
+reduced to 13 lines, but its trigger (a `console` call in the callee) is not
+present in the polyfill's `xo`, so they are not yet proven to be one defect.
+
+## Two unrelated defects found while probing
 
 - **`BigInt.asIntN` returns 0.** `BigInt.asIntN(64, 1793829332000000000n)` is
-  `0` on perry, correct on node. The polyfill's ESM build never calls it, so it
-  is not the cause here, but it is wrong.
-- **`Intl` era parsing.** Once a small instant passes the range check it
-  fails in formatting: `Unknown era 00 in "1/1/1970, 00:00:00 AD`. So even
-  with the range check fixed, `Instant.toString()` has a wall behind it.
+  `0` on perry. The polyfill's ESM build never calls it, so it is not this
+  wall.
+- **`Intl` era parsing.** Once a small instant passes the range check it fails
+  in formatting: `Unknown era 00 in "1/1/1970, 00:00:00 AD`. So a wall sits
+  behind this one.
