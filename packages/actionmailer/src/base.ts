@@ -15,6 +15,7 @@ import {
   type Callbacks as ActiveSupportCallbacks,
   type EventPayload,
   type Included,
+  runLoadHooks,
 } from "@blazetrails/activesupport";
 import * as I18n from "@blazetrails/i18n";
 import {
@@ -622,3 +623,5 @@ Object.setPrototypeOf(
 );
 
 ActionMailer.Base = Base as typeof ActionMailer.Base;
+
+runLoadHooks("action_mailer", Base);

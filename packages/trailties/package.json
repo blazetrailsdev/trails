@@ -114,6 +114,7 @@
     "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/actionmailer": "workspace:*",
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
