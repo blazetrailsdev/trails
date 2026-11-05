@@ -9,6 +9,9 @@ description: >-
   report.pdf fixtures. The .debs are cached per OS/arch and package list, so a
   warm run downloads only packages whose mirror version moved; the key rotates
   weekly and falls back to the previous week, so the cache tracks the mirror.
+  A failed install still saves what it downloaded under a run-scoped key that
+  the next run restores, and a retry drops the Azure mirror for
+  archive.ubuntu.com.
 runs:
   using: composite
   steps:
@@ -32,7 +35,8 @@ runs:
         path: ${{ steps.probe.outputs.debs }}
         key: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}-${{ steps.probe.outputs.week }}
         restore-keys: activestorage-media-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.probe.outputs.packages }}-
-    - if: steps.probe.outputs.present != 'true'
+    - id: install
+      if: steps.probe.outputs.present != 'true'
       shell: bash
       env:
         DEBS: ${{ steps.probe.outputs.debs }}
@@ -49,17 +53,25 @@ runs:
           echo "apt attempt $attempt failed; retrying"
           sleep 10
           sudo dpkg --configure -a || true
+          if [ -f /etc/apt/apt-mirrors.txt ] && grep -qv azure.archive.ubuntu.com /etc/apt/apt-mirrors.txt; then
+            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          fi
         done
         sudo apt-get "${APT_OPTS[@]}" autoclean -q
+    - if: always() && steps.probe.outputs.present != 'true'
+      shell: bash
+      env:
+        DEBS: ${{ steps.probe.outputs.debs }}
+      run: |
         sudo rm -rf "$DEBS/partial" "$DEBS/lock"
         sudo chmod -R a+rX "$DEBS"
         find "$DEBS" -name "*.deb" | wc -l
-    - if: steps.probe.outputs.present != 'true' && steps.restore.outputs.cache-hit != 'true'
+    - if: always() && steps.probe.outputs.present != 'true' && steps.restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       continue-on-error: true
       with:
         path: ${{ steps.probe.outputs.debs }}
-        key: ${{ steps.restore.outputs.cache-primary-key }}
+        key: ${{ steps.restore.outputs.cache-primary-key }}${{ steps.install.outcome != 'success' && format('-partial-{0}', github.run_id) || '' }}
     - shell: bash
       run: |
         ffprobe -version | head -1 || true
