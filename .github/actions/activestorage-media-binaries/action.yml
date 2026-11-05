@@ -11,14 +11,15 @@ runs:
       run: |
         command -v ffprobe >/dev/null && command -v ffmpeg >/dev/null && command -v mutool >/dev/null && command -v pdftoppm >/dev/null && { command -v magick >/dev/null || command -v convert >/dev/null; } \
           || {
-            APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o DPkg::Lock::Timeout=120)
+            APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120)
             for attempt in 1 2 3; do
-              sudo timeout 300 apt-get "${APT_OPTS[@]}" update -q \
-                && sudo timeout 300 apt-get "${APT_OPTS[@]}" install -y ffmpeg mupdf-tools poppler-utils imagemagick \
+              sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
+                && sudo timeout -k 10 180 apt-get "${APT_OPTS[@]}" install -y ffmpeg mupdf-tools poppler-utils imagemagick \
                 && break
               [ "$attempt" = 3 ] && exit 1
               echo "apt attempt $attempt failed; retrying"
               sleep 10
+              sudo dpkg --configure -a || true
             done
           }
         ffprobe -version | head -1 || true
