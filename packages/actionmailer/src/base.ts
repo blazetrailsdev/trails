@@ -197,7 +197,7 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   static methodMissing(methodName: string, ...args: unknown[]): unknown {
-    if (this.actionMethods().includes(methodName)) {
+    if (this.actionMethods().has(methodName)) {
       return new ActionMailer.MessageDelivery(this, methodName, ...args);
     } else {
       throw new NoMethodError(
@@ -209,7 +209,7 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   static respondToMissing(method: string, _includeAll = false): boolean {
-    return this.actionMethods().includes(method);
+    return this.actionMethods().has(method);
   }
 
   /** @internal */

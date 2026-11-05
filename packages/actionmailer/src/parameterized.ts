@@ -13,7 +13,7 @@ import {
 import { ActionMailer } from "./namespaces.js";
 
 interface ParameterizedMailerClass extends MailerClass {
-  actionMethods(): string[];
+  actionMethods(): ReadonlySet<string>;
 }
 
 interface ParameterizedHost {
@@ -57,7 +57,7 @@ export class Mailer {
 
   /** @internal */
   methodMissing(methodName: string, ...args: unknown[]): unknown {
-    if (this._mailer.actionMethods().includes(methodName)) {
+    if (this._mailer.actionMethods().has(methodName)) {
       return new Parameterized.MessageDelivery(this._mailer, methodName, this._params, ...args);
     } else {
       throw new NoMethodError(

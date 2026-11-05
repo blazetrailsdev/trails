@@ -99,7 +99,7 @@ describe("add_flash_types readers", () => {
     const klass = MetalFlashController as unknown as {
       prototype: object;
       addFlashTypes(...types: string[]): void;
-      actionMethods(): string[];
+      actionMethods(): ReadonlySet<string>;
     };
     expect("addFlashTypes" in klass).toBe(true);
     expect("addFlashTypes" in Metal).toBe(false);
