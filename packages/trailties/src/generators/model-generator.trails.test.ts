@@ -4,6 +4,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { capture } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
+import "../generators.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";

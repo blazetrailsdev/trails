@@ -1,4 +1,5 @@
 import { FileUtils } from "@blazetrails/ruby-compat";
+import "../generators.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { noColorBang } from "../command/behavior.js";
