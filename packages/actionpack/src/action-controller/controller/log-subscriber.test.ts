@@ -48,7 +48,7 @@ class LogSubscribersController extends Base {
       }),
     );
 
-    this.beforeAction("redirector", { only: "neverExecuted" });
+    this.beforeAction(":redirector", { only: "neverExecuted" });
   }
 
   lastPayload!: Record<string, unknown>;

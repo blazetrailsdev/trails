@@ -11,9 +11,9 @@ class DummyController extends Base {
   declare loggedIn: boolean;
 
   static {
-    this.beforeAction("authenticate", { only: "index" });
-    this.beforeAction("authenticateWithRequest", { only: "display" });
-    this.beforeAction("authenticateLongCredentials", { only: "show" });
+    this.beforeAction(":authenticate", { only: "index" });
+    this.beforeAction(":authenticateWithRequest", { only: "display" });
+    this.beforeAction(":authenticateLongCredentials", { only: "show" });
   }
 
   async index(): Promise<void> {

@@ -147,7 +147,7 @@ describe("ScaffoldGeneratorTest", () => {
       expect(content).not.toMatch(/respondTo/);
 
       expect(content).toMatch(
-        /this\.beforeAction\("setProductLine", \{ only: \["show", "update", "destroy"\] \}\)/,
+        /this\.beforeAction\(":setProductLine", \{ only: \["show", "update", "destroy"\] \}\)/,
       );
 
       await t.assertInstanceMethod("index", content, (m) => {

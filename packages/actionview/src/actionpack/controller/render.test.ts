@@ -104,7 +104,7 @@ class TestController extends ActionController.Base {
 
   static {
     this.protectFromForgery();
-    this.beforeAction("setVariableForLayout");
+    this.beforeAction(":setVariableForLayout");
     this.layout(":determineLayout");
     this.beforeAction(
       (c) => {

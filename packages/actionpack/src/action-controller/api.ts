@@ -1,4 +1,5 @@
 import { Metal } from "./metal.js";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import { ApiRendering } from "./api/api-rendering.js";
 import {
   RateLimiting,
@@ -23,7 +24,6 @@ import { Renderers } from "./metal/renderers.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import {
   Callbacks,
-  type ActionCallbackHost,
   type beforeAction,
   type prependBeforeAction,
   type skipBeforeAction,
@@ -110,9 +110,9 @@ export class API extends Metal {
 
   declare static raiseOnOpenRedirects: boolean;
 
-  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
-  declare static setCallback: ActionCallbackHost["setCallback"];
-  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;

@@ -14,7 +14,7 @@ export class BaseController extends ActiveStorageBaseController {
 
   static {
     include(this, SetBlob);
-    this.beforeAction("setRepresentation");
+    this.beforeAction(":setRepresentation");
   }
 
   /** @internal */

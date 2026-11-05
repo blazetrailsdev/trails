@@ -52,7 +52,7 @@ class PostController extends AbstractPostController {
     await block();
   }
 }
-PostController.aroundAction("withIphone");
+PostController.aroundAction(":withIphone");
 
 class SuperPostController extends PostController {}
 

@@ -35,5 +35,5 @@ extend(SetBlob, Concern);
 (
   SetBlob as unknown as { included(base: null, block: (this: ControllerClass) => void): void }
 ).included(null, function (this: ControllerClass) {
-  this.beforeAction("setBlob");
+  this.beforeAction(":setBlob");
 });

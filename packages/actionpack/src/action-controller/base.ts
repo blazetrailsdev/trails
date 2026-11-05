@@ -8,6 +8,7 @@ import {
   runLoadHooks,
   TopLevel,
 } from "@blazetrails/activesupport";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
@@ -56,7 +57,6 @@ import type {
 } from "./metal/redirecting.js";
 import {
   Callbacks,
-  type ActionCallbackHost,
   type beforeAction,
   type prependBeforeAction,
   type skipBeforeAction,
@@ -348,9 +348,9 @@ export class Base extends Metal {
   declare readonly flash: FlashHash;
   declare static addFlashTypes: typeof addFlashTypes;
 
-  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
-  declare static setCallback: ActionCallbackHost["setCallback"];
-  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;

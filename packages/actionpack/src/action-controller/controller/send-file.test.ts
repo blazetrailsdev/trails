@@ -42,7 +42,7 @@ class SendFileController extends Base {
     include(this, Testing);
     this.layout("layouts/standard");
 
-    this.beforeAction("file", { only: "fileFromBeforeAction" });
+    this.beforeAction(":file", { only: "fileFromBeforeAction" });
   }
 
   declare _options?: Record<string, unknown>;

@@ -292,14 +292,14 @@ describe("template-builder", () => {
       declarations: [
         tsClass({
           name: "C",
-          staticBlock: tsBody`this.beforeAction("setUp");\ninclude(this, ${refs.Tracked});`,
+          staticBlock: tsBody`this.beforeAction(":setUp");\ninclude(this, ${refs.Tracked});`,
           body: [tsField("post", "unknown", { declare: true })],
         }),
       ],
     });
     expect(out).toContain('import { Tracked } from "./concerns.js";');
     expect(out).toContain(
-      `export class C {\n  static {\n    this.beforeAction("setUp");\n    include(this, Tracked);\n  }\n\n  declare post: unknown;\n}`,
+      `export class C {\n  static {\n    this.beforeAction(":setUp");\n    include(this, Tracked);\n  }\n\n  declare post: unknown;\n}`,
     );
     expect(parseTs(out).diagnostics).toEqual([]);
   });
