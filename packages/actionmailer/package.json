@@ -23,12 +23,17 @@
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/mail": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {
     "node": ">=24"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

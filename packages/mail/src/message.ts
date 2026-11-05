@@ -10,6 +10,9 @@ import {
   warn,
   File,
   IO,
+  Exception,
+  StandardError,
+  rtest,
 } from "@blazetrails/ruby-compat";
 import { Body } from "./body.js";
 import { Configuration } from "./configuration.js";
@@ -97,6 +100,38 @@ export class Message {
         block.call(this, this);
       }
     }
+  }
+
+  informObservers(): void {
+    Mail.informObservers(this);
+  }
+
+  informInterceptors(): void {
+    Mail.informInterceptors(this);
+  }
+
+  async deliver(): Promise<this> {
+    this.informInterceptors();
+    if (this.deliveryHandler != null && this.deliveryHandler !== false) {
+      await (
+        this.deliveryHandler as { deliverMail(mail: Message, block: () => unknown): unknown }
+      ).deliverMail(this, () => this.doDelivery());
+    } else {
+      await this.doDelivery();
+    }
+    this.informObservers();
+    return this;
+  }
+
+  async deliverBang(): Promise<unknown> {
+    this.informInterceptors();
+    const deliveryMethod = this._deliveryMethod as {
+      deliverBang(mail: Message): Promise<unknown>;
+      settings: Record<string, unknown>;
+    };
+    const response = await deliveryMethod.deliverBang(this);
+    this.informObservers();
+    return rtest(deliveryMethod.settings.returnResponse) ? response : this;
   }
 
   deliveryMethod(method: unknown = null, settings: Record<string, unknown> = {}): unknown {
@@ -1196,6 +1231,20 @@ export class Message {
       }
     }
     return filename;
+  }
+
+  /** @internal */
+  private async doDelivery(): Promise<void> {
+    try {
+      if (this.performDeliveries) {
+        await (
+          this._deliveryMethod as { deliverBang(mail: Message): Promise<unknown> }
+        ).deliverBang(this);
+      }
+    } catch (e) {
+      if (!(e instanceof StandardError) && e instanceof Exception) throw e;
+      if (this.raiseDeliveryErrors) throw e;
+    }
   }
 
   /** @internal */
