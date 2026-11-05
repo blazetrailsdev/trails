@@ -309,7 +309,7 @@ describe("AppGenerator", () => {
     expect(pkg.devDependencies.vite).toBeDefined();
     expect(pkg.devDependencies.tsx).toBeUndefined();
     expect(pkg.devDependencies.typescript).toBe("^5.8.0");
-    expect(pkg.scripts["db:seed"]).toBe("trails db seed");
+    expect(pkg.scripts["db:seed"]).toBe("trails db:seed");
     expect(pkg.scripts.dev).toBe("trails server");
     expect(pkg.scripts.trails).toBe("trails");
     const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));

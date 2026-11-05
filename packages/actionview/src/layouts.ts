@@ -210,6 +210,16 @@ export function _defaultLayout(
   keys: readonly string[],
   requireLayout = false,
 ): LayoutValue {
+  const klasses: LayoutsClass[] = [];
+  for (
+    let klass = this.constructor as unknown as LayoutsClass;
+    !Object.hasOwn(klass.prototype, "_layout");
+    klass = Object.getPrototypeOf(klass) as LayoutsClass
+  ) {
+    klasses.unshift(klass);
+  }
+  for (const klass of klasses) klass._writeLayoutMethod();
+
   let value: LayoutValue;
   try {
     if (this.isActionHasLayout()) value = this._layout(lookupContext, formats, keys) as LayoutValue;

@@ -90,7 +90,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
         "You are attempting to modify a database that was last run in `otherenv` environment.\n" +
           `You are running in \`${current}\` environment. ` +
           "If you are sure you want to continue, first set the environment using:\n\n" +
-          "        bin/trails db environment:set\n\n",
+          "        bin/trails db:environment:set\n\n",
       );
     },
   );
@@ -233,7 +233,7 @@ describe("EnvironmentMismatchError message", () => {
     "You are attempting to modify a database that was last run in `staging` environment.\n" +
     "You are running in `development` environment. " +
     "If you are sure you want to continue, first set the environment using:\n\n" +
-    "        bin/trails db environment:set";
+    "        bin/trails db:environment:set";
   const trails = TopLevel.Trails;
 
   afterEach(() => {
@@ -257,7 +257,7 @@ describe("NoEnvironmentInSchemaError message", () => {
   fixtures({}, { useTransactionalTests: false });
   const msg =
     "Environment data not found in the schema. To resolve this issue, run: \n\n" +
-    "        bin/trails db environment:set";
+    "        bin/trails db:environment:set";
   const trails = TopLevel.Trails;
 
   afterEach(() => {

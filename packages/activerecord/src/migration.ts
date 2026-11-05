@@ -217,7 +217,7 @@ export class ConcurrentMigrationError extends MigrationError {
 export class NoEnvironmentInSchemaError extends MigrationError {
   constructor() {
     const msg =
-      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/trails db environment:set";
+      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/trails db:environment:set";
     if (TopLevel.Trails !== undefined) {
       super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}`);
     } else {
@@ -243,7 +243,7 @@ export class EnvironmentMismatchError extends ActiveRecordError {
     let msg = `You are attempting to modify a database that was last run in \`${stored ?? ""}\` environment.\n`;
     msg += `You are running in \`${current ?? ""}\` environment. `;
     msg += `If you are sure you want to continue, first set the environment using:\n\n`;
-    msg += `        bin/trails db environment:set`;
+    msg += `        bin/trails db:environment:set`;
     if (TopLevel.Trails !== undefined) {
       super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}\n\n`);
     } else {

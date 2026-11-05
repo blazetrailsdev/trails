@@ -28,9 +28,9 @@
       dev: "trails server",
       "db:create": "trails db:create",
       "db:migrate": "trails db:migrate",
-      "db:seed": "trails db seed",
-      "db:setup": "trails db:create && trails db:migrate && trails db seed",
-      "db:reset": "trails db:drop && trails db:create && trails db:migrate && trails db seed",
+      "db:seed": "trails db:seed",
+      "db:setup": "trails db:setup",
+      "db:reset": "trails db:reset",
       prepare: "trails-tsc-views build --views app/views",
     },
     dependencies: {

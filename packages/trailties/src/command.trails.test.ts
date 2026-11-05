@@ -10,7 +10,6 @@ import { findByNamespace, hiddenCommands, invoke } from "./command.js";
 import { lookupBang, subclasses } from "./command/behavior.js";
 
 const loaded = vi.hoisted(() => [] as string[]);
-vi.mock("./commands/db.js", async (importOriginal) => (loaded.push("db"), importOriginal()));
 vi.mock(
   "./commands/generate.js",
   async (importOriginal) => (loaded.push("generate"), importOriginal()),
@@ -30,7 +29,7 @@ describe("Trails::Command.find_by_namespace", () => {
   it("resolves the namespace of a namespace:command spelling", async () => {
     const { DevCommand } = await import("./commands/dev.js");
     expect(await findByNamespace("dev", "cache")).toBe(DevCommand);
-    expect(programName(await findByNamespace("db", "migrate"))).toBe("db");
+    expect(await findByNamespace("db", "migrate")).toBeUndefined();
     expect(((await findByNamespace("credentials", "edit")) as typeof Base).namespace()).toBe(
       "trails:credentials",
     );

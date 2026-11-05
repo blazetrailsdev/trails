@@ -22,6 +22,22 @@ class LayoutMailer extends Base {
   }
 }
 
+class ImpliedLayoutMailer extends Base {
+  static {
+    this.setMailerName("implied_layout_mailer");
+    this.prependViewPath(
+      new ActionView.FixtureResolver({
+        "implied-layout-mailer/plain.text.tse": "Body",
+        "layouts/implied-layout-mailer.text.tse": "<%= yield %> (implied)",
+      }),
+    );
+  }
+
+  plain() {
+    return this.mail({ to: "a@example.com", from: "b@example.com" });
+  }
+}
+
 class TextMailer extends Base {
   static {
     this.setMailerName("text_mailer");
@@ -180,5 +196,10 @@ describe("Base#mail", () => {
     const mailer = new LayoutMailer();
     await mailer.process("plain");
     expect((mailer.message as Message).body().encoded()).toBe("[Body]");
+  });
+  it("wraps the rendered template in the mailer's implied layout", async () => {
+    const mailer = new ImpliedLayoutMailer();
+    await mailer.process("plain");
+    expect((mailer.message as Message).body().encoded()).toBe("Body (implied)");
   });
 });
