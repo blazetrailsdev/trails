@@ -1,4 +1,5 @@
 import "./active-job.js";
+import "../mailers-controller.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { AbstractController } from "@blazetrails/actionpack";
 import { ActionMailer, Base, deprecator } from "@blazetrails/actionmailer";

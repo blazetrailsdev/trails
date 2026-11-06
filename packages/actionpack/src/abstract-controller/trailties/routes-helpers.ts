@@ -62,7 +62,11 @@ Object.defineProperty(RoutesHelpers, "with", {
       const namedRoutes = (mod as { _routes?: Partial<RouteSet> })._routes?.namedRoutes;
       earlier.push(installed);
       namedRoutes?._appendIncluder(proto, includePathHelpers, installed, earlier);
-      cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
+      Object.defineProperty(cls, "_routes", {
+        value: (mod as { _routes?: unknown })._routes ?? routes,
+        writable: true,
+        configurable: true,
+      });
     };
   },
   writable: true,
