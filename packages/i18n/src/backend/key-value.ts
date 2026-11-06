@@ -1,4 +1,13 @@
-import { Hash, hashAref, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  TypeError,
+  hashAref,
+  isSymbol,
+  rbInspect,
+  rbObjClass,
+  rbObjIsKindOf,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";
@@ -216,18 +225,17 @@ export class SubtreeProxy {
   }
 
   isA(klass: unknown): boolean {
-    return Hash === klass || (typeof klass === "function" && this instanceof klass);
+    return Hash === klass || rbObjIsKindOf(this, klass);
   }
 
-  isKindOf(klass: unknown): boolean {
-    return this.isA(klass);
-  }
+  declare isKindOf: (klass: unknown) => boolean;
 
   isInstanceOf(klass: unknown): boolean {
-    return (
-      Hash === klass ||
-      Object.getPrototypeOf(this) === (klass as { prototype?: unknown })?.prototype
-    );
+    if (Hash === klass) return true;
+    if (typeof klass !== "function" && (typeof klass !== "object" || klass === null)) {
+      throw new TypeError("class or module required");
+    }
+    return rbObjClass(this) === klass;
   }
 
   isNil(): boolean {
@@ -238,3 +246,5 @@ export class SubtreeProxy {
     return rbInspect(this.#subtree);
   }
 }
+
+SubtreeProxy.prototype.isKindOf = SubtreeProxy.prototype.isA;
