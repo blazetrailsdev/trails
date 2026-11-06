@@ -1034,7 +1034,10 @@ export class Message {
     return this.hasContentType() ? /^text$/im.test(this.mainType() ?? "") : false;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   protected parseMessage(): void {
     const rawSource = this.rawSource;
     const [headerPart, bodyPart] = stringSplit(
@@ -1071,7 +1074,10 @@ export class Message {
     this.addEncodingToBody();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   private setEnvelopeHeader(): void {
     const rawSource = rbObjAsString(this.rawSource) as string | Uint8Array;
     const rawString =
