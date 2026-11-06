@@ -31,7 +31,7 @@
     "websocket-driver": ">=0.7.4"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "peerDependencies": {
     "pg": ">=8.19.0"

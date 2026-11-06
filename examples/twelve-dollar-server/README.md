@@ -7,7 +7,7 @@ of the same name: `app/controllers/posts-controller.ts` is `posts_controller.rb`
 
 |                     |                                                                              |
 | ------------------- | ---------------------------------------------------------------------------- |
-| Language            | TypeScript, run by Node.js 24.21.0 (native type stripping)                   |
+| Language            | TypeScript, run by Node.js 26.13.0 (native type stripping)                   |
 | Framework           | trails (trailties application, Action Controller API, Active Record, router) |
 | Server              | `@blazetrails/rack`'s Node handler (`node:http`), via `trails server`        |
 | SQLite driver       | better-sqlite3 12                                                            |

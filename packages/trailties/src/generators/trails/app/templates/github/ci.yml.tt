@@ -19,7 +19,7 @@ jobs:
           node-version-file: .node-version
 
       - name: Install dependencies
-        run: corepack enable && <%= this.packageManager %> install
+        run: npm install -g corepack && corepack enable && <%= this.packageManager %> install
 
       - name: Lint code for consistent style
         run: bin/eslint --format stylish
@@ -61,7 +61,7 @@ jobs:
           node-version-file: .node-version
 
       - name: Install dependencies
-        run: corepack enable && <%= this.packageManager %> install
+        run: npm install -g corepack && corepack enable && <%= this.packageManager %> install
 
       - name: Run tests
         env:

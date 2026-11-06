@@ -26,7 +26,7 @@ beforeEach(async (context) => {
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
   File.write(
     File.join(t.destinationRoot, "package.json"),
-    JSON.stringify({ name: "tmp", dependencies: { "better-sqlite3": "^12.6.2" } }, null, 2) + "\n",
+    JSON.stringify({ name: "tmp", dependencies: { "better-sqlite3": "^13.0.3" } }, null, 2) + "\n",
   );
 
   await copyDockerfile.call(t);
@@ -145,7 +145,7 @@ describe("ChangeGeneratorTest", () => {
     });
 
     await t.assertFile("package.json", (content) => {
-      expect(JSON.parse(content).dependencies["better-sqlite3"]).toBe("^12.6.2");
+      expect(JSON.parse(content).dependencies["better-sqlite3"]).toBe("^13.0.3");
     });
 
     await t.assertFile("Dockerfile", (content) => {
