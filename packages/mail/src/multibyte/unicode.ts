@@ -1,5 +1,5 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
-import { ArgumentError, pack, unpack } from "@blazetrails/ruby-compat";
+import { ArgumentError, bytes as rbBytes, pack, unpack } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
 
@@ -57,11 +57,12 @@ const _database = {
   ) as Record<number, number>,
 };
 
-const utf8 = new TextDecoder("utf-8", { fatal: true });
-
 function tidyByte(byte: number): number[] {
   if (byte < 160) {
-    return unpack(pack([database().cp1252[byte] || byte], "U"), "C*") as number[];
+    return unpack(
+      Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
+      "C*",
+    ) as number[];
   } else if (byte < 192) {
     return [194, byte];
   } else {
@@ -167,22 +168,21 @@ export const Unicode = {
   tidyBytes(string: string, force: boolean = false): string {
     if (force) {
       return pack(
-        Unicode.uUnpack(
-          utf8.decode(
-            pack(
-              (unpack(string, "C*") as number[])
-                .map((b) => tidyByte(b))
-                .flat()
-                .filter((x) => x != null),
-              "C*",
-            ),
+        unpack(
+          pack(
+            (unpack(Uint8Array.from(rbBytes(string)), "C*") as number[])
+              .map((b) => tidyByte(b))
+              .flat()
+              .filter((x) => x != null),
+            "C*",
           ),
-        ),
+          "U*",
+        ) as number[],
         "U*",
       );
     }
 
-    const bytes: (number | number[])[] = unpack(string, "C*") as number[];
+    const bytes: (number | number[])[] = unpack(Uint8Array.from(rbBytes(string)), "C*") as number[];
     let contsExpected = 0;
     let lastLead = 0;
 
@@ -216,14 +216,13 @@ export const Unicode = {
     return bytes.length === 0
       ? ""
       : pack(
-          Unicode.uUnpack(
-            utf8.decode(
-              pack(
-                bytes.flat().filter((x) => x != null),
-                "C*",
-              ),
+          unpack(
+            pack(
+              bytes.flat().filter((x) => x != null),
+              "C*",
             ),
-          ),
+            "U*",
+          ) as number[],
           "U*",
         );
   },
