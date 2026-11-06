@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Body } from "./body.js";
 import { Field } from "./field.js";
@@ -23,13 +24,13 @@ describe("Mail::Message", () => {
     it("should return a basic email", () => {
       let mail = Mail.new();
       mail = Mail.new(mail.toString());
-      expect(Utilities.isBlank(mail.date())).toBe(false);
-      expect(Utilities.isBlank(mail.messageId())).toBe(false);
+      expect(Utilities.isBlank(mail.date())).toBeFalsy();
+      expect(Utilities.isBlank(mail.messageId())).toBeFalsy();
       expect(mail.mimeVersion()).toBe("1.0");
       expect(mail.contentType()).toBe("text/plain");
       expect(mail.contentTransferEncoding()).toBe("7bit");
-      expect(Utilities.isBlank(mail.subject())).toBe(true);
-      expect(Utilities.isBlank(mail.body())).toBe(true);
+      expect(Utilities.isBlank(mail.subject())).toBeTruthy();
+      expect(Utilities.isBlank(mail.body())).toBeTruthy();
     });
 
     it("should instantiate with a string", () => {
@@ -156,7 +157,7 @@ describe("Mail::Message", () => {
 
   describe("envelope line handling", () => {
     it("should respond to 'envelope from'", () => {
-      expect(typeof new Message().envelopeFrom).toBe("function");
+      expect(new Message()).toRespondTo("envelopeFrom");
     });
 
     it("should ignore a plain text body that starts with ^From", () => {
@@ -344,7 +345,7 @@ describe("Mail::Message", () => {
         const m2 = Mail.new(
           "To: mikel@test.lindsaar.net\r\nMessage-ID: <1234@test.lindsaar.net>\r\nSubject: Yo!\r\n\r\nHello there",
         );
-        expect(m1.equals(m2)).toBe(false);
+        expect(m1).not.toEqualRuby(m2);
         expect(m1.messageId()).toBe("4321@test.lindsaar.net");
         expect(m2.messageId()).toBe("1234@test.lindsaar.net");
       });
@@ -440,7 +441,7 @@ describe("Mail::Message", () => {
     it("should collect up any of its fields' errors", () => {
       const mail = Mail.new("Content-Transfer-Encoding: vl@d\r\nReply-To: a b b\r\n");
       const errors = mail.errors() as unknown[][];
-      expect(Utilities.isBlank(errors)).toBe(false);
+      expect(Utilities.isBlank(errors)).toBeFalsy();
       expect(errors.length).toBe(2);
       expect(errors[0][0]).toBe("Reply-To");
       expect(errors[0][1]).toBe("a b b");
@@ -533,7 +534,7 @@ describe("Mail::Message", () => {
 
   describe("SMTP envelope From", () => {
     it("should respond", () => {
-      expect(typeof new Message().smtpEnvelopeFrom).toBe("function");
+      expect(new Message()).toRespondTo("smtpEnvelopeFrom");
     });
 
     it("should default to return_path, sender, or first from address", () => {
@@ -569,7 +570,7 @@ describe("Mail::Message", () => {
 
   describe("SMTP envelope To", () => {
     it("should respond", () => {
-      expect(typeof new Message().smtpEnvelopeTo).toBe("function");
+      expect(new Message()).toRespondTo("smtpEnvelopeTo");
     });
 
     it("should default to destinations", () => {
