@@ -29,10 +29,3 @@ export function testRoots(pkg: string): readonly ("test" | "src")[] {
 export function sourceRoots(pkg: string): readonly string[] {
   return [...new Set<string>([libRoot(pkg), ...testRoots(pkg)])];
 }
-
-/** The glob segment matching any package root in either layout, for configs
- *  that list paths rather than call this module (`packages/*\/{src,lib,test}/**`). */
-export const ANY_ROOT_GLOB = "{src,lib,test}";
-
-/** The regex alternation matching any package root in either layout. */
-export const ANY_ROOT_RE = "(?:src|lib|test)";
