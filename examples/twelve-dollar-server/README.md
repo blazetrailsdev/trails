@@ -17,7 +17,7 @@ of the same name: `app/controllers/posts-controller.ts` is `posts_controller.rb`
 ## Running it
 
 ```bash
-sudo bash install.sh   # Node.js 24 into /opt/node
+sudo bash install.sh   # Node.js 26 + corepack into /opt/node
 bash build.sh          # pnpm install + build of the trails packages this app uses
 SQLITE_PATH=... JWT_SECRET=... HOST=127.0.0.1 PORT=3000 bash start.sh
 ```
