@@ -2,10 +2,11 @@
  * The module-eval import-cycle ratchet (CLAUDE.md § "Call-time constant
  * resolution").
  *
- * Builds one graph over every package's `src` of the imports that survive
+ * Builds one graph over every package's library root (`lib`, RFC 0223, or
+ * `src`) of the imports that survive
  * emit, relative specifiers and `@blazetrails/*` workspace specifiers alike (a
  * workspace specifier resolves through the target package's `exports`, its
- * `dist` path read back to the `src` file it is built from). An import whose
+ * `dist` path read back to the `lib` or `src` file it is built from). An import whose
  * bindings are read only in type positions is elided by `tsc` (the repo does
  * not set `verbatimModuleSyntax`), so it costs no runtime edge whether or not it
  * is spelled `import type`. Inside each cycle of that graph, a module importing
