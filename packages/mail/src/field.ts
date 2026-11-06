@@ -321,7 +321,8 @@ export class Field implements Comparable {
     const klass = (this.constructor as typeof Field).fieldClassFor(name);
     if (klass != null) {
       if (value instanceof Uint8Array && !(klass.prototype instanceof Mail.UnstructuredField)) {
-        value = forceEncoding(value, Encoding.UTF_8);
+        const utf8 = forceEncoding(value, Encoding.UTF_8);
+        value = utf8 instanceof Uint8Array ? binaryString(utf8) : utf8;
       }
       return klass.parse(value, charset);
     } else {

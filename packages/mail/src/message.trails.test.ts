@@ -57,4 +57,11 @@ describe("Mail::Message binary raw source", () => {
     const value = new Mail.Message(raw).header().get("Subject")!.value as unknown as Uint8Array;
     expect(Array.from(value)).not.toContain(0x0d);
   });
+
+  it("appends a binary body's bytes to the encoded message", () => {
+    const mail = new Mail.Message(new TextEncoder().encode("Subject: hi\r\n\r\nabc"));
+    const encoded = mail.encoded() as Uint8Array;
+    expect(encoded).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(encoded)).toMatch(/\r\n\r\nabc$/);
+  });
 });

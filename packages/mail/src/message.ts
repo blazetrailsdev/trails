@@ -946,11 +946,13 @@ export class Message {
     this.addRequiredFields();
   }
 
-  encoded(): string {
+  encoded(): string | Uint8Array {
     this.readyToSendBang();
     let buffer = this.header().encoded();
     buffer += "\r\n";
-    buffer += this.body().encoded(this.contentTransferEncoding() as string | null);
+    const body = this.body().encoded(this.contentTransferEncoding() as string | null);
+    if (body instanceof Uint8Array) return new Uint8Array([...binaryBytes(buffer), ...body]);
+    buffer += body;
     return buffer;
   }
 
@@ -1016,7 +1018,8 @@ export class Message {
   }
 
   toString(): string {
-    return this.encoded();
+    const encoded = this.encoded();
+    return encoded instanceof Uint8Array ? binaryString(encoded) : encoded;
   }
 
   inspect(): string {

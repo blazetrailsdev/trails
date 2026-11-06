@@ -1,5 +1,7 @@
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import {
+  binaryBytes,
+  binaryString,
   ArgumentError,
   EOFError,
   IOError,
@@ -25,7 +27,7 @@ import {
 type Connection = SMTPConnection & {
   _destroyed: boolean;
   options: { tls?: object };
-  _socket?: { setTimeout(ms: number): unknown; write(data: string): unknown };
+  _socket?: { setTimeout(ms: number): unknown; write(data: string | Uint8Array): unknown };
   _sendCommand(str: string): void;
   _responseActions: Array<(str: string) => void>;
   _actionGreeting(str: string): void;
@@ -634,7 +636,7 @@ export class SMTP {
   }
 
   async sendMessage(
-    msgstr: string,
+    msgstr: string | Uint8Array,
     fromAddr: string | Address,
     ...toAddrs: Array<string | Address | Array<string | Address>>
   ): Promise<Response> {
@@ -648,7 +650,7 @@ export class SMTP {
   }
 
   sendMail(
-    msgstr: string,
+    msgstr: string | Uint8Array,
     fromAddr: string | Address,
     ...toAddrs: Array<string | Address | Array<string | Address>>
   ): Promise<Response> {
@@ -656,7 +658,7 @@ export class SMTP {
   }
 
   sendmail(
-    msgstr: string,
+    msgstr: string | Uint8Array,
     fromAddr: string | Address,
     ...toAddrs: Array<string | Address | Array<string | Address>>
   ): Promise<Response> {
@@ -731,7 +733,7 @@ export class SMTP {
   }
 
   async data(
-    msgstr: string | null = null,
+    msgstr: string | Uint8Array | null = null,
     block: ((stream: { write(str: string): unknown }) => unknown) | null = null,
   ): Promise<Response> {
     if (msgstr != null && block != null) {
@@ -740,14 +742,16 @@ export class SMTP {
     if (msgstr == null && block == null) throw new ArgumentError("message or block is required");
     const res = await this.critical(async () => {
       this.checkContinue(await this.getResponse("DATA"));
-      const chunks: string[] = msgstr != null ? [msgstr] : [];
+      const binary = msgstr instanceof Uint8Array;
+      const chunks: string[] = msgstr != null ? [binary ? binaryString(msgstr) : msgstr] : [];
       if (block != null) await block({ write: (str: string) => chunks.push(str) });
       const body = chunks
         .join("")
         .replace(/\r\n|\n|\r/g, "\r\n")
         .replace(/^\./gm, "..");
       const tail = body.endsWith("\r\n") ? "" : "\r\n";
-      this._socket!._socket.write(`${body}${tail}.\r\n`);
+      const message = `${body}${tail}.\r\n`;
+      this._socket!._socket.write(binary ? binaryBytes(message) : message);
       return await this.recvResponse();
     });
     this.checkResponse(res);
