@@ -188,11 +188,11 @@ export class Body {
   splitBang(boundary: string | null): this {
     this.boundary = boundary;
     const parts = this.extractParts();
-    const text = (part: string | Uint8Array = "") =>
-      part instanceof Uint8Array ? binaryString(part) : part;
 
-    this.preamble = strip(text(parts[0]));
-    this.epilogue = strip(text(parts.at(-1)));
+    const preamble = parts[0] ?? "";
+    const epilogue = parts.at(-1) ?? "";
+    this.preamble = strip(preamble instanceof Uint8Array ? binaryString(preamble) : preamble);
+    this.epilogue = strip(epilogue instanceof Uint8Array ? binaryString(epilogue) : epilogue);
     for (const part of parts.slice(1, -1)) this._parts.push(new Mail.Part(part));
     return this;
   }

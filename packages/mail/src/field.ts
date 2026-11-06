@@ -162,6 +162,7 @@ export class Field implements Comparable {
     return null;
   }
 
+  /** @inventedArm forceEncoding — PERMANENT */
   static split(
     rawField: string | Uint8Array,
   ): [string, string | Uint8Array] | string | Uint8Array | null {
@@ -172,7 +173,10 @@ export class Field implements Comparable {
         const [first, value] = stringSplit(scan, Constants.COLON, 2);
         const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
-          return [rstrip(name), binary ? utf8OrBinary(strip(value)) : strip(value)];
+          return [
+            rstrip(name),
+            binary ? forceEncoding(binaryBytes(strip(value)), Encoding.UTF_8) : strip(value),
+          ];
         } else {
           warn(
             `WARNING: Ignoring unparsable header ${rbInspect(rawField)}: invalid header name syntax: ${rbInspect(name)}`,
@@ -180,7 +184,7 @@ export class Field implements Comparable {
           return null;
         }
       } else {
-        return binary ? utf8OrBinary(strip(scan)) : strip(scan);
+        return binary ? forceEncoding(binaryBytes(strip(scan)), Encoding.UTF_8) : strip(scan);
       }
     } catch (error) {
       const e = error as Error;
@@ -366,8 +370,3 @@ Object.setPrototypeOf(
     },
   }),
 );
-
-/** @noRailsEquivalent PERMANENT */
-function utf8OrBinary(binary: string): string | Uint8Array {
-  return forceEncoding(binaryBytes(binary), Encoding.UTF_8);
-}

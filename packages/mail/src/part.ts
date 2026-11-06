@@ -114,11 +114,9 @@ export class Part extends Message {
       new RegExp(`${LAX}${WSP}*${LAX}`, "m"),
       2,
     );
-    const bytes = (part: string | undefined) =>
-      part == null || !binary ? (part ?? null) : binaryBytes(part);
     if (headerPart != null && Constants.HEADER_LINE.test(headerPart)) {
-      this.setHeader(bytes(headerPart));
-      this.setBody(bytes(bodyPart));
+      this.setHeader(binary ? binaryBytes(headerPart) : headerPart);
+      this.setBody(binary && bodyPart != null ? binaryBytes(bodyPart) : (bodyPart ?? null));
     } else {
       this.setHeader("Content-Type: text/plain\r\n");
       this.setBody(rawSource);
