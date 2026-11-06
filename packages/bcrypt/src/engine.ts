@@ -17,9 +17,13 @@ const _bcHashSync: (key: string, setting: string) => string = (() => {
   const getBuiltinModule = (globalThis as { process?: { getBuiltinModule?(id: string): unknown } })
     .process?.getBuiltinModule;
   if (getBuiltinModule === undefined) return bcryptjs.hashSync;
-  const { createRequire } = getBuiltinModule("node:module") as typeof import("node:module");
-  const { Buffer } = getBuiltinModule("node:buffer") as typeof import("node:buffer");
-  let native: { hashSync(key: Buffer, setting: string): string };
+  const { createRequire } = getBuiltinModule("node:module") as {
+    createRequire(url: string): (id: string) => unknown;
+  };
+  const { Buffer } = getBuiltinModule("node:buffer") as {
+    Buffer: { from(s: string, encoding: "utf8"): Uint8Array };
+  };
+  let native: { hashSync(key: Uint8Array, setting: string): string };
   try {
     native = createRequire(import.meta.url)("bcrypt") as typeof native;
   } catch {
