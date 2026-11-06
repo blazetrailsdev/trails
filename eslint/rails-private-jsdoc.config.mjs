@@ -89,7 +89,7 @@ export default [
       "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -113,18 +113,18 @@ export default [
   // must stay in sync with the `ruby-compat-needs-mri-citation` block in
   // eslint.config.mjs.
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: [
       "**/*.test.ts",
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
     ],
     languageOptions: {
       parser: tseslint.parser,
