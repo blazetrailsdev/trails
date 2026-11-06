@@ -1,11 +1,15 @@
-import { Dir } from "@blazetrails/ruby-compat";
+<% const classPath = this.isNamespaced() ? this.namespacedClassPath() : this.regularClassPath(); -%>
+import "<%= "../".repeat(classPath.length + 2) %>test-helper<%= this.ext() %>";
+import { File } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 import { TestCase } from "@blazetrails/trailties/generators/test-case";
-import { <%= this.className().split("::").pop() %>Generator } from "<%= "../".repeat(this.classPath().length + 3) %>lib/<%= this.generatorPath() %><%= this.ext() %>";
+import { <%= this.className().split("::").pop() %>Generator } from "<%= "../".repeat(classPath.length + 3) %>lib/<%= this.generatorPath() %><%= this.ext() %>";
 
 export class <%= this.className().split("::").pop() %>GeneratorTest extends TestCase {
   static {
     this.tests(<%= this.className().split("::").pop() %>Generator);
-    this.destination(Dir.mktmpdir());
+    this.destination(File.join(Trails.root()!, "tmp/generators"));
+    this.setup(":prepareDestination");
   }
 
   // test("generator runs without errors", async () => {

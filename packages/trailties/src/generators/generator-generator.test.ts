@@ -49,6 +49,7 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "test/lib/generators/awesome-generator.test.ts",
       /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
       /from ".*lib\/generators\/awesome\/awesome-generator\.ts"/,
     );
   });
@@ -71,6 +72,7 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "test/lib/generators/trails/awesome-generator.test.ts",
       /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
       /from ".*lib\/generators\/trails\/awesome\/awesome-generator\.ts"/,
     );
   });
@@ -89,6 +91,7 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "test/lib/generators/awesome-generator.test.ts",
       /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
       /from ".*lib\/generators\/awesome-generator\.ts"/,
     );
   });
@@ -111,6 +114,7 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "test/lib/generators/trails/awesome-generator.test.ts",
       /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
       /from ".*lib\/generators\/trails\/awesome-generator\.ts"/,
     );
   });
