@@ -285,7 +285,7 @@ function renameErbAndRails(segment: string): string {
 
 /** A Ruby test directory (`connection_adapters/erb`) as the TS directory the
  *  conventions table puts it at (`connection-adapters/tse`). */
-export function rubyTestDirToTs(dir: string): string {
+function rubyTestDirToTs(dir: string): string {
   return renameErbAndRails(
     dir
       .split("/")
@@ -1764,7 +1764,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "did-you-mean": "packages/did-you-mean/src/",
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
-  "ruby-compat": "packages/ruby-compat/src/",
+  "ruby-compat": "packages/ruby-compat/test/",
   thor: "packages/thor/src/",
   mail: "packages/mail/src/",
   "solid-queue": "packages/solid-queue/src/",

@@ -227,7 +227,7 @@ is `super(msg)` and then `set_backtrace $!.backtrace if $!`. JS has no
 equivalent: a `catch` binds its exception to a local only, and no hook runs on
 entry to a `catch` that could seat a carrier. **The exception being rescued is
 passed as a trailing `errinfo` parameter.** `excSetupMessage(mesg, errinfo)`
-(`ruby-compat/src/exception.ts`) is the shape for `raise`'s implicit `cause:`,
+(`ruby-compat/lib/exception.ts`) is the shape for `raise`'s implicit `cause:`,
 and `new BadRequest(msg, errinfo)` is the shape for a constructor that reads
 `$!`. A carrier that every rescue site has to set would be an invented call at
 each site, and would still be wrong as soon as an `await` interleaved two

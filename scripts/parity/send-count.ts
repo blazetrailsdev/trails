@@ -107,6 +107,7 @@ export async function measureAt(ref: string, cwd = ROOT_DIR, src = SRC): Promise
         ref,
         "--",
         `${src}/*/src/*.ts`,
+        `${src}/*/lib/*.ts`,
         ":!*.test.ts",
         ":!*/dist/*",
       ],
@@ -143,10 +144,27 @@ export function exceedances(base: SendCounts, current: SendCounts): Exceedance[]
     .map((file) => ({ file, base: base[file] ?? 0, current: current[file] }));
 }
 
+/** Re-keys a base count from `<pkg>/src/` to `<pkg>/lib/` for a package whose
+ *  library now lives in `lib/` (RFC 0223), so a moved package compares file
+ *  for file. */
+export function followLibRoot(base: SendCounts, current: SendCounts): SendCounts {
+  const libPkgs = new Set(
+    Object.keys(current)
+      .filter((file) => file.split("/")[1] === "lib")
+      .map((file) => file.split("/")[0]),
+  );
+  const out: SendCounts = {};
+  for (const [file, n] of Object.entries(base)) {
+    const [pkg, root, ...rest] = file.split("/");
+    out[libPkgs.has(pkg) && root === "src" ? [pkg, "lib", ...rest].join("/") : file] = n;
+  }
+  return out;
+}
+
 export async function main(baseBranch = "origin/main", cwd = ROOT_DIR): Promise<string> {
   const ref = (await git(["merge-base", baseBranch, "HEAD"], cwd)).trim();
-  const base = await measureAt(ref, cwd);
   const current = await measure(path.join(cwd, SRC));
+  const base = followLibRoot(await measureAt(ref, cwd), current);
   const grew = exceedances(base, current);
   if (grew.length > 0) {
     throw new Error(

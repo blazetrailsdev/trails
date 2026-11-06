@@ -1,10 +1,18 @@
 const packagesUrl = new URL("../../../", import.meta.url);
 
-export function resolve(specifier, context, nextResolve) {
+export async function resolve(specifier, context, nextResolve) {
   if (specifier.startsWith("@blazetrails/")) {
     const [name, ...rest] = specifier.slice("@blazetrails/".length).split("/");
-    const target = rest.length > 0 ? `${name}/src/${rest.join("/")}.ts` : `${name}/src/index.ts`;
-    return nextResolve(new URL(target, packagesUrl).href, context);
+    const target = (root) =>
+      new URL(
+        rest.length > 0 ? `${name}/${root}/${rest.join("/")}.ts` : `${name}/${root}/index.ts`,
+        packagesUrl,
+      ).href;
+    try {
+      return await nextResolve(target("lib"), context);
+    } catch {
+      return nextResolve(target("src"), context);
+    }
   }
   return nextResolve(specifier, context);
 }

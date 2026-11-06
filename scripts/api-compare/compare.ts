@@ -309,7 +309,7 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // (RFC 0190). A membership test on any other receiver, or none at all, is the
 // dropped guard and still flags.
 //
-// `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
+// `catch` left the same way: `kernelCatch` (`ruby-compat/lib/kernel-catch.ts`)
 // is the call form Ruby's `Kernel#catch` ports onto.
 //
 // The six that remain are NOT candidates, and ruby-compat cannot make them
@@ -525,12 +525,12 @@ const CONSTRUCT_SKELETON_NAMES = new Map([
 
 /**
  * trails' names for Ruby's `Kernel#throw` / `Kernel#catch`: `kernelThrow` /
- * `kernelCatch` (`ruby-compat/src/kernel-catch.ts`). The Ruby side already
+ * `kernelCatch` (`ruby-compat/lib/kernel-catch.ts`). The Ruby side already
  * folds `ref:throw` / `ref:catch` onto the constructs
  * ({@link CONSTRUCT_SKELETON_NAMES}); without this mirror the call reads as an
  * ordinary `ref:` reach and a faithful port scores a missing `throw`.
  *
- * `rbEnsure` (`ruby-compat/src/ensure.ts`) is the port of `begin … ensure`,
+ * `rbEnsure` (`ruby-compat/lib/ensure.ts`) is the port of `begin … ensure`,
  * whose `:bodystmt` the Ruby side emits as `try`: a hand-written `try` cannot
  * defer the ensure clause to an async block's settlement.
  */

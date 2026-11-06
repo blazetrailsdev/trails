@@ -1029,7 +1029,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "Concern, so in Ruby it joins the *host's* constructor chain via `super` " +
       "when a class does `include ActiveModel::API`. TypeScript has no " +
       "expression for that: `include()` " +
-      "(packages/ruby-compat/src/include.ts) copies prototype members and " +
+      "(packages/ruby-compat/lib/include.ts) copies prototype members and " +
       "cannot install a constructor, so the port keeps the Rails name as an " +
       "exported `initialize` function that each including class calls from its " +
       "own constructor (model.ts). There is no TS `constructor` at the mapped " +

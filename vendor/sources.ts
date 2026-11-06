@@ -734,7 +734,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // Keyed to the TS package it measures — `packages/ruby-compat/src` —
+        // Keyed to the TS package it measures — `packages/ruby-compat/lib` —
         // not to the source name, because the test comparator maps a package
         // key onto a TS src dir (scripts/test-compare/compare.ts pkgDirs).
         name: "ruby-compat",

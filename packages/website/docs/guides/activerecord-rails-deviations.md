@@ -252,7 +252,7 @@ core class with no JS equivalent, so `@blazetrails/ruby-compat` ports it as a
 `core_ext/range/*` reopenings extend. `where({ age: new Range(18, 65)
 })` lowers to the right SQL via Arel.
 
-See `packages/ruby-compat/src/range.ts`.
+See `packages/ruby-compat/lib/range.ts`.
 
 ## 9. Numeric types
 

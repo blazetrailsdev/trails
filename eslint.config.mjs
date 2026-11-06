@@ -245,20 +245,20 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
       // Adapter implementations — these ARE the abstraction layer
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
       "packages/activesupport/src/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/src/tsc-wrapper/**",
@@ -282,7 +282,7 @@ export default defineConfig(
   // `types: []` does not fence them either, because vitest's own types
   // re-reference @types/node transitively for the whole program.
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "no-restricted-globals": [
@@ -482,7 +482,7 @@ export default defineConfig(
       "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -809,18 +809,18 @@ export default defineConfig(
   //    in sync with the same block in eslint/rails-private-jsdoc.config.mjs,
   //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: [
       "**/*.test.ts",
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
     ],
     rules: {
       "blazetrails/ruby-compat-needs-mri-citation": "error",

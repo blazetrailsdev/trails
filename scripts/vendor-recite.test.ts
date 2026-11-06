@@ -13,7 +13,7 @@ const rails = activeVersion(SOURCES.find((s) => s.name === "rails")!);
 const ruby = activeVersion(SOURCES.find((s) => s.name === "ruby")!);
 
 const FIXTURES: Record<string, { input: string; recited: string }> = {
-  "packages/ruby-compat/src/unversioned.ts": {
+  "packages/ruby-compat/lib/unversioned.ts": {
     input:
       "/** Mirrors `vendor/ruby/rational.c:580` and vendor/rack-session/lib/rack/session/pool.rb */\n",
     recited: `/** Mirrors \`vendor/ruby/${ruby}/rational.c:580\` and vendor/rack-session/${activeVersion(SOURCES.find((s) => s.name === "rack-session")!)}/lib/rack/session/pool.rb */\n`,
@@ -31,7 +31,7 @@ const FIXTURES: Record<string, { input: string; recited: string }> = {
 
 const libyaml = activeVersion(SOURCES.find((s) => s.name === "libyaml")!);
 
-FIXTURES["packages/ruby-compat/src/bare-ref.ts"] = {
+FIXTURES["packages/ruby-compat/lib/bare-ref.ts"] = {
   input: `// vendor/libyaml/${libyaml}/src/emitter.c:281 and vendor/libyaml/0.2.4/src/emitter.c\n`,
   recited: `// vendor/libyaml/${libyaml}/src/emitter.c:281 and vendor/libyaml/${libyaml}/src/emitter.c\n`,
 };
@@ -75,8 +75,8 @@ describe("vendor:recite", () => {
       expect(changed.sort()).toEqual([
         "docs/stale.md",
         "packages/activerecord/src/tagged.ts",
-        "packages/ruby-compat/src/bare-ref.ts",
-        "packages/ruby-compat/src/unversioned.ts",
+        "packages/ruby-compat/lib/bare-ref.ts",
+        "packages/ruby-compat/lib/unversioned.ts",
       ]);
       for (const [path, { recited }] of Object.entries(FIXTURES)) {
         expect(await readFile(join(root, path), "utf8")).toBe(recited);

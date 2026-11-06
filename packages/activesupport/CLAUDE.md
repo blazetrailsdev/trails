@@ -57,7 +57,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   `constSet(Owner, "Name", Klass)`; there is no full-path `"A::B"` seat, so
   `constantize` walks one segment at a time. A class the generated table names
   needs no seat for its name.
-- `TopLevel` in `ruby-compat/src/object.ts` is Ruby's top-level `Object`,
+- `TopLevel` in `ruby-compat/lib/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
   (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /

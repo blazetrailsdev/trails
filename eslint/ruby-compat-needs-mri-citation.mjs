@@ -7,7 +7,7 @@
  * entry in `vendor/sources.ts`. RFC 0089 read that as "this package has no
  * anchor"; with `vendor/ruby/` in the tree it has one, and it is a CITATION
  * rather than an extraction — checkable, which is what separates it from a
- * JSDoc habit. So every exported declaration under `packages/ruby-compat/src/`
+ * JSDoc habit. So every exported declaration under `packages/ruby-compat/lib/`
  * carries BOTH halves of the package contract (see the README):
  *
  *   - a `vendor/ruby/<version>/<file>:<line>` citation, RESOLVED against the

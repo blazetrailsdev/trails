@@ -755,7 +755,7 @@ async function main(): Promise<void> {
     )
   ).flat();
   if (only === undefined || only === "ruby-compat") {
-    const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);
+    const target = path.join(ROOT_DIR, "packages/ruby-compat/lib", GENERATED);
     const next = await prettier.format(renderCoreClassPaths(), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
