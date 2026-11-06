@@ -285,7 +285,7 @@ function renameErbAndRails(segment: string): string {
 
 /** A Ruby test directory (`connection_adapters/erb`) as the TS directory the
  *  conventions table puts it at (`connection-adapters/tse`). */
-export function rubyTestDirToTs(dir: string): string {
+function rubyTestDirToTs(dir: string): string {
   return renameErbAndRails(
     dir
       .split("/")
