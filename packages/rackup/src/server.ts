@@ -83,10 +83,9 @@ interface HandlerLike {
 const loadPath: Record<string, (() => Promise<unknown>) | undefined> = {};
 
 export class Options {
-  /** @missingRailsArgs new — CONVERGEABLE ruby-compat-optparse-initialize-banner-width-indent */
   async parseBang(args: string[]): Promise<ServerOptions> {
     const options: ServerOptions = {};
-    const optParser = new OptionParser();
+    const optParser = new OptionParser("", 24, "  ");
     optParser.banner = "Usage: rackup [ruby options] [rack options] [rackup config]";
 
     optParser.separator("");

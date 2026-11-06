@@ -1,0 +1,10 @@
+import { NamedBase } from "@blazetrails/trailties/generators";
+import { File } from "@blazetrails/ruby-compat";
+
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
+export class <%= this.className().split("::").pop() %>Generator extends NamedBase {
+  static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
+  }
+}
