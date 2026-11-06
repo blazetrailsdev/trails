@@ -324,6 +324,7 @@ export class PluginGenerator extends AppBase {
     this.noCommands(() => this.methodAdded("name"));
     this.noCommands(() => this.methodAdded("underscoredName"));
     this.noCommands(() => this.methodAdded("namespacedName"));
+    this.noCommands(() => this.methodAdded("pluginPath"));
     this.noCommands(() => this.methodAdded("isEngine"));
     this.noCommands(() => this.methodAdded("isFull"));
     this.noCommands(() => this.methodAdded("isMountable"));
@@ -374,7 +375,7 @@ export class PluginGenerator extends AppBase {
     }
   }
 
-  get pluginPath(): string {
+  pluginPath(): string {
     return this.appPath;
   }
 
@@ -463,7 +464,7 @@ export class PluginGenerator extends AppBase {
   protected async createDummyApp(path: string | null = null): Promise<void> {
     if (path != null) this.dummyPath(path);
 
-    this.sayStatus("vendorApp", this.dummyPath());
+    this.sayStatus("vendor_app", this.dummyPath());
     await this.mute(async () => {
       await this.build("generateTestDummy");
       await this.build("testDummyConfig");
