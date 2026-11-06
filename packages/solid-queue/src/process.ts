@@ -15,6 +15,7 @@ export class Process extends Record {
   declare metadata: HashWithIndifferentAccess;
   declare last_heartbeat_at: Time;
   declare supervisor_id: unknown;
+  declare supervisor: Promise<Process | null>;
   declare supervisees: Relation<Process>;
   declare failAllClaimedExecutionsWith: (error: Error) => Promise<unknown>;
   declare releaseAllClaimedExecutions: typeof Executor.prototype.releaseAllClaimedExecutions;

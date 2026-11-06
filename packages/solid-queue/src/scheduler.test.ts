@@ -18,23 +18,12 @@ import {
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import "./test-helpers/add-to-buffer-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
-
-async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
-  const end = Date.now() + timeout * 1000;
-  while (Date.now() < end && (await block())) await sleep(0.05);
-}
-
-async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
-  await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
-}
-
-function assertMetadata(process: Process, metadata: Record<string, unknown>) {
-  for (const [attr, value] of Object.entries(metadata)) {
-    expect(process.metadata.get(attr)).toEqual(value);
-  }
-}
+import {
+  sleep,
+  waitWhileWithTimeout,
+  waitForRegisteredProcesses,
+  assertMetadata,
+} from "./test-helpers/processes-test-helper.js";
 
 class SchedulerTest extends TestCase {
   static {

@@ -21,6 +21,7 @@ import { msgpack } from "./assertion-receipts/msgpack.js";
 import { rack } from "./assertion-receipts/rack.js";
 import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
+import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
@@ -60,6 +61,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   rack,
   rake,
   "ruby-compat": rubyCompat,
+  "solid-queue": solidQueue,
   trailties,
   zeitwerk,
 };
