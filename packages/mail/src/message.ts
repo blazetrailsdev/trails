@@ -199,7 +199,7 @@ export class Message {
     return reply;
   }
 
-  compare(other: Message | null): number | null {
+  compareTo(other: Message | null): number | null {
     if (other == null) {
       return 1;
     } else {

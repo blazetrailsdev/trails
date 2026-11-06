@@ -230,8 +230,9 @@ export class Session {
   /** @internal */
   _urlOptions?: Record<string, unknown>;
 
-  /** @internal */
-  _defaultUrlOptions: Record<string, unknown> = {};
+  declare static defaultUrlOptions: Record<string, unknown>;
+
+  declare defaultUrlOptions: Record<string, unknown>;
 
   /** @internal */
   _htmlDocument?: XmlDocument | null;
@@ -267,15 +268,6 @@ export class Session {
       this._urlOptions = urlOptions;
     }
     return this._urlOptions;
-  }
-
-  get defaultUrlOptions(): Record<string, unknown> {
-    return this._defaultUrlOptions;
-  }
-
-  set defaultUrlOptions(options: Record<string, unknown>) {
-    this._defaultUrlOptions = options;
-    this._urlOptions = undefined;
   }
 
   resetBang(): void {
