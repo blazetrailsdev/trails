@@ -2,6 +2,7 @@ import "./constants.inbound-email.generated.js";
 import { include, runLoadHooks, type Extended, type Included } from "@blazetrails/activesupport";
 import type { ClassMethods as AttachedClassMethods } from "@blazetrails/activestorage/attached/model";
 import type { One } from "@blazetrails/activestorage/attached/one";
+import type { Blob } from "@blazetrails/activestorage/blob";
 import { Mail, type Message } from "@blazetrails/mail";
 import { ActionMailbox } from "./action-mailbox.js";
 import { MessageId } from "./inbound-email/message-id.js";
@@ -21,7 +22,7 @@ export class InboundEmail extends Record {
     options?: { [k: string]: unknown },
   ) => Promise<InboundEmail | null>;
 
-  declare rawEmail: One;
+  declare rawEmail: One & Pick<Blob, "download">;
   declare status: string;
   declare message_id: string;
   declare message_checksum: string;
@@ -31,7 +32,7 @@ export class InboundEmail extends Record {
   declare isBounced: () => boolean;
 
   private _mail?: Message;
-  private _source?: string;
+  private _source?: Uint8Array;
 
   static {
     (this as unknown as Extended<typeof AttachedClassMethods>).hasOneAttached("rawEmail", {
@@ -44,12 +45,10 @@ export class InboundEmail extends Record {
     return (this._mail ??= Mail.fromSource(await this.source()));
   }
 
-  async source(): Promise<string> {
+  async source(): Promise<Uint8Array> {
     if (this._source == null) {
       await this.rawEmail.load();
-      this._source = new TextDecoder().decode(
-        await (this.rawEmail as unknown as { download(): Promise<Uint8Array> }).download(),
-      );
+      this._source = await this.rawEmail.download();
     }
     return this._source;
   }
