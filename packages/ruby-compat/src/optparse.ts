@@ -122,14 +122,14 @@ export class OptionParser {
 
   /** @noRailsEquivalent PERMANENT */
   banner: string;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1147 */
   summaryWidth: number;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1148 */
   summaryIndent: string;
   private _lines: (Switch | string)[] = [];
   private _tail: Switch[] = [];
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1143 */
   constructor(banner: string | null = null, width = 32, indent = " ".repeat(4)) {
     this.banner = banner ?? "";
     this.summaryWidth = width;
