@@ -11,6 +11,11 @@ import {
   type HelperMap,
 } from "./extract-ts-core.js";
 import { scopeOf } from "../api-compare/scope.js";
+import { testRoots } from "../layout/package-roots.js";
+
+function globInTestRoots(pkg: string, pattern: string): string[] {
+  return testRoots(pkg).flatMap((root) => globSync(`packages/${pkg}/${root}/${pattern}`));
+}
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
 
@@ -60,29 +65,26 @@ function getPackageTestFiles(): Record<string, string[]> {
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
-    const pattern = `packages/${pkg}/src/**/*.test.ts`;
-    // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
-    const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
-    const files = [
-      ...globSync(pattern, { cwd: ROOT_DIR }),
-      ...globSync(behaviorPattern, { cwd: ROOT_DIR }),
-    ].sort();
+    const files = testRoots(pkg)
+      .flatMap((root) => [
+        ...globSync(`packages/${pkg}/${root}/**/*.test.ts`, { cwd: ROOT_DIR }),
+        // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
+        ...globSync(`packages/${pkg}/${root}/**/behaviors/*-behavior.ts`, { cwd: ROOT_DIR }),
+      ])
+      .sort();
 
     result[pkg] = files;
   }
 
   // ActionPack special handling
-  const actionDispatchFiles = globSync("packages/actionpack/src/action-dispatch/**/*.test.ts", {
-    cwd: ROOT_DIR,
-  }).sort();
-  const actionControllerFiles = globSync("packages/actionpack/src/action-controller/**/*.test.ts", {
-    cwd: ROOT_DIR,
-  }).sort();
-  const abstractControllerFiles = globSync(
-    "packages/actionpack/src/abstract-controller/**/*.test.ts",
-    {
-      cwd: ROOT_DIR,
-    },
+  const actionDispatchFiles = globInTestRoots("actionpack", "action-dispatch/**/*.test.ts").sort();
+  const actionControllerFiles = globInTestRoots(
+    "actionpack",
+    "action-controller/**/*.test.ts",
+  ).sort();
+  const abstractControllerFiles = globInTestRoots(
+    "actionpack",
+    "abstract-controller/**/*.test.ts",
   ).sort();
   result["actiondispatch"] = actionDispatchFiles;
   // Shared test files also relevant to controller/ Ruby tests
@@ -91,7 +93,7 @@ function getPackageTestFiles(): Record<string, string[]> {
 
   // Aliased packages (trailties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {
-    const files = globSync(`packages/${dir}/src/**/*.test.ts`, { cwd: ROOT_DIR }).sort();
+    const files = globInTestRoots(dir, "**/*.test.ts").sort();
     result[alias] = files;
   }
 

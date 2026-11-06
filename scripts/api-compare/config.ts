@@ -1,6 +1,7 @@
 import * as path from "path";
 
 import { apiComparePackages } from "../../vendor/sources.js";
+import { libRoot } from "../layout/package-roots.js";
 
 export const SCRIPT_DIR = __dirname;
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -167,8 +168,8 @@ export function packageSrcDir(pkg: string): string {
   const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
   const subDir = PACKAGE_SRC_SUBDIR[pkg];
   return subDir
-    ? path.join(ROOT_DIR, "packages", dirName, "src", subDir)
-    : path.join(ROOT_DIR, "packages", dirName, "src");
+    ? path.join(ROOT_DIR, "packages", dirName, libRoot(dirName), subDir)
+    : path.join(ROOT_DIR, "packages", dirName, libRoot(dirName));
 }
 
 /**

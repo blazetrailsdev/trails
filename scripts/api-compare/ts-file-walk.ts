@@ -19,6 +19,7 @@
 import * as fs from "fs";
 import * as fsPromises from "fs/promises";
 import * as path from "path";
+import { sourceRoots } from "../layout/package-roots.js";
 
 export interface TsFilePopulation {
   /** Directory *names* pruned during traversal, at any depth. */
@@ -138,7 +139,8 @@ export async function walkTsFiles(dir: string, population: TsFilePopulation): Pr
   return walk(dir, new Set());
 }
 
-/** Every file of `population` under `<packagesDir>/<pkg>/src`, sorted for
+/** Every file of `population` under each of `<packagesDir>/<pkg>`'s source
+ *  roots (`src`, or `lib` and `test`: `sourceRoots`), sorted for
  *  stable output. Missing directories yield no files rather than throwing. */
 export async function walkPackageTsFiles(
   packagesDir: string,
@@ -153,7 +155,9 @@ export async function walkPackageTsFiles(
     return [];
   }
   const perPackage = await Promise.all(
-    pkgs.map((pkg) => walkTsFiles(path.join(packagesDir, pkg, "src"), population)),
+    pkgs.flatMap((pkg) =>
+      sourceRoots(pkg).map((root) => walkTsFiles(path.join(packagesDir, pkg, root), population)),
+    ),
   );
   return perPackage.flat().sort();
 }
