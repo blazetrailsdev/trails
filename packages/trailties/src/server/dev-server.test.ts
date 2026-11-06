@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { connect } from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { RackApp } from "@blazetrails/actionpack";
+import type { RackApp } from "@blazetrails/rack";
 import type { TCPSocket } from "@blazetrails/ruby-compat";
 import { build } from "vite";
 import { AppGenerator } from "../generators/trails/app/app-generator.js";

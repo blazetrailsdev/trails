@@ -123,7 +123,7 @@ describe("AppGeneratorTest", () => {
     await t.assertFile("public/406-unsupported-browser.html");
   });
 
-  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
   it.skip("app update preserves skip active job", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
 
@@ -138,7 +138,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
   it.skip("app update preserves skip action mailbox", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
 
@@ -153,7 +153,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
   it.skip("app update preserves skip action text", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
 
@@ -207,7 +207,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
   it.skip("app update preserves skip test", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-test"]);
 
