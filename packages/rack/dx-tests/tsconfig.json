@@ -5,7 +5,7 @@
     "noEmit": true,
     "paths": {
       "@blazetrails/rack": ["../src/index.ts"],
-      "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
+      "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"]
     }
   },
