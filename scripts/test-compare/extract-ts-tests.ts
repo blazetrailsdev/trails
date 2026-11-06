@@ -14,7 +14,9 @@ import { scopeOf } from "../api-compare/scope.js";
 import { testRoots } from "../layout/package-roots.js";
 
 function globInTestRoots(pkg: string, pattern: string): string[] {
-  return testRoots(pkg).flatMap((root) => globSync(`packages/${pkg}/${root}/${pattern}`));
+  return testRoots(pkg).flatMap((root) =>
+    globSync(`packages/${pkg}/${root}/${pattern}`, { cwd: ROOT_DIR }),
+  );
 }
 
 export { extractTestsFromSource } from "./extract-ts-core.js";

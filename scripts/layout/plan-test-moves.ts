@@ -25,6 +25,8 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { PKG_SRC_DIRS, rubyTestDirToTs, rubyToConventionTs } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
+import { LIB_TEST_PACKAGES } from "./package-roots.js";
+import { COMMITTED_TS_FILES, walkTsFiles } from "../api-compare/ts-file-walk.js";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const COMPARISON_JSON = path.join(
@@ -148,18 +150,6 @@ export function planTestMoves(input: PlanInput): Plan {
   return { moves, flagged: flagged.sort(), collisions: collisions.sort() };
 }
 
-async function listTs(dir: string, prefix = ""): Promise<string[]> {
-  const out: string[] = [];
-  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      if (entry.name !== "node_modules")
-        out.push(...(await listTs(path.join(dir, entry.name), rel)));
-    } else if (entry.name.endsWith(".ts")) out.push(rel);
-  }
-  return out;
-}
-
 /** Files under `libDir` that a non-test file there imports by relative specifier. */
 async function libImportedFiles(libPath: string, files: readonly string[]): Promise<Set<string>> {
   const present = new Set(files);
@@ -181,12 +171,20 @@ async function libImportedFiles(libPath: string, files: readonly string[]): Prom
 export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<string> {
   const pkg = args.find((a) => !a.startsWith("--"));
   if (!pkg) throw new Error("usage: plan-test-moves <pkg> [--apply]");
+  if (LIB_TEST_PACKAGES.has(pkg)) {
+    throw new Error(
+      `plan-test-moves: ${pkg} is already in LIB_TEST_PACKAGES; its tests have moved.`,
+    );
+  }
   const pkgDir = path.join(cwd, "packages", pkg);
   const libDir = await fs.stat(path.join(pkgDir, "lib")).then(
     () => "lib",
     () => "src",
   );
-  const files = await listTs(path.join(pkgDir, libDir));
+  const libPath = path.join(pkgDir, libDir);
+  const files = (await walkTsFiles(libPath, COMMITTED_TS_FILES)).map((f) =>
+    path.relative(libPath, f),
+  );
   const comparison = JSON.parse(await fs.readFile(COMPARISON_JSON, "utf-8")) as {
     results: ComparedPackage[];
   };
@@ -194,7 +192,7 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     pkg,
     libDir,
     files,
-    libImported: await libImportedFiles(path.join(pkgDir, libDir), files),
+    libImported: await libImportedFiles(libPath, files),
     comparison: comparison.results,
   });
   if (plan.collisions.length > 0) {

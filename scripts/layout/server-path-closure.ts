@@ -66,17 +66,6 @@ export function wildcardMatch(pattern: string, value: string): string | null {
   return v.slice(head.length, v.length - tail.length);
 }
 
-async function jsFilesUnder(dir: string, rel: string): Promise<string[]> {
-  const out: string[] = [];
-  const entries = await fs.readdir(path.join(dir, rel), { withFileTypes: true }).catch(() => []);
-  for (const entry of entries) {
-    const child = `${rel}/${entry.name}`;
-    if (entry.isDirectory()) out.push(...(await jsFilesUnder(dir, child)));
-    else if (entry.name.endsWith(".js")) out.push(child);
-  }
-  return out;
-}
-
 export async function readPackages(root = ROOT_DIR): Promise<Map<string, PackageExports>> {
   const out = new Map<string, PackageExports>();
   for (const entry of await fs.readdir(path.join(root, "packages"))) {
@@ -102,7 +91,9 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
       else if (file !== null) exports[key] = path.join(dir, file);
     }
     if (patterns.length > 0) {
-      const built = await jsFilesUnder(dir, "dist");
+      const built = (await fs.readdir(path.join(dir, "dist"), { recursive: true }).catch(() => []))
+        .filter((rel) => rel.endsWith(".js"))
+        .map((rel) => `dist/${rel}`);
       const excluded = patterns.filter(([, file]) => file === null).map(([key]) => key);
       for (const [key, file] of patterns) {
         if (file === null) continue;
@@ -145,13 +136,6 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
       if (isTestingExport(key)) testingEntries.add(file);
     }
   }
-  const sourceCache = new Map<string, string | null>();
-  const read = async (file: string): Promise<string | null> => {
-    if (!sourceCache.has(file)) {
-      sourceCache.set(file, await fs.readFile(file, "utf-8").catch(() => null));
-    }
-    return sourceCache.get(file)!;
-  };
   const found = new Map<string, Violation>();
   const visited = new Set<string>();
   for (const pkg of [...packages.values()].sort((a, b) => a.name.localeCompare(b.name))) {
@@ -164,7 +148,7 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
         if (visited.has(file)) continue;
         visited.add(file);
         const rel = path.relative(root, file);
-        const source = await read(file);
+        const source = await fs.readFile(file, "utf-8").catch(() => null);
         if (source === null) continue;
         const specifiers = moduleSpecifiers(source).map((s) => s.specifier);
         const testing =
