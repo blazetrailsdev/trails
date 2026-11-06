@@ -7,4 +7,5 @@ apt-get install -y build-essential curl openssl python3 xz-utils
 mkdir -p /opt/node
 curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
   | tar -xJ -C /opt/node --strip-components=1
-/opt/node/bin/npm install -g corepack >/dev/null
+export PATH="/opt/node/bin:$PATH"
+npm install -g corepack >/dev/null
