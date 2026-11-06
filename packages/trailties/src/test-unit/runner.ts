@@ -17,6 +17,7 @@ import {
   type Method,
 } from "@blazetrails/ruby-compat";
 import { TestParser } from "./test-parser.js";
+import { Trails } from "../trails.js";
 
 interface Runnable {
   isMethodDefined(method: string): boolean;
@@ -359,3 +360,5 @@ export class Filter {
     return TestParser.definitionFor(method);
   }
 }
+
+Trails.TestUnit = { Runner };
