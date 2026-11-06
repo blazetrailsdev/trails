@@ -27,8 +27,8 @@ export const Registry = {
   },
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @inventedArm if — CONVERGEABLE lib-test-layout-retire-src-compat
+   * @noRailsEquivalent PERMANENT
    */
   async loaderForPackage(
     packageFile: string,
