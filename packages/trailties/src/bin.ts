@@ -6,7 +6,6 @@ import { APP_PATH, setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
 import { aliases } from "./commands.js";
 import "./constants.generated.js";
-import "./source-annotation-extractor.js";
 
 if (APP_PATH == null) {
   const candidate = getPath().join(Dir.pwd(), "config", "application.ts");

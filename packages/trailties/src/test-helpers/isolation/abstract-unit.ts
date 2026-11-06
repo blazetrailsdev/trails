@@ -49,21 +49,21 @@ export class Rack {
   static readonly [classModule] = true;
   declare _app: RackHost | undefined;
 
-  async app(env = "production"): Promise<RackHost> {
-    const oldEnv = ENV["TRAILS_ENV"];
-    try {
-      if (this._app == null) {
+  app(env = "production"): RackHost | Promise<RackHost> {
+    if (this._app != null) return this._app;
+    return (async () => {
+      const oldEnv = ENV["TRAILS_ENV"];
+      try {
         setEnv("TRAILS_ENV", env);
 
         const environment = await this.appPath("config", "environment.ts");
         await import(environment);
 
-        this._app = Trails.application as unknown as RackHost;
+        return (this._app = Trails.application as unknown as RackHost);
+      } finally {
+        setEnv("TRAILS_ENV", oldEnv);
       }
-      return this._app;
-    } finally {
-      setEnv("TRAILS_ENV", oldEnv);
-    }
+    })();
   }
 
   async extractBody(response: RackResponse): Promise<string> {

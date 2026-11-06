@@ -1,30 +1,43 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
-import { Trails } from "./trails.js";
+import { Dir, File, LoadError, rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat";
+import type * as Ast from "typescript/unstable/ast";
 import type { Node } from "typescript/unstable/ast";
+import type * as Scanner from "typescript/unstable/ast/scanner";
+import type * as Sync from "typescript/unstable/sync";
 import type { API } from "typescript/unstable/sync";
+
+const TOKENIZER_FEATURES = [
+  "typescript/unstable/ast",
+  "typescript/unstable/ast/scanner",
+  "typescript/unstable/sync",
+] as const;
+
+/** @noRailsEquivalent PERMANENT */
+const loadPath: Record<string, () => Promise<unknown>> = Object.fromEntries(
+  TOKENIZER_FEATURES.map((feature) => [feature, () => import(feature)]),
+);
 
 /** @noRailsEquivalent PERMANENT */
 async function requireTokenizer() {
   try {
-    const [ast, scanner, sync] = await Promise.all([
-      import("typescript/unstable/ast"),
-      import("typescript/unstable/ast/scanner"),
-      import("typescript/unstable/sync"),
-    ]);
-    return {
-      API: sync.API,
-      SyntaxKind: ast.SyntaxKind,
-      isLiteralLike: (node: Node) =>
-        ast.isStringLiteralLikeNode(node) ||
-        ast.isTemplateHead(node) ||
-        ast.isTemplateMiddle(node) ||
-        ast.isTemplateTail(node) ||
-        ast.isRegularExpressionLiteral(node),
-      createScanner: scanner.createScanner,
-    };
-  } catch {
-    return null;
+    for (const feature of TOKENIZER_FEATURES) await rbFRequire(loadPath, feature);
+  } catch (e) {
+    if (e instanceof LoadError) return null;
+    throw e;
   }
+  const ast = rbRequireLoaded("typescript/unstable/ast") as unknown as typeof Ast;
+  const scanner = rbRequireLoaded("typescript/unstable/ast/scanner") as unknown as typeof Scanner;
+  const sync = rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync;
+  return {
+    API: sync.API,
+    SyntaxKind: ast.SyntaxKind,
+    isLiteralLike: (node: Node) =>
+      ast.isStringLiteralLikeNode(node) ||
+      ast.isTemplateHead(node) ||
+      ast.isTemplateMiddle(node) ||
+      ast.isTemplateTail(node) ||
+      ast.isRegularExpressionLiteral(node),
+    createScanner: scanner.createScanner,
+  };
 }
 
 let tokenizer: Awaited<ReturnType<typeof requireTokenizer>> | undefined;
@@ -251,5 +264,3 @@ export class SourceAnnotationExtractor {
     return lines.map((l) => `${l}\n`).join("");
   }
 }
-
-Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;

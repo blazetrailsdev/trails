@@ -4,7 +4,7 @@ import { Session } from "./test.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface MethodsHost {
-  app: RackApp;
+  app: RackApp | (() => RackApp);
   defaultHost?: string;
   buildRackMockSession?(): Session;
   /** @internal */
@@ -30,13 +30,24 @@ function rackTestSession(this: MethodsHost, name: unknown = ":default"): Session
 const rackMockSession = rackTestSession;
 
 function buildRackTestSession(this: MethodsHost, _name: unknown): Session {
+  let owner = Object.getPrototypeOf(this) as object | null;
+  let descriptor = Object.getOwnPropertyDescriptor(this, "app");
+  while (descriptor === undefined && owner !== null) {
+    descriptor = Object.getOwnPropertyDescriptor(owner, "app");
+    owner = Object.getPrototypeOf(owner) as object | null;
+  }
+  /** @inventedArm descriptor — PERMANENT */
+  const app =
+    !Object.hasOwn(this, "app") && typeof descriptor?.value === "function"
+      ? (descriptor.value as () => RackApp).call(this)
+      : (this.app as RackApp);
   if ("buildRackMockSession" in this) {
     return this.buildRackMockSession!();
   } else {
     if ("defaultHost" in this) {
-      return new Session(this.app, this.defaultHost);
+      return new Session(app, this.defaultHost);
     } else {
-      return new Session(this.app);
+      return new Session(app);
     }
   }
 }
