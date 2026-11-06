@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
-import { include } from "@blazetrails/ruby-compat";
+import { FileUtils, include } from "@blazetrails/ruby-compat";
 import { EnvHelpers } from "../../test-helpers/env-helpers.js";
 import type { Generation, Rack } from "../../test-helpers/isolation/abstract-unit.js";
 import "../../test-helpers/isolation/abstract-unit.js";
@@ -19,6 +19,7 @@ describe("FrameworksTest", () => {
   beforeEach(async () => {
     t = new FrameworksTest("test");
     await t.buildApp();
+    await FileUtils.rmRfAsync(`${await t.appPath()}/config/environments`);
   });
 
   afterEach(() => t.teardownApp());
