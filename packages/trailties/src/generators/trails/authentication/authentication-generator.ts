@@ -89,6 +89,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.route(`this.resource("session");`);
   }
 
+  /** @missingRailsArgs execute_command — PERMANENT */
   async enableBcrypt(): Promise<void> {
     const json = JSON.parse(await File.readAsync(File.join(this.destinationRoot, "package.json")));
     const executor = getPackageManager(this.destinationRoot).name;
