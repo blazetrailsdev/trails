@@ -13,7 +13,6 @@ import {
   type DeprecationBehavior,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
-import { TZInfo } from "@blazetrails/tzinfo";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
 import type { TestCase } from "@blazetrails/activesupport/test-case";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
@@ -98,7 +97,6 @@ export class Trailtie extends BaseTrailtie {
      */
     this.initializer("active_support.initialize_time_zone", (app) => {
       setZoneDefault(findZoneBang(app.config.timeZone));
-      this.config.eagerLoadNamespaces.push(TZInfo);
     });
 
     this.initializer("active_support.set_hash_digest_class", (app) => {

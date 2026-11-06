@@ -161,7 +161,6 @@ export class Core {
     };
   }
 
-  /** @inventedArm throw — PERMANENT */
   deserialize(jobData: JobData): void {
     this.jobId = jobData["job_id"] as string;
     this.providerJobId = jobData["provider_job_id"];
