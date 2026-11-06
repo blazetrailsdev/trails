@@ -37,9 +37,14 @@
     }
   },
   "actionmailbox": {
-    "rows": 3,
+    "rows": 8,
     "excluded": [],
-    "unwalked": ["gem-version.ts::VERSION", "relayer.ts::Relayer.Result"],
+    "unwalked": [
+      "gem-version.ts::VERSION",
+      "inbound-email/message-id.ts::MessageId",
+      "inbound-email/routable.ts::Routable",
+      "relayer.ts::Relayer.Result"
+    ],
     "residue": {}
   },
   "actionmailer": {

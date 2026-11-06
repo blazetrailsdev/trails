@@ -9,7 +9,10 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import type { InboundEmail } from "./inbound-email.js";
+import type { Record as ActionMailboxRecord } from "./record.js";
 import type { Relayer } from "./relayer.js";
+import type { RoutingJob } from "./routing-job.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -17,8 +20,11 @@ const loadPath: Record<string, () => Promise<unknown>> = {};
 
 export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModule & {
   Base: unknown;
+  InboundEmail: typeof InboundEmail;
+  Record: typeof ActionMailboxRecord;
   Relayer: typeof Relayer;
   Router: unknown;
+  RoutingJob: typeof RoutingJob;
   TestCase: unknown;
   deprecator(): Deprecation;
   ingress: string | null;
