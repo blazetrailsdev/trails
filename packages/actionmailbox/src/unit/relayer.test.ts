@@ -2,10 +2,13 @@ import { createServer, type IncomingHttpHeaders } from "node:http";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Errno, File, Net, SocketError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Relayer } from "./relayer.js";
+import { Relayer } from "../relayer.js";
 
 class RelayerTest extends TestCase {}
-RelayerTest.fileFixturePath = File.expandPath("test-helpers/fixtures/files", import.meta.dirname);
+RelayerTest.fileFixturePath = File.expandPath(
+  "../test-helpers/fixtures/files",
+  import.meta.dirname,
+);
 
 const INGRESS_PASSWORD = "secret";
 
@@ -16,7 +19,7 @@ interface RecordedRequest {
   body: string;
 }
 
-describe("ActionMailbox::RelayerTest", () => {
+describe("RelayerTest", () => {
   let URL: string;
   let relayer: Relayer;
   let requests: RecordedRequest[];
@@ -65,19 +68,21 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("2.0.0");
     expect(result.message).toBe("Successfully relayed message to ingress");
-    expect(result.isSuccess()).toBe(true);
-    expect(result.isFailure()).toBe(false);
+    expect(result.isSuccess()).toBeTruthy();
+    expect(result.isFailure()).toBeFalsy();
 
-    expect(requests).toHaveLength(1);
-    const [request] = requests;
-    expect(request.method).toBe("POST");
-    expect(`http://${request.headers.host}${request.url}`).toBe(URL);
-    expect(request.body).toBe(await fileFixture("welcome.eml").read());
-    expect(request.headers.authorization).toBe(
-      `Basic ${btoa(`actionmailbox:${INGRESS_PASSWORD}`)}`,
-    );
-    expect(request.headers["content-type"]).toBe("message/rfc822");
-    expect(request.headers["user-agent"]).toMatch(/^Action Mailbox relayer v\d+\./);
+    expect(requests).toEqual([
+      {
+        method: "POST",
+        url: new globalThis.URL(URL).pathname,
+        headers: expect.objectContaining({
+          authorization: `Basic ${btoa(`actionmailbox:${INGRESS_PASSWORD}`)}`,
+          "content-type": "message/rfc822",
+          "user-agent": expect.stringMatching(/^Action Mailbox relayer v\d+\./),
+        }),
+        body: await fileFixture("welcome.eml").read(),
+      },
+    ]);
   });
 
   it("unsuccessfully relaying with invalid credentials", async () => {
@@ -86,8 +91,8 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.7.0");
     expect(result.message).toBe("Invalid credentials for ingress");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to an unspecified server error", async () => {
@@ -96,8 +101,8 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("HTTP 500");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to a gateway timeout", async () => {
@@ -106,8 +111,8 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("HTTP 504");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to ECONNRESET", async () => {
@@ -116,8 +121,8 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.4.2");
     expect(result.message).toBe("Network error relaying to ingress: Connection reset by peer");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to connection failure", async () => {
@@ -128,8 +133,8 @@ describe("ActionMailbox::RelayerTest", () => {
     expect(result.message).toBe(
       "Network error relaying to ingress: Failed to open TCP connection to example.com:443",
     );
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to client-side timeout", async () => {
@@ -138,8 +143,8 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.4.2");
     expect(result.message).toBe("Timed out relaying to ingress");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 
   it("unsuccessfully relaying due to an unhandled exception", async () => {
@@ -148,7 +153,7 @@ describe("ActionMailbox::RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("Error relaying to ingress: Something went wrong");
-    expect(result.isSuccess()).toBe(false);
-    expect(result.isFailure()).toBe(true);
+    expect(result.isSuccess()).toBeFalsy();
+    expect(result.isFailure()).toBeTruthy();
   });
 });
