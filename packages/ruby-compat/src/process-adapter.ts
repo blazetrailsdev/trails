@@ -765,7 +765,10 @@ function tryAutoRegisterNode(): boolean {
  * `set_noecho` clears echo alone, so the flags go through `stty(1)`, whose
  * `-g` form is the saved `conmode`. A failure raises the `SystemCallError`
  * whose `strerror` text `stty` reported, as `rb_syserr_fail` does with the
- * failing call's errno. A Windows console takes `consoleMode` instead.
+ * failing call's errno. A Windows console takes `console.c:289` instead,
+ * clearing `ENABLE_ECHO_INPUT` alone: Node has only `setRawMode`, which also
+ * clears `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`, so while echo is off
+ * `read` answers a line at CR with backspace applied, and Ctrl-C raises `SIGINT`.
  */
 function stty(proc: NodeProcessLike, args: string[]): string {
   const childProcess = proc.getBuiltinModule?.("node:child_process") as
@@ -831,16 +834,6 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       proc.stdin.once("close", onTerminal);
       proc.stdin.once("error", onError);
     });
-  /**
-   * The Windows arm of `getattr` / `setattr` / `set_noecho`
-   * (`vendor/ruby/v3.3.11/ext/io/console/console.c:252-291`): `set_noecho`
-   * clears `ENABLE_ECHO_INPUT` with `SetConsoleMode` (`console.c:289`) and keeps
-   * `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`. Node exposes no
-   * `SetConsoleMode`, only `setRawMode`, which clears all three, so while echo
-   * is off `read` gives back the two the console no longer does: a line is
-   * answered at CR with backspace applied and CR read as LF, and Ctrl-C raises
-   * `SIGINT`. The saved mode is `"echo"` or `"-echo"`.
-   */
   const consoleMode = () => {
     let echoInput = true;
     let line = "";
