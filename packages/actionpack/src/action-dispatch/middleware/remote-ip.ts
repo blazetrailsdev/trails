@@ -1,6 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ArgumentError, IPAddr, rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
 import { Request } from "../http/request.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse> | RackResponse;
 
@@ -155,6 +156,7 @@ export class GetIp {
 }
 
 export class RemoteIp {
+  static readonly IpSpoofAttackError = IpSpoofAttackError;
   static readonly TRUSTED_PROXIES = TRUSTED_PROXIES;
 
   readonly checkIp: boolean;
@@ -202,3 +204,5 @@ Note that passing an enumerable will *replace* the default set of trusted proxie
     return await (rbProcCall(this.app, req.env) as ReturnType<typeof this.app>);
   }
 }
+
+ActionDispatch.RemoteIp = RemoteIp;

@@ -5,7 +5,7 @@ import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/ke
 import { ActionDispatch } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { ArgumentError, IPAddr, include } from "@blazetrails/ruby-compat";
-import { assertNotDeprecated } from "@blazetrails/activesupport";
+import { assertNotDeprecated, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { Application } from "../../application.js";
 import { Trails } from "../../trails.js";
 import type { Generation } from "../../test-helpers/isolation/abstract-unit.js";
@@ -41,7 +41,7 @@ class RemoteIpTest extends TestCase {
 }
 include(RemoteIpTest, Isolation);
 
-describe("ApplicationTests::RemoteIpTest", () => {
+describe("RemoteIpTest", () => {
   let t: RemoteIpTest;
   beforeEach(() => {
     t = new RemoteIpTest("test");
@@ -59,15 +59,19 @@ describe("ApplicationTests::RemoteIpTest", () => {
 
   it("checks IP spoofing by default", async () => {
     await t.makeBasicApp();
-    await expect(
+    await assertRaises([ActionDispatch.RemoteIp.IpSpoofAttackError], {}, () =>
       t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "1.1.1.2" }),
-    ).rejects.toMatchObject({ name: "IpSpoofAttackError" });
+    );
   });
 
   it("works with both headers individually", async () => {
     await t.makeBasicApp();
-    expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1" })).toBe("1.1.1.1");
-    expect(await t.remoteIp({ HTTP_CLIENT_IP: "1.1.1.2" })).toBe("1.1.1.2");
+    await assertNothingRaised(async () => {
+      expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1" })).toBe("1.1.1.1");
+    });
+    await assertNothingRaised(async () => {
+      expect(await t.remoteIp({ HTTP_CLIENT_IP: "1.1.1.2" })).toBe("1.1.1.2");
+    });
   });
 
   it("can disable IP spoofing check", async () => {
@@ -75,9 +79,11 @@ describe("ApplicationTests::RemoteIpTest", () => {
       app.config.actionDispatch.ipSpoofingCheck = false;
     });
 
-    expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "1.1.1.2" })).toBe(
-      "1.1.1.1",
-    );
+    await assertNothingRaised(async () => {
+      expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "1.1.1.2" })).toBe(
+        "1.1.1.1",
+      );
+    });
   });
 
   it("remote_ip works with HTTP_X_FORWARDED_FOR", async () => {
@@ -117,17 +123,13 @@ describe("ApplicationTests::RemoteIpTest", () => {
   });
 
   it("setting trusted proxies to a single value (deprecated) adds value to default trusted proxies", async () => {
-    const exception = await t
-      .makeBasicApp((app) => {
+    const exception = await assertRaises([ArgumentError], {}, () =>
+      t.makeBasicApp((app) => {
         app.config.actionDispatch.trustedProxies = new IPAddr("4.2.42.0/24") as never;
-      })
-      .then(
-        () => null,
-        (e: unknown) => e,
-      );
+      }),
+    );
 
-    expect(exception).toBeInstanceOf(ArgumentError);
-    expect((exception as Error).message).toMatch(
+    expect(exception.message).toMatch(
       /Setting config\.action_dispatch\.trusted_proxies to a single value/,
     );
   });

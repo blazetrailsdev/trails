@@ -13,7 +13,7 @@ class FrameworksTest extends TestCase {}
 include(FrameworksTest, Isolation);
 include(FrameworksTest, EnvHelpers);
 
-describe("ApplicationTests::FrameworksTest", () => {
+describe("FrameworksTest", () => {
   let t: FrameworksTest;
 
   beforeEach(async () => {
