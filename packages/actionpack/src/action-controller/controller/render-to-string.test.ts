@@ -15,7 +15,7 @@ describe("RenderToStringTest", () => {
     }
 
     async renderPlainTextResponseWithInlineTemplate() {
-      await this.render({ plain: (await this.renderToString({ inline: "hello" })) as string });
+      await this.render({ plain: await this.renderToString({ inline: "hello" }) });
     }
 
     async renderJsonResponseWithPartial() {
@@ -23,7 +23,7 @@ describe("RenderToStringTest", () => {
     }
 
     async renderJsonRenderToString() {
-      await this.render({ plain: (await this.renderToString({ json: "[]" })) as string });
+      await this.render({ plain: await this.renderToString({ json: "[]" }) });
     }
 
     async renderPlainTextResponseWithInlineTemplateAndXmlFormat() {
