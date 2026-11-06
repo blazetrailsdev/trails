@@ -27,7 +27,8 @@ const tableClasses = new Map<string, () => unknown>();
  * read through a thunk on the first lookup after a registration. A table is
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
- * or by a lookup of a class bearing the entry's last path segment.
+ * or by a lookup of a class bearing the entry's last path segment, or of a
+ * plain-object module, which bears no name.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -92,7 +93,7 @@ export function rbClassPath(klass: object): string | undefined {
   if (path !== undefined || pendingClassPaths.length === 0) return path;
   const { name } = klass as { name?: unknown };
   for (const entry of pendingClassPaths.filter(
-    ([, path]) => name === path.slice(path.lastIndexOf(":") + 1),
+    ([, path]) => typeof name !== "string" || name === path.slice(path.lastIndexOf(":") + 1),
   )) {
     let value: unknown;
     try {

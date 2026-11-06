@@ -10,14 +10,14 @@ import { GeneratorError } from "../../generated-attribute.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import { format, File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { TEMPLATES } from "./templates.js";
 
 export interface ScaffoldGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
-export class ScaffoldGenerator extends NamedBase {
+export class ScaffoldGenerator extends Base {
   /** @internal */
   declare controllerName: string;
   /** @internal */

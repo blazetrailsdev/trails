@@ -1,0 +1,6 @@
+import { describe, it } from "vitest";
+import "./test_helper.js";
+
+describe("<%= this.className() %>Test", () => {
+  it.todo("the truth");
+});

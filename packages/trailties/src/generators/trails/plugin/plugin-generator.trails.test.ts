@@ -158,6 +158,19 @@ describe("PluginBuilder", () => {
     expect(await File.isExistAsync(`${root}/Rakefile.ts`)).toBe(true);
   });
 
+  it("cleans the dummy application", async () => {
+    const g = generator("plain");
+    const dummy = `${root}/test/dummy`;
+    await FileUtils.mkdirP(`${dummy}/db`);
+    await FileUtils.mkdirP(`${dummy}/lib`);
+    await File.writeAsync(`${dummy}/.node-version`, "22\n");
+    await File.writeAsync(`${dummy}/package.json`, "{}\n");
+    await g["build"]("testDummyClean");
+    for (const path of [".node-version", "db", "package.json", "lib"]) {
+      expect(await File.isExistAsync(`${dummy}/${path}`)).toBe(false);
+    }
+  });
+
   it("configures the dummy application for an engine", async () => {
     const g = generator("mountable");
     await FileUtils.mkdirP(`${root}/test/dummy/config`);

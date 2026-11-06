@@ -16,7 +16,7 @@ interface PluginBuilderHost {
   insertIntoFile(path: string, content: string, config: object): Promise<unknown>;
   chmod(path: string, mode: number, config: object): Promise<unknown>;
   run(command: string, config: object): Promise<unknown>;
-  inside(path: string, block: () => Promise<void>): Promise<unknown>;
+  inside(dir: string, config: { verbose?: unknown }, block: () => Promise<void>): Promise<unknown>;
   invoke(klass: unknown, args: unknown[], opts: object): Promise<unknown>;
   gitInitCommand(): Promise<string>;
   shebang(): string;
@@ -207,7 +207,7 @@ this.config.actionController.includeAllHelpers = false;
 
   /** @missingRailsArgs remove_file — PERMANENT */
   async testDummyClean(this: PluginBuilderHost): Promise<void> {
-    await this.inside(this.dummyPath(), async () => {
+    await this.inside(this.dummyPath(), {}, async () => {
       await this.removeFile(".node-version");
       await this.removeDir("db");
       await this.removeFile("package.json");

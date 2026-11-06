@@ -1,3 +1,4 @@
+import "./constants.test-helper.generated.js";
 import {
   Concern,
   DescendantsTracker,
