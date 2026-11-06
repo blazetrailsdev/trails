@@ -563,7 +563,7 @@ survives as one construct.
 exported `included` symbol (`Symbol.for("@blazetrails/ruby-compat:included")`).
 `include()` calls it with the including class after the module's methods are
 installed, which is where Ruby runs the block; `extend()` does the same with
-`extended`. `ruby-compat/lib/include.test.ts` covers both: "fires the included
+`extended`. `ruby-compat/test/include.test.ts` covers both: "fires the included
 callback after methods are copied" and "does not copy the included symbol onto
 the prototype".
 
