@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { YAML } from "../../../lib/yaml.js";
-import { File } from "../../../lib/file.js";
+import { YAML } from "../lib/yaml.js";
+import { File } from "../lib/file.js";
 
 describe("YAML.load_file", () => {
   let dir: string;

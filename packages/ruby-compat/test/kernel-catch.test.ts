@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "../../../lib/argument-error.js";
-import { kernelCatch, kernelThrow, UncaughtThrowError } from "../../../lib/kernel-catch.js";
-import { LocalJumpError } from "../../../lib/local-jump-error.js";
+import { ArgumentError } from "../lib/argument-error.js";
+import { kernelCatch, kernelThrow, UncaughtThrowError } from "../lib/kernel-catch.js";
+import { LocalJumpError } from "../lib/local-jump-error.js";
 
 describe("Kernel.catch", () => {
   let recorded: unknown;

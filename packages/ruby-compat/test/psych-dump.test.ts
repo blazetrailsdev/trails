@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { YAML, toYaml } from "../../../lib/yaml.js";
-import { File } from "../../../lib/file.js";
+import { YAML, toYaml } from "../lib/yaml.js";
+import { File } from "../lib/file.js";
 
 function cleanYaml(yaml: string): string {
   return yaml.replace(/([^-]|^---)[ \t]+\n/gm, "$1\n").replace(/\n\.\.\.\n$/, "\n");

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { YAML } from "../../../lib/yaml.js";
-import { File } from "../../../lib/file.js";
+import { YAML } from "../lib/yaml.js";
+import { File } from "../lib/file.js";
 
 const complexKey1 = `    ? # PLAY SCHEDULE
       - Detroit Tigers

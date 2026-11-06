@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "../../../lib/argument-error.js";
-import {
-  kernelCatch,
-  kernelThrow,
-  throwDataP,
-  UncaughtThrowError,
-} from "../../../lib/kernel-catch.js";
+import { ArgumentError } from "../lib/argument-error.js";
+import { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "../lib/kernel-catch.js";
 
 describe("kernelCatch", () => {
   it("raises UncaughtThrowError at the throw site with the inspected tag and value", () => {

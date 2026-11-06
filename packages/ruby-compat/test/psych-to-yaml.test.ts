@@ -1,10 +1,10 @@
-import { TopLevel } from "../../../lib/object.js";
+import { TopLevel } from "../lib/object.js";
 import { describe, expect, it } from "vitest";
-import { toYaml } from "../../../lib/yaml.js";
-import { Struct } from "../../../lib/struct.js";
-import { Range } from "../../../lib/range.js";
+import { toYaml } from "../lib/yaml.js";
+import { Struct } from "../lib/struct.js";
+import { Range } from "../lib/range.js";
 
-import { constSet } from "../../../lib/include.js";
+import { constSet } from "../lib/include.js";
 
 function cleanYaml(yaml: string): string {
   return yaml.replace(/([^-]|^---)[ \t]+\n/gm, "$1\n").replace(/\n\.\.\.\n$/, "\n");

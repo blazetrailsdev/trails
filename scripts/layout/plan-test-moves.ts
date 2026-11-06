@@ -2,8 +2,8 @@
  * `plan-test-moves <pkg> [--apply]` — the `old → new` table RFC 0223's package
  * PRs apply, by the RFC's "Where a test lands" rules:
  *
- * 1. A test file test-compare name-matches to a Rails test file goes to that
- *    Rails file's path under `test/`, through the conventions table.
+ * 1. A test file test-compare name-matches to a Rails test file goes to the
+ *    path test-compare looks for it at: its `conventionTsFile` under `test/`.
  * 2. A `*.trails.test.ts` beside a rule-1 file lands beside its new home.
  * 3. Any other test lands under the gem's main test directory at its `lib/`
  *    path.
@@ -23,7 +23,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
-import { PKG_SRC_DIRS, rubyTestDirToTs, rubyToConventionTs } from "../test-compare/compare.js";
+import { PKG_SRC_DIRS } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
 import { LIB_TEST_PACKAGES } from "./package-roots.js";
 import { COMMITTED_TS_FILES, walkTsFiles } from "../api-compare/ts-file-walk.js";
@@ -83,12 +83,6 @@ export interface Plan {
   collisions: string[];
 }
 
-function rubyPathToTs(rubyFile: string, comparePkg: string): string {
-  const dir = path.dirname(rubyFile);
-  const base = path.basename(rubyToConventionTs(rubyFile, comparePkg));
-  return dir === "." ? base : `${rubyTestDirToTs(dir)}/${base}`;
-}
-
 function supportHome(file: string): string | null {
   const parts = file.split("/");
   const at = parts.findIndex((p, i) => i < parts.length - 1 && SUPPORT_DIRS.has(p));
@@ -118,10 +112,7 @@ export function planTestMoves(input: PlanInput): Plan {
       if (!f.tsFileExists || f.conventionTsPackage || f.rubyFile.startsWith("../")) continue;
       const old = within + f.conventionTsFile;
       if (!present.has(old) || placed.has(old)) continue;
-      placed.set(
-        old,
-        `test/${RUBY_FILE_ROOT[cp.package] ?? ""}${rubyPathToTs(f.rubyFile, cp.package)}`,
-      );
+      placed.set(old, `test/${RUBY_FILE_ROOT[cp.package] ?? ""}${f.conventionTsFile}`);
     }
   }
   for (const [old, to] of [...placed]) {
