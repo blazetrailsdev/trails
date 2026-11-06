@@ -102,7 +102,11 @@ export class String {
   static isBlank(value: string | Uint8Array): boolean {
     return (
       value.length === 0 ||
-      BLANK_RE.test(typeof value === "string" ? value : globalThis.String.fromCharCode(...value))
+      BLANK_RE.test(
+        typeof value === "string"
+          ? value
+          : Array.from(value, (c) => globalThis.String.fromCharCode(c)).join(""),
+      )
     );
   }
   static isPresent(value: string | Uint8Array): boolean {

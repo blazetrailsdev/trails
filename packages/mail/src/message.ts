@@ -4,6 +4,7 @@ import {
   NoMethodError,
   rbObjAsString,
   rbObjDup,
+  rbObjRespondTo,
   rbObjId,
   strip,
   stringSplit,
@@ -87,12 +88,7 @@ export class Message {
     this._transportEncoding = Encodings.getEncoding("7bit");
 
     const first = flatten(args)[0];
-    if (
-      typeof first === "object" &&
-      first !== null &&
-      !(first instanceof Body) &&
-      !(first instanceof Uint8Array)
-    ) {
+    if (rbObjRespondTo(first, "eachPair")) {
       this.initWithHash(first as Record<string, unknown>);
     } else {
       this.initWithString(rbObjAsString(first ?? "") as string | Uint8Array);

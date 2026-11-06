@@ -105,10 +105,14 @@ export class Part extends Message {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   protected override parseMessage(): void {
+    const rawSource = this.rawSource;
     const [headerPart, bodyPart] = stringSplit(
-      this.rawSource as string,
+      rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource,
       new RegExp(`${LAX}${WSP}*${LAX}`, "m"),
       2,
     );
