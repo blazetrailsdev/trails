@@ -50,7 +50,7 @@ let _scope: typeof Thread | typeof Fiber;
 interface Fork {
   context: Thread | Fiber;
   key: IsolatedKey;
-  value: unknown;
+  state: Store;
   parent: Fork | null;
 }
 
@@ -68,12 +68,12 @@ function forks(): AsyncContext<Fork> {
 }
 
 /** @internal */
-function openFork(key: IsolatedKey): Fork | null {
+function forkedState(key: IsolatedKey): Store {
   const context = IsolatedExecutionState.context();
   for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
-    if (fork.context === context && fork.key === key) return fork;
+    if (fork.context === context && fork.key === key) return fork.state;
   }
-  return null;
+  return state();
 }
 
 /** @internal */
@@ -120,38 +120,43 @@ export const IsolatedExecutionState = {
     );
   },
   get<T = unknown>(key: IsolatedKey): T | undefined {
-    const fork = openFork(key);
-    return (fork ? fork.value : state().get(key)) as T | undefined;
+    return forkedState(key).get(key) as T | undefined;
   },
   set<T>(key: IsolatedKey, value: T): T {
-    const fork = openFork(key);
-    if (fork) fork.value = value;
-    else state().set(key, value);
+    forkedState(key).set(key, value);
     return value;
   },
   isKey(key: IsolatedKey): boolean {
-    return openFork(key) != null || state().has(key);
+    return forkedState(key).has(key);
   },
   delete<T = unknown>(key: IsolatedKey): T | undefined {
-    const s = state();
+    const s = forkedState(key);
     const value = s.get(key) as T | undefined;
     s.delete(key);
     return value;
   },
   clear(): void {
     state().clear();
+    const context = IsolatedExecutionState.context();
+    for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
+      if (fork.context === context) fork.state.clear();
+    }
   },
   context(): Thread | Fiber {
     return IsolatedExecutionState.scope.current();
   },
   /** @noRailsEquivalent PERMANENT */
   fork<T>(key: IsolatedKey, block: () => T): T {
-    const value = IsolatedExecutionState.get(key);
+    const forked: Store = new Map();
+    if (IsolatedExecutionState.isKey(key)) {
+      const value = IsolatedExecutionState.get(key);
+      forked.set(key, value == null ? value : rbObjDup(value));
+    }
     return forks().run(
       {
         context: IsolatedExecutionState.context(),
         key,
-        value: value == null ? value : rbObjDup(value),
+        state: forked,
         parent: forks().getStore() ?? null,
       },
       block,

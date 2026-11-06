@@ -2,6 +2,7 @@ import {
   IsolatedExecutionState,
   mattrAccessor,
   threadMattrAccessor,
+  threadMattrKey,
 } from "@blazetrails/activesupport";
 import { included, rbEnsure, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
@@ -23,7 +24,7 @@ export class Contexts {
   /** @inventedArm fork — PERMANENT */
   static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
     this.customContexts ||= [];
-    return IsolatedExecutionState.fork(this["@__thread_mattr_customContexts" as never], () =>
+    return IsolatedExecutionState.fork(threadMattrKey(this, "customContexts"), () =>
       rbEnsure(
         () => {
           this.customContexts!.push(rbObjDup(this.defaultContext));

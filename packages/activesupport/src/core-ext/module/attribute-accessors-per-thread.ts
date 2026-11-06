@@ -26,7 +26,8 @@ function objectId(obj: object): number {
   return id;
 }
 
-function threadMattrKey(klass: Module, sym: string): string {
+/** @noRailsEquivalent PERMANENT */
+export function threadMattrKey(klass: Module, sym: string): string {
   const ivar = `@__thread_mattr_${sym}`;
   if (!Object.hasOwn(klass, ivar)) {
     Object.defineProperty(klass, ivar, {

@@ -737,6 +737,7 @@ interface NodeProcessLike {
   exitCode: number | string | undefined;
   on(event: string, handler: () => void): void;
   listenerCount(event: string): number;
+  emit(event: string): boolean;
   off(event: string, handler: () => void): void;
   stdout: NodeStream;
   stderr: NodeStream;
@@ -768,7 +769,10 @@ function tryAutoRegisterNode(): boolean {
  * failing call's errno. A Windows console takes `console.c:289` instead,
  * clearing `ENABLE_ECHO_INPUT` alone: Node has only `setRawMode`, which also
  * clears `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`, so while echo is off
- * `read` answers a line at CR with backspace applied, and Ctrl-C raises `SIGINT`.
+ * `read` answers a line at CR with backspace applied, and Ctrl-C runs a
+ * `SIGINT` trap or else raises `Interrupt` in the reader, as `ENABLE_PROCESSED_INPUT`
+ * delivers it. The saved `conmode` is the string `"echo"` or `"-echo"`, as the
+ * POSIX arm's is `stty -g`'s text.
  */
 function stty(proc: NodeProcessLike, args: string[]): string {
   const childProcess = proc.getBuiltinModule?.("node:child_process") as
@@ -881,7 +885,8 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
               break;
             case "\x03":
               line = "";
-              proc.kill(proc.pid, "SIGINT");
+              if (proc.listenerCount("SIGINT") > 0) proc.emit("SIGINT");
+              else throw new Interrupt("");
               break;
             default:
               line += c;
