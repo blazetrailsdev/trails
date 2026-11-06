@@ -2,6 +2,7 @@ import {
   Hash,
   TypeError,
   hashAref,
+  isModuleObject,
   isSymbol,
   rbInspect,
   rbObjClass,
@@ -225,14 +226,24 @@ export class SubtreeProxy {
   }
 
   isA(klass: unknown): boolean {
-    return Hash === klass || rbObjIsKindOf(this, klass);
+    if (Hash === klass) return true;
+    if (
+      typeof klass !== "function" &&
+      !(typeof klass === "object" && klass !== null && isModuleObject(klass))
+    ) {
+      throw new TypeError("class or module required");
+    }
+    return rbObjIsKindOf(this, klass);
   }
 
   declare isKindOf: (klass: unknown) => boolean;
 
   isInstanceOf(klass: unknown): boolean {
     if (Hash === klass) return true;
-    if (typeof klass !== "function" && (typeof klass !== "object" || klass === null)) {
+    if (
+      typeof klass !== "function" &&
+      !(typeof klass === "object" && klass !== null && isModuleObject(klass))
+    ) {
       throw new TypeError("class or module required");
     }
     return rbObjClass(this) === klass;
