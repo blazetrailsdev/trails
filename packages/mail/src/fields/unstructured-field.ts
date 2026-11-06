@@ -65,7 +65,7 @@ export class UnstructuredField extends CommonField {
 
   /**
    * @internal
-   * @missingRailsCall map — CONVERGEABLE mail-message-spec-port
+   * @missingRailsCall map — CONVERGEABLE mail-message-spec-port-remaining
    */
   protected fold(prepend = 0): string[] {
     const encoding = this.normalizedEncoding();
