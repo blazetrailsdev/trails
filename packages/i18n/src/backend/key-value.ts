@@ -34,8 +34,6 @@ const JSON = {
   },
 };
 
-const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil", "inspect"]);
-
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface KeyValue extends Base {}
 
@@ -199,17 +197,6 @@ export class SubtreeProxy {
     this.#masterKey = masterKey;
     this.#store = store;
     this.#subtree = null;
-    return new Proxy(this, {
-      get: (target, prop) => {
-        if (typeof prop === "string" && !SUBTREE_PROXY_METHODS.has(prop)) return target.get(prop);
-        const value: unknown = Reflect.get(target, prop);
-        return typeof value === "function" ? value.bind(target) : value;
-      },
-      has: (target, prop) =>
-        typeof prop === "string" && !SUBTREE_PROXY_METHODS.has(prop)
-          ? target.hasKey(prop)
-          : Reflect.has(target, prop),
-    });
   }
 
   hasKey(key: string): boolean {

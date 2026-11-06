@@ -125,3 +125,21 @@ describe("MimeType registry", () => {
     expect(MimeType.all().length).toBe(before);
   });
 });
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends MimeType {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub("text/x-proto", ":proto");
+    expect(sub.secret()).toBe(1);
+    expect(sub.isProto!()).toBe(true);
+    expect(sub.isHtml()).toBe(false);
+    expect("isProto" in sub).toBe(true);
+    expect(sub instanceof MimeType).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});

@@ -18,30 +18,27 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-function undefMethodProxy<T extends object>(
-  instance: T,
+function undefMethodProxy(
+  klass: { prototype: object },
   methodMissing: MethodMissing,
-  superclass: object,
   constMissing?: (this: unknown, name: string) => unknown,
-): T {
-  return new Proxy(instance, {
-    get(target, prop, receiver) {
-      if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
-      if (prop.startsWith("__") || !isUndefined(target, prop, superclass)) {
-        return Reflect.get(target, prop, receiver);
-      }
-      if (constMissing !== undefined && /^[A-Z]/.test(prop)) return constMissing.call(target, prop);
-      return (...args: unknown[]) => methodMissing.call(target, prop, args);
-    },
-  });
-}
-
-function isUndefined(target: object, prop: string, superclass: object): boolean {
-  for (let owner: object | null = target; owner && owner !== superclass; ) {
-    if (Object.hasOwn(owner, prop)) return false;
-    owner = Object.getPrototypeOf(owner);
-  }
-  return true;
+): void {
+  Object.setPrototypeOf(
+    klass.prototype,
+    new Proxy(Object.create(Object.getPrototypeOf(klass.prototype) as object) as object, {
+      get(target, prop, receiver: object) {
+        if (receiver === klass.prototype || !Object.hasOwn(receiver, "_deprecator")) {
+          return Reflect.get(target, prop, receiver);
+        }
+        if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
+        if (prop.startsWith("__")) return Reflect.get(target, prop, receiver);
+        if (constMissing !== undefined && /^[A-Z]/.test(prop)) {
+          return constMissing.call(receiver, prop);
+        }
+        return (...args: unknown[]) => methodMissing.call(receiver, prop, args);
+      },
+    }),
+  );
 }
 
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
@@ -49,14 +46,6 @@ type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown
 export abstract class DeprecationProxy {
   static toString(): string {
     return "ActiveSupport::Deprecation::DeprecationProxy";
-  }
-
-  constructor() {
-    return undefMethodProxy(
-      this,
-      DeprecationProxy.prototype.methodMissing,
-      Object.getPrototypeOf(DeprecationProxy.prototype),
-    );
   }
 
   inspect(): string {
@@ -180,12 +169,6 @@ export class DeprecatedConstantProxy extends Module {
     this._newConst = newConst;
     this._deprecator = deprecator;
     this._message = message ?? `${oldConst} is deprecated! Use ${newConst} instead.`;
-    return undefMethodProxy(
-      this,
-      DeprecatedConstantProxy.prototype.methodMissing as MethodMissing,
-      Module.prototype,
-      DeprecatedConstantProxy.prototype.constMissing,
-    );
   }
 
   inspect(): string {
@@ -248,3 +231,14 @@ export class DeprecatedConstantProxy extends Module {
       : value;
   }
 }
+
+type MissingHooks = { methodMissing: MethodMissing; constMissing(name: string): unknown };
+undefMethodProxy(
+  DeprecationProxy,
+  (DeprecationProxy.prototype as unknown as MissingHooks).methodMissing,
+);
+undefMethodProxy(
+  DeprecatedConstantProxy,
+  (DeprecatedConstantProxy.prototype as unknown as MissingHooks).methodMissing,
+  (DeprecatedConstantProxy.prototype as unknown as MissingHooks).constMissing,
+);

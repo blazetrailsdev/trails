@@ -306,5 +306,6 @@ const ImageProcessingMiniMagick = {
   },
 };
 
-export const MiniMagick = chainableProxy(ImageProcessingMiniMagick);
+chainableProxy(ImageProcessingMiniMagick);
+export const MiniMagick = ImageProcessingMiniMagick;
 ImageProcessing.MiniMagick = MiniMagick;

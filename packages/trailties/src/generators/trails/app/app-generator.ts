@@ -52,10 +52,6 @@ export class ActionMethods {
   constructor(generator: AppGenerator) {
     this.generator = generator;
     this.options = generator.options;
-    return new Proxy(this, {
-      get: (target, key, receiver) =>
-        key in target ? Reflect.get(target, key, receiver) : target.methodMissing(key),
-    });
   }
 
   /** @internal */
@@ -122,11 +118,21 @@ export class ActionMethods {
   }
 
   /** @internal */
-  private methodMissing(key: string | symbol): unknown {
+  methodMissing(key: string | symbol): unknown {
     const value = (this.generator as unknown as Record<string | symbol, unknown>)[key];
     return typeof value === "function" ? value.bind(this.generator) : value;
   }
 }
+
+Object.setPrototypeOf(
+  ActionMethods.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(ActionMethods.prototype) as object) as object, {
+    get: (target, key, receiver: ActionMethods) =>
+      key in target || !Object.hasOwn(receiver, "generator")
+        ? Reflect.get(target, key, receiver)
+        : receiver.methodMissing(key),
+  }),
+);
 
 Trails.ActionMethods = ActionMethods;
 

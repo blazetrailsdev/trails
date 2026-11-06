@@ -120,21 +120,6 @@ export class Generators {
     this.apiOnly = false;
     this._hiddenNamespaces = [];
     this._afterGenerateCallbacks = [];
-
-    return new Proxy(this, {
-      get(target, name, receiver) {
-        if (typeof name === "symbol" || name in target) return Reflect.get(target, name, receiver);
-        if (PROTOCOL_PROBES.has(name)) return undefined;
-        return (...args: unknown[]) => target.methodMissing(name, ...args);
-      },
-      set(target, name, value, receiver) {
-        if (typeof name === "symbol" || name in target) {
-          return Reflect.set(target, name, value, receiver);
-        }
-        target.methodMissing(`${name}=`, value);
-        return true;
-      },
-    });
   }
 
   initializeCopy(_source: Generators): this {
@@ -199,3 +184,23 @@ export class Generators {
     return undefined;
   }
 }
+
+Object.setPrototypeOf(
+  Generators.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Generators.prototype) as object) as object, {
+    get(target, name, receiver: Generators) {
+      if (typeof name === "symbol" || name in target || receiver === Generators.prototype) {
+        return Reflect.get(target, name, receiver);
+      }
+      if (PROTOCOL_PROBES.has(name)) return undefined;
+      return (...args: unknown[]) => receiver.methodMissing(name, ...args);
+    },
+    set(target, name, value, receiver: Generators) {
+      if (typeof name === "symbol" || name in target || receiver === Generators.prototype) {
+        return Reflect.set(target, name, value, receiver);
+      }
+      receiver.methodMissing(`${name}=`, value);
+      return true;
+    },
+  }),
+);
