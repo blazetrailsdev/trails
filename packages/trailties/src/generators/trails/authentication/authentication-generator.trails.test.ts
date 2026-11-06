@@ -42,6 +42,7 @@ describe("AuthenticationGenerator", () => {
     registerChildProcessAdapter("trailties-auth-strict-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
       system: async () => ({ pid: 1, status: 0, signal: null }),
+      capture2e: async () => ["", { pid: 1, status: 0, signal: null }],
     });
     childProcessAdapterConfig.adapter = "trailties-auth-strict-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-strict-"));
@@ -75,6 +76,7 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
     registerChildProcessAdapter("trailties-auth-bcrypt-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
       system: async () => ({ pid: 1, status: 0, signal: null }),
+      capture2e: async () => ["", { pid: 1, status: 0, signal: null }],
     });
     childProcessAdapterConfig.adapter = "trailties-auth-bcrypt-test";
     const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-auth-bcrypt-"));
@@ -90,8 +92,6 @@ describe("AuthenticationGenerator enable_bcrypt", () => {
       await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
       await new AuthenticationGenerator([], {}, { destinationRoot: appDir }).invokeAll();
 
-      const json = JSON.parse(fs.readFileSync(path.join(appDir, "package.json"), "utf-8"));
-      expect(json.dependencies["@blazetrails/bcrypt"]).toBe("*");
       expect(fs.readFileSync(path.join(appDir, "config/application.ts"), "utf-8")).toBe(
         `import { Application } from "@blazetrails/trailties";\n\nimport "@blazetrails/trailties/all";\nimport "@blazetrails/bcrypt";\n`,
       );

@@ -1,6 +1,6 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
-import { run, type ActionsHost as ThorActionsHost } from "@blazetrails/thor/actions";
+import { getPackageManager } from "../../../package-manager.js";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
@@ -89,19 +89,18 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.route(`this.resource("session");`);
   }
 
-  /** @missingRailsCall execute_command — CONVERGEABLE authentication-enable-bcrypt-through-execute-command */
+  /** @missingRailsArgs execute_command — PERMANENT */
   async enableBcrypt(): Promise<void> {
-    if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
-    const full = File.join(this.destinationRoot, "package.json");
-    const json = JSON.parse(File.read(full));
-    if (!json.dependencies?.["bcryptjs"] || !json.dependencies?.["@blazetrails/bcrypt"]) {
-      json.dependencies = { ...json.dependencies, bcryptjs: "*", "@blazetrails/bcrypt": "*" };
-      File.write(full, JSON.stringify(json, null, 2) + "\n");
+    const json = JSON.parse(await File.readAsync(File.join(this.destinationRoot, "package.json")));
+    const executor = getPackageManager(this.destinationRoot).name;
+    if (
+      json.dependencies?.["bcryptjs"] != null &&
+      json.dependencies?.["@blazetrails/bcrypt"] != null
+    ) {
+      await this.executeCommand(executor, "install --silent");
+    } else {
+      await this.executeCommand(executor, "add bcryptjs @blazetrails/bcrypt", { capture: true });
     }
-    const command = `${json.packageManager?.split("@")[0] ?? "pnpm"} install --silent`;
-    await this.inRoot(() =>
-      run.call(this as unknown as ThorActionsHost, command, { verbose: false }),
-    );
 
     const application = "config/application.ts";
     if (!File.isExist(File.join(this.destinationRoot, application))) return;

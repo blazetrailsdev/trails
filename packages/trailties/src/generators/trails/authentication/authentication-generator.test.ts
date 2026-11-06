@@ -79,10 +79,16 @@ beforeEach(() => {
       spawned.push(args == null ? command.split(" ") : [command, ...args]);
       return { pid: 1, status: 0, signal: null };
     },
+    capture2e: async (command, _env, args) => {
+      spawned.push(args == null ? command.split(" ") : [command, ...args]);
+      return ["", { pid: 1, status: 0, signal: null }];
+    },
   });
   childProcessAdapterConfig.adapter = "trailties-auth-test";
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
+  write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
+  write("pnpm-lock.yaml", "");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
   write("config/routes.ts", "Trails.application!.routes().draw(function () {\n});\n");
 });
@@ -207,10 +213,18 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("adds bcryptjs to the application's dependencies and installs it", async () => {
-    write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
+    write("package.json", '{ "dependencies": { "bcryptjs": "*", "@blazetrails/bcrypt": "*" } }');
     await makeGen().run();
-    expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
-    expect(spawned).toContainEqual(["pnpm", "install", "--silent"]);
+    const commands = spawned.map((command) => command.join(" "));
+    expect(commands.some((c) => c.endsWith("bin/pnpm install --silent"))).toBe(true);
+  });
+
+  it("authentication_generator_without_bcrypt_in_gemfile", async () => {
+    await makeGen().run();
+    const commands = spawned.map((command) => command.join(" "));
+    expect(commands.some((c) => c.endsWith("bin/pnpm add bcryptjs @blazetrails/bcrypt"))).toBe(
+      true,
+    );
   });
 
   it("does not silently overwrite an existing file", async () => {
