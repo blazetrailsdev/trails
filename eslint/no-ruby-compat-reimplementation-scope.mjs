@@ -7,7 +7,10 @@
  */
 
 /** Files the rule applies to (repo-relative globs). */
-export const noRubyCompatReimplementationFiles = ["packages/*/{src,lib,test}/**/*.ts"];
+export const noRubyCompatReimplementationFiles = [
+  "packages/*/src/**/*.ts",
+  "packages/*/lib/**/*.ts",
+];
 
 /**
  * Out of scope (repo-relative globs). `packages/ruby-compat/` is the sanctioned
@@ -18,6 +21,7 @@ export const noRubyCompatReimplementationIgnores = [
   "packages/ruby-compat/**",
   "**/*.test.ts",
   "**/test-helpers/**",
+  "packages/*/test/**",
 ];
 
 /**

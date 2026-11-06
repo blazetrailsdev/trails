@@ -33,6 +33,7 @@ import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
 import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
+import { libRoot } from "../layout/package-roots.js";
 import type { ClassInfo } from "@blazetrails/parity/types";
 
 const run = promisify(execFile);
@@ -155,7 +156,7 @@ function renameTokens(fqn: string): string {
  */
 async function entryGraph(dir: string, subpath?: string): Promise<Set<string>> {
   const cwd = path.join(ROOT_DIR, "packages", dir);
-  const srcRoot = path.join(cwd, "src");
+  const srcRoot = path.join(cwd, libRoot(dir));
   const entry =
     subpath ?? (await entryFile(cwd)).replace(/^\.\/dist\//, "").replace(/\.js$/, ".ts");
   const seen = new Set<string>();
@@ -211,7 +212,7 @@ const unexportedModules: string[] = [];
  * false for a module the pairing fell back to, which a lazy file never seats.
  */
 async function placement(dir: string) {
-  const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
+  const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
   const excluded = await tsconfigExcludes(dir);
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
@@ -223,7 +224,7 @@ async function placement(dir: string) {
     sources.get(file) ??
     sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
-    const rel = path.join("src", file);
+    const rel = path.join(libRoot(dir), file);
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&
@@ -300,7 +301,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const tsPkg = ts.packages[pkg];
     if (!tsPkg || SKIPPED.has(pkg) || (only !== undefined && pkg !== only)) continue;
     const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
-    const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
+    const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
 
     const paired = new Map<string, ClassPathEntry>();
@@ -379,8 +380,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         entries.push({ ...entry, namespace: true });
       } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
-        unexportedModules.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
-      } else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
+        unexportedModules.push(
+          `${dir}/${libRoot(dir)}/${entry.file}: ${entry.tsName} (${entry.fqn})`,
+        );
+      } else
+        unexported.push(`${dir}/${libRoot(dir)}/${entry.file}: ${entry.tsName} (${entry.fqn})`);
     }
     byDir.set(dir, entries);
   }
@@ -541,7 +545,7 @@ export function renderCoreClassPaths(): string {
 
 /** The per-file tables on disk, so one left with no paired classes is still visited. */
 async function lazyTablesOnDisk(dir: string): Promise<string[]> {
-  const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, "src"));
+  const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, libRoot(dir)));
   return files.filter(
     (file) =>
       /^constants\..+\.generated\.ts$/.test(file) &&
@@ -557,7 +561,10 @@ async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Pr
   const missing = new Set<string>();
   for (const { file, table } of entries) {
     if (!table || !prefixes.some((prefix) => file.startsWith(prefix))) continue;
-    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    const source = await fs.readFile(
+      path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
+      "utf8",
+    );
     if (!source.includes(`/${table.replace(/\.ts$/, ".js")}"`)) missing.add(file);
   }
   return [...missing];
@@ -665,7 +672,10 @@ export async function unreceiptedExclusions(
   for (const key of record.excluded) {
     if (before.has(key)) continue;
     const [file, tsName] = splitKey(key);
-    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    const source = await fs.readFile(
+      path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
+      "utf8",
+    );
     if (!isReceipted(source, tsName)) out.push(key);
   }
   return out;
@@ -770,7 +780,7 @@ async function main(): Promise<void> {
     }
   }
   for (const [dir, table, entries] of targets) {
-    const target = path.join(ROOT_DIR, "packages", dir, "src", table);
+    const target = path.join(ROOT_DIR, "packages", dir, libRoot(dir), table);
     if (entries.length === 0) {
       const exists = await fs.access(target).then(
         () => true,
@@ -813,7 +823,7 @@ async function main(): Promise<void> {
   if (check) {
     for (const [dir, entries] of tables) {
       for (const file of await lazyFilesMissingTable(dir, entries)) {
-        console.error(`${dir}/src/${file} does not import its constant table`);
+        console.error(`${dir}/${libRoot(dir)}/${file} does not import its constant table`);
         process.exitCode = 1;
       }
       if (entries.length > 0) {
