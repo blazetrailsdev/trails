@@ -46,6 +46,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
       "action-dispatch/http",
     ],
   },
+  actionmailer: { root: "ActionMailer", siblings: true },
   actionview: { root: "ActionView", collapse: ["renderer"] },
   activejob: { root: "ActiveJob" },
   activemodel: { root: "ActiveModel", siblings: true },

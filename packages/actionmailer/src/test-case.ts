@@ -16,6 +16,7 @@ import { File, IO, StandardError, TopLevel, include, rbModName } from "@blazetra
 import { Base } from "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
+import "./constants.excluded.generated.js";
 
 export class NonInferrableMailerError extends StandardError {
   constructor(name: unknown) {
@@ -179,11 +180,6 @@ export class TestCase extends ActiveSupportTestCase {
 
   static ClearTestDeliveries = ClearTestDeliveries;
   static Behavior = Behavior;
-
-  /** @noRailsEquivalent CONVERGEABLE test-case-constant-table-rows */
-  static override toString(): string {
-    return "ActionMailer::TestCase";
-  }
 }
 include(TestCase, Behavior);
 
