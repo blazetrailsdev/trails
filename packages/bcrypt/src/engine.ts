@@ -26,7 +26,8 @@ const _bcHashSync: (key: string, setting: string) => string = (() => {
   let native: { hashSync(key: Uint8Array, setting: string): string };
   try {
     native = createRequire(import.meta.url)("bcrypt") as typeof native;
-  } catch {
+  } catch (e) {
+    if ((e as { code?: unknown }).code !== "MODULE_NOT_FOUND") throw e;
     return bcryptjs.hashSync;
   }
   return (key, setting) => {
