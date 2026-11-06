@@ -1,3 +1,4 @@
+import { ArgumentError } from "../../argument-error.js";
 import type { HTTP as URIHTTP } from "../../uri/http.js";
 
 /**
@@ -32,11 +33,19 @@ export class HTTPRequest {
     const klass = this.constructor as typeof HTTPRequest;
     this.method = klass.METHOD;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
-    if (typeof path === "string") {
-      this.path = path;
-    } else {
+    if (typeof path !== "string") {
+      const hostname = path.hostname;
+      if (!(hostname != null && hostname.length > 0)) {
+        throw new ArgumentError("no host component for URI");
+      }
       this.uri = path;
-      this.path = path.requestUri()!;
+      const requestUri = path.requestUri();
+      if (requestUri == null) throw new ArgumentError("no HTTP request path given");
+      this.path = requestUri;
+    } else {
+      if (path == null) throw new ArgumentError("no HTTP request path given");
+      if (path.length === 0) throw new ArgumentError("HTTP request path is empty");
+      this.path = path;
     }
     if (initheader != null) {
       for (const [key, value] of Object.entries(initheader)) this.set(key, value);
@@ -71,6 +80,12 @@ export class HTTPRequest {
 
   /** @noRailsEquivalent PERMANENT */
   setBodyInternal(str: string | Uint8Array | null): void {
+    if (str != null && this.body != null) {
+      throw new ArgumentError("both of body argument and HTTPRequest#body set");
+    }
     if (str != null) this.body = str;
+    if (this.body == null && (this.constructor as typeof HTTPRequest).REQUEST_HAS_BODY) {
+      this.body = "";
+    }
   }
 }
