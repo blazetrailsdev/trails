@@ -2228,3 +2228,80 @@ the cap only lets the overcommit run longer. Fixed in `73b556b1e`.
 **Raising the memory cap is the wrong first move when a compile OOMs.** Check
 what the worker count is actually derived from first; here more memory made it
 fail faster.
+
+## The upstream fixes retired the stubs, and the measurement is what proves it
+
+Trails main brought #9742 (dev toolchain off the production server graph),
+plus #9747 (vite/vitest off statically-resolvable edges) and #9759
+(colocated tests excluded from every package's published build). Those are
+the real remedies for what r51's five `--module-alias` stubs were papering
+over.
+
+| run     | stubs    | modules  | outcome                    |
+| ------- | -------- | -------- | -------------------------- |
+| pre-fix | none     | ~2300    | OOM at `stage=lower`       |
+| r51–r56 | five     | 2102     | compiles                   |
+| r58     | **none** | **1962** | compiles and links, 201 MB |
+
+The upstream fixes do not merely substitute for the stubs — they cut 140
+modules _below_ what the stubs achieved, because a stub only hides a module the
+graph still reaches. The stubs are deleted in `3e21597afa`.
+
+**#9759 pays off only after a clean `dist`.** `tsc` does not delete the output
+of a file it no longer compiles, so 2790 stale `*.test.js` sat in the dists
+after the merge, and perry resolves those packages from `dist`, not `src`. The
+exclusion buys nothing until the dists are wiped and rebuilt.
+
+Two more things the merge moved. The hand-maintained list of dist-resolved
+packages was wrong twice in one sitting (#9727 put rackup on trailties' build
+path, #9763 put actionmailer on it); `tsc --build` over the root project graph
+orders by dependency and removes the list entirely. And `pnpm install`
+**recreates** the `@blazetrails` symlinks, so the cycle check has to run every
+time — by Tarjan over the whole graph (`find-link-cycles.py`), not by
+spot-checking the two legs that were known on 2026-11-04, since a newly added
+package can close a cycle no hardcoded list mentions.
+
+## A cold object cache, not the cap, is what OOMs a 1962-module codegen
+
+r57 was killed at `stage=codegen` 1905/1962 against a 28G scope cap, where r56
+had survived the same 28G with _more_ modules (2102). The difference is the
+object cache: wiping every `dist` for #9759 changed every source hash, so r56
+was mostly cache hits that never entered an LLVM worker and r57 was the first
+genuinely cold codegen. r58 pinned `PERRY_CODEGEN_UNIT_JOBS=4` and compiled
+clean at a _lower_ 22G cap — the pin, not a bigger cap, is the fix for a cold
+run. (The pin is read before the cgroup budget, so it overrides the sizing from
+`73b556b1e`. That is deliberate here; it is the same override that silently
+defeated that fix in r49.)
+
+Read `stage=` before touching any of this. r57 at `stage=codegen` is the LLVM
+unit-worker phase where job counts and caps genuinely apply — unlike the
+earlier OOMs at `stage=lower`, where they were irrelevant and the real cause
+was the TypeScript compiler sitting in the graph.
+
+## Wall 27: `FileStore` gets `undefined`, and it is perry-specific
+
+Boot reaches 1339 init lines, past `config/environment.ts`, then:
+
+    ArgumentError: wrong number of arguments (given 0, expected 1)
+        at new FileStore / at lookupStore / at lookupStore
+
+**That message is a hardcoded string**, not a count —
+`activesupport/src/cache/file-store.ts:62` only tests `cachePath === undefined`.
+The one established fact is that `cachePath` arrives `undefined`; the stack
+trace says less than it appears to. Two `lookupStore` frames means the
+`Array.isArray` recursion at `cache.ts:36` ran, so the config arrived in array
+form.
+
+**Running the ladder entrypoint under `tsx` is the cheapest thing that
+localises this**, and it should come before writing any probe. Node boots clean
+through cache setup to the last line of `08-serve.ts` and never raises this, so
+the defect is in the compile, not in trails. Three perry probes all match Node
+and clear their patterns: a conditional multi-spread `new`, `extractOptionsBang`
+with a string last element, and a class-field template-literal array.
+
+**There is no small repro for this wall.** Every route to `Application.config`
+drags the framework in: a probe importing `Application` resolves 1768 modules
+against the ladder's 1962, the same trap as the `db.js` repro that came out at
+2112 — _more_ than the ladder. Check `Found N module` before trusting a probe
+to be cheap. The loop that works is instrumentation inside the real binary,
+which is what cracked the `db.js` symbol bug.
