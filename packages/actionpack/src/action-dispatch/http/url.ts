@@ -75,7 +75,7 @@ function normalizeProtocol(protocol: string | false | null | undefined): string 
     const m = protocol.match(PROTOCOL_REGEXP);
     if (m) return `${m[1]}://`;
   }
-  throw new Error(`Invalid :protocol option: ${rbInspect(protocol)}`);
+  throw new ArgumentError(`Invalid :protocol option: ${rbInspect(protocol)}`);
 }
 
 /** @internal */
@@ -193,7 +193,7 @@ export class URL {
 
   static pathFor(options: UrlOptions): string {
     let path = (options.scriptName ?? "").replace(/\/$/, "");
-    if ("path" in options && options.path !== undefined) path += options.path;
+    if ("path" in options) path += options.path;
     if (options.trailingSlash && isBlank(path)) path = "/";
 
     const parts: string[] = [path];

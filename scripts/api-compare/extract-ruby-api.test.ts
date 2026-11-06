@@ -4076,6 +4076,32 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("proves a class-level Hash ivar from the class body for a def self. reader, apart from the instance ivar", () => {
+    const c = rubyCallReceivers({
+      "lib/mail/encodings.rb": `
+        class Encodings
+          @transfer_encodings = {}
+          @mixed = {}
+
+          def Encodings.defined?(name)
+            @transfer_encodings.include?(name)
+            @mixed.include?(name)
+          end
+
+          def self.reset
+            @mixed = compute
+          end
+
+          def call(name)
+            @transfer_encodings.include?(name)
+          end
+        end
+      `,
+    });
+    expect(c["Encodings#defined?"]).toEqual({ "include?": ["hash", "ivar"] });
+    expect(c["Encodings#call"]).toEqual({ "include?": ["ivar"] });
+  });
+
   it("proves an Array ivar only when every assignment in the class is an Array literal", () => {
     const c = rubyCallReceivers({
       "lib/active_record/stack.rb": `

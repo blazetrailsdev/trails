@@ -12,16 +12,11 @@ export abstract class Node {
     this.left = left;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  *[globalThis.Symbol.iterator](): IterableIterator<Node> {
-    const nodes: Node[] = [];
-    this.each((node) => nodes.push(node));
-    yield* nodes;
-  }
-
   grep<T extends Node>(klass: abstract new (...args: never[]) => T): T[] {
     const out: T[] = [];
-    for (const n of this) if (n instanceof klass) out.push(n);
+    this.each((n) => {
+      if (n instanceof klass) out.push(n);
+    });
     return out;
   }
 
@@ -48,6 +43,7 @@ export abstract class Node {
   }
 
   declare findAll: (block: (node: Node) => unknown) => Node[];
+  declare filterMap: <R>(block: (node: Node) => R | false | null | undefined) => R[];
 
   each(block: (node: Node) => void): void {
     Visitors.Each.INSTANCE.accept(this, block);
@@ -256,7 +252,7 @@ export class Ast {
 
   /** @internal */
   private visitTree(formatted: boolean | string | RegExp | null | undefined): void {
-    for (const node of this.tree) {
+    this.tree.each((node) => {
       if (node.isSymbol()) {
         const sym = node as Symbol;
         this.pathParams.push(sym.toSym());
@@ -275,6 +271,6 @@ export class Ast {
       if (node.isTerminal()) {
         this.terminals.push(node);
       }
-    }
+    });
   }
 }
