@@ -313,8 +313,10 @@ export class Field implements Comparable {
   /** @internal */
   /** @inventedArm forceEncoding — PERMANENT */
   private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
-    if (value instanceof Uint8Array) value = forceEncoding(rbObjDup(value), Encoding.UTF_8);
     if (typeof value === "string") value = this.unfold(value);
+    if (value instanceof Uint8Array) {
+      value = forceEncoding(binaryBytes(this.unfold(binaryString(value))), Encoding.UTF_8);
+    }
 
     const klass = (this.constructor as typeof Field).fieldClassFor(name);
     if (klass != null) {

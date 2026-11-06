@@ -103,12 +103,12 @@ export class Body {
     return TransferEncoding.negotiate(
       messageEncoding,
       this.encoding() as string,
-      this.rawSource instanceof Uint8Array ? binaryString(this.rawSource) : this.rawSource,
+      this.rawSource,
       allowedEncodings,
     );
   }
 
-  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string {
+  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
     if (this.isMultipart()) {
       this.sortPartsBang();
       const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());

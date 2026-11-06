@@ -20,11 +20,11 @@ export class TransferEncoding {
     return this.canTransport(enc);
   }
 
-  static cost(_str: string): number {
+  static cost(_str: string | Uint8Array): number {
     throw new RuntimeError("Unimplemented");
   }
 
-  static isCompatibleInput(_str: string): boolean {
+  static isCompatibleInput(_str: string | Uint8Array): boolean {
     return true;
   }
 
@@ -35,7 +35,7 @@ export class TransferEncoding {
   static negotiate(
     messageEncoding: string | typeof TransferEncoding | null,
     sourceEncoding: string | typeof TransferEncoding | null,
-    str: string,
+    str: string | Uint8Array,
     allowedEncodings: (typeof TransferEncoding)[] | null = null,
   ): typeof TransferEncoding | null {
     messageEncoding =
@@ -57,7 +57,7 @@ export class TransferEncoding {
   static renegotiate(
     messageEncoding: typeof TransferEncoding,
     sourceEncoding: typeof TransferEncoding | null,
-    str: string,
+    str: string | Uint8Array,
     allowedEncodings: (typeof TransferEncoding)[] | null = null,
   ): typeof TransferEncoding | null {
     const encodings = Encodings.getAll().filter(
@@ -71,7 +71,7 @@ export class TransferEncoding {
   }
 
   static lowestCost(
-    str: string,
+    str: string | Uint8Array,
     encodings: (typeof TransferEncoding)[],
   ): typeof TransferEncoding | null {
     let best: typeof TransferEncoding | null = null;

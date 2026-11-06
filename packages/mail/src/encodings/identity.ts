@@ -10,7 +10,7 @@ export class Identity extends TransferEncoding {
     return str;
   }
 
-  static override cost(_str: string): number {
+  static override cost(_str: string | Uint8Array): number {
     return 1.0;
   }
 

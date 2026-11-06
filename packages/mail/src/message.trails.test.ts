@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Mail, Part } from "./index.js";
+import { Body, Mail, Part } from "./index.js";
 
 describe("Mail::Message YAML", () => {
   it("round-trips a multipart message through toYaml and fromYaml", () => {
@@ -41,5 +41,20 @@ describe("Mail::Message binary raw source", () => {
     expect(field.unparsedValue).toEqual(new Uint8Array([0x63, 0x61, 0x66, 0xe9]));
     const lead = new Mail.Message(new Uint8Array([0xa0, 0x0d, 0x0a, 0x0d, 0x0a, 0x78]));
     expect(lead.header().rawSource).toEqual(new Uint8Array([0xa0]));
+  });
+
+  it("negotiates a binary body by its bytes", () => {
+    const body = new Body(new Uint8Array([...new TextEncoder().encode("abcdefgh"), 0xe9]));
+    expect(String(body.negotiateBestEncoding("7bit"))).toBe("quoted-printable");
+  });
+
+  it("unfolds a folded Latin-1 header value", () => {
+    const raw = new Uint8Array([
+      ...new TextEncoder().encode("Subject: caf"),
+      0xe9,
+      ...new TextEncoder().encode("\r\n x\r\n\r\nbody"),
+    ]);
+    const value = new Mail.Message(raw).header().get("Subject")!.value as unknown as Uint8Array;
+    expect(Array.from(value)).not.toContain(0x0d);
   });
 });

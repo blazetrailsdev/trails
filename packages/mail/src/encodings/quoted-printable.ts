@@ -31,13 +31,15 @@ export class QuotedPrintable extends SevenBit {
     return Utilities.toCrlf(pack([Utilities.toLf(str)], "M"));
   }
 
-  static override cost(str: string): number {
-    const c = strCount(str, ["\x09\x0a\x0d\x20-\x3c\x3e-\x7e"]);
+  static override cost(str: string | Uint8Array): number {
+    const c = strCount(str instanceof Uint8Array ? binaryString(str) : str, [
+      "\x09\x0a\x0d\x20-\x3c\x3e-\x7e",
+    ]);
     const total = (b(str).length - c) * 3 + c;
     return total / b(str).length;
   }
 
-  static override isCompatibleInput(_str: string): boolean {
+  static override isCompatibleInput(_str: string | Uint8Array): boolean {
     return true;
   }
 
