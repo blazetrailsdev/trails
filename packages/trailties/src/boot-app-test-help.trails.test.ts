@@ -103,6 +103,17 @@ describe("test_help wires a booted app into the test case classes", () => {
       expect(session._routes).toBe(Trails.application!.routes()._routes);
     });
 
+    it("seats with_routing's route set on the booted application's @routes", async ({
+      testCase,
+    }) => {
+      const session = testCase as BootAppIntegrationTest;
+      const original = Trails.application!.routes();
+      await session.withRouting((routes: RouteSet) => {
+        expect(Trails.application!.routes()).toBe(routes);
+      });
+      expect(Trails.application!.routes()).toBe(original);
+    });
+
     it("runs the test class's setup against its fixtures and url helpers", async ({ testCase }) => {
       const session = testCase as BootAppIntegrationTest & { postsUrl(): string };
       expect(session["@post"].title).toBe("Welcome to Trails");

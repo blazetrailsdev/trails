@@ -697,9 +697,8 @@ export class IntegrationTest extends TestCase {
     ];
     if (routesIvar) return routesIvar;
     const app = this.app as RoutesApp | null;
-    return rbObjRespondTo(app, "routes") && app!.routes() instanceof RouteSet
-      ? app!.routes()._routes
-      : this.routes._routes;
+    const routes = rbObjRespondTo(app, "routes") ? app!.routes() : null;
+    return routes instanceof RouteSet ? routes._routes : this.routes._routes;
   }
 
   controller!: Metal;
