@@ -14,7 +14,8 @@ import {
   days,
   stub,
 } from "@blazetrails/activesupport";
-import type { AddressContainer, Field, Message } from "@blazetrails/mail";
+import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
+import { Mail, type AddressContainer, type Field, type Message } from "@blazetrails/mail";
 import {
   ArgumentError,
   RuntimeError,
@@ -25,7 +26,12 @@ import {
 import { Base } from "./base.js";
 import { Preview } from "./preview.js";
 import type { MessageDelivery } from "./message-delivery.js";
-import { BaseMailer as BaseMailerClass } from "./test-helpers/mailers/base-mailer.js";
+import { AssetMailer } from "./test-helpers/mailers/asset-mailer.js";
+import {
+  ANOTHER_PATH_RESOLVER,
+  BaseMailer as BaseMailerClass,
+  UNKNOWN_RESOLVER,
+} from "./test-helpers/mailers/base-mailer.js";
 import { ProcMailer as ProcMailerClass } from "./test-helpers/mailers/proc-mailer.js";
 
 I18n.setEnforceAvailableLocales(false);
@@ -99,12 +105,19 @@ constSet(BaseTestNamespace, "MyInterceptor", MyInterceptor);
 describe("BaseTest", () => {
   let originalDeliveryMethod: typeof Base.deliveryMethod;
 
+  let originalAssetHost: string | undefined;
+  let originalAssetsDir: string | undefined;
+
   beforeEach(() => {
     originalDeliveryMethod = Base.deliveryMethod;
     Base.deliveryMethod = "test";
+    originalAssetHost = Base.assetHost;
+    originalAssetsDir = Base.assetsDir;
   });
 
   afterEach(() => {
+    Base.assetHost = originalAssetHost;
+    Base.assetsDir = originalAssetsDir;
     BaseMailer.deliveries.length = 0;
     Base.deliveryMethod = originalDeliveryMethod;
   });
@@ -530,6 +543,57 @@ describe("BaseTest", () => {
     });
   });
 
+  it("implicit multipart with fallback locale", async () => {
+    const fallbackBackend = class extends I18n.Fallbacks(I18n.Simple) {};
+
+    const backend = I18n.backend();
+    try {
+      I18n.setBackend(new fallbackBackend());
+      (I18n.fallbacks() as Map<string, string[]>).set("de-AT", ["de"]);
+
+      await swap(I18n, { locale: "de-AT" }, async () => {
+        const email = await BaseMailer.implicitWithLocale().message();
+        expect(email.parts.length).toBe(2);
+        expect(email.mimeType()).toBe("multipart/alternative");
+        expect(email.parts[0].mimeType()).toBe("text/plain");
+        expect(email.parts[0].body().encoded()).toBe("Implicit with locale DE-AT TEXT");
+        expect(email.parts[1].mimeType()).toBe("text/html");
+        expect(email.parts[1].body().encoded()).toBe("Implicit with locale DE HTML");
+      });
+    } finally {
+      I18n.setBackend(backend);
+    }
+  });
+
+  const viewPaths = (...args: unknown[]) =>
+    (
+      ActionView.ViewPaths.ClassMethods.viewPaths as unknown as (...args: unknown[]) => {
+        paths: unknown[];
+      }
+    ).call(BaseMailerClass, ...args);
+
+  it("implicit multipart with several view paths uses the first one with template", async () => {
+    const old = viewPaths();
+    try {
+      viewPaths([ANOTHER_PATH_RESOLVER, ...old.paths]);
+      const email = await BaseMailer.welcome().message();
+      expect(email.body().encoded()).toBe("Welcome from another path");
+    } finally {
+      viewPaths(old);
+    }
+  });
+
+  it("implicit multipart with inexistent templates uses the next view path", async () => {
+    const old = viewPaths();
+    try {
+      viewPaths([UNKNOWN_RESOLVER, ...old.paths]);
+      const email = await BaseMailer.welcome().message();
+      expect(email.body().encoded()).toBe("Welcome");
+    } finally {
+      viewPaths(old);
+    }
+  });
+
   it("explicit multipart", async () => {
     const email = await BaseMailer.explicitMultipart().message();
     expect(email.parts.length).toBe(2);
@@ -651,6 +715,15 @@ describe("BaseTest", () => {
     expect(BaseMailer.deliveries.length).toBe(1);
   });
 
+  it("calling deliver, ActionMailer should yield back to mail to let it call :do_delivery on itself", async () => {
+    const mail = new Mail.Message();
+    await assertCalled(mail, "doDelivery" as never, null, {}, async () => {
+      await assertCalled(BaseMailer, "welcome", null, { returns: mail }, async () => {
+        await (BaseMailer.welcome() as unknown as Message).deliver();
+      });
+    });
+  });
+
   it("you can specify a different template for implicit render", async () => {
     const mail = (await BaseMailer.implicitDifferentTemplate(
       "implicit-multipart",
@@ -686,6 +759,50 @@ describe("BaseTest", () => {
     const mail = (await BaseMailer.differentLayout("different-layout").deliverNow()) as Message;
     expect(mail.htmlPart()!.body().decoded()).toBe("HTML -- HTML");
     expect(mail.textPart()!.body().decoded()).toBe("PLAIN -- PLAIN");
+  });
+
+  it("you can specify the template path for implicit lookup", async () => {
+    let mail = (await BaseMailer.welcomeFromAnotherPath(
+      "another.path/base-mailer",
+    ).deliverNow()) as Message;
+    expect(mail.body().encoded()).toBe("Welcome from another path");
+
+    mail = (await BaseMailer.welcomeFromAnotherPath([
+      "unknown/invalid",
+      "another.path/base-mailer",
+    ]).deliverNow()) as Message;
+    expect(mail.body().encoded()).toBe("Welcome from another path");
+  });
+
+  it("assets tags should use ActionMailer's asset_host settings", async () => {
+    Base.config().assetHost = "http://global.com";
+    Base.config().assetsDir = "global/";
+
+    const mail = await (AssetMailer as Mailer<typeof AssetMailer>).welcome().message();
+
+    assertDomEqual(
+      `<img src="http://global.com/images/dummy.png" />`,
+      mail.body().toString().trim(),
+    );
+  });
+
+  it("assets tags should use a Mailer's asset_host settings when available", async () => {
+    Base.config().assetHost = "http://global.com";
+    Base.config().assetsDir = "global/";
+
+    const TempAssetMailer = class extends AssetMailer {
+      static {
+        this.setMailerName("asset_mailer");
+        this.assetHost = "http://local.com";
+      }
+    };
+
+    const mail = await (TempAssetMailer as Mailer<typeof TempAssetMailer>).welcome().message();
+
+    assertDomEqual(
+      `<img src="http://local.com/images/dummy.png" />`,
+      mail.body().toString().trim(),
+    );
   });
 
   it("the view is not rendered when mail was never called", async () => {

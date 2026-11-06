@@ -85,6 +85,9 @@ export class Base extends AbstractController.Base {
   declare static deliverLaterQueueName: unknown;
   declare static with: typeof ParameterizedClassMethods.with;
   declare static previewPaths: string[];
+  declare static assetHost: string | undefined;
+  declare static assetsDir: string | undefined;
+  declare static config: () => { assetHost?: string; assetsDir?: string };
   declare static showPreviews: boolean | null;
   declare static previewInterceptors: unknown[];
   declare static registerPreviewInterceptors: typeof PreviewsClassMethods.registerPreviewInterceptors;
