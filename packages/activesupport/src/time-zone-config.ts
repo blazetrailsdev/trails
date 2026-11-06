@@ -8,23 +8,23 @@ import { ArgumentError } from "./hash-utils.js";
 (TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).inTimeZone = (self: unknown, zone?: unknown) =>
   inTimeZone.call(self as DateOrTime, zone);
 
-let _zoneDefault: TimeZone | null | false = null;
+let _zoneDefault: TimeZone | null = null;
 
 export function zone(): TimeZone | null {
   const timeZone = IsolatedExecutionState.get<TimeZone | null | false>(":time_zone");
   if (timeZone != null && timeZone !== false) return timeZone;
-  return _zoneDefault || null;
+  return _zoneDefault;
 }
 
 export function setZone(timeZone: TimeZone | string | number | Duration | null | false): void {
   IsolatedExecutionState.set(":time_zone", findZoneBang(timeZone));
 }
 
-export function zoneDefault(): TimeZone | null | false {
+export function zoneDefault(): TimeZone | null {
   return _zoneDefault;
 }
 
-export function setZoneDefault(zone: TimeZone | null | false): void {
+export function setZoneDefault(zone: TimeZone | null): void {
   _zoneDefault = zone;
 }
 
@@ -52,6 +52,9 @@ export function findZone(timeZone: unknown): TimeZone | null | false {
   }
 }
 
+export function findZoneBang(timeZone: false): false;
+export function findZoneBang(timeZone: string): TimeZone;
+export function findZoneBang(timeZone: unknown): TimeZone | null | false;
 export function findZoneBang(timeZone: unknown): TimeZone | null | false {
   if (timeZone === null || timeZone === undefined) return null;
   if (timeZone === false) return false;
