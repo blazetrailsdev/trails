@@ -7,6 +7,5 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "exclude": ["lib/**/*.test.ts"],
   "references": []
 }
