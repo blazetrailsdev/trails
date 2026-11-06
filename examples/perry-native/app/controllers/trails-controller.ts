@@ -3,7 +3,7 @@ import { ApplicationController } from "./application-controller.js";
 
 export class TrailsController extends ApplicationController {
   static {
-    this.beforeAction("setTrail", { only: ["show", "edit", "update", "destroy"] });
+    this.beforeAction(":setTrail", { only: ["show", "edit", "update", "destroy"] });
   }
 
   declare trails: Trail[];
