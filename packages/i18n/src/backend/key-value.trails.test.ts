@@ -32,6 +32,8 @@ describe("prototype-chain method_missing", () => {
     expect(() => sub.isInstanceOf(null)).toThrow(TypeError);
     expect(() => sub.isA({})).toThrow(TypeError);
     expect(() => sub.isInstanceOf({})).toThrow(TypeError);
+    expect(() => sub.isA(() => {})).toThrow(TypeError);
+    expect(() => sub.isInstanceOf(() => {})).toThrow(TypeError);
     expect(SubtreeProxy.prototype.isKindOf).toBe(SubtreeProxy.prototype.isA);
   });
 });

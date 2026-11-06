@@ -228,7 +228,10 @@ export class SubtreeProxy {
   isA(klass: unknown): boolean {
     if (Hash === klass) return true;
     if (
-      typeof klass !== "function" &&
+      !(
+        typeof klass === "function" &&
+        Object.getOwnPropertyDescriptor(klass, "prototype")?.writable === false
+      ) &&
       !(typeof klass === "object" && klass !== null && isModuleObject(klass))
     ) {
       throw new TypeError("class or module required");
@@ -241,7 +244,10 @@ export class SubtreeProxy {
   isInstanceOf(klass: unknown): boolean {
     if (Hash === klass) return true;
     if (
-      typeof klass !== "function" &&
+      !(
+        typeof klass === "function" &&
+        Object.getOwnPropertyDescriptor(klass, "prototype")?.writable === false
+      ) &&
       !(typeof klass === "object" && klass !== null && isModuleObject(klass))
     ) {
       throw new TypeError("class or module required");
