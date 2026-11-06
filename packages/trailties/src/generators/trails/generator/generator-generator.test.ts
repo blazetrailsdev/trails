@@ -1,8 +1,8 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, it } from "vitest";
-import { GeneratorGenerator } from "./trails/generator/generator-generator.js";
-import { TestCase } from "./test-case.js";
+import { GeneratorGenerator } from "./generator-generator.js";
+import { TestCase } from "../../test-case.js";
 
 class GeneratorGeneratorTest extends TestCase {}
 GeneratorGeneratorTest.destination(Dir.mktmpdir());
