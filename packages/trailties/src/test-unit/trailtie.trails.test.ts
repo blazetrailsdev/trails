@@ -17,3 +17,10 @@ describe("Trails::TestUnitRailtie", () => {
     });
   });
 });
+
+describe("Trails::TestUnitRailtie initializers", () => {
+  it("registers the test_unit.line_filtering initializer", () => {
+    const names = TestUnitRailtie.instance().initializers.map((i) => i.name);
+    expect(names).toContain("test_unit.line_filtering");
+  });
+});

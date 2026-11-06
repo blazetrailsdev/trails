@@ -362,11 +362,31 @@ function RequestForgeryProtectionTests(
     Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
   });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with token tag", () => {});
+  it("should render form with token tag", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("index"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render button to with token tag", () => {});
+  it("should render button to with token tag", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("showButton"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
   it("should render form without token tag if remote", async () => {
     await assertNotBlocked(() => tc.get("formForRemote"));
@@ -384,17 +404,47 @@ function RequestForgeryProtectionTests(
     }
   });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with token tag if remote and external authenticity token requested and embedding is on", () => {});
+  it("should render form with token tag if remote and external authenticity token requested and embedding is on", async () => {
+    const original = embedAuthenticityTokenInRemoteForms;
+    try {
+      setEmbedAuthenticityTokenInRemoteForms(true);
+      await assertNotBlocked(() => tc.get("formForRemoteWithExternalToken"));
+      tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", "external_token");
+    } finally {
+      setEmbedAuthenticityTokenInRemoteForms(original);
+    }
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with token tag if remote and external authenticity token requested", () => {});
+  it("should render form with token tag if remote and external authenticity token requested", async () => {
+    await assertNotBlocked(() => tc.get("formForRemoteWithExternalToken"));
+    tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", "external_token");
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with token tag if remote and authenticity token requested", () => {});
+  it("should render form with token tag if remote and authenticity token requested", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("formForRemoteWithToken"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with token tag with authenticity token requested", () => {});
+  it("should render form with token tag with authenticity token requested", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("formForWithToken"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
   it("should render form with with token tag if remote", async () => {
     await assertNotBlocked(() => tc.get("formWithRemote"));
@@ -412,20 +462,67 @@ function RequestForgeryProtectionTests(
     }
   });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with with token tag if remote and external authenticity token requested and embedding is on", () => {});
+  it("should render form with with token tag if remote and external authenticity token requested and embedding is on", async () => {
+    const original = embedAuthenticityTokenInRemoteForms;
+    try {
+      setEmbedAuthenticityTokenInRemoteForms(true);
+      await assertNotBlocked(() => tc.get("formWithRemoteWithExternalToken"));
+      tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", "external_token");
+    } finally {
+      setEmbedAuthenticityTokenInRemoteForms(original);
+    }
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with with token tag if remote and external authenticity token requested", () => {});
+  it("should render form with with token tag if remote and external authenticity token requested", async () => {
+    await assertNotBlocked(() => tc.get("formWithRemoteWithExternalToken"));
+    tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", "external_token");
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with with token tag if remote and authenticity token requested", () => {});
+  it("should render form with with token tag if remote and authenticity token requested", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("formWithRemoteWithToken"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with with token tag with authenticity token requested", () => {});
+  it("should render form with with token tag with authenticity token requested", async () => {
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() => tc.get("formWithLocalWithToken"));
+        tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+      },
+    );
+  });
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should render form with with token tag if remote and embedding token is on", () => {});
+  it("should render form with with token tag if remote and embedding token is on", async () => {
+    const original = embedAuthenticityTokenInRemoteForms;
+    try {
+      setEmbedAuthenticityTokenInRemoteForms(true);
+
+      await stub(
+        tc.controller as unknown as CsrfPrivate,
+        "formAuthenticityToken",
+        TOKEN,
+        [],
+        async () => {
+          await assertNotBlocked(() => tc.get("formWithRemote"));
+        },
+      );
+      tc.assertSelect("form>input[name=?][value=?]", "custom_authenticity_token", TOKEN);
+    } finally {
+      setEmbedAuthenticityTokenInRemoteForms(original);
+    }
+  });
 
   it("should allow get", async () => {
     await assertNotBlocked(() => tc.get("index"));
@@ -825,10 +922,24 @@ function RequestForgeryProtectionTests(
 }
 
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
-  RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingResetSession);
+  const { t } = RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingResetSession);
 
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
+  it("should emit a csrf-param meta tag and a csrf-token meta tag", async () => {
+    const tc = t();
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN + "<=?",
+      [],
+      async () => {
+        await tc.get("meta");
+        tc.assertSelect("meta[name=?][content=?]", "csrf-param", "custom_authenticity_token");
+        tc.assertSelect("meta[name=?]", "csrf-token");
+        const regexp = `${TOKEN}&lt;=\\?`;
+        expect(tc.response.body).toMatch(new RegExp(regexp));
+      },
+    );
+  });
 });
 
 describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
@@ -940,10 +1051,18 @@ describe("PrependProtectForgeryBaseControllerTest", () => {
 });
 
 describe("FreeCookieControllerTest", () => {
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should not render form with token tag", () => {});
-  // BLOCKED: port-request-forgery-form-token-tag-tests
-  it.skip("should not render button to with token tag", () => {});
+  it("should not render form with token tag", async () => {
+    await stub(SecureRandom, "urlsafeBase64", token, [], async () => {
+      await tc.get("index");
+      tc.assertSelect("form>div>input[name=?][value=?]", "authenticity_token", token, false);
+    });
+  });
+  it("should not render button to with token tag", async () => {
+    await stub(SecureRandom, "urlsafeBase64", token, [], async () => {
+      await tc.get("showButton");
+      tc.assertSelect("form>div>input[name=?][value=?]", "authenticity_token", token, false);
+    });
+  });
 
   let tc: TestCase;
   let token: string;
