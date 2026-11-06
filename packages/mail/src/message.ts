@@ -65,11 +65,18 @@ export class Message {
   protected _separateParts = false;
   protected _textPart: Message | null = null;
   protected _htmlPart: Message | null = null;
+  /** @internal */
+  protected _errors: unknown = null;
   protected _header: Header | null = null;
   protected _charset: string | null;
   protected _defaultedCharset = true;
   protected _smtpEnvelopeFrom: unknown = null;
   protected _smtpEnvelopeTo: unknown = null;
+  performDeliveries = true;
+  raiseDeliveryErrors = true;
+  deliveryHandler: unknown = null;
+  /** @internal */
+  _deliveryMethod: unknown = null;
   protected _transportEncoding: unknown;
   protected _markForDelete = false;
   protected _rawSource = "";
@@ -77,12 +84,6 @@ export class Message {
   protected _envelope: Envelope | null = null;
   protected _deliveryStatusPart: Part | null | undefined;
   protected _attachment: unknown = undefined;
-
-  deliveryHandler: unknown = null;
-  /** @internal */
-  _deliveryMethod: unknown = null;
-  performDeliveries = true;
-  raiseDeliveryErrors = true;
 
   static get defaultCharset(): string {
     return defaultCharset;
@@ -1319,11 +1320,14 @@ rbDeclareIvar(Message, "@body_raw", "_bodyRaw");
 rbDeclareIvar(Message, "@separate_parts", "_separateParts");
 rbDeclareIvar(Message, "@text_part", "_textPart");
 rbDeclareIvar(Message, "@html_part", "_htmlPart");
+rbDeclareIvar(Message, "@errors", "_errors");
 rbDeclareIvar(Message, "@header", "_header");
 rbDeclareIvar(Message, "@charset", "_charset");
 rbDeclareIvar(Message, "@defaulted_charset", "_defaultedCharset");
 rbDeclareIvar(Message, "@smtp_envelope_from", "_smtpEnvelopeFrom");
 rbDeclareIvar(Message, "@smtp_envelope_to", "_smtpEnvelopeTo");
+rbDeclareIvar(Message, "@perform_deliveries", "performDeliveries");
+rbDeclareIvar(Message, "@raise_delivery_errors", "raiseDeliveryErrors");
 rbDeclareIvar(Message, "@delivery_method", "_deliveryMethod");
 rbDeclareIvar(Message, "@transport_encoding", "_transportEncoding");
 rbDeclareIvar(Message, "@mark_for_delete", "_markForDelete");
