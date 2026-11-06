@@ -66,7 +66,13 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * `public_instance_methods` and both get a forwarder. A JS accessor carries
  * both halves in ONE descriptor, so a descriptor with a `set` gets a
  * forwarding setter beside its getter — dropping it would drop the `foo=`
- * forwarder Ruby generates.
+ * forwarder Ruby generates. A data property that is not a function — an
+ * Array's `length` — is Ruby's `length` method, so it forwards as an accessor,
+ * and a symbol-keyed method (`Symbol.iterator`, Ruby's `each`) forwards too.
+ * A symbol-keyed data property is skipped: `Symbol.unscopables` and
+ * ruby-compat's own brands (the include records) are not Ruby methods, and a
+ * forwarding accessor would read `__getobj__` off the prototype and break
+ * `include()` on a subclass.
  *
  * `block` is Ruby's `&block`, `module_eval`'d on the generated class
  * (`:394,442`); `call` supplies the class as `this`, which is the `self`
@@ -147,8 +153,8 @@ export function DelegateClass<T extends MixinBase>(
     proto !== null && proto !== Object.prototype;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    for (const method of Object.getOwnPropertyNames(proto)) {
-      if (ignores.has(method) || method.startsWith("_")) continue;
+    for (const method of Reflect.ownKeys(proto)) {
+      if (typeof method === "string" && (ignores.has(method) || method.startsWith("_"))) continue;
       if (Object.hasOwn(klass.prototype, method)) continue;
       const descriptor = Object.getOwnPropertyDescriptor(proto, method)!;
       if (descriptor.get || descriptor.set) {
@@ -156,21 +162,37 @@ export function DelegateClass<T extends MixinBase>(
           configurable: true,
           ...(descriptor.get && {
             get(this: InstanceType<typeof klass>): unknown {
-              return (this.__getobj__() as Record<string, unknown>)[method];
+              return (this.__getobj__() as Record<string | symbol, unknown>)[method];
             },
           }),
           ...(descriptor.set && {
             set(this: InstanceType<typeof klass>, value: unknown): void {
-              (this.__getobj__() as Record<string, unknown>)[method] = value;
+              (this.__getobj__() as Record<string | symbol, unknown>)[method] = value;
             },
           }),
         });
-      } else if (typeof descriptor.value === "function") {
+      } else if (typeof descriptor.value !== "function") {
+        if (typeof method === "symbol") continue;
+        Object.defineProperty(klass.prototype, method, {
+          configurable: true,
+          get(this: InstanceType<typeof klass>): unknown {
+            return (this.__getobj__() as Record<string | symbol, unknown>)[method];
+          },
+          ...(descriptor.writable && {
+            set(this: InstanceType<typeof klass>, value: unknown): void {
+              (this.__getobj__() as Record<string | symbol, unknown>)[method] = value;
+            },
+          }),
+        });
+      } else {
         Object.defineProperty(klass.prototype, method, {
           configurable: true,
           writable: true,
           value(this: InstanceType<typeof klass>, ...args: unknown[]): unknown {
-            const target = this.__getobj__() as Record<string, (...a: unknown[]) => unknown>;
+            const target = this.__getobj__() as Record<
+              string | symbol,
+              (...a: unknown[]) => unknown
+            >;
             return target[method](...args);
           },
         });

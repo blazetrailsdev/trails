@@ -96,3 +96,28 @@ describe("TestDelegateClass", () => {
     expect("length" in proxied).toBe(false);
   });
 });
+
+describe("DelegateClass(Array)", () => {
+  it("forwards length, index reads and iteration to the wrapped Array", () => {
+    const parts = [1, 2, 3];
+    const delegator = new (DelegateClass(Array))(parts) as unknown as number[];
+    expect(delegator.length).toBe(3);
+    expect(delegator[1]).toBe(2);
+    expect([...delegator]).toEqual([1, 2, 3]);
+    delegator.push(4);
+    expect(parts).toEqual([1, 2, 3, 4]);
+    delegator.length = 0;
+    expect(parts).toEqual([]);
+  });
+});
+
+describe("Delegator Kernel names", () => {
+  it("forwards a Kernel name the delegate answers and leaves an unanswered one unread", () => {
+    const answering = new SimpleDelegator({ caseEquals: (other: unknown) => other === 1 });
+    expect((answering as unknown as { caseEquals(o: unknown): boolean }).caseEquals(1)).toBe(true);
+
+    const silent = new SimpleDelegator({});
+    expect((silent as unknown as { caseEquals?: unknown }).caseEquals).toBeUndefined();
+    expect(() => (silent as unknown as { other(): void }).other()).toThrow(/undefined method/);
+  });
+});
