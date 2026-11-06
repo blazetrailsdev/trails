@@ -1,4 +1,4 @@
-import { Dir, File, FileUtils, TSE, rbFBinding } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, TSE, rbFBinding, type Hash } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "./testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
@@ -59,14 +59,16 @@ export async function copyMinimalDevcontainerComposeFile(this: TestCase): Promis
 
 export async function assertComposeFile(
   this: TestCase,
-  block: (composeConfig: any) => unknown,
+  block: (composeConfig: Hash<string, any>) => unknown,
 ): Promise<void> {
-  await assertFile.call(this, ".devcontainer/compose.yaml", (content) => block(YAML.load(content)));
+  await assertFile.call(this, ".devcontainer/compose.yaml", (content) =>
+    block(YAML.load(content) as Hash<string, any>),
+  );
 }
 
 export async function assertDevcontainerJsonFile(
   this: TestCase,
-  block: (content: any) => unknown,
+  block: (content: Record<string, any>) => unknown,
 ): Promise<void> {
   await assertFile.call(this, ".devcontainer/devcontainer.json", (content) =>
     block(JSON.parse(content)),
