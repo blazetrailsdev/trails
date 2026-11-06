@@ -189,8 +189,6 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   if (pkg === "solid-queue" || pkg === "solid-cable") {
-    // Tests sort into `unit/`, `models/solid_queue/`, `jobs/` and `lib/`
-    // buckets the TS package does not repeat; `integration/` is kept.
     const rest = rubyFile.replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
     const tsFile =
