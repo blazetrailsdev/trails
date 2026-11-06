@@ -224,6 +224,8 @@ export const Random = {
  */
 export const OpenSSL = {
   Cipher,
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2999-3000 */
+  SSL: { VERIFY_NONE: 0, VERIFY_PEER: 1 },
   HMAC,
   Random,
   Digest: {

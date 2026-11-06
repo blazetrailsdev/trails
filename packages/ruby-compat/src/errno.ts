@@ -360,6 +360,24 @@ class ECONNRESET extends SystemCallError {
 }
 
 /**
+ * `Errno::ECONNREFUSED`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is: the error `connect(2)` raises when nothing listens on
+ * the port.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ECONNREFUSED`.
+ */
+class ECONNREFUSED extends SystemCallError {
+  static readonly Errno = 111;
+  readonly code = "ECONNREFUSED";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Connection refused" : `Connection refused - ${mesg}`);
+    this.name = "Errno::ECONNREFUSED";
+    this.errno = ECONNREFUSED.Errno;
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
@@ -369,6 +387,7 @@ class ECONNRESET extends SystemCallError {
 export const Errno = {
   EACCES,
   EAGAIN,
+  ECONNREFUSED,
   ECONNRESET,
   EEXIST,
   EINTR,

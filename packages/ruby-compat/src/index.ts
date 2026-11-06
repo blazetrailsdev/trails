@@ -508,7 +508,9 @@ export {
   RejectedExecutionError,
   ThreadPoolExecutor,
 } from "./thread-pool-executor.js";
-export { BasicSocket, Socket, TCPSocket } from "./socket.js";
+export { BasicSocket, Socket, SocketError, TCPSocket } from "./socket.js";
+export { Net } from "./net/protocol.js";
+import "./net/http.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { CancelledOperationError, ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";

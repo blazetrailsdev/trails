@@ -48,8 +48,37 @@ export interface HttpServer {
   on(event: "close", listener: () => void): unknown;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface HttpClientResponse {
+  httpVersion: string;
+  statusCode: number;
+  statusMessage: string;
+  headers: Record<string, string | string[] | undefined>;
+  body: Uint8Array;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface HttpClientConnection {
+  request(
+    method: string,
+    path: string,
+    headers: Record<string, string>,
+    body: string | Uint8Array | null,
+  ): Promise<HttpClientResponse>;
+  close(): void;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface HttpConnectOptions {
+  host: string;
+  port: number;
+  useSsl: boolean;
+  verifyPeer: boolean;
+}
+
 export interface HttpAdapter {
   createServer(handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer;
+  connect?(options: HttpConnectOptions): Promise<HttpClientConnection>;
 }
 
 const registry = new Map<string, HttpAdapter>();
@@ -88,9 +117,83 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
+type NodeSocket = {
+  once(event: string, listener: (error?: Error) => void): unknown;
+  removeListener(event: string, listener: (error?: Error) => void): unknown;
+  destroy(): unknown;
+};
+
+type NodeIncoming = {
+  httpVersion: string;
+  statusCode?: number;
+  statusMessage?: string;
+  headers: Record<string, string | string[] | undefined>;
+  on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
+  on(event: "end", listener: () => void): unknown;
+  on(event: "error", listener: (error: Error) => void): unknown;
+};
+
 type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
+  request(
+    options: Record<string, unknown>,
+    callback: (res: NodeIncoming) => void,
+  ): {
+    on(event: "error", listener: (error: Error) => void): unknown;
+    end(chunk?: string | Uint8Array | null): unknown;
+  };
 };
+
+type NodeNet = { connect(options: Record<string, unknown>): NodeSocket };
+
+function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, http: NodeHttp) {
+  return new Promise<HttpClientConnection>((resolve, reject) => {
+    const socket = options.useSsl
+      ? tls.connect({
+          host: options.host,
+          port: options.port,
+          servername: options.host,
+          rejectUnauthorized: options.verifyPeer,
+        })
+      : net.connect({ host: options.host, port: options.port });
+    socket.once("error", reject);
+    socket.once(options.useSsl ? "secureConnect" : "connect", () => {
+      socket.removeListener("error", reject);
+      resolve({
+        request: (method, path, headers, body) =>
+          new Promise((resolveResponse, rejectResponse) => {
+            const req = http.request(
+              { method, path, headers, createConnection: () => socket },
+              (res) => {
+                const chunks: Uint8Array[] = [];
+                res.on("data", (chunk) => chunks.push(chunk));
+                res.on("error", rejectResponse);
+                res.on("end", () => {
+                  const total = chunks.reduce((n, c) => n + c.length, 0);
+                  const bytes = new Uint8Array(total);
+                  let offset = 0;
+                  for (const c of chunks) {
+                    bytes.set(c, offset);
+                    offset += c.length;
+                  }
+                  resolveResponse({
+                    httpVersion: res.httpVersion,
+                    statusCode: res.statusCode!,
+                    statusMessage: res.statusMessage ?? "",
+                    headers: res.headers,
+                    body: bytes,
+                  });
+                });
+              },
+            );
+            req.on("error", rejectResponse);
+            req.end(body);
+          }),
+        close: () => socket.destroy(),
+      });
+    });
+  });
+}
 
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
@@ -104,7 +207,12 @@ function tryAutoRegisterNode(): boolean {
     const req = syncBuiltinLoader();
     if (!req) return false;
     const http = req("node:http") as NodeHttp;
-    registry.set("node", { createServer: (handler) => http.createServer(handler) });
+    const net = req("node:net") as NodeNet;
+    const tls = req("node:tls") as NodeNet;
+    registry.set("node", {
+      createServer: (handler) => http.createServer(handler),
+      connect: (options) => _nodeConnect(net, tls, options, http),
+    });
     return true;
   } catch {
     return false;
