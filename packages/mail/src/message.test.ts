@@ -418,6 +418,16 @@ describe("Mail::Message", () => {
     });
   });
   describe("helper methods", () => {
+    it("should implement the spaceship operator on the date field", () => {
+      const now = new Date();
+      const mail1 = Mail.new(function (this: Message) {
+        this.date(now);
+      });
+      const mail2 = Mail.new(function (this: Message) {
+        this.date(new Date(now.getTime() - 10_000));
+      });
+      expect(sort([mail2, mail1])).toEqual([mail2, mail1]);
+    });
     describe("==", () => {
       it("should be implemented", () => {
         expect(() => Mail.new().equals(Mail.new())).not.toThrow();
@@ -618,19 +628,6 @@ describe("Mail::Message", () => {
         );
         expect(message.decoded()).toBe("Hi –");
       });
-    });
-  });
-
-  describe("helper methods (spaceship)", () => {
-    it("should implement the spaceship operator on the date field", () => {
-      const now = new Date();
-      const mail1 = Mail.new(function (this: Message) {
-        this.date(now);
-      });
-      const mail2 = Mail.new(function (this: Message) {
-        this.date(new Date(now.getTime() - 10_000));
-      });
-      expect(sort([mail2, mail1])).toEqual([mail2, mail1]);
     });
   });
 
