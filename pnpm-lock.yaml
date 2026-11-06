@@ -672,6 +672,9 @@ importers:
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/html-sanitizer:
     dependencies:
@@ -794,6 +797,9 @@ importers:
         specifier: ^10.3.0
         version: 10.3.0
     devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
       '@types/nodemailer':
         specifier: ^8.0.2
         version: 8.0.2
@@ -838,6 +844,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rack-session:
     dependencies:
@@ -847,6 +856,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rack-test:
     dependencies:
@@ -875,6 +888,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rake:
     dependencies:
@@ -1008,6 +1024,10 @@ importers:
       typescript-5:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/trailties:
     dependencies:
@@ -8387,7 +8407,6 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
-    optional: true
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -9755,8 +9774,7 @@ snapshots:
     dependencies:
       node-int64: 0.4.0
 
-  buffer-from@1.1.2:
-    optional: true
+  buffer-from@1.1.2: {}
 
   buffer@5.7.1:
     dependencies:
@@ -9907,8 +9925,7 @@ snapshots:
 
   commander@14.0.3: {}
 
-  commander@2.20.3:
-    optional: true
+  commander@2.20.3: {}
 
   commander@7.2.0: {}
 
@@ -10751,7 +10768,8 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
-  fsevents@2.3.2: {}
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -12528,12 +12546,10 @@ snapshots:
     dependencies:
       buffer-from: 1.1.2
       source-map: 0.6.1
-    optional: true
 
   source-map@0.5.7: {}
 
-  source-map@0.6.1:
-    optional: true
+  source-map@0.6.1: {}
 
   space-separated-tokens@2.0.2: {}
 
@@ -12640,7 +12656,6 @@ snapshots:
   supports-color@8.1.1:
     dependencies:
       has-flag: 4.0.0
-    optional: true
 
   supports-hyperlinks@2.3.0:
     dependencies:
@@ -12702,7 +12717,6 @@ snapshots:
       acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
-    optional: true
 
   test-exclude@7.0.2:
     dependencies:

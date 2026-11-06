@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test"
+  },
+  "exclude": ["src/test-helpers/fixtures/all/admin/**"],
+  "include": ["src/**/*.test.ts", "src/test-setup-*.ts", "src/**/*.bench.ts"],
+  "references": [{ "path": "./tsconfig.json" }, { "path": "../arel/tsconfig.test.json" }]
+}

@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "types": ["node"]
   },
   "include": ["src"],
   "references": [
@@ -12,5 +13,6 @@
     { "path": "../tse-compiler" },
     { "path": "../zeitwerk" },
     { "path": "../actionview" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts"]
 }

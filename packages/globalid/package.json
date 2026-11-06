@@ -33,6 +33,7 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/activemodel": "workspace:*"
+    "@blazetrails/activemodel": "workspace:*",
+    "@types/node": "25.3.5"
   }
 }

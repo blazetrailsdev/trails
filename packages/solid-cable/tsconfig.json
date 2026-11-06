@@ -7,29 +7,14 @@
   },
   "include": ["src"],
   "references": [
-    {
-      "path": "../actioncable"
-    },
-    {
-      "path": "../activejob"
-    },
-    {
-      "path": "../activerecord"
-    },
-    {
-      "path": "../activesupport"
-    },
-    {
-      "path": "../arel"
-    },
-    {
-      "path": "../date"
-    },
-    {
-      "path": "../ruby-compat"
-    },
-    {
-      "path": "../trailties"
-    }
-  ]
+    { "path": "../actioncable" },
+    { "path": "../activejob" },
+    { "path": "../activerecord" },
+    { "path": "../activesupport" },
+    { "path": "../arel" },
+    { "path": "../date" },
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

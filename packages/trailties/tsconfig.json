@@ -30,5 +30,6 @@
     { "path": "../thor" },
     { "path": "../et-orbi" },
     { "path": "../vitest-matchers" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/**/__fixtures__"]
 }

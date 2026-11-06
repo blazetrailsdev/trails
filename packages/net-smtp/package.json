@@ -29,6 +29,7 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@types/node": "25.3.5",
     "@types/nodemailer": "^8.0.2",
     "@types/smtp-server": "^3.5.13",
     "smtp-server": "^3.21.2"

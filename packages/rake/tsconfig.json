@@ -11,5 +11,6 @@
     { "path": "../ruby-compat" },
     { "path": "../did-you-mean" },
     { "path": "../vitest-matchers" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

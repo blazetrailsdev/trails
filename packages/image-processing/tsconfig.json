@@ -8,14 +8,9 @@
   "include": ["src"],
   "references": [
     { "path": "../activesupport" },
-    {
-      "path": "../ruby-compat"
-    },
-    {
-      "path": "../mini-magick"
-    },
-    {
-      "path": "../vitest-matchers"
-    }
-  ]
+    { "path": "../ruby-compat" },
+    { "path": "../mini-magick" },
+    { "path": "../vitest-matchers" }
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }
