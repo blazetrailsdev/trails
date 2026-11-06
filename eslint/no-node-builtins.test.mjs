@@ -185,7 +185,7 @@ tester.run("no-node-builtins", rule, {
     },
     // ruby-compat is no longer a special case: the seat it is pointed at is its own
     {
-      filename: "/repo/packages/ruby-compat/src/hash.ts",
+      filename: "/repo/packages/ruby-compat/lib/hash.ts",
       code: 'import { createHash } from "node:crypto";\ncreateHash("sha256");',
       errors: [{ messageId: "useAdapter" }],
       output:

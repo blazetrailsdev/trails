@@ -31,7 +31,7 @@ export type StdlibMixin = keyof typeof STDLIB_MIXINS;
  * The TS member that answers the Ruby contract without the mixin: a class with
  * `[Symbol.iterator]` is iterable (the `for...of` lowering of `each`), and
  * ruby-compat's `Comparable` spells `<=>` as `compareTo`
- * (`packages/ruby-compat/src/comparable.ts`).
+ * (`packages/ruby-compat/lib/comparable.ts`).
  */
 const TS_CONTRACT_MEMBER: Record<StdlibMixin, string> = {
   Enumerable: "[Symbol.iterator]",

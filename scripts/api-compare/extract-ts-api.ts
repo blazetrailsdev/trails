@@ -1020,7 +1020,7 @@ export function extractFromProgram(
       } else if (ts.isVariableStatement(node) && isExported(node)) {
         // Capture `export const X = { method() {...}, foo, bar: ... }`
         // as a module. This is the shape every `include(Host, Mod)`
-        // mixin uses (see ruby-compat/src/include.ts).
+        // mixin uses (see ruby-compat/lib/include.ts).
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
@@ -3033,7 +3033,7 @@ export function internalJsDocTagApplies(node: ts.Node): boolean {
  */
 /**
  * Ruby module-body visibility, read off `defineModule(pub, prot, priv)`
- * (`packages/ruby-compat/src/include.ts`) — the single declaration site for a
+ * (`packages/ruby-compat/lib/include.ts`) — the single declaration site for a
  * mixin member's visibility, and the one syntactic shape this can key on.
  *
  * A member of `QueryMethodsPrivateInstanceMethods` is `private` in Rails
@@ -4127,7 +4127,7 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
 
 /**
  * The methods an exported `Module` instance is built with — Ruby's
- * `module X; def m; end; end` ported as a live module (ruby-compat/src/include.ts):
+ * `module X; def m; end; end` ported as a live module (ruby-compat/lib/include.ts):
  *
  * - `new Module().include({ m() {} })` — every object literal an `.include(...)`
  *   chained on the construction is handed.

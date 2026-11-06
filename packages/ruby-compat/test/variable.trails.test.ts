@@ -267,13 +267,13 @@ describe("rbModDeprecateConstant", () => {
 
   beforeAll(async () => {
     vi.resetModules();
-    vi.doMock("./kernel-warn.js", () => ({ warn }));
+    vi.doMock("../lib/kernel-warn.js", () => ({ warn }));
     v = await import("../lib/variable.js");
     inc = await import("../lib/include.js");
     ({ rbConstGet, constGet, rbModDeprecateConstant } = v);
     ({ include, Module, constSet } = inc);
     ({ NameError } = await import("../lib/name-error.js"));
-    vi.doUnmock("./kernel-warn.js");
+    vi.doUnmock("../lib/kernel-warn.js");
   });
 
   it("records the names, answers the receiver and still reads the constant", () => {

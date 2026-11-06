@@ -5,7 +5,7 @@
  * Without a gate the package relocates today's duplicates and grows fresh ones
  * — the history that produced them: `regexpEscape` has been the canonical
  * spelling for a long time (in `activesupport/src/core-ext/regexp.ts` before
- * RFC 0129 moved it to `ruby-compat/src/regexp.ts`) and three byte-identical
+ * RFC 0129 moved it to `ruby-compat/lib/regexp.ts`) and three byte-identical
  * private copies exist anyway (`quote-regex.ts:27`, `run-token.ts:23`,
  * `trails-actions.ts:191`).
  *

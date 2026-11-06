@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { getFs, getPath, type FsAdapter } from "../lib/fs-adapter.js";
 
-const fsAdapterPath = fileURLToPath(new URL("./fs-adapter.ts", import.meta.url));
+const fsAdapterPath = fileURLToPath(new URL("../lib/fs-adapter.ts", import.meta.url));
 
 describe("fs-adapter auto-registration", () => {
   test("sync getFs resolves the node adapter under pure ESM", () => {

@@ -251,7 +251,7 @@ const RUBY_COMPAT_EXPORT_BY_REF = new Map(
  * Ruby call chains ONE ruby-compat export stands for, keyed by the chain's
  * outermost callee — the only link the recorder keeps — and valued by the
  * export. `first.class.name` (core_ext/array/conversions.rb:191) records as
- * `ref:name`; `rbObjClassname` (ruby-compat/src/object.ts) answers the class NAME,
+ * `ref:name`; `rbObjClassname` (ruby-compat/lib/object.ts) answers the class NAME,
  * not the class, because a JS `number` is the seat for both `Integer` and
  * `Float` and only the value can say which, so `first.constructor.name` would
  * answer `Number` where Ruby answers `Integer`. The key alone would admit any
