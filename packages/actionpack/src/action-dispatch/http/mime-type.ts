@@ -185,7 +185,9 @@ const METHOD_MISSING_HANDLER: ProxyHandler<object> = {
     return (...args: unknown[]) => receiver.methodMissing(method, ...args);
   },
   has(target, prop) {
-    return Reflect.has(target, prop) || rubyPredicateName(prop) !== null;
+    if (Reflect.has(target, prop)) return true;
+    const method = rubyPredicateName(prop);
+    return method !== null && MimeType.prototype.respondToMissing(method, false);
   },
 };
 
