@@ -1,5 +1,5 @@
 import { Migration } from "@blazetrails/activerecord";
-import { TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/ruby-compat";
 
 export class CreateActionMailboxTables extends Migration.get(6.0) {
   async change(): Promise<void> {
@@ -21,7 +21,7 @@ export class CreateActionMailboxTables extends Migration.get(6.0) {
   private primaryKeyType(): string {
     const config = TopLevel.Trails!.configuration!.generators();
     return (
-      (config.options.get(config.orm!())!.primaryKeyType as string | null | undefined) ||
+      (config.options.get(config.orm!())!.primaryKeyType as string | null | undefined) ??
       "primary_key"
     );
   }
