@@ -220,13 +220,7 @@ export class CookieJar implements Iterable<[string, string]> {
 
   declare hasKey: CookieJar["isKey"];
 
-  toH(): Record<string, string> {
-    const result: Record<string, string> = {};
-    for (const [k, v] of this._cookies) {
-      result[k] = v;
-    }
-    return result;
-  }
+  declare toH: () => Record<string, string>;
 
   declare toHash: CookieJar["toH"];
 
@@ -463,8 +457,9 @@ export class AbstractCookieJar {
 }
 
 CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
-CookieJar.prototype.toHash = CookieJar.prototype.toH;
 
+include(CookieJar, Enumerable);
+CookieJar.prototype.toHash = CookieJar.prototype.toH;
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);
 

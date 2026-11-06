@@ -387,9 +387,7 @@ describe("Mail::Body", () => {
     it("should encoded", () => {
       const body = new Body("あいうえお\r\n");
       body.charset = "iso-2022-jp";
-      expect(new TextDecoder().decode(body.encoded() as Uint8Array)).toEqual(
-        '\x1b$B$"$$$&$($*\x1b(B\r\n',
-      );
+      expect(body.encoded()).toEqual('\x1b$B$"$$$&$($*\x1b(B\r\n');
     });
   });
 

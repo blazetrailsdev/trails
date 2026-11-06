@@ -933,8 +933,7 @@ export class Message {
     this.readyToSendBang();
     let buffer = this.header().encoded();
     buffer += "\r\n";
-    const body = this.body().encoded(this.contentTransferEncoding() as string | null);
-    buffer += typeof body === "string" ? body : new TextDecoder("latin1").decode(body);
+    buffer += this.body().encoded(this.contentTransferEncoding() as string | null);
     return buffer;
   }
 

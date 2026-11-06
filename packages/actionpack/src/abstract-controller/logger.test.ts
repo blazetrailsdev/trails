@@ -18,7 +18,7 @@ describe("benchmark()", () => {
     const lines: string[] = [];
     const logger: LoggerLike = {
       debug: () => {},
-      info: (m) => {
+      info: (m: string) => {
         lines.push(m);
       },
       warn: () => {},
@@ -38,7 +38,7 @@ describe("benchmark()", () => {
     const lines: string[] = [];
     const logger: LoggerLike = {
       debug: () => {},
-      info: (m) => {
+      info: (m: string) => {
         lines.push(m);
       },
       warn: () => {},
