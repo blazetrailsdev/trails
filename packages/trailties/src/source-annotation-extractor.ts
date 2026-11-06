@@ -12,14 +12,10 @@ const TOKENIZER_FEATURES = [
 ] as const;
 
 /** @noRailsEquivalent PERMANENT */
-const loadPath: Record<string, () => Promise<unknown>> = Object.fromEntries(
-  TOKENIZER_FEATURES.map((feature) => [feature, () => import(feature)]),
-);
-
-/** @noRailsEquivalent PERMANENT */
 async function requireTokenizer() {
   try {
-    for (const feature of TOKENIZER_FEATURES) await rbFRequire(loadPath, feature);
+    for (const feature of TOKENIZER_FEATURES)
+      await rbFRequire({ [feature]: () => import(feature) }, feature);
   } catch (e) {
     if (e instanceof LoadError) return null;
     throw e;

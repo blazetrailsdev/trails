@@ -79,10 +79,7 @@ describe("SendfileTest", () => {
     await t.makeBasicApp((app) => {
       app.config.actionDispatch.xSendfileHeader = "X-Sendfile";
       app.config.publicFileServer.enabled = true;
-      app
-        .instance()
-        .paths()
-        .add("public", { with: File.join(trailsRoot, "public") });
+      app.instance().paths().set("public", File.join(trailsRoot, "public"));
     });
 
     await t.appFile("public/foo.txt", "foo");
