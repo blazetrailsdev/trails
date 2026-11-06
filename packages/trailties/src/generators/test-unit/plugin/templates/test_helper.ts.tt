@@ -1,1 +1,2 @@
+import "@blazetrails/activesupport/testing/autorun";
 import "@blazetrails/activesupport";

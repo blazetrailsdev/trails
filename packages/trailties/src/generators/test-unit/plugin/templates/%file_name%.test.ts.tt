@@ -1,9 +1,8 @@
 import "./test_helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 
-// import { describe, expect, it } from "vitest";
-//
-// describe("<%= this.className() %>Test", () => {
-//   it("the truth", () => {
-//     expect(true).toBe(true);
-//   });
-// });
+export class <%= this.className().split("::").join("") %>Test extends TestCase {
+  // test("the truth", () => {
+  //   assert(true);
+  // });
+}

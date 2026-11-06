@@ -94,6 +94,7 @@ export class Trailtie extends BaseTrailtie {
     /**
      * @missingRailsCall get — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
      * @missingRailsCall exception — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
+     * @missingRailsCall eager_load_namespaces — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
      */
     this.initializer("active_support.initialize_time_zone", (app) => {
       setZoneDefault(findZoneBang(app.config.timeZone));
