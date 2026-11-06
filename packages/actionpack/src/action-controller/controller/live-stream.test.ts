@@ -805,18 +805,18 @@ describe("LiveStreamRouterTest", () => {
 
   class LiveStreamRouterTest extends IntegrationTest {
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static {
       constSetPath("LiveStreamRouterTest::TestController", TestController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.get("/test", { to: "live_stream_router_test/test#index" });
       });
     }

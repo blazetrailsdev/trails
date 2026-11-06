@@ -585,7 +585,7 @@ describe("WithRoutingResetTest", () => {
         },
       );
     });
-    (t().app as { routes: RouteSet }).routes.draw(function () {
+    (t().app as { routes(): RouteSet }).routes().draw(function () {
       this.get("/purchase", { to: "store#purchase" });
     });
 

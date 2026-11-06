@@ -130,7 +130,7 @@ describe("Mapper public DSL additions", () => {
 
     await m.draw("external");
 
-    expect(set.routes.routes.map((r) => r.path.spec.toString())).toContain("/external(.:format)");
+    expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/external(.:format)");
   });
 
   it("root routes through match_root_route and keeps the bare slash", () => {
@@ -138,8 +138,8 @@ describe("Mapper public DSL additions", () => {
     const m = new Mapper(set);
     m.root("pages#home");
 
-    expect(set.routes.routes.map((r) => r.path.spec.toString())).toContain("/");
-    expect(set.routes.routes.find((r) => r.path.spec.toString() === "/")!.name).toBe("root");
+    expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/");
+    expect(set.routes().routes.find((r) => r.path.spec.toString() === "/")!.name).toBe("root");
   });
 
   it("draw raises when the external file is not found", async () => {
@@ -172,10 +172,10 @@ describe("Mapper public DSL additions", () => {
     const m = new Mapper(set);
     let before = 0;
     m.resources("posts", () => {
-      before = set.routes.routes.length;
+      before = set.routes().routes.length;
       m.setMemberMappingsForResource();
     });
-    const added = set.routes.routes.slice(before, before + 5);
+    const added = set.routes().routes.slice(before, before + 5);
     expect(added.map((r) => `${r.verb} ${r.path.spec}#${r.defaults.action}`)).toEqual([
       "GET /posts/:id/edit(.:format)#edit",
       "GET /posts/:id(.:format)#show",
@@ -194,9 +194,11 @@ describe("Mapper public DSL additions", () => {
         m.resources("comments");
       });
     });
-    const commentShow = set.routes.routes.find(
-      (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
-    );
+    const commentShow = set
+      .routes()
+      .routes.find(
+        (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
+      );
     expect(commentShow?.path.spec.toString()).toBe("/admin/comments/:id(.:format)");
   });
 
@@ -208,9 +210,11 @@ describe("Mapper public DSL additions", () => {
         m.resources("comments");
       });
     });
-    const commentShow = set.routes.routes.find(
-      (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
-    );
+    const commentShow = set
+      .routes()
+      .routes.find(
+        (r) => r.defaults.action === "show" && String(r.defaults.controller).endsWith("comments"),
+      );
     expect(commentShow?.name).toBe("admin_comment");
   });
 
@@ -218,7 +222,7 @@ describe("Mapper public DSL additions", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     m.resources("posts");
-    const updates = set.routes.routes.filter((r) => r.defaults.action === "update");
+    const updates = set.routes().routes.filter((r) => r.defaults.action === "update");
     expect(updates.map((r) => r.verb)).toEqual(["PATCH", "PUT"]);
   });
 
@@ -248,9 +252,11 @@ describe("Mapper public DSL additions", () => {
         m.resources("tags");
       });
     });
-    const tagIndex = set.routes.routes.find(
-      (r) => r.defaults.action === "index" && String(r.defaults.controller).includes("tags"),
-    );
+    const tagIndex = set
+      .routes()
+      .routes.find(
+        (r) => r.defaults.action === "index" && String(r.defaults.controller).includes("tags"),
+      );
     expect(tagIndex?.path.spec.toString()).toBe("/posts/:post_id/admin/tags(.:format)");
   });
 });

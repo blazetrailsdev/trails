@@ -169,7 +169,7 @@ export class DebugExceptions {
       rbObjRespondTo(this.routesApp, "routes") &&
       (exception.isRoutingError() || exception.isTemplateError())
     ) {
-      return new RoutesInspector(this.routesApp!.routes().routes);
+      return new RoutesInspector(this.routesApp!.routes().routes());
     }
     return null;
   }

@@ -269,7 +269,7 @@ describe("Controller routing integration", () => {
       this.get("/posts", { to: "posts#index", as: "posts" });
       this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    expect(routes.routes.routes.length).toBe(2);
+    expect(routes.routes().routes.length).toBe(2);
   });
 
   it("named routes map", () => {

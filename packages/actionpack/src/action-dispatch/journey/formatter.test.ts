@@ -36,7 +36,7 @@ function buildHost(named: Record<string, Route>, routesList: Route[] = Object.va
   const routes = new Routes(routesList);
   for (const r of routesList) routes.partitionRoute(r);
   return {
-    routes,
+    routes: () => routes,
     namedRoutes: {
       isKey: (n: string) => Object.hasOwn(named, n),
       get: (n: string) => named[n],

@@ -903,12 +903,12 @@ describe("ApplicationIntegrationTest", () => {
 
   class ApplicationIntegrationTest extends IntegrationTest {
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
@@ -916,7 +916,7 @@ describe("ApplicationIntegrationTest", () => {
       include(TestController, SharedTestRoutes.urlHelpers());
       constSetPath("ApplicationIntegrationTest::MetalController", MetalController);
       constSetPath("ApplicationIntegrationTest::TestController", TestController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.get("", { to: "application_integration_test/test#index", as: "empty_string" });
 
         this.get("metal", { to: "application_integration_test/metal#new", as: "new_metal" });
@@ -1005,18 +1005,18 @@ describe("EnvironmentFilterIntegrationTest", () => {
   class EnvironmentFilterIntegrationTest extends IntegrationTest {
     static call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.parameter_filter"] = ["password"];
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static {
       constSetPath("EnvironmentFilterIntegrationTest::TestController", TestController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.match("/post", { to: "environment_filter_integration_test/test#post", via: ":post" });
       });
     }
@@ -1098,12 +1098,12 @@ describe("UrlOptionsIntegrationTest", () => {
   class UrlOptionsIntegrationTest extends IntegrationTest {
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     override get app(): unknown {
@@ -1115,7 +1115,7 @@ describe("UrlOptionsIntegrationTest", () => {
       include(BarController, SharedTestRoutes.urlHelpers());
       constSetPath("UrlOptionsIntegrationTest::FooController", FooController);
       constSetPath("UrlOptionsIntegrationTest::BarController", BarController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.defaultUrlOptions = { host: "foo.com" };
 
         this.scope({ module: "url_options_integration_test" }, () => {
@@ -1188,12 +1188,12 @@ describe("HeadWithStatusActionIntegrationTest", () => {
   class HeadWithStatusActionIntegrationTest extends IntegrationTest {
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     override get app(): unknown {
@@ -1202,7 +1202,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
 
     static {
       constSetPath("HeadWithStatusActionIntegrationTest::FooController", FooController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.get("/foo/status", { to: "head_with_status_action_integration_test/foo#status" });
       });
     }
@@ -1506,12 +1506,12 @@ describe("IntegrationFileUploadTest", () => {
   class IntegrationFileUploadTest extends IntegrationTest {
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     override get app(): unknown {
@@ -1524,7 +1524,7 @@ describe("IntegrationFileUploadTest", () => {
 
     static {
       constSetPath("IntegrationFileUploadTest::IntegrationController", IntegrationController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.post("test_file_upload", {
           to: "integration_file_upload_test/integration#test_file_upload",
         });
@@ -1558,12 +1558,12 @@ describe("PageDumpIntegrationTest", () => {
   class PageDumpIntegrationTest extends IntegrationTest {
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static call(env: RackEnv): Promise<RackResponse> {
-      return this.routes.call(env);
+      return this.routes().call(env);
     }
 
     override get app(): unknown {
@@ -1591,7 +1591,7 @@ describe("PageDumpIntegrationTest", () => {
 
     static {
       constSetPath("PageDumpIntegrationTest::FooController", FooController);
-      this.routes.draw(function () {
+      this.routes().draw(function () {
         this.get("/", { to: "page_dump_integration_test/foo#index" });
         this.get("/redirect", { to: "page_dump_integration_test/foo#redirect" });
       });

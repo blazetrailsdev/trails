@@ -117,14 +117,18 @@ class Config {
 export class RoutedRackApp {
   static Config = Config;
 
-  readonly routes: RouteSet;
+  _routes: RouteSet;
   private _stack: MiddlewareStack;
   private _app: RackApp | RackAppObject;
 
   constructor(routes: RouteSet, blk?: (stack: MiddlewareStack) => void) {
-    this.routes = routes;
+    this._routes = routes;
     this._stack = new MiddlewareStack(blk);
-    this._app = this._stack.build(this.routes);
+    this._app = this._stack.build(this._routes);
+  }
+
+  routes(): RouteSet {
+    return this._routes;
   }
 
   call(env: RackEnv): Promise<RackResponse> {
@@ -160,7 +164,7 @@ IntegrationTest.buildApp = buildApp;
 
 IntegrationTest.app = IntegrationTest.buildApp();
 
-(IntegrationTest.app as RoutedRackApp).routes.draw(function () {
+(IntegrationTest.app as RoutedRackApp).routes().draw(function () {
   deprecator().silence(() => {
     this.get(":controller(/:action)");
   });

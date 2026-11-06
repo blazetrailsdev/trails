@@ -133,7 +133,7 @@ describe("Integration::Runner#integration_session", () => {
     }
   }
 
-  it("is built by the first name the test misses, which the session then answers (integration.rb:424-432)", ({
+  it("is built by the first name the test misses, which the session then answers (integration.rb:442-450)", ({
     task,
   }) => {
     const test = new HelperSession(task.name) as HelperSession & { widgetsPath(): string };
@@ -156,7 +156,7 @@ describe("Integration::Runner#integration_session", () => {
     expect(Object.hasOwn(HelperSession.prototype, "_integrationSession")).toBe(false);
   });
 
-  it("keeps one session class per app across reset! (integration.rb:358-363)", ({ task }) => {
+  it("keeps one session class per app across reset! (integration.rb:358-372)", ({ task }) => {
     const test = new HelperSession(task.name);
     test.resetBang();
     const klass = Object.getPrototypeOf(test.integrationSession) as object;

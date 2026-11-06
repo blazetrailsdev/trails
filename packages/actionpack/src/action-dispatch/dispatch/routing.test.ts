@@ -406,7 +406,7 @@ describe("TestRoutingMapper", () => {
       this.root("pages#home");
       this.resources("posts");
     });
-    expect(routes.routes.routes.length).toBe(9);
+    expect(routes.routes().routes.length).toBe(9);
   });
 
   it("returns 404 for unmatched routes", async () => {

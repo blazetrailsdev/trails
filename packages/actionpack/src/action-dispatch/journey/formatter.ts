@@ -6,7 +6,7 @@ import type { Route } from "./route.js";
 export { UrlGenerationError };
 
 export interface FormatterHost {
-  routes: { routes: readonly Route[] };
+  routes(): { routes: readonly Route[] };
   namedRoutes: { isKey(name: string): boolean; get(name: string): Route | undefined };
 }
 
@@ -273,7 +273,7 @@ export class Formatter {
   /** @internal */
   private buildCache(): Record<string, unknown> {
     const root: Record<string, unknown> = { ___routes: [] as [number, Route][] };
-    const list = this.routes.routes.routes;
+    const list = this.routes.routes().routes;
     for (let i = 0; i < list.length; i++) {
       const route = list[i];
       const leaf = Object.entries(route.requiredDefaults).reduce<Record<string, unknown>>(

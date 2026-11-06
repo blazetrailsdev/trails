@@ -53,7 +53,7 @@ export class InfoController extends ApplicationController {
     const queryWithoutUrlOrPathSuffix = query
       .replace(/(\w)(_path$)/, "$1")
       .replace(/(\w)(_url$)/, "$1");
-    return [...(this as unknown as { _routes: RouteSet })._routes.routes].flatMap((route) => {
+    return [...(this as unknown as { _routes: RouteSet })._routes.routes()].flatMap((route) => {
       const routeWrapper = new RouteWrapper(route);
       let match: unknown;
       if (exactMatch) {

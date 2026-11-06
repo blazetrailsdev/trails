@@ -30,7 +30,7 @@ describe("ChunkedTest", () => {
 
   it("parses request raw_post correctly when request has Transfer-Encoding header without a Content-Length value", async () => {
     t.app = ChunkedTest.buildApp();
-    (t.app as RoutedRackApp).routes.draw(function () {
+    (t.app as RoutedRackApp).routes().draw(function () {
       this.post("chunked", { to: ChunkedController.action("chunk") });
     });
 

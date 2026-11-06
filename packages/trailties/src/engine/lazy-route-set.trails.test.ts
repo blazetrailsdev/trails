@@ -46,7 +46,7 @@ describe("LazyRouteSet#routes", () => {
   it("reloads routes when routes is read", () => {
     const routes = new LazyRouteSet();
 
-    expect(routes.routes.routes).toEqual([]);
+    expect(routes.routes().routes).toEqual([]);
     expect(reload).toHaveBeenCalledTimes(1);
   });
 });
