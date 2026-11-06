@@ -1352,7 +1352,8 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - if: needs.changes.outputs.ar_scope != ''
@@ -1680,7 +1681,8 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
         run: pnpm vitest run $AR_SCOPE
         env:
@@ -1919,7 +1921,8 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
         run: pnpm vitest run $AR_SCOPE
         env:
