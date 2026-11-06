@@ -212,18 +212,18 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("adds bcryptjs to the application's dependencies and installs it", async () => {
+    write("package.json", '{ "dependencies": { "bcryptjs": "*" } }');
+    await makeGen().run();
+    const commands = spawned.map((command) => command.join(" "));
+    expect(commands.some((c) => c.endsWith("bin/pnpm install --silent"))).toBe(true);
+  });
+
+  it("authentication_generator_without_bcrypt_in_gemfile", async () => {
     await makeGen().run();
     const commands = spawned.map((command) => command.join(" "));
     expect(commands.some((c) => c.endsWith("bin/pnpm add bcryptjs @blazetrails/bcrypt"))).toBe(
       true,
     );
-
-    write("package.json", '{ "dependencies": { "bcryptjs": "*" } }');
-    spawned = [];
-    await makeGen().run();
-    expect(
-      spawned.map((c) => c.join(" ")).some((c) => c.endsWith("bin/pnpm install --silent")),
-    ).toBe(true);
   });
 
   it("does not silently overwrite an existing file", async () => {
