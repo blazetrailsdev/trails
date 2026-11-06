@@ -10,6 +10,7 @@ import {
   URI,
   type HTTP as URIHTTP,
 } from "@blazetrails/ruby-compat";
+import { ActionMailbox } from "./action-mailbox.js";
 import { version } from "./version.js";
 
 export class Relayer {
@@ -104,3 +105,5 @@ export class Relayer {
     })());
   }
 }
+
+ActionMailbox.Relayer = Relayer;

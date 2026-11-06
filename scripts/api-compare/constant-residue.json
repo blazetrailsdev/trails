@@ -37,10 +37,10 @@
     }
   },
   "actionmailbox": {
-    "rows": 1,
+    "rows": 3,
     "excluded": [],
-    "unwalked": [],
-    "residue": { "gem-version.ts::VERSION": "ActionMailbox::VERSION" }
+    "unwalked": ["gem-version.ts::VERSION", "relayer.ts::Relayer.Result"],
+    "residue": {}
   },
   "actionmailer": {
     "rows": 25,
