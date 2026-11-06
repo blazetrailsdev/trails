@@ -36,11 +36,11 @@ runs:
   using: composite
   steps:
     - if: runner.environment == 'github-hosted'
-      uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
       with:
         version: ${{ inputs.pnpm-version }}
     - if: runner.environment == 'github-hosted'
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: pnpm
@@ -50,7 +50,7 @@ runs:
     # Node differs from inputs.node-version, validating pnpm under the
     # wrong Node could spuriously fail (or worse, succeed for the wrong
     # reason). No `cache: pnpm` — the whole point of the self-hosted path
-    # is to avoid GitHub's hosted cache service. setup-node v5 defaults
+    # is to avoid GitHub's hosted cache service. setup-node defaults
     # `package-manager-cache: true`, which reads the `packageManager` field
     # from package.json and would silently re-enable that hosted pnpm-store
     # cache (the 1 TB WAN-egress incident above) — so pin it off explicitly.
@@ -60,7 +60,7 @@ runs:
     # to `self-hosted`, infra/runner/Dockerfile must ship the pinned pnpm in the
     # image itself or the version assertion below fails.
     - if: runner.environment != 'github-hosted'
-      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version: ${{ inputs.node-version }}
         package-manager-cache: false
