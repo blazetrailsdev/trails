@@ -1,7 +1,7 @@
 import { File, Dir, FileUtils } from "@blazetrails/ruby-compat";
 import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { Base, setTimestampedMigrations } from "@blazetrails/activerecord";
@@ -22,7 +22,13 @@ let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGene
 let t: TestCase & { generatorClass?: typeof ModelGenerator };
 let oldBelongsToRequiredByDefault: boolean | undefined;
 const fixtures = Dir.mktmpdir();
+const originalTemplates = ModelGeneratorApp.instance().config.generators().templates;
 ModelGeneratorApp.instance().config.generators().templates = [File.join(fixtures, "lib/templates")];
+
+afterAll(() => {
+  ModelGeneratorApp.instance().config.generators().templates = originalTemplates;
+  FileUtils.rmRf(fixtures);
+});
 
 beforeAll(async () => {
   await ModelGeneratorApp.instance().loadGenerators();

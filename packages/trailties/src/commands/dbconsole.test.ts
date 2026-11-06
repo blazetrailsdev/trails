@@ -139,7 +139,6 @@ describe("Trails::DBConsoleTest", () => {
 
   it("env", () => {
     const ENV = env as Record<string, string | undefined>;
-    const [trailsEnv, nodeEnv] = [ENV.TRAILS_ENV, ENV.NODE_ENV];
     try {
       expect(new DBConsole().environment()).toBe("test");
 
@@ -154,8 +153,8 @@ describe("Trails::DBConsoleTest", () => {
       ENV.TRAILS_ENV = "rails_env";
       expect(new DBConsole().environment()).toBe("rails_env");
     } finally {
-      ENV.TRAILS_ENV = trailsEnv;
-      ENV.NODE_ENV = nodeEnv;
+      ENV.TRAILS_ENV = "test";
+      delete ENV.NODE_ENV;
     }
   });
 
