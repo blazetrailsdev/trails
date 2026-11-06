@@ -126,7 +126,7 @@ export class Body {
       ) as typeof Identity | null;
 
       if (dec == null) {
-        return this.rawSource instanceof Uint8Array ? binaryString(this.rawSource) : this.rawSource;
+        return this.rawSource;
       } else {
         let decoded = dec.decode(this.rawSource);
         if (this.charset != null && this.charset !== "US-ASCII") {
