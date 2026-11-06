@@ -97,10 +97,9 @@ describe("TestRequest.create cookie hash", () => {
     const hash = req.getHeader("rack.request.cookie_hash");
     expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
     req.setHeader("HTTP_COOKIE", "user_name=david");
-    expect((req.cookies as unknown as HashWithIndifferentAccess<string>).get("user_name")).toBe(
-      "david",
-    );
-    expect(req.cookies).toBe(hash);
+    const cookies = req.cookies;
+    expect(cookies).toBe(hash);
+    expect(cookies instanceof Map && cookies.get("user_name")).toBe("david");
   });
 });
 

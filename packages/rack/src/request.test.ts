@@ -22,6 +22,8 @@ import {
   strNew,
   warn,
   b,
+  hashAref,
+  hashAset,
 } from "@blazetrails/ruby-compat";
 import {
   escape,
@@ -997,7 +999,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   it("modify the cookies hash in place", () => {
     const req = makeRequest(MockRequest.envFor(""));
     expect(req.cookies).toEqual({});
-    req.cookies["foo"] = "bar";
+    hashAset(req.cookies, "foo", "bar");
     expect(req.cookies).toEqual({ foo: "bar" });
   });
 
@@ -1107,17 +1109,17 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
 
   it("pass through non-uri escaped cookies as-is", () => {
     const req = makeReq("", { HTTP_COOKIE: "foo=%" });
-    expect(req.cookies["foo"]).toBe("%");
+    expect(hashAref(req.cookies, "foo")).toBe("%");
   });
 
   it("parse cookies according to RFC 2109", () => {
     const req = makeReq("/", { HTTP_COOKIE: "foo=bar; foo=baz" });
-    expect(req.cookies["foo"]).toBe("bar");
+    expect(hashAref(req.cookies, "foo")).toBe("bar");
   });
 
   it("parse cookies with quotes", () => {
     const req = makeReq("/", { HTTP_COOKIE: 'foo="bar"' });
-    expect(req.cookies["foo"]).toBe('"bar"');
+    expect(hashAref(req.cookies, "foo")).toBe('"bar"');
   });
 
   it("provide setters", () => {

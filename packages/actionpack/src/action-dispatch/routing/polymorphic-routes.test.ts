@@ -192,6 +192,15 @@ describe("polymorphic dispatch against a drawn RouteSet", () => {
 });
 
 describe("HelperMethodBuilder dispatch", () => {
+  test("dispatches the named route helper the target answers", () => {
+    const target = makeHost();
+    const builder = HelperMethodBuilder.path();
+    expect(builder.handleStringCall(target, "posts")).toBe("/posts");
+    expect(builder.handleClassCall(target, Post as never)).toBe("/posts");
+    expect(builder.handleModelCall(target, new Post(3))).toBe("/posts/3");
+    expect(builder.handleModelCall(target, new Post(null))).toBe("/posts");
+  });
+
   test("a missing route helper raises NoMethodError", () => {
     const target = {} as PolymorphicHost;
     expect(() => HelperMethodBuilder.path().handleStringCall(target, "widget")).toThrow(

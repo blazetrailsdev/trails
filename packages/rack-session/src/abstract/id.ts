@@ -11,6 +11,7 @@ import {
   KeyError,
   eachPair,
   rbProcCall,
+  hashAref,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
@@ -329,7 +330,7 @@ export interface SessionClass {
 /** @noRailsEquivalent PERMANENT */
 export interface PersistedRequest {
   env: RackEnv;
-  cookies: Record<string, unknown>;
+  cookies: Record<string, unknown> | Map<string, unknown>;
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
   setHeader(key: string, value: unknown): unknown;
@@ -444,7 +445,7 @@ export class Persisted {
 
   /** @internal */
   extractSessionId(request: PersistedRequest): unknown {
-    let sid = request.cookies[this.key];
+    let sid = hashAref(request.cookies, this.key);
     if (!isTruthy(sid) && !isTruthy(this.cookieOnly)) sid = request.params[this.key];
     return sid;
   }
@@ -563,7 +564,7 @@ export class Persisted {
 
   /** @internal */
   setCookie(request: PersistedRequest, response: Raw, cookie: Record<string, unknown>): void {
-    if (request.cookies[this.key] !== cookie["value"] || isTruthy(cookie["expires"])) {
+    if (hashAref(request.cookies, this.key) !== cookie["value"] || isTruthy(cookie["expires"])) {
       response.setCookie(this.key, cookie);
     }
   }
