@@ -1,11 +1,12 @@
 import type { ThorClass } from "@blazetrails/thor";
-import { File, constDefined, rbFBackquote } from "@blazetrails/ruby-compat";
+import { File, chomp, constDefined, rbFBackquote } from "@blazetrails/ruby-compat";
 import {
   TopLevel,
   camelize,
   humanize,
   indent,
   isBlank,
+  isPresent,
   underscore,
 } from "@blazetrails/activesupport";
 import { AppGenerator } from "../app/app-generator.js";
@@ -40,11 +41,11 @@ interface PluginBuilderHost {
   name(): string;
   trailsAppPath(): string | null;
   relativePath(): string | null;
-  isApi(): boolean;
-  isEngine(): boolean;
-  isFull(): boolean;
-  isMountable(): boolean;
-  isInsideApplication(): boolean;
+  isApi(): boolean | undefined;
+  isEngine(): boolean | undefined;
+  isFull(): boolean | undefined;
+  isMountable(): boolean | undefined;
+  isInsideApplication(): string | boolean | null;
   skipEslint(): boolean | undefined;
 }
 
@@ -325,22 +326,6 @@ export class PluginGenerator extends AppBase {
     this.noCommands(() => this.methodAdded("underscoredName"));
     this.noCommands(() => this.methodAdded("namespacedName"));
     this.noCommands(() => this.methodAdded("pluginPath"));
-    this.noCommands(() => this.methodAdded("isEngine"));
-    this.noCommands(() => this.methodAdded("isFull"));
-    this.noCommands(() => this.methodAdded("isMountable"));
-    this.noCommands(() => this.methodAdded("isWithDummyApp"));
-    this.noCommands(() => this.methodAdded("isApi"));
-    this.noCommands(() => this.methodAdded("wrapInModules"));
-    this.noCommands(() => this.methodAdded("camelizedModules"));
-    this.noCommands(() => this.methodAdded("humanized"));
-    this.noCommands(() => this.methodAdded("author"));
-    this.noCommands(() => this.methodAdded("email"));
-    this.noCommands(() => this.methodAdded("trailsVersionSpecifier"));
-    this.noCommands(() => this.methodAdded("dummyPath"));
-    this.noCommands(() => this.methodAdded("trailsAppPath"));
-    this.noCommands(() => this.methodAdded("isInsideApplication"));
-    this.noCommands(() => this.methodAdded("relativePath"));
-    this.noCommands(() => this.methodAdded("testCommand"));
   }
 
   private _dummyPath: string | null;
@@ -348,13 +333,14 @@ export class PluginGenerator extends AppBase {
   private _underscoredName?: string;
   private _namespacedName?: string;
   private _originalName?: string;
+  private _modules?: string[];
   private _camelizedModules?: string;
   private _humanized?: string;
   private _camelized?: string;
   /** @internal */
-  _author?: string;
+  protected _author?: string;
   /** @internal */
-  _email?: string;
+  protected _email?: string;
 
   declare options: AppBaseOptions & {
     dummyPath: string;
@@ -365,6 +351,10 @@ export class PluginGenerator extends AppBase {
     skipGemfileEntry?: boolean;
   };
 
+  pluginPath(): string {
+    return this.appPath;
+  }
+
   constructor(...args: ConstructorParameters<typeof AppBase>) {
     super(...args);
     this._dummyPath = null;
@@ -373,10 +363,6 @@ export class PluginGenerator extends AppBase {
     if (!this.isEngine() || !this.isWithDummyApp()) {
       this.options = Object.freeze({ ...this.options, skipAssetPipeline: true });
     }
-  }
-
-  pluginPath(): string {
-    return this.appPath;
   }
 
   async createRootFiles(): Promise<void> {
@@ -475,33 +461,33 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  isEngine(): boolean {
-    return !!(this.isFull() || this.isMountable() || this.options.engine);
+  protected isEngine(): boolean | undefined {
+    return this.isFull() || this.isMountable() || this.options.engine;
   }
 
   /** @internal */
-  isFull(): boolean {
-    return !!this.options.full;
+  protected isFull(): boolean | undefined {
+    return this.options.full;
   }
 
   /** @internal */
-  isMountable(): boolean {
-    return !!this.options.mountable;
+  protected isMountable(): boolean | undefined {
+    return this.options.mountable;
   }
 
   /** @internal */
-  protected isSkipGit(): boolean {
-    return !!this.options.skipGit;
+  protected isSkipGit(): boolean | undefined {
+    return this.options.skipGit;
   }
 
   /** @internal */
-  isWithDummyApp(): boolean {
+  protected isWithDummyApp(): boolean {
     return isBlank(this.options.skipTest) || this.options.dummyPath !== "test/dummy";
   }
 
   /** @internal */
-  isApi(): boolean {
-    return !!this.options.api;
+  protected isApi(): boolean | undefined {
+    return this.options.api;
   }
 
   /** @internal */
@@ -517,22 +503,32 @@ export class PluginGenerator extends AppBase {
     return (this._originalName ??= File.basename(this.destinationRoot));
   }
 
-  /**
-   * @internal
-   * @inventedArm return — PERMANENT
-   */
-  wrapInModules(unwrappedCode: string): string {
-    unwrappedCode = `${unwrappedCode}`.trim().replace(/\s$\n/gm, "");
-    return unwrappedCode;
+  /** @internal */
+  protected modules(): string[] {
+    return (this._modules ??= camelize(this.namespacedName()).split("::"));
   }
 
   /** @internal */
-  camelizedModules(): string {
+  protected wrapInModules(unwrappedCode: string): string {
+    unwrappedCode = `${unwrappedCode}`.trim().replace(/\s$\n/gm, "");
+    return [...this.modules()].reverse().reduce((content, mod) => {
+      let str = `export namespace ${mod} {\n`;
+      str += content
+        .split(/(?<=\n)/)
+        .map((line) => `  ${line}`)
+        .join("");
+      str += isPresent(content) ? "\n}" : "}";
+      return str;
+    }, unwrappedCode);
+  }
+
+  /** @internal */
+  protected camelizedModules(): string {
     return (this._camelizedModules ??= camelize(this.namespacedName()));
   }
 
   /** @internal */
-  humanized(): string {
+  protected humanized(): string {
     return (this._humanized ??= humanize(underscore(this.originalName())));
   }
 
@@ -542,13 +538,13 @@ export class PluginGenerator extends AppBase {
   };
 
   /** @internal */
-  async author(): Promise<string> {
+  protected async author(): Promise<string> {
     const fallback = "TODO: Write your name";
     if (this.isSkipGit()) {
       this._author = fallback;
     } else {
       try {
-        this._author = (await rbFBackquote("git config user.name")).replace(/\r?\n$/, "");
+        this._author = chomp(await rbFBackquote("git config user.name"));
       } catch {
         this._author = fallback;
       }
@@ -557,13 +553,13 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  async email(): Promise<string> {
+  protected async email(): Promise<string> {
     const fallback = "TODO: Write your email address";
     if (this.isSkipGit()) {
       this._email = fallback;
     } else {
       try {
-        this._email = (await rbFBackquote("git config user.email")).replace(/\r?\n$/, "");
+        this._email = chomp(await rbFBackquote("git config user.email"));
       } catch {
         this._email = fallback;
       }
@@ -572,7 +568,7 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  trailsVersionSpecifier(gemVersion = Trails.gemVersion()): string[] {
+  protected trailsVersionSpecifier(gemVersion = Trails.gemVersion()): string[] {
     return [`>= ${gemVersion}`];
   }
 
@@ -611,7 +607,7 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  dummyPath(path: string | null = null): string {
+  protected dummyPath(path: string | null = null): string {
     if (path != null) this._dummyPath = path;
     return this._dummyPath ?? this.options.dummyPath;
   }
@@ -622,25 +618,25 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  trailsAppPath(): string | null {
+  protected trailsAppPath(): string | null {
     return APP_PATH != null ? APP_PATH.replace("/config/application", "") : null;
   }
 
   /** @internal */
-  isInsideApplication(): boolean {
+  protected isInsideApplication(): string | boolean | null {
     const trailsAppPath = this.trailsAppPath();
-    return trailsAppPath != null && this.destinationRoot.startsWith(trailsAppPath);
+    return trailsAppPath && this.destinationRoot.startsWith(trailsAppPath);
   }
 
   /** @internal */
-  relativePath(): string | null {
+  protected relativePath(): string | null {
     if (!this.isInsideApplication()) return null;
     const prefix = `${this.trailsAppPath()}/`;
     return this.appPath.startsWith(prefix) ? this.appPath.slice(prefix.length) : this.appPath;
   }
 
   /** @internal */
-  testCommand(): string {
+  protected testCommand(): string {
     if (this.isEngine() && !this.options.skipActiveRecord && this.isWithDummyApp()) {
       return "bin/trails db:test:prepare test";
     } else if (this.isEngine()) {

@@ -74,13 +74,16 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([File.join(t.destinationRoot, "hyphenated-name")]);
     t.assertNoFile("hyphenated-name/lib/hyphenated-name.ts");
     t.assertNoFile("hyphenated-name/lib/hyphenated_name.ts");
-    await t.assertFile("hyphenated-name/lib/hyphenated/name.ts", /\/\/ Your code goes here\.\.\./);
+    await t.assertFile(
+      "hyphenated-name/lib/hyphenated/name.ts",
+      /export namespace Hyphenated \{\n {2}export namespace Name \{\n {4}\/\/ Your code goes here\.\.\.\n {2}\}\n\}/,
+    );
   });
 
   it("correct file in lib folder of camelcase plugin name", async () => {
     await t.runGenerator([File.join(t.destinationRoot, "CamelCasedName")]);
     t.assertNoFile("CamelCasedName/lib/CamelCasedName.ts");
-    await t.assertFile("CamelCasedName/lib/camel_cased_name.ts", /\/\/ Your code goes here/);
+    await t.assertFile("CamelCasedName/lib/camel_cased_name.ts", /export namespace CamelCasedName/);
   });
 
   it("generating without options", async () => {
@@ -92,7 +95,7 @@ describe("PluginGeneratorTest", () => {
     });
     await t.assertFile(
       "lib/bukkits/railtie.ts",
-      /export class Railtie extends Trails\.Trailtie \{\}/,
+      /export namespace Bukkits \{\n {2}export class Railtie extends Trails\.Trailtie \{\}\n\}/,
     );
     await t.assertFile("lib/bukkits.ts", (content: string) => {
       expect(content).toMatch(/import "\.\/bukkits\/version\.js"/);
@@ -156,7 +159,10 @@ describe("PluginGeneratorTest", () => {
     await t.assertFile("app/mailers");
     await t.assertFile("app/jobs");
     await t.assertFile("config/routes.ts", /Trails\.application\.routes\(\)\.draw/);
-    await t.assertFile("lib/bukkits/engine.ts", /export class Engine extends Trails\.Engine \{/);
+    await t.assertFile(
+      "lib/bukkits/engine.ts",
+      /export namespace Bukkits \{\n {2}export class Engine extends Trails\.Engine \{/,
+    );
     await t.assertFile("lib/bukkits.ts", /import "\.\/bukkits\/engine\.js"/);
   });
 
