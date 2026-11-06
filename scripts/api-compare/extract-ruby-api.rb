@@ -1008,9 +1008,12 @@ class ApiExtractor
       line: @current_line,
     }
     old_in_defs = @in_defs
-    @in_defs = true
-    record_body_facts(method_info, node[5], find_params_defs(node), fqn)
-    @in_defs = old_in_defs
+    begin
+      @in_defs = true
+      record_body_facts(method_info, node[5], find_params_defs(node), fqn)
+    ensure
+      @in_defs = old_in_defs
+    end
 
     target[:classMethods] << method_info
 
