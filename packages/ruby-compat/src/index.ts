@@ -448,6 +448,7 @@ export {
   rstrip,
   strip,
   STRING_METHOD_TABLE,
+  BINARY_METHOD_TABLE,
   stringSuperclass,
   type StringReceiver,
   type StringInstance,

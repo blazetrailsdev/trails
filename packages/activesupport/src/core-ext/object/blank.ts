@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import {
+  BINARY_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   STRING_METHOD_TABLE,
   rbDefineMethod,
@@ -97,10 +98,13 @@ export class String {
 
   static readonly BLANK_RE = BLANK_RE;
 
-  static isBlank(value: string): boolean {
-    return value.length === 0 || BLANK_RE.test(value);
+  static isBlank(value: string | Uint8Array): boolean {
+    return (
+      value.length === 0 ||
+      BLANK_RE.test(typeof value === "string" ? value : globalThis.String.fromCharCode(...value))
+    );
   }
-  static isPresent(value: string): boolean {
+  static isPresent(value: string | Uint8Array): boolean {
     return !String.isBlank(value);
   }
 }
@@ -112,6 +116,7 @@ declare module "@blazetrails/ruby-compat" {
 }
 
 STRING_METHOD_TABLE.isBlank = rbDefineMethod(0, (self) => String.isBlank(self.string));
+BINARY_METHOD_TABLE.isBlank = (self) => String.isBlank(self);
 
 export class Time {
   static toString(): string {
