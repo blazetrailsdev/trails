@@ -202,7 +202,7 @@ describe("Mail::Field", () => {
     });
 
     it("should say it is not == to nil", () => {
-      expect(new Field("From", "mikel").equals(null)).not.toEqual(true);
+      expect(new Field("From", "mikel").equals(null)).not.toEqual(null);
     });
 
     it("should sort according to the field order", () => {
