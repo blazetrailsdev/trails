@@ -112,6 +112,8 @@ export class Parser {
 }
 
 export class ParserExtractor {
+  static Parser = Parser;
+
   constructor(public pattern: RegExp) {}
 
   annotations(file: string): Annotation[] {
@@ -199,6 +201,8 @@ function registerDefaults(): void {
 registerDefaults();
 
 export class SourceAnnotationExtractor {
+  static ParserExtractor = ParserExtractor;
+  static PatternExtractor = PatternExtractor;
   static Annotation = Annotation;
 
   /** @inventedArm requireTokenizer — PERMANENT */
