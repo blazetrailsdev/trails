@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import "./image-processing.js";
 import { Stub, StubImage, StubProcessor } from "./test-helpers/stub-processor.js";
 import { fixtureImage } from "./test-helpers/test-helper.js";
+import { Builder } from "./builder.js";
+import { DEFAULT_OPTIONS } from "./chainable.js";
 
 const Vips = Stub;
 
@@ -39,5 +41,23 @@ describe("Chainable as a thenable Proxy", () => {
     expect(builder.toJSON).toBeUndefined();
     expect((builder as unknown as Record<symbol, unknown>)[Symbol.toPrimitive]).toBeUndefined();
     expect(typeof builder.constructor).toBe("function");
+  });
+});
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends Builder {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub(DEFAULT_OPTIONS);
+    expect(sub.secret()).toBe(1);
+    const next = (sub as unknown as { invert(): Builder }).invert();
+    expect(next.options.operations).toEqual([["invert", []]]);
+    expect(typeof sub.then).toBe("function");
+    expect(sub instanceof Builder).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MiddlewareStack } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { MiddlewareStackProxy } from "./configuration.js";
+import { Generators } from "./configuration.js";
 
 class Unicorns {
   constructor(private app: (env: RackEnv) => Promise<RackResponse>) {}
@@ -38,5 +39,22 @@ describe("MiddlewareStackProxy against a real MiddlewareStack", () => {
 
     const stack = left.plus(right).mergeInto(new MiddlewareStack());
     expect(stack.middlewares.map((m) => m.klass)).toEqual([Unicorns]);
+  });
+});
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends Generators {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub() as Sub & Record<string, (...args: unknown[]) => unknown>;
+    expect(sub.secret()).toBe(1);
+    sub.orm("active_record");
+    expect(sub.orm()).toBe("active_record");
+    expect(sub instanceof Generators).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
   });
 });

@@ -150,22 +150,35 @@ export const DEFAULT_OPTIONS: Options = Object.freeze({
 });
 
 /** @noRailsEquivalent PERMANENT */
-export function chainableProxy<T extends object>(target: T): T {
-  return new Proxy(target, {
-    get(proxyTarget, name, receiver) {
-      if (name === "then") {
-        return (resolve?: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-          (receiver as ChainableHost).call().then(resolve, reject);
-      }
-      if (
-        typeof name === "symbol" ||
-        name in proxyTarget ||
-        name === "constructor" ||
-        PROTOCOL_PROBES.has(name)
+export function chainableProxy(host: object): void {
+  const layer = Object.create(Object.getPrototypeOf(host) as object, {
+    then: {
+      configurable: true,
+      writable: true,
+      value(
+        this: ChainableHost,
+        resolve?: (value: unknown) => unknown,
+        reject?: (reason: unknown) => unknown,
       ) {
-        return Reflect.get(proxyTarget, name, receiver);
-      }
-      return (...args: unknown[]) => (receiver as ChainableHost).methodMissing(name, ...args);
+        return this.call().then(resolve, reject);
+      },
     },
-  });
+  }) as object;
+  Object.setPrototypeOf(
+    host,
+    new Proxy(layer, {
+      get(target, name, receiver) {
+        if (
+          typeof name === "symbol" ||
+          name in target ||
+          name === "constructor" ||
+          PROTOCOL_PROBES.has(name) ||
+          Object.hasOwn(receiver as object, "constructor")
+        ) {
+          return Reflect.get(target, name, receiver);
+        }
+        return (...args: unknown[]) => (receiver as ChainableHost).methodMissing(name, ...args);
+      },
+    }),
+  );
 }

@@ -21,3 +21,20 @@ describe("MiniMagick::Tool deprecated constants", () => {
     expect(rbModConstants(Tool)).toEqual(expect.arrayContaining(["Convert", "Identify"]));
   });
 });
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends Tool {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub("convert") as Sub & Record<string, (...args: unknown[]) => unknown>;
+    expect(sub.secret()).toBe(1);
+    sub.resize("10x10");
+    expect(sub.args).toEqual(["-resize", "10x10"]);
+    expect(sub instanceof Tool).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});

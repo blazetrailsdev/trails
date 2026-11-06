@@ -33,14 +33,6 @@ export abstract class XmlBase {
     this._indent_ = indent;
     this._level = initial;
     this._encoding = encoding.toLowerCase();
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target || PROTOCOL_PROBES.has(prop)) {
-          return Reflect.get(target, prop, receiver);
-        }
-        return (...args: unknown[]) => receiver.methodMissing(stringToSym(prop), ...args);
-      },
-    });
   }
 
   isExplicitNilHandling(): unknown {
@@ -218,3 +210,20 @@ export interface XmlBase {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [tag: string]: any;
 }
+
+Object.setPrototypeOf(
+  XmlBase.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(XmlBase.prototype) as object) as object, {
+    get(target, prop, receiver: XmlBase) {
+      if (
+        typeof prop === "symbol" ||
+        prop in target ||
+        PROTOCOL_PROBES.has(prop) ||
+        Object.hasOwn(receiver, "constructor")
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      return (...args: unknown[]) => receiver.methodMissing(stringToSym(prop), ...args);
+    },
+  }),
+);

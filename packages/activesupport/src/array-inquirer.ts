@@ -5,21 +5,6 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
 
   constructor(...items: T[]) {
     super(...items);
-    return new Proxy(this, {
-      get(target, prop: string | symbol, receiver) {
-        if (typeof prop === "symbol" || Reflect.has(target, prop)) {
-          return Reflect.get(target, prop, receiver);
-        }
-        if (prop.endsWith("?")) {
-          const methodName = prop;
-          return () => target.any(methodName.slice(0, -1));
-        }
-        return undefined;
-      },
-      has(target, prop) {
-        return (typeof prop === "string" && prop.endsWith("?")) || Reflect.has(target, prop);
-      },
-    });
   }
 
   any(...candidates: (string | ((element: T) => boolean))[]): boolean {
@@ -35,6 +20,29 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
     );
   }
 }
+
+Object.setPrototypeOf(
+  ArrayInquirer.prototype,
+  new Proxy(Object.create(Array.prototype) as object, {
+    get(target, prop: string | symbol, receiver: ArrayInquirer<string>) {
+      if (
+        typeof prop === "symbol" ||
+        Reflect.has(target, prop) ||
+        receiver === ArrayInquirer.prototype
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (prop.endsWith("?")) {
+        const methodName = prop;
+        return () => receiver.any(methodName.slice(0, -1));
+      }
+      return undefined;
+    },
+    has(target, prop) {
+      return (typeof prop === "string" && prop.endsWith("?")) || Reflect.has(target, prop);
+    },
+  }),
+);
 
 export function inquiry<T extends string | symbol>(
   this: T[],

@@ -14,7 +14,6 @@ export class Builder {
 
   constructor(options: Options) {
     this.options = options;
-    return chainableProxy(this);
   }
 
   callBang(callOptions: { save?: boolean } = {}): Promise<unknown> {
@@ -43,4 +42,5 @@ export class Builder {
 }
 
 include(Builder, Chainable);
+chainableProxy(Builder.prototype);
 ImageProcessing.Builder = Builder;

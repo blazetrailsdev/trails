@@ -17,3 +17,20 @@ describe("MiniMagick::Image signature cache", () => {
     expect(image.equals(other)).toBe(true);
   });
 });
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends Image {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub("/tmp/none.png");
+    expect(sub.secret()).toBe(1);
+    expect(typeof (sub as unknown as Record<string, unknown>).resize).toBe("function");
+    expect((sub as unknown as Record<string, unknown>).then).toBeUndefined();
+    expect(sub instanceof Image).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});
