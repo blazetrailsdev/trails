@@ -181,7 +181,7 @@ describe("Resource routing", () => {
       routes.draw(function () {
         this.resource("session");
       });
-      const all = routes.routes.routes;
+      const all = routes.routes().routes;
       const actions = all.map((r) => r.defaults.action);
       expect(actions).not.toContain("index");
     });
@@ -489,7 +489,7 @@ describe("Resource routing", () => {
       routes.draw(function () {
         this.resources("messages");
       });
-      const all = routes.routes.routes;
+      const all = routes.routes().routes;
       const seen = new Set<string>();
       for (const r of all) {
         const key = `${r.verb} ${r.path.spec}`;

@@ -186,7 +186,7 @@ export class RoutesInspector {
 
     const routes = (route.rackApp as { routes(): unknown }).routes();
     if (routes instanceof RouteSet) {
-      this.engines[name] = this.collectRoutes(routes.routes);
+      this.engines[name] = this.collectRoutes(routes.routes());
     }
   }
 }

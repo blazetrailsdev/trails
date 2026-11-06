@@ -19,19 +19,19 @@ class FakeSet extends RouteSet {
   }
 
   defaults(): Record<string, unknown>[] {
-    return [...this.routes].map((route) => route.defaults);
+    return [...this.routes()].map((route) => route.defaults);
   }
 
   conditions(): Record<string, unknown>[] {
-    return [...this.routes].map((route) => route.constraints);
+    return [...this.routes()].map((route) => route.constraints);
   }
 
   requirements(): Pattern["requirements"][] {
-    return [...this.routes].map((route) => route.path).map((path) => path.requirements);
+    return [...this.routes()].map((route) => route.path).map((path) => path.requirements);
   }
 
   asts(): Pattern["spec"][] {
-    return [...this.routes].map((route) => route.path).map((path) => path.spec);
+    return [...this.routes()].map((route) => route.path).map((path) => path.spec);
   }
 }
 
@@ -77,7 +77,7 @@ describe("MapperTest", () => {
       mapper.get("/", { to: "posts#index", as: "main" });
     });
     expect(fakeset.defaults()[0]).toEqual({ omg: "awesome", controller: "posts", action: "index" });
-    expect([...fakeset.routes][0].verb).toBe("GET");
+    expect([...fakeset.routes()][0].verb).toBe("GET");
   });
 
   it("mapping requirements", () => {
@@ -106,7 +106,7 @@ describe("MapperTest", () => {
     mapper.scope({ via: ":put" }, () => {
       mapper.match("/", { to: "posts#index", as: "main" });
     });
-    expect([...fakeset.routes][0].verb).toBe("PUT");
+    expect([...fakeset.routes()][0].verb).toBe("PUT");
   });
 
   it("to scope", () => {
@@ -117,8 +117,8 @@ describe("MapperTest", () => {
       mapper.post("most");
     });
 
-    expect([...fakeset.routes][0].defaults["to"]).toBe("posts#index");
-    expect([...fakeset.routes][1].defaults["to"]).toBe("posts#index");
+    expect([...fakeset.routes()][0].defaults["to"]).toBe("posts#index");
+    expect([...fakeset.routes()][1].defaults["to"]).toBe("posts#index");
   });
 
   it("map slash", () => {
@@ -187,8 +187,8 @@ describe("MapperTest", () => {
         ["anchor", true],
       ]),
     );
-    expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/path");
-    expect(fakeset.routes.routes[0].path.anchored).toBeTruthy();
+    expect(fakeset.routes().routes[0].path.spec.toString()).toBe("/path");
+    expect(fakeset.routes().routes[0].path.anchored).toBeTruthy();
   });
 
   it("raising error when path is not passed", () => {

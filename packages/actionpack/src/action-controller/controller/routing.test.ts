@@ -1394,29 +1394,29 @@ describe("RouteSetTest", () => {
   });
 
   it("draw", () => {
-    expect(set.routes.size).toBe(0);
+    expect(set.routes().size).toBe(0);
     set.draw(function () {
       this.get({ "/hello/world": "a#b" });
     });
-    expect(set.routes.size).toBe(1);
+    expect(set.routes().size).toBe(1);
   });
 
   it("draw symbol controller name", () => {
-    expect(set.routes.size).toBe(0);
+    expect(set.routes().size).toBe(0);
     set.draw(function () {
       this.get({ "/users/index": "users#index" });
     });
     set.recognizePath("/users/index", { method: "get" });
-    expect(set.routes.size).toBe(1);
+    expect(set.routes().size).toBe(1);
   });
 
   it("named draw", () => {
-    expect(set.routes.size).toBe(0);
+    expect(set.routes().size).toBe(0);
     set.draw(function () {
       this.get({ "/hello/world": "a#b", as: "hello" });
     });
-    expect(set.routes.size).toBe(1);
-    expect(set.namedRoutes.get("hello")).toBe(first(set.routes));
+    expect(set.routes().size).toBe(1);
+    expect(set.namedRoutes.get("hello")).toBe(first(set.routes()));
   });
 
   it("duplicate named route raises rather than pick precedence", () => {
@@ -1519,7 +1519,7 @@ describe("RouteSetTest", () => {
       });
     });
 
-    expect(set.routes.size).toBe(1);
+    expect(set.routes().size).toBe(1);
 
     expect(tc.urlFor(set, { controller: "users", action: "show", id: 10 })).toBe("/users/show/10");
     expect(tc.urlFor(set, { controller: "users", id: 10 })).toBe("/users/index/10");

@@ -258,7 +258,7 @@ export class Session {
       }
 
       if (rbObjRespondTo(this._app, "routes")) {
-        reverseMergeBang(urlOptions, (rbFSend(this._app, "routes") as RouteSet).defaultUrlOptions);
+        reverseMergeBang(urlOptions, (this._app as RoutesApp).routes().defaultUrlOptions);
       }
 
       reverseMergeBang(urlOptions, {
@@ -430,6 +430,8 @@ include(Session, RequestHelpers);
 include(Session, Assertions);
 include(Session, urlForMod.UrlFor);
 
+type RoutesApp = { routes(): RouteSet };
+
 interface RunnerHost {
   _integrationSession: Session | null;
   _htmlDocument?: XmlDocument | null;
@@ -464,9 +466,9 @@ function createSession(this: RunnerHost, app: unknown): Session {
   let klass = APP_SESSIONS.get(app);
   if (klass === undefined) {
     klass = class extends Session {};
-    if (rbObjRespondTo(app, "routes") && rbFSend(app, "routes") instanceof RouteSet) {
-      include(klass, (rbFSend(app, "routes") as RouteSet).urlHelpers());
-      include(klass, (rbFSend(app, "routes") as RouteSet).mountedHelpers());
+    if (rbObjRespondTo(app, "routes") && (app as RoutesApp).routes() instanceof RouteSet) {
+      include(klass, (app as RoutesApp).routes().urlHelpers());
+      include(klass, (app as RoutesApp).routes().mountedHelpers());
     }
     APP_SESSIONS.set(app, klass);
   }
@@ -694,8 +696,10 @@ export class IntegrationTest extends TestCase {
       urlForMod._routesIvar
     ];
     if (routesIvar) return routesIvar;
-    const app = this.app as { routes?: unknown } | null;
-    return app?.routes instanceof RouteSet ? app.routes._routes : this.routes._routes;
+    const app = this.app as RoutesApp | null;
+    return rbObjRespondTo(app, "routes") && app!.routes() instanceof RouteSet
+      ? app!.routes()._routes
+      : this.routes._routes;
   }
 
   controller!: Metal;

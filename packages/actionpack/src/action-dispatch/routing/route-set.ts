@@ -808,7 +808,7 @@ export class RouteSet {
     this._config = config;
   }
 
-  get routes(): JourneyRoutes {
+  routes(): JourneyRoutes {
     return this.set;
   }
 
@@ -857,7 +857,7 @@ export class RouteSet {
   }
 
   fromRequirements(requirements: Record<string, unknown>): Route | undefined {
-    return this.routes.routes.find((r) =>
+    return this.routes().routes.find((r) =>
       shallowEqual(r.requirements, requirements as Record<string, string | RegExp>),
     );
   }
@@ -1069,12 +1069,12 @@ export class RouteSet {
 
   eagerLoadBang(): void {
     this.router.eagerLoadBang();
-    this.routes.each((route) => route.eagerLoadBang());
+    this.routes().each((route) => route.eagerLoadBang());
     this.formatter.eagerLoadBang();
   }
 
   isEmpty(): boolean {
-    return this.routes.isEmpty();
+    return this.routes().isEmpty();
   }
 
   addRoute(

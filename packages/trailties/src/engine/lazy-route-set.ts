@@ -90,9 +90,9 @@ export class LazyRouteSet extends RouteSet {
     return super.recognizePathWithRequest(req, path, extras, options);
   }
 
-  override get routes(): RouteSet["routes"] {
+  override routes(): ReturnType<RouteSet["routes"]> {
     void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.routes;
+    return super.routes();
   }
 
   /** @internal */

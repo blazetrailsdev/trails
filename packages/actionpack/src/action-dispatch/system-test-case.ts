@@ -136,7 +136,7 @@ export class SystemTestCase extends TestCase {
   /** @internal */
   private urlHelpers(): object | null {
     if (this._urlHelpers) return this._urlHelpers;
-    const testApp = ActionDispatch.testApp as { routes: RouteSet } | null;
+    const testApp = ActionDispatch.testApp as { routes(): RouteSet } | null;
     if (testApp) {
       const klass = class {
         declare defaultUrlOptions: Record<string, unknown>;
@@ -149,8 +149,8 @@ export class SystemTestCase extends TestCase {
           return vite.appHost ?? vite.url ?? DEFAULT_HOST;
         }
       };
-      include(klass, testApp.routes.urlHelpers());
-      include(klass, testApp.routes.mountedHelpers());
+      include(klass, testApp.routes().urlHelpers());
+      include(klass, testApp.routes().mountedHelpers());
       return (this._urlHelpers = new klass());
     }
     return (this._urlHelpers = null);

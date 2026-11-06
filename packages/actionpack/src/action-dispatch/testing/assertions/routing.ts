@@ -49,7 +49,7 @@ export const WithIntegrationRouting = {
       let oldIntegrationSession: Session | undefined;
 
       this.setup(function () {
-        oldRoutes = (this.app as { routes: RouteSet }).routes;
+        oldRoutes = (this.app as { routes(): RouteSet }).routes();
         oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
         oldIntegrationSession = this.integrationSession;
         this.createRoutes(block);
@@ -62,7 +62,7 @@ export const WithIntegrationRouting = {
   },
 
   withRouting<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
-    const oldRoutes = (this.app as { routes: RouteSet }).routes;
+    const oldRoutes = (this.app as { routes(): RouteSet }).routes();
     const oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
     const oldIntegrationSession = this.integrationSession;
     let result: T;
@@ -83,10 +83,10 @@ export const WithIntegrationRouting = {
 
   /** @internal */
   createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
-    const app = this.app as { routes: RouteSet };
+    const app = this.app as { routes(): RouteSet; _routes: RouteSet };
     const routes = new RouteSet();
 
-    this._originalRoutes ??= app.routes;
+    this._originalRoutes ??= app.routes();
     const routesCallMethod = rbObjMethod(routes, "call");
     (rbObjSingletonClass(this._originalRoutes).prototype as { call: unknown }).call = (
       ...args: unknown[]
@@ -95,10 +95,10 @@ export const WithIntegrationRouting = {
     const https = this.integrationSession.isHttps();
     const host = this.integrationSession.host;
 
-    app.routes = routes;
+    app._routes = routes;
     const klass = class extends ActionDispatch.Integration.Session {};
-    include(klass, app.routes.urlHelpers());
-    include(klass, app.routes.mountedHelpers());
+    include(klass, app.routes().urlHelpers());
+    include(klass, app.routes().mountedHelpers());
     this._integrationSession = new klass(app);
     this._integrationSession.httpsBang(https);
     this._integrationSession.hostBang(host);
@@ -114,7 +114,7 @@ export const WithIntegrationRouting = {
     oldRoutesCallMethod: Method,
     oldIntegrationSession: Session,
   ): void {
-    (this.app as { routes: RouteSet }).routes = oldRoutes;
+    (this.app as { _routes: RouteSet })._routes = oldRoutes;
     (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
       ...args: unknown[]
     ) => oldRoutesCallMethod.call(...args);

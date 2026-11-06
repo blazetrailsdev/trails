@@ -1260,7 +1260,7 @@ describe("ResourcesTest", () => {
 
   it("restful routes dont generate duplicates", async () => {
     await tc.withRestfulRouting("messages", () => {
-      const routes = tc.routes!.routes.routes;
+      const routes = tc.routes!.routes().routes;
       for (const route of routes) {
         for (const r of routes) {
           if (route === r) continue;

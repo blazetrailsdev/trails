@@ -17,7 +17,7 @@ describe("Mapping#routeSourceLocation", () => {
       this.get("/custom/assets", { to: "custom_assets#show" });
     });
 
-    const output = new RoutesInspector(set.routes).format(
+    const output = new RoutesInspector(set.routes()).format(
       new ConsoleFormatter.Expanded({ width: 23 }),
     );
     expect(output).toMatch(
@@ -33,7 +33,7 @@ describe("Mapping#routeSourceLocation", () => {
     set.draw(function () {
       this.get("/custom/assets", { to: "custom_assets#show" });
     });
-    const output = new RoutesInspector(set.routes).format(new ConsoleFormatter.Expanded());
+    const output = new RoutesInspector(set.routes()).format(new ConsoleFormatter.Expanded());
     expect(output).not.toContain("Source Location");
   });
 });

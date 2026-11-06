@@ -262,6 +262,22 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
 
+## A colon-leading route path is a Symbol (`Mapper#map_match`'s `path_types`)
+
+`Mapper#map_match` (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/routing/mapper.rb:1962-2006`)
+groups its paths by class: a String is a path (`post ":action"` draws
+`/:action(.:format)` with a dynamic segment), a Symbol is an action
+(`post :action` draws `/action(.:format)`, `path_for_action`, `:1887-1895`).
+A Ruby Symbol is a colon-leading JS string (root CLAUDE.md, § "Ruby idioms that
+do not translate literally"), so the two are one JS value at the Mapper's
+signature, and `mapMatch` reads `/^:\w+[?!=]?$/` as the Symbol arm.
+
+So a String path that starts with `:` is written with its leading slash:
+Rails' `post ":action", to: ...`
+(`actionpack/test/dispatch/request/multipart_params_parsing_test.rb:162`) is
+`this.post("/:action", { to })`. `Mapping.normalize_path` (`mapper.rb:116-117`, called at `:2058`)
+draws both spellings as the same route. Ruled by the repo owner on 2026-11-06.
+
 ## `method_missing` definers in this package
 
 Class-specific rules under root § "Ruby protocol methods with a different JS

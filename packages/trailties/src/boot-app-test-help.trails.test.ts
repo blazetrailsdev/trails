@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { ActiveJob } from "@blazetrails/activejob";
 import { ActionCable } from "@blazetrails/actioncable";
 import { Base as Connection } from "@blazetrails/actioncable/connection/base";
@@ -94,6 +94,13 @@ describe("test_help wires a booted app into the test case classes", () => {
       };
       controllerTest.beforeSetup();
       expect(controllerTest.routes).toBe(Trails.application!.routes());
+    });
+
+    it("reads the booted application's routes through app.routes() in _routes", ({ testCase }) => {
+      const session = testCase as BootAppIntegrationTest;
+      session.routes = new RouteSet();
+      expect(session.app).toBe(Trails.application);
+      expect(session._routes).toBe(Trails.application!.routes()._routes);
     });
 
     it("runs the test class's setup against its fixtures and url helpers", async ({ testCase }) => {
