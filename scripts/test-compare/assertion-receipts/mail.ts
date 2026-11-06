@@ -91,6 +91,15 @@ export const mail: Record<string, AssertionReceipt[]> = {
           "encodings_spec.rb:591 spells the expected text as octal UTF-8 bytes; a JS string has no encoding tag, so the port spells the decoded characters (CLAUDE.md, A String has no encoding tag either).",
       },
     ],
+  "mail:mail/field_spec.rb › helper methods › should say it is not == to nil": [
+    {
+      kind: "expect_not_to_eq",
+      value: "x:nil",
+      as: "expect_to_be_falsey",
+      reason:
+        "field_spec.rb:195-197 is `field == nil`; JS has no `==` dispatch, so the port calls `Field#equals(null)` and asserts its boolean result is falsy.",
+    },
+  ],
   "mail:mail/field_spec.rb › initialization › should return an unstuctured field if the structured field parsing raises an error":
     [
       {
