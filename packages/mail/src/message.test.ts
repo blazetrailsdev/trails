@@ -1,5 +1,6 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { sort } from "@blazetrails/ruby-compat";
+import { DateTime } from "@blazetrails/date";
+import { rbObjDup, Socket, sort } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { hashAref, hashAset, Hash } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
@@ -245,12 +246,36 @@ describe("Mail::Message", () => {
       expect(new Message()).toRespondTo("envelopeFrom");
     });
 
+    it("should strip off the envelope from field if present", async () => {
+      const message = await readFixture("emails", "plain_emails", "raw_email.eml");
+      expect(message.envelopeFrom()).toBe("jamis_buck@byu.edu");
+      expect(message.envelopeDate()).toEqual(DateTime.parse("Mon May  2 16:07:05 2005"));
+    });
+
+    it("should strip off the envelope from field if present", async () => {
+      const message = await readFixture("emails", "plain_emails", "raw_email.eml");
+      expect(message.rawEnvelope).toBe("jamis_buck@byu.edu Mon May  2 16:07:05 2005");
+      expect([...(message.from() as string[])]).toEqual(["jamis@37signals.com"]);
+    });
+
+    it("should not cause any problems if there is no envelope from present", async () => {
+      const message = await readFixture("emails", "plain_emails", "basic_email.eml");
+      expect([...(message.from() as string[])]).toEqual(["test@lindsaar.net"]);
+    });
+
     it("should ignore a plain text body that starts with ^From", () => {
       const m = new Message(
         "From: mikel@test.lindsaar.net\r\n\r\nThis is a way to break mail by putting\r\nFrom at the start of a body\r\nor elsewhere.",
       );
       expect(m.from()).not.toBeNull();
       expect([...(m.from() as string[])]).toEqual(["mikel@test.lindsaar.net"]);
+    });
+
+    it("should handle a multipart message that has ^From in it", async () => {
+      const m = await readFixture("emails", "error_emails", "cant_parse_from.eml");
+      expect(m.from()).not.toBeNull();
+      expect([...(m.from() as string[])]).toEqual(["News@InsideApple.Apple.com"]);
+      expect(m.isMultipart()).toBe(true);
     });
   });
 
@@ -414,6 +439,453 @@ describe("Mail::Message", () => {
         expect((mail.get("from") as Field).field.constructor).toBe(FromField);
         mail.setFrom("bob@test.lindsaar.net");
         expect((mail.get("from") as Field).field.constructor).toBe(FromField);
+      });
+    });
+
+    describe("setting headers", () => {
+      it("should accept them in block form", () => {
+        const message = Mail.new(function (this: Message) {
+          this.bcc("mikel@bcc.lindsaar.net");
+          this.cc("mikel@cc.lindsaar.net");
+          this.comments("this is a comment");
+          this.date("12 Aug 2009 00:00:01 GMT");
+          this.from("mikel@from.lindsaar.net");
+          this.inReplyTo("<1234@in_reply_to.lindsaar.net>");
+          this.keywords('test, "of the new mail", system');
+          this.messageId("<1234@message_id.lindsaar.net>");
+          this.received("from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+          this.references("<1234@references.lindsaar.net>");
+          this.replyTo("mikel@reply-to.lindsaar.net");
+          this.resentBcc("mikel@resent-bcc.lindsaar.net");
+          this.resentCc("mikel@resent-cc.lindsaar.net");
+          this.resentDate("12 Aug 2009 00:00:03 GMT");
+          this.resentFrom("mikel@resent-from.lindsaar.net");
+          this.resentMessageId("<1234@resent_message_id.lindsaar.net>");
+          this.resentSender("mikel@resent-sender.lindsaar.net");
+          this.resentTo("mikel@resent-to.lindsaar.net");
+          this.sender("mikel@sender.lindsaar.net");
+          this.subject("Hello there Mikel");
+          this.to("mikel@to.lindsaar.net");
+          this.contentType("text/plain; charset=UTF-8");
+          this.contentTransferEncoding("7bit");
+          this.contentDescription("This is a test");
+          this.contentDisposition("attachment; filename=File");
+          this.contentId("<1234@message_id.lindsaar.net>");
+          this.mimeVersion("1.0");
+          this.body("This is a body of text");
+        });
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should accept them in assignment form", () => {
+        const message = Mail.new();
+        message.setBcc("mikel@bcc.lindsaar.net");
+        message.setCc("mikel@cc.lindsaar.net");
+        message.setComments("this is a comment");
+        message.setDate("12 Aug 2009 00:00:01 GMT");
+        message.setFrom("mikel@from.lindsaar.net");
+        message.setInReplyTo("<1234@in_reply_to.lindsaar.net>");
+        message.setKeywords('test, "of the new mail", system');
+        message.setMessageId("<1234@message_id.lindsaar.net>");
+        message.setReceived("from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+        message.setReferences("<1234@references.lindsaar.net>");
+        message.setReplyTo("mikel@reply-to.lindsaar.net");
+        message.setResentBcc("mikel@resent-bcc.lindsaar.net");
+        message.setResentCc("mikel@resent-cc.lindsaar.net");
+        message.setResentDate("12 Aug 2009 00:00:03 GMT");
+        message.setResentFrom("mikel@resent-from.lindsaar.net");
+        message.setResentMessageId("<1234@resent_message_id.lindsaar.net>");
+        message.setResentSender("mikel@resent-sender.lindsaar.net");
+        message.setResentTo("mikel@resent-to.lindsaar.net");
+        message.setSender("mikel@sender.lindsaar.net");
+        message.setSubject("Hello there Mikel");
+        message.setTo("mikel@to.lindsaar.net");
+        message.setContentType("text/plain; charset=UTF-8");
+        message.setContentTransferEncoding("7bit");
+        message.setContentDescription("This is a test");
+        message.setContentDisposition("attachment; filename=File");
+        message.setContentId("<1234@message_id.lindsaar.net>");
+        message.setMimeVersion("1.0");
+        message.setBody("This is a body of text");
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should let you set custom headers with a :headers => {hash}", () => {
+        const message = Mail.new({ headers: { "custom-header": "mikel" } });
+        expect(message.get("custom-header")!.decoded()).toBe("mikel");
+      });
+
+      it("should assign the body to a part on creation", () => {
+        const message = Mail.new(function (this: Message) {
+          this.part({
+            contentType: "multipart/alternative",
+            contentDisposition: "inline",
+            body: "Nothing to see here.",
+          });
+        });
+        expect(message.parts[0].body().decoded()).toBe("Nothing to see here.");
+      });
+
+      it("should not overwrite bodies on creation", () => {
+        const message = Mail.new(function (this: Message) {
+          this.part(
+            {
+              contentType: "multipart/alternative",
+              contentDisposition: "inline",
+              body: "Nothing to see here.",
+            },
+            (p) => {
+              p.part({ contentType: "text/html", body: "<b>test</b> HTML<br/>" });
+            },
+          );
+        });
+        expect(message.parts[0].parts[0].body().decoded()).toBe("Nothing to see here.");
+        expect(message.parts[0].parts[1].body().decoded()).toBe("<b>test</b> HTML<br/>");
+        expect(message.encoded()).toMatch(/Nothing to see here\./);
+        expect(message.encoded()).toMatch(/<b>test<\/b> HTML<br\/>/);
+      });
+
+      it("should allow you to init on an array of addresses from a hash", () => {
+        const mail = Mail.new({ to: ["test1@lindsaar.net", "Mikel <test2@lindsaar.net>"] });
+        expect([...(mail.to() as string[])]).toEqual(["test1@lindsaar.net", "test2@lindsaar.net"]);
+      });
+
+      it("should allow you to init on an array of addresses directly", () => {
+        const mail = Mail.new();
+        mail.setTo(["test1@lindsaar.net", "Mikel <test2@lindsaar.net>"]);
+        expect([...(mail.to() as string[])]).toEqual(["test1@lindsaar.net", "test2@lindsaar.net"]);
+      });
+
+      it("should allow you to init on an array of addresses directly", () => {
+        const mail = Mail.new();
+        mail.set("to", ["test1@lindsaar.net", "Mikel <test2@lindsaar.net>"]);
+        expect([...(mail.to() as string[])]).toEqual(["test1@lindsaar.net", "test2@lindsaar.net"]);
+      });
+    });
+  });
+  describe("making a copy of a message with dup", () => {
+    function messageShouldHaveDefaultValues(message: Message) {
+      expect(message.bcc()).toBeNull();
+      expect(message.cc()).toBeNull();
+      expect(message.comments()).toBeNull();
+      expect(message.date()).toBeNull();
+      expect(message.from()).toBeNull();
+      expect(message.inReplyTo()).toBeNull();
+      expect(message.keywords()).toBeNull();
+      expect(message.messageId()).toBeNull();
+      expect(message.received()).toBeNull();
+      expect(message.references()).toBeNull();
+      expect(message.replyTo()).toBeNull();
+      expect(message.resentBcc()).toBeNull();
+      expect(message.resentCc()).toBeNull();
+      expect(message.resentDate()).toBeNull();
+      expect(message.resentFrom()).toBeNull();
+      expect(message.resentMessageId()).toBeNull();
+      expect(message.resentSender()).toBeNull();
+      expect(message.resentTo()).toBeNull();
+      expect(message.sender()).toBeNull();
+      expect(message.subject()).toBeNull();
+      expect(message.to()).toBeNull();
+      expect(message.contentType()).toBeNull();
+      expect(message.contentTransferEncoding()).toBeNull();
+      expect(message.contentDescription()).toBeNull();
+      expect(message.contentDisposition()).toBeNull();
+      expect(message.contentId()).toBeNull();
+      expect(message.mimeVersion()).toBeNull();
+      expect(message.body().toString()).toBe("");
+    }
+
+    it("its headers should not be changed when you change the headers of the original", () => {
+      const message = Mail.new();
+      const messageCopy = rbObjDup(message);
+      messageShouldHaveDefaultValues(message);
+      messageShouldHaveDefaultValues(messageCopy);
+
+      message.set("bcc", "mikel@bcc.lindsaar.net");
+      message.set("cc", "mikel@cc.lindsaar.net");
+      message.set("comments", "this is a comment");
+      message.set("date", "12 Aug 2009 00:00:01 GMT");
+      message.set("from", "mikel@from.lindsaar.net");
+      message.set("in_reply_to", "<1234@in_reply_to.lindsaar.net>");
+      message.set("keywords", 'test, "of the new mail", system');
+      message.set("message_id", "<1234@message_id.lindsaar.net>");
+      message.set("received", "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+      message.set("references", "<1234@references.lindsaar.net>");
+      message.set("reply_to", "mikel@reply-to.lindsaar.net");
+      message.set("resent_bcc", "mikel@resent-bcc.lindsaar.net");
+      message.set("resent_cc", "mikel@resent-cc.lindsaar.net");
+      message.set("resent_date", "12 Aug 2009 00:00:03 GMT");
+      message.set("resent_from", "mikel@resent-from.lindsaar.net");
+      message.set("resent_message_id", "<1234@resent_message_id.lindsaar.net>");
+      message.set("resent_sender", "mikel@resent-sender.lindsaar.net");
+      message.set("resent_to", "mikel@resent-to.lindsaar.net");
+      message.set("sender", "mikel@sender.lindsaar.net");
+      message.set("subject", "Hello there Mikel");
+      message.set("to", "mikel@to.lindsaar.net");
+      message.set("content_type", "text/plain; charset=UTF-8");
+      message.set("content_transfer_encoding", "7bit");
+      message.set("content_description", "This is a test");
+      message.set("content_disposition", "attachment; filename=File");
+      message.set("content_id", "<1234@message_id.lindsaar.net>");
+      message.set("mime_version", "1.0");
+      message.set("body", "This is a body of text");
+
+      messageShouldHaveDefaultValues(messageCopy);
+    });
+
+    function messageHeadersShouldMatch(message: Message, other: Message) {
+      expect(message.bcc()).toEqual(other.bcc());
+      expect(message.cc()).toEqual(other.cc());
+      expect(message.comments()).toEqual(other.comments());
+      expect(message.date()).toEqual(other.date());
+      expect(message.from()).toEqual(other.from());
+      expect(message.inReplyTo()).toEqual(other.inReplyTo());
+      expect(message.keywords()).toEqual(other.keywords());
+      expect(message.messageId()).toEqual(other.messageId());
+      expect(message.received()).toEqual(other.received());
+      expect(message.references()).toEqual(other.references());
+      expect(message.replyTo()).toEqual(other.replyTo());
+      expect(message.resentBcc()).toEqual(other.resentBcc());
+      expect(message.resentCc()).toEqual(other.resentCc());
+      expect(message.resentDate()).toEqual(other.resentDate());
+      expect(message.resentFrom()).toEqual(other.resentFrom());
+      expect(message.resentMessageId()).toEqual(other.resentMessageId());
+      expect(message.resentSender()).toEqual(other.resentSender());
+      expect(message.resentTo()).toEqual(other.resentTo());
+      expect(message.sender()).toEqual(other.sender());
+      expect(message.subject()).toEqual(other.subject());
+      expect(message.to()).toEqual(other.to());
+      expect(message.contentType()).toEqual(other.contentType());
+      expect(message.contentTransferEncoding()).toEqual(other.contentTransferEncoding());
+      expect(message.contentDescription()).toEqual(other.contentDescription());
+      expect(message.contentDisposition()).toEqual(other.contentDisposition());
+      expect(message.contentId()).toEqual(other.contentId());
+      expect(message.mimeVersion()).toEqual(other.mimeVersion());
+      expect(message.body().toString()).toBe(other.body().toString());
+    }
+
+    it("its headers should be copies of the headers of the original", () => {
+      const message = Mail.new();
+      message.set("bcc", "mikel@bcc.lindsaar.net");
+      message.set("cc", "mikel@cc.lindsaar.net");
+      message.set("comments", "this is a comment");
+      message.set("date", "12 Aug 2009 00:00:01 GMT");
+      message.set("from", "mikel@from.lindsaar.net");
+      message.set("in_reply_to", "<1234@in_reply_to.lindsaar.net>");
+      message.set("keywords", 'test, "of the new mail", system');
+      message.set("message_id", "<1234@message_id.lindsaar.net>");
+      message.set("received", "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+      message.set("references", "<1234@references.lindsaar.net>");
+      message.set("reply_to", "mikel@reply-to.lindsaar.net");
+      message.set("resent_bcc", "mikel@resent-bcc.lindsaar.net");
+      message.set("resent_cc", "mikel@resent-cc.lindsaar.net");
+      message.set("resent_date", "12 Aug 2009 00:00:03 GMT");
+      message.set("resent_from", "mikel@resent-from.lindsaar.net");
+      message.set("resent_message_id", "<1234@resent_message_id.lindsaar.net>");
+      message.set("resent_sender", "mikel@resent-sender.lindsaar.net");
+      message.set("resent_to", "mikel@resent-to.lindsaar.net");
+      message.set("sender", "mikel@sender.lindsaar.net");
+      message.set("subject", "Hello there Mikel");
+      message.set("to", "mikel@to.lindsaar.net");
+      message.set("content_type", "text/plain; charset=UTF-8");
+      message.set("content_transfer_encoding", "7bit");
+      message.set("content_description", "This is a test");
+      message.set("content_disposition", "attachment; filename=File");
+      message.set("content_id", "<1234@message_id.lindsaar.net>");
+      message.set("mime_version", "1.0");
+      message.set("body", "This is a body of text");
+
+      const messageCopy = rbObjDup(message);
+      messageHeadersShouldMatch(messageCopy, message);
+    });
+  });
+
+  describe("handling missing required fields:", () => {
+    describe("every email", () => {
+      describe("Message-ID", () => {
+        it("should say if it has a message id", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          expect(mail.hasMessageId()).toBe(false);
+        });
+
+        it("should preserve any message id that you pass it if add_message_id is called explicitly", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.addMessageId("<ThisIsANonUniqueMessageId@me.com>");
+          expect(mail.toString()).toMatch(/Message-ID: <ThisIsANonUniqueMessageId@me.com>\r\n/);
+        });
+
+        it("should generate a random message ID if nothing is passed to add_message_id", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.addMessageId();
+          expect(mail.toString()).toMatch(
+            new RegExp(`Message-ID: <[\\w]+@${Socket.gethostname()}.mail>\r\n`),
+          );
+        });
+
+        it("should make an email and inject a message ID if none was set if told to_s", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          expect(mail.toString()).toMatch(/Message-ID: <.+@.+.mail>/i);
+        });
+
+        it("should add the message id to the message permanently once sent to_s", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.toString();
+          expect(mail.hasMessageId()).toBe(true);
+        });
+
+        it("should add a body part if it is missing", () => {
+          const mail = Mail.new();
+          mail.toString();
+          expect(mail.body().constructor).toBe(Body);
+        });
+      });
+
+      describe("Date", () => {
+        it("should say if it has a date", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          expect(mail.hasDate()).toBe(false);
+        });
+
+        it("should preserve any date that you pass it if add_date is called explicitly", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.addDate("Mon, 24 Nov 1997 14:22:01 -0800");
+          expect(mail.toString()).toMatch(/Date: Mon, 24 Nov 1997 14:22:01 -0800/);
+        });
+
+        it("should generate a current date if nothing is passed to add_date", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.addDate();
+          expect(mail.toString()).toMatch(
+            /Date: \w{3}, [\s\d]\d \w{3} \d{4} \d{2}:\d{2}:\d{2} [-+]?\d{4}\r\n/,
+          );
+        });
+
+        it("should make an email and inject a date if none was set if told to_s", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          expect(mail.toString()).toMatch(
+            /Date: \w{3}, [\s\d]\d \w{3} \d{4} \d{2}:\d{2}:\d{2} [-+]?\d{4}\r\n/,
+          );
+        });
+
+        it("should add the date to the message permanently once sent to_s", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.from("mikel@test.lindsaar.net");
+            this.to("you@test.lindsaar.net");
+            this.subject("This is a test email");
+            this.body("This is a body of the email");
+          });
+          mail.toString();
+          expect(mail.hasDate()).toBe(true);
+        });
       });
     });
   });
