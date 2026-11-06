@@ -94,7 +94,6 @@ export interface GeneratorBase extends Invocation {
   say: ShellHost["say"];
   sayStatus: ShellHost["sayStatus"];
   template(source: string, ...args: unknown[]): Promise<unknown>;
-  directory(source: string, ...args: unknown[]): Promise<unknown>;
   removeFile(path: string, ...args: unknown[]): Promise<unknown>;
   removeDir(path: string, ...args: unknown[]): Promise<unknown>;
   capture: OmitThisParameter<typeof ThorActions.Actions.capture>;
