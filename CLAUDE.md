@@ -980,6 +980,25 @@ a plain `TypeError` at the call site — the JS analogue of that `NameError`. A
 surface. The two guarded reads of `ActiveRecord.Base?.` on a standalone
 adapter's own path are the one exception, recorded in the activerecord file.
 
+## A thread-local block stack forks per async block (`IsolatedExecutionState.fork`)
+
+Ruby's `thread_mattr_accessor` stores through `IsolatedExecutionState`, keyed
+on `Thread.current`
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/isolated_execution_state.rb`),
+so a block that pushes onto a thread-local stack and pops in `ensure`
+(`Contexts.with_encryption_context`,
+`vendor/rails/v8.0.2/activerecord/lib/active_record/encryption/contexts.rb:33-43`)
+cannot interleave with a sibling. One trails `Thread` holds many in-flight
+promises, and a thread-local read carries no signal of which sibling is
+reading. So the block's entry opens the child context:
+`IsolatedExecutionState.fork(key, block)` runs the block with its own dup of
+that key's value, and `get` / `set` / `isKey` read through it. The `Thread`
+context itself is unchanged, so a block queries on its opener's leased
+connection. The one opening call carries `@inventedArm fork — PERMANENT`.
+
+This is a genuine language shortcoming, ratified repo-wide by the repo owner
+on 2026-11-05; a new instance is not a new decision to argue.
+
 ## The pool monitor guards only sections that span an `await` (`ConnectionPool`'s `MonitorMixin`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#the-pool-monitor-guards-only-sections-that-span-an-await-connectionpools-monitormixin); unchanged, heading kept for citations.

@@ -4,6 +4,7 @@ import { buildMail, closeMockSmtp, deliveries, mockSmtp } from "../../test-helpe
 import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import { Message } from "../../message.js";
 import { SMTP } from "./smtp.js";
+import { NULL_SENDER } from "../../constants.js";
 
 afterEach(closeMockSmtp);
 
@@ -37,6 +38,42 @@ describe("SMTP Delivery Method", () => {
         returnResponse: true,
       }).deliverBang(buildMail());
       expect((response as { message: string }).message.slice(4).trim()).toBe("OK");
+    });
+  });
+
+  describe("enabling ssl", () => {
+    const verifyModeDelivery = (settings: Record<string, unknown>) => {
+      const verifyMode = vi.fn();
+      const context = {};
+      Object.defineProperty(context, "verifyMode", { set: verifyMode });
+      const deliver = async () => {
+        const defaultSslContext = vi.spyOn(NetSMTP, "defaultSslContext").mockReturnValue(context);
+        const start = vi.spyOn(NetSMTP.prototype, "start").mockResolvedValue(null);
+        try {
+          await new SMTP({
+            address: "smtp.mockup.com",
+            port: 587,
+            tls: true,
+            ...settings,
+          }).deliverBang(buildMail());
+        } finally {
+          start.mockRestore();
+          defaultSslContext.mockRestore();
+        }
+      };
+      return { verifyMode, deliver };
+    };
+
+    it("should not set verify mode when none is given", async () => {
+      const { verifyMode, deliver } = verifyModeDelivery({});
+      await expect(deliver()).resolves.not.toThrow();
+      expect(verifyMode).not.toHaveBeenCalled();
+    });
+
+    it("should set verify mode if one is given", async () => {
+      const { verifyMode, deliver } = verifyModeDelivery({ opensslVerifyMode: "peer" });
+      await expect(deliver()).resolves.not.toThrow();
+      expect(verifyMode).toHaveBeenCalledWith("VERIFY_PEER");
     });
   });
 
@@ -109,6 +146,20 @@ describe("SMTP Delivery Method", () => {
       await new SMTP({ address: "127.0.0.1", port }).deliverBang(mail);
       expect(deliveries[0][1]).toBe("smtp_from@someemail.com");
       expect(deliveries[0][2]).toEqual(["smtp_to@someemail.com"]);
+    });
+
+    it("supports the null sender in the envelope from address", async () => {
+      const port = await mockSmtp();
+      const mail = envelopeMail();
+      mail.setSmtpEnvelopeFrom(NULL_SENDER);
+      const sendmail = vi.spyOn(NetSMTP.prototype, "sendmail").mockResolvedValue(null as never);
+      try {
+        await new SMTP({ address: "127.0.0.1", port }).deliverBang(mail);
+        expect(sendmail.mock.calls[0][1]).toBe("<>");
+        expect(sendmail.mock.calls[0][2]).toEqual(["smtp_to@someemail.com"]);
+      } finally {
+        sendmail.mockRestore();
+      }
     });
 
     it("should raise an error if there is no envelope From address", async () => {

@@ -24,6 +24,7 @@ export const CR_ENCODED = "=0D";
 export const LF_ENCODED = "=0A";
 export const CAPITAL_M = "M";
 export const EQUAL_LF = "=\n";
+export const NULL_SENDER = "<>";
 export const SPACE = " ";
 export const COLON = ":";
 
