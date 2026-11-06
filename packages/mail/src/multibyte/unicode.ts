@@ -63,23 +63,6 @@ const _database = {
   ) as Record<number, number>,
 };
 
-function tidyByte(byte: number | number[]): number[] {
-  /** @inventedArm if — PERMANENT */
-  if (typeof byte !== "number") {
-    throw new NoMethodError("undefined method `<' for an instance of Array", "<");
-  }
-  if (byte < 160) {
-    return unpack(
-      Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
-      "C*",
-    ) as number[];
-  } else if (byte < 192) {
-    return [194, byte];
-  } else {
-    return [195, byte - 64];
-  }
-}
-
 function caseEq(
   matcher: number | ((cp: number) => boolean),
   codepoint: number | undefined,
@@ -278,3 +261,20 @@ export const Unicode = {
     );
   },
 };
+
+function tidyByte(byte: number | number[]): number[] {
+  /** @inventedArm if — PERMANENT */
+  if (typeof byte !== "number") {
+    throw new NoMethodError("undefined method `<' for an instance of Array", "<");
+  }
+  if (byte < 160) {
+    return unpack(
+      Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
+      "C*",
+    ) as number[];
+  } else if (byte < 192) {
+    return [194, byte];
+  } else {
+    return [195, byte - 64];
+  }
+}
