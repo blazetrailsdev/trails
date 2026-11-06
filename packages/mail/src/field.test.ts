@@ -194,15 +194,15 @@ describe("Mail::Field", () => {
     });
 
     it("should say it is not == to another if their field names do not match", () => {
-      expect(new Field("From", "mikel")).not.toEqual(new Field("To", "bob"));
+      expect(new Field("From", "mikel").equals(new Field("To", "bob"))).not.toEqual(true);
     });
 
     it("should say it is not == to another if their field names match, but not their values", () => {
-      expect(new Field("To", "mikel")).not.toEqual(new Field("To", "bob"));
+      expect(new Field("To", "mikel").equals(new Field("To", "bob"))).not.toEqual(true);
     });
 
     it("should say it is not == to nil", () => {
-      expect(new Field("From", "mikel")).not.toEqual(null);
+      expect(new Field("From", "mikel").equals(null)).not.toEqual(true);
     });
 
     it("should sort according to the field order", () => {
