@@ -4,8 +4,10 @@ import {
   CurrentAttributes,
   deprecator,
   ExecutorTestHelper,
+  findZoneBang,
   include,
   onLoad,
+  setZoneDefault,
   TopLevel,
   type Deprecation,
   type DeprecationBehavior,
@@ -87,6 +89,15 @@ export class Trailtie extends BaseTrailtie {
           deprecators.setDisallowedWarnings(disallowedWarnings);
         }
       }
+    });
+
+    /**
+     * @missingRailsCall get — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
+     * @missingRailsCall exception — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
+     * @missingRailsCall eager_load_namespaces — CONVERGEABLE initialize-time-zone-checks-tzinfo-data-source
+     */
+    this.initializer("active_support.initialize_time_zone", (app) => {
+      setZoneDefault(findZoneBang(app.config.timeZone));
     });
 
     this.initializer("active_support.set_hash_digest_class", (app) => {

@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
@@ -109,7 +110,7 @@ describe("DirtyTest", () => {
           this.attribute("catchphrase", "string");
         }
       };
-      const zone = timeZone()!;
+      const zone = timeZone() as TimeZone;
 
       const pirate = new Target();
       expect(pirate.attributeChanged("created_on")).toBeFalsy();
@@ -731,7 +732,7 @@ describe("DirtyTest", () => {
 
         static tableName = "topics";
       };
-      const zone = timeZone()!;
+      const zone = timeZone() as TimeZone;
 
       const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
 
@@ -764,7 +765,7 @@ describe("DirtyTest", () => {
 
       const timeInParis = new TimeWithZone(
         Temporal.Instant.from("2014-01-01T12:00:00Z"),
-        timeZone()!,
+        timeZone() as TimeZone,
       );
       const pirate = await Target.create({
         catchphrase: "rrrr",

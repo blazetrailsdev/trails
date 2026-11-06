@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -9,7 +9,7 @@ export interface ModelGeneratorOptions extends GeneratorOptions {
   fixtureReplacement?: string | null;
 }
 
-export class ModelGenerator extends NamedBase {
+export class ModelGenerator extends Base {
   static readonly RESERVED_YAML_KEYWORDS = [
     "y",
     "yes",

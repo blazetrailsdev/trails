@@ -3,7 +3,7 @@ import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/te
 import { include } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
-import "./constants.excluded.generated.js";
+import "./constants.test-case.generated.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase extends ActiveSupportTestCase {

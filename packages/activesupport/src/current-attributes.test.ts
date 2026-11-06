@@ -5,6 +5,7 @@ import { CurrentAttributes } from "./current-attributes.js";
 import { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { assertSame, assertNil } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
+import type { TimeZone } from "./values/time-zone.js";
 
 describe("CurrentAttributesTest", () => {
   class Person {
@@ -154,16 +155,16 @@ describe("CurrentAttributesTest", () => {
 
   it("set auxiliary class via overwritten method", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(zone()!.name).toBe("Central Time (US & Canada)");
+    expect((zone() as TimeZone).name).toBe("Central Time (US & Canada)");
     expect(Session.current).toBe(42);
   });
 
   it("resets auxiliary classes via callback", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(zone()!.name).toBe("Central Time (US & Canada)");
+    expect((zone() as TimeZone).name).toBe("Central Time (US & Canada)");
 
     Current.reset();
-    expect(zone()!.name).toBe("UTC");
+    expect((zone() as TimeZone).name).toBe("UTC");
     expect(Session.previous).toBe(42);
     assertNil(Session.current);
   });

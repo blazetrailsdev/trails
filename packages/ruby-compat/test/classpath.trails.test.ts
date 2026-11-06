@@ -112,6 +112,14 @@ describe("rbModName over the generated class-path table", () => {
     expect(classPathMismatches()).toContainEqual(["<unresolved>", "Deferred::Never"]);
   });
 
+  it("resolves a plain-object module whose row was in TDZ at the first lookup", () => {
+    defineConstants([[() => LateModule, "Deferred::LateModule"]]);
+    class Probe {}
+    expect(rbModName(Probe)).toBe("Probe");
+    const LateModule = {};
+    expect(rbModName(LateModule)).toBe("Deferred::LateModule");
+  });
+
   it("seats a plain-object module", () => {
     const Mod = {};
     defineConstants([[() => Mod, "Outer::PlainModule"]]);

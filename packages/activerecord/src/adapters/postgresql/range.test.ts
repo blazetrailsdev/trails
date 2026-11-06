@@ -311,8 +311,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ tstz_range: new Range(timeString, timeString) });
         expect(record.tstz_range).toEqual(new Range(time, time));
@@ -332,8 +332,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ tstz_range: new Range(timeString, null, true) });
         expect(record.tstz_range).toEqual(new Range(time, null, true));
@@ -353,8 +353,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ tstz_range: new Range(null, timeString) });
         expect(record.tstz_range).toEqual(new Range(null, time));
@@ -375,10 +375,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
 
-        const fromTimeString = zone()!.now().toString();
-        const fromTime = zone()!.parse(fromTimeString)!;
+        const fromTimeString = (zone() as TimeZone).now().toString();
+        const fromTime = (zone() as TimeZone).parse(fromTimeString)!;
         const toTimeString = fromTime.advance({ hours: 1 }).toString();
-        const toTime = zone()!.parse(toTimeString)!;
+        const toTime = (zone() as TimeZone).parse(toTimeString)!;
 
         const record = new PostgresqlRangesTz({
           tstz_ranges: [
@@ -530,8 +530,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString) });
         expect(record.ts_range).toEqual(new Range(time, time));
@@ -551,8 +551,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, null, true) });
         expect(record.ts_range).toEqual(new Range(time, null, true));
@@ -572,8 +572,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await inTimeZone(tz, async () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
-        const timeString = zone()!.now().toString();
-        const time = zone()!.parse(timeString)!;
+        const timeString = (zone() as TimeZone).now().toString();
+        const time = (zone() as TimeZone).parse(timeString)!;
 
         const record = new PostgresqlRangesTz({ ts_range: new Range(null, timeString) });
         expect(record.ts_range).toEqual(new Range(null, time));
@@ -594,10 +594,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
 
-        const fromTimeString = zone()!.now().toString();
-        const fromTime = zone()!.parse(fromTimeString)!;
+        const fromTimeString = (zone() as TimeZone).now().toString();
+        const fromTime = (zone() as TimeZone).parse(fromTimeString)!;
         const toTimeString = fromTime.advance({ hours: 1 }).toString();
-        const toTime = zone()!.parse(toTimeString)!;
+        const toTime = (zone() as TimeZone).parse(toTimeString)!;
 
         const record = new PostgresqlRangesTz({
           ts_ranges: [
@@ -714,7 +714,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         void PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = "2017-09-26 07:30:59.132451 -0700";
-        const time = zone()!.parse(timeString)!;
+        const time = (zone() as TimeZone).parse(timeString)!;
         expect(time.usec > 0).toBeTruthy();
 
         const record = new PostgresqlRangesTz({ ts_range: new Range(timeString, timeString) });

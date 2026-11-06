@@ -48,6 +48,7 @@ describe("active_support/message_pack is awaited at boot", () => {
   let savedActionDispatch: unknown;
 
   beforeEach(() => {
+    ActiveSupportTrailtie.config.set("timeZone", "UTC");
     resetLoadHooks();
     Trails.cache = null;
     verboseAtLoad = [];

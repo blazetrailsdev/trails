@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { days, freezeTime, travelBack, useZone } from "@blazetrails/activesupport";
+import {
+  days,
+  freezeTime,
+  setZoneDefault,
+  travelBack,
+  useZone,
+  zoneDefault,
+} from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { rbHashSRuby2KeywordsHashP, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
@@ -80,6 +87,29 @@ describe("ActiveJob::Core", () => {
     job.deserialize({ locale: "", timezone: "" });
     expect(job.locale).toBe("");
     expect(job.timezone).toBe("");
+  });
+
+  it("raises NoMethodError reading Time.zone&.name off a false zone default", () => {
+    const saved = zoneDefault();
+    setZoneDefault(false);
+    try {
+      expect(() => new HelloJob()).toThrow("undefined method `name' for false");
+      const job = Object.create(HelloJob.prototype) as HelloJob;
+      expect(() => job.deserialize({})).toThrow("undefined method `name' for false");
+      expect(() => job.deserialize({ timezone: false })).toThrow(
+        "undefined method `name' for false",
+      );
+      job.deserialize({ timezone: "UTC" });
+      expect(job.timezone).toBe("UTC");
+    } finally {
+      setZoneDefault(saved);
+    }
+  });
+
+  it("falls back to Time.zone for a false serialized timezone, as Ruby || does", () => {
+    const job = new HelloJob();
+    useZone("Hawaii", () => job.deserialize({ timezone: false }));
+    expect(job.timezone).toBe("Hawaii");
   });
 
   it("falls back to I18n.locale when locale is absent", () => {

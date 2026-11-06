@@ -16,7 +16,7 @@ import { File, IO, StandardError, TopLevel, include, rbModName } from "@blazetra
 import { Base } from "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
-import "./constants.excluded.generated.js";
+import "./constants.test-case.generated.js";
 
 export class NonInferrableMailerError extends StandardError {
   constructor(name: unknown) {

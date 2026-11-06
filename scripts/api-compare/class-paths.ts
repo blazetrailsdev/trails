@@ -68,6 +68,8 @@ const LAZY_DIRS: Record<string, string[]> = {
     "test-databases.ts",
     "testing/query-assertions.ts",
   ],
+  actionmailer: ["test-case.ts", "test-helper.ts"],
+  activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts"],
 };
