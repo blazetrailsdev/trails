@@ -93,7 +93,7 @@ describe("ArInitTest", () => {
       dependencies: {
         "@blazetrails/activerecord": "^1.0.0",
         "@blazetrails/activerecord-cli": "*",
-        "better-sqlite3": "^12.6.2",
+        "better-sqlite3": "^13.0.3",
       },
       devDependencies: {
         "@blazetrails/trails-tsc": "*",
