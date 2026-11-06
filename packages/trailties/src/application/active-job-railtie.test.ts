@@ -11,7 +11,7 @@ interface ActiveJobTrailtieTest extends Generation {}
 class ActiveJobTrailtieTest extends TestCase {}
 include(ActiveJobTrailtieTest, Isolation);
 
-describe("ApplicationTests::ActiveJobTrailtieTest", () => {
+describe("ActiveJobRailtieTest", () => {
   let t: ActiveJobTrailtieTest;
 
   beforeEach(async () => {
