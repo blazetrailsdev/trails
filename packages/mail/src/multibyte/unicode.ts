@@ -1,5 +1,11 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
-import { ArgumentError, bytes as rbBytes, pack, unpack } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  bytes as rbBytes,
+  NoMethodError,
+  pack,
+  unpack,
+} from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
 
@@ -57,7 +63,11 @@ const _database = {
   ) as Record<number, number>,
 };
 
-function tidyByte(byte: number): number[] {
+function tidyByte(byte: number | number[]): number[] {
+  /** @inventedArm if — PERMANENT */
+  if (typeof byte !== "number") {
+    throw new NoMethodError("undefined method `<' for an instance of Array", "<");
+  }
   if (byte < 160) {
     return unpack(
       Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
@@ -200,7 +210,7 @@ export const Unicode = {
         else contsExpected -= 1;
       } else {
         if (contsExpected > 0) {
-          for (let j = 1; j <= i - lastLead; j++) bytes[i - j] = tidyByte(bytes[i - j] as number);
+          for (let j = 1; j <= i - lastLead; j++) bytes[i - j] = tidyByte(bytes[i - j]);
           contsExpected = 0;
         }
         if (isLead) {
