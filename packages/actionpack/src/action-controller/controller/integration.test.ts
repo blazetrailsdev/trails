@@ -1371,7 +1371,7 @@ describe("IntegrationRequestEncodersTest", () => {
       assertResponse("success");
       expect(t.request.mediaType).toBe("application/json");
       expect(t.request.accepts[0].toString()).toBe("application/json");
-      expect(t.request.format.ref()).toBe(":json");
+      expect(t.request.format().ref()).toBe(":json");
       expect(t.request.requestParameters).toEqual({ foo: "fighters" });
       assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
@@ -1407,7 +1407,7 @@ describe("IntegrationRequestEncodersTest", () => {
         expect(t.request.path).toBe("/foos_wibble");
         expect(t.request.mediaType).toBe("text/wibble");
         expect(t.request.accepts[0].toString()).toBe("text/wibble");
-        expect(t.request.format.ref()).toBe(":wibble");
+        expect(t.request.format().ref()).toBe(":wibble");
         expect(t.request.requestParameters).toEqual({});
         expect(t.response.parsedBody).toBe("ok");
       });
@@ -1428,7 +1428,7 @@ describe("IntegrationRequestEncodersTest", () => {
         expect(t.request.path).toBe("/foos_json_api");
         expect(t.request.mediaType).toBe("application/vnd.api+json");
         expect(t.request.accepts[0].toString()).toBe(acceptHeader);
-        expect(t.request.format.ref()).toBe(":json_api");
+        expect(t.request.format().ref()).toBe(":json_api");
         expect(t.request.requestParameters).toEqual({});
         expect(t.response.parsedBody).toBe("ok");
       });

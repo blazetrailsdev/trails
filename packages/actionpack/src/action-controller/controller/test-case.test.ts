@@ -114,7 +114,7 @@ class TestController extends Base {
   }
 
   async testFormat() {
-    await this.render({ plain: String(this.request.format) });
+    await this.render({ plain: String(this.request.format()) });
   }
 
   async testProtocol() {
@@ -716,7 +716,7 @@ describe("TestCaseTest", () => {
       params: { bool_value: true, str_value: "string", num_value: 2 },
       as: "json",
     });
-    assertEqual("json", tc.request.format);
+    assertEqual("json", tc.request.format());
   });
 
   it("using as json with empty params", async () => {

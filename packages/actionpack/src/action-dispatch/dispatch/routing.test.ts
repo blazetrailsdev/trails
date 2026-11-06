@@ -1124,7 +1124,7 @@ describe("TestRoutingMapper", () => {
 
     await t.get("/api/1.0/users.json");
     expect(t.response.body).toBe("api/users#index");
-    expect((t.request.format as unknown as { isJson(): boolean }).isJson()).toBe(true);
+    expect((t.request.format() as unknown as { isJson(): boolean }).isJson()).toBe(true);
     expect(t.apiUsersPath({ version: "1.0", format: "json" })).toBe("/api/1.0/users.json");
 
     await t.get("/api/1.0/users/first.last");
@@ -1135,7 +1135,7 @@ describe("TestRoutingMapper", () => {
     await t.get("/api/1.0/users/first.last.xml");
     expect(t.response.body).toBe("api/users#show");
     expect(t.request.params["id"]).toBe("first.last");
-    expect((t.request.format as unknown as { isXml(): boolean }).isXml()).toBe(true);
+    expect((t.request.format() as unknown as { isXml(): boolean }).isXml()).toBe(true);
     expect(t.apiUserPath({ version: "1.0", id: "first.last", format: "xml" })).toBe(
       "/api/1.0/users/first.last.xml",
     );

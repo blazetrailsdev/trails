@@ -847,27 +847,27 @@ describe("RequestParamsParsing", () => {
 describe("RequestFormat", () => {
   it("xml format", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xml" });
-    expect(req.format.symbol).toBe(":xml");
+    expect(req.format().symbol).toBe(":xml");
   });
 
   it("xhtml format", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xhtml+xml" });
-    expect(req.format.symbol).toBe(":html");
+    expect(req.format().symbol).toBe(":html");
   });
 
   it("txt format", () => {
     const req = new Request({ HTTP_ACCEPT: "text/plain" });
-    expect(req.format.symbol).toBe(":text");
+    expect(req.format().symbol).toBe(":text");
   });
 
   it("formats text/html with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "text/html" });
-    expect(req.format.symbol).toBe(":html");
+    expect(req.format().symbol).toBe(":html");
   });
 
   it("formats blank with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "" });
-    expect(req.format.symbol).toBe(":html");
+    expect(req.format().symbol).toBe(":html");
   });
 
   it("formats XMLHttpRequest with accept header", async () => {
@@ -877,7 +877,7 @@ describe("RequestFormat", () => {
 
   it("formats application/xml with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xml" });
-    expect(req.format.symbol).toBe(":xml");
+    expect(req.format().symbol).toBe(":xml");
   });
 
   it("XMLHttpRequest", async () => {
@@ -894,21 +894,21 @@ describe("RequestFormat", () => {
     });
 
     assertPredicate(request, (r) => r.xhr);
-    assertEqual(Mime.get(":js")!, request.format);
+    assertEqual(Mime.get(":js")!, request.format());
   });
 
   it("format is not nil with unknown format", () => {
     const req = new Request({ QUERY_STRING: "format=hello" });
-    assertNil(req.format);
-    assertNotPredicate(req.format, (f) => f.isHtml!());
-    assertNotPredicate(req.format, (f) => f.isXml!());
-    assertNotPredicate(req.format, (f) => f.isJson!());
+    assertNil(req.format());
+    assertNotPredicate(req.format(), (f) => f.isHtml!());
+    assertNotPredicate(req.format(), (f) => f.isXml!());
+    assertNotPredicate(req.format(), (f) => f.isJson!());
   });
 
   it("can override format with parameter positive", async () => {
     const request = await stubRequest({ QUERY_STRING: "format=xml" });
 
-    assertPredicate(request.format, (r) => r.isXml!());
+    assertPredicate(request.format(), (r) => r.isXml!());
   });
 
   it("formats with xhr request", () => {
@@ -938,7 +938,7 @@ describe("RequestFormat", () => {
   it("can override format with parameter negative", async () => {
     const request = await stubRequest({ QUERY_STRING: "format=txt" });
 
-    assertNotPredicate(request.format, (r) => r.isXml!());
+    assertNotPredicate(request.format(), (r) => r.isXml!());
   });
 
   it("formats format:text with accept header", () => {
@@ -949,13 +949,13 @@ describe("RequestFormat", () => {
   it("formats format:unknown with accept header", async () => {
     const request = await stubRequest({ QUERY_STRING: "format=unknown" });
 
-    assertInstanceOf(NullType as unknown as abstract new () => NullType, request.format);
+    assertInstanceOf(NullType as unknown as abstract new () => NullType, request.format());
   });
 
   it("format does not throw exceptions when malformed GET parameters", async () => {
     const request = await stubRequest({ QUERY_STRING: "x[y]=1&x[y][][w]=2" });
     assert(request.formats);
-    assertPredicate(request.format, (f) => f.isHtml!());
+    assertPredicate(request.format(), (f) => f.isHtml!());
   });
 
   it("format does not throw exceptions when invalid POST parameters", async () => {
@@ -970,7 +970,7 @@ describe("RequestFormat", () => {
       "action_dispatch.logger": new Logger(output),
     });
     assert(request.formats);
-    assertPredicate(request.format, (f) => f.isHtml!());
+    assertPredicate(request.format(), (f) => f.isHtml!());
 
     output.rewind();
     const err = output.read();

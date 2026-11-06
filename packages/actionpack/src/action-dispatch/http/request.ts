@@ -277,9 +277,7 @@ export class Request {
   declare hasContentType: () => boolean;
   declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
-  get format(): MimeType | NullType {
-    return _format.call(this);
-  }
+  declare format: (_viewPath?: unknown) => MimeType | NullType;
   declare setFormat: (extension: unknown) => void;
 
   declare static ignoreAcceptHeader: boolean;
@@ -935,6 +933,7 @@ Request.prototype.useAcceptHeader = function (this: Request) {
 Request.prototype.formatFromPathExtension = function (this: Request) {
   return _formatFromPathExtension.call(this);
 };
+Request.prototype.format = _format;
 Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 

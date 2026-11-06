@@ -20,6 +20,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
+import { withIndifferentAccess } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   b,
@@ -583,7 +584,7 @@ export class TestRequest extends AbstractTestRequest {
     if (TopLevel.Trails !== undefined && TopLevel.Trails.application) {
       env = { ...TopLevel.Trails.application.envConfig(), ...env };
     }
-    env["rack.request.cookie_hash"] = {};
+    env["rack.request.cookie_hash"] = withIndifferentAccess({});
     return new TestRequest(
       { ...TestRequest.defaultEnv(), ...env },
       TestRequest.newSession(),

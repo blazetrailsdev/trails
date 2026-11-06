@@ -1,5 +1,11 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  HashWithIndifferentAccess,
+  include,
+  isModuleIncluded,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   b,
@@ -33,6 +39,13 @@ import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import "../test-helpers/abstract-unit.js";
+
+describe("TestRequest.create", () => {
+  it("seeds rack.request.cookie_hash with indifferent access", () => {
+    const cookieHash = TestRequest.create(null).getHeader("rack.request.cookie_hash");
+    expect(cookieHash).toBeInstanceOf(HashWithIndifferentAccess);
+  });
+});
 
 describe("TestRequest#assignParameters Content-Type case", () => {
   it("raises on a Content-Type no Mime::Type is registered for", () => {
