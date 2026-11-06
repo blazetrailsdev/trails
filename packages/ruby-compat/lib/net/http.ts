@@ -1,9 +1,9 @@
 import { Errno } from "../errno.js";
 import { getHttpAsync, type HttpClientConnection } from "../http-adapter.js";
 import { IOError } from "../io-error.js";
-import { IPAddr } from "../ipaddr.js";
 import { NotImplementedError } from "../not-implemented-error.js";
 import { OpenSSL } from "../openssl.js";
+import { Resolv } from "../resolv.js";
 import { Socket } from "../socket.js";
 import { Timeout } from "../timeout.js";
 import type { HTTP as URIHTTP } from "../uri/http.js";
@@ -114,9 +114,7 @@ export class HTTP {
     const connPort = this.port;
 
     let sslHostAddress: string | null = null;
-    try {
-      new IPAddr(connAddr);
-    } catch {
+    if (!(Resolv.IPv4.Regex.test(connAddr) || Resolv.IPv6.Regex.test(connAddr))) {
       sslHostAddress = connAddr;
     }
 
