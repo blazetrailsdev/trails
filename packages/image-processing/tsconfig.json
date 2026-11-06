@@ -3,14 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../activesupport" },
     { "path": "../ruby-compat" },
     { "path": "../mini-magick" },
     { "path": "../vitest-matchers" }
   ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
 }

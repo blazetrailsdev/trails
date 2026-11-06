@@ -3,10 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "lib",
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [{ "path": "../rack" }, { "path": "../ruby-compat" }],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/**/__fixtures__"]
+  "exclude": ["lib/**/*.test.ts", "lib/test-helpers", "lib/**/__fixtures__"]
 }
