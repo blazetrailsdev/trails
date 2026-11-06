@@ -5,3 +5,6 @@ export { deprecator } from "./deprecator.js";
 import "./constants.generated.js";
 import "./mail-ext.js";
 export { Relayer } from "./relayer.js";
+export { Record } from "./record.js";
+export type { InboundEmail } from "./inbound-email.js";
+export { RoutingJob } from "./routing-job.js";
