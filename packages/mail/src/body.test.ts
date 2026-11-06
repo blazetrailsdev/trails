@@ -1,3 +1,4 @@
+import { binaryBytes } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Body } from "./body.js";
 import "./index.js";
@@ -387,7 +388,7 @@ describe("Mail::Body", () => {
     it("should encoded", () => {
       const body = new Body("あいうえお\r\n");
       body.charset = "iso-2022-jp";
-      expect(body.encoded()).toEqual('\x1b$B$"$$$&$($*\x1b(B\r\n');
+      expect(body.encoded()).toEqual(binaryBytes('\x1b$B$"$$$&$($*\x1b(B\r\n'));
     });
   });
 

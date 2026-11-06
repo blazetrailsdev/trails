@@ -132,12 +132,7 @@ export class Body {
         if (this.charset != null && this.charset !== "US-ASCII") {
           decoded = encode(decoded, this.charset);
         }
-        const encoded = enc!.encode(decoded);
-        /** @inventedArm if — PERMANENT */
-        if (encoded instanceof Uint8Array) {
-          return Array.from(encoded, (b) => String.fromCharCode(b)).join("");
-        }
-        return encoded;
+        return enc!.encode(decoded);
       }
     }
   }
