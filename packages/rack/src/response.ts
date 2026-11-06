@@ -1,12 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import {
-  ArgumentError,
-  hashDelete,
-  rbFSend,
-  rbObjRespondTo,
-  toI,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, hashDelete, rbFSend, toI, toS } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -221,7 +214,7 @@ export abstract class Helpers {
           this._writer(toS(part));
         });
 
-        if (rbObjRespondTo(body, "close")) body.close();
+        if (typeof body.close === "function") body.close();
       } else {
         this._buffered = false;
       }
