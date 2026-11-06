@@ -223,7 +223,6 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_be_an_instance_of: "instanceOf",
   expect_to_be_instance_of: "instanceOf",
   expect_to_be_kind_of: "kindOf",
-  expect_not_to_be_kind_of: "notInstanceOf",
   expect_to_respond_to: "respondTo",
   expect_not_to_respond_to: "notRespondTo",
 };

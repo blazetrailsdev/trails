@@ -1,4 +1,3 @@
-import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, rbInspect, rbObjDup, stderr, toA } from "@blazetrails/ruby-compat";
 import { Field, Header, Mail, Utilities } from "./index.js";
@@ -591,7 +590,7 @@ describe("Mail::Header", () => {
 
     it("should enforce appear-once rule even with mass assigned header", () => {
       const header = new Header("Content-Type: multipart/alternative\nContent-Type: text/plain\n");
-      expect(header.get("content-type")).not.toBeExactInstanceOf(Array);
+      expect(header.get("content-type")).not.toSatisfy(Array.isArray);
     });
   });
 

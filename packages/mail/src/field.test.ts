@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { describe, expect, it, vi } from "vitest";
 import { CcField, DateTimeElement, FromField, MessageIdField, ReplyToField } from "./index.js";
 import { SubjectField, UnstructuredField } from "./index.js";
@@ -202,7 +203,7 @@ describe("Mail::Field", () => {
     });
 
     it("should say it is not == to nil", () => {
-      expect(new Field("From", "mikel").equals(null)).not.toEqual(null);
+      expect(new Field("From", "mikel")).not.toEqualRuby(null);
     });
 
     it("should sort according to the field order", () => {
