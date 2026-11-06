@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Mail, type Message } from "@blazetrails/mail";
-import "../mail-ext.js";
+import "../../mail-ext.js";
 
 describe("AddressesTest", () => {
   let mail: Message;

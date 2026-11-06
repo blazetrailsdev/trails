@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Address } from "@blazetrails/mail";
-import "../mail-ext.js";
+import "../../mail-ext.js";
 
 describe("AddressWrappingTest", () => {
   it("wrap", () => {
