@@ -56,6 +56,7 @@ HTTPResponse.CODE_CLASS_TO_OBJ = {
   "4": HTTPClientError,
   "5": HTTPServerError,
 };
+/** @inventedArm CODE_TO_OBJ — CONVERGEABLE ruby-compat-net-http-full-transport */
 HTTPResponse.CODE_TO_OBJ = {
   "200": HTTPOK,
   "401": HTTPUnauthorized,

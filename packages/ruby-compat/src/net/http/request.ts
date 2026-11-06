@@ -28,13 +28,15 @@ export class HTTPRequest {
   private readonly _header: Record<string, string> = {};
   private readonly _responseHasBody: boolean;
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @missingRailsCall dup — CONVERGEABLE ruby-compat-net-http-full-transport
+   * @noRailsEquivalent PERMANENT
+   */
   constructor(path: string | URIHTTP, initheader: Record<string, string> | null = null) {
     const klass = this.constructor as typeof HTTPRequest;
     this.method = klass.METHOD;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
-    if (typeof path !== "string") {
-      if (!(path instanceof URIHTTP)) throw new ArgumentError("not an HTTP URI");
+    if (path instanceof URIHTTP) {
       const hostname = path.hostname;
       if (!(hostname != null && hostname.length > 0)) {
         throw new ArgumentError("no host component for URI");

@@ -181,7 +181,13 @@ export class HTTP {
     return res!;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @missingRailsCall beginTransport — CONVERGEABLE ruby-compat-net-http-full-transport
+   * @missingRailsCall endTransport — CONVERGEABLE ruby-compat-net-http-full-transport
+   * @missingRailsCall isKindOf — CONVERGEABLE ruby-compat-net-http-full-transport
+   * @missingRailsCall setUri — CONVERGEABLE ruby-compat-net-http-full-transport
+   * @noRailsEquivalent PERMANENT
+   */
   async transportRequest(
     req: HTTPRequest,
     block?: (res: HTTPResponse) => unknown,
