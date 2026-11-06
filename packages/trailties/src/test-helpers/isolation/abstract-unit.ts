@@ -20,7 +20,6 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
 import { ConnectionAdapters } from "@blazetrails/activerecord";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { Methods as RackTestMethods } from "@blazetrails/rack-test";
 import { Application } from "../../application.js";
 import type { EnvHelpers } from "../env-helpers.js";
 import { Trails } from "../../trails.js";
@@ -194,6 +193,9 @@ export class Generation {
   }
 
   async makeBasicApp(block?: (app: typeof Application) => unknown): Promise<void> {
+    await import("../../trailties/action-controller.js");
+    await import("../../trailties/action-view.js");
+
     const app = class RailtiesTestApp extends Application {};
     this._app = app as unknown as RackHost;
     Application.register(app);
@@ -215,7 +217,8 @@ export class Generation {
         this.get("/", { to: "omg#index" });
       });
 
-    extend(this, RackTestMethods);
+    const RackTest = await import("@blazetrails/rack-test");
+    extend(this, RackTest.Methods);
   }
 
   async teardownApp(): Promise<void> {

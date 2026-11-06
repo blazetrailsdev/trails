@@ -35,4 +35,14 @@ describe("AbstractController::UrlFor", () => {
     }
     expect([...Host.actionMethods()]).toEqual(["show"]);
   });
+
+  it("memoizes action_methods per class", () => {
+    class Abstract extends Base {}
+    include(Abstract, UrlFor);
+    Abstract.abstractBang();
+    class Host extends Abstract {
+      show() {}
+    }
+    expect(Host.actionMethods()).toBe(Host.actionMethods());
+  });
 });
