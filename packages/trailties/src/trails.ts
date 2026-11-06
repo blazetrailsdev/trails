@@ -176,8 +176,13 @@ export class Trails {
 }
 
 /** @internal */
-export function _resetTrailsEnv(): void {
+export function _resetEnv(): void {
   _env = undefined;
+}
+
+/** @internal */
+export function _resetTrailsEnv(): void {
+  _resetEnv();
   _backtraceCleaner = undefined;
 }
 

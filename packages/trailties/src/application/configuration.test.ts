@@ -20,26 +20,9 @@ import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-co
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
 import { Trails, _resetTrailsEnv } from "../trails.js";
+import { EnvHelpers } from "../test-helpers/env-helpers.js";
 
-function switchEnv(key: string, value: string | undefined, block: () => void): void {
-  const old = env[key];
-  setEnv(key, value);
-  try {
-    block();
-  } finally {
-    setEnv(key, old);
-  }
-}
-
-function withTrailsEnv(trailsEnv: string | undefined, block: () => void): void {
-  _resetTrailsEnv();
-  switchEnv("TRAILS_ENV", trailsEnv, () => switchEnv("NODE_ENV", undefined, block));
-}
-
-function withRackEnv(rackEnv: string | undefined, block: () => void): void {
-  _resetTrailsEnv();
-  switchEnv("NODE_ENV", rackEnv, () => switchEnv("TRAILS_ENV", undefined, block));
-}
+const envHelpers = new EnvHelpers();
 
 let appPath: string;
 
@@ -77,14 +60,14 @@ describe("ConfigurationTest", () => {
     await rm(appPath, { recursive: true, force: true });
   });
 
-  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", () => {
-    withTrailsEnv("", () => {
+  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", async () => {
+    await envHelpers.withTrailsEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
 
-  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", () => {
-    withRackEnv("", () => {
+  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", async () => {
+    await envHelpers.withRackEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
