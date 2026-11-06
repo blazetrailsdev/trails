@@ -13,7 +13,7 @@
  */
 
 /** Packages already moved to `lib/` + `test/`. Only-grow. */
-export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>(["ruby-compat"]);
+export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>(["ruby-compat", "tzinfo"]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */
 export function libRoot(pkg: string): "lib" | "src" {
