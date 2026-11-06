@@ -3642,11 +3642,6 @@ class ApiExtractor
   # and one of another kind to the same name in any other class or module of
   # the file (a subclass or mixin writing the parent's ivar). An ivar of the
   # same name in another class of the file is not proven by it.
-  # The class-level ivar is the module's own, a different object from any
-  # instance's, so it is proven separately under `[owner, name, :singleton]`
-  # from the writes in the class body, `class << self` and `def self.`:
-  # `@transfer_encodings = {}` (`mail/encodings.rb:13`) proves the receiver of
-  # `def Encodings.defined?`'s `@transfer_encodings.include?` (`:29-31`).
   def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
