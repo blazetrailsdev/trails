@@ -1,4 +1,4 @@
-import { rbObjAsString, stringSplit } from "@blazetrails/ruby-compat";
+import { binaryBytes, binaryString, rbObjAsString, stringSplit } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 import type { ContentDispositionField } from "./fields/content-disposition-field.js";
 import type { Field } from "./field.js";
@@ -105,23 +105,18 @@ export class Part extends Message {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm decode — PERMANENT
-   */
+  /** @internal */
   protected override parseMessage(): void {
-    const rawSource =
-      this.rawSource instanceof Uint8Array
-        ? new TextDecoder().decode(this.rawSource)
-        : this.rawSource;
+    const rawSource = this.rawSource;
+    const binary = rawSource instanceof Uint8Array;
     const [headerPart, bodyPart] = stringSplit(
-      rawSource,
+      binary ? binaryString(rawSource) : rawSource,
       new RegExp(`${LAX}${WSP}*${LAX}`, "m"),
       2,
     );
     if (headerPart != null && Constants.HEADER_LINE.test(headerPart)) {
-      this.setHeader(headerPart);
-      this.setBody(bodyPart ?? null);
+      this.setHeader(binary ? binaryBytes(headerPart) : headerPart);
+      this.setBody(binary && bodyPart != null ? binaryBytes(bodyPart) : (bodyPart ?? null));
     } else {
       this.setHeader("Content-Type: text/plain\r\n");
       this.setBody(rawSource);

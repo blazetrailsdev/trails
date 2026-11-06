@@ -1,4 +1,6 @@
 import {
+  binaryBytes,
+  binaryString,
   eachSlice,
   encode,
   isAsciiOnly,
@@ -26,15 +28,15 @@ export class Body {
   /** @internal */
   private _parts: PartsList;
   /** @internal */
-  private _rawSource: string;
+  private _rawSource: string | Uint8Array;
   /** @internal */
   private _encoding: unknown;
   /** @internal */
   private _asciiOnly: boolean | undefined;
 
   boundary: string | null = null;
-  preamble: string | null = null;
-  epilogue: string | null = null;
+  preamble: string | Uint8Array | null = null;
+  epilogue: string | Uint8Array | null = null;
   charset: string | null = null;
 
   constructor(string: unknown = "") {
@@ -106,15 +108,18 @@ export class Body {
     );
   }
 
-  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string {
+  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
     if (this.isMultipart()) {
       this.sortPartsBang();
       const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());
-      return (
-        [this.preamble, ...encodedParts].join(this.crlfBoundary()) +
-        this.endBoundary() +
-        (this.epilogue ?? "")
+      const pieces = [this.preamble, ...encodedParts, this.epilogue ?? ""];
+      const binary = pieces.some((s) => s instanceof Uint8Array);
+      const [preamble, ...rest] = pieces.map((s) =>
+        s instanceof Uint8Array ? binaryString(s) : s,
       );
+      const epilogue = rest.pop();
+      const encoded = [preamble, ...rest].join(this.crlfBoundary()) + this.endBoundary() + epilogue;
+      return binary ? binaryBytes(encoded) : encoded;
     } else {
       const dec = Encodings.getEncoding(this.encoding() as string) as typeof Identity | null;
       const enc = (
@@ -128,12 +133,7 @@ export class Body {
         if (this.charset != null && this.charset !== "US-ASCII") {
           decoded = encode(decoded, this.charset);
         }
-        const encoded = enc!.encode(decoded);
-        /** @inventedArm if — PERMANENT */
-        if (encoded instanceof Uint8Array) {
-          return Array.from(encoded, (b) => String.fromCharCode(b)).join("");
-        }
-        return encoded;
+        return enc!.encode(decoded);
       }
     }
   }
@@ -167,7 +167,7 @@ export class Body {
     this._encoding = val === "text" || Utilities.isBlank(val) ? this.defaultEncoding() : val;
   }
 
-  get rawSource(): string {
+  get rawSource(): string | Uint8Array {
     return this._rawSource;
   }
 
@@ -187,8 +187,12 @@ export class Body {
     this.boundary = boundary;
     const parts = this.extractParts();
 
-    this.preamble = strip(parts[0] ?? "");
-    this.epilogue = strip(parts.at(-1) ?? "");
+    const preamble = parts[0] ?? "";
+    const epilogue = parts.at(-1) ?? "";
+    this.preamble =
+      preamble instanceof Uint8Array ? binaryBytes(strip(binaryString(preamble))) : strip(preamble);
+    this.epilogue =
+      epilogue instanceof Uint8Array ? binaryBytes(strip(binaryString(epilogue))) : strip(epilogue);
     for (const part of parts.slice(1, -1)) this._parts.push(new Mail.Part(part));
     return this;
   }
@@ -214,13 +218,19 @@ export class Body {
   }
 
   /** @internal */
-  private extractParts(): string[] {
+  private extractParts(): (string | Uint8Array)[] {
     const partsRegex = new RegExp(
       `(?:(?<![\\s\\S])|\\r\\n)(--${regexpEscape(this.boundary ?? "")}(?:--)?)(?=\\s*$)`,
       "m",
     );
+    const rawSource = this.rawSource;
+    const binary = rawSource instanceof Uint8Array;
     const parts: string[][] = [];
-    eachSlice(stringSplit(this.rawSource, partsRegex), 2, (slice: string[]) => parts.push(slice));
+    eachSlice(
+      stringSplit(binary ? binaryString(rawSource) : rawSource, partsRegex),
+      2,
+      (slice: string[]) => parts.push(slice),
+    );
     for (let index = 0; index < parts.length; index++) {
       if (index > 0 && Utilities.isBlank(parts[index][0])) parts.splice(index, 1);
     }
@@ -229,7 +239,7 @@ export class Body {
       const finalSeparator = parts.at(-2)![1];
       if (finalSeparator !== `--${this.boundary}--`) parts.push([""]);
     }
-    return parts.map((p) => p[0]);
+    return parts.map((p) => (binary ? binaryBytes(p[0]) : p[0]));
   }
 
   /** @internal */

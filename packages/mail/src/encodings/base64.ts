@@ -15,7 +15,7 @@ export class Base64 extends SevenBit {
     return true;
   }
 
-  static override decode(str: string): Uint8Array {
+  static override decode(str: string | Uint8Array): Uint8Array {
     return Utilities.decodeBase64(str);
   }
 
@@ -23,11 +23,11 @@ export class Base64 extends SevenBit {
     return Utilities.binaryUnsafeToCrlf(Utilities.encodeBase64(str));
   }
 
-  static override cost(_str: string): number {
+  static override cost(_str: string | Uint8Array): number {
     return 4.0 / 3;
   }
 
-  static override isCompatibleInput(_str: string): boolean {
+  static override isCompatibleInput(_str: string | Uint8Array): boolean {
     return true;
   }
 }

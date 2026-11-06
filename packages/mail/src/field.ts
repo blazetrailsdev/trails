@@ -310,12 +310,22 @@ export class Field implements Comparable {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm forceEncoding — CONVERGEABLE mail-structured-fields-parse-binary-values-without-utf8-decode
+   */
   private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
     if (typeof value === "string") value = this.unfold(value);
+    if (value instanceof Uint8Array) {
+      value = binaryBytes(this.unfold(binaryString(value)));
+    }
 
     const klass = (this.constructor as typeof Field).fieldClassFor(name);
     if (klass != null) {
+      if (value instanceof Uint8Array && !(klass.prototype instanceof Mail.UnstructuredField)) {
+        const utf8 = forceEncoding(value, Encoding.UTF_8);
+        value = utf8 instanceof Uint8Array ? binaryString(utf8) : utf8;
+      }
       return klass.parse(value, charset);
     } else {
       return Mail.OptionalField.parse(name, value, charset);

@@ -1,4 +1,7 @@
 import {
+  rbEqual,
+  binaryBytes,
+  binaryString,
   cmp,
   flatten,
   NoMethodError,
@@ -212,13 +215,13 @@ export class Message {
     if (typeof other?.encoded !== "function") return false;
 
     if (present(this.messageId()) && present(other.messageId())) {
-      return this.encoded() === other.encoded();
+      return rbEqual(this.encoded(), other.encoded());
     } else {
       const m = rbObjDup(this);
       m.setMessageId("<temp@test>");
       const o = rbObjDup(other);
       o.setMessageId("<temp@test>");
-      return m.encoded() === o.encoded();
+      return rbEqual(m.encoded(), o.encoded());
     }
   }
 
@@ -944,11 +947,13 @@ export class Message {
     this.addRequiredFields();
   }
 
-  encoded(): string {
+  encoded(): string | Uint8Array {
     this.readyToSendBang();
     let buffer = this.header().encoded();
     buffer += "\r\n";
-    buffer += this.body().encoded(this.contentTransferEncoding() as string | null);
+    const body = this.body().encoded(this.contentTransferEncoding() as string | null);
+    if (body instanceof Uint8Array) return new Uint8Array([...binaryBytes(buffer), ...body]);
+    buffer += body;
     return buffer;
   }
 
@@ -1014,7 +1019,8 @@ export class Message {
   }
 
   toString(): string {
-    return this.encoded();
+    const encoded = this.encoded();
+    return encoded instanceof Uint8Array ? binaryString(encoded) : encoded;
   }
 
   inspect(): string {
@@ -1087,20 +1093,19 @@ export class Message {
     return this.hasContentType() ? /^text$/im.test(this.mainType() ?? "") : false;
   }
 
-  /**
-   * @internal
-   * @inventedArm decode — PERMANENT
-   */
+  /** @internal */
   protected parseMessage(): void {
     const rawSource = this.rawSource;
-    const [headerPart, bodyPart] = stringSplit(
-      (rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource).replace(
-        /^[\s\0]+/,
-        "",
-      ),
+    const binary = rawSource instanceof Uint8Array;
+    let [headerPart, bodyPart]: (string | Uint8Array | undefined)[] = stringSplit(
+      (binary ? binaryString(rawSource) : rawSource).replace(/^[\0\t\n\v\f\r ]+/, ""),
       new RegExp(`${Constants.LAX_CRLF.source}${Constants.LAX_CRLF.source}`),
       2,
     );
+    if (binary) {
+      headerPart = headerPart == null ? headerPart : binaryBytes(headerPart);
+      bodyPart = bodyPart == null ? bodyPart : binaryBytes(bodyPart);
+    }
     this.setHeader(headerPart ?? null);
     this.setBody(bodyPart ?? null);
   }
@@ -1127,20 +1132,18 @@ export class Message {
     this.addEncodingToBody();
   }
 
-  /**
-   * @internal
-   * @inventedArm decode — PERMANENT
-   */
+  /** @internal */
   private setEnvelopeHeader(): void {
     const rawSource = rbObjAsString(this.rawSource) as string | Uint8Array;
-    const rawString =
-      rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource;
+    const binary = rawSource instanceof Uint8Array;
+    const rawString = binary ? binaryString(rawSource) : rawSource;
     const matchData = new RegExp(
       `^From\\s+([^:\\s]${Constants.TEXT.source}*)${Constants.LAX_CRLF.source}`,
     ).exec(rawString);
     if (matchData) {
       this.setEnvelope(matchData[1]);
-      this._rawSource = rawString.replace(matchData[0], "");
+      const rest = rawString.replace(matchData[0], "");
+      this._rawSource = binary ? binaryBytes(rest) : rest;
     }
   }
 
