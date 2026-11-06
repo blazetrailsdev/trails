@@ -44,7 +44,7 @@ export const Encodings = {
     transferEncodings[Encodings.getName(name)] = cls;
   },
 
-  /** @missingRailsCall include? — CONVERGEABLE mail-message-spec-port */
+  /** @missingRailsCall include? — CONVERGEABLE mail-message-spec-port-remaining */
   isDefined(name: string): boolean {
     return Encodings.getName(name) in transferEncodings;
   },

@@ -9,6 +9,7 @@ type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
 type Hash = Record<string, unknown>;
 
 const FIXTURES: Record<string, string> = {
+  "another.path/base-mailer/welcome.tse": "Welcome from another path",
   "base-mailer/attachment-with-content.tse": "Attachment with content",
   "base-mailer/attachment-with-hash.html.tse": "",
   "base-mailer/attachment-with-hash-default-encoding.html.tse": "",
@@ -31,6 +32,8 @@ const FIXTURES: Record<string, string> = {
     "Implicit Multipart <%= '[' + formats.join(', ') + ']' %>",
   "base-mailer/implicit-multipart.html.tse": "HTML Implicit Multipart",
   "base-mailer/implicit-multipart.text.tse": "TEXT Implicit Multipart",
+  "base-mailer/implicit-with-locale.de-AT.text.tse": "Implicit with locale DE-AT TEXT",
+  "base-mailer/implicit-with-locale.de.html.tse": "Implicit with locale DE HTML",
   "base-mailer/implicit-with-locale.en.html.tse": "Implicit with locale EN HTML",
   "base-mailer/implicit-with-locale.html.tse": "Implicit with locale HTML",
   "base-mailer/implicit-with-locale.pl.text.tse": "Implicit with locale PL TEXT",
@@ -43,6 +46,12 @@ const FIXTURES: Record<string, string> = {
   "layouts/different-layout.html.tse": "HTML -- <%= yield %>",
   "layouts/different-layout.text.tse": "PLAIN -- <%= yield %>",
 };
+
+export const ANOTHER_PATH_RESOLVER = new ActionView.FixtureResolver({
+  "base-mailer/welcome.tse": "Welcome from another path",
+});
+
+export const UNKNOWN_RESOLVER = new ActionView.FixtureResolver({});
 
 export class BaseMailer extends Base {
   static {
@@ -60,6 +69,10 @@ export class BaseMailer extends Base {
   welcome(hash: Hash = {}) {
     (this.headers() as Message).set("X-SPAM", "Not SPAM");
     return this.mail(Object.assign({ subject: "The first email on new API!" }, hash));
+  }
+
+  welcomeFromAnotherPath(path: string | string[]) {
+    return this.mail({ templateName: "welcome", templatePath: path });
   }
 
   welcomeWithHeaders(hash: Hash = {}) {
