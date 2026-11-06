@@ -20,19 +20,22 @@ type AcceptEncoding = ReadonlyArray<[string, number]>;
 type Found = readonly [filepath: string, contentHeaders: Record<string, string>];
 
 export class Static {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   /** @internal */
   private fileHandler: FileHandler;
 
-  constructor(app: RackApp, path: string, { index = "index", headers = {} }: StaticOptions = {}) {
+  constructor(
+    app: RackApp | { call: RackApp },
+    path: string,
+    { index = "index", headers = {} }: StaticOptions = {},
+  ) {
     this.app = app;
     this.fileHandler = new FileHandler(path, { index, headers });
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
     return (
-      (await this.fileHandler.attempt(env)) ??
-      (rbProcCall(this.app, env) as ReturnType<typeof this.app>)
+      (await this.fileHandler.attempt(env)) ?? (rbProcCall(this.app, env) as Promise<RackResponse>)
     );
   }
 }

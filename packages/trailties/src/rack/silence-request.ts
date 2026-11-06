@@ -3,10 +3,10 @@ import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Trails } from "../trails.js";
 
 export class SilenceRequest {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private path: string;
 
-  constructor(app: RackApp, { path }: { path: string }) {
+  constructor(app: RackApp | { call: RackApp }, { path }: { path: string }) {
     this.app = app;
     this.path = path;
   }

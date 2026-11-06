@@ -38,14 +38,14 @@ export class DebugExceptions {
     DebugExceptions.interceptors.push(object);
   }
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private routesApp: { routes(): RouteSet } | null;
   private responseFormat: "default" | "api";
   private interceptors: Interceptor[];
   private _stderrLogger?: ActiveSupportLogger;
 
   constructor(
-    app: RackApp,
+    app: RackApp | { call: RackApp },
     routesApp: { routes(): RouteSet } | null = null,
     responseFormat: "default" | "api" = "default",
     interceptors: Interceptor[] = DebugExceptions.interceptors,
@@ -186,7 +186,7 @@ export class DebugExceptions {
 
   async call(env: RackEnv): Promise<RackResponse> {
     try {
-      const response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+      const response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
       const [, headers, body] = response;
 
       if (headers[X_CASCADE] === "pass") {

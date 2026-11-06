@@ -27,9 +27,9 @@ describe("QueryStringParsingTest", () => {
   }
 
   class EarlyParse {
-    private app: RackApp;
+    private app: RackApp | { call: RackApp };
 
-    constructor(app: RackApp) {
+    constructor(app: RackApp | { call: RackApp }) {
       this.app = app;
     }
 
@@ -39,7 +39,7 @@ describe("QueryStringParsingTest", () => {
 
     async call(env: RackEnv): Promise<RackResponse> {
       this.populateRackCache(env);
-      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+      return rbFSend(this.app, "call", env) as Promise<RackResponse>;
     }
   }
 

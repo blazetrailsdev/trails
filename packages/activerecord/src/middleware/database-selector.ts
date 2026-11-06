@@ -1,3 +1,4 @@
+import type { RackApp, RackResponse } from "@blazetrails/rack";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
@@ -22,10 +23,10 @@ export class DatabaseSelector {
   readonly contextKlass: ContextClass;
   readonly options: Record<string, unknown>;
 
-  private readonly app: (env: Record<string, unknown>) => Promise<unknown>;
+  private readonly app: RackApp | { call: RackApp };
 
   constructor(
-    app: (env: Record<string, unknown>) => Promise<unknown>,
+    app: RackApp | { call: RackApp },
     resolverKlass?: ResolverClass,
     contextKlass?: ContextClass,
     options: Record<string, unknown> = {},
@@ -39,10 +40,7 @@ export class DatabaseSelector {
   async call(env: Record<string, unknown>): Promise<unknown> {
     const request = new TopLevel.ActionDispatch!.Request(env);
 
-    return this.selectDatabase(
-      request,
-      () => rbProcCall(this.app, env) as ReturnType<typeof this.app>,
-    );
+    return this.selectDatabase(request, () => rbProcCall(this.app, env) as Promise<RackResponse>);
   }
 
   /** @internal */

@@ -51,14 +51,14 @@ export class Subscriber {
 export class ServerTiming {
   static Subscriber = Subscriber;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private subscriber: Subscriber;
 
   static unsubscribe(): void {
     Subscriber.instance().unsubscribe();
   }
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
     this.subscriber = Subscriber.instance();
     this.subscriber.ensureSubscribed();
@@ -67,7 +67,7 @@ export class ServerTiming {
   async call(env: RackEnv): Promise<RackResponse> {
     let response: RackResponse | undefined;
     const events = await this.subscriber.collectEvents(async () => {
-      response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+      response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
     });
 
     const headers = response![1];

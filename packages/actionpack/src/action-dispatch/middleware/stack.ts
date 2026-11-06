@@ -18,7 +18,7 @@ export type MiddlewareBlock = (...args: any[]) => unknown;
 type MiddlewareArgs = unknown[] | [...unknown[], MiddlewareBlock];
 
 export type MiddlewareFactory = new (
-  app: any,
+  app: RackApp | { call: RackApp },
   ...args: any[]
 ) => { call(env: RackEnv): Promise<RackResponse> };
 

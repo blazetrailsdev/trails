@@ -10,11 +10,11 @@ type RackAppObject = { call(env: RackEnv): Promise<RackResponse> };
 
 class MyMiddleware {
   constructor(
-    private app: RackApp,
+    private app: RackApp | { call: RackApp },
     _options?: { kw?: number },
   ) {}
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const result = await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
     result[1]["Middleware-Test"] = "Success";
     result[1]["Middleware-Order"] = "First";
     return result;
@@ -23,11 +23,11 @@ class MyMiddleware {
 
 class ExclaimerMiddleware {
   constructor(
-    private app: RackApp,
+    private app: RackApp | { call: RackApp },
     _options?: { kw?: number },
   ) {}
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const result = await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
     result[1]["Middleware-Order"] += "!";
     return result;
   }
@@ -36,13 +36,13 @@ class ExclaimerMiddleware {
 class BlockMiddleware {
   configurableMessage?: string;
   constructor(
-    private app: RackApp,
+    private app: RackApp | { call: RackApp },
     block?: (config: BlockMiddleware) => void,
   ) {
     block?.(this);
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    const result = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const result = await (rbFSend(this.app, "call", env) as Promise<RackResponse>);
     result[1]["Configurable-Message"] = this.configurableMessage!;
     return result;
   }
