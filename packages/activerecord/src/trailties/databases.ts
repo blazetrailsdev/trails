@@ -19,7 +19,7 @@ import { DatabaseTasks, type SchemaFormat } from "../tasks/database-tasks.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import * as ActiveRecord from "../active-record.js";
 
-const databases = DatabaseTasks.setupInitialDatabaseYaml();
+const databases = await DatabaseTasks.setupInitialDatabaseYaml();
 
 DSL.namespace("db", (dbNamespace) => {
   DSL.desc("Set the environment value for the database");

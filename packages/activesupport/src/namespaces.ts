@@ -94,6 +94,7 @@ declare module "@blazetrails/ruby-compat" {
         config: {
           considerAllRequestsLocal: boolean;
           root?: string | null;
+          loadDatabaseYaml(): Promise<Record<string, unknown>>;
           paths(): {
             get(path: string): { firstSync(): string | undefined; toAry(): string[] } | undefined;
           };

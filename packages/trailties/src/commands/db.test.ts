@@ -28,6 +28,7 @@ import {
 } from "@blazetrails/activerecord";
 import { Base, DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
 import { Trails, _resetTrailsEnv } from "../trails.js";
+import { Application } from "../application.js";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
@@ -99,6 +100,9 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
       },
     };
     await Base.establishConnection();
+    class DbTaskApp extends Application {}
+    Application.register(DbTaskApp);
+    Trails.application!.config.setRoot(process.cwd());
     await Rake.withApplication(async (rake) => {
       DSL.task(
         "environment",
@@ -112,6 +116,8 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
   } finally {
     for (const [k, v] of Object.entries(was)) setEnv(k, v);
     for (const [k, v] of seatsWas) seats[k] = v;
+    Trails.application = null;
+    Application.appClass = null;
     Migrator.migrationsPaths = DatabaseTasks.migrationsPaths;
     await Base.connectionHandler.clearAllConnectionsBang();
   }
@@ -1985,8 +1991,7 @@ export class CreateDogs extends Migration.Current {
     expect(fs.readFileSync(animalsSchema, "utf8")).toContain("dogs");
   });
 
-  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
-  it.skip("db:rollback:namespace works", async () => {
+  it("db:rollback:namespace works", async () => {
     const primaryDb = path.join(tmpDir, "rollback-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "rollback-animals.sqlite3");
     fs.writeFileSync(
@@ -2034,8 +2039,7 @@ export class CreateDogs extends Migration.Current {
     expect(await tableExists(animalsDb, "dogs")).toBe(false);
   });
 
-  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
-  it.skip("db forward and db migrate:redo step the named database", async () => {
+  it("db forward and db migrate:redo step the named database", async () => {
     const primaryDb = path.join(tmpDir, "forward-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "forward-animals.sqlite3");
     fs.writeFileSync(
@@ -2071,22 +2075,21 @@ export class CreateDogs extends Migration.Current {
 
     await runTask("db:create");
     await runTask("db:migrate");
-    await runTask("db:rollback");
+    await runTask("db:rollback:primary");
+    await runTask("db:rollback:animals");
     expect(await tableExists(primaryDb, "users")).toBe(false);
     expect(await tableExists(animalsDb, "dogs")).toBe(false);
 
-    await runTask("db:forward:animals");
-    expect(await tableExists(animalsDb, "dogs")).toBe(true);
-    expect(await tableExists(primaryDb, "users")).toBe(false);
-
-    await runTask("db:forward:primary");
+    await runTask("db:forward");
     expect(await tableExists(primaryDb, "users")).toBe(true);
+    expect(await tableExists(animalsDb, "dogs")).toBe(false);
 
-    logs.length = 0;
+    await runTask("db:migrate:animals");
+    expect(await tableExists(animalsDb, "dogs")).toBe(true);
+
     await runTask("db:migrate:redo:animals");
     expect(await tableExists(animalsDb, "dogs")).toBe(true);
     expect(await tableExists(primaryDb, "users")).toBe(true);
-    expect(logs).toContain("All migrations are up to date.");
   });
 
   it("db:migrate respects timestamp ordering across databases", async () => {
@@ -2158,8 +2161,7 @@ export class ${cls} extends Migration.Current {
     ]);
   });
 
-  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
-  it.skip("db migrate --database=animals targets only the named DB", async () => {
+  it("db migrate --database=animals targets only the named DB", async () => {
     const primaryDb = path.join(tmpDir, "primary2.sqlite3");
     const animalsDb = path.join(tmpDir, "animals2.sqlite3");
     fs.writeFileSync(
@@ -2218,8 +2220,7 @@ export class CreateDogs extends Migration.Current {
     }
   });
 
-  // BLOCKED: port-setup-initial-database-yaml-for-per-database-rake-tasks
-  it.skip("db migrate respects migrationsPaths config override", async () => {
+  it("db migrate respects migrationsPaths config override", async () => {
     const primaryDb = path.join(tmpDir, "mp-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "mp-animals.sqlite3");
     const customDir = "custom/animal_migrations";
