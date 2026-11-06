@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
-import { isPresent } from "@blazetrails/activesupport";
+import { assertDifference, assertNoDifference, isPresent } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import { Job, Process, ReadyExecution, RecurringTask, SolidQueueAdapter, Worker } from "./index.js";
@@ -113,19 +113,22 @@ describe("SolidQueue::RecurringTaskTest", () => {
   });
 
   async function enqueueAndAssertPerformedWithResult(task: RecurringTask, result: unknown) {
-    const jobCount = await Job.count();
-    const readyCount = await ReadyExecution.count();
-    await task.enqueue({ at: Time.now() });
-    expect(await Job.count()).toBe(jobCount + 1);
-    expect(await ReadyExecution.count()).toBe(readyCount + 1);
+    await assertDifference([() => Job.count(), () => ReadyExecution.count()], +1, null, () =>
+      task.enqueue({ at: Time.now() }),
+    );
 
-    const size = JobBuffer.values.length;
-    const worker = new Worker({ queues: "*" });
-    worker.mode = "inline";
-    await worker.start();
-    expect(JobBuffer.values.length).toBe(size + 1);
+    await assertDifference(
+      () => JobBuffer.size(),
+      +1,
+      null,
+      async () => {
+        const worker = new Worker({ queues: "*" });
+        worker.mode = "inline";
+        await worker.start();
+      },
+    );
 
-    expect(JobBuffer.values.at(-1)).toEqual(result);
+    expect(JobBuffer.lastValue()).toEqual(result);
   }
 
   function recurringTaskWith({
@@ -197,9 +200,11 @@ describe("SolidQueue::RecurringTaskTest", () => {
     vi.spyOn(Job, "createBang").mockRejectedValue(new Deadlocked());
 
     const task = recurringTaskWith({ class_name: "JobWithoutArguments" });
-    const jobCount = await Job.count();
-    await task.enqueue({ at: Time.now() });
-    expect(await Job.count()).toBe(jobCount);
+    await assertNoDifference(
+      () => Job.count(),
+      null,
+      () => task.enqueue({ at: Time.now() }),
+    );
   });
 
   it("error when enqueuing job using another adapter that raises ActiveJob::EnqueueError", async () => {
@@ -222,46 +227,46 @@ describe("SolidQueue::RecurringTaskTest", () => {
         class_name: "JobWithoutArguments",
         schedule: "once a year",
       }).isValid(),
-    ).toBe(false);
+    ).toBeFalsy();
     expect(
       await recurringTaskWith({
         class_name: "JobWithoutArguments",
         schedule: "tomorrow",
       }).isValid(),
-    ).toBe(false);
+    ).toBeFalsy();
 
     let task = recurringTaskWith({
       class_name: "JobWithoutArguments",
       schedule: "every Thursday at 1 AM",
     });
-    expect(await task.isValid()).toBe(true);
-    expect(task.toString().endsWith("[ 0 1 * * 4 ]")).toBe(true);
+    expect(await task.isValid()).toBeTruthy();
+    expect(task.toString().endsWith("[ 0 1 * * 4 ]")).toBeTruthy();
 
     task = recurringTaskWith({ class_name: "JobWithoutArguments", schedule: "every month" });
-    expect(await task.isValid()).toBe(true);
-    expect(task.toString().endsWith("[ 0 0 1 * * ]")).toBe(true);
+    expect(await task.isValid()).toBeTruthy();
+    expect(task.toString().endsWith("[ 0 0 1 * * ]")).toBeTruthy();
 
     task = recurringTaskWith({ class_name: "JobWithoutArguments", schedule: "every second" });
-    expect(await task.isValid()).toBe(true);
-    expect(task.toString().endsWith("[ * * * * * * ]")).toBe(true);
+    expect(await task.isValid()).toBeTruthy();
+    expect(task.toString().endsWith("[ * * * * * * ]")).toBeTruthy();
 
     expect(
       await new RecurringTask({
         key: "task-id",
         class_name: "SolidQueue::RecurringTaskTest::JobWithoutArguments",
       }).isValid(),
-    ).toBe(false);
+    ).toBeFalsy();
   });
 
   it("valid and invalid job class and command", async () => {
-    expect(await recurringTaskWith({ command: "puts '¡hola!'" }).isValid()).toBe(true);
-    expect(await recurringTaskWith({ class_name: "JobWithPriority" }).isValid()).toBe(true);
+    expect(await recurringTaskWith({ command: "puts '¡hola!'" }).isValid()).toBeTruthy();
+    expect(await recurringTaskWith({ class_name: "JobWithPriority" }).isValid()).toBeTruthy();
 
-    expect(await recurringTaskWith({ class_name: "UnknownJob" }).isValid()).toBe(false);
+    expect(await recurringTaskWith({ class_name: "UnknownJob" }).isValid()).toBeFalsy();
 
-    expect(await recurringTaskWith({ key: "task-id", schedule: "every minute" }).isValid()).toBe(
-      false,
-    );
+    expect(
+      await recurringTaskWith({ key: "task-id", schedule: "every minute" }).isValid(),
+    ).toBeFalsy();
   });
 
   it("task with custom queue and priority", async () => {

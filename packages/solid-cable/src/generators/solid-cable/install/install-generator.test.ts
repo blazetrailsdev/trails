@@ -1,20 +1,28 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, it } from "vitest";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { TestCase } from "@blazetrails/trailties/generators/test-case";
+import { Dir } from "@blazetrails/ruby-compat";
 import { InstallGenerator } from "./install-generator.js";
 
+class InstallGeneratorTest extends TestCase {}
+InstallGeneratorTest.tests(InstallGenerator);
+InstallGeneratorTest.destination(Dir.mktmpdir());
+registerSpecType(/^SolidCable::InstallGeneratorTest$/, InstallGeneratorTest);
+
+let testCase: TestCase;
+
+beforeEach(async (context) => {
+  testCase = context.testCase as TestCase;
+  testCase.prepareDestination();
+  await testCase.runGenerator();
+});
+
 describe("SolidCable::InstallGeneratorTest", () => {
-  let destinationRoot: string;
-
-  beforeEach(async () => {
-    destinationRoot = Dir.mktmpdir();
-    await InstallGenerator.start([], { destinationRoot });
+  it("cable_schema exists", async () => {
+    await testCase.assertFile("db/cable_schema.ts");
   });
 
-  it("cable_schema exists", () => {
-    expect(File.isExist(File.join(destinationRoot, "db/cable_schema.ts"))).toBe(true);
-  });
-
-  it("cable.yml exists", () => {
-    expect(File.isExist(File.join(destinationRoot, "config/cable.ts"))).toBe(true);
+  it("cable.yml exists", async () => {
+    await testCase.assertFile("config/cable.ts");
   });
 });

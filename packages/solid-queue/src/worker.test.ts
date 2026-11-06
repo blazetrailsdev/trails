@@ -20,6 +20,13 @@ import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
+import {
+  assertMetadata,
+  sleep,
+  waitWhileWithTimeout,
+  waitForRegisteredProcesses,
+  assertNoRegisteredProcesses,
+} from "./test-helpers/processes-test-helper.js";
 
 class ExpectedTestError extends RuntimeError {}
 constSet(TopLevel, "ExpectedTestError", ExpectedTestError);
@@ -46,17 +53,6 @@ class ErrorBuffer {
   get messages(): string[] {
     return this.errors.map((error) => error[0].message);
   }
-}
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
-
-async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
-  const end = Date.now() + timeout * 1000;
-  while (Date.now() < end && (await block())) await sleep(0.05);
-}
-
-async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
-  await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
 }
 
 async function waitForJobsToFinishFor(timeout = 1) {
@@ -105,9 +101,7 @@ describe("WorkerTest", () => {
 
     const process = (await Process.first()) as Process;
     expect(process.kind).toBe("Worker");
-    expect(process.metadata.get("queues")).toBe("background");
-    expect(process.metadata.get("polling_interval")).toBe(0.2);
-    expect(process.metadata.get("thread_pool_size")).toBe(3);
+    assertMetadata(process, { queues: "background", polling_interval: 0.2, thread_pool_size: 3 });
   });
 
   it("errors on polling are passed to on_thread_error and re-raised", async () => {
@@ -116,9 +110,9 @@ describe("WorkerTest", () => {
       errors.push((error as Error).message);
     };
 
-    vi.spyOn(ReadyExecution, "claim").mockRejectedValue(
-      new ExpectedTestError("everything is broken"),
-    );
+    const claim = vi
+      .spyOn(ReadyExecution, "claim")
+      .mockRejectedValue(new ExpectedTestError("everything is broken"));
 
     await AddToBufferJob.performLater("hey!");
 
@@ -129,6 +123,7 @@ describe("WorkerTest", () => {
     await expect(worker.stop()).rejects.toThrow(ExpectedTestError);
 
     expect(errors).toEqual(["everything is broken"]);
+    expect(claim).toHaveBeenCalled();
   });
 
   it("errors on claimed executions are reported via Rails error subscriber", async () => {
@@ -240,7 +235,7 @@ describe("WorkerTest", () => {
 
     await worker.stop();
     await waitForRegisteredProcesses(0, { timeout: 1 });
-    expect(await Process.isNone()).toBe(true);
+    await assertNoRegisteredProcesses();
   });
 
   it("run inline", async () => {
@@ -267,7 +262,7 @@ describe("WorkerTest", () => {
       await worker.start();
       await waitForRegisteredProcesses(1, { timeout: 1 });
 
-      expect(worker.pool.isShutdown()).toBe(false);
+      expect(worker.pool.isShutdown()).toBeFalsy();
 
       const process = (await Process.first()) as Process;
       expect(process.kind).toBe("Worker");
@@ -275,7 +270,7 @@ describe("WorkerTest", () => {
       await process.deregister();
 
       await waitWhileWithTimeout(2, async () => !worker.pool.isShutdown());
-      expect(worker.pool.isShutdown()).toBe(true);
+      expect(worker.pool.isShutdown()).toBeTruthy();
     } finally {
       SolidQueue.processHeartbeatInterval = oldHeartbeatInterval;
     }
