@@ -57,7 +57,10 @@ interface Fork {
 let _adapter: AsyncContextAdapter | null = null;
 let _forks: AsyncContext<Fork> | null = null;
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 function forks(): AsyncContext<Fork> {
   const adapter = getAsyncContext();
   if (!_forks || _adapter !== adapter) {
@@ -67,7 +70,10 @@ function forks(): AsyncContext<Fork> {
   return _forks;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 function forkedState(key: IsolatedKey): Store {
   const context = IsolatedExecutionState.context();
   for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
