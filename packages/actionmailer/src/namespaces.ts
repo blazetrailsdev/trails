@@ -43,7 +43,7 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule & {
-  Base: typeof Base & { logger: Logger | null };
+  Base: typeof Base & { logger: Logger | null; descendants: (typeof Base)[] };
   MessageDelivery: typeof MessageDelivery;
   MailDeliveryJob: typeof MailDeliveryJob;
   Parameterized: typeof Parameterized;

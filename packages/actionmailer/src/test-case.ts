@@ -13,7 +13,7 @@ import * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assert
 import * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";
 import { Encodings, Mail, type Message } from "@blazetrails/mail";
 import { File, IO, StandardError, TopLevel, include, rbModName } from "@blazetrails/ruby-compat";
-import { Base } from "./base.js";
+import type { Base } from "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
 import "./constants.test-case.generated.js";
