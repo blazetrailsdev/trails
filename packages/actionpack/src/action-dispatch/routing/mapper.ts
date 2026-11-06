@@ -8,7 +8,7 @@ import { Parser } from "../journey/parser.js";
 import { Ast, type Node } from "../journey/nodes/node.js";
 import { Pattern } from "../journey/path/pattern.js";
 import { Route as JourneyRoute, type VerbMatcher } from "../journey/route.js";
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   BacktraceCleaner as ActiveSupportBacktraceCleaner,
   camelize,
@@ -49,6 +49,9 @@ import {
   rbIterBreakValue,
   rbBlockGivenP,
   type Block,
+  rbProcCall,
+  rbObjIsProc,
+  rbObjMethod,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -345,7 +348,8 @@ export class Constraints extends Endpoint {
 
   static readonly SERVE: ConstraintsStrategy = (app, req) =>
     (app as { serve(req: ConstraintsRequest): unknown }).serve(req);
-  static readonly CALL: ConstraintsStrategy = (app, req) => callableOf(app).call(app, req.env);
+  static readonly CALL: ConstraintsStrategy = (app, req) =>
+    rbProcCall(app as RackApp | { call: RackApp }, req.env);
 
   private readonly _strategy: ConstraintsStrategy;
   private readonly _app: unknown;
@@ -374,10 +378,7 @@ export class Constraints extends Endpoint {
         if (matched != null && matched !== false) return true;
       }
       if (rbObjRespondTo(constraint, "call")) {
-        const called = callableOf(constraint).apply(
-          constraint,
-          this.constraintArgs(constraint, req),
-        );
+        const called = rbProcCall(constraint, ...this.constraintArgs(constraint, req));
         if (called != null && called !== false) return true;
       }
       return false;
@@ -396,7 +397,9 @@ export class Constraints extends Endpoint {
   private constraintArgs(constraint: ConstraintLike, request: Request): unknown[] {
     const arity = rbObjRespondTo(constraint, "arity")
       ? constraint.arity!
-      : callableOf(constraint).length;
+      : rbObjIsProc(constraint)
+        ? constraint.length
+        : rbObjMethod(constraint, "call").arity();
 
     if (arity < 1) {
       return [];
@@ -413,14 +416,6 @@ interface ConstraintLike {
   arity?: number;
   matches?: (req: Request) => unknown;
   call?: (...args: unknown[]) => unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-function callableOf(target: unknown): (...args: unknown[]) => unknown {
-  return typeof target === "function" &&
-    Object.getOwnPropertyDescriptor(target, "prototype")?.writable !== false
-    ? (target as (...args: unknown[]) => unknown)
-    : (target as { call: (...args: unknown[]) => unknown }).call;
 }
 
 /** @internal */
@@ -1453,7 +1448,7 @@ export class Mapper {
     for (const name of args.flat(Infinity) as string[]) {
       const concern = this._concerns.get(name);
       if (concern != null) {
-        callableOf(concern).call(concern, this, options);
+        rbProcCall(concern, this, options);
       } else {
         throw new ArgumentError(`No concern named ${name} was found!`);
       }

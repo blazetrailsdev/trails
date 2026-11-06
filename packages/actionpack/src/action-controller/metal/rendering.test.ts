@@ -91,8 +91,8 @@ describe("_processVariant", () => {
     const request = (variant: unknown) => ({
       request: { variant, shouldApplyVaryHeader: () => true },
     });
-    _processVariant.call(request(Symbol.for("mobile")), opts);
-    expect(opts.variant).toBe(Symbol.for("mobile"));
+    _processVariant.call(request(":mobile"), opts);
+    expect(opts.variant).toBe(":mobile");
 
     const opts2: Record<string, unknown> = {};
     _processVariant.call(request(undefined), opts2);

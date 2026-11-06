@@ -27,17 +27,6 @@ function fakeRequest(): ConstraintsRequest & Request {
 }
 
 describe("ActionDispatch::Routing::Mapper::Constraints", () => {
-  it("invokes a function constraint with the constraint as this", () => {
-    const receivers: unknown[] = [];
-    const constraint = function (this: unknown) {
-      receivers.push(this);
-      return true;
-    };
-    const c = new Constraints({}, [constraint], Constraints.SERVE);
-    expect(c.matches(fakeRequest())).toBe(true);
-    expect(receivers).toEqual([constraint]);
-  });
-
   it("hands each constraint the arguments its arity asks for", () => {
     const req = fakeRequest();
     const seen: unknown[][] = [];

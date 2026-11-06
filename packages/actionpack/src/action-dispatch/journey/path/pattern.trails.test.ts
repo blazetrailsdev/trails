@@ -18,7 +18,7 @@ function buildPath(
 }
 
 describe("ActionDispatch::Journey::Path::Pattern — anchored to_regexp", () => {
-  const x = ".+";
+  const x = "(?-ims:.+)";
   const cases: Array<[string, string]> = [
     ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?$`],
     ["/:controller/foo", `^/(${x})/foo$`],
@@ -41,7 +41,7 @@ describe("ActionDispatch::Journey::Path::Pattern — anchored to_regexp", () => 
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — unanchored to_regexp", () => {
-  const x = ".+";
+  const x = "(?-ims:.+)";
   const cases: Array<[string, string]> = [
     ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?(?:\\b|$|/)`],
     ["/:controller/foo", `^/(${x})/foo(?:\\b|$|/)`],
