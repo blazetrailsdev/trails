@@ -22,18 +22,20 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["two expects"]).toBe(2);
   });
 
-  it("counts a receiver-form x.expect(...) as the Ruby extractor does", () => {
+  it("counts a receiver-form x.expect(...) only as Minitest::Mock#expect, as the Ruby extractor does", () => {
     const src = `
       it("receiver expect", () => {
         const name = params.expect({ person: "name" }).expect("name");
         params.expectBang("id");
+        params.expect("a", "b");
+        mock.expect("call", null, [1]);
         assertEqual("David", name);
         expect(name).toBe("David");
       });
     `;
     const info = extractTestsFromSource(src, "packages/actionpack/src/x.test.ts");
-    expect(info.testCases[0].assertionCount).toBe(4);
-    expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
+    expect(info.testCases[0].assertionCount).toBe(3);
+    expect(info.testCases[0].assertionKinds).toEqual(["expect", "assertEqual", "toBe"]);
   });
 
   it("reads a two-argument mustBe / wontBe as assertPredicate / refutePredicate", () => {

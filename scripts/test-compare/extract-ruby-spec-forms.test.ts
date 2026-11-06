@@ -99,3 +99,38 @@ describe("Ruby extractor loop-member floats", () => {
     expect(Object.keys(cases)).toEqual(['turns numeric "1001.05" into ISO "PT1001.05S"']);
   });
 });
+
+describe("Ruby extractor receiver expect", () => {
+  const cases = rubyTestCases(`
+    describe Foo do
+      it "receiverless" do
+        expect(x).to eq(1)
+      end
+
+      it "mock" do
+        mock.expect(:call, nil)
+        mock.expect :new, mock, [1]
+      end
+
+      it "receiver" do
+        params.expect(person: [:name])
+        @params.expect(:person)
+        params.expect(:a, :b)
+        assert_equal 1, x
+      end
+    end
+  `);
+
+  it("counts a receiver-less expect", () => {
+    expect(cases["receiverless"].count).toBe(1);
+  });
+
+  it("counts a Minitest::Mock#expect", () => {
+    expect(cases["mock"].count).toBe(2);
+  });
+
+  it("does not count Parameters#expect", () => {
+    expect(cases["receiver"].count).toBe(1);
+    expect(cases["receiver"].kinds).toEqual(["assert_equal"]);
+  });
+});
