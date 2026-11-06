@@ -30,6 +30,7 @@ let _lookupPaths: URL[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
 let _fallbacks: Record<string, unknown> | undefined;
+let _templatesPath: string[] | undefined;
 let _afterGenerateCallbacks: AfterGenerateCallback[] | undefined;
 let _generatedFiles: string[] | undefined;
 
@@ -90,8 +91,14 @@ export class Generators {
     deepMergeBang(Generators.aliases(), config.aliases as never);
     deepMergeBang(Generators.options(), config.options as never);
     Object.assign(Generators.fallbacks(), config.fallbacks);
+    Generators.templatesPath().push(...config.templates);
+    Generators.templatesPath().splice(0, Infinity, ...new Set(Generators.templatesPath()));
     Generators.hideNamespaces(...config.hiddenNamespaces);
     Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
+  }
+
+  static templatesPath(): string[] {
+    return (_templatesPath ??= []);
   }
 
   static aliases(): Record<string, Record<string, unknown>> {
