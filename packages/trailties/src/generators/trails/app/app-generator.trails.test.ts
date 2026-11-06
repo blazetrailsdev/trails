@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import { ActionMethods } from "./app-generator.js";
 
 describe("prototype-chain method_missing", () => {
@@ -16,5 +17,12 @@ describe("prototype-chain method_missing", () => {
     expect((sub as unknown as { gemfileEntries(): string[] }).gemfileEntries()).toEqual(["trails"]);
     expect(sub instanceof ActionMethods).toBe(true);
     expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});
+
+describe("ActionMethods included into a module", () => {
+  it("does not splice a prototype into a plain-object module", () => {
+    const mod = {};
+    expect(() => include(mod, ActionMethods)).not.toThrow();
   });
 });

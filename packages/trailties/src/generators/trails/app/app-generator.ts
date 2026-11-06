@@ -140,9 +140,8 @@ Object.setPrototypeOf(
   ),
 );
 
-(ActionMethods as unknown as Record<symbol, unknown>)[included] = (base: {
-  prototype: object;
-}): void => {
+(ActionMethods as unknown as Record<symbol, unknown>)[included] = (base: object): void => {
+  if (typeof base !== "function") return;
   if (base.prototype instanceof ActionMethods || spliced.has(base.prototype)) return;
   spliced.add(base.prototype);
   Object.setPrototypeOf(
