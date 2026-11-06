@@ -514,24 +514,8 @@ export class CommandRecorder {
     return _joinTableName(table1, table2);
   }
 
-  /** @internal */
   respondToMissing(method: string, _includePrivate = false): boolean {
     return !method.startsWith("_") && rbObjRespondTo(this.delegate, method);
-  }
-
-  /** @internal */
-  methodMissing(method: string, ...args: unknown[]): unknown {
-    if (this.respondToMissing(method)) {
-      return rbFSend(this.delegate, method, ...args);
-    } else {
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
-        method,
-        args,
-        false,
-        { receiver: this },
-      );
-    }
   }
 }
 
@@ -554,7 +538,15 @@ Object.setPrototypeOf(
         return typeof member === "function" ? member.bind(delegate) : member;
       }
       if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return value;
-      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      return (...args: unknown[]) => {
+        throw new NoMethodError(
+          `undefined method '${prop}' for an instance of ${receiver.constructor.name}`,
+          prop,
+          args,
+          false,
+          { receiver },
+        );
+      };
     },
   }),
 );

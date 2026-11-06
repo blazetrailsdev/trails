@@ -1,6 +1,6 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { File, Hash, hashDelete, rbFSystem } from "@blazetrails/ruby-compat";
+import { File, Hash, hashAset, hashDelete, rbFSystem } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 type MiddlewareOperation = (middleware: any) => void;
@@ -85,14 +85,6 @@ export type GeneratorsConfigHash = Hash<unknown, Record<string, unknown>>;
 
 export type AfterGenerateCallback = (files: string[]) => void | Promise<void>;
 
-function namespaceHash(): GeneratorsConfigHash {
-  return new Hash<unknown, Record<string, unknown>>((h, k) => {
-    const value: Record<string, unknown> = {};
-    h.set(k, value);
-    return value;
-  });
-}
-
 export class Generators {
   aliases: GeneratorsConfigHash;
   options: GeneratorsConfigHash;
@@ -112,8 +104,12 @@ export class Generators {
   }
 
   constructor() {
-    this.aliases = namespaceHash();
-    this.options = namespaceHash();
+    this.aliases = new Hash<unknown, Record<string, unknown>>((h, k) =>
+      hashAset(h, k, {}),
+    ) as GeneratorsConfigHash;
+    this.options = new Hash<unknown, Record<string, unknown>>((h, k) =>
+      hashAset(h, k, {}),
+    ) as GeneratorsConfigHash;
     this.fallbacks = {};
     this.templates = [];
     this.colorizeLogging = true;

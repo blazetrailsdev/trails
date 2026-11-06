@@ -145,7 +145,7 @@ export class Image {
   ) {
     this._path = String(inputPath);
     this._tempfile = tempfile;
-    this._info = new Info(this._path);
+    this._info = new Info(this.path);
     if (block != null) {
       (this._info._pending = this.combineOptions(block)).catch(() => {});
     }
