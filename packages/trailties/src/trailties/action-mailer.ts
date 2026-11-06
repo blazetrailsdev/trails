@@ -1,5 +1,4 @@
 import "./active-job.js";
-import "../mailers-controller.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { AbstractController } from "@blazetrails/actionpack";
 import type { Base } from "@blazetrails/actionmailer";
@@ -37,6 +36,7 @@ type MailerClass = typeof Base & {
   logger?: unknown;
 };
 
+/** @inventedArm import — PERMANENT */
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -126,6 +126,11 @@ export class Trailtie extends BaseTrailtie {
           (this.config as { compileMethods(): void }).compileMethods();
         }
       });
+    });
+
+    this.initializer("action_mailer.base", { after: "make_routes_lazy" }, async () => {
+      await import("@blazetrails/actionmailer");
+      await import("../mailers-controller.js");
     });
 
     this.config.afterInitialize((app) => {

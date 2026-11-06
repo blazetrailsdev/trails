@@ -12,4 +12,17 @@ describe("ActionMailer::Railtie load order", () => {
     const { ActionMailer } = await import("@blazetrails/actionmailer");
     expect(loaded).toEqual([ActionMailer.Base]);
   });
+
+  it("loads ActionMailer::Base at boot once routes are lazy", async () => {
+    await import("./action-mailer.js");
+    const { Application } = await import("../application.js");
+    class MailerBootApp extends Application {}
+    Application.register(MailerBootApp);
+    const names = MailerBootApp.instance()
+      .initializers.tsort()
+      .map((i) => i.name);
+
+    expect(names.indexOf("action_mailer.base")).toBeGreaterThan(names.indexOf("make_routes_lazy"));
+    expect(names.indexOf("make_routes_lazy")).toBeGreaterThan(-1);
+  });
 });

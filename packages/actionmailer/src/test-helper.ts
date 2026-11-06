@@ -106,7 +106,7 @@ export const TestHelper = {
   deliveryJobFilter(this: TestHelper, job: unknown): boolean {
     const jobClass = isPlainHash(job) ? fetch(job, "job") : rbObjClass(job);
 
-    return [ActionMailer.Base, ...ActionMailer.Base.descendants]
+    return ActionMailer.Base.descendants
       .map((klass) => klass.deliveryJob)
       .includes(jobClass as typeof Base.deliveryJob);
   },
