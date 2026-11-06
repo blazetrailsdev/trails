@@ -1487,7 +1487,7 @@ describe("CI runs every tooling test suite", () => {
         (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
       ).toBe("");
       expect(
-        (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts"))
+        (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/src/b.ts"))
           .sqlite_only,
       ).toBe("false");
       expect(

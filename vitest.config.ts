@@ -374,8 +374,8 @@ const alias = {
     "packages/trailties/src/trailtie/configuration.ts",
   ),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
-  "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
-  "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
+  "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/lib") + "/",
+  "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/lib/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
   "@blazetrails/vitest-matchers/setup": path.resolve(
     __dirname,
@@ -444,7 +444,7 @@ const COVERAGE_INCLUDE = AR_COVERAGE
     ? ["packages/activerecord-cli/src/**/*.ts", "packages/activerecord-cli/src/**/*.mts"]
     : TRAILS_TSC_COVERAGE
       ? ["packages/trails-tsc/src/**/*.ts", "packages/trails-tsc/src/**/*.mts"]
-      : ["packages/*/src/**/*.ts", "packages/*/src/**/*.mts"];
+      : ["packages/*/{src,lib}/**/*.ts", "packages/*/{src,lib}/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
   "**/*.test.mts",
@@ -651,6 +651,7 @@ export default defineConfig({
           globals: true,
           include: [
             "packages/*/src/**/*.test.ts",
+            "packages/*/test/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",

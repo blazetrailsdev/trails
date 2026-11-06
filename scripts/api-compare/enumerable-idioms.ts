@@ -86,7 +86,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
 
 /**
  * Ruby `File` class methods whose faithful port goes through trails' fs adapter
- * (`ruby-compat/src/fs-adapter.ts`), whose members carry NODE's spellings —
+ * (`ruby-compat/lib/fs-adapter.ts`), whose members carry NODE's spellings —
  * `File.exist?` is `getFs().existsSync`, `File.stat` is `statSync`, and so on.
  * Ruby's name is not available: the adapter is the Node `fs` surface, so the
  * port cannot spell the call `exist` without inventing a wrapper Rails does not
@@ -105,7 +105,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365,1328`).
  *
  * The `File` predicates' rows name ruby-compat's async statics
- * (`packages/ruby-compat/src/file.ts`), for the bodies that use async fs only:
+ * (`packages/ruby-compat/lib/file.ts`), for the bodies that use async fs only:
  * `File.directory?` in `Thor::Actions::Directory#execute!`
  * (`vendor/thor/v1.3.2/lib/thor/actions/directory.rb:82`) is
  * `File.isDirectoryAsync`.

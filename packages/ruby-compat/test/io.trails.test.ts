@@ -1,0 +1,514 @@
+import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Encoding } from "../lib/encoding.js";
+import { File } from "../lib/file.js";
+import { IO, STDOUT, printf, puts } from "../lib/io.js";
+import { InvalidByteSequenceError } from "../lib/invalid-byte-sequence-error.js";
+import { stderr, stdout } from "../lib/process-adapter.js";
+import { b } from "../lib/string/b.js";
+import { ArgumentError } from "../lib/argument-error.js";
+import { EOFError } from "../lib/eof-error.js";
+import { IOError } from "../lib/io-error.js";
+
+describe("IO", () => {
+  it("binwrite writes the string and answers its byte count", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "secret.enc");
+    expect(IO.binwrite(path, "abc def")).toBe(7);
+    expect(readFileSync(path, "utf-8")).toBe("abc def");
+  });
+
+  it("binread answers one character per byte, and binwrite writes them back", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes.bin");
+    writeFileSync(path, "héllo 日本");
+    const bytes = IO.binread(path);
+    expect(bytes.length).toBe(statSync(path).size);
+    expect(bytes).not.toBe("héllo 日本");
+
+    const copy = join(mkdtempSync(join(tmpdir(), "trails-io-")), "copy.bin");
+    expect(IO.binwrite(copy, bytes)).toBe(bytes.length);
+    expect(IO.binread(copy)).toEqual(bytes);
+    expect(readFileSync(copy, "utf-8")).toBe("héllo 日本");
+  });
+
+  it("seek moves relative to the current position and the end under SEEK_CUR and SEEK_END", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "s.txt");
+    writeFileSync(path, "abcdef");
+    File.open(path, "r", (f) => {
+      f.seek(1);
+      f.seek(2, IO.SEEK_CUR);
+      expect(f.pos).toBe(3);
+      f.seek(-2, IO.SEEK_END);
+      expect(f.pos).toBe(4);
+    });
+  });
+
+  it("readline stops at the given separator", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "r.txt");
+    writeFileSync(path, "a;b\nc");
+    File.open(path, "r", (f) => {
+      expect(f.readline(";")).toBe("a;");
+      expect(f.readline("\n")).toBe("b\n");
+      expect(f.readline()).toBe("c");
+    });
+  });
+
+  it("pread reads at an offset without moving the position, and raises at EOF", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "t.txt");
+    writeFileSync(path, "First line\nSecond line\n");
+    File.open(path, "r", (f) => {
+      expect(new TextDecoder().decode(f.pread(8, 8))).toBe("ne\nSecon");
+      expect(f.gets()).toBe("First line\n");
+      expect(() => f.pread(4, 100)).toThrow("end of file reached");
+    });
+    const closed = File.open(path, "r");
+    closed.close();
+    expect(() => closed.pread(4, 0)).toThrow("closed stream");
+  });
+
+  it("readlines answers every line, each keeping its separator", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "a.rb");
+    writeFileSync(path, "one\ntwo\n");
+    expect(IO.readlines(path)).toEqual(["one\n", "two\n"]);
+  });
+
+  it("read answers nil rather than an empty String once the stream is at EOF", () => {
+    // vendor/ruby/v3.3.11/io.c:3774 — a positive length past the end is nil.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes");
+    writeFileSync(path, "abcdef");
+    File.open(path, "rb", (file) => {
+      expect(file.seek(2)).toBe(0);
+      expect(file.read(3)).toEqual(b("cde"));
+      expect(file.read(3)).toEqual(b("f"));
+      expect(file.read(3)).toBe(null);
+    });
+  });
+
+  it("read fills the str buffer it is handed, and empties it at EOF", () => {
+    // vendor/ruby/v3.3.11/io.c:3778 — `read(length, str)` fills str; io.c:3800 resizes
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "buffered");
+    writeFileSync(path, "abcdef");
+    const str = new Uint8Array(3);
+    File.open(path, "rb", (file) => {
+      expect(file.read(3, str)).toEqual(b("abc"));
+      expect([...str]).toEqual([0x61, 0x62, 0x63]);
+      expect(file.read(null, str)).toEqual(b("def"));
+      expect([...str]).toEqual([0x64, 0x65, 0x66]);
+      expect(file.read(3, str)).toBe(null);
+      expect([...str]).toEqual([0, 0, 0]);
+    });
+  });
+
+  it("puts is one body, mixed into any receiver carrying a write", () => {
+    const written: string[] = [];
+    const out = { write: (string: string) => written.push(string) };
+    expect(puts.call(out, "a", ["b", ["c"]], 1)).toBe(null);
+    expect(written.join("")).toBe("a\nb\nc\n1\n");
+  });
+
+  it("read answers the external encoding, and ASCII-8BIT when given a length", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "utf8.txt");
+    const file = File.open(path, "w+");
+    expect(file.write("héllo")).toBe(6);
+    file.rewind();
+    expect(file.read()).toBe("héllo");
+    file.rewind();
+    expect(file.read(3)).toEqual(b("hé"));
+    file.close();
+  });
+
+  it("read keeps the bytes on a binary stream, and write sends them unchanged", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bin.dat");
+    const file = File.open(path, "w+");
+    file.binmode();
+    expect(file.write("héllo")).toBe(6);
+    file.rewind();
+    expect(file.read()).toEqual(b("héllo"));
+    file.close();
+    expect(File.binread(path)).toEqual(b("héllo"));
+  });
+
+  it("write sends a Uint8Array's bytes unchanged, whatever the stream's encoding", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes.dat");
+    const file = File.open(path, "w:UTF-8");
+    expect(file.write(new Uint8Array([0x68, 0xc3, 0xa9, 0xff]))).toBe(4);
+    file.close();
+    expect(File.binread(path)).toEqual(Uint8Array.of(0x68, 0xc3, 0xa9, 0xff));
+  });
+
+  it("read answers the mode string's external encoding, and write transcodes to it", () => {
+    // vendor/ruby/v3.3.11/io.c:6883-6886 — everything after the mode's `:` is the encoding.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "latin1.txt");
+    writeFileSync(path, Uint8Array.from([0x68, 0xe9, 0x6c]));
+    File.open(path, "r:ISO-8859-1", (file) => {
+      expect(file.externalEncoding()).toBe(Encoding.find("ISO-8859-1"));
+      expect(file.read()).toBe("hél");
+    });
+    const binary = File.open(path, "r", { externalEncoding: "ASCII-8BIT" });
+    expect(binary.read()).toEqual(Uint8Array.of(0x68, 0xe9, 0x6c));
+    binary.close();
+  });
+
+  it("write raises rather than sending the bytes of an encoding the stream did not ask for", () => {
+    // vendor/ruby/v3.3.11/io.c:1904 do_writeconv — TextEncoder produces UTF-8 and nothing else.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "conv.txt");
+    const file = File.open(path, "w:ISO-8859-1");
+    expect(() => file.write("hél")).toThrow("code converter not found (UTF-8 to ISO-8859-1)");
+    file.close();
+  });
+
+  it("read decodes the UTF-32 seats, and raises rather than leaking TextDecoder's RangeError", () => {
+    // vendor/ruby/v3.3.11/transcode.c:2097 rb_econv_open_exc — a converter this platform lacks.
+    const dir = mkdtempSync(join(tmpdir(), "trails-io-"));
+    const utf32le = join(dir, "u32le.bin");
+    writeFileSync(
+      utf32le,
+      Uint8Array.from([0x68, 0, 0, 0, 0xe9, 0, 0, 0, 0x6c, 0, 0, 0, 0x6c, 0, 0, 0, 0x6f, 0, 0, 0]),
+    );
+    File.open(utf32le, "rb:UTF-32LE", (file) => {
+      expect(file.read()).toBe("héllo");
+    });
+
+    const utf32be = join(dir, "u32be.bin");
+    writeFileSync(utf32be, Uint8Array.from([0, 0, 0, 0x68, 0, 0, 0, 0xe9, 0, 0, 0, 0x6c]));
+    File.open(utf32be, "rb:UTF-32BE", (file) => {
+      expect(file.read()).toBe("hél");
+    });
+
+    const bad = join(dir, "u32bad.bin");
+    writeFileSync(bad, Uint8Array.from([0x68, 0, 0, 0, 0, 0, 0x11, 0]));
+    File.open(bad, "rb:UTF-32LE", (file) => {
+      expect(file.read()).toBe("h\ufffd");
+    });
+
+    const euctw = join(dir, "euctw.bin");
+    writeFileSync(euctw, Uint8Array.from([0xa1, 0xa1]));
+    File.open(euctw, "rb:EUC-TW", (file) => {
+      expect(() => file.read()).toThrow("code converter not found (EUC-TW to UTF-8)");
+    });
+  });
+
+  it("read dispatches the UTF-16 and UTF-32 dummy seats on the BOM", () => {
+    // vendor/ruby/v3.3.11/enc/trans/utf_16_32.trans:278,327 fun_si_from_utf_16 / fun_si_from_utf_32.
+    const dir = mkdtempSync(join(tmpdir(), "trails-io-"));
+    const cases: [string, string, number[]][] = [
+      ["u16be.bin", "UTF-16", [0xfe, 0xff, 0, 0x68, 0, 0x69]],
+      ["u16le.bin", "UTF-16", [0xff, 0xfe, 0x68, 0, 0x69, 0]],
+      ["u32be.bin", "UTF-32", [0, 0, 0xfe, 0xff, 0, 0, 0, 0x68, 0, 0, 0, 0x69]],
+      ["u32le.bin", "UTF-32", [0xff, 0xfe, 0, 0, 0x68, 0, 0, 0, 0x69, 0, 0, 0]],
+    ];
+    for (const [name, encoding, bytes] of cases) {
+      const path = join(dir, name);
+      writeFileSync(path, Uint8Array.from(bytes));
+      File.open(path, `rb:${encoding}`, (file) => {
+        expect(file.read()).toBe(String.fromCharCode(...bytes));
+      });
+    }
+    const rawNobom = join(dir, "raw-nobom.bin");
+    writeFileSync(rawNobom, Uint8Array.from([0, 0x68, 0, 0x69]));
+    for (const encoding of ["UTF-16", "UTF-32"]) {
+      File.open(rawNobom, `rb:${encoding}`, (file) => {
+        expect(file.read()).toBe("\x00h\x00i");
+      });
+    }
+
+    const previousInternal = Encoding.defaultInternal;
+    Encoding.defaultInternal = "UTF-8";
+    try {
+      for (const [name, encoding] of cases) {
+        File.open(join(dir, name), `rb:${encoding}`, (file) => {
+          expect(file.read()).toBe("hi");
+        });
+      }
+
+      const partial16 = join(dir, "partial16.bin");
+      writeFileSync(partial16, Uint8Array.from([0xfe, 0xff, 0x68]));
+      File.open(partial16, "rb:UTF-16", (file) => {
+        let error: unknown;
+        try {
+          file.read();
+        } catch (e) {
+          error = e;
+        }
+        const invalid = error as InvalidByteSequenceError;
+        expect(invalid.message).toBe('incomplete "h" on UTF-16');
+        expect(invalid.errorBytes()).toBe("h");
+        expect(invalid.isIncompleteInput()).toBe(true);
+      });
+      const partial32 = join(dir, "partial32.bin");
+      writeFileSync(partial32, Uint8Array.from([0, 0, 0xfe, 0xff, 0, 0, 0, 0x68, 0]));
+      File.open(partial32, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-32');
+      });
+      const nobom = join(dir, "nobom.bin");
+      writeFileSync(nobom, Uint8Array.from([0, 0x68, 0, 0x69]));
+      File.open(nobom, "rb:UTF-16", (file) => {
+        let error: unknown;
+        try {
+          file.read();
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(InvalidByteSequenceError);
+        const invalid = error as InvalidByteSequenceError;
+        expect(invalid.message).toBe('"\\x00h" on UTF-16');
+        expect(invalid.errorBytes()).toBe("\x00h");
+        expect(invalid.readagainBytes()).toBeNull();
+        expect(invalid.isIncompleteInput()).toBe(false);
+        expect(invalid.sourceEncodingName()).toBe("UTF-16");
+        expect(invalid.destinationEncodingName()).toBe("UTF-8");
+      });
+      File.open(nobom, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('"\\x00h\\x00i" on UTF-32');
+      });
+
+      const one = join(dir, "one.bin");
+      writeFileSync(one, Uint8Array.from([0]));
+      File.open(one, "rb:UTF-16", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-16');
+      });
+      File.open(one, "rb:UTF-32", (file) => {
+        expect(() => file.read()).toThrow('incomplete "\\x00" on UTF-32');
+      });
+
+      const empty = join(dir, "empty.bin");
+      writeFileSync(empty, Uint8Array.from([]));
+      for (const encoding of ["UTF-16", "UTF-32"]) {
+        File.open(empty, `rb:${encoding}`, (file) => {
+          expect(file.read()).toBe("");
+        });
+      }
+    } finally {
+      Encoding.defaultInternal = previousInternal;
+    }
+  });
+
+  it("read falls back to Encoding.default_external where the stream carries none", () => {
+    // vendor/ruby/v3.3.11/io.c:1010 io_read_encoding.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "default.txt");
+    writeFileSync(path, "héllo");
+    const file = File.open(path, "r");
+    expect(file.externalEncoding()).toBe(Encoding.defaultExternal);
+    expect(file.read()).toBe("héllo");
+    file.close();
+  });
+
+  it("set_encoding parses a one-argument 'enc2:enc' the way a mode string's encoding half is", () => {
+    // vendor/ruby/v3.3.11/io.c:11704-11707 io_encoding_set routes a String through parse_mode_enc.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "pair.txt");
+    writeFileSync(path, "hi");
+    const cases: [string, string | null, string | null][] = [
+      ["UTF-8:EUC-JP", "UTF-8", "EUC-JP"],
+      ["UTF-8:-", "UTF-8", null],
+      ["UTF-8:UTF-8", "UTF-8", null],
+      ["EUC-JP", "EUC-JP", null],
+      ["BINARY:EUC-JP", "ASCII-8BIT", null],
+    ];
+    for (const [argument, external, internal] of cases) {
+      const file = File.open(path, "r");
+      file.setEncoding(argument);
+      expect([
+        argument,
+        file.externalEncoding()?.name ?? null,
+        file.internalEncoding()?.name ?? null,
+      ]).toEqual([argument, external, internal]);
+      file.close();
+    }
+  });
+
+  it("a bom| mode prefix opens under the encoding it names", () => {
+    // vendor/ruby/v3.3.11/io.c:6480-6483, 6671-6681
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    File.open(path, "r:bom|utf-8", (file) => {
+      expect(file.externalEncoding()).toBe(Encoding.find("UTF-8"));
+    });
+  });
+
+  it("a bom| mode strips a UTF-8 byte order mark before the read", () => {
+    // vendor/ruby/v3.3.11/io.c:7085-7163, 7196
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, Uint8Array.from([0xef, 0xbb, 0xbf, 0x68, 0x69]));
+    File.open(path, "r:bom|utf-8", (file) => {
+      expect(file.read()).toBe("hi");
+    });
+  });
+
+  it("a bom| mode on a file with no mark clears the external half of the pair", () => {
+    // vendor/ruby/v3.3.11/io.c:7161 — ruby 3.3 answers EUC-JP and nil.
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    File.open(path, "r:bom|utf-8:euc-jp", (file) => {
+      expect(file.externalEncoding()).toBe(Encoding.find("EUC-JP"));
+      expect(file.internalEncoding()).toBeNull();
+      expect(file.read()).toBe("hi");
+    });
+  });
+
+  it("a bom| prefix on a non-UTF encoding warns and keeps that encoding", () => {
+    // vendor/ruby/v3.3.11/io.c:6678 — rb_enc_warn "BOM with non-UTF encoding %s is nonsense".
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bom.txt");
+    writeFileSync(path, "hi");
+    const write = vi.spyOn(stderr, "write").mockReturnValue(true);
+    try {
+      File.open(path, "r:bom|euc-jp", (file) => {
+        expect(file.externalEncoding()).toBe(Encoding.find("EUC-JP"));
+      });
+      expect(write).toHaveBeenCalledWith("BOM with non-UTF encoding euc-jp is nonsense\n");
+    } finally {
+      write.mockRestore();
+    }
+  });
+
+  it("set_encoding('internal') leaves no external encoding while default_internal is unset", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "enc.txt");
+    const file = File.open(path, "w+");
+    expect(file.setEncoding("internal").externalEncoding()).toBeNull();
+    expect(file.setEncoding("external").externalEncoding()).toBe(Encoding.defaultExternal);
+    file.close();
+  });
+});
+
+describe("STDOUT", () => {
+  it("is an IO answering write / puts / print over the process adapter's stdout", () => {
+    const write = vi.spyOn(stdout, "write").mockReturnValue(true);
+    try {
+      expect(STDOUT).toBeInstanceOf(IO);
+      expect(STDOUT.path()).toBe("<STDOUT>");
+      expect(STDOUT.write("héllo")).toBe(6);
+      STDOUT.puts("a", ["b"]);
+      STDOUT.print(1, null);
+      expect(write.mock.calls.map(([chunk]) => chunk).join("")).toBe("hélloa\nb\n1");
+    } finally {
+      write.mockRestore();
+    }
+  });
+});
+
+describe("IO#tty?", () => {
+  it("answers whether the standard stream is a terminal", () => {
+    const isTTY = vi
+      .spyOn(stdout, "isTTY", "get")
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+    try {
+      expect(STDOUT.isTty()).toBe(true);
+      expect(STDOUT.isTty()).toBe(false);
+    } finally {
+      isTTY.mockRestore();
+    }
+  });
+});
+
+describe("printf", () => {
+  it("writes the formatted String to the receiver and answers nil", () => {
+    const written: string[] = [];
+    const io = { write: (string: string) => written.push(string) };
+    expect(printf.call(io, "%-5s|%3d", "é", 7)).toBeNull();
+    expect(written).toEqual(["é    |  7"]);
+  });
+});
+
+describe("TestIO", () => {
+  const text = (bytes: unknown) => new TextDecoder().decode(bytes as Uint8Array);
+
+  it("test_write_nonblock", () => {
+    const [r, w] = IO.pipe();
+    w.writeNonblock(1);
+    w.close();
+    expect(text(r.read())).toBe("1");
+  });
+
+  it("test_read_nonblock_with_not_empty_buffer", () => {
+    const [r, w] = IO.pipe();
+    w.write("foob");
+    w.close();
+    const s = new TextEncoder().encode("01234567");
+    expect(text(r.readNonblock(5, s))).toBe("foob");
+  });
+
+  it("test_write_nonblock_simple_no_exceptions", () => {
+    const [r, w] = IO.pipe();
+    w.writeNonblock("1", { exception: false });
+    w.close();
+    expect(text(r.read())).toBe("1");
+  });
+
+  it("test_read_nonblock_error", () => {
+    const [r] = IO.pipe();
+    expect(() => r.readNonblock(4096)).toThrow(IO.EAGAINWaitReadable);
+  });
+
+  it("test_read_nonblock_invalid_exception", () => {
+    const [r] = IO.pipe();
+    expect(() => r.readNonblock(4096, null, { exception: 1 as never })).toThrow(ArgumentError);
+  });
+
+  it("test_read_nonblock_no_exceptions", () => {
+    const [r, w] = IO.pipe();
+    expect(r.readNonblock(4096, null, { exception: false })).toBe("wait_readable");
+    w.puts("HI!");
+    expect(text(r.readNonblock(4096, null, { exception: false }))).toBe("HI!\n");
+    w.close();
+    expect(r.readNonblock(4096, null, { exception: false })).toBeNull();
+  });
+
+  it("test_write_nonblock_error", () => {
+    const [, w] = IO.pipe();
+    expect(() => {
+      for (;;) w.writeNonblock("a".repeat(100000));
+    }).toThrow(IO.EAGAINWaitWritable);
+  });
+
+  it("test_write_nonblock_invalid_exception", () => {
+    const [, w] = IO.pipe();
+    expect(() => w.writeNonblock(4096, { exception: 1 as never })).toThrow(ArgumentError);
+  });
+
+  it("test_write_nonblock_no_exceptions", () => {
+    const [, w] = IO.pipe();
+    let ret: number | string;
+    do ret = w.writeNonblock("a".repeat(100000), { exception: false });
+    while (typeof ret === "number");
+    expect(ret).toBe("wait_writable");
+  });
+
+  it("wait_readable resolves on a write and on a timeout", async () => {
+    const [r, w] = IO.pipe();
+    expect(await r.waitReadable(0.01)).toBeNull();
+    const waiting = r.waitReadable(1);
+    w.write("x");
+    expect(await waiting).toBe(r);
+    expect(() => r.readNonblock(0)).not.toThrow();
+  });
+
+  it("raises EOFError once the writer is closed", () => {
+    const [r, w] = IO.pipe();
+    w.close();
+    expect(() => r.readNonblock(1)).toThrow(EOFError);
+  });
+
+  it("wait_readable raises IOError when the reader is closed during the wait", async () => {
+    const [r] = IO.pipe();
+    const waiting = r.waitReadable();
+    r.close();
+    await expect(waiting).rejects.toThrow(IOError);
+  });
+
+  it("read raises EAGAINWaitReadable where io_read would block", () => {
+    const [r, w] = IO.pipe();
+    w.write("ab");
+    expect(() => r.read(4)).toThrow(IO.EAGAINWaitReadable);
+    expect(() => r.read()).toThrow(IO.EAGAINWaitReadable);
+    w.close();
+    expect(text(r.read(4))).toBe("ab");
+    expect(r.read(4)).toBeNull();
+  });
+
+  it("read(0) answers an empty buffer at end of file", () => {
+    const [r, w] = IO.pipe();
+    w.close();
+    expect(r.read(0)).toEqual(new Uint8Array(0));
+  });
+});

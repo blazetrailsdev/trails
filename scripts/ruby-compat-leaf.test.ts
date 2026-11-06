@@ -80,10 +80,11 @@ describe("ruby-compat leaf guard", () => {
   it("ruby-compat's runtime sources compile in a program @types/node cannot reach", async () => {
     const runtime = JSON.parse(await readFile(path.join(PACKAGE_DIR, "tsconfig.json"), "utf-8"));
     expect(runtime.compilerOptions.types).toEqual([]);
-    expect(runtime.exclude).toContain("src/**/*.test.ts");
+    expect(runtime.include).toEqual(["lib"]);
+    expect(runtime.exclude).toBeUndefined();
 
     const tests = JSON.parse(await readFile(path.join(PACKAGE_DIR, "tsconfig.test.json"), "utf-8"));
-    expect(tests.include).toEqual(["src/**/*.test.ts"]);
+    expect(tests.include).toEqual(["test"]);
     expect(tests.references).toEqual([{ path: "./tsconfig.json" }]);
 
     const root = JSON.parse(await readFile(path.join(HERE, "..", "tsconfig.json"), "utf-8"));

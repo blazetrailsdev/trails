@@ -7,7 +7,7 @@
  * used to regex the whole comment text, so it accepted a tag written on a
  * hang-indented continuation line and reported nothing while the extractor
  * dropped the receipt. On PR #7266 that silently dropped all ten
- * `packages/ruby-compat/src/comparable.ts` receipts and moved
+ * `packages/ruby-compat/lib/comparable.ts` receipts and moved
  * `parity:api:extra:gate` from `ruby-compat novel 4` to `novel 14` on a run
  * whose `pnpm lint` was green.
  *

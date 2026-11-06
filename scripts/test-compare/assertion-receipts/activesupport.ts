@@ -61,7 +61,7 @@ export const activesupport: Record<string, AssertionReceipt[]> = {
         value: null,
         as: null,
         reason:
-          'core_ext/string_ext_test.rb:799 `EUC_JP_STRING` — a JS string carries no encoding tag, so `"さよなら".encode("EUC-JP")` has no JS value distinct from the UTF-8 string (ruby-compat/src/string/force-encoding.ts)',
+          'core_ext/string_ext_test.rb:799 `EUC_JP_STRING` — a JS string carries no encoding tag, so `"さよなら".encode("EUC-JP")` has no JS value distinct from the UTF-8 string (ruby-compat/lib/string/force-encoding.ts)',
       },
     ],
   "activesupport:json/encoding_test.rb › TestJSONEncoding › utf8 string encoded properly": [
@@ -70,14 +70,14 @@ export const activesupport: Record<string, AssertionReceipt[]> = {
       value: null,
       as: null,
       reason:
-        "json/encoding_test.rb:77 `result.encoding` — a JS string carries no encoding tag (ruby-compat/src/string/force-encoding.ts)",
+        "json/encoding_test.rb:77 `result.encoding` — a JS string carries no encoding tag (ruby-compat/lib/string/force-encoding.ts)",
     },
     {
       kind: "assert_equal",
       value: null,
       as: null,
       reason:
-        "json/encoding_test.rb:81 `result.encoding` — a JS string carries no encoding tag (ruby-compat/src/string/force-encoding.ts)",
+        "json/encoding_test.rb:81 `result.encoding` — a JS string carries no encoding tag (ruby-compat/lib/string/force-encoding.ts)",
     },
   ],
   "activesupport:safe_buffer_test.rb › SafeBufferTest › Should not fail if the returned object is not a string":

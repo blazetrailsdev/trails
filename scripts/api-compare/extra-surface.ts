@@ -1512,7 +1512,7 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * The two symbol-keyed members trails uses to port a Ruby Concern's hooks —
  * `included do ... end` and `def self.extended(base)` — as
  * `static [included](base)` / `static [extended](base)`, keyed by the symbols
- * `packages/ruby-compat/src/include.ts` exports
+ * `packages/ruby-compat/lib/include.ts` exports
  * (`Symbol.for("@blazetrails/ruby-compat:included")` and its `extended`
  * twin). CLAUDE.md § "Module mixins" ratifies the shape repo-wide.
  *

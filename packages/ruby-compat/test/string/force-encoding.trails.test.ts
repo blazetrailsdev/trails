@@ -1,0 +1,63 @@
+import { describe, it, expect } from "vitest";
+import { forceEncoding, rbObjEncoding } from "../../lib/string/force-encoding.js";
+import { Encoding } from "../../lib/encoding.js";
+import { ArgumentError } from "../../lib/argument-error.js";
+
+describe("forceEncoding", () => {
+  it("returns the buffer unchanged for a binary encoding", () => {
+    const bytes = "cafÃ©";
+    expect(forceEncoding(bytes, "BINARY")).toBe(bytes);
+    expect(forceEncoding(bytes, "ASCII-8BIT")).toBe(bytes);
+    expect(forceEncoding(bytes, "binary")).toBe(bytes);
+  });
+
+  it("reads the buffer's bytes back under the named encoding", () => {
+    expect(forceEncoding("cafÃ©", "UTF-8")).toBe("café");
+    expect(forceEncoding("é", "ISO-8859-1")).toBe("é");
+  });
+
+  it("masks each character to its low byte", () => {
+    expect(forceEncoding("Ł", "BINARY")).toBe("Ł");
+    expect(forceEncoding("Ã©", "UTF-8")).toBe("é");
+  });
+
+  it("keeps a leading byte-order mark", () => {
+    expect(forceEncoding("\xef\xbb\xbfab", "UTF-8")).toBe("\u{feff}ab");
+    expect(forceEncoding(Uint8Array.of(0xef, 0xbb, 0xbf, 0x61), "UTF-8")).toBe("\u{feff}a");
+  });
+});
+
+describe("forceEncoding resolves its argument through the Ruby registry", () => {
+  it("decodes under a Ruby name TextDecoder does not take", () => {
+    const sjis = String.fromCharCode(0x82, 0xa0);
+    expect(forceEncoding(sjis, "CP932")).toBe("あ");
+    expect(forceEncoding(sjis, "Windows-31J")).toBe("あ");
+  });
+
+  it("raises ArgumentError for a name outside the registry, as rb_to_encoding does", () => {
+    expect(() => forceEncoding("abc", "no-such-encoding")).toThrow(ArgumentError);
+  });
+
+  it("spells bytes valid in the encoding as the string they encode", () => {
+    expect(forceEncoding(new TextEncoder().encode("café"), "UTF-8")).toBe("café");
+  });
+
+  it("keeps bytes broken in the encoding and associates them with it", () => {
+    const bytes = Uint8Array.of(0x78, 0x9c, 0xff);
+    expect(rbObjEncoding(bytes)).toBe(Encoding.ASCII_8BIT);
+    expect(forceEncoding(bytes, "UTF-8")).toBe(bytes);
+    expect(rbObjEncoding(bytes)).toBe(Encoding.UTF_8);
+    expect(forceEncoding(bytes, "ASCII-8BIT")).toBe(bytes);
+    expect(rbObjEncoding(bytes)).toBe(Encoding.ASCII_8BIT);
+  });
+
+  it("reads a JS string as UTF-8", () => {
+    expect(rbObjEncoding("café")).toBe(Encoding.UTF_8);
+  });
+
+  it("keeps bytes forced to a non-UTF-8 encoding as bytes", () => {
+    const bytes = Uint8Array.of(0x63, 0x61, 0x66, 0xe9);
+    expect(forceEncoding(bytes, "ISO-8859-1")).toBe(bytes);
+    expect(rbObjEncoding(bytes)).toBe(Encoding.find("ISO-8859-1"));
+  });
+});

@@ -104,7 +104,7 @@ get as close as the language allows.
   `Klass.prototype`. Skips methods already on the prototype. If the
   module exports a function keyed by the `included` `Symbol`, it runs
   that hook with the class as its argument. See
-  `packages/ruby-compat/src/include.ts`.
+  `packages/ruby-compat/lib/include.ts`.
 - **`extend(Klass, mod)`** is the class-method equivalent. Copies onto
   the class itself and runs the `extended` `Symbol` hook.
 - **`Included<Mod>` / `Extended<Mod>`** are type helpers that translate
