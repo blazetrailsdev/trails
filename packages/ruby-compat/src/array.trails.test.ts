@@ -174,6 +174,17 @@ describe("Array#pack integer, float and position directives", () => {
 });
 
 describe("String#unpack", () => {
+  it("unpacks U as UTF-8 code points and raises on a malformed sequence", () => {
+    expect(unpack(Uint8Array.of(0x61, 0xc3, 0xa9, 0xe2, 0x82, 0xac), "U*")).toEqual([
+      0x61, 0xe9, 0x20ac,
+    ]);
+    expect(() => unpack(Uint8Array.of(0x80), "U*")).toThrow("malformed UTF-8 character");
+    expect(() => unpack(Uint8Array.of(0xe2, 0x82), "U*")).toThrow(
+      "malformed UTF-8 character (expected 3 bytes, given 2 bytes)",
+    );
+    expect(() => unpack(Uint8Array.of(0xc0, 0x80), "U*")).toThrow("redundant UTF-8 sequence");
+  });
+
   it("answers every item the format pushes, and packs L as it unpacks it", () => {
     const packed = pack([1, 0xffffffff, 2n], "CL>*");
     expect(packed).toEqual(bin("\x01\xff\xff\xff\xff\x00\x00\x00\x02"));
