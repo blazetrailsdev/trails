@@ -160,7 +160,7 @@ export class Generation {
         this.config.hosts.push(() => true);
         this.config.eagerLoad = false;
         this.config.sessionStore(":cookie_store", { key: "_myapp_session" });
-        this.config.cacheStore = ":mem_cache_store";
+        this.config.cacheStore = ":memory_store";
         this.config.activeSupport.deprecation = "log";
         this.config.actionController.allowForgeryProtection = false;
 `);
