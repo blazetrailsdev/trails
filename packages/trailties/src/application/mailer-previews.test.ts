@@ -24,9 +24,11 @@ describe("MailerPreviewsTest", () => {
     t = new MailerPreviewsTest("test") as unknown as Host;
     await t.buildApp();
     const application = File.join(await t.appPath(), "config/application.ts");
+    const source = await getFs().readFile(application, "utf-8");
+    expect(source).toContain('// import "@blazetrails/trailties/trailties/action-mailer";');
     await getFs().writeFile!(
       application,
-      (await getFs().readFile(application, "utf-8")).replace(
+      source.replace(
         '// import "@blazetrails/trailties/trailties/action-mailer";',
         'import "@blazetrails/trailties/trailties/action-mailer";',
       ),
