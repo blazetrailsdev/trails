@@ -26,7 +26,10 @@ export const Registry = {
     deleteIf(this.autoloads, (_k, l) => l === loader);
   },
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @noRailsEquivalent PERMANENT
+   * @inventedArm if — CONVERGEABLE lib-test-layout-retire-src-compat
+   */
   async loaderForPackage(
     packageFile: string,
     { namespace }: { namespace: object },

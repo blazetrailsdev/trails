@@ -30,6 +30,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import * as packageRootsModule from "../layout/package-roots.js";
 import ts from "typescript-5";
 import { lineLeadingTag } from "../../eslint/jsdoc-tag-line.mjs";
 import { SOURCES } from "../../vendor/sources.js";
@@ -64,6 +65,7 @@ function cjs<T extends object>(ns: T): T {
 }
 const { rowsOfKind } = cjs(callMismatchBaselineModule);
 const { PACKAGE_DIR_OVERRIDES } = cjs(apiCompareConfigModule);
+const { libRoot } = cjs(packageRootsModule);
 
 export function packageDirOf(key: string): string {
   return PACKAGE_DIR_OVERRIDES[key] ?? key;
@@ -443,7 +445,7 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
     const tags = Object.fromEntries(
       TAGS.map((t) => [t, { PERMANENT: 0, CONVERGEABLE: 0, none: 0 }]),
     ) as PackageSummary["tags"];
-    for (const f of await listFiles(path.join(dir, "src"), isSource)) {
+    for (const f of await listFiles(path.join(dir, libRoot(name)), isSource)) {
       const text = await fs.readFile(f, "utf-8");
       for (const site of tagSitesIn(name, rel(f), text, claudeSections)) {
         tags[site.tag][site.receipt ?? "none"]++;
