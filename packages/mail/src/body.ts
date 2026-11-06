@@ -35,8 +35,8 @@ export class Body {
   private _asciiOnly: boolean | undefined;
 
   boundary: string | null = null;
-  preamble: string | null = null;
-  epilogue: string | null = null;
+  preamble: string | Uint8Array | null = null;
+  epilogue: string | Uint8Array | null = null;
   charset: string | null = null;
 
   constructor(string: unknown = "") {
@@ -113,9 +113,11 @@ export class Body {
       this.sortPartsBang();
       const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());
       return (
-        [this.preamble, ...encodedParts].join(this.crlfBoundary()) +
+        [this.preamble, ...encodedParts]
+          .map((s) => (s instanceof Uint8Array ? binaryString(s) : s))
+          .join(this.crlfBoundary()) +
         this.endBoundary() +
-        (this.epilogue ?? "")
+        (this.epilogue instanceof Uint8Array ? binaryString(this.epilogue) : (this.epilogue ?? ""))
       );
     } else {
       const dec = Encodings.getEncoding(this.encoding() as string) as typeof Identity | null;
@@ -191,8 +193,10 @@ export class Body {
 
     const preamble = parts[0] ?? "";
     const epilogue = parts.at(-1) ?? "";
-    this.preamble = strip(preamble instanceof Uint8Array ? binaryString(preamble) : preamble);
-    this.epilogue = strip(epilogue instanceof Uint8Array ? binaryString(epilogue) : epilogue);
+    this.preamble =
+      preamble instanceof Uint8Array ? binaryBytes(strip(binaryString(preamble))) : strip(preamble);
+    this.epilogue =
+      epilogue instanceof Uint8Array ? binaryBytes(strip(binaryString(epilogue))) : strip(epilogue);
     for (const part of parts.slice(1, -1)) this._parts.push(new Mail.Part(part));
     return this;
   }

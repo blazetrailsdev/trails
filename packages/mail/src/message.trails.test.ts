@@ -30,4 +30,16 @@ describe("Mail::Message binary raw source", () => {
     expect(mail.body().rawSource).toEqual(body);
     expect(mail.body().decoded()).toEqual(body);
   });
+
+  it("keeps a Latin-1 header value and a leading 0xA0 byte as bytes", () => {
+    const raw = new Uint8Array([
+      ...new TextEncoder().encode("X-Note: caf"),
+      0xe9,
+      ...new TextEncoder().encode("\r\n\r\nbody"),
+    ]);
+    const field = new Mail.Message(raw).header().fields.find((f) => f.name === "X-Note")!;
+    expect(field.unparsedValue).toEqual(new Uint8Array([0x63, 0x61, 0x66, 0xe9]));
+    const lead = new Mail.Message(new Uint8Array([0xa0, 0x0d, 0x0a, 0x0d, 0x0a, 0x78]));
+    expect(lead.header().rawSource).toEqual(new Uint8Array([0xa0]));
+  });
 });

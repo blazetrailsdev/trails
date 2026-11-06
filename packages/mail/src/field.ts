@@ -162,7 +162,6 @@ export class Field implements Comparable {
     return null;
   }
 
-  /** @inventedArm forceEncoding — PERMANENT */
   static split(
     rawField: string | Uint8Array,
   ): [string, string | Uint8Array] | string | Uint8Array | null {
@@ -173,10 +172,7 @@ export class Field implements Comparable {
         const [first, value] = stringSplit(scan, Constants.COLON, 2);
         const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
-          return [
-            rstrip(name),
-            binary ? forceEncoding(binaryBytes(strip(value)), Encoding.UTF_8) : strip(value),
-          ];
+          return [rstrip(name), binary ? binaryBytes(strip(value)) : strip(value)];
         } else {
           warn(
             `WARNING: Ignoring unparsable header ${rbInspect(rawField)}: invalid header name syntax: ${rbInspect(name)}`,
@@ -184,7 +180,7 @@ export class Field implements Comparable {
           return null;
         }
       } else {
-        return binary ? forceEncoding(binaryBytes(strip(scan)), Encoding.UTF_8) : strip(scan);
+        return binary ? binaryBytes(strip(scan)) : strip(scan);
       }
     } catch (error) {
       const e = error as Error;
@@ -315,7 +311,9 @@ export class Field implements Comparable {
   }
 
   /** @internal */
+  /** @inventedArm forceEncoding — PERMANENT */
   private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
+    if (value instanceof Uint8Array) value = forceEncoding(rbObjDup(value), Encoding.UTF_8);
     if (typeof value === "string") value = this.unfold(value);
 
     const klass = (this.constructor as typeof Field).fieldClassFor(name);

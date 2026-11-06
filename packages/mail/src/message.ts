@@ -1094,7 +1094,7 @@ export class Message {
     const rawSource = this.rawSource;
     const binary = rawSource instanceof Uint8Array;
     let [headerPart, bodyPart]: (string | Uint8Array | undefined)[] = stringSplit(
-      (binary ? binaryString(rawSource) : rawSource).replace(/^[\s\0]+/, ""),
+      (binary ? binaryString(rawSource) : rawSource).replace(/^[\0\t\n\v\f\r ]+/, ""),
       new RegExp(`${Constants.LAX_CRLF.source}${Constants.LAX_CRLF.source}`),
       2,
     );
