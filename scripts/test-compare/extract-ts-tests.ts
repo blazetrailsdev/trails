@@ -55,6 +55,8 @@ function getPackageTestFiles(): Record<string, string[]> {
     "mini-mime",
     "net-smtp",
     "rake",
+    "solid-queue",
+    "solid-cable",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};

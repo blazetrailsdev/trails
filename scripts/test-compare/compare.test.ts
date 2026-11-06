@@ -217,6 +217,23 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("drops solid_queue's and solid_cable's test bucket dirs", () => {
+    expect(rubyToConventionTs("models/solid_queue/ready_execution_test.rb", "solid-queue")).toBe(
+      "ready-execution.test.ts",
+    );
+    expect(rubyToConventionTs("unit/worker_test.rb", "solid-queue")).toBe("worker.test.ts");
+    expect(rubyToConventionTs("integration/puma/plugin_test.rb", "solid-queue")).toBe(
+      "integration/puma/plugin.test.ts",
+    );
+    expect(
+      rubyToConventionTs(
+        "lib/action_cable/subscription_adapter/solid_cable_test.rb",
+        "solid-cable",
+      ),
+    ).toBe("action-cable/subscription-adapter/solid-cable.test.ts");
+    expect(rubyToConventionTs("jobs/trim_job_test.rb", "solid-cable")).toBe("trim-job.test.ts");
+  });
+
   it("strips raabro's _spec suffix", () => {
     expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
   });

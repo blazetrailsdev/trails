@@ -188,6 +188,19 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
+  if (pkg === "solid-queue" || pkg === "solid-cable") {
+    // Tests sort into `unit/`, `models/solid_queue/`, `jobs/` and `lib/`
+    // buckets the TS package does not repeat; `integration/` is kept.
+    const rest = rubyFile.replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
+    const dir = path.dirname(rest).replace(/_/g, "-");
+    const tsFile =
+      path
+        .basename(rest, ".rb")
+        .replace(/_test$/, "")
+        .replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
   if (pkg === "mini-magick") {
     // Specs sit under `spec/lib/mini_magick/`, repeating the gem's lib root;
     // drop it so `lib/mini_magick/image_spec.rb` lands on `image.test.ts` and
@@ -1751,6 +1764,8 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "ruby-compat": "packages/ruby-compat/src/",
   thor: "packages/thor/src/",
   mail: "packages/mail/src/",
+  "solid-queue": "packages/solid-queue/src/",
+  "solid-cable": "packages/solid-cable/src/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
