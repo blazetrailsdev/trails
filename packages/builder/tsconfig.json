@@ -6,6 +6,5 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "references": [{ "path": "../activesupport" }, { "path": "../ruby-compat" }],
-  "exclude": ["lib/**/*.test.ts"]
+  "references": [{ "path": "../activesupport" }, { "path": "../ruby-compat" }]
 }

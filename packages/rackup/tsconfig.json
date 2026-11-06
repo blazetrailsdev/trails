@@ -7,6 +7,5 @@
     "types": ["node"]
   },
   "include": ["lib"],
-  "references": [{ "path": "../rack" }, { "path": "../ruby-compat" }],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers", "lib/**/__fixtures__"]
+  "references": [{ "path": "../rack" }, { "path": "../ruby-compat" }]
 }

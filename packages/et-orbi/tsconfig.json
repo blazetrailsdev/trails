@@ -12,6 +12,5 @@
     { "path": "../ruby-compat" },
     { "path": "../tzinfo" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
+  ]
 }

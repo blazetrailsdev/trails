@@ -11,6 +11,5 @@
     { "path": "../ruby-compat" },
     { "path": "../mini-magick" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
+  ]
 }
