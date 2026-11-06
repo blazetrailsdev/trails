@@ -438,48 +438,6 @@ export function unpack(
   return packUnpackInternal(str, fmt, UNPACK_ARRAY, offset);
 }
 
-const UTF8_LIMITS = [0x0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000, 0x80000000];
-
-/** `utf8_to_uv` (`vendor/ruby/v3.3.11/pack.c:1684`). */
-function utf8ToUv(ptr: Uint8Array, p: number, lenp: number): [number, number] {
-  let c = ptr[p++];
-  let uv = c;
-  let n: number;
-
-  if (!(uv & 0x80)) return [uv, 1];
-  if (!(uv & 0x40)) throw new ArgumentError("malformed UTF-8 character");
-
-  if (!(uv & 0x20)) {
-    n = 2;
-    uv &= 0x1f;
-  } else if (!(uv & 0x10)) {
-    n = 3;
-    uv &= 0x0f;
-  } else if (!(uv & 0x08)) {
-    n = 4;
-    uv &= 0x07;
-  } else if (!(uv & 0x04)) {
-    n = 5;
-    uv &= 0x03;
-  } else if (!(uv & 0x02)) {
-    n = 6;
-    uv &= 0x01;
-  } else {
-    throw new ArgumentError("malformed UTF-8 character");
-  }
-  if (n > lenp) {
-    throw new ArgumentError(`malformed UTF-8 character (expected ${n} bytes, given ${lenp} bytes)`);
-  }
-  lenp = n--;
-  while (n--) {
-    c = ptr[p++];
-    if ((c & 0xc0) !== 0x80) throw new ArgumentError("malformed UTF-8 character");
-    uv = uv * 64 + (c & 0x3f);
-  }
-  if (uv < UTF8_LIMITS[lenp - 1]) throw new ArgumentError("redundant UTF-8 sequence");
-  return [uv, lenp];
-}
-
 const UNPACK_ARRAY = 0;
 const UNPACK_1 = 2;
 
@@ -502,6 +460,48 @@ function packUnpackInternal(
   function hex2num(c: number): number {
     const n = parseInt(String.fromCharCode(c), 36);
     return Number.isNaN(n) || n >= 16 ? -1 : n;
+  }
+  /** `utf8_to_uv` (`vendor/ruby/v3.3.11/pack.c:1684`). */
+  function utf8ToUv(ptr: Uint8Array, p: number, lenp: number): [number, number] {
+    const utf8Limits = [0x0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000, 0x80000000];
+    let c = ptr[p++];
+    let uv = c;
+    let n: number;
+
+    if (!(uv & 0x80)) return [uv, 1];
+    if (!(uv & 0x40)) throw new ArgumentError("malformed UTF-8 character");
+
+    if (!(uv & 0x20)) {
+      n = 2;
+      uv &= 0x1f;
+    } else if (!(uv & 0x10)) {
+      n = 3;
+      uv &= 0x0f;
+    } else if (!(uv & 0x08)) {
+      n = 4;
+      uv &= 0x07;
+    } else if (!(uv & 0x04)) {
+      n = 5;
+      uv &= 0x03;
+    } else if (!(uv & 0x02)) {
+      n = 6;
+      uv &= 0x01;
+    } else {
+      throw new ArgumentError("malformed UTF-8 character");
+    }
+    if (n > lenp) {
+      throw new ArgumentError(
+        `malformed UTF-8 character (expected ${n} bytes, given ${lenp} bytes)`,
+      );
+    }
+    lenp = n--;
+    while (n--) {
+      c = ptr[p++];
+      if ((c & 0xc0) !== 0x80) throw new ArgumentError("malformed UTF-8 character");
+      uv = uv * 64 + (c & 0x3f);
+    }
+    if (uv < utf8Limits[lenp - 1]) throw new ArgumentError("redundant UTF-8 sequence");
+    return [uv, lenp];
   }
   let s = offset;
   let p = 0;
