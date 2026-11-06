@@ -105,10 +105,17 @@ export class Part extends Message {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   protected override parseMessage(): void {
+    const rawSource =
+      this.rawSource instanceof Uint8Array
+        ? new TextDecoder().decode(this.rawSource)
+        : this.rawSource;
     const [headerPart, bodyPart] = stringSplit(
-      this.rawSource,
+      rawSource,
       new RegExp(`${LAX}${WSP}*${LAX}`, "m"),
       2,
     );
@@ -117,7 +124,7 @@ export class Part extends Message {
       this.setBody(bodyPart ?? null);
     } else {
       this.setHeader("Content-Type: text/plain\r\n");
-      this.setBody(this.rawSource);
+      this.setBody(rawSource);
     }
   }
 

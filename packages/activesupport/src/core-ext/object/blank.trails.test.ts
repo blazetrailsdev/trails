@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { isBlank, mbChars, presence } from "../../index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {
@@ -95,5 +96,18 @@ describe("Multibyte::Chars#blank?", () => {
   it("finds Object#blank? before method_missing forwards to the String", () => {
     expect(isBlank(mbChars("  "))).toBe(false);
     expect(isBlank(mbChars(""))).toBe(true);
+  });
+});
+
+describe("binary String respond_to?", () => {
+  it("answers dup and blank? for a String held as its bytes, as for any String", () => {
+    const bytes = Uint8Array.of(0x20, 0x0a);
+    expect(rbObjRespondTo(bytes, "dup")).toBe(true);
+    expect(rbObjRespondTo(bytes, "isBlank")).toBe(true);
+    const copy = rbFSend(bytes, "dup");
+    expect(copy).toEqual(bytes);
+    expect(copy).not.toBe(bytes);
+    expect(rbFSend(bytes, "isBlank")).toBe(true);
+    expect(rbFSend(Uint8Array.of(0x7b), "isBlank")).toBe(false);
   });
 });

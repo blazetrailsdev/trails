@@ -247,7 +247,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
  * `:2225`), as `length` and `size` do (one character per byte), `getbyte`
  * reads one, `empty?` asks whether there are any, `byteslice` slices them,
  * `start_with?` compares a prefix of them, `include?` searches them,
- * and `+` joins them.
+ * `+` joins them, and `dup` copies them (`rb_str_dup_m`, `:1798`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -267,6 +267,7 @@ export const BINARY_METHOD_TABLE: Record<
   byteslice: (self, ...args) => byteslice(self, ...args),
   isStartWith: (self, ...prefixes) => rbStrStartWith(self, ...prefixes),
   isInclude: (self, arg) => rbStrInclude(self, arg),
+  dup: (self) => self.slice(),
 };
 
 /**

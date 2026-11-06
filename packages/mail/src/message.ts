@@ -4,6 +4,7 @@ import {
   NoMethodError,
   rbObjAsString,
   rbObjDup,
+  rbObjRespondTo,
   rbObjId,
   strip,
   stringSplit,
@@ -59,7 +60,7 @@ export class Message {
   protected _smtpEnvelopeTo: unknown = null;
   protected _transportEncoding: unknown;
   protected _markForDelete = false;
-  protected _rawSource = "";
+  protected _rawSource: string | Uint8Array = "";
   protected _rawEnvelope: unknown = null;
   protected _envelope: Envelope | null = null;
   protected _deliveryStatusPart: Part | null | undefined;
@@ -87,10 +88,10 @@ export class Message {
     this._transportEncoding = Encodings.getEncoding("7bit");
 
     const first = flatten(args)[0];
-    if (typeof first === "object" && first !== null && !(first instanceof Body)) {
+    if (rbObjRespondTo(first, "eachPair")) {
       this.initWithHash(first as Record<string, unknown>);
     } else {
-      this.initWithString(rbObjAsString(first ?? ""));
+      this.initWithString(rbObjAsString(first ?? "") as string | Uint8Array);
     }
 
     if (block !== undefined) {
@@ -212,7 +213,7 @@ export class Message {
     return this;
   }
 
-  get rawSource(): string {
+  get rawSource(): string | Uint8Array {
     return this._rawSource;
   }
 
@@ -1029,10 +1030,17 @@ export class Message {
     return this.hasContentType() ? /^text$/im.test(this.mainType() ?? "") : false;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   protected parseMessage(): void {
+    const rawSource = this.rawSource;
     const [headerPart, bodyPart] = stringSplit(
-      this.rawSource.replace(/^[\s\0]+/, ""),
+      (rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource).replace(
+        /^[\s\0]+/,
+        "",
+      ),
       new RegExp(`${Constants.LAX_CRLF.source}${Constants.LAX_CRLF.source}`),
       2,
     );
@@ -1062,9 +1070,14 @@ export class Message {
     this.addEncodingToBody();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm decode — PERMANENT
+   */
   private setEnvelopeHeader(): void {
-    const rawString = rbObjAsString(this.rawSource);
+    const rawSource = rbObjAsString(this.rawSource) as string | Uint8Array;
+    const rawString =
+      rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource;
     const matchData = new RegExp(
       `^From\\s+([^:\\s]${Constants.TEXT.source}*)${Constants.LAX_CRLF.source}`,
     ).exec(rawString);
@@ -1192,7 +1205,7 @@ export class Message {
   }
 
   /** @internal */
-  protected initWithString(string: string): void {
+  protected initWithString(string: string | Uint8Array): void {
     this._rawSource = string;
     this.setEnvelopeHeader();
     this.parseMessage();

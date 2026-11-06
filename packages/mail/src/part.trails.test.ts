@@ -21,4 +21,16 @@ describe("mail body and part edges", () => {
     expect(body.rawSource).toBe("y");
     expect(body.boundary).toBe("b");
   });
+
+  it("parses a binary raw source as Part#parse_message splits the binary String", () => {
+    const part = new Part(new TextEncoder().encode("Content-Type: text/plain\r\n\r\nhéllo"));
+    expect(part.mimeType()).toBe("text/plain");
+    expect(part.body().decoded()).toBe("héllo");
+  });
+
+  it("takes a binary raw source with no header line as the body", () => {
+    const part = new Part(new TextEncoder().encode("just a body"));
+    expect(part.mimeType()).toBe("text/plain");
+    expect(part.body().decoded()).toBe("just a body");
+  });
 });
