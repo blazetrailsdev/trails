@@ -1432,7 +1432,12 @@ export class Enumerable<T = unknown, E = unknown> {
       if (arg.length !== 2) {
         throw new ArgumentError(`element has wrong array length (expected 2, was ${arg.length})`);
       }
-      hash[arg[0] as string] = arg[1];
+      Object.defineProperty(hash, arg[0] as string, {
+        value: arg[1],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
     });
     return hash;
   }

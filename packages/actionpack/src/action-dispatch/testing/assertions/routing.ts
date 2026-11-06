@@ -385,9 +385,8 @@ export function failOn<T>(
     return block();
   } catch (e) {
     if (e instanceof exceptionClass) {
-      /** @inventedArm if — PERMANENT */
-      if (typeof message === "function") message = message();
-      throw new Assertion(message ?? e.message);
+      /** @inventedArm conditional — PERMANENT */
+      throw new Assertion((typeof message === "function" ? message() : message) ?? e.message);
     }
     throw e;
   }
