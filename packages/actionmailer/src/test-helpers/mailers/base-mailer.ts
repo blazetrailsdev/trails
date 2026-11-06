@@ -9,6 +9,7 @@ type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
 type Hash = Record<string, unknown>;
 
 const FIXTURES: Record<string, string> = {
+  "another.path/base-mailer/welcome.tse": "Welcome from another path",
   "base-mailer/attachment-with-content.tse": "Attachment with content",
   "base-mailer/attachment-with-hash.html.tse": "",
   "base-mailer/attachment-with-hash-default-encoding.html.tse": "",
@@ -46,11 +47,9 @@ const FIXTURES: Record<string, string> = {
   "layouts/different-layout.text.tse": "PLAIN -- <%= yield %>",
 };
 
-export const ANOTHER_PATH_FIXTURES: Record<string, string> = {
+export const ANOTHER_PATH_RESOLVER = new ActionView.FixtureResolver({
   "base-mailer/welcome.tse": "Welcome from another path",
-};
-
-export const ANOTHER_PATH_RESOLVER = new ActionView.FixtureResolver(ANOTHER_PATH_FIXTURES);
+});
 
 export const UNKNOWN_RESOLVER = new ActionView.FixtureResolver({});
 
@@ -65,11 +64,6 @@ export class BaseMailer extends Base {
     });
 
     this.prependViewPath(new ActionView.FixtureResolver(FIXTURES));
-    this.appendViewPath(
-      new ActionView.FixtureResolver({
-        "another.path/base-mailer/welcome.tse": "Welcome from another path",
-      }),
-    );
   }
 
   welcome(hash: Hash = {}) {
