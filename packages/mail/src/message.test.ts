@@ -576,7 +576,7 @@ describe("Mail::Message", () => {
 
       it("should let you set custom headers with a :headers => {hash}", () => {
         const message = Mail.new({ headers: { "custom-header": "mikel" } });
-        expect(message.get("custom-header")!.decoded()).toBe("mikel");
+        expect((message.get("custom-header") as Field).decoded()).toBe("mikel");
       });
 
       it("should assign the body to a part on creation", () => {
