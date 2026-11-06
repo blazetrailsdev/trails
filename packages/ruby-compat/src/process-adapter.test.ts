@@ -386,6 +386,54 @@ describe("processAdapter", () => {
       );
     });
 
+    it("noecho on a Windows console clears echo input and keeps line input and Ctrl-C", async () => {
+      const rawModes: boolean[] = [];
+      const kills: [number, number | string][] = [];
+      const keys = ["se", "cx\b", "ret\x03", "pw\x7fd\r\nnext\r"];
+      const fakeProcess = {
+        versions: { node: "24.0.0" },
+        env: {},
+        argv: ["node", "script"],
+        cwd: () => "/",
+        chdir: () => {},
+        platform: "win32",
+        execPath: "node",
+        umask: () => 0,
+        pid: 42,
+        ppid: 1,
+        kill: (pid: number, signal: number | string) => kills.push([pid, signal]) > 0,
+        exit: () => {
+          throw new Error("exit");
+        },
+        exitCode: undefined,
+        on: () => {},
+        off: () => {},
+        listenerCount: () => 0,
+        stdout: { write: () => true },
+        stderr: { write: () => true },
+        stdin: {
+          isTTY: true,
+          setRawMode: (mode: boolean) => rawModes.push(mode),
+          once: (event: string, handler: (data: string) => void) => {
+            if (event === "data") queueMicrotask(() => handler(keys.shift()!));
+          },
+          off: () => {},
+        },
+      };
+      vi.stubGlobal("process", fakeProcess);
+      try {
+        __INTERNAL_resetProcessAdapter_TEST_ONLY();
+        const answer = stdin.noecho((io) => io.gets());
+        expect(rawModes).toEqual([true]);
+        await expect(answer).resolves.toBe("pd\n");
+        expect(kills).toEqual([[42, "SIGINT"]]);
+        expect(rawModes).toEqual([true, false]);
+      } finally {
+        vi.unstubAllGlobals();
+        __INTERNAL_resetProcessAdapter_TEST_ONLY();
+      }
+    });
+
     it("noecho raises ENOTTY off a terminal", () => {
       registerFakeStdin([], false);
       let error: unknown;

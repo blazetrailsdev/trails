@@ -1,4 +1,12 @@
-import { ArgumentError, Fiber, Thread, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Fiber,
+  getAsyncContext,
+  Thread,
+  rbObjDup,
+  type AsyncContext,
+  type AsyncContextAdapter,
+} from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
@@ -38,6 +46,35 @@ Fiber.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
 
 let _isolationLevel: IsolationLevel | null = null;
 let _scope: typeof Thread | typeof Fiber;
+
+interface Fork {
+  context: Thread | Fiber;
+  key: IsolatedKey;
+  value: unknown;
+  parent: Fork | null;
+}
+
+let _adapter: AsyncContextAdapter | null = null;
+let _forks: AsyncContext<Fork> | null = null;
+
+/** @internal */
+function forks(): AsyncContext<Fork> {
+  const adapter = getAsyncContext();
+  if (!_forks || _adapter !== adapter) {
+    _adapter = adapter;
+    _forks = adapter.create<Fork>();
+  }
+  return _forks;
+}
+
+/** @internal */
+function openFork(key: IsolatedKey): Fork | null {
+  const context = IsolatedExecutionState.context();
+  for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
+    if (fork.context === context && fork.key === key) return fork;
+  }
+  return null;
+}
 
 /** @internal */
 function state(): Store {
@@ -83,14 +120,17 @@ export const IsolatedExecutionState = {
     );
   },
   get<T = unknown>(key: IsolatedKey): T | undefined {
-    return state().get(key) as T | undefined;
+    const fork = openFork(key);
+    return (fork ? fork.value : state().get(key)) as T | undefined;
   },
   set<T>(key: IsolatedKey, value: T): T {
-    state().set(key, value);
+    const fork = openFork(key);
+    if (fork) fork.value = value;
+    else state().set(key, value);
     return value;
   },
   isKey(key: IsolatedKey): boolean {
-    return state().has(key);
+    return openFork(key) != null || state().has(key);
   },
   delete<T = unknown>(key: IsolatedKey): T | undefined {
     const s = state();
@@ -103,6 +143,19 @@ export const IsolatedExecutionState = {
   },
   context(): Thread | Fiber {
     return IsolatedExecutionState.scope.current();
+  },
+  /** @noRailsEquivalent CONVERGEABLE isolated-execution-state-fork-needs-owner-ruling */
+  fork<T>(key: IsolatedKey, block: () => T): T {
+    const value = IsolatedExecutionState.get(key);
+    return forks().run(
+      {
+        context: IsolatedExecutionState.context(),
+        key,
+        value: value == null ? value : rbObjDup(value),
+        parent: forks().getStore() ?? null,
+      },
+      block,
+    );
   },
   shareWith(other: Thread | Fiber): void {
     const otherState = other.activeSupportExecutionState();

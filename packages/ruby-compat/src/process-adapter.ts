@@ -716,6 +716,7 @@ interface NodeStream {
   readableEnded?: boolean;
   destroyed?: boolean;
   pause?(): void;
+  setRawMode?(mode: boolean): unknown;
   once(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler: (...args: unknown[]) => void): void;
 }
@@ -764,10 +765,7 @@ function tryAutoRegisterNode(): boolean {
  * `set_noecho` clears echo alone, so the flags go through `stty(1)`, whose
  * `-g` form is the saved `conmode`. A failure raises the `SystemCallError`
  * whose `strerror` text `stty` reported, as `rb_syserr_fail` does with the
- * failing call's errno. Node exposes no `SetConsoleMode`, so the Windows arm
- * (`console.c:289`, clearing `ENABLE_ECHO_INPUT`) is not reachable and a
- * Windows console raises `Errno::ENOTTY`; its convergence is
- * `ruby-compat-noecho-windows-console-echo-input`.
+ * failing call's errno. A Windows console takes `consoleMode` instead.
  */
 function stty(proc: NodeProcessLike, args: string[]): string {
   const childProcess = proc.getBuiltinModule?.("node:child_process") as
@@ -794,7 +792,113 @@ function stty(proc: NodeProcessLike, args: string[]): string {
   throw new SystemCallError(err);
 }
 
+/**
+ * The Windows arm of `getattr` / `setattr` / `set_noecho`
+ * (`vendor/ruby/v3.3.11/ext/io/console/console.c:252-291`): `set_noecho`
+ * clears `ENABLE_ECHO_INPUT` with `SetConsoleMode` (`console.c:289`) and keeps
+ * `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`. Node exposes no
+ * `SetConsoleMode`, only `setRawMode`, which clears all three, so while echo
+ * is off `read` gives back the two the console no longer does: a line is
+ * answered at CR with backspace applied and CR read as LF, and Ctrl-C raises
+ * `SIGINT`. The saved mode is `"echo"` or `"-echo"`.
+ */
+function consoleMode(proc: NodeProcessLike, readChunk: () => Promise<string | null>) {
+  let echoInput = true;
+  let line = "";
+  let keys = "";
+  const tty = (): void => {
+    if (!proc.stdin.isTTY || proc.stdin.setRawMode == null) throw new Errno.ENOTTY();
+  };
+  const setConsoleMode = (echo: boolean): void => {
+    tty();
+    proc.stdin.setRawMode!(!echo);
+    echoInput = echo;
+  };
+  return {
+    getattr: (): string => {
+      tty();
+      return echoInput ? "echo" : "-echo";
+    },
+    setattr: (t: string): void => setConsoleMode(t === "echo"),
+    setNoecho: (): void => setConsoleMode(false),
+    read: async (): Promise<string | null> => {
+      if (echoInput && keys === "") return readChunk();
+      for (;;) {
+        if (keys === "") {
+          const chunk = await readChunk();
+          if (chunk == null) {
+            const rest = line;
+            line = "";
+            return rest === "" ? null : rest;
+          }
+          keys = chunk;
+        }
+        const c = keys[0];
+        keys = keys.slice(1);
+        switch (c) {
+          case "\r":
+          case "\n": {
+            if (c === "\r" && keys[0] === "\n") keys = keys.slice(1);
+            const answer = `${line}\n`;
+            line = "";
+            return answer;
+          }
+          case "\b":
+          case "\x7f":
+            line = Array.from(line).slice(0, -1).join("");
+            break;
+          case "\x03":
+            line = "";
+            proc.kill(proc.pid, "SIGINT");
+            break;
+          default:
+            line += c;
+        }
+      }
+    },
+  };
+}
+
 function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
+  const readChunk = (): Promise<string | null> =>
+    new Promise<string | null>((resolve, reject) => {
+      if (proc.stdin.readableEnded || proc.stdin.destroyed) {
+        resolve(null);
+        return;
+      }
+      const onData = (...args: unknown[]) => {
+        cleanup();
+        const data = args[0];
+        resolve(
+          typeof data === "string"
+            ? data
+            : data && typeof (data as { toString(): string }).toString === "function"
+              ? (data as { toString(): string }).toString()
+              : null,
+        );
+      };
+      const onTerminal = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onError = (...args: unknown[]) => {
+        cleanup();
+        const err = args[0];
+        reject(err instanceof Error ? err : new Error(String(err)));
+      };
+      const cleanup = () => {
+        proc.stdin.pause?.();
+        proc.stdin.off("data", onData);
+        proc.stdin.off("end", onTerminal);
+        proc.stdin.off("close", onTerminal);
+        proc.stdin.off("error", onError);
+      };
+      proc.stdin.once("data", onData);
+      proc.stdin.once("end", onTerminal);
+      proc.stdin.once("close", onTerminal);
+      proc.stdin.once("error", onError);
+    });
+  const windowsConsole = proc.platform === "win32" ? consoleMode(proc, readChunk) : null;
   return {
     envSnapshot: () => ({ ...proc.env }),
     argvSnapshot: () => [...proc.argv],
@@ -893,51 +997,16 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       get isTTY() {
         return Boolean(proc.stdin.isTTY);
       },
-      getattr: () => stty(proc, ["-g"]),
+      getattr: () => (windowsConsole ? windowsConsole.getattr() : stty(proc, ["-g"])),
       setattr: (t) => {
-        stty(proc, [t]);
+        if (windowsConsole) windowsConsole.setattr(t);
+        else stty(proc, [t]);
       },
       setNoecho: () => {
-        stty(proc, ["-echo", "-echoe", "-echok", "-echonl"]);
+        if (windowsConsole) windowsConsole.setNoecho();
+        else stty(proc, ["-echo", "-echoe", "-echok", "-echonl"]);
       },
-      read: () =>
-        new Promise<string | null>((resolve, reject) => {
-          if (proc.stdin.readableEnded || proc.stdin.destroyed) {
-            resolve(null);
-            return;
-          }
-          const onData = (...args: unknown[]) => {
-            cleanup();
-            const data = args[0];
-            resolve(
-              typeof data === "string"
-                ? data
-                : data && typeof (data as { toString(): string }).toString === "function"
-                  ? (data as { toString(): string }).toString()
-                  : null,
-            );
-          };
-          const onTerminal = () => {
-            cleanup();
-            resolve(null);
-          };
-          const onError = (...args: unknown[]) => {
-            cleanup();
-            const err = args[0];
-            reject(err instanceof Error ? err : new Error(String(err)));
-          };
-          const cleanup = () => {
-            proc.stdin.pause?.();
-            proc.stdin.off("data", onData);
-            proc.stdin.off("end", onTerminal);
-            proc.stdin.off("close", onTerminal);
-            proc.stdin.off("error", onError);
-          };
-          proc.stdin.once("data", onData);
-          proc.stdin.once("end", onTerminal);
-          proc.stdin.once("close", onTerminal);
-          proc.stdin.once("error", onError);
-        }),
+      read: () => (windowsConsole ? windowsConsole.read() : readChunk()),
     },
   };
 }
