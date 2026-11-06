@@ -62,7 +62,7 @@ export interface HttpClientConnection {
   request(
     method: string,
     path: string,
-    headers: Record<string, string>,
+    headers: Record<string, string[]>,
     body: string | Uint8Array | null,
   ): Promise<HttpClientResponse>;
   close(): void;

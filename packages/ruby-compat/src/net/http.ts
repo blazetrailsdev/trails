@@ -25,7 +25,17 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT */
   static defaultPort(): number {
+    return HTTP.httpDefaultPort();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static httpDefaultPort(): number {
     return 80;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static httpsDefaultPort(): number {
+    return 443;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -196,7 +206,7 @@ export class HTTP {
   addrPort(): string {
     let addr = this.address;
     if (addr.includes(":")) addr = `[${addr}]`;
-    const defaultPort = this.isUseSsl() ? 443 : HTTP.defaultPort();
+    const defaultPort = this.isUseSsl() ? HTTP.httpsDefaultPort() : HTTP.httpDefaultPort();
     return defaultPort === this.port ? addr : `${addr}:${this.port}`;
   }
 }
@@ -209,14 +219,15 @@ export class HTTP {
  * @noRailsEquivalent PERMANENT
  */
 function _rsockSysFail(e: unknown, host: string, port: number): Error {
-  const code = (e as { code?: unknown } | null)?.code;
+  if (!(e instanceof Error)) throw e;
+  const code = (e as { code?: unknown }).code;
   if (code === "ECONNREFUSED") {
     return new Errno.ECONNREFUSED(`connect(2) for "${host}" port ${port}`);
   }
   if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME") {
     return new Socket.ResolutionError("getaddrinfo: Name or service not known");
   }
-  return e as Error;
+  return e;
 }
 
 Net.HTTP = HTTP;

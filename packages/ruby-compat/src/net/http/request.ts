@@ -1,5 +1,5 @@
 import { ArgumentError } from "../../argument-error.js";
-import type { HTTP as URIHTTP } from "../../uri/http.js";
+import { HTTP as URIHTTP } from "../../uri/http.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -34,6 +34,7 @@ export class HTTPRequest {
     this.method = klass.METHOD;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
     if (typeof path !== "string") {
+      if (!(path instanceof URIHTTP)) throw new ArgumentError("not an HTTP URI");
       const hostname = path.hostname;
       if (!(hostname != null && hostname.length > 0)) {
         throw new ArgumentError("no host component for URI");
@@ -69,8 +70,8 @@ export class HTTPRequest {
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#to_hash` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:477-479`). */
-  toHash(): Record<string, string> {
-    return { ...this._header };
+  toHash(): Record<string, string[]> {
+    return Object.fromEntries(Object.entries(this._header).map(([k, v]) => [k, [v]]));
   }
 
   /** @noRailsEquivalent PERMANENT */
