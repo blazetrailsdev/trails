@@ -63,10 +63,7 @@ export class CredentialsGenerator extends GeneratorBase {
         "credentials.yml",
         tmpPath,
         { force: true, verbose: false },
-        (rendered: string) => {
-          content = rendered;
-          return rendered;
-        },
+        (rendered: string) => (content = rendered),
       );
     });
 
