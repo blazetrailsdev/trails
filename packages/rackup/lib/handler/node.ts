@@ -177,9 +177,18 @@ export class Node {
           if (length > MAX_BODY_SIZE) throw new Error("Request body too large");
           const parsed: Uint8Array[] = [];
           await new Promise<void>((resolve, reject) => {
-            req.on("data", (chunk) => parsed.push(chunk));
-            req.on("end", () => resolve());
-            req.on("error", () => reject(new EOFError("end of file reached")));
+            const onData = (chunk: Uint8Array): void => {
+              parsed.push(chunk);
+            };
+            req.on("data", onData);
+            req.once("end", () => {
+              req.removeListener("data", onData);
+              resolve();
+            });
+            req.once("error", (error) => {
+              req.removeListener("data", onData);
+              reject(error);
+            });
           });
           const buffered = Buffer.concat([...parsed, head]);
           const bodyBytes = new Uint8Array(length);

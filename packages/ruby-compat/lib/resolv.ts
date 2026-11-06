@@ -16,13 +16,7 @@ const IPv4 = {
   ),
 };
 
-/**
- * Ruby stdlib `Resolv::IPv6` (`vendor/ruby/v3.3.11/lib/resolv.rb:2913`), its
- * address regexes only.
- *
- * @noRailsEquivalent PERMANENT
- */
-const IPv6 = {
+const IPV6_FORMS = {
   /** `Resolv::IPv6::Regex_8Hex` (`vendor/ruby/v3.3.11/lib/resolv.rb:2917-2920`). */
   Regex_8Hex: /^(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}$/,
   /** `Resolv::IPv6::Regex_CompressedHex` (`vendor/ruby/v3.3.11/lib/resolv.rb:2925-2928`). */
@@ -39,21 +33,22 @@ const IPv6 = {
   Regex_CompressedHexLinkLocal: new RegExp(
     `^[Ff][Ee]80:(?:(${HEX_GROUPS})::(${HEX_GROUPS})|:(${HEX_GROUPS}))?:[0-9A-Fa-f]{1,4}%[-0-9A-Za-z._~]+$`,
   ),
+};
+
+/**
+ * Ruby stdlib `Resolv::IPv6` (`vendor/ruby/v3.3.11/lib/resolv.rb:2913`), its
+ * address regexes only.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+const IPv6 = {
+  ...IPV6_FORMS,
   /** `Resolv::IPv6::Regex` (`vendor/ruby/v3.3.11/lib/resolv.rb:2972-2979`). */
-  get Regex(): RegExp {
-    return new RegExp(
-      [
-        this.Regex_8Hex,
-        this.Regex_CompressedHex,
-        this.Regex_6Hex4Dec,
-        this.Regex_CompressedHex4Dec,
-        this.Regex_8HexLinkLocal,
-        this.Regex_CompressedHexLinkLocal,
-      ]
-        .map((r) => `(?:${r.source})`)
-        .join("|"),
-    );
-  },
+  Regex: new RegExp(
+    Object.values(IPV6_FORMS)
+      .map((r) => `(?:${r.source})`)
+      .join("|"),
+  ),
 };
 
 /**

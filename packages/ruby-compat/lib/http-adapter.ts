@@ -6,6 +6,8 @@ export interface HttpRequest {
   socket: { remoteAddress?: string | undefined; encrypted?: boolean | undefined };
   on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   on(event: "end" | "error", listener: (error: Error) => void): unknown;
+  once(event: "end" | "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   destroy(): unknown;
 }
 
