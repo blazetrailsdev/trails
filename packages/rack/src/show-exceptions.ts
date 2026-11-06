@@ -7,7 +7,7 @@ import {
   rbObjRespondTo,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
-import { chomp } from "@blazetrails/ruby-compat";
+import { chomp, isEmpty } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Request } from "./request.js";
@@ -345,7 +345,7 @@ ${frames
 
   <h3 id="cookie-info">COOKIES</h3>
   ${
-    Object.keys(req.cookies).length !== 0
+    !isEmpty(req.cookies)
       ? `<table class="req">
       <thead>
         <tr>
@@ -354,7 +354,7 @@ ${frames
         </tr>
       </thead>
       <tbody>
-        ${Object.entries(req.cookies)
+        ${[...(req.cookies instanceof Map ? req.cookies : Object.entries(req.cookies))]
           .map(
             ([key, val]) => `<tr>
             <td>${h(key)}</td>

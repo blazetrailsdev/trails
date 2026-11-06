@@ -196,7 +196,7 @@ describe("HelperMethodBuilder dispatch", () => {
     const target = makeHost();
     const builder = HelperMethodBuilder.path();
     expect(builder.handleStringCall(target, "posts")).toBe("/posts");
-    expect(builder.handleClassCall(target, Post as never)).toBe("/posts");
+    expect(builder.handleClassCall(target, Post)).toBe("/posts");
     expect(builder.handleModelCall(target, new Post(3))).toBe("/posts/3");
     expect(builder.handleModelCall(target, new Post(null))).toBe("/posts");
   });
