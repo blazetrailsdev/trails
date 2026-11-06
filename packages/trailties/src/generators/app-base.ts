@@ -507,7 +507,10 @@ ${requireStatements.join("\n")}`;
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall rails_version_specifier — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
+   */
   trailsGemfileEntry(name: string, packageManager: string): string {
     if (this.options.dev) {
       const path = this.trailsDevPackages()[name];

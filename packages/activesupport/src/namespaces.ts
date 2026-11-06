@@ -150,6 +150,7 @@ declare module "@blazetrails/ruby-compat" {
       };
     };
     AppBuilder?: new (generator: never) => object;
+    PluginBuilder?: new (generator: never) => object;
   }
 }
 
