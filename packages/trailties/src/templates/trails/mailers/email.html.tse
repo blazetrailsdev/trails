@@ -92,7 +92,7 @@
     <% } %>
 
     <dt>Date:</dt>
-    <dd id="date"><%= this.email.header().get("date") ?? new Date().toUTCString() %></dd>
+    <dd id="date"><%= this.email.header().get("date") ?? Time.current().rfc2822() %></dd>
 
     <dt>Subject:</dt>
     <dd><strong id="subject"><%= this.email.subject() %></strong></dd>

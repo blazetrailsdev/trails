@@ -1,7 +1,7 @@
 import { I18n, indexBy, toQuery } from "@blazetrails/activesupport";
 import { AbstractController, DebugView, Mime, MimeType } from "@blazetrails/actionpack";
 import { ActionMailer, Preview } from "@blazetrails/actionmailer";
-import { Base64, File, rbModName } from "@blazetrails/ruby-compat";
+import { Base64, File, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";
 
@@ -23,6 +23,7 @@ interface PreviewEmail extends MailPart {
 export class MailersController extends ApplicationController {
   declare previews: (typeof Preview)[];
   declare pageTitle: string;
+  /** @missingRailsName preview — PERMANENT */
   declare _preview: typeof Preview;
   declare emailAction: string;
   declare email: PreviewEmail;
@@ -85,7 +86,7 @@ export class MailersController extends ApplicationController {
           if ((part = this.findPart(partType))) {
             this.response.contentType = partType.toString();
             await this.render({
-              plain: String(part.decoded !== undefined ? part.decoded() : part),
+              plain: String(rbObjRespondTo(part, "decoded") ? part.decoded!() : part),
             });
           } else {
             throw new AbstractController.ActionNotFound(
@@ -170,8 +171,8 @@ export class MailersController extends ApplicationController {
       email.allParts().filter((part) => part.isAttachment()),
       (attachment) =>
         String(
-          attachment.originalFilename !== undefined
-            ? attachment.originalFilename()
+          rbObjRespondTo(attachment, "originalFilename")
+            ? attachment.originalFilename!()
             : attachment.filename(),
         ),
     );
@@ -195,7 +196,7 @@ export class MailersController extends ApplicationController {
   /** @internal */
   private async setLocale(block: () => Promise<void>): Promise<void> {
     await I18n.withLocale(
-      (this.params.get("locale") as string | undefined) || I18n.defaultLocale(),
+      (this.params.get("locale") as string | null | undefined) ?? I18n.defaultLocale(),
       block,
     );
   }
