@@ -98,7 +98,6 @@ export class String {
 
   static readonly BLANK_RE = BLANK_RE;
 
-  /** @inventedArm fromCharCode — PERMANENT */
   static isBlank(value: string | Uint8Array): boolean {
     return (
       value.length === 0 ||
