@@ -314,9 +314,10 @@ export abstract class Helpers {
     return this.getHeader(SERVER_PORT) ?? null;
   }
 
-  get cookies(): Record<string, string> {
-    const hash: Record<string, string> = this.fetchHeader(RACK_REQUEST_COOKIE_HASH, (key) =>
-      this.setHeader(key, {}),
+  get cookies(): Record<string, string> | Map<string, string> {
+    const hash: Record<string, string> | Map<string, string> = this.fetchHeader(
+      RACK_REQUEST_COOKIE_HASH,
+      (key) => this.setHeader(key, {}),
     );
 
     const string = this.getHeader(HTTP_COOKIE);

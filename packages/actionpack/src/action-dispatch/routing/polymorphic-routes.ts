@@ -284,8 +284,7 @@ export class HelperMethodBuilder {
   }
 
   handleStringCall(target: PolymorphicHost, str: string): string {
-    const m = this.getMethodForString(str);
-    return (target[m] as (...a: unknown[]) => string).call(target);
+    return rbFSend(target, this.getMethodForString(str)) as string;
   }
 
   handleClass(klass: ModelClass): [string, unknown[]] {
@@ -293,8 +292,7 @@ export class HelperMethodBuilder {
   }
 
   handleClassCall(target: PolymorphicHost, klass: ModelClass): string {
-    const m = this.getMethodForClass(klass);
-    return (target[m] as (...a: unknown[]) => string).call(target);
+    return rbFSend(target, this.getMethodForClass(klass)) as string;
   }
 
   handleModel(record: ToModel): [string, unknown[]] {
@@ -310,7 +308,7 @@ export class HelperMethodBuilder {
     const mapping = polymorphicMapping(target, record);
     if (mapping) return mapping.call(target, [record], this.suffix === "path");
     const [method, args] = this.handleModel(record);
-    return (target[method] as (...a: unknown[]) => string).call(target, ...args);
+    return rbFSend(target, method, ...args) as string;
   }
 
   handleList(list: ReadonlyArray<unknown>): [string, unknown[]] {

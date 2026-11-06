@@ -7,7 +7,7 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
-import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbInspect, rbProcCall, hashAref } from "@blazetrails/ruby-compat";
 
 /** @internal */
 type FakeResponse = [number, Record<string, string | string[]>, string[]];
@@ -28,7 +28,7 @@ export class FakeApp {
 
   /** @internal */
   private newCookieCount(req: Request): string {
-    const oldValue = parseInt(req.cookies["count"] ?? "", 10) || 0;
+    const oldValue = parseInt((hashAref(req.cookies, "count") as string | null) ?? "", 10) || 0;
     return String(oldValue + 1);
   }
 

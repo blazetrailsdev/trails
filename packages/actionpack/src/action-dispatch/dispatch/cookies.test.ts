@@ -20,7 +20,15 @@ import {
   assertEmpty,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
-import { ArgumentError, JSON, Marshal, block, hashDelete } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  JSON,
+  Marshal,
+  block,
+  hashDelete,
+  hashAset,
+  hashReplace,
+} from "@blazetrails/ruby-compat";
 import { escape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 import { TestRequest } from "../testing/test-request.js";
@@ -240,13 +248,13 @@ describe("CookiesTest", () => {
   });
 
   it("setting the same value to cookie", async () => {
-    tc.request.cookies["user_name"] = "david";
+    hashAset(tc.request.cookies, "user_name", "david");
     await tc.get("authenticate");
     assertEmpty(tc.response.cookies);
   });
 
   it("setting the same value to permanent cookie", async () => {
-    tc.request.cookies["user_name"] = "Jamie";
+    hashAset(tc.request.cookies, "user_name", "Jamie");
     await tc.get("setPermanentCookie");
     assertEqual({ user_name: "Jamie" }, tc.response.cookies);
   });
@@ -320,7 +328,7 @@ describe("CookiesTest", () => {
   });
 
   it("expiring cookie", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("logout");
     tc.assertSetCookieHeader(
       "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
@@ -329,7 +337,7 @@ describe("CookiesTest", () => {
   });
 
   it("delete cookie with path", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithPath");
     tc.assertSetCookieHeader(
       "user_name=; path=/beaten; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
@@ -337,7 +345,7 @@ describe("CookiesTest", () => {
   });
 
   it("delete cookie return value", () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     const returnValue = hashDelete(tc.request.cookies, "user_name");
     assertEqual("Joe", returnValue);
   });
@@ -348,7 +356,7 @@ describe("CookiesTest", () => {
   });
 
   it("delete unexisting cookie", async () => {
-    for (const key of Object.keys(tc.request.cookies)) delete tc.request.cookies[key];
+    hashReplace(tc.request.cookies, {});
     await tc.get("deleteCookie");
     assertEmpty(tc.response.cookies);
   });
@@ -361,37 +369,37 @@ describe("CookiesTest", () => {
   });
 
   it("deleting cookie get", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("logout");
     assertNil(tc.cookies().get("user_name"));
   });
 
   it("deleting cookie post", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.post("logout");
     assertNil(tc.cookies().get("user_name"));
   });
 
   it("deleting cookie patch", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.patch("logout");
     assertNil(tc.cookies().get("user_name"));
   });
 
   it("deleting cookie put", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.put("logout");
     assertNil(tc.cookies().get("user_name"));
   });
 
   it("deleting cookie delete", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.delete("logout");
     assertNil(tc.cookies().get("user_name"));
   });
 
   it("deleting cookie head", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.head("logout");
     assertNil(tc.cookies().get("user_name"));
   });
@@ -536,7 +544,7 @@ describe("CookiesTest", () => {
   });
 
   it("delete and set cookie", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteAndSetCookie");
     tc.assertSetCookieHeader(
       "user_name=david; path=/; expires=Mon, 10 Oct 2005 05:00:00 GMT; SameSite=Lax",
@@ -1325,7 +1333,7 @@ describe("CookiesTest", () => {
   });
 
   it("deleting cookie with all domain option", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomain");
     tc.assertResponse("success");
     tc.assertSetCookieHeader(
@@ -1368,7 +1376,7 @@ describe("CookiesTest", () => {
   });
 
   it("deleting cookie with all domain option and tld length", async () => {
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomainAndTld");
     tc.assertResponse("success");
     tc.assertSetCookieHeader(
@@ -1436,7 +1444,7 @@ describe("CookiesTest", () => {
 
   it("deleting cookie with several preset domains using one of these domains", async () => {
     tc.request.host = "example2.com";
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomains");
     tc.assertResponse("success");
     tc.assertSetCookieHeader(
@@ -1446,7 +1454,7 @@ describe("CookiesTest", () => {
 
   it("deleting cookie with several preset domains using other domain", async () => {
     tc.request.host = "other-domain.com";
-    tc.request.cookies["user_name"] = "Joe";
+    hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomains");
     tc.assertResponse("success");
     tc.assertSetCookieHeader(
@@ -1518,7 +1526,7 @@ describe("CookiesTest", () => {
   });
 
   it("can set request cookies", async () => {
-    tc.request.cookies["user_name"] = "david";
+    hashAset(tc.request.cookies, "user_name", "david");
     await tc.get("noop");
     assertEqual("david", tc.cookies().get("user_name"));
     assertEqual("david", tc.cookies().get("user_name"));
@@ -1527,7 +1535,7 @@ describe("CookiesTest", () => {
     assertEqual("david", tc.cookies().get("user_name"));
     assertEqual("david", tc.cookies().get("user_name"));
 
-    tc.request.cookies["user_name"] = "andrew";
+    hashAset(tc.request.cookies, "user_name", "andrew");
     await tc.get("noop");
     assertEqual("andrew", tc.cookies().get("user_name"));
     assertEqual("andrew", tc.cookies().get("user_name"));
@@ -1545,7 +1553,7 @@ describe("CookiesTest", () => {
   });
 
   it("cookies precedence over request cookies", async () => {
-    tc.request.cookies["user_name"] = "andrew";
+    hashAset(tc.request.cookies, "user_name", "andrew");
     await tc.get("authenticate");
     assertEqual("david", tc.cookies().get("user_name"));
     assertEqual("david", tc.cookies().get("user_name"));

@@ -15,6 +15,7 @@ import {
   isValidEncoding,
   rbFSend,
   rbObjMethod,
+  hashAref,
 } from "@blazetrails/ruby-compat";
 import {
   I18n,
@@ -1381,8 +1382,8 @@ describe("RequestCookie", () => {
     const req = new Request({
       HTTP_COOKIE: "_session_id=c84ace84796670c052c6ceb2451fb0f2; is_admin=yes",
     });
-    expect(req.cookies["_session_id"]).toBe("c84ace84796670c052c6ceb2451fb0f2");
-    expect(req.cookies["is_admin"]).toBe("yes");
+    expect(hashAref(req.cookies, "_session_id")).toBe("c84ace84796670c052c6ceb2451fb0f2");
+    expect(hashAref(req.cookies, "is_admin")).toBe("yes");
   });
 });
 

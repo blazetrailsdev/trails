@@ -181,7 +181,7 @@ export class Cookie extends PersistedSecure {
   private unpackedCookieData(request: PersistedRequest): object {
     return request.fetchHeader<object>(RACK_SESSION_UNPACKED_COOKIE_DATA, (k) => {
       let sessionData: unknown = null;
-      const cookieData = request.cookies[this.key] as string | undefined;
+      const cookieData = hashAref(request.cookies, this.key) as string | undefined;
       if (isTruthy(cookieData)) {
         for (const encryptor of this.encryptors) {
           try {
