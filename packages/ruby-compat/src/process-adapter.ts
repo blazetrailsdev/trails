@@ -792,73 +792,6 @@ function stty(proc: NodeProcessLike, args: string[]): string {
   throw new SystemCallError(err);
 }
 
-/**
- * The Windows arm of `getattr` / `setattr` / `set_noecho`
- * (`vendor/ruby/v3.3.11/ext/io/console/console.c:252-291`): `set_noecho`
- * clears `ENABLE_ECHO_INPUT` with `SetConsoleMode` (`console.c:289`) and keeps
- * `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`. Node exposes no
- * `SetConsoleMode`, only `setRawMode`, which clears all three, so while echo
- * is off `read` gives back the two the console no longer does: a line is
- * answered at CR with backspace applied and CR read as LF, and Ctrl-C raises
- * `SIGINT`. The saved mode is `"echo"` or `"-echo"`.
- */
-function consoleMode(proc: NodeProcessLike, readChunk: () => Promise<string | null>) {
-  let echoInput = true;
-  let line = "";
-  let keys = "";
-  const tty = (): void => {
-    if (!proc.stdin.isTTY || proc.stdin.setRawMode == null) throw new Errno.ENOTTY();
-  };
-  const setConsoleMode = (echo: boolean): void => {
-    tty();
-    proc.stdin.setRawMode!(!echo);
-    echoInput = echo;
-  };
-  return {
-    getattr: (): string => {
-      tty();
-      return echoInput ? "echo" : "-echo";
-    },
-    setattr: (t: string): void => setConsoleMode(t === "echo"),
-    setNoecho: (): void => setConsoleMode(false),
-    read: async (): Promise<string | null> => {
-      if (echoInput && keys === "") return readChunk();
-      for (;;) {
-        if (keys === "") {
-          const chunk = await readChunk();
-          if (chunk == null) {
-            const rest = line;
-            line = "";
-            return rest === "" ? null : rest;
-          }
-          keys = chunk;
-        }
-        const c = keys[0];
-        keys = keys.slice(1);
-        switch (c) {
-          case "\r":
-          case "\n": {
-            if (c === "\r" && keys[0] === "\n") keys = keys.slice(1);
-            const answer = `${line}\n`;
-            line = "";
-            return answer;
-          }
-          case "\b":
-          case "\x7f":
-            line = Array.from(line).slice(0, -1).join("");
-            break;
-          case "\x03":
-            line = "";
-            proc.kill(proc.pid, "SIGINT");
-            break;
-          default:
-            line += c;
-        }
-      }
-    },
-  };
-}
-
 function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
   const readChunk = (): Promise<string | null> =>
     new Promise<string | null>((resolve, reject) => {
@@ -898,7 +831,73 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       proc.stdin.once("close", onTerminal);
       proc.stdin.once("error", onError);
     });
-  const windowsConsole = proc.platform === "win32" ? consoleMode(proc, readChunk) : null;
+  /**
+   * The Windows arm of `getattr` / `setattr` / `set_noecho`
+   * (`vendor/ruby/v3.3.11/ext/io/console/console.c:252-291`): `set_noecho`
+   * clears `ENABLE_ECHO_INPUT` with `SetConsoleMode` (`console.c:289`) and keeps
+   * `ENABLE_LINE_INPUT` and `ENABLE_PROCESSED_INPUT`. Node exposes no
+   * `SetConsoleMode`, only `setRawMode`, which clears all three, so while echo
+   * is off `read` gives back the two the console no longer does: a line is
+   * answered at CR with backspace applied and CR read as LF, and Ctrl-C raises
+   * `SIGINT`. The saved mode is `"echo"` or `"-echo"`.
+   */
+  const consoleMode = () => {
+    let echoInput = true;
+    let line = "";
+    let keys = "";
+    const tty = (): void => {
+      if (!proc.stdin.isTTY || proc.stdin.setRawMode == null) throw new Errno.ENOTTY();
+    };
+    const setConsoleMode = (echo: boolean): void => {
+      tty();
+      proc.stdin.setRawMode!(!echo);
+      echoInput = echo;
+    };
+    return {
+      getattr: (): string => {
+        tty();
+        return echoInput ? "echo" : "-echo";
+      },
+      setattr: (t: string): void => setConsoleMode(t === "echo"),
+      setNoecho: (): void => setConsoleMode(false),
+      read: async (): Promise<string | null> => {
+        if (echoInput && keys === "") return readChunk();
+        for (;;) {
+          if (keys === "") {
+            const chunk = await readChunk();
+            if (chunk == null) {
+              const rest = line;
+              line = "";
+              return rest === "" ? null : rest;
+            }
+            keys = chunk;
+          }
+          const c = keys[0];
+          keys = keys.slice(1);
+          switch (c) {
+            case "\r":
+            case "\n": {
+              if (c === "\r" && keys[0] === "\n") keys = keys.slice(1);
+              const answer = `${line}\n`;
+              line = "";
+              return answer;
+            }
+            case "\b":
+            case "\x7f":
+              line = Array.from(line).slice(0, -1).join("");
+              break;
+            case "\x03":
+              line = "";
+              proc.kill(proc.pid, "SIGINT");
+              break;
+            default:
+              line += c;
+          }
+        }
+      },
+    };
+  };
+  const windowsConsole = proc.platform === "win32" ? consoleMode() : null;
   return {
     envSnapshot: () => ({ ...proc.env }),
     argvSnapshot: () => [...proc.argv],
