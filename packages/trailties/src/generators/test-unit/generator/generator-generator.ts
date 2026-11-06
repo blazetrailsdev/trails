@@ -1,10 +1,10 @@
 import type { GeneratorGeneratorOptions } from "../../trails/generator/generator-generator.js";
 import { File } from "@blazetrails/ruby-compat";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-export class GeneratorGenerator extends NamedBase {
+export class GeneratorGenerator extends Base {
   declare options: GeneratorGeneratorOptions;
 
   static {
