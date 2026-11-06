@@ -35,6 +35,7 @@ export interface PackageLayout {
 /** A package with no row has its directories for roots. */
 export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   actioncable: { root: "ActionCable" },
+  actionmailbox: { root: "ActionMailbox", siblings: true },
   actionpack: {
     collapse: [
       "action-controller/metal",
