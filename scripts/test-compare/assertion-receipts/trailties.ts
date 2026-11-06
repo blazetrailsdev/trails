@@ -10,6 +10,34 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "command/base_test.rb:13 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
     },
   ],
+  "trailties:generators_test.rb › GeneratorsTest › find by namespace with context": [
+    {
+      kind: "assert_equal",
+      value: "s:test_unit:model",
+      as: "assert_equal",
+      reason:
+        'generators_test.rb:105 asserts the snake_case namespace; trails dasherizes a generator namespace (trails#9399, generators.trails.test.ts "resolves a generator from either spelling")',
+    },
+  ],
+  "trailties:generators_test.rb › GeneratorsTest › fallbacks for generators on find by namespace": [
+    {
+      kind: "assert_equal",
+      value: "s:test_unit:plugin",
+      as: "assert_equal",
+      reason:
+        'generators_test.rb:186 asserts the snake_case namespace; trails dasherizes a generator namespace (trails#9399, generators.trails.test.ts "resolves a generator from either spelling")',
+    },
+  ],
+  "trailties:generators_test.rb › GeneratorsTest › fallbacks for generators on find by namespace with context":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:test_unit:plugin",
+        as: "assert_equal",
+        reason:
+          'generators_test.rb:195 asserts the snake_case namespace; trails dasherizes a generator namespace (trails#9399, generators.trails.test.ts "resolves a generator from either spelling")',
+      },
+    ],
   "trailties:generators/api_app_generator_test.rb › ApiAppGeneratorTest › api modified files": [
     {
       kind: "assert_match",
