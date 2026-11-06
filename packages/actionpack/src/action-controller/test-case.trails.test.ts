@@ -1,5 +1,11 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  HashWithIndifferentAccess,
+  include,
+  isModuleIncluded,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   b,
@@ -33,6 +39,18 @@ import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import "../test-helpers/abstract-unit.js";
+
+describe("TestRequest.create cookie_hash", () => {
+  it("seeds rack.request.cookie_hash with a HashWithIndifferentAccess the jar reads", () => {
+    const req = TestRequest.create(null);
+    const seeded = req.getHeader("rack.request.cookie_hash");
+    expect(seeded).toBeInstanceOf(HashWithIndifferentAccess);
+    req.setHeader("HTTP_COOKIE", "user_name=david");
+    expect(req.cookies).toBe(seeded);
+    expect(seeded.get("user_name")).toBe("david");
+    expect(req.cookieJar().get("user_name")).toBe("david");
+  });
+});
 
 describe("TestRequest#assignParameters Content-Type case", () => {
   it("raises on a Content-Type no Mime::Type is registered for", () => {
@@ -383,7 +401,7 @@ describe("TestCase over a PostsController", () => {
 
     it("throws on unknown symbol", async () => {
       await tc.get("index");
-      expect(() => tc.assertResponse("banana")).toThrow(/Invalid response name: banana/);
+      expect(() => tc.assertResponse("banana")).toThrow(/Unrecognized status code :banana/);
     });
 
     it("accepts 'missing' for 4xx", async () => {

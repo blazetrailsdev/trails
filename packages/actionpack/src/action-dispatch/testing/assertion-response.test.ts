@@ -37,7 +37,9 @@ describe("AssertionResponse", () => {
   });
 
   it("throws on invalid name", () => {
-    expect(() => new AssertionResponse("bogus_status")).toThrow(/Invalid response name/);
+    expect(() => new AssertionResponse("bogus_status")).toThrow(
+      /Unrecognized status code :bogus_status/,
+    );
   });
 
   it("throws on invalid code", () => {
