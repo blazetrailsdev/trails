@@ -42,34 +42,38 @@ describe("SMTP Delivery Method", () => {
   });
 
   describe("enabling ssl", () => {
-    const deliveredVerifyModes = async (settings: Record<string, unknown>) => {
-      const verifyModes: unknown[] = [];
+    const verifyModeDelivery = (settings: Record<string, unknown>) => {
+      const verifyMode = vi.fn();
       const context = {};
-      Object.defineProperty(context, "verifyMode", {
-        set: (value: unknown) => verifyModes.push(value),
-      });
-      const defaultSslContext = vi.spyOn(NetSMTP, "defaultSslContext").mockReturnValue(context);
-      const start = vi.spyOn(NetSMTP.prototype, "start").mockResolvedValue(null);
-      try {
-        await new SMTP({
-          address: "smtp.mockup.com",
-          port: 587,
-          tls: true,
-          ...settings,
-        }).deliverBang(buildMail());
-      } finally {
-        start.mockRestore();
-        defaultSslContext.mockRestore();
-      }
-      return verifyModes;
+      Object.defineProperty(context, "verifyMode", { set: verifyMode });
+      const deliver = async () => {
+        const defaultSslContext = vi.spyOn(NetSMTP, "defaultSslContext").mockReturnValue(context);
+        const start = vi.spyOn(NetSMTP.prototype, "start").mockResolvedValue(null);
+        try {
+          await new SMTP({
+            address: "smtp.mockup.com",
+            port: 587,
+            tls: true,
+            ...settings,
+          }).deliverBang(buildMail());
+        } finally {
+          start.mockRestore();
+          defaultSslContext.mockRestore();
+        }
+      };
+      return { verifyMode, deliver };
     };
 
     it("should not set verify mode when none is given", async () => {
-      expect(await deliveredVerifyModes({})).toEqual([]);
+      const { verifyMode, deliver } = verifyModeDelivery({});
+      await expect(deliver()).resolves.not.toThrow();
+      expect(verifyMode).not.toHaveBeenCalled();
     });
 
     it("should set verify mode if one is given", async () => {
-      expect(await deliveredVerifyModes({ opensslVerifyMode: "peer" })).toContain("VERIFY_PEER");
+      const { verifyMode, deliver } = verifyModeDelivery({ opensslVerifyMode: "peer" });
+      await expect(deliver()).resolves.not.toThrow();
+      expect(verifyMode).toHaveBeenCalledWith("VERIFY_PEER");
     });
   });
 
