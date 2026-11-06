@@ -708,6 +708,25 @@ ${requireStatements.join("\n")}`;
     if (this.isInstall()) this.installCommand("install");
   }
 
+  /**
+   * @internal
+   * @missingRailsCall bundle_command — PERMANENT
+   */
+  protected async generateBundlerBinstub(): Promise<void> {
+    if (this.isInstall()) {
+      const pm = getPackageManager(this.destinationRoot, {
+        fallback: (this as unknown as { packageManager?: string }).packageManager,
+      });
+      await this.createFile(
+        `bin/${pm.name}`,
+        `import { spawnSync } from "node:child_process";\n\n` +
+          `const { status } = spawnSync(${JSON.stringify(pm.name)}, process.argv.slice(2), { stdio: "inherit" });\n` +
+          `process.exit(status ?? 1);\n`,
+        { verbose: false },
+      );
+    }
+  }
+
   /** @internal */
   protected async runJavascript(): Promise<void> {
     if (this.options.skipJavascript || !this.isInstall()) return;

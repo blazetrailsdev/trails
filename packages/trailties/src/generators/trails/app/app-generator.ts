@@ -525,6 +525,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteNewFrameworkDefaults");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
+    this.publicCommand("generateBundlerBinstub");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
