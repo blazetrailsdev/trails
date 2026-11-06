@@ -390,6 +390,8 @@ describe("File.openAsync", () => {
     const bytes = await File.openAsync(path, "rb", (f) => f.readAsync());
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect((bytes as Uint8Array).length).toBe(20002);
+    expect(await File.openAsync(path, "rb", (f) => f.readAsync(null))).toEqual(bytes);
+    expect(await File.openAsync(path, "rb", (f) => f.readAsync(0))).toEqual(new Uint8Array(0));
   });
 
   it("yields each line by eachAsync, separator retained, and closes after the block", async () => {

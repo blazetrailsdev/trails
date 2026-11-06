@@ -1251,7 +1251,7 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/v3.3.11/io.c:3774`).
    */
-  async readAsync(): Promise<string | Uint8Array>;
+  async readAsync(length?: null): Promise<string | Uint8Array>;
   async readAsync(length: number): Promise<Uint8Array | null>;
   async readAsync(length?: number | null): Promise<string | Uint8Array | null> {
     if (length == null) {
