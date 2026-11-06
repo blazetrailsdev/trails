@@ -108,7 +108,7 @@ export class Part extends Message {
   /** @internal */
   protected override parseMessage(): void {
     const [headerPart, bodyPart] = stringSplit(
-      this.rawSource,
+      this.rawSource as string,
       new RegExp(`${LAX}${WSP}*${LAX}`, "m"),
       2,
     );

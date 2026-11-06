@@ -1,6 +1,5 @@
 import { Time } from "@blazetrails/date";
 import {
-  forceEncoding,
   File,
   kernelRand,
   Process,
@@ -134,11 +133,8 @@ export const Mail: MailConstants = {
     for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
   },
 
-  /** @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source */
   async read(filename: string): Promise<Message> {
-    return Mail.new(
-      forceEncoding(await File.openAsync(filename, "rb", (f) => f.readAsync()), "UTF-8"),
-    );
+    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
   },
 
   randomTag(): string {
