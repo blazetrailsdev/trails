@@ -18,7 +18,19 @@ export {
   defineConstants,
 } from "./classpath.js";
 export { CGI } from "./cgi.js";
-export { IO, PipeIO, STDERR, STDIN, STDOUT, print, printf, puts, rbOutputRs } from "./io.js";
+export {
+  IO,
+  PipeIO,
+  STDERR,
+  STDIN,
+  STDOUT,
+  binaryBytes,
+  binaryString,
+  print,
+  printf,
+  puts,
+  rbOutputRs,
+} from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,

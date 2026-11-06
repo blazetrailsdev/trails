@@ -11,13 +11,13 @@ import {
   rbObjDup,
   stringSplit,
   warn,
+  binaryBytes,
+  binaryString,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 import { Field } from "./field.js";
 import { FieldList } from "./field-list.js";
 import { Utilities } from "./utilities.js";
-
-const LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32];
 
 type ContentTypeParameters = Hash<string, string | Encoding>;
 type HasParameters = { parameters(): ContentTypeParameters | null };
@@ -47,13 +47,9 @@ export class Header {
   ) {
     this._charset = charset;
     const crlf = Utilities.toCrlf(headerText as string | Uint8Array);
-    if (crlf instanceof Uint8Array) {
-      let start = 0;
-      while (start < crlf.length && LSTRIP_BYTES.includes(crlf[start])) start++;
-      this._rawSource = crlf.subarray(start);
-    } else {
-      this._rawSource = crlf.replace(/^[\0\t\n\v\f\r ]+/, "");
-    }
+    const binary = crlf instanceof Uint8Array;
+    const lstripped = (binary ? binaryString(crlf) : crlf).replace(/^[\0\t\n\v\f\r ]+/, "");
+    this._rawSource = binary ? binaryBytes(lstripped) : lstripped;
     if (headerText != null) this.splitHeader();
   }
 
@@ -187,10 +183,7 @@ export class Header {
   private splitHeader(): void {
     const raw = this._rawSource;
     if (raw instanceof Uint8Array) {
-      const scan = Array.from(raw, (b) => String.fromCharCode(b)).join("");
-      this.fields = stringSplit(scan, Constants.HEADER_SPLIT).map((f) =>
-        Uint8Array.from(f, (c) => c.charCodeAt(0)),
-      );
+      this.fields = stringSplit(binaryString(raw), Constants.HEADER_SPLIT).map(binaryBytes);
     } else {
       this.fields = stringSplit(raw, Constants.HEADER_SPLIT);
     }

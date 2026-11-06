@@ -22,6 +22,8 @@ import {
   strip,
   stringSplit,
   warn,
+  binaryBytes,
+  binaryString,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 import type { CommonField } from "./fields/common-field.js";
@@ -164,14 +166,13 @@ export class Field implements Comparable {
     rawField: string | Uint8Array,
   ): [string, string | Uint8Array] | string | Uint8Array | null {
     const binary = rawField instanceof Uint8Array;
-    const scan = binary ? Array.from(rawField, (b) => String.fromCharCode(b)).join("") : rawField;
-    const bytes = (str: string) => (binary ? Uint8Array.from(str, (c) => c.charCodeAt(0)) : str);
+    const scan = binary ? binaryString(rawField) : rawField;
     try {
       if (scan.includes(Constants.COLON)) {
         const [first, value] = stringSplit(scan, Constants.COLON, 2);
         const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
-          return [rstrip(name), bytes(strip(value))];
+          return [rstrip(name), binary ? binaryBytes(strip(value)) : strip(value)];
         } else {
           warn(
             `WARNING: Ignoring unparsable header ${rbInspect(rawField)}: invalid header name syntax: ${rbInspect(name)}`,
@@ -179,7 +180,7 @@ export class Field implements Comparable {
           return null;
         }
       } else {
-        return bytes(strip(scan));
+        return binary ? binaryBytes(strip(scan)) : strip(scan);
       }
     } catch (error) {
       const e = error as Error;

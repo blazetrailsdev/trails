@@ -1,5 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it } from "vitest";
+import { hashAref, hashAset, Hash } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "./body.js";
 import { Field } from "./field.js";
 import { FieldList } from "./field-list.js";
@@ -9,7 +11,15 @@ import "./index.js";
 import { Mail } from "./mail.js";
 import { Message } from "./message.js";
 import { Part } from "./part.js";
+import { PartsList } from "./parts-list.js";
 import { Utilities } from "./utilities.js";
+import { YAML } from "./yaml.js";
+
+class DeliveryAgent {
+  static deliverMail(_mail: Message, block: () => unknown): unknown {
+    return block();
+  }
+}
 
 describe("Mail::Message", () => {
   function basicEmail() {
@@ -115,6 +125,76 @@ describe("Mail::Message", () => {
       expect(mail.references()).toBe("b@b.b");
     });
 
+    describe("YAML serialization", () => {
+      let yamlMail: Message;
+      const smtpSettings = {
+        address: "smtp.somewhere.net",
+        port: "587",
+        domain: "somewhere.net",
+        userName: "someone@somewhere.net",
+        password: "password",
+        authentication: "plain",
+        enableStarttlsAuto: true,
+        enableStarttls: null,
+        opensslVerifyMode: null,
+        ssl: null,
+        tls: null,
+        openTimeout: null,
+        readTimeout: null,
+      };
+
+      beforeEach(() => {
+        yamlMail = new Message({
+          to: "someone@somewhere.com",
+          cc: "someoneelse@somewhere.com",
+          bcc: "someonesecret@somewhere.com",
+          body: "body",
+          subject: "subject",
+        });
+        yamlMail.deliveryMethod("smtp", smtpSettings);
+      });
+
+      it("should serialize the basic information to YAML", () => {
+        const yamlOutput = YAML.load(yamlMail.toYaml()) as Hash<string, unknown>;
+        const headers = hashAref(yamlOutput, "headers");
+        expect(hashAref(headers as object, "To")).toEqual("someone@somewhere.com");
+        expect(hashAref(headers as object, "Cc")).toEqual("someoneelse@somewhere.com");
+        expect(hashAref(headers as object, "Subject")).toEqual("subject");
+        expect(hashAref(headers as object, "Bcc")).toEqual("someonesecret@somewhere.com");
+        expect(hashAref(yamlOutput, "@body_raw")).toEqual("body");
+        expect(Utilities.isBlank(hashAref(yamlOutput, "@delivery_method"))).toBeFalsy();
+      });
+
+      it("should serialize a Message with a custom delivery_handler", () => {
+        yamlMail.deliveryHandler = DeliveryAgent;
+        const yamlOutput = YAML.load(yamlMail.toYaml()) as Hash<string, unknown>;
+        expect(hashAref(yamlOutput, "delivery_handler")).toEqual("DeliveryAgent");
+      });
+
+      it("should not deserialize a delivery_handler that does not exist", () => {
+        const yamlHash = YAML.load(yamlMail.toYaml()) as Hash<string, unknown>;
+        hashAset(yamlHash, "delivery_handler", "NotARealClass");
+        const deserialized = Message.fromYaml(toYaml(yamlHash));
+        expect(deserialized.deliveryHandler).toBeNull();
+      });
+
+      it("should deserialize parts as an instance of Mail::PartsList", () => {
+        const yamlHash = YAML.load(yamlMail.toYaml());
+        const deserialized = Message.fromYaml(toYaml(yamlHash));
+        expect(deserialized.parts).toBeInstanceOf(PartsList);
+      });
+
+      it("should handle multipart mail", () => {
+        yamlMail.addPart(new Part({ contentType: "text/html", body: "<b>body</b>" }));
+        const deserialized = Message.fromYaml(yamlMail.toYaml());
+        expect(deserialized.isMultipart()).toBe(true);
+        deserialized.parts.forEach((part) => expect(part).toBeInstanceOf(Part));
+        expect(Array.from(deserialized.parts, (p) => p.body().toString())).toEqual([
+          "body",
+          "<b>body</b>",
+        ]);
+      });
+    });
     describe("splitting", () => {
       it("should split the body from the header", () => {
         const message = new Message("To: Example <example@cirw.in>\r\n\r\nHello there\r\n");

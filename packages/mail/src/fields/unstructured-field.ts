@@ -8,6 +8,8 @@ import {
   rbObjDup,
   rbObjEncoding,
   stringSplit,
+  binaryBytes,
+  binaryString,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "../constants.js";
 import { Encodings } from "../encodings.js";
@@ -63,17 +65,12 @@ export class UnstructuredField extends CommonField {
     return result.join("\r\n ");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall map — CONVERGEABLE mail-message-spec-port-remaining
-   */
+  /** @internal */
   protected fold(prepend = 0): string[] {
     const encoding = this.normalizedEncoding();
     const decoded = rbObjAsString(this.decoded()) as string | Uint8Array;
     const binary = decoded instanceof Uint8Array;
-    const decodedString = binary
-      ? Array.from(decoded, (b) => String.fromCharCode(b)).join("")
-      : decoded;
+    const decodedString = binary ? binaryString(decoded) : decoded;
     const shouldEncode = !isAsciiOnly(decodedString);
     let words: (string | Uint8Array)[];
     if (shouldEncode) {
@@ -86,7 +83,7 @@ export class UnstructuredField extends CommonField {
             word = ` ${word}`;
           }
           if (!isAsciiOnly(word)) {
-            return binary ? Uint8Array.from(word, (c) => c.charCodeAt(0)) : word;
+            return word;
           } else {
             return word.match(/[^\n]{7}|[^\n]+$/gm) ?? [];
           }
@@ -95,6 +92,7 @@ export class UnstructuredField extends CommonField {
     } else {
       words = stringSplit(decodedString, /[ \t]/);
     }
+    if (binary) words = words.map((word) => binaryBytes(word as string));
 
     const foldedLines: string[] = [];
     while (words.length !== 0) {
