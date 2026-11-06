@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { MockRequest } from "@blazetrails/rack";
-import { include } from "@blazetrails/ruby-compat";
+import { File, getFs, include } from "@blazetrails/ruby-compat";
 import type { Generation, Rack } from "../test-helpers/isolation/abstract-unit.js";
 import "../test-helpers/isolation/abstract-unit.js";
 
@@ -23,6 +23,14 @@ describe("MailerPreviewsTest", () => {
   beforeEach(async () => {
     t = new MailerPreviewsTest("test") as unknown as Host;
     await t.buildApp();
+    const application = File.join(await t.appPath(), "config/application.ts");
+    await getFs().writeFile!(
+      application,
+      (await getFs().readFile(application, "utf-8")).replace(
+        '// import "@blazetrails/trailties/trailties/action-mailer";',
+        'import "@blazetrails/trailties/trailties/action-mailer";',
+      ),
+    );
   });
 
   afterEach(() => t.teardownApp());
