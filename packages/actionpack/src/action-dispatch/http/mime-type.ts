@@ -7,6 +7,7 @@ import {
   KERNEL_METHODS,
   KeyError,
   NoMethodError,
+  objRespondToMissing,
   PROTOCOL_PROBES,
   rbInspect,
   regexpEscape,
@@ -292,8 +293,8 @@ export class MimeType {
   }
 
   /** @internal */
-  respondToMissing(method: string, _includePrivate = false): boolean {
-    return method.endsWith("?");
+  respondToMissing(method: string, includePrivate = false): boolean {
+    return method.endsWith("?") || objRespondToMissing(this, method, includePrivate);
   }
 
   static register(

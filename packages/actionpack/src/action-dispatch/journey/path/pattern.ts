@@ -33,7 +33,7 @@ export class AnchoredRegexp extends Visitor {
   override accept(node: Node): RegExp {
     return new RegExp(
       `^${this.visit(node)}$`,
-      unicodeFlag([...node].filter((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
+      unicodeFlag(node.findAll((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
     );
   }
 
@@ -83,7 +83,7 @@ export class UnanchoredRegexp extends AnchoredRegexp {
       ? new RegExp(`^/`)
       : new RegExp(
           `^${path}(?:\\b|$|/)`,
-          unicodeFlag([...node].filter((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
+          unicodeFlag(node.findAll((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
         );
   }
 }
@@ -253,16 +253,21 @@ export class Pattern {
     if (this._offsets == null) {
       const offsets: number[] = [0];
 
-      for (const node of [...this.spec].filter((n) => n.isSymbol())) {
-        if (Object.hasOwn(this.requirements, node.toSym())) {
-          const reqs = this.requirements[node.toSym()];
-          const re = new RegExp(`${rbRegToS(rbRegSUnion(...[reqs].flat()))}|`, unicodeFlag([reqs]));
-          const m = re.exec("");
-          offsets.push((m ? m.length - 1 : 0) + offsets[offsets.length - 1]);
-        } else {
-          offsets.push(offsets[offsets.length - 1]);
-        }
-      }
+      this.spec
+        .findAll((n) => n.isSymbol())
+        .forEach((node) => {
+          if (Object.hasOwn(this.requirements, node.toSym())) {
+            const reqs = this.requirements[node.toSym()];
+            const re = new RegExp(
+              `${rbRegToS(rbRegSUnion(...[reqs].flat()))}|`,
+              unicodeFlag([reqs]),
+            );
+            const m = re.exec("");
+            offsets.push((m ? m.length - 1 : 0) + offsets[offsets.length - 1]);
+          } else {
+            offsets.push(offsets[offsets.length - 1]);
+          }
+        });
 
       this._offsets = offsets;
     }

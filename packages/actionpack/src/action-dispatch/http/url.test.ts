@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { URL } from "./url.js";
 
 beforeEach(() => {
@@ -141,6 +142,9 @@ describe("URL.fullUrlFor", () => {
   });
 
   it("invalid protocol option raises", () => {
+    expect(() =>
+      URL.fullUrlFor({ host: "example.com", protocol: "::" as unknown as string }),
+    ).toThrow(ArgumentError);
     expect(() =>
       URL.fullUrlFor({ host: "example.com", protocol: "::" as unknown as string }),
     ).toThrow(/Invalid :protocol/);

@@ -9,7 +9,9 @@ function asts(strings: string[]) {
   return strings.map((s) => {
     const memo = { id: s };
     const tree = parser.parse(s)!;
-    for (const n of tree) n.memo = memo;
+    tree.each((n) => {
+      n.memo = memo;
+    });
     return tree;
   });
 }

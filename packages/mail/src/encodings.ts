@@ -44,7 +44,6 @@ export const Encodings = {
     transferEncodings[Encodings.getName(name)] = cls;
   },
 
-  /** @missingRailsCall include? — CONVERGEABLE call-gate-credits-include-on-hash-literal-ivar */
   isDefined(name: string): boolean {
     return Object.hasOwn(transferEncodings, Encodings.getName(name));
   },

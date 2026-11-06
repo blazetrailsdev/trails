@@ -170,7 +170,7 @@ export class Builder {
   /** @internal */
   private buildFollowpos(): Map<Node, Node[]> {
     const table = new Map<Node, Node[]>();
-    for (const n of this.ast) {
+    this.ast.each((n) => {
       if (n instanceof Cat) {
         for (const i of this.lastpos(n.left as Node)) {
           const list = table.get(i) ?? [];
@@ -178,7 +178,7 @@ export class Builder {
           table.set(i, list);
         }
       }
-    }
+    });
     return table;
   }
 

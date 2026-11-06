@@ -10,7 +10,9 @@ function asts(paths: string[]) {
   const parser = new Parser();
   return paths.map((x) => {
     const ast = parser.parse(x)!;
-    for (const n of ast) n.memo = ast;
+    ast.each((n) => {
+      n.memo = ast;
+    });
     return ast;
   });
 }

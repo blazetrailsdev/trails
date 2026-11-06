@@ -219,17 +219,19 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     const states = `function tt() { return ${this.toJSON()}; }`;
 
     const funRoutes = sample(paths, 3).map((ast) => {
-      const out: unknown[] = [];
-      for (const n of ast) {
-        if (n instanceof SymbolNode) {
-          if (n.left === ":id") out.push(String(Math.floor(Math.random() * 100)));
-          else if (n.left === ":format") out.push(sample(["xml", "json"], 1)[0]);
-          else out.push("omg");
-        } else if (n instanceof Terminal) {
-          out.push(n.symbol);
-        }
-      }
-      return out.join("");
+      return ast
+        .filterMap((n) => {
+          if (n instanceof SymbolNode) {
+            if (n.left === ":id") return String(Math.floor(Math.random() * 100));
+            else if (n.left === ":format") return sample(["xml", "json"], 1)[0];
+            else return "omg";
+          } else if (n instanceof Terminal) {
+            return n.symbol;
+          } else {
+            return null;
+          }
+        })
+        .join("");
     });
 
     const stylesheets = [fsmCss];

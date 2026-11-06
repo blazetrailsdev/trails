@@ -528,8 +528,8 @@ class ApiExtractor
     @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
     ivar_kinds = typed_ivars(sexp)
     ivar_kinds.clear if ivar_kinds.keys.any? { |_owner, name| name == "*" }
-    kinds_by_name = ivar_kinds.group_by { |(_owner, name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
-    ivar_kinds.reject! { |(_owner, name), _kind| kinds_by_name[name].size > 1 }
+    kinds_by_name = ivar_kinds.group_by { |(_owner, *name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
+    ivar_kinds.reject! { |(_owner, *name), _kind| kinds_by_name[name].size > 1 }
     @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
     @array_ivars = ivar_kinds.select { |_key, kind| kind == "array" }.keys.to_set
     walk(sexp)
@@ -1007,7 +1007,10 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
+    old_in_defs = @in_defs
+    @in_defs = true
     record_body_facts(method_info, node[5], find_params_defs(node), fqn)
+    @in_defs = old_in_defs
 
     target[:classMethods] << method_info
 
@@ -3531,7 +3534,9 @@ class ApiExtractor
 
     case inner[0]
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
-    when :@ivar then ivar_receiver_kind([@namespace_stack.join("::"), inner[1]])
+    when :@ivar
+      key = [@namespace_stack.join("::"), inner[1]]
+      ivar_receiver_kind(@in_sclass || @in_defs ? key + [:singleton] : key)
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
     when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
@@ -3637,6 +3642,11 @@ class ApiExtractor
   # and one of another kind to the same name in any other class or module of
   # the file (a subclass or mixin writing the parent's ivar). An ivar of the
   # same name in another class of the file is not proven by it.
+  # The class-level ivar is the module's own, a different object from any
+  # instance's, so it is proven separately under `[owner, name, :singleton]`
+  # from the writes in the class body, `class << self` and `def self.`:
+  # `@transfer_encodings = {}` (`mail/encodings.rb:13`) proves the receiver of
+  # `def Encodings.defined?`'s `@transfer_encodings.include?` (`:29-31`).
   def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
@@ -3656,11 +3666,22 @@ class ApiExtractor
       if key
         kind = node[0] == :assign && scope == :instance ? assigned_ivar_kind(node[2]) : nil
         assigned[key] = assigned.key?(key) && assigned[key] != kind ? nil : kind
+        unless scope == :instance
+          skey = key + [:singleton]
+          skind = node[0] == :assign ? assigned_ivar_kind(node[2]) : nil
+          assigned[skey] = assigned.key?(skey) && assigned[skey] != skind ? nil : skind
+        end
       end
     when :massign
-      each_massign_ivar(node[1]) { |name| assigned[[owner.join("::"), name]] = nil }
+      each_massign_ivar(node[1]) do |name|
+        assigned[[owner.join("::"), name]] = nil
+        assigned[[owner.join("::"), name, :singleton]] = nil unless scope == :instance
+      end
     when :command, :command_call, :method_add_arg
-      external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
+      external_ivar_writes(node).each do |name|
+        assigned[[owner.join("::"), name]] = nil
+        assigned[[owner.join("::"), name, :singleton]] = nil unless scope == :instance
+      end
     end
     node.each { |child| typed_ivars(child, owner, assigned, scope) if child.is_a?(Array) }
     assigned
