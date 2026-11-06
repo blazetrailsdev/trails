@@ -21,6 +21,7 @@ scripts/api-compare/.rails-source
 
 # Local SQLite test databases
 *.db
+!packages/mini-mime/lib/**/*.db
 !packages/mini-mime/test/**/*.db
 *.db-shm
 *.db-wal

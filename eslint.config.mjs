@@ -157,7 +157,7 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/src/test-helpers/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
-      "packages/mini-magick/lib/test-helpers/fixtures/**",
+      "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
       "packages/activestorage/src/test-helpers/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
