@@ -97,7 +97,6 @@ export class Generators {
     Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
   }
 
-  /** @internal */
   static templatesPath(): string[] {
     return (_templatesPath ??= []);
   }
