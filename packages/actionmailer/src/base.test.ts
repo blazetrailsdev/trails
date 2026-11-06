@@ -25,7 +25,6 @@ import {
 import { Base } from "./base.js";
 import { Preview } from "./preview.js";
 import type { MessageDelivery } from "./message-delivery.js";
-import { Preview } from "./preview.js";
 import { BaseMailer as BaseMailerClass } from "./test-helpers/mailers/base-mailer.js";
 import { ProcMailer as ProcMailerClass } from "./test-helpers/mailers/proc-mailer.js";
 
@@ -1174,14 +1173,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor(MyInterceptor);
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -1190,14 +1189,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor("BasePreviewInterceptorsTest::MyInterceptor");
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -1206,14 +1205,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor("base_preview_interceptors_test/my_interceptor");
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -1226,8 +1225,8 @@ describe("BasePreviewInterceptorsTest", () => {
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
       await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
-        await assertCalledWith(MySecondInterceptor, "previewingEmail", [mail], {}, () => {
-          BaseMailerPreview.call("welcome");
+        await assertCalledWith(MySecondInterceptor, "previewingEmail", [mail], {}, async () => {
+          await BaseMailerPreview.call("welcome");
         });
       });
     });
@@ -1236,11 +1235,11 @@ describe("BasePreviewInterceptorsTest", () => {
       "BasePreviewInterceptorsTest::MyInterceptor",
       MySecondInterceptor,
     );
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
-    await assertNotCalled(MySecondInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MySecondInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 });
