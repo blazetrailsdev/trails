@@ -2207,9 +2207,6 @@ class TestExtractor
   end
 
   # Is this node a receiver-form (`:call`/`:command_call`) assertion call?
-  # A receiver-form `expect` counts only as `Minitest::Mock#expect(name, retval,
-  # ...)`: `params.expect(...)` is `ActionController::Parameters#expect`, an
-  # ordinary method taking filters (see mock_expect_args?).
   def receiver_call_assertion?(node)
     if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call
       (@mock_expects ||= {}.compare_by_identity)[node[1]] = true if mock_expect_args?(node[2])
@@ -2551,8 +2548,6 @@ class TestExtractor
 
   # Positional argument nodes from an `:arg_paren` / `:args_add_block` wrapper, or
   # nil when the shape isn't a plain positional list.
-  # `Minitest::Mock#expect(name, retval, args = [])`: a Symbol name, then a
-  # return value. `Parameters#expect` takes filters, never a non-Symbol second.
   def mock_expect_args?(args)
     list = positional_args(args)
     return false unless list && list.length >= 2

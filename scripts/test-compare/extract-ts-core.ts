@@ -139,11 +139,6 @@ export function collectRequiredTests(content: string, file: string, name: string
   return tests;
 }
 
-/**
- * A receiver-form `expect` counts only as `Minitest::Mock#expect(name, retval, ...)`,
- * the twin of the Ruby extractor's `mock_expect_args?`: `params.expect(...)` is
- * `ActionController::Parameters#expect`, which takes filters.
- */
 function isReceiverExpect(call: ts.CallExpression): boolean {
   if (
     !ts.isPropertyAccessExpression(call.expression) ||
