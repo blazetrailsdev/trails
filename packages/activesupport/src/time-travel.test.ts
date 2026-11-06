@@ -142,7 +142,7 @@ describe("TimeTravelTest", () => {
           const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
           travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
-            expect(zone()!.now().toF()).toEqual(expectedTime.toF());
+            expect((zone() as TimeZone).now().toF()).toEqual(expectedTime.toF());
           });
         } finally {
           now.mockRestore();
@@ -322,7 +322,7 @@ describe("TimeTravelTest", () => {
           expect(() => {
             travelTo(traveledTime);
 
-            expect(zone()!.now().toF()).toEqual(expectedTime.toF());
+            expect((zone() as TimeZone).now().toF()).toEqual(expectedTime.toF());
 
             travelBack();
           }).not.toThrow();

@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
@@ -368,7 +369,9 @@ describe("MultiParameterAttributeTest", () => {
           const topic = await Topic.find(1);
           await topic.assignAttributes(attributes);
           const bonusTime = topic.bonus_time as unknown as TimeWithZone;
-          expect(bonusTime.valueOf()).toEqual(timeZone()!.local(2000, 1, 1, 16, 24, 0).valueOf());
+          expect(bonusTime.valueOf()).toEqual(
+            (timeZone() as TimeZone).local(2000, 1, 1, 16, 24, 0).valueOf(),
+          );
           expect(bonusTime.isUtc()).toBeFalsy();
 
           attributes = {

@@ -4,7 +4,7 @@ import { setZone, setZoneDefault, useZone, zone, zoneDefault } from "./time-zone
 import { TimeZone } from "./values/time-zone.js";
 
 describe("Time.use_zone", () => {
-  let oldZoneDefault: TimeZone | null;
+  let oldZoneDefault: TimeZone | null | false;
 
   beforeEach(() => {
     oldZoneDefault = zoneDefault();
@@ -20,11 +20,11 @@ describe("Time.use_zone", () => {
     setZone("Alaska");
     const promise = useZone("Hawaii", async () => {
       await Promise.resolve();
-      return zone()?.name;
+      return (zone() as TimeZone | null)?.name;
     });
-    expect(zone()?.name).toBe("Hawaii");
+    expect((zone() as TimeZone | null)?.name).toBe("Hawaii");
     expect(await promise).toBe("Hawaii");
-    expect(zone()?.name).toBe("Alaska");
+    expect((zone() as TimeZone | null)?.name).toBe("Alaska");
   });
 
   it("restores the zone when an async block rejects", async () => {
@@ -34,14 +34,14 @@ describe("Time.use_zone", () => {
       throw new Error("boom");
     });
     await expect(promise).rejects.toThrow("boom");
-    expect(zone()?.name).toBe("Alaska");
+    expect((zone() as TimeZone | null)?.name).toBe("Alaska");
   });
 
   it("restores the reader's value, so an unset zone becomes the default", () => {
     setZoneDefault(TimeZone.find("Alaska"));
     useZone("Hawaii", () => {});
     setZoneDefault(TimeZone.find("Hawaii"));
-    expect(zone()?.name).toBe("Alaska");
+    expect((zone() as TimeZone | null)?.name).toBe("Alaska");
   });
 
   it("returns a lazy thenable unevaluated, as Ruby returns an unloaded relation", () => {
@@ -64,7 +64,7 @@ describe("Time.use_zone", () => {
       new Thread(() =>
         useZone(name, async () => {
           await gate;
-          return zone()?.name;
+          return (zone() as TimeZone | null)?.name;
         }),
       ).value();
     const hawaii = inZone("Hawaii");

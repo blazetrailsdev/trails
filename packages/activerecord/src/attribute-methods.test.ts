@@ -340,7 +340,7 @@ describe("AttributeMethodsTest", () => {
       const record = new target() as any;
 
       const dateString = "2011-03-24";
-      const time = zone()!.parse(dateString);
+      const time = (zone() as TimeZone).parse(dateString);
 
       record.written_on = dateString;
       expect(record.readAttributeBeforeTypeCast("written_on")).toBe(dateString);
@@ -558,7 +558,7 @@ describe("AttributeMethodsTest", () => {
         const record = new target({}) as any;
         record.written_on = timeString;
         expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
-          zone()!.parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
+          (zone() as TimeZone).parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
         );
         expect(record.written_on.timeZone.name).toBe("Pacific Time (US & Canada)");
         expect([
@@ -579,7 +579,7 @@ describe("AttributeMethodsTest", () => {
       record.written_on = "2012-02-20 09:00";
       await record.save();
       expect((await record.reload()).written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
-        zone()!.local(2012, 2, 20, 9).utc().toZonedDateTime().epochNanoseconds,
+        (zone() as TimeZone).local(2012, 2, 20, 9).utc().toZonedDateTime().epochNanoseconds,
       );
     });
   });
@@ -598,7 +598,7 @@ describe("AttributeMethodsTest", () => {
         const record = new target({}) as any;
         record.written_on = timeString;
         expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
-          zone()!.parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
+          (zone() as TimeZone).parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
         );
         expect(record.written_on.timeZone.utcOffset).toBe(TimeZone.find(timezoneOffset)!.utcOffset);
         expect([
@@ -616,7 +616,7 @@ describe("AttributeMethodsTest", () => {
     const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
     await inTimeZone("Pacific Time (US & Canada)", () => {
       const record = new target({}) as any;
-      record.written_on = new TimeWithZone(utcTime, zone()!);
+      record.written_on = new TimeWithZone(utcTime, zone() as TimeZone);
       expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
         utcTime.epochNanoseconds,
       );
@@ -635,7 +635,7 @@ describe("AttributeMethodsTest", () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
       const record = new target({}) as any;
       const timeString = "10:00:00";
-      const expectedTime = zone()!.parse(`2000-01-01 ${timeString}`)!;
+      const expectedTime = (zone() as TimeZone).parse(`2000-01-01 ${timeString}`)!;
 
       record.bonus_time = timeString;
       expect(record.bonus_time.utc().toZonedDateTime().epochNanoseconds).toBe(
@@ -649,7 +649,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware time with DST", async () => {
     await inTimeZone("Pacific Time (US & Canada)", async () => {
-      const currentTime = zone()!.local(2014, 6, 15, 10);
+      const currentTime = (zone() as TimeZone).local(2014, 6, 15, 10);
       const record = new target({ bonus_time: currentTime }) as any;
       const timeBeforeSave = record.bonus_time;
 
@@ -1297,7 +1297,7 @@ describe("AttributeMethodsTest", () => {
       record.written_on = "2009-10-11 12:13:14";
       expect(record.readAttributeBeforeTypeCast("written_on")).toBe("2009-10-11 12:13:14");
       expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
-        zone()!.parse("2009-10-11 12:13:14")!.utc().toZonedDateTime().epochNanoseconds,
+        (zone() as TimeZone).parse("2009-10-11 12:13:14")!.utc().toZonedDateTime().epochNanoseconds,
       );
       expect(record.written_on.timeZone.name).toBe("Pacific Time (US & Canada)");
     });

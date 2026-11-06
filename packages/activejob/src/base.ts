@@ -4,6 +4,7 @@ import {
   Rescuable,
   runLoadHooks,
   zone,
+  type TimeZone,
 } from "@blazetrails/activesupport";
 import {
   extend,
@@ -120,7 +121,7 @@ export class Base {
     this.priority = klass.priority;
     this.executions = 0;
     this.exceptionExecutions = {};
-    this.timezone = zone()?.name ?? null;
+    this.timezone = (zone() as TimeZone | null)?.name ?? null;
   }
 }
 include(Base, Core);

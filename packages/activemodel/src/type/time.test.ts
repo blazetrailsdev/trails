@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import * as Types from "../index.js";
@@ -37,7 +38,7 @@ describe("TimeTest", () => {
       assertNil(type.userInputInTimeZone("ABC"));
       assertNil(type.userInputInTimeZone(" ".repeat(129)));
 
-      const offset = zone()!.formattedOffset();
+      const offset = (zone() as TimeZone).formattedOffset();
       const timeString = `2015-02-09T19:45:54${offset}`;
 
       expect((type.userInputInTimeZone(timeString) as TimeWithZone).hour).toEqual(19);

@@ -456,7 +456,7 @@ describe("DateExtCalculationsTest", () => {
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
     try {
       withEnvTz("US/Central", () => {
-        expect(DateExt.current().toString()).toEqual(zone()!.today().toString());
+        expect(DateExt.current().toString()).toEqual((zone() as TimeZone).today().toString());
       });
     } finally {
       setZone(null);

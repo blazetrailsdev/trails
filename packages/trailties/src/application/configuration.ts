@@ -61,7 +61,7 @@ export class Configuration extends EngineConfiguration {
   assumeSsl = false;
   forceSsl = false;
   sslOptions: SslOptions = {};
-  timeZone = "UTC";
+  timeZone: string | null | false = "UTC";
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
   logLevel: LogLevel | number | string = "debug";

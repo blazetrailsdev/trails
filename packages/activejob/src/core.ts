@@ -1,5 +1,5 @@
 import type { ConfiguredJob } from "./configured-job.js";
-import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
+import { constantize, I18n, seconds, zone, type TimeZone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
 import { Arguments } from "./arguments.js";
@@ -170,7 +170,10 @@ export class Core {
     this.executions = jobData["executions"] as number;
     this.exceptionExecutions = jobData["exception_executions"] as Record<string, number>;
     this.locale = (jobData["locale"] as string | null | undefined) ?? String(I18n.locale());
-    this.timezone = (jobData["timezone"] as string | null | undefined) ?? zone()?.name ?? null;
+    this.timezone =
+      (jobData["timezone"] as string | null | undefined) ??
+      (zone() as TimeZone | null)?.name ??
+      null;
     if (jobData["enqueued_at"] != null && jobData["enqueued_at"] !== false)
       this.enqueuedAt = Time.iso8601(jobData["enqueued_at"] as string);
     if (jobData["scheduled_at"] != null && jobData["scheduled_at"] !== false)
