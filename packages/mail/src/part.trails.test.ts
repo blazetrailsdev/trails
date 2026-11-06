@@ -27,4 +27,10 @@ describe("mail body and part edges", () => {
     expect(part.mimeType()).toBe("text/plain");
     expect(part.body().decoded()).toBe("héllo");
   });
+
+  it("takes a binary raw source with no header line as the body", () => {
+    const part = new Part(new TextEncoder().encode("just a body"));
+    expect(part.mimeType()).toBe("text/plain");
+    expect(part.body().decoded()).toBe("just a body");
+  });
 });
