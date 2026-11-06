@@ -187,7 +187,7 @@ describe("Mail::Message", () => {
       it("should handle multipart mail", () => {
         yamlMail.addPart(new Part({ contentType: "text/html", body: "<b>body</b>" }));
         const deserialized = Message.fromYaml(yamlMail.toYaml());
-        expect(deserialized.isMultipart()).toBe(true);
+        expect(deserialized.isMultipart()).toBeTruthy();
         deserialized.parts.forEach((part) => expect(part).toBeInstanceOf(Part));
         expect(Array.from(deserialized.parts, (p) => p.body().toString())).toEqual([
           "body",

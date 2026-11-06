@@ -100,6 +100,16 @@ export const mail: Record<string, AssertionReceipt[]> = {
         'field_spec.rb:16 asserts `field.value.encoding`; a JS string has no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "mail:mail/field_spec.rb › initialization › should return an unstuctured field if the structured field parsing raises an error":
+    [
+      {
+        kind: "expect_to_eq",
+        value: null,
+        as: null,
+        reason:
+          'field_spec.rb:103 asserts `field.value.encoding`; a JS string has no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
   "mail:mail/header_spec.rb › encoding › should output a parsed version of itself to US-ASCII on encoded and tidy up and sort correctly":
     [
       {

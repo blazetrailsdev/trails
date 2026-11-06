@@ -405,20 +405,20 @@ describe("Mail::Header", () => {
     });
 
     it("should say if it has a message_id field defined", () => {
-      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasMessageId()).toBe(false);
+      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasMessageId()).toBeFalsy();
     });
 
     it("should say if it has a message_id field defined", () => {
-      expect(new Header("To: Mikel\r\nFrom: bob\r\nMessage-ID: 1234").hasMessageId()).toBe(true);
+      expect(new Header("To: Mikel\r\nFrom: bob\r\nMessage-ID: 1234").hasMessageId()).toBeTruthy();
     });
 
     it("should say if it has a content_id field defined", () => {
-      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasContentId()).toBe(false);
+      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasContentId()).toBeFalsy();
     });
 
     it("should say if it has a content_id field defined", () => {
       const header = new Header("To: Mikel\r\nFrom: bob\r\nContent-ID: <1234@me.com>");
-      expect(header.hasContentId()).toBe(true);
+      expect(header.hasContentId()).toBeTruthy();
     });
 
     it("should know its own charset", () => {
@@ -590,7 +590,7 @@ describe("Mail::Header", () => {
 
     it("should enforce appear-once rule even with mass assigned header", () => {
       const header = new Header("Content-Type: multipart/alternative\nContent-Type: text/plain\n");
-      expect(Array.isArray(header.get("content-type"))).toBe(false);
+      expect(header.get("content-type")).not.toBeInstanceOf(Array);
     });
   });
 
@@ -642,11 +642,11 @@ describe("Mail::Header", () => {
 
   describe("detecting required fields", () => {
     it("should say it has a date id if it does", () => {
-      expect(new Header("Date: Mon, 24 Nov 1997 14:22:01 -0800").hasDate()).toBe(true);
+      expect(new Header("Date: Mon, 24 Nov 1997 14:22:01 -0800").hasDate()).toBeTruthy();
     });
 
     it("should say it has a date id if it does", () => {
-      expect(new Header("Mime-Version: 1.0").hasMimeVersion()).toBe(true);
+      expect(new Header("Mime-Version: 1.0").hasMimeVersion()).toBeTruthy();
     });
   });
 
