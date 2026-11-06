@@ -10,7 +10,7 @@ import {
   type PolymorphicHost,
   type PolymorphicMappingEntry,
 } from "./polymorphic-routes.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include, NoMethodError } from "@blazetrails/ruby-compat";
 import { RoutesProxy } from "./routes-proxy.js";
 import { RouteSet } from "./route-set.js";
 import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
@@ -187,6 +187,15 @@ describe("polymorphic dispatch against a drawn RouteSet", () => {
     );
     expect(host.polymorphicUrl(new Article(null), { host: "example.com" })).toBe(
       "http://example.com/articles",
+    );
+  });
+});
+
+describe("HelperMethodBuilder dispatch", () => {
+  test("a missing route helper raises NoMethodError", () => {
+    const target = {} as PolymorphicHost;
+    expect(() => HelperMethodBuilder.path().handleStringCall(target, "widget")).toThrow(
+      NoMethodError,
     );
   });
 });
