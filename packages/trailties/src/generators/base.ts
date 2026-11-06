@@ -200,6 +200,22 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     if (await getFs().exists(path)) return path;
   }
 
+  static override sourcePaths(): string[] {
+    if (!Object.hasOwn(this, "_sourcePaths")) {
+      const sourcePaths: string[] = (this._sourcePaths = []);
+      if (this.name && !this.name.endsWith("Base")) {
+        for (const path of Generators.templatesPath()) {
+          if (this.name.includes("::")) {
+            sourcePaths.push(File.join(path, this.baseName()!, this.generatorName()!));
+          } else {
+            sourcePaths.push(File.join(path, this.generatorName()!));
+          }
+        }
+      }
+    }
+    return ThorActions.ClassMethods.sourcePaths.call(this as never);
+  }
+
   static baseRoot(): string {
     const path = decodeURIComponent(new URL(import.meta.url).pathname);
     return File.dirname(/^\/[A-Za-z]:/.test(path) ? path.slice(1) : path);
@@ -222,6 +238,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
+  declare directory: OmitThisParameter<typeof ThorActions.Actions.directory>;
   declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
   declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;

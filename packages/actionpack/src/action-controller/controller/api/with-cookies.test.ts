@@ -1,3 +1,4 @@
+import { hashAset } from "@blazetrails/ruby-compat";
 import { assertEqual, include } from "@blazetrails/activesupport";
 import { beforeEach, describe, it } from "vitest";
 import "../../../test-helpers/abstract-unit.js";
@@ -33,7 +34,7 @@ describe("WithCookiesTest", () => {
   });
 
   it("with cookies", async () => {
-    tc.request.cookies["foobar"] = "bazbang";
+    hashAset(tc.request.cookies, "foobar", "bazbang");
 
     await tc.get("withCookies");
 

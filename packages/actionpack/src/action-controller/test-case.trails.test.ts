@@ -1,5 +1,11 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  HashWithIndifferentAccess,
+  include,
+  isModuleIncluded,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   b,
@@ -82,6 +88,18 @@ describe("TestRequest#assignParameters multipart body", () => {
     expect(req.getHeader("CONTENT_LENGTH")).toBe(String(body.length));
     expect((req.requestParameters["upload"] as HttpUploadedFile).read()).toEqual(b("héllo"));
     expect(req.requestParameters["t"]).toBe("café");
+  });
+});
+
+describe("TestRequest.create cookie hash", () => {
+  it("seeds rack.request.cookie_hash with indifferent access", () => {
+    const req = TestRequest.create(null);
+    const hash = req.getHeader("rack.request.cookie_hash");
+    expect(hash).toBeInstanceOf(HashWithIndifferentAccess);
+    req.setHeader("HTTP_COOKIE", "user_name=david");
+    const cookies = req.cookies;
+    expect(cookies).toBe(hash);
+    expect(cookies instanceof Map && cookies.get("user_name")).toBe("david");
   });
 });
 

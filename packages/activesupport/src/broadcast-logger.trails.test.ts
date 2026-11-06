@@ -66,3 +66,25 @@ describe("BroadcastLogger#log", () => {
     expect(calls).toEqual([[Logger.INFO, "hi"]]);
   });
 });
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Custom extends Logger {
+      foo(): string {
+        return "foo";
+      }
+    }
+    class Sub extends BroadcastLogger {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub(new Custom(null)) as Sub & { foo(): string; bar?: unknown };
+    expect(sub.secret()).toBe(1);
+    expect(sub.foo()).toBe("foo");
+    expect(sub.bar).toBeUndefined();
+    expect(sub instanceof BroadcastLogger).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});

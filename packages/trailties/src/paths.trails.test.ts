@@ -92,11 +92,16 @@ describe("Parser", () => {
 
 describe("Annotation", () => {
   it("falls back to the regexp without typescript", async () => {
-    const missing = () => {
-      throw new Error("missing");
-    };
     vi.resetModules();
-    vi.doMock("typescript/unstable/sync", missing);
+    vi.doMock("@blazetrails/ruby-compat", async (importOriginal) => {
+      const original = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
+      return {
+        ...original,
+        rbFRequire: async (_loadPath: unknown, feature: string) => {
+          throw new original.LoadError(`cannot load such file -- ${feature}`);
+        },
+      };
+    });
     try {
       const { Annotation: Fallback, SourceAnnotationExtractor: Extractor } =
         await import("./source-annotation-extractor.js");
@@ -104,7 +109,7 @@ describe("Annotation", () => {
       const extension = Fallback.extensions.find((e) => e.test.test("a.ts"))!;
       expect(extension.builder("TODO")).toBeInstanceOf(RegExp);
     } finally {
-      vi.doUnmock("typescript/unstable/sync");
+      vi.doUnmock("@blazetrails/ruby-compat");
       vi.resetModules();
     }
   });

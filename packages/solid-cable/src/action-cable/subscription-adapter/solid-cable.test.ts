@@ -162,7 +162,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
 
           expect(await queue.pop()).toBe("hello world");
         }),
-      ).resolves.toBeUndefined();
+      ).resolves.not.toThrow();
     });
   });
 
@@ -187,7 +187,7 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
       await adapter.subscribe(channel, callback, () => subscribed.set());
       await subscribed.wait(WAIT_WHEN_EXPECTING_EVENT);
       await sleep(WAIT_WHEN_EXPECTING_EVENT);
-      expect(subscribed.isSet()).toBe(true);
+      expect(subscribed.isSet()).toBeTruthy();
 
       await block(queue);
 

@@ -95,17 +95,6 @@ export class Tool {
     this._name = name;
     this._args = [];
     this._options = options;
-    return new Proxy(this, {
-      get(target, name, receiver) {
-        if (typeof name === "symbol" || name in target || PROTOCOL_PROBES.has(name))
-          return Reflect.get(target, name, receiver);
-        return (...args: unknown[]) =>
-          (receiver as Tool).methodMissing(
-            name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
-            ...args,
-          );
-      },
-    });
   }
 
   async call(
@@ -293,3 +282,23 @@ export class Tool {
     rbModDeprecateConstant(Tool, Name);
   }
 }
+
+Object.setPrototypeOf(
+  Tool.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Tool.prototype) as object) as object, {
+    get(target, name, receiver: Tool) {
+      if (
+        typeof name === "symbol" ||
+        name in target ||
+        PROTOCOL_PROBES.has(name) ||
+        Object.hasOwn(receiver, "constructor")
+      )
+        return Reflect.get(target, name, receiver);
+      return (...args: unknown[]) =>
+        receiver.methodMissing(
+          name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+          ...args,
+        );
+    },
+  }),
+);

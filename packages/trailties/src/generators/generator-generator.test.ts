@@ -1,20 +1,33 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { beforeEach, describe, it } from "vitest";
-import { GeneratorGenerator } from "./generator-generator.js";
-import { TestCase } from "../../test-case.js";
+import { afterEach, beforeAll, beforeEach, describe, it } from "vitest";
+import { Application } from "../application.js";
+import { Trails } from "../trails.js";
+import "../test-unit/trailtie.js";
+import { TestCase } from "./test-case.js";
 
+class GeneratorGeneratorApp extends Application {}
 class GeneratorGeneratorTest extends TestCase {}
 GeneratorGeneratorTest.destination(Dir.mktmpdir());
-GeneratorGeneratorTest.tests(GeneratorGenerator);
 GeneratorGeneratorTest.arguments(["awesome"]);
 registerSpecType(/^GeneratorGeneratorTest$/, GeneratorGeneratorTest);
 let t: TestCase;
 
+beforeAll(async () => {
+  await GeneratorGeneratorApp.instance().loadGenerators();
+  const { GeneratorGenerator } = await import("./trails/generator/generator-generator.js");
+  GeneratorGeneratorTest.tests(GeneratorGenerator);
+});
+
 beforeEach((context) => {
   t = context.testCase as TestCase;
   t.prepareDestination();
+  Trails.application = GeneratorGeneratorApp.instance();
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
+});
+
+afterEach(() => {
+  Trails.application = null;
 });
 
 describe("GeneratorGeneratorTest", () => {
@@ -33,6 +46,12 @@ describe("GeneratorGeneratorTest", () => {
       "lib/generators/awesome/awesome-generator.ts",
       /class AwesomeGenerator extends NamedBase/,
     );
+    await t.assertFile(
+      "test/lib/generators/awesome-generator.test.ts",
+      /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
+      /from ".*lib\/generators\/awesome\/awesome-generator\.ts"/,
+    );
   });
 
   it("namespaced generator skeleton", async () => {
@@ -50,6 +69,12 @@ describe("GeneratorGeneratorTest", () => {
       "lib/generators/trails/awesome/awesome-generator.ts",
       /class AwesomeGenerator extends NamedBase/,
     );
+    await t.assertFile(
+      "test/lib/generators/trails/awesome-generator.test.ts",
+      /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
+      /from ".*lib\/generators\/trails\/awesome\/awesome-generator\.ts"/,
+    );
   });
 
   it("generator skeleton is created without file name namespace", async () => {
@@ -62,6 +87,12 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "lib/generators/awesome-generator.ts",
       /class AwesomeGenerator extends NamedBase/,
+    );
+    await t.assertFile(
+      "test/lib/generators/awesome-generator.test.ts",
+      /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
+      /from ".*lib\/generators\/awesome-generator\.ts"/,
     );
   });
 
@@ -79,6 +110,12 @@ describe("GeneratorGeneratorTest", () => {
     await t.assertFile(
       "lib/generators/trails/awesome-generator.ts",
       /class AwesomeGenerator extends NamedBase/,
+    );
+    await t.assertFile(
+      "test/lib/generators/trails/awesome-generator.test.ts",
+      /class AwesomeGeneratorTest extends TestCase/,
+      /import ".*test-helper\.ts"/,
+      /from ".*lib\/generators\/trails\/awesome-generator\.ts"/,
     );
   });
 });

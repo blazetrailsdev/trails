@@ -530,5 +530,6 @@ const ImageProcessingVips = {
   },
 };
 
-export const Vips = chainableProxy(ImageProcessingVips);
+chainableProxy(ImageProcessingVips);
+export const Vips = ImageProcessingVips;
 ImageProcessing.Vips = Vips;

@@ -20,7 +20,7 @@ import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrail
 import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
-import type { Annotation } from "../source-annotation-extractor.js";
+import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
 
@@ -450,7 +450,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   annotations(): typeof Annotation {
-    return Trails.SourceAnnotationExtractor!.Annotation;
+    return SourceAnnotationExtractor.Annotation;
   }
 
   inspect(): string {
@@ -613,26 +613,6 @@ export class Custom {
 
   constructor() {
     this.#configurations = new Map();
-    return new Proxy(this, {
-      get(target, method, receiver) {
-        if (typeof method === "symbol" || method in target) {
-          return Reflect.get(target, method, receiver);
-        }
-        return target.methodMissing(method);
-      },
-      set(target, method, value, receiver) {
-        if (typeof method === "symbol" || method in target) {
-          return Reflect.set(target, method, value, receiver);
-        }
-        target.methodMissing(`${method}=`, value);
-        return true;
-      },
-      has(target, method) {
-        return typeof method === "symbol"
-          ? method in target
-          : target.respondToMissing(method, false);
-      },
-    });
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
@@ -653,3 +633,27 @@ export class Custom {
     return true;
   }
 }
+
+Object.setPrototypeOf(
+  Custom.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Custom.prototype) as object) as object, {
+    get(target, method, receiver: Custom) {
+      if (typeof method === "symbol" || method in target || receiver === Custom.prototype) {
+        return Reflect.get(target, method, receiver);
+      }
+      return receiver.methodMissing(method);
+    },
+    set(target, method, value, receiver: Custom) {
+      if (typeof method === "symbol" || method in target || receiver === Custom.prototype) {
+        return Reflect.set(target, method, value, receiver);
+      }
+      receiver.methodMissing(`${method}=`, value);
+      return true;
+    },
+    has(target, method) {
+      return typeof method === "symbol"
+        ? method in target
+        : Custom.prototype.respondToMissing(method, false);
+    },
+  }),
+);

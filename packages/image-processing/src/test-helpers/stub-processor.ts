@@ -38,4 +38,6 @@ export class StubProcessor extends Processor {
 
 export type Chain = { options: Options } & { [operation: string]: (...args: unknown[]) => Chain };
 
-export const Stub = chainableProxy({ ...Chainable, Processor: StubProcessor }) as unknown as Chain;
+const StubModule = { ...Chainable, Processor: StubProcessor };
+chainableProxy(StubModule);
+export const Stub = StubModule as unknown as Chain;

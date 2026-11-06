@@ -60,8 +60,10 @@ describe("SolidQueue::ReadyExecutionTest", () => {
     await assertClaimedJobs(count, () => ReadyExecution.claim("backend", count + 1, 42));
 
     const records = await reloaded();
-    for (const job of records) expect(await job.isReady()).toBe(false);
-    for (const job of records) expect(await job.isClaimed()).toBe(true);
+    expect(
+      (await Promise.all(records.map((job) => job.isReady()))).every((value) => !value),
+    ).toBeTruthy();
+    expect((await Promise.all(records.map((job) => job.isClaimed()))).every(Boolean)).toBeTruthy();
   });
 
   it("claim jobs for queue without jobs at the moment", async () => {
@@ -77,13 +79,13 @@ describe("SolidQueue::ReadyExecutionTest", () => {
 
     const records = await reloaded();
     for (const job of records.slice(0, 2)) {
-      expect(await job.isReady()).toBe(false);
-      expect(await job.isClaimed()).toBe(true);
+      expect(await job.isReady()).toBeFalsy();
+      expect(await job.isClaimed()).toBeTruthy();
     }
 
     for (const job of records.slice(2)) {
-      expect(await job.isReady()).toBe(true);
-      expect(await job.isClaimed()).toBe(false);
+      expect(await job.isReady()).toBeTruthy();
+      expect(await job.isClaimed()).toBeFalsy();
     }
   });
 
@@ -108,7 +110,11 @@ describe("SolidQueue::ReadyExecutionTest", () => {
       ReadyExecution.claim("backgr*", (await Job.count()) + 1, 42),
     );
 
-    for (const job of await reloaded()) expect(await job.isClaimed()).toBe(false);
+    expect(
+      (await Promise.all((await reloaded()).map((job) => job.isClaimed()))).every(
+        (value) => !value,
+      ),
+    ).toBeTruthy();
   });
 
   it("claim jobs using a wildcard and having paused queues", async () => {
@@ -118,7 +124,11 @@ describe("SolidQueue::ReadyExecutionTest", () => {
 
     await assertClaimedJobs(1, async () => ReadyExecution.claim("*", (await Job.count()) + 1, 42));
 
-    for (const job of await reloaded()) expect(await job.isClaimed()).toBe(false);
+    expect(
+      (await Promise.all((await reloaded()).map((job) => job.isClaimed()))).every(
+        (value) => !value,
+      ),
+    ).toBeTruthy();
   });
 
   it("claim jobs using both exact names and a prefix", async () => {
@@ -145,10 +155,10 @@ describe("SolidQueue::ReadyExecutionTest", () => {
 
     await assertClaimedJobs(3, () => ReadyExecution.claim("*", 3, 42));
 
-    expect(await (await job.reload()).isClaimed()).toBe(true);
+    expect(await (await job.reload()).isClaimed()).toBeTruthy();
     for (const job of (await reloaded()).slice(0, 2)) {
-      expect(await job.isReady()).toBe(false);
-      expect(await job.isClaimed()).toBe(true);
+      expect(await job.isReady()).toBeFalsy();
+      expect(await job.isClaimed()).toBeTruthy();
     }
   });
 
@@ -159,10 +169,10 @@ describe("SolidQueue::ReadyExecutionTest", () => {
 
     await assertClaimedJobs(3, () => ReadyExecution.claim(["background", "backend"], 3, 42));
 
-    expect(await (await job.reload()).isClaimed()).toBe(true);
+    expect(await (await job.reload()).isClaimed()).toBeTruthy();
     for (const job of (await reloaded()).slice(0, 2)) {
-      expect(await job.isReady()).toBe(false);
-      expect(await job.isClaimed()).toBe(true);
+      expect(await job.isReady()).toBeFalsy();
+      expect(await job.isClaimed()).toBeTruthy();
     }
   });
 

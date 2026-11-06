@@ -138,6 +138,7 @@ export class Image {
     return this._tempfile;
   }
 
+  /** @missingRailsName path — PERMANENT */
   constructor(
     inputPath: string | Pathname,
     tempfile: Tempfile | null = null,
@@ -149,17 +150,6 @@ export class Image {
     if (block != null) {
       (this._info._pending = this.combineOptions(block)).catch(() => {});
     }
-    return new Proxy(this, {
-      get(target, name, receiver) {
-        if (typeof name === "symbol" || name in target || PROTOCOL_PROBES.has(name))
-          return Reflect.get(target, name, receiver);
-        return (...args: unknown[]) =>
-          (receiver as Image).methodMissing(
-            name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
-            ...args,
-          );
-      },
-    });
   }
 
   equals(other: Image) {
@@ -431,3 +421,23 @@ export class Image {
   Image.attribute("signature");
   Image.attribute("data");
 }
+
+Object.setPrototypeOf(
+  Image.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Image.prototype) as object) as object, {
+    get(target, name, receiver: Image) {
+      if (
+        typeof name === "symbol" ||
+        name in target ||
+        PROTOCOL_PROBES.has(name) ||
+        Object.hasOwn(receiver, "constructor")
+      )
+        return Reflect.get(target, name, receiver);
+      return (...args: unknown[]) =>
+        receiver.methodMissing(
+          name.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
+          ...args,
+        );
+    },
+  }),
+);

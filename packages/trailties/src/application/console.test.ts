@@ -130,4 +130,10 @@ describe("FullStackConsoleTest", () => {
 
     await writePrompt("(await newSession()).constructor.name", "Session");
   });
+
+  it("app helper method", async () => {
+    await spawnConsole("-e development");
+
+    await writePrompt("(await app()).fooPath()", "/foo");
+  });
 });

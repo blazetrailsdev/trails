@@ -41,6 +41,10 @@
       "default": "./dist/bin.js"
     },
     "./generators": "./dist/generators/index.js",
+    "./generators/test-case": {
+      "types": "./dist/generators/test-case.d.ts",
+      "default": "./dist/generators/test-case.js"
+    },
     "./autoloaders": {
       "types": "./dist/autoloaders.d.ts",
       "default": "./dist/autoloaders.js"

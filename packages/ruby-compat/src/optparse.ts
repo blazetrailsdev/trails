@@ -121,9 +121,20 @@ export class OptionParser {
   static InvalidOption = InvalidOption;
 
   /** @noRailsEquivalent PERMANENT */
-  banner = "";
+  banner: string;
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1147 */
+  summaryWidth: number;
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1148 */
+  summaryIndent: string;
   private _lines: (Switch | string)[] = [];
   private _tail: Switch[] = [];
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1143 */
+  constructor(banner: string | null = null, width = 32, indent = " ".repeat(4)) {
+    this.banner = banner ?? "";
+    this.summaryWidth = width;
+    this.summaryIndent = indent;
+  }
 
   /** @noRailsEquivalent PERMANENT */
   separator(string: string): void {
@@ -282,8 +293,10 @@ export class OptionParser {
       ];
       const left = names.join(", ");
       const desc = line.desc.join(" ");
-      if (left.length > 32) out.push(`    ${left}`, `${"".padEnd(37)}${desc}`);
-      else out.push(`    ${left.padEnd(32)} ${desc}`);
+      const indent = this.summaryIndent;
+      const width = this.summaryWidth;
+      if (left.length > width) out.push(`${indent}${left}`, `${indent}${"".padEnd(width)} ${desc}`);
+      else out.push(`${indent}${left.padEnd(width)} ${desc}`);
     }
     return out.join("\n") + "\n";
   }

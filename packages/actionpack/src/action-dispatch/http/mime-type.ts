@@ -171,17 +171,23 @@ function rubyPredicateName(prop: string | symbol): string | null {
   return /^is[A-Z]/.test(prop) ? `${underscore(prop.slice(2))}?` : null;
 }
 
-const METHOD_MISSING_HANDLER: ProxyHandler<MimeType | NullType> = {
-  get(target, prop, receiver) {
-    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+const METHOD_MISSING_HANDLER: ProxyHandler<object> = {
+  get(target, prop, receiver: MimeType | NullType) {
+    if (
+      Reflect.has(target, prop) ||
+      receiver === MimeType.prototype ||
+      receiver === NullType.prototype
+    ) {
+      return Reflect.get(target, prop, receiver);
+    }
     const method = rubyPredicateName(prop);
-    if (method === null || !target.respondToMissing(method, false)) return undefined;
-    return (...args: unknown[]) => target.methodMissing(method, ...args);
+    if (method === null || !receiver.respondToMissing(method, false)) return undefined;
+    return (...args: unknown[]) => receiver.methodMissing(method, ...args);
   },
   has(target, prop) {
     if (Reflect.has(target, prop)) return true;
     const method = rubyPredicateName(prop);
-    return method !== null && target.respondToMissing(method, false);
+    return method !== null && MimeType.prototype.respondToMissing(method, false);
   },
 };
 
@@ -220,7 +226,6 @@ export class MimeType {
     this.symbol = symbol;
     this.synonyms = synonyms;
     this._hash = rbHash([this.string, this.synonyms, this.symbol]);
-    return new Proxy<MimeType>(this, METHOD_MISSING_HANDLER);
   }
 
   toString(): string {
@@ -429,9 +434,7 @@ export class NullType {
   /** @internal */
   readonly string = "";
 
-  private constructor() {
-    return new Proxy<NullType>(this, METHOD_MISSING_HANDLER);
-  }
+  private constructor() {}
 
   isNil(): boolean {
     return true;
@@ -455,6 +458,16 @@ export class NullType {
     if (method.endsWith("?")) return false;
     return null;
   }
+}
+
+for (const klass of [MimeType, NullType]) {
+  Object.setPrototypeOf(
+    klass.prototype,
+    new Proxy(
+      Object.create(Object.getPrototypeOf(klass.prototype) as object) as object,
+      METHOD_MISSING_HANDLER,
+    ),
+  );
 }
 
 MimeType.InvalidMimeType.prototype.name = "Mime::Type::InvalidMimeType";

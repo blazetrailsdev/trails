@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "./test-helpers/dummy-application.js";
 import {
@@ -56,9 +57,7 @@ describe("QueueTest", () => {
   });
 
   it("all existing queues", async () => {
-    const all = await Queue.all();
-    expect(all.length).toBe(1);
-    expect(all[0].equals(backgroundQueue)).toBe(true);
+    expect(await Queue.all()).toEqualRuby([backgroundQueue]);
   });
 
   it("pause and resume queue", async () => {

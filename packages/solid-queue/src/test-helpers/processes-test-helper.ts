@@ -1,5 +1,6 @@
-import { vi } from "vitest";
-import { TopLevel } from "@blazetrails/activesupport";
+import { expect, vi } from "vitest";
+import { isPresent, TopLevel } from "@blazetrails/activesupport";
+import { SystemExit } from "@blazetrails/ruby-compat";
 import { Process } from "../process.js";
 import { Supervisor } from "../supervisor.js";
 
@@ -40,4 +41,62 @@ export async function waitWhileWithTimeout(timeout: number, block: () => Promise
 
 export async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
   await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
+}
+
+export async function assertNoRegisteredProcesses() {
+  expect(await Process.isNone()).toBeTruthy();
+}
+
+export async function assertRegisteredProcesses({
+  kind,
+  count = 1,
+  supervisorPid = null,
+  ...attributes
+}: {
+  kind: string;
+  count?: number;
+  supervisorPid?: number | null;
+  [attr: string]: unknown;
+}) {
+  const processes = await Process.where({ kind }).toArray();
+  expect(processes.length).toEqual(count);
+
+  if (supervisorPid != null) {
+    for (const process of processes) {
+      expect((await process.supervisor)!.pid).toEqual(supervisorPid);
+    }
+  }
+
+  for (const [attr, value] of Object.entries(attributes)) {
+    for (const process of processes) {
+      const actual = (process as unknown as Record<string, unknown>)[attr];
+      if (isPresent(value)) {
+        expect(actual).toEqual(value);
+      } else {
+        expect(actual).toBeNull();
+      }
+    }
+  }
+}
+
+export function assertMetadata(process: Process, metadata: Record<string, unknown>) {
+  for (const [attr, value] of Object.entries(metadata)) {
+    expect(process.metadata.get(attr)).toEqual(value);
+  }
+}
+
+export function findProcessesRegisteredAs(kind: string) {
+  return Process.where({ kind });
+}
+
+export async function waitForProcessTerminationWithTimeout(
+  run: ReturnType<typeof runSupervisor>,
+  { exitstatus = 0 }: { exitstatus?: number } = {},
+) {
+  const error = await run.terminate().then(
+    () => null,
+    (e: unknown) => e,
+  );
+  if (error !== null && !(error instanceof SystemExit)) throw error;
+  expect(exitstatus, String(error?.status ?? 0)).toBeTruthy();
 }
