@@ -18,9 +18,9 @@ import {
   toXml,
   fromXml,
   type Included,
+  withIndifferentAccess,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { withIndifferentAccess } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   b,

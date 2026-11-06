@@ -275,7 +275,7 @@ export class Request {
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
   declare hasContentType: () => boolean;
-  declare negotiateMime: (order: MimeType[]) => MimeType | NullType | null;
+  declare negotiateMime: (order: (MimeType | undefined)[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
   declare format: (_viewPath?: unknown) => MimeType | NullType;
   declare setFormat: (extension: unknown) => void;
@@ -883,7 +883,7 @@ Object.defineProperty(Request.prototype, "accepts", {
 Request.prototype.hasContentType = function (this: Request) {
   return _hasContentType.call(this);
 };
-Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
+Request.prototype.negotiateMime = function (this: Request, order: (MimeType | undefined)[]) {
   return _negotiateMime.call(this, order);
 };
 Request.prototype.shouldApplyVaryHeader = function (this: Request) {

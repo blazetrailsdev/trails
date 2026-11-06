@@ -70,8 +70,13 @@ export class Collector {
     }
   }
 
-  negotiateFormat(request: { negotiateMime(order: MimeType[]): Format | null }): Format | null {
-    return (this.format = request.negotiateMime([...this._responses.keys()] as MimeType[]));
+  negotiateFormat(request: {
+    negotiateMime(order: (MimeType | undefined)[]): Format | null;
+  }): Format | null {
+    return (this.format = request.negotiateMime([...this._responses.keys()] as (
+      | MimeType
+      | undefined
+    )[]));
   }
 }
 
@@ -81,7 +86,7 @@ export function respondTo(
   this: {
     request: {
       variant?: readonly string[] | null;
-      negotiateMime(order: MimeType[]): Format | null;
+      negotiateMime(order: (MimeType | undefined)[]): Format | null;
     };
     mediaType?: string | null;
     contentType: string | null;
