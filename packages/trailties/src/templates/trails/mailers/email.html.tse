@@ -60,6 +60,7 @@
 
 <body>
 <header>
+  <dl>
     <% if (!RubyCompat.rbEqual(RubyCompat.rbFArray(this.email.from()), RubyCompat.rbFArray(this.email.smtpEnvelopeFrom()))) { %>
       <dt>SMTP-From:</dt>
       <dd id="smtp_from"><%= this.email.smtpEnvelopeFrom() %></dd>

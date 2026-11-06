@@ -5,20 +5,8 @@ import { Base64, File, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compa
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";
 
-interface MailPart {
-  mimeType(): string | null;
-  isAttachment(): boolean;
-  isInline(): boolean | null;
-  filename(): unknown;
-  originalFilename?(): unknown;
-  decoded?(): unknown;
-  body(): unknown;
-}
-
-interface PreviewEmail extends MailPart {
-  findFirstMimeType(mt: string): MailPart | null;
-  allParts(): MailPart[];
-}
+type Message = Awaited<ReturnType<typeof Preview.call>>;
+type Part = ReturnType<Message["allParts"]>[number];
 
 export class MailersController extends ApplicationController {
   declare previews: (typeof Preview)[];
@@ -26,10 +14,10 @@ export class MailersController extends ApplicationController {
   /** @missingRailsName preview — PERMANENT */
   declare _preview: typeof Preview;
   declare emailAction: string;
-  declare email: PreviewEmail;
-  declare attachments: Record<string, MailPart>;
-  declare inlineAttachments: Record<string, MailPart>;
-  declare part: MailPart | PreviewEmail | null | undefined;
+  declare email: Message;
+  declare attachments: Record<string, Part>;
+  declare inlineAttachments: Record<string, Part>;
+  declare part: Part | Message | null | undefined;
 
   static override controllerPath(): string {
     return "trails/mailers";
@@ -43,10 +31,7 @@ export class MailersController extends ApplicationController {
   async download(): Promise<void> {
     this.emailAction = File.basename(this.params.get("path") as string);
     if (this._preview.isEmailExists(this.emailAction)) {
-      this.email = (await this._preview.call(
-        this.emailAction,
-        this.params as never,
-      )) as unknown as PreviewEmail;
+      this.email = await this._preview.call(this.emailAction, this.params as never);
       this.sendData(this.email.toString(), { filename: `${this.emailAction}.eml` });
     } else {
       throw new AbstractController.ActionNotFound(
@@ -64,10 +49,7 @@ export class MailersController extends ApplicationController {
 
       if (this._preview.isEmailExists(this.emailAction)) {
         this.pageTitle = `Mailer Preview for ${this._preview.previewName()}#${this.emailAction}`;
-        this.email = (await this._preview.call(
-          this.emailAction,
-          this.params as never,
-        )) as unknown as PreviewEmail;
+        this.email = await this._preview.call(this.emailAction, this.params as never);
         this.attachments = Object.fromEntries(
           Object.entries(this.attachmentsFor(this.email)).filter(
             ([_filename, attachment]) => !attachment.isInline(),
@@ -86,7 +68,7 @@ export class MailersController extends ApplicationController {
           if ((part = this.findPart(partType))) {
             this.response.contentType = partType.toString();
             await this.render({
-              plain: String(rbObjRespondTo(part, "decoded") ? part.decoded!() : part),
+              plain: String(rbObjRespondTo(part, "decoded") ? part.decoded() : part),
             });
           } else {
             throw new AbstractController.ActionNotFound(
@@ -111,7 +93,7 @@ export class MailersController extends ApplicationController {
 
   /** @internal */
   private isShowPreviews(): boolean | null {
-    return (ActionMailer.Base as unknown as { showPreviews: boolean | null }).showPreviews;
+    return ActionMailer.Base.showPreviews;
   }
 
   /**
@@ -140,7 +122,7 @@ export class MailersController extends ApplicationController {
   }
 
   /** @internal */
-  private findPreferredPart(...formats: MimeType[]): MailPart | PreviewEmail | null {
+  private findPreferredPart(...formats: MimeType[]): Part | Message | null {
     for (const format of formats) {
       let part;
       if ((part = this.email.findFirstMimeType(format.toStr()))) {
@@ -155,7 +137,7 @@ export class MailersController extends ApplicationController {
   }
 
   /** @internal */
-  private findPart(format: MimeType): MailPart | PreviewEmail | null {
+  private findPart(format: MimeType): Part | Message | null {
     let part;
     if ((part = this.email.findFirstMimeType(format.toStr()))) {
       return part;
@@ -166,20 +148,20 @@ export class MailersController extends ApplicationController {
   }
 
   /** @internal */
-  private attachmentsFor(email: PreviewEmail): Record<string, MailPart> {
+  private attachmentsFor(email: Message): Record<string, Part> {
     return indexBy(
       email.allParts().filter((part) => part.isAttachment()),
       (attachment) =>
         String(
           rbObjRespondTo(attachment, "originalFilename")
-            ? attachment.originalFilename!()
+            ? (attachment as Part & { originalFilename(): unknown }).originalFilename()
             : attachment.filename(),
         ),
     );
   }
 
   /** @internal */
-  private attachmentUrl(attachment: MailPart): string {
+  private attachmentUrl(attachment: Part): string {
     return `data:application/octet-stream;charset=utf-8;base64,${Base64.encode64(String(attachment.body()))}`;
   }
 
