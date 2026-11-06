@@ -64,22 +64,20 @@ export class Parameters {
   }
 
   static set parameterParsers(
-    parsers: Record<string | symbol, ParameterParser> | Map<unknown, ParameterParser>,
+    parsers: Record<string, ParameterParser> | Map<unknown, ParameterParser>,
   ) {
     const normalized: ParameterParsers = {};
     const entries: Iterable<[unknown, ParameterParser]> =
       parsers instanceof Map
         ? parsers.entries()
-        : (Reflect.ownKeys(parsers).map((k) => [k, parsers[k as never]]) as Array<
+        : (Object.keys(parsers).map((k) => [k, parsers[k as never]]) as Array<
             [unknown, ParameterParser]
           >);
     for (const [key, value] of entries) {
       const sym =
         key !== null && typeof key === "object" && "symbol" in key
           ? String((key as { symbol: unknown }).symbol)
-          : typeof key === "symbol"
-            ? (key.description ?? String(key))
-            : String(key);
+          : String(key);
       normalized[sym] = value;
     }
     Parameters._parameterParsers = normalized;
