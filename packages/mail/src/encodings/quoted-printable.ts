@@ -1,4 +1,4 @@
-import { b, pack, strCount, unpack } from "@blazetrails/ruby-compat";
+import { b, binaryString, pack, strCount, unpack } from "@blazetrails/ruby-compat";
 import { Encodings } from "../encodings.js";
 import { Utilities } from "../utilities.js";
 import { EightBit } from "./8bit.js";
@@ -14,10 +14,14 @@ export class QuotedPrintable extends SevenBit {
     return EightBit.canEncode(enc);
   }
 
-  static override decode(str: string): Uint8Array {
+  static override decode(str: string | Uint8Array): Uint8Array {
+    const crlf = Utilities.toCrlf(str);
     return Utilities.toLf(
       unpack(
-        Utilities.toCrlf(str).replace(/(?:=0D=0A|=0D|=0A)\r\n/g, "\r\n"),
+        (crlf instanceof Uint8Array ? binaryString(crlf) : crlf).replace(
+          /(?:=0D=0A|=0D|=0A)\r\n/g,
+          "\r\n",
+        ),
         "M*",
       )[0] as Uint8Array,
     );

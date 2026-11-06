@@ -15,3 +15,19 @@ describe("Mail::Message YAML", () => {
     expect(bodies).toEqual(["text", "<p>html</p>"]);
   });
 });
+
+describe("Mail::Message binary raw source", () => {
+  it("keeps a Latin-1 8-bit body as its bytes", () => {
+    const body = new Uint8Array([0x63, 0x61, 0x66, 0xe9, 0x0d, 0x0a]);
+    const raw = new Uint8Array([
+      ...new TextEncoder().encode(
+        "From: a@b.com\r\nSubject: hi\r\nContent-Type: text/plain; charset=ISO-8859-1\r\nContent-Transfer-Encoding: 8bit\r\n\r\n",
+      ),
+      ...body,
+    ]);
+    const mail = new Mail.Message(raw);
+    expect(mail.subject()).toBe("hi");
+    expect(mail.body().rawSource).toEqual(body);
+    expect(mail.body().decoded()).toEqual(body);
+  });
+});

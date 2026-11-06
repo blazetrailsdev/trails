@@ -172,7 +172,7 @@ export class Field implements Comparable {
         const [first, value] = stringSplit(scan, Constants.COLON, 2);
         const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
-          return [rstrip(name), binary ? binaryBytes(strip(value)) : strip(value)];
+          return [rstrip(name), binary ? utf8OrBinary(strip(value)) : strip(value)];
         } else {
           warn(
             `WARNING: Ignoring unparsable header ${rbInspect(rawField)}: invalid header name syntax: ${rbInspect(name)}`,
@@ -180,7 +180,7 @@ export class Field implements Comparable {
           return null;
         }
       } else {
-        return binary ? binaryBytes(strip(scan)) : strip(scan);
+        return binary ? utf8OrBinary(strip(scan)) : strip(scan);
       }
     } catch (error) {
       const e = error as Error;
@@ -366,3 +366,8 @@ Object.setPrototypeOf(
     },
   }),
 );
+
+/** @noRailsEquivalent PERMANENT */
+function utf8OrBinary(binary: string): string | Uint8Array {
+  return forceEncoding(binaryBytes(binary), Encoding.UTF_8);
+}

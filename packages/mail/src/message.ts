@@ -1,4 +1,6 @@
 import {
+  binaryBytes,
+  binaryString,
   cmp,
   flatten,
   NoMethodError,
@@ -1087,20 +1089,19 @@ export class Message {
     return this.hasContentType() ? /^text$/im.test(this.mainType() ?? "") : false;
   }
 
-  /**
-   * @internal
-   * @inventedArm decode — PERMANENT
-   */
+  /** @internal */
   protected parseMessage(): void {
     const rawSource = this.rawSource;
-    const [headerPart, bodyPart] = stringSplit(
-      (rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource).replace(
-        /^[\s\0]+/,
-        "",
-      ),
+    const binary = rawSource instanceof Uint8Array;
+    let [headerPart, bodyPart]: (string | Uint8Array | undefined)[] = stringSplit(
+      (binary ? binaryString(rawSource) : rawSource).replace(/^[\s\0]+/, ""),
       new RegExp(`${Constants.LAX_CRLF.source}${Constants.LAX_CRLF.source}`),
       2,
     );
+    if (binary) {
+      headerPart = headerPart == null ? headerPart : binaryBytes(headerPart);
+      bodyPart = bodyPart == null ? bodyPart : binaryBytes(bodyPart);
+    }
     this.setHeader(headerPart ?? null);
     this.setBody(bodyPart ?? null);
   }
@@ -1127,20 +1128,18 @@ export class Message {
     this.addEncodingToBody();
   }
 
-  /**
-   * @internal
-   * @inventedArm decode — PERMANENT
-   */
+  /** @internal */
   private setEnvelopeHeader(): void {
     const rawSource = rbObjAsString(this.rawSource) as string | Uint8Array;
-    const rawString =
-      rawSource instanceof Uint8Array ? new TextDecoder().decode(rawSource) : rawSource;
+    const binary = rawSource instanceof Uint8Array;
+    const rawString = binary ? binaryString(rawSource) : rawSource;
     const matchData = new RegExp(
       `^From\\s+([^:\\s]${Constants.TEXT.source}*)${Constants.LAX_CRLF.source}`,
     ).exec(rawString);
     if (matchData) {
       this.setEnvelope(matchData[1]);
-      this._rawSource = rawString.replace(matchData[0], "");
+      const rest = rawString.replace(matchData[0], "");
+      this._rawSource = binary ? binaryBytes(rest) : rest;
     }
   }
 
