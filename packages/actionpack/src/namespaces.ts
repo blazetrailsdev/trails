@@ -35,6 +35,7 @@ import type { AssertionResponse } from "./action-dispatch/testing/assertion-resp
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 import type { ActionableExceptions } from "./action-dispatch/middleware/actionable-exceptions.js";
+import type { RemoteIp } from "./action-dispatch/middleware/remote-ip.js";
 import type { HtmlTableFormatter } from "./action-dispatch/routing/inspector.js";
 import type {
   AbstractSecureStore,
@@ -108,6 +109,7 @@ export const ActionDispatch = {
 } as AutoloadModule & {
   Request: typeof Request;
   ActionableExceptions: typeof ActionableExceptions;
+  RemoteIp: typeof RemoteIp;
   MissingController: typeof MissingController;
   Routing: typeof Routing;
   Assertions: typeof Assertions;

@@ -29,6 +29,7 @@ export interface ActiveSupportConfig {
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
   executorAroundTestCase?: boolean | null;
   messageSerializer?: string | typeof Codec.defaultSerializer | null;
+  toTimePreservesTimezone?: string;
 }
 
 declare module "../trailtie/configuration.js" {

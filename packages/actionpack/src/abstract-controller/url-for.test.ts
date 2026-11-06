@@ -1,62 +1,48 @@
 import { describe, it, expect } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
-import {
-  _routes,
-  _routesInstanceDefault,
-  _routesClassDefault,
-  UrlForDefaults,
-  actionMethods,
-  type RouteSetLike,
-} from "./url-for.js";
+import { include } from "@blazetrails/activesupport";
+import { Base } from "./base.js";
+import { UrlFor, type RouteSetLike } from "./url-for.js";
 
 describe("AbstractController::UrlFor", () => {
   it("_routes raises until routing helpers are included", () => {
-    expect(() => _routes()).toThrow(RuntimeError);
-    expect(() => _routes()).toThrow(/you must include routing helpers explicitly/);
+    class Host extends Base {}
+    include(Host, UrlFor);
+    const host = new Host() as unknown as { readonly _routes: never };
+    expect(() => host._routes).toThrow(RuntimeError);
+    expect(() => host._routes).toThrow(/you must include routing helpers explicitly/);
   });
 
-  describe("_routes property defaults", () => {
-    it("both instance and class defaults are null (consistent with property contract)", () => {
-      expect(_routesInstanceDefault).toBeNull();
-      expect(_routesClassDefault).toBeNull();
-    });
+  it("action_methods drops route helper names", () => {
+    class Abstract extends Base {}
+    include(Abstract, UrlFor);
+    Abstract.abstractBang();
+    class Host extends Abstract {
+      show() {}
+      index() {}
+    }
+    const routes: RouteSetLike = { namedRoutes: { helperNames: () => ["posts_url", "show"] } };
+    Object.defineProperty(Host, "_routes", { get: () => routes });
+    expect([...Host.actionMethods()].sort()).toEqual(["index"]);
   });
 
-  describe("actionMethods()", () => {
-    it("returns the unfiltered list when no route set is wired up", () => {
-      expect(actionMethods(["show", "index"], null)).toEqual(["show", "index"]);
-    });
-
-    it("removes any action name that collides with a route helper name", () => {
-      const routes: RouteSetLike = {
-        namedRoutes: { helperNames: () => ["posts_url", "post_path", "show"] },
-      };
-      expect(actionMethods(["show", "index", "edit"], routes)).toEqual(["index", "edit"]);
-    });
-
-    it("returns a defensive copy so callers can't mutate the source", () => {
-      const original = ["a", "b"];
-      const filtered = actionMethods(original, null);
-      filtered.push("evil");
-      expect(original).toEqual(["a", "b"]);
-    });
-
-    it("ignores a defaultEnv on the route set when filtering", () => {
-      const routes: RouteSetLike = {
-        namedRoutes: { helperNames: () => ["posts_path", "show"] },
-        defaultEnv: () => ({ HTTP_HOST: "example.com" }),
-      };
-      expect(actionMethods(["show", "index"], routes)).toEqual(["index"]);
-    });
+  it("action_methods is the super list with no route set", () => {
+    class Abstract extends Base {}
+    include(Abstract, UrlFor);
+    Abstract.abstractBang();
+    class Host extends Abstract {
+      show() {}
+    }
+    expect([...Host.actionMethods()]).toEqual(["show"]);
   });
 
-  describe("UrlForDefaults", () => {
-    it("exposes the instance stub under Rails-shaped name", () => {
-      expect(UrlForDefaults._routes).toBe(_routesInstanceDefault);
-    });
-
-    it("exposes the class default under _routesStatic", () => {
-      expect(UrlForDefaults._routesStatic).toBe(_routesClassDefault);
-    });
+  it("memoizes action_methods per class", () => {
+    class Abstract extends Base {}
+    include(Abstract, UrlFor);
+    Abstract.abstractBang();
+    class Host extends Abstract {
+      show() {}
+    }
+    expect(Host.actionMethods()).toBe(Host.actionMethods());
   });
 });

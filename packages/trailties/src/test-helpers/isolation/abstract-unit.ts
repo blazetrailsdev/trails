@@ -7,6 +7,7 @@ import {
   Shellwords,
   classModule,
   env as ENV,
+  extend,
   include,
   getFs,
   rbFArray,
@@ -17,7 +18,10 @@ import {
 import { Dependencies, Stream } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
+import { ConnectionAdapters } from "@blazetrails/activerecord";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Application } from "../../application.js";
+import type { EnvHelpers } from "../env-helpers.js";
 import { Trails } from "../../trails.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
 
@@ -100,8 +104,10 @@ export class Bukkit {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Generation extends Paths {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Generation extends Paths, EnvHelpers {
+  _app: RackHost | undefined;
+}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Generation {
   static readonly [classModule] = true;
@@ -169,6 +175,50 @@ export class Generation {
       "this\\.config\\.generators\\(\\)\\.applyEslintAutocorrectAfterGenerateBang\\(\\);",
     );
     await this.addToEnvConfig("production", `this.config.logLevel = "error";`);
+  }
+
+  async withUnhealthyDatabase<T>(block: () => T | Promise<T>): Promise<T> {
+    await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
+
+    const dumpPath = File.join(await this.appPath(), "db/schema_cache.yml");
+    if (await File.isExistAsync(dumpPath)) {
+      const schemaCache = (await ConnectionAdapters.SchemaCache._loadFrom(dumpPath))!;
+      Object.assign(schemaCache, {
+        _databaseVersion: new ConnectionAdapters.AbstractAdapter.Version("8.8.8"),
+      });
+      await File.writeAsync(dumpPath, YAML.dump(schemaCache));
+    }
+
+    return this.switchEnv("DATABASE_URL", "mysql2://127.0.0.1:1", block);
+  }
+
+  async makeBasicApp(block?: (app: typeof Application) => unknown): Promise<void> {
+    await import("../../trailties/action-controller.js");
+    await import("../../trailties/action-view.js");
+
+    const app = class RailtiesTestApp extends Application {};
+    this._app = app as unknown as RackHost;
+    Application.register(app);
+    app.config.hosts.push(() => true);
+    app.config.eagerLoad = false;
+    app.config.sessionStore(":cookie_store", { key: "_myapp_session" });
+    app.config.activeSupport.deprecation = "log";
+    app.config.logLevel = "error";
+    app.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
+    app.config.activeSupport.toTimePreservesTimezone = ":zone";
+
+    if (block) await block(app);
+    await app.instance().initializeBang();
+
+    app
+      .instance()
+      .routes()
+      .draw(function () {
+        this.get("/", { to: "omg#index" });
+      });
+
+    const RackTest = await import("@blazetrails/rack-test");
+    extend(this, RackTest.Methods);
   }
 
   async teardownApp(): Promise<void> {

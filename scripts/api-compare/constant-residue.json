@@ -69,7 +69,7 @@
     }
   },
   "actionpack": {
-    "rows": 323,
+    "rows": 325,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -91,6 +91,8 @@
       "abstract-controller/rendering.ts::Rendering",
       "abstract-controller/trailties/routes-helpers.ts::RoutesHelpers",
       "abstract-controller/translation.ts::Translation",
+      "abstract-controller/url-for.ts::ClassMethods",
+      "abstract-controller/url-for.ts::UrlFor",
       "action-controller/api/api-rendering.ts::ApiRendering",
       "action-controller/caching.ts::Caching",
       "action-controller/form-builder.ts::ClassMethods",

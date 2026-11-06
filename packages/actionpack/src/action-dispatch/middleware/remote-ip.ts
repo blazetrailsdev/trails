@@ -1,6 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ArgumentError, IPAddr, rbInspect, rbProcCall } from "@blazetrails/ruby-compat";
 import { Request } from "../http/request.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse> | RackResponse;
 
@@ -20,7 +21,7 @@ export const TRUSTED_PROXIES: readonly string[] = [
   "192.168.0.0/16",
 ];
 
-export type Proxy = string | RegExp;
+export type Proxy = string | RegExp | IPAddr;
 
 export type CustomProxies =
   | ReadonlyArray<Proxy>
@@ -91,6 +92,7 @@ function cidrContains(cidr: ParsedCidr, ip: ParsedIp): boolean {
 function proxyMatches(proxy: Proxy | null, ipStr: string | undefined): boolean {
   if (proxy == null || ipStr == null) return false;
   if (proxy instanceof RegExp) return proxy.test(ipStr);
+  if (proxy instanceof IPAddr) return proxy.caseEquals(ipStr);
   const cidr = parseCidr(proxy);
   const ip = parseIp(ipStr);
   return !!cidr && !!ip && cidrContains(cidr, ip);
@@ -154,6 +156,7 @@ export class GetIp {
 }
 
 export class RemoteIp {
+  static readonly IpSpoofAttackError = IpSpoofAttackError;
   static readonly TRUSTED_PROXIES = TRUSTED_PROXIES;
 
   readonly checkIp: boolean;
@@ -180,10 +183,18 @@ export class RemoteIp {
         (customProxies instanceof Set && customProxies.size === 0);
       this.proxies = isEmptyCollection ? TRUSTED_PROXIES : [...customProxies];
     } else {
-      throw new TypeError(
-        "Setting config.action_dispatch.trusted_proxies to a single value isn't supported. " +
-          "Please set this to an enumerable instead.",
-      );
+      throw new ArgumentError(`Setting config.action_dispatch.trusted_proxies to a single value isn't
+supported. Please set this to an enumerable instead. For
+example, instead of:
+
+config.action_dispatch.trusted_proxies = IPAddr.new("10.0.0.0/8")
+
+Wrap the value in an Array:
+
+config.action_dispatch.trusted_proxies = [IPAddr.new("10.0.0.0/8")]
+
+Note that passing an enumerable will *replace* the default set of trusted proxies.
+`);
     }
   }
 
@@ -193,3 +204,5 @@ export class RemoteIp {
     return await (rbProcCall(this.app, req.env) as ReturnType<typeof this.app>);
   }
 }
+
+ActionDispatch.RemoteIp = RemoteIp;

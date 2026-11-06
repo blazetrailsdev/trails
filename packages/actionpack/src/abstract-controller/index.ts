@@ -35,14 +35,7 @@ export {
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
-export {
-  _routesInstanceDefault,
-  _routesClassDefault,
-  UrlForDefaults,
-  type NamedRoutesLike,
-  type RouteSetLike,
-  type UrlForClassMethods,
-} from "./url-for.js";
+export { UrlFor, type NamedRoutesLike, type RouteSetLike } from "./url-for.js";
 export {
   cache,
   Caching,
