@@ -487,10 +487,14 @@ declare module "@blazetrails/date" {
 include(RubyTime, DateAndTimeCalculations);
 include(RubyDate, DateAndTimeCalculations);
 
-TopLevel.DateAndTime = { name: "DateAndTime", Calculations: DateAndTimeCalculations };
+(TopLevel.DateAndTime ??= { name: "DateAndTime" }).Calculations = DateAndTimeCalculations;
 
 declare module "@blazetrails/ruby-compat" {
   interface TopLevelConstants {
-    DateAndTime?: { name: string; Calculations: typeof DateAndTimeCalculations };
+    DateAndTime?: {
+      name: string;
+      Calculations?: typeof DateAndTimeCalculations;
+      Zones?: typeof import("./zones.js").Zones;
+    };
   }
 }

@@ -1,5 +1,5 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { include } from "@blazetrails/ruby-compat";
+import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { include, TopLevel } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";
@@ -65,6 +65,14 @@ declare module "@blazetrails/date" {
   interface Time {
     inTimeZone(zone?: unknown): TimeWithZone | Time;
   }
+  interface Date {
+    inTimeZone(zone?: unknown): TimeWithZone | Time;
+  }
 }
 
-include(RubyTime, { inTimeZone });
+export const Zones = { inTimeZone };
+
+include(RubyTime, Zones);
+include(RubyDate, Zones);
+
+(TopLevel.DateAndTime ??= { name: "DateAndTime" }).Zones = Zones;
