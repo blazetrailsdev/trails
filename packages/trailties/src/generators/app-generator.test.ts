@@ -1,5 +1,5 @@
 import { Dir, File, FileUtils, Process, rbFBackquote } from "@blazetrails/ruby-compat";
-import { assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertNoChanges, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AppGenerator } from "./trails/app/app-generator.js";
@@ -73,6 +73,153 @@ describe("AppGeneratorTest", () => {
 
     await t.assertFile(defaultsPath);
     t.assertNoFile("config/initializers/cors.ts");
+  });
+
+  it("app update supports skip", async () => {
+    await t.runGenerator();
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await File.open(config, "a", (file) => file.puts("// some configuration"));
+      await assertNoChanges(
+        () => File.readlinesAsync(config),
+        null,
+        {},
+        () => runAppUpdate.call(t, t.destinationRoot, { flags: "--skip" }),
+      );
+    });
+  });
+
+  it("app update supports pretend", async () => {
+    await t.runGenerator();
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await File.open(config, "a", (file) => file.puts("// some configuration"));
+      await assertNoChanges(
+        () => File.readlinesAsync(config),
+        null,
+        {},
+        () => runAppUpdate.call(t, t.destinationRoot, { flags: "--pretend --force" }),
+      );
+      const defaultsPath = `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
+      t.assertNoFile(defaultsPath);
+    });
+  });
+
+  it("app update does not remove rack cors if already present", async () => {
+    await t.runGenerator();
+    await FileUtils.touchAsync(`${t.destinationRoot}/config/initializers/cors.ts`);
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/initializers/cors.ts");
+  });
+
+  it("app update generates public folders", async () => {
+    await t.runGenerator();
+
+    await FileUtils.rmRfAsync(`${t.destinationRoot}/public/406-unsupported-browser.html`);
+
+    await runAppUpdate.call(t);
+
+    await t.assertFile("public/406-unsupported-browser.html");
+  });
+
+  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  it.skip("app update preserves skip active job", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  it.skip("app update preserves skip action mailbox", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  it.skip("app update preserves skip action text", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip brakeman", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-brakeman"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/brakeman"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip eslint", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-eslint"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/eslint"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip thruster", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-thruster"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/thrust"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  // PERMANENT-SKIP: runAppUpdate runs app:update in-process (@missingRailsCall system, generators-test-helper.ts), so the generated app's railties are not what defined? reads.
+  it.skip("app update preserves skip test", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-test"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
   });
 
   it("skip git", async () => {

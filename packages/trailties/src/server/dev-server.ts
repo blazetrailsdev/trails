@@ -1,21 +1,21 @@
 import { Dir, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rackup";
 import { createServer, type ViteDevServer } from "vite";
-import type { RackApp } from "@blazetrails/actionpack";
+import type { RackApp, RackMiddleware } from "@blazetrails/rack";
 import { trailsPlugin } from "./vite-plugin.js";
 
 export interface DevServerOptions {
   port: number;
   host: string;
   cwd: string;
-  app?: RackApp;
+  app?: RackApp | RackMiddleware;
 }
 
 export class DevServer {
   private port: number;
   private host: string;
   private cwd: string;
-  private app: RackApp | undefined;
+  private app: RackApp | RackMiddleware | undefined;
   private server: ViteDevServer | null = null;
 
   constructor(options: DevServerOptions) {
@@ -27,7 +27,7 @@ export class DevServer {
 
   /** @noRailsEquivalent PERMANENT */
   static async run(
-    app: RackApp,
+    app: RackApp | RackMiddleware,
     options: { Port?: number; Host?: string } = {},
   ): Promise<NonNullable<ViteDevServer["httpServer"]>> {
     const server = new DevServer({

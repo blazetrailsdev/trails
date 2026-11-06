@@ -2,12 +2,12 @@ import { File, Dir } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { beforeAll, beforeEach, describe, it } from "vitest";
-import { Application } from "../../../application.js";
-import "../../../trailties/active-record.js";
-import "../../../test-unit/trailtie.js";
-import { copyRoutes } from "../../generators-test-helper.js";
-import { ModelHelpers } from "../../model-helpers.js";
-import { TestCase } from "../../test-case.js";
+import { Application } from "../application.js";
+import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
+import { copyRoutes } from "./generators-test-helper.js";
+import { ModelHelpers } from "./model-helpers.js";
+import { TestCase } from "./test-case.js";
 
 class ResourceGeneratorApp extends Application {}
 class ResourceGeneratorTest extends TestCase {}
@@ -18,7 +18,7 @@ let t: TestCase;
 
 beforeAll(async () => {
   await ResourceGeneratorApp.instance().loadGenerators();
-  const { ResourceGenerator } = await import("./resource-generator.js");
+  const { ResourceGenerator } = await import("./trails/resource/resource-generator.js");
   ResourceGeneratorTest.tests(ResourceGenerator);
 });
 

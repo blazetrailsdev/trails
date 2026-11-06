@@ -2,10 +2,10 @@ import { File, Dir, TopLevel } from "@blazetrails/ruby-compat";
 import { capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Application } from "../../../application.js";
-import "../../../test-unit/trailtie.js";
-import { copyRoutes } from "../../generators-test-helper.js";
-import { TestCase } from "../../test-case.js";
+import { Application } from "../application.js";
+import "../test-unit/trailtie.js";
+import { copyRoutes } from "./generators-test-helper.js";
+import { TestCase } from "./test-case.js";
 
 class ControllerGeneratorApp extends Application {}
 class ControllerGeneratorTest extends TestCase {}
@@ -16,7 +16,7 @@ let t: TestCase;
 
 beforeAll(async () => {
   await ControllerGeneratorApp.instance().loadGenerators();
-  const { ControllerGenerator } = await import("./controller-generator.js");
+  const { ControllerGenerator } = await import("./trails/controller/controller-generator.js");
   ControllerGeneratorTest.tests(ControllerGenerator);
 });
 

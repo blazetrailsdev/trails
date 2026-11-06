@@ -1,7 +1,6 @@
 import { getEnv, presence } from "@blazetrails/activesupport";
 import { getPath, setEnv } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
-import { type RackEnv } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
 import { APP_PATH } from "../app-path.js";
 import { Trails } from "../trails.js";
@@ -48,7 +47,7 @@ export async function serve(options: ServeOptions = {}): Promise<HttpServer> {
   const host = serverHost(options);
   const port = serverPort(options);
   const node = (await Handler.get("node")) as typeof Handler.Node;
-  const server = await node.run((env: RackEnv) => app.call(env), {
+  const server = await node.run(app, {
     Port: port,
     Host: host,
   });

@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils, stdin } from "@blazetrails/ruby-compat";
-import { ChangeGenerator } from "../../../../generators/trails/db/system/change/change-generator.js";
-import { DATABASES } from "../../../../generators/database.js";
-import { invoke } from "../../../../command.js";
+import { ChangeGenerator } from "../generators/trails/db/system/change/change-generator.js";
+import { DATABASES } from "../generators/database.js";
+import { invoke } from "../command.js";
 
 let appPath: string;
 let originalCwd: string;
