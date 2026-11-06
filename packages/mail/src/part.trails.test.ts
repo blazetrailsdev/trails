@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "./body.js";
 import "./index.js";
 import { AttachmentsList } from "./attachments-list.js";
@@ -17,7 +18,9 @@ describe("mail body and part edges", () => {
 
   it("restores ivars through initWith", () => {
     const body = new Body("x");
-    body.initWith({ map: { raw_source: "y", boundary: "b" }, get: () => [] });
+    const coder = new YAML.Coder(null);
+    coder.setMap({ raw_source: "y", boundary: "b" });
+    body.initWith(coder);
     expect(body.rawSource).toBe("y");
     expect(body.boundary).toBe("b");
   });

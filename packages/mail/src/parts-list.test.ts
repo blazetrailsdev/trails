@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import "./index.js";
+import { YAML as MailYAML } from "./yaml.js";
 import { Part } from "./part.js";
 import { PartsList } from "./parts-list.js";
 
@@ -96,6 +97,6 @@ describe("PartsList", () => {
 
   it("should have a round-tripping YAML serialization", () => {
     const p = new PartsList([1, 2]);
-    expect(YAML.load(p.toYaml())).toEqual(Array.from(p));
+    expect(MailYAML.load(YAML.dump(p))).toEqual(Array.from(p));
   });
 });

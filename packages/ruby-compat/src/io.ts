@@ -124,15 +124,21 @@ const READ_CHUNK = 8192;
  * `vendor/ruby/v3.3.11/io.c:12257`): one character per byte. It is assembled a
  * character at a time because no `TextDecoder` encoding gives it — its
  * "latin1" is windows-1252, which remaps 0x80-0x9F.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function binaryString(bytes: Uint8Array, length: number): string {
+export function binaryString(bytes: Uint8Array, length = bytes.length): string {
   let part = "";
   for (let i = 0; i < length; i++) part += String.fromCharCode(bytes[i]);
   return part;
 }
 
-/** The bytes `io_write_m` (`vendor/ruby/v3.3.11/io.c:2263`) sends an ASCII-8BIT String as. */
-function binaryBytes(string: string): Uint8Array {
+/**
+ * The bytes `io_write_m` (`vendor/ruby/v3.3.11/io.c:2263`) sends an ASCII-8BIT String as.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function binaryBytes(string: string): Uint8Array {
   const buffer = new Uint8Array(string.length);
   for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i) & 0xff;
   return buffer;

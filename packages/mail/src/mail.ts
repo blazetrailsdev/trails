@@ -25,6 +25,7 @@ interface MailConstants {
   TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
   Parsers?: typeof import("./parsers.js");
+  YAML: typeof import("./yaml.js").YAML;
   BccField: typeof import("./fields/bcc-field.js").BccField;
   CcField: typeof import("./fields/cc-field.js").CcField;
   CommentsField: typeof import("./fields/comments-field.js").CommentsField;
