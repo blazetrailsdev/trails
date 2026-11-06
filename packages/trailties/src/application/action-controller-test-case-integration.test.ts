@@ -5,7 +5,6 @@ import { TopLevel, include } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
 import "../test-helpers/isolation/abstract-unit.js";
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface ActionControllerTestCaseIntegrationTest extends Omit<
   Generation,
@@ -13,7 +12,7 @@ interface ActionControllerTestCaseIntegrationTest extends Omit<
 > {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ActionControllerTestCaseIntegrationTest extends ActionController.TestCase {
-  static executorAroundEachRequest_: boolean;
+  static executorAroundEachRequest: boolean | null | undefined;
 
   async setup(): Promise<void> {
     await this.buildApp();
@@ -57,7 +56,7 @@ class ActionControllerTestCaseIntegrationTest extends ActionController.TestCase 
 
     await this.removeFromConfig(".*config\\.loadDefaults.*\\n");
     await this.addToConfig(
-      `this.config.activeSupport.executorAroundTestCase = ${(this.constructor as typeof ActionControllerTestCaseIntegrationTest).executorAroundEachRequest_};`,
+      `this.config.activeSupport.executorAroundTestCase = ${(this.constructor as typeof ActionControllerTestCaseIntegrationTest).executorAroundEachRequest};`,
     );
 
     await this.appFile(
@@ -122,60 +121,68 @@ class ActionControllerTestCaseIntegrationTest extends ActionController.TestCase 
 }
 include(ActionControllerTestCaseIntegrationTest, Isolation);
 
-function defineSuite(
-  name: string,
-  executorAroundEachRequest: boolean,
-  body: (t: () => ActionControllerTestCaseIntegrationTest) => void,
-): void {
-  class Suite extends ActionControllerTestCaseIntegrationTest {
-    static override executorAroundEachRequest_ = executorAroundEachRequest;
+class WithExecutorIntegrationTest extends ActionControllerTestCaseIntegrationTest {
+  static {
+    this.executorAroundEachRequest = true;
   }
-  describe(name, () => {
-    let t: ActionControllerTestCaseIntegrationTest;
-    beforeEach(async ({ task }) => {
-      t = new Suite(task.name);
-      await t.setup();
-      await t.beforeSetup();
-    }, 120_000);
-    afterEach(() => t.teardownApp());
-    body(() => t);
-  });
 }
 
-defineSuite("WithExecutorIntegrationTest", true, (t) => {
+class WithoutExecutorIntegrationTest extends ActionControllerTestCaseIntegrationTest {
+  static {
+    this.executorAroundEachRequest = false;
+  }
+}
+
+describe("WithExecutorIntegrationTest", () => {
+  let t: WithExecutorIntegrationTest;
+  beforeEach(async ({ task }) => {
+    t = new WithExecutorIntegrationTest(task.name);
+    await t.setup();
+    await t.beforeSetup();
+  }, 120_000);
+  afterEach(() => t.teardownApp());
+
   it("current customer is cleared after each request", { timeout: 120_000 }, async () => {
     expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeTruthy();
     expect(ActionController.TestCase.executorAroundEachRequest).toBeTruthy();
 
-    await t().get("getCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/noone,UTC/);
+    await t.get("getCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/noone,UTC/);
 
-    await t().get("setCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/david,Copenhagen/);
+    await t.get("setCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/david,Copenhagen/);
 
-    await t().get("getCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/noone,UTC/);
+    await t.get("getCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/noone,UTC/);
   });
 });
 
-defineSuite("WithoutExecutorIntegrationTest", false, (t) => {
+describe("WithoutExecutorIntegrationTest", () => {
+  let t: WithoutExecutorIntegrationTest;
+  beforeEach(async ({ task }) => {
+    t = new WithoutExecutorIntegrationTest(task.name);
+    await t.setup();
+    await t.beforeSetup();
+  }, 120_000);
+  afterEach(() => t.teardownApp());
+
   it("current customer is not cleared after each request", { timeout: 120_000 }, async () => {
     expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeFalsy();
     expect(ActionController.TestCase.executorAroundEachRequest).toBeFalsy();
 
-    await t().get("getCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/noone,UTC/);
+    await t.get("getCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/noone,UTC/);
 
-    await t().get("setCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/david,Copenhagen/);
+    await t.get("setCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/david,Copenhagen/);
 
-    await t().get("getCurrentCustomer");
-    t().assertResponse("ok");
-    expect(t().response.body).toMatch(/david,Copenhagen/);
+    await t.get("getCurrentCustomer");
+    t.assertResponse("ok");
+    expect(t.response.body).toMatch(/david,Copenhagen/);
   });
 });
