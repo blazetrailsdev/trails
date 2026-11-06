@@ -5,12 +5,9 @@ import { MiniMime } from "../../lib/mini-mime.js";
 const __FILE__ = decodeURIComponent(new URL(import.meta.url).pathname);
 
 describe("MiniMime::ConfigurationTest", () => {
-  const CUSTOM_EXT_MIME_DB_PATH = File.expandPath(
-    "../../test-helpers/fixtures/custom_ext_mime.db",
-    __FILE__,
-  );
+  const CUSTOM_EXT_MIME_DB_PATH = File.expandPath("../../fixtures/custom_ext_mime.db", __FILE__);
   const CUSTOM_CONTENT_TYPE_MIME_DB_PATH = File.expandPath(
-    "../../test-helpers/fixtures/custom_content_type_mime.db",
+    "../../fixtures/custom_content_type_mime.db",
     __FILE__,
   );
   let oldExtDbPath: string;

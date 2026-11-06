@@ -7,7 +7,7 @@ import { IDHash } from "./dhash-vips.js";
 type PathLike = { path(): string | null };
 
 export function fixtureImage(name: string): File {
-  return File.open(File.join(File.expandPath("fixtures", import.meta.dirname), name), "rb");
+  return File.open(File.join(File.expandPath("../fixtures", import.meta.dirname), name), "rb");
 }
 
 export function copyToTempfile(io: IO, extension: string | null = null): Tempfile {

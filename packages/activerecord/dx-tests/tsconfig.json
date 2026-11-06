@@ -43,7 +43,7 @@
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/test-case": ["../../activesupport/src/test-case.ts"],
-      "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],
+      "@blazetrails/tse-compiler": ["../../tse-compiler/lib/index.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
       ],
@@ -60,8 +60,8 @@
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/src/index.ts"],
-      "@blazetrails/nokogiri": ["../../nokogiri/src/index.ts"],
-      "@blazetrails/builder": ["../../builder/src/builder.ts"],
+      "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
+      "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/tzinfo": ["../../tzinfo/lib/index.ts"],
@@ -72,7 +72,7 @@
       "@blazetrails/activejob": ["../../activejob/src/index.ts"],
       "@blazetrails/actioncable": ["../../actioncable/src/index.ts"],
       "@blazetrails/solid-queue": ["../../solid-queue/src/index.ts"],
-      "@blazetrails/solid-cable": ["../../solid-cable/src/index.ts"],
+      "@blazetrails/solid-cable": ["../../solid-cable/lib/index.ts"],
       "@blazetrails/activestorage": ["../../activestorage/src/index.ts"],
       "@blazetrails/actionmailbox": ["../../actionmailbox/src/index.ts"]
     }

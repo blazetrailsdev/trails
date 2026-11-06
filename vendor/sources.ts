@@ -643,7 +643,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/ruby/racc.git",
       // The runtime nokogiri's generated CSS parser runs on
       // (vendor/nokogiri/v1.18.3/lib/nokogiri/css/parser.rb:4 names Racc 1.8.0);
-      // a read-anchor for packages/nokogiri/src/racc.
+      // a read-anchor for packages/nokogiri/lib/racc.
       ref: "v1.8.0",
     },
     packages: [

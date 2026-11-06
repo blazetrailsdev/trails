@@ -404,7 +404,7 @@ describe("Rackup::Server", () => {
   });
 
   it("support -I option to change the load path and -r to require", async () => {
-    const dir = File.join(File.dirname(new URL(import.meta.url).pathname), "test-helpers/load");
+    const dir = File.join(File.dirname(new URL(import.meta.url).pathname), "support/load");
     argv.splice(0, argv.length, "-scgi", "-Ifoo/bar", `-I${dir}`, "-rrack-test-a", "-rrack-test-b");
     try {
       const server = await newServer();
