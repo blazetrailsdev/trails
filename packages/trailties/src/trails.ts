@@ -24,6 +24,7 @@ import { InfoController } from "./info-controller.js";
 import { WelcomeController } from "./welcome-controller.js";
 import { HealthController } from "./health-controller.js";
 import { PwaController } from "./pwa-controller.js";
+import type { MailersController } from "./mailers-controller.js";
 import * as TrailsConfiguration from "./configuration.js";
 import * as Paths from "./paths.js";
 import { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
@@ -44,6 +45,7 @@ let _backtraceCleaner: BacktraceCleaner | undefined;
 export class Trails {
   declare static HealthController: typeof HealthController;
   declare static InfoController: typeof InfoController;
+  declare static MailersController: typeof MailersController;
   declare static PwaController: typeof PwaController;
   declare static WelcomeController: typeof WelcomeController;
   declare static Configuration: typeof TrailsConfiguration;

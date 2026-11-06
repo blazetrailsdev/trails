@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { LookupContext, type Template } from "@blazetrails/actionview";
+import { File } from "@blazetrails/ruby-compat";
+import { ApplicationController } from "./application-controller.js";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
 import { Trails } from "./trails.js";
@@ -33,5 +36,19 @@ describe("Trails::ApplicationController", () => {
     const policy = tc.request.contentSecurityPolicy!.build();
     expect(policy).toContain("script-src 'self' 'unsafe-inline'");
     expect(policy).toContain("style-src 'self' 'unsafe-inline'");
+  });
+
+  it("prepends its templates directory as a path, and the build ships the application layout", async () => {
+    const templates = File.expandPath("templates", import.meta.dirname);
+    expect([...ApplicationController.viewPaths()].map((p) => String(p))).toContain(templates);
+    const dist = File.expandPath("../dist/templates", import.meta.dirname);
+    const layout = new LookupContext([dist]).findTemplate(
+      "application",
+      ["layouts"],
+      false,
+      [],
+      {},
+    ) as Template;
+    expect(await File.isExist(`${layout.identifier}.js`)).toBe(true);
   });
 });

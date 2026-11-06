@@ -120,4 +120,15 @@ describe("RoutesHelpers.with (trails)", () => {
     RoutesHelpers.with(new RouteSet())(wired);
     expect((new cls() as unknown as { enginePath(): string }).enginePath()).toBe("/engine");
   });
+
+  it("redefines a getter-only _routes the class extended from UrlFor::ClassMethods", () => {
+    const routes = new RouteSet();
+    const cls = class {
+      static get _routes(): null {
+        return null;
+      }
+    };
+    RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
+    expect((cls as unknown as { _routes: unknown })._routes).toBe(routes);
+  });
 });
