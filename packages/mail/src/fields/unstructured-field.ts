@@ -75,8 +75,8 @@ export class UnstructuredField extends CommonField {
     let words: (string | Uint8Array)[];
     if (shouldEncode) {
       let first = true;
-      words = stringSplit(decodedString, /[ \t]/).flatMap(
-        (word): string | Uint8Array | string[] => {
+      words = stringSplit(decodedString, /[ \t]/)
+        .map((word): string | Uint8Array | string[] => {
           if (first) {
             first = !first;
           } else {
@@ -87,8 +87,8 @@ export class UnstructuredField extends CommonField {
           } else {
             return word.match(/[^\n]{7}|[^\n]+$/gm) ?? [];
           }
-        },
-      );
+        })
+        .flat();
     } else {
       words = stringSplit(decodedString, /[ \t]/);
     }

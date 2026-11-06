@@ -1,5 +1,5 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
-import { ArgumentError, pack } from "@blazetrails/ruby-compat";
+import { ArgumentError, pack, unpack } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
 
@@ -49,7 +49,25 @@ const _database = {
     lvt: (cp: number) => isHangulSyllable(cp, false),
     extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
   } as Record<BoundaryClass, number | ((cp: number) => boolean)>,
+  cp1252: Object.fromEntries(
+    Array.from({ length: 32 }, (_, i) => [
+      0x80 + i,
+      new TextDecoder("windows-1252").decode(Uint8Array.of(0x80 + i)).codePointAt(0)!,
+    ]),
+  ) as Record<number, number>,
 };
+
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+function tidyByte(byte: number): number[] {
+  if (byte < 160) {
+    return unpack(pack([database().cp1252[byte] || byte], "U"), "C*") as number[];
+  } else if (byte < 192) {
+    return [194, byte];
+  } else {
+    return [195, byte - 64];
+  }
+}
 
 function caseEq(
   matcher: number | ((cp: number) => boolean),
@@ -146,9 +164,68 @@ export const Unicode = {
     return ActiveSupportUnicode.compose(codepoints);
   },
 
-  /** @missingRailsCall map — CONVERGEABLE mail-message-spec-port-rest */
   tidyBytes(string: string, force: boolean = false): string {
-    return ActiveSupportUnicode.tidyBytes(string, force);
+    if (force) {
+      return pack(
+        Unicode.uUnpack(
+          utf8.decode(
+            pack(
+              (unpack(string, "C*") as number[])
+                .map((b) => tidyByte(b))
+                .flat()
+                .filter((x) => x != null),
+              "C*",
+            ),
+          ),
+        ),
+        "U*",
+      );
+    }
+
+    const bytes: (number | number[])[] = unpack(string, "C*") as number[];
+    let contsExpected = 0;
+    let lastLead = 0;
+
+    bytes.forEach((_, i) => {
+      const byte = bytes[i] as number;
+      const isCont = byte > 127 && byte < 192;
+      const isLead = byte > 191 && byte < 245;
+      const isUnused = byte > 240;
+      const isRestricted = byte > 244;
+
+      if (isUnused || isRestricted) {
+        bytes[i] = tidyByte(byte);
+      } else if (isCont) {
+        if (contsExpected === 0) bytes[i] = tidyByte(byte);
+        else contsExpected -= 1;
+      } else {
+        if (contsExpected > 0) {
+          for (let j = 1; j <= i - lastLead; j++) bytes[i - j] = tidyByte(bytes[i - j] as number);
+          contsExpected = 0;
+        }
+        if (isLead) {
+          if (i === bytes.length - 1) {
+            bytes[i] = tidyByte(bytes.at(-1) as number);
+          } else {
+            contsExpected = byte < 224 ? 1 : byte < 240 ? 2 : 3;
+            lastLead = i;
+          }
+        }
+      }
+    });
+    return bytes.length === 0
+      ? ""
+      : pack(
+          Unicode.uUnpack(
+            utf8.decode(
+              pack(
+                bytes.flat().filter((x) => x != null),
+                "C*",
+              ),
+            ),
+          ),
+          "U*",
+        );
   },
 
   normalize(string: string, form: string | null = null): string {

@@ -12,11 +12,10 @@ export class PartsList extends (DelegateClass(Array) as new (
 ) => PartsListPart[] & { __getobj__(): PartsListPart[] }) {
   declare parts: PartsListPart[];
 
-  /** @missingRailsCall new — CONVERGEABLE mail-message-spec-port-rest */
   constructor(...args: unknown[]) {
     let parts: PartsListPart[];
     if (typeof args[0] === "number") {
-      parts = Array.from({ length: args[0] }, () => (args[1] ?? null) as PartsListPart);
+      parts = new Array<PartsListPart>(args[0]).fill((args[1] ?? null) as PartsListPart);
     } else {
       parts = args[0] != null ? Array.from(args[0] as PartsListPart[]) : [];
     }
