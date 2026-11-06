@@ -954,6 +954,7 @@ jobs:
           scripts/rails-find
           scripts/sync-stats
           scripts/parity
+          scripts/layout
           eslint/
           scripts/strip-asany.test.ts
           scripts/tasks-shim.test.ts
