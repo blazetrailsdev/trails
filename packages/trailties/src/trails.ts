@@ -175,9 +175,17 @@ export class Trails {
   }
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function _resetEnv(): void {
+  _env = undefined;
+}
+
 /** @internal */
 export function _resetTrailsEnv(): void {
-  _env = undefined;
+  _resetEnv();
   _backtraceCleaner = undefined;
 }
 
