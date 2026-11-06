@@ -2,11 +2,11 @@ import { Benchmark } from "./benchmark.js";
 import { assertValidKeys } from "./hash-utils.js";
 
 export interface BenchmarkLogger {
-  debug(message: string): void;
-  info(message: string): void;
-  warn(message: string): void;
-  error(message: string): void;
-  fatal(message?: string | null, block?: () => string): void;
+  debug(message?: string | (() => string) | null, block?: () => string): void;
+  info(message?: string | (() => string) | null, block?: () => string): void;
+  warn(message?: string | (() => string) | null, block?: () => string): void;
+  error(message?: string | (() => string) | null, block?: () => string): void;
+  fatal(message?: string | (() => string) | null, block?: () => string): void;
   silence?(tempLevel?: number, fn?: () => void): void;
 }
 

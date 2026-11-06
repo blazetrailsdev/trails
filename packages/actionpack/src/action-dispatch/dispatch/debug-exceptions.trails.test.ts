@@ -4,7 +4,8 @@ import { StringIO } from "@blazetrails/ruby-compat";
 import { NotImplemented } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
 import { MimeType } from "../http/mime-type.js";
-import { HASH_CONVERSIONS, Logger, TaggedLogging } from "@blazetrails/activesupport";
+import { Logger, TaggedLogging } from "@blazetrails/activesupport";
+import { Hash as RubyHash, rbModDefineMethod, rbModUndefMethod } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
@@ -82,7 +83,9 @@ describe("DebugExceptions interceptors", () => {
 describe("DebugExceptions API body conversions", () => {
   it("selects a Hash conversion activesupport adds by the matching Mime symbol", async () => {
     MimeType.register("text/wibble", ":wibble");
-    HASH_CONVERSIONS.toWibble = (hash) => `wibble:${String(hash.status)}`;
+    rbModDefineMethod(RubyHash, "toWibble", function (this: { status: unknown }) {
+      return `wibble:${String(this.status)}`;
+    });
     try {
       const [, headers, body] = await new DebugExceptions(errorApp, null, "api").call({
         REQUEST_METHOD: "GET",
@@ -93,7 +96,7 @@ describe("DebugExceptions API body conversions", () => {
       expect(String(headers["content-type"])).toContain("text/wibble");
       expect([...(body as Iterable<string>)].join("")).toBe("wibble:500");
     } finally {
-      delete HASH_CONVERSIONS.toWibble;
+      rbModUndefMethod(RubyHash, "toWibble");
       MimeType.unregister(":wibble");
     }
   });

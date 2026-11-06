@@ -192,12 +192,13 @@ describe("ExceptionWrapperTest", () => {
     const wrapper = new ExceptionWrapper(makeCleaner(), exception);
     const exceptionObjectId = wrapper.exceptionId();
 
+    const [index, inRack] = wrapper.fullTrace;
     expect(wrapper.traces).toEqual({
-      "Application Trace": [{ exceptionObjectId, id: 0, trace: "at index (lib/file.rb:42:1)" }],
-      "Framework Trace": [{ exceptionObjectId, id: 1, trace: "at in_rack (/gems/rack.rb:43:1)" }],
+      "Application Trace": [{ exceptionObjectId, id: 0, trace: index }],
+      "Framework Trace": [{ exceptionObjectId, id: 1, trace: inRack }],
       "Full Trace": [
-        { exceptionObjectId, id: 0, trace: "at index (lib/file.rb:42:1)" },
-        { exceptionObjectId, id: 1, trace: "at in_rack (/gems/rack.rb:43:1)" },
+        { exceptionObjectId, id: 0, trace: index },
+        { exceptionObjectId, id: 1, trace: inRack },
       ],
     });
   });

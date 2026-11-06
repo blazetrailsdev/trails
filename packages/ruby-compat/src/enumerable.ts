@@ -10,6 +10,7 @@
 
 import { classModule } from "./class-module.js";
 import { ArgumentError } from "./argument-error.js";
+import { TypeError as RbTypeError } from "./type-error.js";
 import { Hash } from "./hash.js";
 import {
   numericPlus,
@@ -19,7 +20,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
-import { rbCheckFuncall, rbFSend, rbProcCall } from "./object.js";
+import { rbCheckFuncall, rbFSend, rbObjClassname, rbProcCall } from "./object.js";
 import { Enumerator } from "./enumerator.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
@@ -1410,6 +1411,35 @@ export class Enumerable<T = unknown, E = unknown> {
 
   sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]) {
     return sum(this, ...args);
+  }
+
+  /**
+   * Mirrors: Ruby's Enumerable#to_h — `vendor/ruby/v3.3.11/enum.c:767` `enum_to_h`, each
+   * pair set by `rb_hash_set_pair` (`vendor/ruby/v3.3.11/hash.c:3503`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toH(
+    this: Each<unknown, unknown>,
+    block?: (...argv: unknown[]) => unknown,
+  ): Record<string, unknown> {
+    const hash: Record<string, unknown> = {};
+    (this.each as (block: (...argv: unknown[]) => void) => unknown)((...argv: unknown[]) => {
+      const arg = block ? block(...argv) : argv.length === 1 ? argv[0] : argv;
+      if (!Array.isArray(arg)) {
+        throw new RbTypeError(`wrong element type ${rbObjClassname(arg)} (expected array)`);
+      }
+      if (arg.length !== 2) {
+        throw new ArgumentError(`element has wrong array length (expected 2, was ${arg.length})`);
+      }
+      Object.defineProperty(hash, arg[0] as string, {
+        value: arg[1],
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    });
+    return hash;
   }
 
   /** @noRailsEquivalent PERMANENT */

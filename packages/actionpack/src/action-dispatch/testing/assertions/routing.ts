@@ -187,7 +187,7 @@ export function assertRecognizes(
     }
     return;
   }
-  const request = recognizedRequestFor.call(this, path, extras, msg as string | undefined);
+  const request = recognizedRequestFor.call(this, path, extras, msg);
 
   expectedOptions = { ...expectedOptions };
 
@@ -302,7 +302,7 @@ export function recognizedRequestFor(
   this: RoutingAssertionsHost,
   path: string | PathWithMethod,
   extras: Options = {},
-  msg?: string,
+  msg?: string | (() => string),
 ): TestRequest {
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
   path = typeof path === "string" ? path : path.path;
@@ -378,14 +378,15 @@ export function resetRoutes(
 /** @internal */
 export function failOn<T>(
   exceptionClass: new (...args: never[]) => Error,
-  message: string | undefined,
+  message: string | (() => string) | undefined,
   block: () => T,
 ): T {
   try {
     return block();
   } catch (e) {
     if (e instanceof exceptionClass) {
-      throw new Assertion(message ?? e.message);
+      /** @inventedArm conditional — PERMANENT */
+      throw new Assertion((typeof message === "function" ? message() : message) ?? e.message);
     }
     throw e;
   }

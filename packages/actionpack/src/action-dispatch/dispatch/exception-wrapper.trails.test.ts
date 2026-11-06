@@ -171,7 +171,7 @@ describe("ExceptionWrapper#clean_backtrace", () => {
     error.stack = "Error: boom\n    at index (/app/lib/file.js:42:7)";
     const wrapper = new ExceptionWrapper(new BacktraceCleaner().removeFilters(), error);
     expect(wrapper.fullTrace[0]).toBe(wrapper.backtrace[0]);
-    expect(wrapper.traces["Full Trace"][0].trace).toBe("at index (/app/lib/file.js:42:7)");
+    expect(wrapper.traces["Full Trace"][0].trace).toBe(wrapper.backtrace[0]);
   });
 });
 

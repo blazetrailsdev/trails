@@ -60,7 +60,11 @@ function _idFor(err: object): number {
 }
 
 export type TraceEntry = { file: string; line: number };
-export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
+export type TraceWithId = {
+  exceptionObjectId: number;
+  id: number;
+  trace: BacktraceLine | string;
+};
 export type SourceExtract = {
   code: Record<number, string | [string, string, string]> | null;
   lineNumber: number;
@@ -228,7 +232,7 @@ export class ExceptionWrapper {
       const traceWithId: TraceWithId = {
         exceptionObjectId: _idFor(this.exception),
         id: idx,
-        trace: String(trace),
+        trace: trace,
       };
 
       if (this.applicationTrace.includes(trace)) {

@@ -104,28 +104,38 @@ export class MethodCall implements CallTemplate {
     return [target, block, this.methodName];
   }
 
-  private send(target: object, block?: (() => unknown) | null): unknown {
-    const method = (target as Record<PropertyKey, unknown>)[this.methodName];
-    if (typeof method !== "function") {
-      if (this.methodName in target) return method;
-      throw new NoMethodError(
-        `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
-      );
-    }
-    return (method as (this: object, block?: (() => unknown) | null) => unknown).call(
-      target,
-      block,
-    );
-  }
-
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
-    return (target: object, _value: unknown, block?: (() => unknown) | null) =>
-      this.send(target, block);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      const method = (target as Record<PropertyKey, unknown>)[this.methodName];
+      if (typeof method !== "function") {
+        /** @inventedArm if — PERMANENT */
+        if (this.methodName in target) return method;
+        throw new NoMethodError(
+          `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
+        );
+      }
+      return (method as (this: object, block?: (() => unknown) | null) => unknown).call(
+        target,
+        block,
+      );
+    };
   }
 
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
-    return (target: object, _value: unknown, block?: (() => unknown) | null) =>
-      !this.send(target, block);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      const method = (target as Record<PropertyKey, unknown>)[this.methodName];
+      if (typeof method !== "function") {
+        /** @inventedArm if — PERMANENT */
+        if (this.methodName in target) return !method;
+        throw new NoMethodError(
+          `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
+        );
+      }
+      return !(method as (this: object, block?: (() => unknown) | null) => unknown).call(
+        target,
+        block,
+      );
+    };
   }
 }
 
@@ -143,34 +153,34 @@ export class ObjectCall implements CallTemplate {
     return [this.target ?? target, block, this.methodName, target];
   }
 
-  private send(
-    receiver: Record<string, unknown>,
-    target: object,
-    block?: (() => unknown) | null,
-  ): unknown {
-    const method = receiver[this.methodName];
-    if (typeof method !== "function") {
-      throw new NoMethodError(
-        `undefined method '${this.methodName}' for an instance of ${receiver.constructor.name}`,
-      );
-    }
-    return (method as (this: unknown, arg: object, block?: (() => unknown) | null) => unknown).call(
-      receiver,
-      target,
-      block,
-    );
-  }
-
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
-    const ot = this.target;
-    return (target: object, _value: unknown, block?: (() => unknown) | null) =>
-      this.send((ot ?? target) as Record<string, unknown>, target, block);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      const receiver = (this.target ?? target) as Record<string, unknown>;
+      const method = receiver[this.methodName];
+      if (typeof method !== "function") {
+        throw new NoMethodError(
+          `undefined method '${this.methodName}' for an instance of ${receiver.constructor.name}`,
+        );
+      }
+      return (
+        method as (this: unknown, arg: object, block?: (() => unknown) | null) => unknown
+      ).call(receiver, target, block);
+    };
   }
 
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
-    const ot = this.target;
-    return (target: object, _value: unknown, block?: (() => unknown) | null) =>
-      !this.send((ot ?? target) as Record<string, unknown>, target, block);
+    return (target: object, _value: unknown, block?: (() => unknown) | null) => {
+      const receiver = (this.target ?? target) as Record<string, unknown>;
+      const method = receiver[this.methodName];
+      if (typeof method !== "function") {
+        throw new NoMethodError(
+          `undefined method '${this.methodName}' for an instance of ${receiver.constructor.name}`,
+        );
+      }
+      return !(
+        method as (this: unknown, arg: object, block?: (() => unknown) | null) => unknown
+      ).call(receiver, target, block);
+    };
   }
 }
 

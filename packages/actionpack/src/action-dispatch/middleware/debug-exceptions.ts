@@ -1,6 +1,7 @@
 import {
   fetch,
   rbInspect,
+  rbFSend,
   rbObjRespondTo,
   rtest,
   stderr,
@@ -8,7 +9,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import {
   camelize,
-  HASH_CONVERSIONS,
+  ActiveSupportJSON,
   Logger as ActiveSupportLogger,
   type BacktraceCleaner,
 } from "@blazetrails/activesupport";
@@ -75,15 +76,15 @@ export class DebugExceptions {
       traces: wrapper.traces,
     };
 
-    const toFormat = camelize(`to_${contentType?.symbol?.replace(/^:/, "") ?? ""}`, false);
+    const toFormat = camelize(`to_${contentType?.toSym()?.slice(1) ?? ""}`, false);
 
     let formattedBody: string;
     let format: MimeType;
-    if (contentType && HASH_CONVERSIONS[toFormat]) {
-      formattedBody = HASH_CONVERSIONS[toFormat](body);
+    if (contentType && rbObjRespondTo(body, toFormat)) {
+      formattedBody = rbFSend(body, toFormat) as string;
       format = contentType;
     } else {
-      formattedBody = HASH_CONVERSIONS.toJson(body);
+      formattedBody = ActiveSupportJSON.encode(body);
       format = Mime.get("json")!;
     }
 

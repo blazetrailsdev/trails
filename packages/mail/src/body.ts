@@ -107,7 +107,7 @@ export class Body {
     );
   }
 
-  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string | Uint8Array {
+  encoded(transferEncoding: string | typeof TransferEncoding | null = null): string {
     if (this.isMultipart()) {
       this.sortPartsBang();
       const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());
@@ -129,7 +129,12 @@ export class Body {
         if (this.charset != null && this.charset !== "US-ASCII") {
           decoded = encode(decoded, this.charset);
         }
-        return enc!.encode(decoded);
+        const encoded = enc!.encode(decoded);
+        /** @inventedArm if — PERMANENT */
+        if (encoded instanceof Uint8Array) {
+          return Array.from(encoded, (b) => String.fromCharCode(b)).join("");
+        }
+        return encoded;
       }
     }
   }
