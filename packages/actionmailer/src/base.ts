@@ -13,6 +13,7 @@ import {
   presence,
   underscore,
   type Callbacks as ActiveSupportCallbacks,
+  type Configuration,
   type EventPayload,
   type Included,
   runLoadHooks,
@@ -87,7 +88,11 @@ export class Base extends AbstractController.Base {
   declare static previewPaths: string[];
   declare static assetHost: string | undefined;
   declare static assetsDir: string | undefined;
-  declare static config: () => { assetHost?: string; assetsDir?: string };
+  declare static config: () => Configuration;
+  declare static viewPaths: {
+    (paths: ActionView.ViewPathsInput): void;
+    (): ActionView.PathSet;
+  };
   declare static showPreviews: boolean | null;
   declare static previewInterceptors: unknown[];
   declare static registerPreviewInterceptors: typeof PreviewsClassMethods.registerPreviewInterceptors;

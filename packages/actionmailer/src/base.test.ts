@@ -565,32 +565,25 @@ describe("BaseTest", () => {
     }
   });
 
-  const viewPaths = (...args: unknown[]) =>
-    (
-      ActionView.ViewPaths.ClassMethods.viewPaths as unknown as (...args: unknown[]) => {
-        paths: unknown[];
-      }
-    ).call(BaseMailerClass, ...args);
-
   it("implicit multipart with several view paths uses the first one with template", async () => {
-    const old = viewPaths();
+    const old = BaseMailerClass.viewPaths();
     try {
-      viewPaths([ANOTHER_PATH_RESOLVER, ...old.paths]);
+      BaseMailerClass.viewPaths([ANOTHER_PATH_RESOLVER, ...old.paths]);
       const email = await BaseMailer.welcome().message();
       expect(email.body().encoded()).toBe("Welcome from another path");
     } finally {
-      viewPaths(old);
+      BaseMailerClass.viewPaths(old);
     }
   });
 
   it("implicit multipart with inexistent templates uses the next view path", async () => {
-    const old = viewPaths();
+    const old = BaseMailerClass.viewPaths();
     try {
-      viewPaths([UNKNOWN_RESOLVER, ...old.paths]);
+      BaseMailerClass.viewPaths([UNKNOWN_RESOLVER, ...old.paths]);
       const email = await BaseMailer.welcome().message();
       expect(email.body().encoded()).toBe("Welcome");
     } finally {
-      viewPaths(old);
+      BaseMailerClass.viewPaths(old);
     }
   });
 
@@ -775,8 +768,8 @@ describe("BaseTest", () => {
   });
 
   it("assets tags should use ActionMailer's asset_host settings", async () => {
-    Base.config().assetHost = "http://global.com";
-    Base.config().assetsDir = "global/";
+    Base.config().set("assetHost", "http://global.com");
+    Base.config().set("assetsDir", "global/");
 
     const mail = await (AssetMailer as Mailer<typeof AssetMailer>).welcome().message();
 
@@ -787,8 +780,8 @@ describe("BaseTest", () => {
   });
 
   it("assets tags should use a Mailer's asset_host settings when available", async () => {
-    Base.config().assetHost = "http://global.com";
-    Base.config().assetsDir = "global/";
+    Base.config().set("assetHost", "http://global.com");
+    Base.config().set("assetsDir", "global/");
 
     const TempAssetMailer = class extends AssetMailer {
       static {
