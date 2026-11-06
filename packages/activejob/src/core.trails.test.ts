@@ -96,11 +96,20 @@ describe("ActiveJob::Core", () => {
       expect(() => new HelloJob()).toThrow("undefined method `name' for false");
       const job = Object.create(HelloJob.prototype) as HelloJob;
       expect(() => job.deserialize({})).toThrow("undefined method `name' for false");
+      expect(() => job.deserialize({ timezone: false })).toThrow(
+        "undefined method `name' for false",
+      );
       job.deserialize({ timezone: "UTC" });
       expect(job.timezone).toBe("UTC");
     } finally {
       setZoneDefault(saved);
     }
+  });
+
+  it("falls back to Time.zone for a false serialized timezone, as Ruby || does", () => {
+    const job = new HelloJob();
+    useZone("Hawaii", () => job.deserialize({ timezone: false }));
+    expect(job.timezone).toBe("Hawaii");
   });
 
   it("falls back to I18n.locale when locale is absent", () => {

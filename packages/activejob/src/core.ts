@@ -171,12 +171,14 @@ export class Core {
     this.executions = jobData["executions"] as number;
     this.exceptionExecutions = jobData["exception_executions"] as Record<string, number>;
     this.locale = (jobData["locale"] as string | null | undefined) ?? String(I18n.locale());
-    const timeZone = zone();
-    if (jobData["timezone"] == null && timeZone === false) {
-      throw new NoMethodError("undefined method `name' for false", "name");
+    const timezone = jobData["timezone"] as string | null | false | undefined;
+    if (timezone != null && timezone !== false) {
+      this.timezone = timezone;
+    } else {
+      const timeZone = zone();
+      if (timeZone === false) throw new NoMethodError("undefined method `name' for false", "name");
+      this.timezone = timeZone?.name ?? null;
     }
-    this.timezone =
-      (jobData["timezone"] as string | null | undefined) ?? (timeZone || null)?.name ?? null;
     if (jobData["enqueued_at"] != null && jobData["enqueued_at"] !== false)
       this.enqueuedAt = Time.iso8601(jobData["enqueued_at"] as string);
     if (jobData["scheduled_at"] != null && jobData["scheduled_at"] !== false)
