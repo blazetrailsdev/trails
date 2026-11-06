@@ -1,4 +1,3 @@
-import "../constants.message-id.generated.js";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { RecordNotUnique, type Base } from "@blazetrails/activerecord";
 import { Blob } from "@blazetrails/activestorage/blob";
