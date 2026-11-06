@@ -2305,3 +2305,79 @@ against the ladder's 1962, the same trap as the `db.js` repro that came out at
 2112 — _more_ than the ladder. Check `Found N module` before trusting a probe
 to be cheap. The loop that works is instrumentation inside the real binary,
 which is what cracked the `db.js` symbol bug.
+
+## Wall 28 — `Handler.Node` is undefined, and `/up` routed at `rails/health`
+
+Both reproduced under `tsx`, so neither was the compiler's. The oracle found
+each in one command; no probe was built.
+
+`Handler.Node` is a type-only `declare static` (rackup `handler.ts:13`). The
+runtime value is assigned by a side effect at the bottom of `handler/node.ts`,
+and the only thing that loads that file is the dynamic `import()` in
+`Handler.loadPath`, reached through `Handler.get("node")`. A rung that imports
+`{ Handler }` alone gets `undefined` while TypeScript still types the call as
+safe. The rung now imports `handler/node.js` for its side effect, which keeps
+it on the direct path with 0 dynamic edges. Routing through `Handler.get` is
+the deployed path but adds this graph's first dynamic edge — a separate rung.
+
+The app's `routes.ts` still carried `rails/health#show`; the framework's
+generator template emits `trails/health#show`. Stale app output, not a
+framework bug.
+
+## Wall 29 — a `const`-aliased rest-param export loses its rest bundling
+
+A compiled request raised `TypeError: Cannot read properties of undefined
+(reading 'includes')` in `ExceptionWrapper.get unwrappedException`.
+`wrapperExceptions` is a cattr installed by `cattrAccessor.call(this, ...)` in
+a static block, and under perry `cattrAccessor` installed NOTHING — no
+prototype getter, no static accessor, and no exception.
+
+Instrumenting `mattrAccessor` printed the answer:
+
+    [mattrAccessor] entry syms="attr" len=4
+
+`syms` is a rest parameter, so it must be an array. It was bound to the bare
+string `"attr"`, and `len=4` is that string's CHARACTER COUNT — the same
+signature as wall 27's `params=98`. `extractOptionsBang` then finds no hash,
+`names` is empty, the loop runs zero times, and nothing is installed silently.
+
+Minimal repro is 2 modules (`perry/probes/rest-imported.ts`). All three
+conditions are required:
+
+- the callee is a `const` alias of a function (`export const a = f`)
+- it is imported across a module boundary
+- it is invoked through `Function.prototype.call`
+
+Imported function + `.call` works. Alias + direct call works. Only the
+combination fails.
+
+Root cause: `exported_func_has_rest` in `run_pipeline.rs` is keyed off
+function DECLARATIONS (lines 1883, 1964) and off re-export chains (~2580). An
+`export const alias = someFn` is none of those, so the alias name is never
+recorded, `imported_func_has_rest` misses it, and the cross-module `.call`
+site in `extern_func.rs` (`has_rest` at line 1475) does not bundle. The direct
+call path resolves the alias by another route, which is why only `.call` shows
+it.
+
+### Three hypotheses this cost, all killed at 1 module
+
+Checking `Found N module` before trusting a probe's cost paid for itself.
+
+- `declare` instance field shadowing the prototype getter with `undefined`.
+  Perry matches the oracle exactly, including `own property? : false`.
+- mixed spread + trailing argument (`f.call(this, ...names, options)`)
+  mis-lowered. The most convincing theory — same `call_spread.rs` path as
+  wall 27, and an empty `names` explains the silent no-op perfectly. All six
+  forms matched.
+- `pop()`/`length` wrong on a rest array built by wall 27's `js_array_slice`
+  lowering. All three forms matched.
+
+### `@blazetrails/activesupport/<subpath>` resolves from dist, not src
+
+The first instrumentation printed nothing under `tsx`. activesupport's
+`exports` maps `./*` to `./dist/*.js`, so Node runs `dist` while perry
+compiles `src`. Only the BARE specifier reaches `src`. The hazard is general:
+the oracle and the compiler can read different files, which makes a tsx
+comparison meaningless without anything looking wrong. Check the `exports` map
+before trusting a subpath comparison, and rebuild the dist or instrument the
+file the oracle actually loads.
