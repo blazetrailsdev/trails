@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Body, Mail, Part } from "./index.js";
+import { Body, type Field, Mail, Part } from "./index.js";
 
 describe("Mail::Message YAML", () => {
   it("round-trips a multipart message through toYaml and fromYaml", () => {
@@ -54,7 +54,8 @@ describe("Mail::Message binary raw source", () => {
       0xe9,
       ...new TextEncoder().encode("\r\n x\r\n\r\nbody"),
     ]);
-    const value = new Mail.Message(raw).header().get("Subject")!.value as unknown as Uint8Array;
+    const value = (new Mail.Message(raw).header().get("Subject") as Field)
+      .value as unknown as Uint8Array;
     expect(Array.from(value)).not.toContain(0x0d);
   });
 
