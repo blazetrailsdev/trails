@@ -62,13 +62,11 @@ function addressList(this: Message, obj: unknown): AddressList | null {
   }
 }
 
-Object.assign(Message.prototype, {
-  fromAddress,
-  recipientsAddresses,
-  toAddresses,
-  ccAddresses,
-  bccAddresses,
-  xOriginalToAddresses,
-  xForwardedToAddresses,
-  addressList,
-});
+Message.prototype.fromAddress = fromAddress;
+Message.prototype.recipientsAddresses = recipientsAddresses;
+Message.prototype.toAddresses = toAddresses;
+Message.prototype.ccAddresses = ccAddresses;
+Message.prototype.bccAddresses = bccAddresses;
+Message.prototype.xOriginalToAddresses = xOriginalToAddresses;
+Message.prototype.xForwardedToAddresses = xForwardedToAddresses;
+Message.prototype.addressList = addressList;
