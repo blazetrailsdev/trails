@@ -68,8 +68,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("2.0.0");
     expect(result.message).toBe("Successfully relayed message to ingress");
-    expect(result.isSuccess()).toBeTruthy();
-    expect(result.isFailure()).toBeFalsy();
+    expect(result.isSuccess()).toBe(true);
+    expect(result.isFailure()).toBe(false);
 
     expect(requests).toEqual([
       {
@@ -91,8 +91,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.7.0");
     expect(result.message).toBe("Invalid credentials for ingress");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to an unspecified server error", async () => {
@@ -101,8 +101,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("HTTP 500");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to a gateway timeout", async () => {
@@ -111,8 +111,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("HTTP 504");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to ECONNRESET", async () => {
@@ -121,8 +121,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.4.2");
     expect(result.message).toBe("Network error relaying to ingress: Connection reset by peer");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to connection failure", async () => {
@@ -133,8 +133,8 @@ describe("RelayerTest", () => {
     expect(result.message).toBe(
       "Network error relaying to ingress: Failed to open TCP connection to example.com:443",
     );
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to client-side timeout", async () => {
@@ -143,8 +143,8 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.4.2");
     expect(result.message).toBe("Timed out relaying to ingress");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 
   it("unsuccessfully relaying due to an unhandled exception", async () => {
@@ -153,7 +153,7 @@ describe("RelayerTest", () => {
     const result = await relayer.relay(await fileFixture("welcome.eml").read());
     expect(result.statusCode).toBe("4.0.0");
     expect(result.message).toBe("Error relaying to ingress: Something went wrong");
-    expect(result.isSuccess()).toBeFalsy();
-    expect(result.isFailure()).toBeTruthy();
+    expect(result.isSuccess()).toBe(false);
+    expect(result.isFailure()).toBe(true);
   });
 });
