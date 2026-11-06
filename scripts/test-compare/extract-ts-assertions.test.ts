@@ -98,6 +98,43 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["inline def"]).toBe(5);
   });
 
+  it("folds a same-file test-class method called through an instance", () => {
+    const src = `
+      class LegacyRouteSetTests {
+        testNamedRouteMethod(): void {
+          expect(a).toBe(1);
+          expect(b).toBe(2);
+        }
+      }
+      describe("LegacyRouteSetTests", () => {
+        let tc: LegacyRouteSetTests;
+        it("named routes array", () => {
+          tc.testNamedRouteMethod();
+          expect(c).toEqual(3);
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["named routes array"]).toBe(3);
+  });
+
+  it("counts an assert-named test-class method called through an instance once", () => {
+    const src = `
+      class C {
+        assertRouting(): void {
+          expect(a).toBe(1);
+          expect(b).toBe(2);
+        }
+      }
+      describe("C", () => {
+        let tc: C;
+        it("routing", () => {
+          tc.assertRouting();
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["routing"]).toBe(1);
+  });
+
   it("still expands a helper declared outside the test body per call site", () => {
     const src = `
       describe("s", () => {

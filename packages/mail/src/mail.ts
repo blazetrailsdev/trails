@@ -1,7 +1,7 @@
 import { Time } from "@blazetrails/date";
 import {
   forceEncoding,
-  IO,
+  File,
   kernelRand,
   Process,
   rbObjAsString,
@@ -134,13 +134,11 @@ export const Mail: MailConstants = {
     for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
   },
 
-  /**
-   * @missingRailsCall open — CONVERGEABLE ruby-compat-io-read-async-to-eof
-   * @missingRailsCall read — CONVERGEABLE ruby-compat-io-read-async-to-eof
-   * @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source
-   */
+  /** @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source */
   async read(filename: string): Promise<Message> {
-    return Mail.new(forceEncoding((await IO.binreadAsync(filename))!, "UTF-8"));
+    return Mail.new(
+      forceEncoding(await File.openAsync(filename, "rb", (f) => f.readAsync()), "UTF-8"),
+    );
   },
 
   randomTag(): string {

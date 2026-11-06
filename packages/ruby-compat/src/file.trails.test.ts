@@ -383,6 +383,17 @@ describe("File.foreach", () => {
 });
 
 describe("File.openAsync", () => {
+  it("reads to EOF by readAsync with no length, bytes in binary mode", async () => {
+    const path = join(fixture(), "all.txt");
+    writeFileSync(path, `é${"x".repeat(20000)}`);
+    expect(await File.openAsync(path, "r", (f) => f.readAsync())).toBe(`é${"x".repeat(20000)}`);
+    const bytes = await File.openAsync(path, "rb", (f) => f.readAsync());
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect((bytes as Uint8Array).length).toBe(20002);
+    expect(await File.openAsync(path, "rb", (f) => f.readAsync(null))).toEqual(bytes);
+    expect(await File.openAsync(path, "rb", (f) => f.readAsync(0))).toEqual(new Uint8Array(0));
+  });
+
   it("yields each line by eachAsync, separator retained, and closes after the block", async () => {
     const path = join(fixture(), "lines.txt");
     writeFileSync(path, `é\n${"x".repeat(70000)}é\nlast`);
