@@ -8,7 +8,7 @@ const HTML_KEY_PATTERN = /(?:_|\b)html$/;
 
 /** @internal */
 export const HtmlSafeTranslation = {
-  translate(key: string, options: Record<string, unknown> = {}): unknown {
+  translate(key: string | null, options: Record<string, unknown> = {}): unknown {
     if (isHtmlSafeTranslationKey(key)) {
       const htmlSafeOptions = htmlEscapeTranslationOptions({ ...options });
 
@@ -46,8 +46,8 @@ export const HtmlSafeTranslation = {
   htmlSafeTranslation,
 };
 
-function isHtmlSafeTranslationKey(key: string): boolean {
-  return HTML_KEY_PATTERN.test(key);
+function isHtmlSafeTranslationKey(key: string | null): boolean {
+  return key != null && HTML_KEY_PATTERN.test(key);
 }
 
 /** @internal */

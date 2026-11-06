@@ -106,6 +106,7 @@ declare module "@blazetrails/ruby-compat" {
         envConfig(): Record<string, unknown>;
         executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
         configFor(name: string): Promise<unknown>;
+        loadSeed(): Promise<void>;
         migrationRailties(): Array<{
           railtieName: string;
           root(): string | null;
@@ -114,6 +115,7 @@ declare module "@blazetrails/ruby-compat" {
         call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
       } | null;
       Application: abstract new (...args: never[]) => unknown;
+      Generators?: { configureBang(config: unknown): void };
       Engine: abstract new (...args: never[]) => unknown;
       Trailtie: abstract new (...args: never[]) => unknown;
       root(): string | null | undefined;

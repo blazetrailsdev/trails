@@ -20,7 +20,7 @@ import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrail
 import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
-import { Annotation } from "../source-annotation-extractor.js";
+import type { Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
 
@@ -450,7 +450,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   annotations(): typeof Annotation {
-    return Annotation;
+    return Trails.SourceAnnotationExtractor!.Annotation;
   }
 
   inspect(): string {

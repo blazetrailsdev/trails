@@ -309,7 +309,7 @@ describe("AppGenerator", () => {
     expect(pkg.devDependencies.vite).toBeDefined();
     expect(pkg.devDependencies.tsx).toBeUndefined();
     expect(pkg.devDependencies.typescript).toBe("^5.8.0");
-    expect(pkg.scripts["db:seed"]).toBe("trails db seed");
+    expect(pkg.scripts["db:seed"]).toBe("trails db:seed");
     expect(pkg.scripts.dev).toBe("trails server");
     expect(pkg.scripts.trails).toBe("trails");
     const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
@@ -508,9 +508,6 @@ describe("AppGenerator", () => {
 
   it("includes app name in generated files", async () => {
     await makeGen().invokeAll();
-
-    const readme = fs.readFileSync(appPath("README.md"), "utf-8");
-    expect(readme).toContain("my-app");
 
     const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
     expect(appConfig).toContain("MyApp");

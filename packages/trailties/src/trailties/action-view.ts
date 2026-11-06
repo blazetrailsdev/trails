@@ -1,4 +1,5 @@
 import { onLoad, TopLevel, type Reloader } from "@blazetrails/activesupport";
+import { Trails } from "../trails.js";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
@@ -214,7 +215,7 @@ async function watchViews(app: unknown): Promise<void> {
       : actionView.cacheTemplateLoading;
   if (enableCaching) return;
 
-  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
+  const { watchViews: watchViewFiles } = Trails.TrailsTsc!;
   let started = false;
   let initialError: Error | null = null;
   const handle = await watchViewFiles({

@@ -66,6 +66,10 @@
       "types": "./dist/core-ext/date/calculations.d.ts",
       "default": "./dist/core-ext/date/calculations.js"
     },
+    "./core-ext/string/inflections": {
+      "types": "./dist/core-ext/string/inflections.d.ts",
+      "default": "./dist/core-ext/string/inflections.js"
+    },
     "./core-ext/date/conversions": {
       "types": "./dist/core-ext/date/conversions.d.ts",
       "default": "./dist/core-ext/date/conversions.js"

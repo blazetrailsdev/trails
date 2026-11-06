@@ -9,6 +9,13 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import type { ScopeOn } from "../../scoping/named.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    approved: ScopeOn<T, Topic>;
+  }
+}
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface Topic {

@@ -6,7 +6,12 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/test-helpers/fixtures/all/admin/**"],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/test-setup-*.ts",
+    "src/**/*.bench.ts",
+    "src/test-helpers/fixtures/all/admin/**"
+  ],
   "references": [
     { "path": "../rake" },
     { "path": "../ruby-compat" },
@@ -18,6 +23,7 @@
     { "path": "../msgpack" },
     { "path": "../actionview" },
     { "path": "../rack" },
-    { "path": "../activejob" }
+    { "path": "../activejob" },
+    { "path": "../vitest-matchers" }
   ]
 }

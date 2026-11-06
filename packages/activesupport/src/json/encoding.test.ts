@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { ActiveSupportJSON } from "../json.js";
-import { DateTime, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Encoding, type EncodeOptions } from "./encoding.js";
@@ -9,6 +9,7 @@ import { asJson, ToJsonWithActiveSupportEncoder } from "../core-ext/object/json.
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { assertNil } from "../testing/assertions.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 class Hashlike {
   toHash(): Record<string, unknown> {
@@ -62,22 +63,6 @@ function sortedJson(json: string): string {
 
 function objectKeys(jsonObject: string): string[] {
   return [...jsonObject.slice(1, -1).matchAll(/([^{}:,\s]+):/g)].map((match) => match[1]).sort();
-}
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
 }
 
 function withStandardJsonTimeFormat(value: boolean, block: () => void): void {

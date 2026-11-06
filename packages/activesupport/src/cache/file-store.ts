@@ -246,7 +246,6 @@ export class FileStore extends Store implements CacheStore {
     if (!File.isExist(path)) FileUtils.makedirs(path);
   }
 
-  /** @missingRailsCall exist? — CONVERGEABLE file-store-async-fs-bodies */
   protected async searchDir(dir: string, callback: (path: string) => Promise<void>): Promise<void> {
     if (!(await File.isExistAsync(dir))) return;
     for (const d of await Dir.childrenAsync(dir)) {

@@ -11,5 +11,6 @@
     { "path": "../date" },
     { "path": "../rack" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/fixtures"]
 }

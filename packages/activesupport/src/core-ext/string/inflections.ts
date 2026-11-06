@@ -1,6 +1,10 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
 
-import { camelize as inflectorCamelize, pluralize as inflectorPluralize } from "../../inflector.js";
+import {
+  camelize as inflectorCamelize,
+  classify as inflectorClassify,
+  pluralize as inflectorPluralize,
+} from "../../inflector.js";
 
 export function pluralize(str: string, count?: number, locale = "en"): string {
   if (count === 1) {
@@ -20,3 +24,9 @@ export function camelize(str: string, firstLetter: "upper" | "lower" = "upper"):
       throw new ArgumentError("Invalid option, use either :upper or :lower.");
   }
 }
+
+export function classify(str: string): string {
+  return inflectorClassify(str);
+}
+
+STRING_METHOD_TABLE.classify = (self) => classify(self.string);

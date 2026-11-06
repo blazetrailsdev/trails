@@ -64,14 +64,14 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
   }
 }
 
-export function actionMethods(this: FlashClassHost): string[] {
-  const host = this as FlashClassHost & { _actionMethodCache?: Set<string> };
+export function actionMethods(this: FlashClassHost): ReadonlySet<string> {
+  const host = this as FlashClassHost & { _actionMethodCache?: ReadonlySet<string> };
   if (!Object.hasOwn(host, "_actionMethodCache") || !host._actionMethodCache) {
     const flashTypes = new Set(host._flashTypes.map(String));
-    const methods = rbCallSuper(this, actionMethods) as string[];
-    host._actionMethodCache = new Set(methods.filter((name) => !flashTypes.has(name)));
+    const methods = rbCallSuper(this, actionMethods) as ReadonlySet<string>;
+    host._actionMethodCache = new Set([...methods].filter((name) => !flashTypes.has(name)));
   }
-  return [...host._actionMethodCache];
+  return host._actionMethodCache;
 }
 
 export const ClassMethods = { addFlashTypes, actionMethods };

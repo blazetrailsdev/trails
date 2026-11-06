@@ -7,7 +7,7 @@ import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
 import { plusWithDuration } from "../core-ext/time/calculations.js";
-import { toTime } from "../core-ext/time/compatibility.js";
+import { toTime } from "../core-ext/date-time/compatibility.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 class Stub {
@@ -149,7 +149,7 @@ export function travelTo(
             ? BigInt(now.getTime()) * 1_000_000n
             : now instanceof Temporal.Instant
               ? now.epochNanoseconds
-              : toTime(now).epochNanoseconds,
+              : toTime(now).toZonedDateTime().epochNanoseconds,
           1_000_000_000n,
         ),
       );

@@ -31,7 +31,13 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * (`vendor/ruby/v3.3.11/object.c:3355`), which Rails calls without defining, so there
  * is no Ruby file in any gem for the port to mirror.
  */
-export function kernelInteger(val: unknown, base: unknown = 0): number {
+export function kernelInteger(val: number, base?: unknown): number;
+/** `Kernel#Integer` (`vendor/ruby/v3.3.11/object.c:3355`).
+ * @noRailsEquivalent PERMANENT */
+export function kernelInteger(val: unknown, base?: unknown): number | bigint;
+/** `Kernel#Integer` (`vendor/ruby/v3.3.11/object.c:3355`).
+ * @noRailsEquivalent PERMANENT */
+export function kernelInteger(val: unknown, base: unknown = 0): number | bigint {
   const radix = rbNum2Int(base);
   if (radix !== 0) {
     const tmp = rbCheckStringType(val);
@@ -42,7 +48,7 @@ export function kernelInteger(val: unknown, base: unknown = 0): number {
     if (!Number.isFinite(val)) throw new FloatDomainError(String(val));
     return Math.trunc(val);
   }
-  if (typeof val === "bigint") return Number(val);
+  if (typeof val === "bigint") return val;
   if (typeof val === "string") return rbStrConvertToInum(val, radix);
   if (val === null || val === undefined) {
     throw new TypeError("can't convert nil into Integer");
@@ -111,22 +117,22 @@ function rbCheckStringType(val: unknown): string | null {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbCheckToInt(val: unknown): number | null {
+export function rbCheckToInt(val: unknown): number | bigint | null {
   const toInt = (val as { toInt?: unknown }).toInt;
   if (typeof toInt !== "function") return null;
   const tmp = (toInt as () => unknown).call(val);
-  return rbIntegerTypeP(tmp) ? Number(tmp) : null;
+  return rbIntegerTypeP(tmp) ? tmp : null;
 }
 
 /** `rb_to_integer(val, "to_i", idTo_i)` (`vendor/ruby/v3.3.11/object.c:3213`). */
-function rbToInteger(val: unknown): number {
+function rbToInteger(val: unknown): number | bigint {
   const klass = rbBuiltinClassName(val);
   const toI = (val as { toI?: unknown }).toI;
   if (typeof toI !== "function") {
     throw new TypeError(`can't convert ${klass} into Integer`);
   }
   const tmp = (toI as () => unknown).call(val);
-  if (rbIntegerTypeP(tmp)) return Number(tmp);
+  if (rbIntegerTypeP(tmp)) return tmp;
   throw new TypeError(
     `can't convert ${klass} to Integer (${klass}#to_i gives ${rbBuiltinClassName(tmp)})`,
   );
@@ -138,7 +144,7 @@ function rbToInteger(val: unknown): number {
  * prefix (falling back to `-base` below -1, then to 10), and any base outside
  * `valid_radix_p`'s 2..36 raises.
  */
-function rbStrConvertToInum(str: string, base: number): number {
+function rbStrConvertToInum(str: string, base: number): number | bigint {
   const signMatch = /^([+-]?)(.*)$/s.exec(str.trim())!;
   const sign = signMatch[1];
   let body = signMatch[2];
@@ -165,5 +171,10 @@ function rbStrConvertToInum(str: string, base: number): number {
   if (!new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) {
     throw new ArgumentError(`invalid value for Integer(): ${rbInspect(str)}`);
   }
-  return (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), base);
+  const n = (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), base);
+  if (Number.isSafeInteger(n)) return n;
+  let big = 0n;
+  for (const d of body.replace(/_/g, ""))
+    big = big * BigInt(base) + BigInt(DIGITS.indexOf(d.toLowerCase()));
+  return sign === "-" ? -big : big;
 }

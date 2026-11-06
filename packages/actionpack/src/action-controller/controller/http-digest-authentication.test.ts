@@ -13,8 +13,8 @@ class DummyDigestController extends Base {
   declare loggedIn: boolean;
 
   static {
-    this.beforeAction("authenticate", { only: "index" });
-    this.beforeAction("authenticateWithRequest", { only: "display" });
+    this.beforeAction(":authenticate", { only: "index" });
+    this.beforeAction(":authenticateWithRequest", { only: "display" });
   }
 
   static USERS: Record<string, string> = {

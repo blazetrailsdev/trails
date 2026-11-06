@@ -32,6 +32,64 @@ describe("Mail::Sendmail", () => {
     );
   });
 
+  const expectPopen = async (mail: Message, from: string, ...to: string[]) => {
+    expect(await deliverWith(new Sendmail({}), mail)).toHaveBeenCalledWith(
+      ["/usr/sbin/sendmail", "-i", "-f", from, "--", ...to],
+      expect.any(Function),
+    );
+  };
+  const DEFAULT_TO = ["marcel@test.lindsaar.net", "bob@test.lindsaar.net"];
+
+  it("spawns a sendmail process", async () => {
+    await expectPopen(buildMail(), "roger@test.lindsaar.net", ...DEFAULT_TO);
+  });
+
+  describe("SMTP From", () => {
+    it("explicitly passes an envelope From address to sendmail", async () => {
+      const mail = buildMail();
+      mail.setSmtpEnvelopeFrom("smtp_from@test.lindsaar.net");
+      await expectPopen(mail, "smtp_from@test.lindsaar.net", ...DEFAULT_TO);
+    });
+
+    it("escapes the From address", async () => {
+      const mail = buildMail();
+      mail.setFrom('"from+suffix test"@test.lindsaar.net');
+      await expectPopen(mail, '"from+suffix test"@test.lindsaar.net', ...DEFAULT_TO);
+    });
+
+    it("does not escape ~ in From address", async () => {
+      const mail = buildMail();
+      mail.setFrom("tilde~@test.lindsaar.net");
+      await expectPopen(mail, "tilde~@test.lindsaar.net", ...DEFAULT_TO);
+    });
+  });
+
+  describe("SMTP To", () => {
+    it("explicitly passes envelope To addresses to sendmail", async () => {
+      const mail = buildMail();
+      mail.setSmtpEnvelopeTo("smtp_to@test.lindsaar.net");
+      await expectPopen(mail, "roger@test.lindsaar.net", "smtp_to@test.lindsaar.net");
+    });
+
+    it("escapes the To address", async () => {
+      const mail = buildMail();
+      mail.setTo('"to+suffix test"@test.lindsaar.net');
+      await expectPopen(mail, "roger@test.lindsaar.net", '"to+suffix test"@test.lindsaar.net');
+    });
+
+    it("does not escape ~ in To address", async () => {
+      const mail = buildMail();
+      mail.setTo("tilde~@test.lindsaar.net");
+      await expectPopen(mail, "roger@test.lindsaar.net", "tilde~@test.lindsaar.net");
+    });
+
+    it("quotes the destinations to ensure leading -hyphen doesn't confuse sendmail", async () => {
+      const mail = buildMail();
+      mail.setTo("-hyphen@test.lindsaar.net");
+      await expectPopen(mail, "roger@test.lindsaar.net", "-hyphen@test.lindsaar.net");
+    });
+  });
+
   it("still sends an email if the arguments setting have been set to nil", async () => {
     const dm = new Sendmail({});
     dm.settings.arguments = null;
@@ -39,6 +97,14 @@ describe("Mail::Sendmail", () => {
       `/usr/sbin/sendmail -f roger@test.lindsaar.net ${DESTS}`.split(" "),
       expect.any(Function),
     );
+  });
+
+  it("escapes evil haxxor attempts", async () => {
+    const evil = '"foo\\";touch /tmp/PWNED;\\""@blah.com';
+    const mail = buildMail();
+    mail.setFrom(evil);
+    mail.setTo(evil);
+    await expectPopen(mail, evil, evil);
   });
 
   it("raises on nonzero exitstatus", async () => {

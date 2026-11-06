@@ -1,4 +1,4 @@
-import { Hash, Module, strip, toS } from "@blazetrails/ruby-compat";
+import { Hash, strip, toS } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
@@ -134,14 +134,10 @@ export function setLogger(this: TestHelperHost, logger: MockLogger | null): void
   LogSubscriber.logger = logger as unknown as Logger | null;
 }
 
-export const TestHelper = new Module() as Module<{
+export const TestHelper = { setup, teardown, wait, setLogger } as {
   setup: typeof setup;
   teardown: typeof teardown;
   wait: typeof wait;
   setLogger: typeof setLogger;
-}> & { MockLogger: typeof MockLogger };
-TestHelper.defineMethod("setup", setup);
-TestHelper.defineMethod("teardown", teardown);
-TestHelper.MockLogger = MockLogger;
-TestHelper.defineMethod("wait", wait);
-TestHelper.defineMethod("setLogger", setLogger);
+} & { MockLogger: typeof MockLogger };
+Object.defineProperty(TestHelper, "MockLogger", { value: MockLogger });

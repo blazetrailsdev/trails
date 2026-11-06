@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Enumerator, Hash } from "@blazetrails/ruby-compat";
 
 describe("HashWithIndifferentAccess", () => {
   it("dig with array", () => {
@@ -61,5 +61,11 @@ describe("HashWithIndifferentAccess", () => {
     expect((h.toHash() as Hash<string, unknown>).get("a")).not.toBeInstanceOf(
       HashWithIndifferentAccess,
     );
+  });
+
+  it("transform_keys! with neither a hash nor a block answers an Enumerator", () => {
+    const hash = new HashWithIndifferentAccess({ a: 1 });
+    expect(hash.transformKeysBang()).toBeInstanceOf(Enumerator);
+    expect([...hash.keys()]).toEqual(["a"]);
   });
 });

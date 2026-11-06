@@ -89,6 +89,7 @@ import {
   rubyMethodToTsForFqn,
   copyHookClaimed,
   rubyCallToTsForReceivers,
+  unreachableSingletonCallsDropped,
 } from "./compare.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
@@ -5012,5 +5013,44 @@ describe("rubyCallToTsForReceivers", () => {
     expect(rubyCallToTsForReceivers("new", "actiondispatch", undefined, true)).toEqual([
       "constructor",
     ]);
+  });
+});
+
+describe("unreachableSingletonCallsDropped", () => {
+  const all = { has: () => true };
+  it("drops an expr-receiver call to a singleton-only method from an instance body", () => {
+    const s = unreachableSingletonCallsDropped(all, "instance", { split: ["expr"] }, () => true);
+    expect(s.has("split")).toBe(false);
+  });
+  it("keeps a self.class call", () => {
+    expect(
+      unreachableSingletonCallsDropped(all, "instance", { split: ["class"] }, () => true).has(
+        "split",
+      ),
+    ).toBe(true);
+    expect(
+      unreachableSingletonCallsDropped(
+        all,
+        "instance",
+        { split: ["expr", "class"] },
+        () => true,
+      ).has("split"),
+    ).toBe(true);
+  });
+
+  it("keeps a self call, a class body, and an instance-defined method", () => {
+    expect(
+      unreachableSingletonCallsDropped(all, "instance", { split: ["self"] }, () => true).has(
+        "split",
+      ),
+    ).toBe(true);
+    expect(
+      unreachableSingletonCallsDropped(all, "class", { split: ["expr"] }, () => true).has("split"),
+    ).toBe(true);
+    expect(
+      unreachableSingletonCallsDropped(all, "instance", { split: ["expr"] }, () => false).has(
+        "split",
+      ),
+    ).toBe(true);
   });
 });

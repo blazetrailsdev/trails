@@ -11,11 +11,11 @@ export {
   type DateParts,
   type StrftimeSubject,
 } from "./date.js";
-export { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
+export { Time, Timezone, nowTimeZoneId, resetLocalTimeZoneId } from "./time.js";
 export {
   tzdataBaseOffsets,
   tzdataIsdst,
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "./tzdata-isdst.js";
-export { tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";
+export { tzdataAbbreviation, tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";

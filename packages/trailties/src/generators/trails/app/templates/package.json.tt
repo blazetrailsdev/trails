@@ -1,0 +1,70 @@
+<%
+  const entries = (names) =>
+    Object.fromEntries(names.map((n) => [n, this.trailsGemfileEntry(n, this.packageManager)]));
+  const dep = this.database.pkgDependency;
+  const dbDep =
+    this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
+      ? this.sqliteDriver === "expo-sqlite"
+        ? { "expo-sqlite": "^15.0.0" }
+        : {}
+      : { [dep.name]: dep.version };
+-%>
+<%= JSON.stringify(
+  {
+    name: this.originalAppName(),
+    version: "0.1.0",
+    private: true,
+    type: "module",
+    exports: {
+      "./*.tse": {
+        types: "./.trails/views/*.tse.d.ts",
+        default: "./.trails/views/*.tse.js",
+      },
+    },
+    scripts: {
+      build: "trails-tsc --schema db/schema.ts",
+      test: "vitest run",
+      trails: "trails",
+      dev: "trails server",
+      "db:create": "trails db:create",
+      "db:migrate": "trails db:migrate",
+      "db:seed": "trails db:seed",
+      "db:setup": "trails db:setup",
+      "db:reset": "trails db:reset",
+      prepare: "trails-tsc-views build --views app/views",
+    },
+    dependencies: {
+      ...entries([
+        "@blazetrails/activerecord",
+        "@blazetrails/activemodel",
+        "@blazetrails/date",
+        "@blazetrails/activesupport",
+        "@blazetrails/rack",
+        "@blazetrails/rackup",
+        "@blazetrails/ruby-compat",
+        "@blazetrails/actionpack",
+        "@blazetrails/actionview",
+        "@blazetrails/trailties",
+        ...(this.options.skipActiveJob ? [] : ["@blazetrails/activejob"]),
+        ...(this.skipSolid() ? [] : ["@blazetrails/solid-queue"]),
+        ...(this.skipActionCable() ? [] : ["@blazetrails/actioncable"]),
+      ]),
+      ...dbDep,
+    },
+    devDependencies: {
+      ...entries(["@blazetrails/activerecord-cli", "@blazetrails/trails-tsc"]),
+      "@types/node": "^22.0.0",
+      typescript: "^5.8.0",
+      vite: "^7.0.0",
+      vitest: "^3.0.0",
+      ...(this.skipEslint()
+        ? {}
+        : { "@eslint/js": "^10.0.1", eslint: "^10.0.3", "typescript-eslint": "^8.57.0" }),
+    },
+    ...(this.options.dev && this.packageManager !== "pnpm"
+      ? { overrides: entries(Object.keys(this.trailsDevPackages())) }
+      : {}),
+  },
+  null,
+  2,
+) %>

@@ -285,9 +285,18 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
@@ -297,6 +306,13 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
 
   packages/actionpack:
     dependencies:
@@ -349,6 +365,9 @@ importers:
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       vite:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
@@ -488,6 +507,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
@@ -717,6 +739,9 @@ importers:
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/html-sanitizer:
     dependencies:
@@ -839,6 +864,9 @@ importers:
         specifier: ^10.3.0
         version: 10.3.0
     devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
       '@types/nodemailer':
         specifier: ^8.0.2
         version: 8.0.2
@@ -883,6 +911,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rack-session:
     dependencies:
@@ -892,6 +923,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rack-test:
     dependencies:
@@ -920,6 +955,9 @@ importers:
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/rake:
     dependencies:
@@ -1053,12 +1091,19 @@ importers:
       typescript-5:
         specifier: npm:typescript@5.9.3
         version: typescript@5.9.3
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/trailties:
     dependencies:
       '@blazetrails/actioncable':
         specifier: workspace:*
         version: link:../actioncable
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
@@ -8435,7 +8480,6 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
-    optional: true
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
@@ -9815,8 +9859,7 @@ snapshots:
     dependencies:
       node-int64: 0.4.0
 
-  buffer-from@1.1.2:
-    optional: true
+  buffer-from@1.1.2: {}
 
   buffer@5.7.1:
     dependencies:
@@ -9967,8 +10010,7 @@ snapshots:
 
   commander@14.0.3: {}
 
-  commander@2.20.3:
-    optional: true
+  commander@2.20.3: {}
 
   commander@7.2.0: {}
 
@@ -10811,7 +10853,8 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
-  fsevents@2.3.2: {}
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -12588,12 +12631,10 @@ snapshots:
     dependencies:
       buffer-from: 1.1.2
       source-map: 0.6.1
-    optional: true
 
   source-map@0.5.7: {}
 
-  source-map@0.6.1:
-    optional: true
+  source-map@0.6.1: {}
 
   space-separated-tokens@2.0.2: {}
 
@@ -12700,7 +12741,6 @@ snapshots:
   supports-color@8.1.1:
     dependencies:
       has-flag: 4.0.0
-    optional: true
 
   supports-hyperlinks@2.3.0:
     dependencies:
@@ -12762,7 +12802,6 @@ snapshots:
       acorn: 8.16.0
       commander: 2.20.3
       source-map-support: 0.5.21
-    optional: true
 
   test-exclude@7.0.2:
     dependencies:

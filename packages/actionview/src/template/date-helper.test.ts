@@ -3,7 +3,7 @@ import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError, Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { inTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
+import "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import {
   Duration,
   TimeZone,
@@ -412,13 +412,13 @@ describe("DateHelperTest", () => {
 
   it("distance in words with time zones", () => {
     const from = Time.mktime(2004, 6, 6, 21, 45, 0);
-    assertDistanceOfTimeInWords(inTimeZone(from, "Alaska"));
-    assertDistanceOfTimeInWords(inTimeZone(from, "Hawaii"));
+    assertDistanceOfTimeInWords(from.inTimeZone("Alaska"));
+    assertDistanceOfTimeInWords(from.inTimeZone("Hawaii"));
   });
 
   it("distance in words with different time zones", () => {
     const from = Time.mktime(2004, 6, 6, 21, 45, 0);
-    assertDistanceOfTimeInWords(inTimeZone(from, "Alaska"), inTimeZone(from, "Hawaii"));
+    assertDistanceOfTimeInWords(from.inTimeZone("Alaska"), from.inTimeZone("Hawaii"));
   });
 
   it("distance in words with dates", () => {

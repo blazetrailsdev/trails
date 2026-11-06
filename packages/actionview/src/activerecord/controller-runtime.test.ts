@@ -7,7 +7,12 @@ import {
   assertMatch,
   LogSubscriber as ActiveSupportLogSubscriber,
 } from "@blazetrails/activesupport";
-import { TestHelper, type MockLogger } from "@blazetrails/activesupport/log-subscriber/test-helper";
+import {
+  setup as testHelperSetup,
+  teardown as testHelperTeardown,
+  TestHelper,
+  type MockLogger,
+} from "@blazetrails/activesupport/log-subscriber/test-helper";
 import { ActionController } from "@blazetrails/actionpack";
 import { include, type Included } from "@blazetrails/ruby-compat";
 
@@ -69,12 +74,12 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
 
     override setup(): void {
       this.oldLogger = ActionController.Base.logger;
-      super.setup();
+      testHelperSetup.call(this as never);
       ActionController.LogSubscriber.attachTo("action_controller");
     }
 
     override teardown(): void {
-      super.teardown();
+      testHelperTeardown.call(this as never);
       ActiveSupportLogSubscriber.logSubscribers().length = 0;
       ActionController.Base.logger = this.oldLogger;
     }

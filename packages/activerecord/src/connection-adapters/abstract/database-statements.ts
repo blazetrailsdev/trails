@@ -622,8 +622,12 @@ export function emptyInsertStatementValue(_primaryKey?: string | null): string {
   return "DEFAULT VALUES";
 }
 
-export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
-  if ((typeof limit === "number" && Number.isInteger(limit)) || limit instanceof Nodes.SqlLiteral) {
+export function sanitizeLimit(limit: unknown): number | bigint | Nodes.SqlLiteral {
+  if (
+    (typeof limit === "number" && Number.isInteger(limit)) ||
+    typeof limit === "bigint" ||
+    limit instanceof Nodes.SqlLiteral
+  ) {
     return limit;
   }
   return kernelInteger(limit);

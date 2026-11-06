@@ -37,7 +37,7 @@
     }
   },
   "actionmailer": {
-    "rows": 15,
+    "rows": 25,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -54,7 +54,17 @@
       "gem-version.ts::VERSION": "ActionMailer::VERSION",
       "inline-preview-interceptor.ts::InlinePreviewInterceptor": "ActionMailer::InlinePreviewInterceptor",
       "log-subscriber.ts::LogSubscriber": "ActionMailer::LogSubscriber",
+      "mail-delivery-job.ts::MailDeliveryJob": "ActionMailer::MailDeliveryJob",
       "mail-helper.ts::MailHelper": "ActionMailer::MailHelper",
+      "message-delivery.ts::MessageDelivery": "ActionMailer::MessageDelivery",
+      "parameterized.ts::ClassMethods": "ActionMailer::Parameterized::ClassMethods",
+      "parameterized.ts::Mailer": "ActionMailer::Parameterized::Mailer",
+      "parameterized.ts::MessageDelivery": "ActionMailer::Parameterized::MessageDelivery",
+      "parameterized.ts::Parameterized": "ActionMailer::Parameterized",
+      "preview.ts::ClassMethods": "ActionMailer::Previews::ClassMethods",
+      "preview.ts::Preview": "ActionMailer::Preview",
+      "preview.ts::Previews": "ActionMailer::Previews",
+      "queued-delivery.ts::QueuedDelivery": "ActionMailer::QueuedDelivery",
       "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
     }
   },
@@ -771,7 +781,7 @@
     }
   },
   "activesupport": {
-    "rows": 185,
+    "rows": 186,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -888,6 +898,7 @@
       "concurrency/load-interlock-aware-monitor.ts::ThreadLoadInterlockAwareMonitor": "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor",
       "core-ext/big-decimal/conversions.ts::BigDecimalWithDefaultFormat": "ActiveSupport::BigDecimalWithDefaultFormat",
       "core-ext/date-and-time/calculations.ts::Calculations": "DateAndTime::Calculations",
+      "core-ext/date-and-time/zones.ts::Zones": "DateAndTime::Zones",
       "core-ext/enumerable.ts::SoleItemExpectedError": "Enumerable::SoleItemExpectedError",
       "core-ext/hash/conversions.ts::DisallowedType": "ActiveSupport::XMLConverter::DisallowedType",
       "core-ext/hash/conversions.ts::XMLConverter": "ActiveSupport::XMLConverter",
@@ -1136,7 +1147,7 @@
   },
   "rackup": {
     "rows": 6,
-    "excluded": ["handler/node.ts::Node"],
+    "excluded": [],
     "unwalked": [],
     "residue": {
       "server.ts::Options": "Rackup::Server::Options",
@@ -1207,7 +1218,7 @@
     }
   },
   "trailties": {
-    "rows": 66,
+    "rows": 68,
     "excluded": [
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
@@ -1235,9 +1246,16 @@
       "backtrace-cleaner.ts::BacktraceCleaner": "Trails::BacktraceCleaner",
       "command.ts::CorrectableNameError": "Trails::Command::CorrectableNameError",
       "command.ts::UnrecognizedCommandError": "Trails::Command::UnrecognizedCommandError",
+      "commands/app/update-command.ts::UpdateCommand": "Trails::Command::App::UpdateCommand",
       "commands/console.ts::Console": "Trails::Console",
       "commands/console.ts::ConsoleCommand": "Trails::Command::ConsoleCommand",
+      "commands/console/irb-console.ts::AppInstance": "Trails::Console::AppInstance",
+      "commands/console/irb-console.ts::ControllerHelper": "Trails::Console::ControllerHelper",
+      "commands/console/irb-console.ts::ControllerInstance": "Trails::Console::ControllerInstance",
       "commands/console/irb-console.ts::IRBConsole": "Trails::Console::IRBConsole",
+      "commands/console/irb-console.ts::NewSession": "Trails::Console::NewSession",
+      "commands/console/irb-console.ts::RailsHelperBase": "Trails::Console::TrailsHelperBase",
+      "commands/console/irb-console.ts::ReloadHelper": "Trails::Console::ReloadHelper",
       "commands/credentials.ts::CredentialsCommand": "Trails::Command::CredentialsCommand",
       "commands/credentials/credentials-command/diffing.ts::Diffing": "Trails::Command::CredentialsCommand::Diffing",
       "commands/db/system/change/change-command.ts::ChangeCommand": "Trails::Command::Db::System::ChangeCommand",
@@ -1277,11 +1295,6 @@
       "rack.ts::Rack": "Trails::Rack",
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
-      "source-annotation-extractor.ts::Annotation": "Trails::SourceAnnotationExtractor::Annotation",
-      "source-annotation-extractor.ts::Parser": "Trails::SourceAnnotationExtractor::ParserExtractor::Parser",
-      "source-annotation-extractor.ts::ParserExtractor": "Trails::SourceAnnotationExtractor::ParserExtractor",
-      "source-annotation-extractor.ts::PatternExtractor": "Trails::SourceAnnotationExtractor::PatternExtractor",
-      "source-annotation-extractor.ts::SourceAnnotationExtractor": "Trails::SourceAnnotationExtractor",
       "trailtie.ts::Trailtie": "Trails::Trailtie",
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
       "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",

@@ -3,7 +3,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ControllerGenerator } from "./controller-generator.js";
-import { controllerPathHelpers } from "./controller-paths.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -43,30 +42,15 @@ describe("ControllerGenerator emit", () => {
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
   });
-});
 
-describe("controllerPathHelpers", () => {
-  it("derives canonical names for a flat controller", async () => {
-    expect(controllerPathHelpers("Account")).toMatchObject({
-      className: "AccountController",
-      displayName: "AccountController",
-      controllerFile: "account-controller",
-      viewBase: "account",
-      helperName: "AccountHelper",
-      helperFile: "account-helper",
-      namespaceParts: ["Account"],
-    });
-  });
-
-  it("flattens namespace for the TS class name but preserves :: for display", async () => {
-    expect(controllerPathHelpers("admin/dashboard")).toMatchObject({
-      className: "DashboardController",
-      displayName: "Admin::DashboardController",
-      controllerFile: "admin/dashboard-controller",
-    });
-  });
-
-  it("strips a trailing Controller suffix", async () => {
-    expect(controllerPathHelpers("account_controller").controllerFile).toBe("account-controller");
+  it("keeps an underscored namespace segment as Rails' class_path has it", async () => {
+    await runController("blog_admin/posts", ["index"]);
+    expect(fs.existsSync(path.join(tmpDir, "app/controllers/blog_admin/posts-controller.ts"))).toBe(
+      true,
+    );
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/blog_admin/posts-helper.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/blog-admin/posts/index.html.tse"))).toBe(
+      true,
+    );
   });
 });

@@ -11,13 +11,14 @@ import {
   include,
   type Included,
   isBlank,
+  stub,
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
-import { SecureRandom, rbEnsure, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
+import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TestCase, TestSession } from "../test-case.js";
 import {
@@ -202,7 +203,7 @@ class PrependProtectForgeryBaseController extends Base {
     this.addCalledCallback("verify_authenticity_token");
   }
 }
-PrependProtectForgeryBaseController.beforeAction("customAction");
+PrependProtectForgeryBaseController.beforeAction(":customAction");
 
 class FreeCookieController extends RequestForgeryProtectionControllerUsingResetSession {
   async index(): Promise<void> {
@@ -274,7 +275,7 @@ class CookieCsrfTokenStorageStrategyController extends Base {
   }
 }
 include(CookieCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
-CookieCsrfTokenStorageStrategyController.afterAction("commitToken", { only: "cookie" });
+CookieCsrfTokenStorageStrategyController.afterAction(":commitToken", { only: "cookie" });
 CookieCsrfTokenStorageStrategyController.protectFromForgery({
   only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
   with: "exception",
@@ -464,13 +465,16 @@ function RequestForgeryProtectionTests(
 
   it("should allow post with token", async () => {
     initializeCsrfToken();
-    const stub = vi
-      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(TOKEN);
-    await rbEnsure(
-      () =>
-        assertNotBlocked(() => tc.post("index", { params: { custom_authenticity_token: TOKEN } })),
-      () => stub.mockRestore(),
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -478,53 +482,61 @@ function RequestForgeryProtectionTests(
     const tokenLength = Math.ceil((32 * 4.0) / 3);
     const tokenIncludingUrlUnsafeChars = "+/".padEnd(tokenLength, "A");
     initializeCsrfToken(tokenIncludingUrlUnsafeChars);
-    const stub = vi
-      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(tokenIncludingUrlUnsafeChars);
-    await rbEnsure(
-      () =>
-        assertNotBlocked(() =>
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      tokenIncludingUrlUnsafeChars,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
           tc.post("index", { params: { custom_authenticity_token: tokenIncludingUrlUnsafeChars } }),
-        ),
-      () => stub.mockRestore(),
+        );
+      },
     );
   });
 
   it("should allow patch with token", async () => {
     initializeCsrfToken();
-    const stub = vi
-      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(TOKEN);
-    await rbEnsure(
-      () =>
-        assertNotBlocked(() => tc.patch("index", { params: { custom_authenticity_token: TOKEN } })),
-      () => stub.mockRestore(),
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc.patch("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
   it("should allow put with token", async () => {
     initializeCsrfToken();
-    const stub = vi
-      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(TOKEN);
-    await rbEnsure(
-      () =>
-        assertNotBlocked(() => tc.put("index", { params: { custom_authenticity_token: TOKEN } })),
-      () => stub.mockRestore(),
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc.put("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
   it("should allow delete with token", async () => {
     initializeCsrfToken();
-    const stub = vi
-      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(TOKEN);
-    await rbEnsure(
-      () =>
-        assertNotBlocked(() =>
+    await stub(
+      tc.controller as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
           tc.delete("index", { params: { custom_authenticity_token: TOKEN } }),
-        ),
-      () => stub.mockRestore(),
+        );
+      },
     );
   });
 
@@ -555,16 +567,17 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and correct origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi
-        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-        .mockReturnValue(TOKEN);
-      await rbEnsure(
-        () =>
-          assertNotBlocked(() => {
+      await stub(
+        tc.controller as unknown as CsrfPrivate,
+        "formAuthenticityToken",
+        TOKEN,
+        [],
+        async () => {
+          await assertNotBlocked(() => {
             tc.request.setHeader("HTTP_ORIGIN", "http://test.host");
             return tc.post("index", { params: { custom_authenticity_token: TOKEN } });
-          }),
-        () => stub.mockRestore(),
+          });
+        },
       );
     });
   });
@@ -572,15 +585,16 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and no origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi
-        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-        .mockReturnValue(TOKEN);
-      await rbEnsure(
-        () =>
-          assertNotBlocked(() =>
+      await stub(
+        tc.controller as unknown as CsrfPrivate,
+        "formAuthenticityToken",
+        TOKEN,
+        [],
+        async () => {
+          await assertNotBlocked(() =>
             tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
-          ),
-        () => stub.mockRestore(),
+          );
+        },
       );
     });
   });
@@ -588,10 +602,11 @@ function RequestForgeryProtectionTests(
   it("should raise for post with null origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi
-        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-        .mockReturnValue(TOKEN);
-      await rbEnsure(
+      await stub(
+        tc.controller as unknown as CsrfPrivate,
+        "formAuthenticityToken",
+        TOKEN,
+        [],
         async () => {
           const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
             tc.request.setHeader("HTTP_ORIGIN", "null");
@@ -599,7 +614,6 @@ function RequestForgeryProtectionTests(
           });
           expect(exception.message).toMatch("The browser returned a 'null' origin for a request");
         },
-        () => stub.mockRestore(),
       );
     });
   });
@@ -611,16 +625,17 @@ function RequestForgeryProtectionTests(
     try {
       await forgeryProtectionOriginCheck(async () => {
         initializeCsrfToken();
-        const stub = vi
-          .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
-          .mockReturnValue(TOKEN);
-        await rbEnsure(
-          () =>
-            assertBlocked(() => {
+        await stub(
+          tc.controller as unknown as CsrfPrivate,
+          "formAuthenticityToken",
+          TOKEN,
+          [],
+          async () => {
+            await assertBlocked(() => {
               tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
               return tc.post("index", { params: { custom_authenticity_token: TOKEN } });
-            }),
-          () => stub.mockRestore(),
+            });
+          },
         );
       });
 
@@ -858,10 +873,11 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi
-        .spyOn(t().controller as unknown as CsrfPrivate, "formAuthenticityToken")
-        .mockReturnValue(TOKEN);
-      await rbEnsure(
+      await stub(
+        t().controller as unknown as CsrfPrivate,
+        "formAuthenticityToken",
+        TOKEN,
+        [],
         async () => {
           const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
             t().request.setHeader("HTTP_ORIGIN", "http://bad.host");
@@ -871,7 +887,6 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
             "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
           );
         },
-        () => stub.mockRestore(),
       );
     });
   });
@@ -1428,17 +1443,6 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   const tc = () => t() as CookieCsrfTokenStorageStrategyControllerTest;
   const controller = () => tc().controller as CookieCsrfTokenStorageStrategyController;
 
-  async function stubFormAuthenticityToken(block: () => Promise<unknown>): Promise<void> {
-    const stub = vi
-      .spyOn(controller() as unknown as CsrfPrivate, "formAuthenticityToken")
-      .mockReturnValue(TOKEN);
-    try {
-      await block();
-    } finally {
-      stub.mockRestore();
-    }
-  }
-
   it("csrf token is stored in cookie", async () => {
     await tc().get("cookie");
     assertNot(tc().session().isKey("_csrf_token"));
@@ -1483,16 +1487,32 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   it("should allow when session id in cookie matches session id", async () => {
     initializeCsrfToken();
 
-    await stubFormAuthenticityToken(() =>
-      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
   it("should not allow when session id in cookie does not match session id", async () => {
     initializeCsrfToken(TOKEN, new TestSession());
 
-    await stubFormAuthenticityToken(() =>
-      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -1500,8 +1520,16 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     tc().request.session = new TestSession({}, null as never) as never;
     initializeCsrfToken(TOKEN, null);
 
-    await stubFormAuthenticityToken(() =>
-      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -1509,8 +1537,16 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     initializeCsrfToken();
     tc().request.session = new TestSession({}, null as never) as never;
 
-    await stubFormAuthenticityToken(() =>
-      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -1518,8 +1554,16 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     initializeCsrfToken(TOKEN, null);
     tc().request.session = new TestSession_(null) as never;
 
-    await stubFormAuthenticityToken(() =>
-      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -1527,8 +1571,16 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     initializeCsrfToken();
     tc().request.session = new TestSession_(tc().session().id()) as never;
 
-    await stubFormAuthenticityToken(() =>
-      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertNotBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 
@@ -1536,8 +1588,16 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
     initializeCsrfToken();
     tc().request.session = new TestSession_(null) as never;
 
-    await stubFormAuthenticityToken(() =>
-      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    await stub(
+      controller() as unknown as CsrfPrivate,
+      "formAuthenticityToken",
+      TOKEN,
+      [],
+      async () => {
+        await assertBlocked(() =>
+          tc().post("index", { params: { custom_authenticity_token: TOKEN } }),
+        );
+      },
     );
   });
 

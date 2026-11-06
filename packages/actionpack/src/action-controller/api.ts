@@ -1,4 +1,5 @@
 import { Metal } from "./metal.js";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import { ApiRendering } from "./api/api-rendering.js";
 import {
   RateLimiting,
@@ -23,7 +24,6 @@ import { Renderers } from "./metal/renderers.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import {
   Callbacks,
-  type ActionCallbackHost,
   type beforeAction,
   type prependBeforeAction,
   type skipBeforeAction,
@@ -43,6 +43,7 @@ import {
 } from "../abstract-controller/rendering.js";
 import type { Renderer } from "./renderer.js";
 import { UrlFor } from "./metal/url-for.js";
+import { _routesIvar } from "../action-dispatch/routing/url-for.js";
 import type { Head } from "./metal/head.js";
 import { Rescue } from "./metal/rescue.js";
 import { Instrumentation } from "./metal/instrumentation.js";
@@ -109,9 +110,9 @@ export class API extends Metal {
 
   declare static raiseOnOpenRedirects: boolean;
 
-  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
-  declare static setCallback: ActionCallbackHost["setCallback"];
-  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
@@ -149,11 +150,10 @@ export class API extends Metal {
    * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
    * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
    * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
-   * @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property
    */
   constructor() {
     super();
-    if ("_routes" in this) this._routes = null;
+    (this as Record<symbol, unknown>)[_routesIvar] = null;
     this._urlOptions = null;
     this.viewRuntime = null;
     if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {

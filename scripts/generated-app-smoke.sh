@@ -40,7 +40,7 @@ const fs=require("fs"),f="app/models/author.ts";
 const s=fs.readFileSync(f,"utf8").replace(/(class Author extends \w+ \{\n)/, "$1  static {\n    this.hasMany(\"books\");\n  }\n");
 if(!s.includes("hasMany"))throw new Error("could not add hasMany to "+f);
 fs.writeFileSync(f,s);'
-pnpm trails db migrate
+pnpm trails db:migrate
 
 cat > test/models/module-graph.test.ts <<'EOF'
 import { describe, expect, it } from "vitest";

@@ -2,9 +2,9 @@ import "../constants.server.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include EnvironmentArgument` (`server_command.rb:94`); the class/interface merge is how a mixin surfaces on the type side. */
 import { type BroadcastLogger, getEnv, isBlank, Logger } from "@blazetrails/activesupport";
 import {
+  atExit,
   block,
   Dir,
-  env,
   fetch,
   File,
   FileUtils,
@@ -15,15 +15,18 @@ import {
   include,
   LoadError,
   NameError,
-  onSignal,
+  trap,
   setEnv,
   STDERR,
   STDOUT,
   toI,
   type Included,
 } from "@blazetrails/ruby-compat";
-import { type RackEnv } from "@blazetrails/rack";
-import { Handler } from "@blazetrails/rackup";
+import {
+  Handler,
+  Server as RackupServer,
+  type ServerOptions as RackupServerOptions,
+} from "@blazetrails/rackup";
 import { demodulize, isPresent, underscore } from "@blazetrails/activesupport";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
@@ -33,8 +36,11 @@ import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { DevCaching } from "../dev-caching.js";
 import { Trails } from "../trails.js";
+import * as TrailsTsc from "@blazetrails/trails-tsc";
 
-export interface ServerOptions {
+Trails.TrailsTsc = TrailsTsc;
+
+export interface ServerOptions extends RackupServerOptions {
   userSuppliedOptions?: string[];
   server?: string;
   logStdout?: boolean;
@@ -51,16 +57,12 @@ export interface ServerOptions {
   SSLEnable?: boolean;
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface ServerHandler {
-  name: string;
-  run(
-    app: (env: RackEnv) => unknown,
-    options: { Port?: number; Host?: string },
-  ): Promise<{ on(event: string, cb: () => void): unknown }>;
-}
-
-Handler.loadPath["rackup/handler/vite"] = () => import("../server/dev-server.js");
+Handler.loadPath["rackup/handler/vite"] = async () => {
+  if (!Trails.env["development?"]() || !(await hasViteConfig(Dir.pwd()))) {
+    throw new LoadError("cannot load such file -- rackup/handler/vite");
+  }
+  return import("../server/dev-server.js");
+};
 
 export class Options {
   parseBang(args: string[]): ServerOptions {
@@ -68,20 +70,18 @@ export class Options {
   }
 }
 
-export class Server {
+export class Server extends RackupServer<ServerOptions> {
   /** @internal */
   _defaultOptions: ServerOptions;
-  options: ServerOptions;
-  /** @internal */
-  _server: ServerHandler | null = null;
 
   constructor(options: ServerOptions | null = null) {
-    this._defaultOptions = options ?? {};
-    this.options = this._defaultOptions;
+    const defaultOptions = options ?? {};
+    super(defaultOptions);
+    this._defaultOptions = defaultOptions;
     this.setEnvironment();
   }
 
-  optParser(): Options {
+  override optParser(): Options {
     return new Options();
   }
 
@@ -89,23 +89,25 @@ export class Server {
     if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", this.options.environment);
   }
 
-  async start(afterStopCallback: (() => void) | null = null): Promise<void> {
+  /** @inventedArm atExit — PERMANENT */
+  override async start(afterStopCallback: (() => void) | null = null): Promise<unknown> {
+    let stopped = false;
+    const ensure = () => {
+      if (stopped || afterStopCallback == null) return;
+      stopped = true;
+      afterStopCallback();
+    };
+    const off = atExit(ensure);
     try {
-      onSignal("SIGINT", () => {
-        afterStopCallback?.();
-        exit();
-      });
+      trap("INT", () => exit());
       this.createTmpDirectories();
       this.setupDevCaching();
-      const app = await Trails.initialize();
-      if (this.options.logStdout) this.logToStdout();
+      if (this.options.logStdout) await this.logToStdout();
 
-      await app.loadServer();
-      const trailsApp = (env: RackEnv) => app.call(env);
-      const server = await (await this.server()).run(trailsApp, this.options);
-      if (afterStopCallback != null) server.on("close", afterStopCallback);
+      return await super.start();
     } catch (error) {
-      afterStopCallback?.();
+      off();
+      ensure();
       throw error;
     }
   }
@@ -120,24 +122,12 @@ export class Server {
     }
   }
 
-  /** @noRailsEquivalent CONVERGEABLE rails-server-extends-rackup-server */
-  async server(): Promise<ServerHandler> {
-    return (this._server ??= ((await Handler.get(this.options.server)) ??
-      (env[Handler.RACKUP_HANDLER] != null || env[Handler.RACK_HANDLER] != null
-        ? await Handler.default()
-        : await Handler.get(
-            this.options.environment === "development" && (await hasViteConfig(Dir.pwd()))
-              ? "vite"
-              : "node",
-          ))) as ServerHandler);
+  override middleware(): ReturnType<RackupServer["middleware"]> {
+    return new Hash([]);
   }
 
-  middleware(): Hash<string, unknown[]> {
-    return new Hash<string, unknown[]>([]);
-  }
-
-  defaultOptions(): ServerOptions {
-    return { ...this._defaultOptions };
+  override defaultOptions(): ServerOptions {
+    return { ...super.defaultOptions(), ...this._defaultOptions } as ServerOptions;
   }
 
   async servedUrl(): Promise<string | undefined> {
@@ -161,7 +151,9 @@ export class Server {
   }
 
   /** @internal */
-  private logToStdout(): void {
+  private async logToStdout(): Promise<void> {
+    await this.wrappedApp();
+
     const console = new Logger(STDOUT);
     console.formatter = Trails.logger!.formatter;
     console.level = Trails.logger!.level;

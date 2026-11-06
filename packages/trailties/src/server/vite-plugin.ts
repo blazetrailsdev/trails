@@ -8,13 +8,15 @@ export interface TrailsPluginOptions {
 }
 
 export function trailsPlugin(options: TrailsPluginOptions): Plugin {
-  const handler = new Handler.Node(options.app);
+  let handler!: InstanceType<typeof Handler.Node>;
 
   return {
     name: "trails",
     enforce: "post",
 
-    configureServer(server: ViteDevServer) {
+    async configureServer(server: ViteDevServer) {
+      const node = (await Handler.get("node")) as typeof Handler.Node;
+      handler = new node(options.app);
       server.httpServer?.on("upgrade", (req, socket, head) => {
         const protocol = req.headers["sec-websocket-protocol"];
         if (protocol === "vite-hmr" || protocol === "vite-ping") return;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, NameError } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "./build-templates.js";
 
 describe("buildTemplates", () => {
@@ -35,9 +35,12 @@ describe("buildTemplates", () => {
     expect(await render("<% if (false) { %><%= missing %><% } %>ok", {})).toBe("ok");
   });
 
-  it("raises ReferenceError for a free name the binding does not answer", async () => {
+  it("raises NameError for a free name the binding does not answer", async () => {
     await expect(render("<%= missing %>", {})).rejects.toThrow(
-      new ReferenceError("missing is not defined"),
+      new NameError(
+        "undefined local variable or method 'missing' for an instance of Hash",
+        "missing",
+      ),
     );
   });
 

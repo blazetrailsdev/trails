@@ -13,6 +13,7 @@
     "./field": null,
     "./field-list": null,
     "./header": null,
+    "./fields/*": null,
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

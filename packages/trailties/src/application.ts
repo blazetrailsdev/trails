@@ -196,9 +196,9 @@ export class Application extends Engine {
   }
 
   /** @internal */
-  override runConsoleBlocks(app: unknown): void {
-    for (const r of this.railties()) r.runConsoleBlocks(app);
-    super.runConsoleBlocks(app);
+  override async runConsoleBlocks(app: unknown): Promise<void> {
+    for (const r of this.railties()) await r.runConsoleBlocks(app);
+    await super.runConsoleBlocks(app);
   }
 
   /** @internal */

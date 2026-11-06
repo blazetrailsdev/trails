@@ -184,8 +184,8 @@ describe("ControllerInstanceTests", () => {
 
   it("action methods with inherited shadowed internal method", () => {
     assertIncludes(publicInstanceMethods(Base), "status");
-    assertEqual(["hello", "status"], SimpleController.actionMethods().sort());
-    assertEqual(["hello", "status"], ChildController.actionMethods().sort());
+    expect(SimpleController.actionMethods()).toEqual(new Set(["status", "hello"]));
+    expect(ChildController.actionMethods()).toEqual(new Set(["status", "hello"]));
   });
 
   it("temporary anonymous controllers", () => {

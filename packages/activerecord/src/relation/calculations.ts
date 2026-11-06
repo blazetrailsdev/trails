@@ -18,6 +18,7 @@ import {
   kernelArray,
   many,
   pick as enumerablePick,
+  pluck as enumerablePluck,
   tryCall,
 } from "@blazetrails/activesupport";
 import {
@@ -432,12 +433,7 @@ export async function pluck(
   if (this.isNullRelation()) return [];
 
   if (this.loaded && isAllAttributes.call(this, columnNames)) {
-    const records = await this.records();
-    return records.map((record) =>
-      columnNames.length > 1
-        ? columnNames.map((column) => record.get(String(column)))
-        : record.get(String(columnNames[0])),
-    );
+    return enumerablePluck(await this.records(), ...(columnNames as never[]));
   }
 
   if (hasInclude.call(this, columnNames[0] ?? null)) {

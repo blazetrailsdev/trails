@@ -4,6 +4,8 @@ import type { RackResponse } from "@blazetrails/rack";
 import { Thread } from "@blazetrails/ruby-compat";
 import { Executor, type ExecutorLike } from "../middleware/executor.js";
 
+await Handler.get("node");
+
 describe("Executor execution context", () => {
   it("runs completeBang in the request's execution context", async () => {
     let requestThread: Thread | undefined;

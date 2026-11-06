@@ -1,12 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 
-import {
-  DateTime,
-  Date as RubyDate,
-  Temporal,
-  Time,
-  resetLocalTimeZoneId,
-} from "@blazetrails/date";
+import { DateTime, Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { TimeZone } from "./values/time-zone.js";
 import { setZone, zone } from "./time-zone-config.js";
 import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
@@ -16,22 +10,7 @@ import { toFs as dateTimeToFs, usec as dateTimeUsec } from "./core-ext/date-time
 import { advance as dateTimeAdvance } from "./core-ext/date-time/calculations.js";
 import { travelTo, travelBack, travel, freezeTime, unfreezeTime } from "./testing/time-helpers.js";
 import { currentTimeInstant, setFrozenInstant, setTimeOffsetNs } from "./time-travel.js";
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  try {
-    return fn();
-  } finally {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  }
-}
+import { withEnvTz } from "./time-zone-test-helpers.js";
 
 function withTzDefault<T>(tz: TimeZone | null, fn: () => T): T {
   const oldTz = zone();

@@ -21,7 +21,6 @@ import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
 import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
-import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
 import type { BaseConfig } from "@blazetrails/thor/base";
@@ -90,7 +89,7 @@ type GroupStatics = {
   fromSuperclass(method: string, defaultValue?: unknown): unknown;
 };
 
-export interface GeneratorBase extends Invocation, GeneratorActionsState {
+export interface GeneratorBase extends Invocation {
   shell: ShellHost["shell"];
   say: ShellHost["say"];
   sayStatus: ShellHost["sayStatus"];
@@ -211,7 +210,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare options: GeneratorOptions;
   declare args: unknown[];
   declare behavior: "invoke" | "revoke";
-  afterInstallCallbacks: Array<() => void | Promise<void>> = [];
 
   _sourcePaths?: string[];
   private _namespaceDirs?: string[];
@@ -238,7 +236,6 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   rakefile = Actions.rakefile;
   initializer = Actions.initializer;
   generate = Actions.generate;
-  afterInstall = Actions.afterInstall;
   rake = Actions.rake;
   trailsCommand = Actions.trailsCommand;
   route = Actions.route;

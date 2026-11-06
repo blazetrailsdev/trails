@@ -145,7 +145,7 @@ class TestController extends Base {
   static {
     this.protectFromForgery();
 
-    this.beforeAction("setVariableForLayout");
+    this.beforeAction(":setVariableForLayout");
   }
 
   static LabellingFormBuilder = class LabellingFormBuilder extends FormBuilder {};
@@ -327,7 +327,7 @@ class TestController extends Base {
     await this.render({ action: "hello_world" });
   }
   static {
-    this.beforeAction("handleLastModifiedAndEtags", { only: "conditionalHelloWithBangs" });
+    this.beforeAction(":handleLastModifiedAndEtags", { only: "conditionalHelloWithBangs" });
   }
 
   async handleLastModifiedAndEtags(): Promise<void> {

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
 import { File, STDERR, TopLevel, rbFLoad, stdout } from "@blazetrails/ruby-compat";
+import type {} from "./statistics.js";
 import { deprecator } from "../deprecator.js";
 
 describe("tasks/statistics", () => {

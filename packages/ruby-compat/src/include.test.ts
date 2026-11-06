@@ -853,7 +853,7 @@ describe("Module#ancestors", () => {
     const names = (x: unknown) => rbModAncestors(rbObjClass(x)).map(rbModName).join(" ");
     const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
     expect(names(dateTime)).toBe(
-      "DateTime Date DateAndTime::Calculations Comparable Object Kernel BasicObject",
+      "DateTime Date DateAndTime::Calculations DateAndTime::Zones Comparable Object Kernel BasicObject",
     );
     expect(names(1)).toBe("Integer Numeric Comparable Object Kernel BasicObject");
     expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
@@ -870,7 +870,7 @@ describe("Module#ancestors", () => {
     expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
     expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
     expect(names(new Date(0))).toBe(
-      "Time DateAndTime::Calculations Comparable Object Kernel BasicObject",
+      "Time DateAndTime::Calculations DateAndTime::Zones Comparable Object Kernel BasicObject",
     );
     expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
   });

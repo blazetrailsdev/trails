@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { RouteSet } from "./route-set.js";
 import { RoutesProxy, mergeScriptNames, type RoutesProxyInstance } from "./routes-proxy.js";
-import { urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
+import { _routesIvar, urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 
 function makeRoutes(label = "R1"): UrlForRoutes {
   return {
@@ -12,13 +12,15 @@ function makeRoutes(label = "R1"): UrlForRoutes {
 }
 
 function makeScope(routes: UrlForRoutes, extraOptions: Record<string, unknown> = {}): UrlForHost {
-  const scope: UrlForHost = {
-    _routes: routes,
+  const scope = {
+    get _routes(): UrlForRoutes | null {
+      return (this as unknown as Record<symbol, UrlForRoutes | null>)[_routesIvar] ?? routes;
+    },
     defaultUrlOptions: { host: "example.com", ...extraOptions },
     urlOptions() {
       return { ...urlOptions.call(this), routesRef: this._routes };
     },
-  };
+  } as UrlForHost;
   return scope;
 }
 

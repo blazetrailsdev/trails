@@ -10,7 +10,7 @@ import { TestCase } from "../../test-case.js";
 
 class ConditionalGetApiController extends API {
   static {
-    this.beforeAction("handleLastModifiedAndEtags", { only: "two" });
+    this.beforeAction(":handleLastModifiedAndEtags", { only: "two" });
   }
 
   async one() {

@@ -22,7 +22,7 @@ export class ControllerGenerator extends NamedBase {
       "functional_test.ts",
       File.join(
         "test/controllers",
-        ...this.classPathParts.map((p) => dasherize(p)),
+        ...this.classPath(),
         `${dasherize(this.fileName)}-controller.test${this.ext()}`,
       ),
     );

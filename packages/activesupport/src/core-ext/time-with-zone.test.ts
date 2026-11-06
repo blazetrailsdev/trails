@@ -5,7 +5,7 @@ import { TimeZone } from "../values/time-zone.js";
 import { Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import { travelTo } from "../testing/time-helpers.js";
 import { instantFromDate } from "../testing/temporal-helpers.js";
-import { DateTime, Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   zone as timeZone,
   setZone,
@@ -42,36 +42,13 @@ import {
 } from "../testing/assertions.js";
 import { actsLike } from "./object/acts-like.js";
 import { deprecator } from "../deprecator.js";
+import { withEnvTz } from "../time-zone-test-helpers.js";
 
 type MethodMissing = TimeWithZone &
   Record<
     "yearsSince" | "yearsAgo" | "monthsSince" | "monthsAgo" | "weeksSince" | "weeksAgo",
     (n: number) => TimeWithZone
   >;
-
-function withEnvTz<T>(newTz: string, fn: () => T): T {
-  const oldTz = process.env.TZ;
-  process.env.TZ = newTz;
-  resetLocalTimeZoneId();
-  const restore = () => {
-    if (oldTz === undefined) {
-      delete process.env.TZ;
-    } else {
-      process.env.TZ = oldTz;
-    }
-    resetLocalTimeZoneId();
-  };
-  let result: T;
-  try {
-    result = fn();
-  } catch (e) {
-    restore();
-    throw e;
-  }
-  if (result instanceof Promise) return result.finally(restore) as T;
-  restore();
-  return result;
-}
 
 function withTzDefault<T>(tz: TimeZone | string | null, fn: () => T): T {
   const oldTz = timeZone();
@@ -1611,67 +1588,67 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("in time zone", () => {
     useZone("Alaska", () => {
-      expect((inTimeZone(t) as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t) as TimeWithZone).inspect()).toEqual(
         "1999-12-31 15:00:00.000000000 AKST -09:00",
       );
-      expect((inTimeZone(dt) as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(dt) as TimeWithZone).inspect()).toEqual(
         "1999-12-31 15:00:00.000000000 AKST -09:00",
       );
     });
     useZone("Hawaii", () => {
-      expect((inTimeZone(t) as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t) as TimeWithZone).inspect()).toEqual(
         "1999-12-31 14:00:00.000000000 HST -10:00",
       );
-      expect((inTimeZone(dt) as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(dt) as TimeWithZone).inspect()).toEqual(
         "1999-12-31 14:00:00.000000000 HST -10:00",
       );
     });
     withTzDefault(null, () => {
-      expect(inTimeZone(t)).toEqual(t);
-      expect(inTimeZone(dt)).toEqual(dt);
+      expect(inTimeZone.call(t)).toEqual(t);
+      expect(inTimeZone.call(dt)).toEqual(dt);
     });
   });
 
   it("nil time zone", () => {
     withTzDefault(null, () => {
-      assertNotRespondTo(inTimeZone(t), "period", "no period method");
-      assertNotRespondTo(inTimeZone(dt), "period", "no period method");
+      assertNotRespondTo(inTimeZone.call(t), "period", "no period method");
+      assertNotRespondTo(inTimeZone.call(dt), "period", "no period method");
     });
   });
 
   it("in time zone with argument", () => {
     useZone("Eastern Time (US & Canada)", () => {
-      expect((inTimeZone(t, "Alaska") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t, "Alaska") as TimeWithZone).inspect()).toEqual(
         "1999-12-31 15:00:00.000000000 AKST -09:00",
       );
-      expect((inTimeZone(dt, "Alaska") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(dt, "Alaska") as TimeWithZone).inspect()).toEqual(
         "1999-12-31 15:00:00.000000000 AKST -09:00",
       );
-      expect((inTimeZone(t, "Hawaii") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t, "Hawaii") as TimeWithZone).inspect()).toEqual(
         "1999-12-31 14:00:00.000000000 HST -10:00",
       );
-      expect((inTimeZone(dt, "Hawaii") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(dt, "Hawaii") as TimeWithZone).inspect()).toEqual(
         "1999-12-31 14:00:00.000000000 HST -10:00",
       );
-      expect((inTimeZone(t, "UTC") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t, "UTC") as TimeWithZone).inspect()).toEqual(
         "2000-01-01 00:00:00.000000000 UTC +00:00",
       );
-      expect((inTimeZone(dt, "UTC") as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(dt, "UTC") as TimeWithZone).inspect()).toEqual(
         "2000-01-01 00:00:00.000000000 UTC +00:00",
       );
-      expect((inTimeZone(t, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
+      expect((inTimeZone.call(t, Duration.hours(-9)) as TimeWithZone).inspect()).toEqual(
         "1999-12-31 15:00:00.000000000 AKST -09:00",
       );
     });
   });
 
   it("in time zone with invalid argument", async () => {
-    await assertRaise([ArgumentError], {}, () => inTimeZone(t, "No such timezone exists"));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, "No such timezone exists"));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(t, Duration.hours(-15)));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, Duration.hours(-15)));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(t, {}));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(dt, {}));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(t, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(dt, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(t, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(dt, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(t, {}));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(dt, {}));
   });
 
   it("in time zone with time local instance", () => {
@@ -1829,7 +1806,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   it("time in time zone doesnt affect receiver", () => {
     withEnvTz("Europe/London", () => {
       const time = RubyTime.local(2000, 7, 1);
-      const timeWithZone = inTimeZone(time, "Eastern Time (US & Canada)") as TimeWithZone;
+      const timeWithZone = inTimeZone.call(time, "Eastern Time (US & Canada)") as TimeWithZone;
       expect(timeWithZone.eql(RubyTime.utc(2000, 6, 30, 23, 0, 0))).toEqual(true);
       assertNot(time.isUtc(), "time expected to be local, but is UTC");
     });
@@ -1845,41 +1822,43 @@ describe("TimeWithZoneMethodsForDate", () => {
 
   it("in time zone", () => {
     withTzDefault("Alaska", () => {
-      expect(rbInspect(inTimeZone(d))).toEqual("2000-01-01 00:00:00.000000000 AKST -09:00");
+      expect(rbInspect(inTimeZone.call(d))).toEqual("2000-01-01 00:00:00.000000000 AKST -09:00");
     });
     withTzDefault("Hawaii", () => {
-      expect(rbInspect(inTimeZone(d))).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
+      expect(rbInspect(inTimeZone.call(d))).toEqual("2000-01-01 00:00:00.000000000 HST -10:00");
     });
     withTzDefault(null, () => {
-      expect(inTimeZone(d)).toEqual(dateToTime(d));
+      expect(inTimeZone.call(d)).toEqual(dateToTime(d));
     });
   });
 
   it("nil time zone", () => {
     withTzDefault(null, () => {
-      assertNotRespondTo(inTimeZone(d), "period", "no period method");
+      assertNotRespondTo(inTimeZone.call(d), "period", "no period method");
     });
   });
 
   it("in time zone with argument", () => {
     withTzDefault("Eastern Time (US & Canada)", () => {
-      expect(rbInspect(inTimeZone(d, "Alaska"))).toEqual(
+      expect(rbInspect(inTimeZone.call(d, "Alaska"))).toEqual(
         "2000-01-01 00:00:00.000000000 AKST -09:00",
       );
-      expect(rbInspect(inTimeZone(d, "Hawaii"))).toEqual(
+      expect(rbInspect(inTimeZone.call(d, "Hawaii"))).toEqual(
         "2000-01-01 00:00:00.000000000 HST -10:00",
       );
-      expect(rbInspect(inTimeZone(d, "UTC"))).toEqual("2000-01-01 00:00:00.000000000 UTC +00:00");
-      expect(rbInspect(inTimeZone(d, Duration.hours(-9)))).toEqual(
+      expect(rbInspect(inTimeZone.call(d, "UTC"))).toEqual(
+        "2000-01-01 00:00:00.000000000 UTC +00:00",
+      );
+      expect(rbInspect(inTimeZone.call(d, Duration.hours(-9)))).toEqual(
         "2000-01-01 00:00:00.000000000 AKST -09:00",
       );
     });
   });
 
   it("in time zone with invalid argument", async () => {
-    await assertRaise([ArgumentError], {}, () => inTimeZone(d, "No such timezone exists"));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(d, Duration.hours(-15)));
-    await assertRaise([ArgumentError], {}, () => inTimeZone(d, {}));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(d, "No such timezone exists"));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(d, Duration.hours(-15)));
+    await assertRaise([ArgumentError], {}, () => inTimeZone.call(d, {}));
   });
 });
 

@@ -9,7 +9,6 @@ import type { ScopeMethod, ScopeOn } from "./named.js";
 
 declare module "../relation.js" {
   interface RelationScopes<T extends Base> {
-    approved: ScopeOn<T, Topic>;
     replied: ScopeOn<T, Topic>;
   }
 }

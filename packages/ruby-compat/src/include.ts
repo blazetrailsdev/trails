@@ -1602,8 +1602,12 @@ export function rbModAppendFeatures(
         string | symbol,
         PropertyDescriptor
       >;
+      const namespace = (ancestor as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
       for (const key of [...Object.keys(modDescs), Symbol.iterator, Symbol.asyncIterator]) {
-        const modDesc = modDescs[key];
+        let modDesc = modDescs[key];
+        if (modDesc !== undefined && namespace === "Module" && !("value" in modDesc)) {
+          modDesc = { value: Reflect.get(ancestor, key), enumerable: modDesc.enumerable };
+        }
         if (modDesc === undefined || (typeof key === "string" && !modDesc.enumerable)) continue;
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;

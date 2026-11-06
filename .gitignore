@@ -4,6 +4,7 @@ dist-test/
 *.tsbuildinfo
 scripts/test-compare/output/
 scripts/api-compare/output/
+scripts/parity/output/
 scripts/test-deps/output/
 scripts/guides-typecheck/.tmp/
 scripts/api-compare/.rack-source

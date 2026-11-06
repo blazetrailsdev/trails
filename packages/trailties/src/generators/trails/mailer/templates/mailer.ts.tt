@@ -1,0 +1,20 @@
+import { ApplicationMailer } from "<%= "../".repeat(this.classPathParts.length) || "./" %>application-mailer<%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>Mailer extends ApplicationMailer {
+  declare greeting: string;
+<% this.actions.forEach((action, index) => { -%>
+<% if (index !== 0) { -%>
+
+<% } -%>
+  // Subject can be set in your I18n file at config/locales/en.yml
+  // with the following lookup:
+  //
+  //   en.<%= this.filePath().replace(/\//g, ".") %>_mailer.<%= action %>.subject
+  //
+  <%= action %>(): unknown {
+    this.greeting = "Hi";
+
+    return this.mail({ to: "to@example.org" });
+  }
+<% }); -%>
+}

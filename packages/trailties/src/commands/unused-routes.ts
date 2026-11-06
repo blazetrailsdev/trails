@@ -19,7 +19,7 @@ interface ViewPathRoot {
 }
 
 interface ControllerClass {
-  actionMethods(): string[];
+  actionMethods(): ReadonlySet<string>;
   viewPaths?: () => Iterable<unknown>;
 }
 
@@ -84,7 +84,7 @@ export class RouteInfo {
   /** @internal */
   private actionMissing(): boolean {
     if (this.controllerClass == null) return false;
-    return !this.controllerClass.actionMethods().includes(String(this.actionName));
+    return !this.controllerClass.actionMethods().has(String(this.actionName));
   }
 }
 

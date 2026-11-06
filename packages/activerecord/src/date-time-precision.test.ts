@@ -151,8 +151,8 @@ describe("DateTimePrecisionTest", () => {
           expect(foo).toBeTruthy();
           expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
           expect(foo.created_at.toI()).toBe(date.toI());
-          expect(foo.created_at.toString()).toBe(dateInTimeZone(date).toString());
-          expect(foo.updated_at.toString()).toBe(dateInTimeZone(date).toString());
+          expect(foo.created_at.toString()).toBe(dateInTimeZone.call(date).toString());
+          expect(foo.updated_at.toString()).toBe(dateInTimeZone.call(date).toString());
           expect(foo.created_at.usec).toBe(0);
           expect(foo.updated_at.usec).toBe(999900);
         },
@@ -207,8 +207,8 @@ describe("DateTimePrecisionTest", () => {
             expect(foo).toBeTruthy();
             expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
             expect(foo.created_at.toI()).toBe(date.toI());
-            expect(foo.created_at.toString()).toBe(dateInTimeZone(date).toString());
-            expect(foo.updated_at.toString()).toBe(dateInTimeZone(date).toString());
+            expect(foo.created_at.toString()).toBe(dateInTimeZone.call(date).toString());
+            expect(foo.updated_at.toString()).toBe(dateInTimeZone.call(date).toString());
             expect(foo.created_at.usec).toBe(0);
             expect(foo.updated_at.usec).toBe(999900);
           },

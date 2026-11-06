@@ -14,7 +14,6 @@ import {
 import { Configuration } from "./configuration.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
-import type { CommonField } from "./fields/common-field.js";
 
 interface MailConstants {
   Message: typeof Message;
@@ -27,6 +26,37 @@ interface MailConstants {
   TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
   Parsers?: typeof import("./parsers.js");
+  BccField: typeof import("./fields/bcc-field.js").BccField;
+  CcField: typeof import("./fields/cc-field.js").CcField;
+  CommentsField: typeof import("./fields/comments-field.js").CommentsField;
+  ContentDescriptionField: typeof import("./fields/content-description-field.js").ContentDescriptionField;
+  ContentDispositionField: typeof import("./fields/content-disposition-field.js").ContentDispositionField;
+  ContentIdField: typeof import("./fields/content-id-field.js").ContentIdField;
+  ContentLocationField: typeof import("./fields/content-location-field.js").ContentLocationField;
+  ContentTransferEncodingField: typeof import("./fields/content-transfer-encoding-field.js").ContentTransferEncodingField;
+  ContentTypeField: typeof import("./fields/content-type-field.js").ContentTypeField;
+  DateField: typeof import("./fields/date-field.js").DateField;
+  FromField: typeof import("./fields/from-field.js").FromField;
+  InReplyToField: typeof import("./fields/in-reply-to-field.js").InReplyToField;
+  KeywordsField: typeof import("./fields/keywords-field.js").KeywordsField;
+  MessageIdField: typeof import("./fields/message-id-field.js").MessageIdField;
+  MimeVersionField: typeof import("./fields/mime-version-field.js").MimeVersionField;
+  OptionalField: typeof import("./fields/optional-field.js").OptionalField;
+  ReceivedField: typeof import("./fields/received-field.js").ReceivedField;
+  ReferencesField: typeof import("./fields/references-field.js").ReferencesField;
+  ReplyToField: typeof import("./fields/reply-to-field.js").ReplyToField;
+  ResentBccField: typeof import("./fields/resent-bcc-field.js").ResentBccField;
+  ResentCcField: typeof import("./fields/resent-cc-field.js").ResentCcField;
+  ResentDateField: typeof import("./fields/resent-date-field.js").ResentDateField;
+  ResentFromField: typeof import("./fields/resent-from-field.js").ResentFromField;
+  ResentMessageIdField: typeof import("./fields/resent-message-id-field.js").ResentMessageIdField;
+  ResentSenderField: typeof import("./fields/resent-sender-field.js").ResentSenderField;
+  ResentToField: typeof import("./fields/resent-to-field.js").ResentToField;
+  ReturnPathField: typeof import("./fields/return-path-field.js").ReturnPathField;
+  SenderField: typeof import("./fields/sender-field.js").SenderField;
+  SubjectField: typeof import("./fields/subject-field.js").SubjectField;
+  ToField: typeof import("./fields/to-field.js").ToField;
+  UnstructuredField: typeof import("./fields/unstructured-field.js").UnstructuredField;
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
   defaults(block: (this: Configuration) => unknown): unknown;
@@ -54,9 +84,7 @@ export interface DeliveryInterceptor {
 const deliveryNotificationObservers: DeliveryObserver[] = [];
 const deliveryInterceptors: DeliveryInterceptor[] = [];
 
-type FieldConstant = new (...args: never[]) => CommonField;
-
-export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
+export const Mail: MailConstants = {
   RANDOM_TAG: "%x%x_%x%x%d%x",
 
   new(...args: unknown[]) {
@@ -138,7 +166,7 @@ export const Mail: MailConstants & Record<`${string}Field`, FieldConstant> = {
   uniq(): number | bigint {
     return (_uniq = BigInt(_uniq) + 1n);
   },
-} as unknown as MailConstants & Record<`${string}Field`, FieldConstant>;
+} as unknown as MailConstants;
 
 TopLevel.Mail = Mail;
 

@@ -5,7 +5,15 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { capture, isPlainObject } from "@blazetrails/activesupport";
-import { Dir, rbArgv, registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  TopLevel,
+  constSet,
+  rbArgv,
+  rbModRemoveConst,
+  registerReplAdapter,
+  replAdapterConfig,
+} from "@blazetrails/ruby-compat";
 import { invoke } from "../command.js";
 import { Trails } from "../trails.js";
 import { Console, ConsoleCommand } from "./console.js";
@@ -37,20 +45,58 @@ function startConsole(): Promise<void> {
 }
 
 describe("ConsoleCommand (trails)", () => {
-  it("refuses --sandbox rather than promising a rollback it cannot perform", async () => {
+  it("starts a --sandbox console, which promises the rollback the AR console block installs", async () => {
+    let sandbox: unknown;
+    const started = { value: false };
     Trails.application = {
       sandbox: null,
-      config: {},
+      config: { console: { start: () => (started.value = true) } },
       name: () => "app",
-      loadConsole() {},
+      async loadConsole() {
+        sandbox = (this as { sandbox: unknown }).sandbox;
+      },
     } as never;
+    const command = new ConsoleCommand([], ["--sandbox"]);
+    command.bootApplicationBang = async () => {};
     try {
-      const printed = await capture(":stdout", () =>
-        expect(new ConsoleCommand([], ["--sandbox"]).perform()).rejects.toThrow("sandbox"),
-      );
-      expect(printed).not.toContain("rolled back");
+      const printed = await capture(":stdout", () => command.perform());
+      expect(printed).toContain("Any modifications you make will be rolled back on exit");
+      expect(sandbox).toBe(true);
+      expect(started.value).toBe(true);
     } finally {
       Trails.application = null;
+    }
+  });
+
+  it("offers helper and controller at the prompt", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    class ApplicationController {
+      static helpers() {
+        return { truncate: (s: string) => `${s.slice(0, 27)}...` };
+      }
+    }
+    constSet(TopLevel, "ApplicationController", ApplicationController);
+    const g = globalThis as Record<string, unknown>;
+    io.server = null;
+    const started = startConsole();
+    await vi.waitFor(() => expect(io.server).not.toBeNull());
+    try {
+      await evaluate(
+        `globalThis.consoleHelperText = helper().truncate("Once upon a time in a world far far away")`,
+      );
+      await evaluate(`globalThis.consoleControllerName = controller().constructor.name`);
+      await evaluate(`globalThis.consoleSameController = controller() === controller()`);
+      expect(g.consoleHelperText).toBe("Once upon a time in a world...");
+      expect(g.consoleControllerName).toBe("ApplicationController");
+      expect(g.consoleSameController).toBe(true);
+    } finally {
+      io.server!.close();
+      await started;
+      delete g.consoleHelperText;
+      delete g.consoleControllerName;
+      delete g.consoleSameController;
+      rbModRemoveConst(TopLevel, "ApplicationController");
+      vi.restoreAllMocks();
     }
   });
 

@@ -9,6 +9,8 @@ import { Application } from "../application.js";
 import { _resetTrailsEnv } from "../trails.js";
 import { Engine } from "./action-cable.js";
 
+await Handler.get("node");
+
 let appPath: string;
 
 async function app(): Promise<Application> {

@@ -17,4 +17,4 @@ export class PwaController extends ApplicationController {
   }
 }
 
-PwaController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
+PwaController.skipBeforeAction(":verifyAuthenticityToken", { raise: false });

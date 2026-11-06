@@ -71,5 +71,5 @@ jobs:
 <% } else if (this.database.name !== "sqlite3") { -%>
           DATABASE_URL: mysql2://127.0.0.1:3306
 <% } -%>
-        run: bin/trails db test:prepare && <%= this.packageManager %> test
+        run: bin/trails db:test:prepare && <%= this.packageManager %> test
 <% } -%>

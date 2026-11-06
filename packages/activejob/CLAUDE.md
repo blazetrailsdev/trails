@@ -38,5 +38,14 @@ second, invented API. The members with no I/O stay sync: `queue_name`,
 `priority`, `serialize`, instance `deserialize`, `set`, `job_or_instantiate`,
 and the `TestAdapter` readers.
 
+Delivery follows the same rule (RFC `0204-actionmailer-and-mail-port`,
+"Delivery is async"). `Mail::Message#deliver` / `deliver!`, every delivery
+method's `deliver!`, and `ActionMailer::MessageDelivery#deliver_now`,
+`deliver_now!`, `deliver_later` and `deliver_later!` are `async`: SMTP and
+sendmail are I/O, and `deliver_later` awaits `MailDeliveryJob`'s
+`perform_later`. Building the message processes the mailer, and that awaits the
+action, so `MessageDelivery#message` is async. Its `__getobj__` answers only
+a message already built, so a `Delegator` read never starts the mailer.
+
 This is a genuine language shortcoming, ratified repo-wide here. Every async
 job member cites this section; a new instance is not a new decision to argue.

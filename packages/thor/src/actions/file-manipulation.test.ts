@@ -292,8 +292,7 @@ describe("Thor::Actions", () => {
       expect(File.isExist(file)).toBe(true);
     });
 
-    // BLOCKED: thor-template-raises-name-error-at-source-mapped-line
-    it.skip("has proper TSE stacktraces", async () => {
+    it("has proper TSE stacktraces", async () => {
       let error: unknown = null;
       try {
         await action("template", "template/bad_config.yaml.tt");

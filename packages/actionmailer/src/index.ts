@@ -9,7 +9,12 @@ export { DeliveryMethods } from "./delivery-methods.js";
 export { FormBuilder } from "./form-builder.js";
 export { InlinePreviewInterceptor } from "./inline-preview-interceptor.js";
 export { LogSubscriber } from "./log-subscriber.js";
+export { MailDeliveryJob } from "./mail-delivery-job.js";
 export { MailHelper } from "./mail-helper.js";
+export { MessageDelivery } from "./message-delivery.js";
+export { Parameterized } from "./parameterized.js";
+export { Preview } from "./preview.js";
+export { QueuedDelivery } from "./queued-delivery.js";
 export { Rescuable } from "./rescuable.js";
 
 import "./constants.generated.js";

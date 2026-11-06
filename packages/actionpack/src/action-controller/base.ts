@@ -8,6 +8,7 @@ import {
   runLoadHooks,
   TopLevel,
 } from "@blazetrails/activesupport";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
@@ -56,7 +57,6 @@ import type {
 } from "./metal/redirecting.js";
 import {
   Callbacks,
-  type ActionCallbackHost,
   type beforeAction,
   type prependBeforeAction,
   type skipBeforeAction,
@@ -177,12 +177,11 @@ import {
   _processVariant,
   _normalizeOptions,
   Rendering,
-  renderToString,
 } from "./metal/rendering.js";
 import type { Renderer, RendererController } from "./renderer.js";
 import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
 import { UrlFor, type urlOptions } from "./metal/url-for.js";
-import type { UrlForOptions } from "../action-dispatch/routing/url-for.js";
+import { _routesIvar, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
 import type {
   PolymorphicArg,
   PolymorphicOptions,
@@ -309,6 +308,7 @@ export interface Base
     Included<typeof HttpAuthentication.Token.ControllerMethods>,
     RequestForgeryProtectionPrivate {
   render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void>;
+  renderToString<P extends string = string>(...args: RenderArgs<P>): string | Promise<string>;
   /** @internal */
   renderToBody(options?: Record<string, unknown>): unknown;
   get params(): StrongParameters;
@@ -348,9 +348,9 @@ export class Base extends Metal {
   declare readonly flash: FlashHash;
   declare static addFlashTypes: typeof addFlashTypes;
 
-  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
-  declare static setCallback: ActionCallbackHost["setCallback"];
-  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;
   declare static beforeAction: OmitThisParameter<typeof beforeAction>;
   declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
@@ -485,13 +485,12 @@ export class Base extends Metal {
    * @inlinedFrom ActionView::Rendering#initialize rails/v8.0.2/actionview/lib/action_view/rendering.rb:32-35
    * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
    * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114
-   * @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property
    */
   constructor() {
     super();
     this._actionHasLayout = true;
     this._renderedFormat = null;
-    if ("_routes" in this) this._routes = null;
+    (this as Record<symbol, unknown>)[_routesIvar] = null;
     this._urlOptions = null;
     this._markedForSameOriginVerification = null;
     this.viewRuntime = null;
@@ -634,7 +633,6 @@ export class Base extends Metal {
   declare _normalizeArgs: typeof _normalizeArgs;
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
-  declare renderToString: typeof renderToString;
   declare renderedFormat: OmitThisParameter<typeof renderedFormat>;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;

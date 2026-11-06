@@ -1,4 +1,5 @@
 import { ActionController } from "../../namespaces.js";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
 import { TypeError } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
@@ -29,7 +30,6 @@ import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
 import type { Req } from "../../action-dispatch/request/session.js";
 import { ActionControllerError } from "./exceptions.js";
 import type {
-  ActionCallbackHost,
   afterAction,
   beforeAction,
   CallbackOptions,
@@ -195,7 +195,8 @@ export function commitCsrfToken(
 }
 
 /** @internal */
-export interface RequestForgeryProtectionHost extends ActionCallbackHost, HelpersClassMethods {
+export interface RequestForgeryProtectionHost
+  extends Extended<typeof ASCallbacks.ClassMethods>, HelpersClassMethods {
   new (...args: never[]): unknown;
   configAccessor(...names: string[]): void;
   helperMethod: OmitThisParameter<typeof helperMethod>;
@@ -314,15 +315,18 @@ export function protectFromForgery(
       : new SessionStore(),
   );
 
-  this.beforeAction("verifyAuthenticityToken", options as CallbackOptions);
-  this.appendAfterAction("verifySameOriginRequest");
+  this.beforeAction(":verifyAuthenticityToken", options as CallbackOptions);
+  this.appendAfterAction(":verifySameOriginRequest");
 }
 
 export function skipForgeryProtection(
   this: RequestForgeryProtectionHost,
   options: Record<string, unknown> = {},
 ): void {
-  this.skipBeforeAction("verifyAuthenticityToken", { raise: false, ...options } as CallbackOptions);
+  this.skipBeforeAction(":verifyAuthenticityToken", {
+    raise: false,
+    ...options,
+  } as CallbackOptions);
 }
 
 /** @internal */

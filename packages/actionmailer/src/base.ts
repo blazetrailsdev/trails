@@ -12,19 +12,43 @@ import {
   Notifications,
   presence,
   underscore,
+  type Callbacks as ActiveSupportCallbacks,
   type EventPayload,
   type Included,
+  runLoadHooks,
 } from "@blazetrails/activesupport";
 import * as I18n from "@blazetrails/i18n";
-import { Address, Mail, type AttachmentsList, type Message, type Part } from "@blazetrails/mail";
-import { NoMethodError, RuntimeError, SimpleDelegator, rbModName } from "@blazetrails/ruby-compat";
+import {
+  Address,
+  Mail,
+  type AttachmentsList,
+  type Message,
+  type Part,
+  type TestMailer,
+} from "@blazetrails/mail";
+import {
+  NoMethodError,
+  PROTOCOL_PROBES,
+  RuntimeError,
+  SimpleDelegator,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { Collector } from "./collector.js";
 import {
   DeliveryMethods,
   type ClassMethods as DeliveryMethodsClassMethods,
+  type DeliveryMethodsClass,
 } from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
 import { ActionMailer } from "./namespaces.js";
+import {
+  Parameterized,
+  type ClassMethods as ParameterizedClassMethods,
+  type ParameterizedIncluded,
+} from "./parameterized.js";
+import { Previews, type ClassMethods as PreviewsClassMethods } from "./preview.js";
+import { QueuedDelivery } from "./queued-delivery.js";
+import type { MailDeliveryJob } from "./mail-delivery-job.js";
 import { Rescuable } from "./rescuable.js";
 
 type Headers = Record<string, unknown>;
@@ -37,17 +61,34 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
-  declare static prependViewPath: (path: unknown) => void;
-  declare static appendViewPath: (path: unknown) => void;
-  declare static deliveryMethod: unknown;
-  declare static deliveryMethods: Readonly<Record<string, unknown>>;
-  declare static performDeliveries: boolean;
-  declare static raiseDeliveryErrors: boolean;
-  declare static deliveries: Message[];
+  declare static prependViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.prependViewPath
+  >;
+  declare static appendViewPath: OmitThisParameter<
+    typeof ActionView.ViewPaths.ClassMethods.appendViewPath
+  >;
+  declare static deliveryMethod: DeliveryMethodsClass["deliveryMethod"];
+  declare static deliveryMethods: DeliveryMethodsClass["deliveryMethods"];
+  declare static isDeliveryMethod: () => boolean;
+  declare static isDeliveryMethods: () => boolean;
+  declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
+  declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
+  declare static deliveries: typeof TestMailer.deliveries;
   declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
   /** @internal */
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;
   declare static defaultParams: Readonly<Record<string, unknown>>;
+  declare static deliveryJob: typeof MailDeliveryJob;
+  declare static isDeliveryJob: () => boolean;
+  declare static deliverLaterQueueName: unknown;
+  declare static with: typeof ParameterizedClassMethods.with;
+  declare static previewPaths: string[];
+  declare static showPreviews: boolean | null;
+  declare static previewInterceptors: unknown[];
+  declare static registerPreviewInterceptors: typeof PreviewsClassMethods.registerPreviewInterceptors;
+  declare static unregisterPreviewInterceptors: typeof PreviewsClassMethods.unregisterPreviewInterceptors;
+  declare static registerPreviewInterceptor: typeof PreviewsClassMethods.registerPreviewInterceptor;
+  declare static unregisterPreviewInterceptor: typeof PreviewsClassMethods.unregisterPreviewInterceptor;
 
   /** @internal */
   protected static _mailerName?: string;
@@ -156,8 +197,8 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   static methodMissing(methodName: string, ...args: unknown[]): unknown {
-    if (this.actionMethods().includes(methodName)) {
-      return new ActionMailer.MessageDelivery!(this, methodName, ...args);
+    if (this.actionMethods().has(methodName)) {
+      return new ActionMailer.MessageDelivery(this, methodName, ...args);
     } else {
       throw new NoMethodError(
         `undefined method \`${methodName}' for class ${rbModName(this)}`,
@@ -168,7 +209,7 @@ export class Base extends AbstractController.Base {
 
   /** @internal */
   static respondToMissing(method: string, _includeAll = false): boolean {
-    return this.actionMethods().includes(method);
+    return this.actionMethods().has(method);
   }
 
   /** @internal */
@@ -496,13 +537,26 @@ export class Base extends AbstractController.Base {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `include Rescuable` (`action_mailer/base.rb:480`). */
-export interface Base extends Included<typeof Rescuable>, Included<typeof DeliveryMethods> {
-  lookupContext: InstanceType<typeof ActionView.LookupContext>;
-  render(...args: unknown[]): unknown;
+export interface Base
+  extends Included<typeof Rescuable>, Included<typeof DeliveryMethods>, ParameterizedIncluded {
+  readonly lookupContext: ReturnType<typeof ActionView.lookupContext>;
+  render: OmitThisParameter<typeof AbstractController.render>;
+  runCallbacks: OmitThisParameter<(typeof ActiveSupportCallbacks)["runCallbacks"]>;
 }
 
 /** @internal */
 export class NullMail {
+  constructor() {
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || Reflect.has(target, prop)) {
+          return Reflect.get(target, prop, receiver);
+        }
+        return (...args: unknown[]) => target.methodMissing(prop, ...args);
+      },
+    });
+  }
+
   body(): string {
     return "";
   }
@@ -523,7 +577,10 @@ export class NullMail {
 Base.NullMail = NullMail;
 include(Base, Callbacks);
 include(Base, DeliveryMethods);
+include(Base, QueuedDelivery);
 include(Base, Rescuable);
+include(Base, Parameterized);
+include(Base, Previews);
 Base.abstractBang();
 
 include(Base, AbstractController.Rendering);
@@ -566,3 +623,5 @@ Object.setPrototypeOf(
 );
 
 ActionMailer.Base = Base as typeof ActionMailer.Base;
+
+runLoadHooks("action_mailer", Base);

@@ -94,7 +94,15 @@ export class DatabaseTasks {
     this._root = value;
   }
 
-  static seedLoader: { loadSeed(): void | Promise<void> } | null = null;
+  private static _seedLoader: { loadSeed(): void | Promise<void> } | null = null;
+
+  static get seedLoader(): { loadSeed(): void | Promise<void> } | null {
+    return (this._seedLoader ??= TopLevel.Trails!.application ?? null);
+  }
+
+  static set seedLoader(value: { loadSeed(): void | Promise<void> } | null) {
+    this._seedLoader = value;
+  }
   static structureDumpFlags: string | string[] | Record<string, string | string[]> | null = null;
   static structureLoadFlags: string | string[] | Record<string, string | string[]> | null = null;
 
@@ -335,7 +343,7 @@ export class DatabaseTasks {
 
   static checkSchemaFile(filename: string): void {
     if (!File.isExist(filename)) {
-      let message = `${filename} doesn't exist yet. Run \`bin/trails db migrate\` to create it, then try again.`;
+      let message = `${filename} doesn't exist yet. Run \`bin/trails db:migrate\` to create it, then try again.`;
       const root = trailsRoot();
       if (root != null) {
         message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;
@@ -668,7 +676,7 @@ export class DatabaseTasks {
       }
     }
 
-    if (seed && this.seedLoader) await this.loadSeed();
+    if (seed) await this.loadSeed();
   }
 
   static async dbConfigsWithVersions(
@@ -783,7 +791,7 @@ export class DatabaseTasks {
     return hash.digest("hex");
   }
 
-  static setupInitialDatabaseYaml(): Record<string, unknown> {
+  static setupInitialDatabaseYaml(): RawConfigurations {
     return {};
   }
 

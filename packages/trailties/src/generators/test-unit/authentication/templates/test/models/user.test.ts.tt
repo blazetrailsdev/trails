@@ -1,0 +1,8 @@
+import { describe } from "vitest";
+import "../test-helper.js";
+
+describe("UserTest", () => {
+  // it("the truth", () => {
+  //   expect(true).toBe(true);
+  // });
+});

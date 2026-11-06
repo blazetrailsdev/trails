@@ -10,5 +10,6 @@
     { "path": "../activesupport" },
     { "path": "../activemodel" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-setup-*.ts", "src/**/*.bench.ts", "src/test-helpers"]
 }

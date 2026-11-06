@@ -18,7 +18,13 @@ import {
   rbObjRespondTo,
   rbObjAsString,
 } from "../../object.js";
+import { BigDecimal } from "../../big-decimal.js";
+import { excBacktrace } from "../../backtrace-location.js";
+import { Complex } from "../../complex.js";
+import { Encoding } from "../../encoding.js";
+import { NameError } from "../../name-error.js";
 import { Range } from "../../range.js";
+import { Rational } from "../../rational.js";
 import { type StructInstance, isStruct } from "../../struct.js";
 import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
@@ -183,6 +189,12 @@ export class YAMLTree {
     if (tag === "Temporal.PlainDate") {
       return this.register(target as object, this.visitInteger(target as PlainDate));
     }
+    if (target instanceof Encoding) return this.visitEncoding(target);
+    if (target instanceof NameError) return this.visitNameError(target);
+    if (target instanceof Error) return this.visitException(target);
+    if (target instanceof Rational) return this.visitRational(target);
+    if (target instanceof Complex) return this.visitComplex(target);
+    if (target instanceof BigDecimal) return this.visitBigDecimal(target);
     if (target instanceof Range) return this.visitRange(target);
     if (target instanceof RegExp) return this.visitRegexp(target);
     if (target instanceof Uint8Array) return this.visitString(target);
@@ -214,6 +226,16 @@ export class YAMLTree {
     return this.emitter.scalar("", null, "tag:yaml.org,2002:null", true, false, Scalar.ANY);
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:147-150`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitEncoding(o: Encoding): Node {
+    const tag = "!ruby/encoding";
+    return this.emitter.scalar(o.name, null, tag, false, false, Scalar.ANY);
+  }
+
   private visitObject(o: object): Node {
     let tag = Psych.dumpTags.get(o.constructor);
     if (tag === undefined) {
@@ -238,6 +260,47 @@ export class YAMLTree {
       this.emitter.scalar(member, null, null, true, false, Scalar.ANY);
       this.accept((o as unknown as Record<string, unknown>)[member]);
     }
+
+    this.dumpIvars(o);
+
+    return this.emitter.endMapping();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:182-184`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitException(o: Error): Node {
+    return this.dumpException(o, rbObjAsString(o.message));
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:186-188`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitNameError(o: NameError): Node {
+    return this.dumpException(o, rbObjAsString(o.message));
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:466-482`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  dumpException(o: Error, msg: string | null): Node {
+    const tag = ["!ruby/exception", rbModName(o.constructor as new () => unknown)].join(":");
+
+    this.emitter.startMapping(null, tag, false, Mapping.BLOCK);
+
+    if (msg != null) {
+      this.emitter.scalar("message", null, null, true, false, Scalar.ANY);
+      this.accept(msg);
+    }
+
+    this.emitter.scalar("backtrace", null, null, true, false, Scalar.ANY);
+    this.accept(excBacktrace(o));
 
     this.dumpIvars(o);
 
@@ -324,6 +387,55 @@ export class YAMLTree {
     return this.register(
       o,
       this.emitter.scalar(this.formatTime(o), null, null, true, false, Scalar.ANY),
+    );
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:210-221`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitRational(o: Rational): Node {
+    this.register(
+      o,
+      this.emitter.startMapping(null, "!ruby/object:Rational", false, Mapping.BLOCK),
+    );
+
+    for (const m of ["denominator", String(o.denominator), "numerator", String(o.numerator)]) {
+      this.emitter.scalar(m, null, null, true, false, Scalar.ANY);
+    }
+
+    return this.emitter.endMapping();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:223-231`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitComplex(o: Complex): Node {
+    this.register(o, this.emitter.startMapping(null, "!ruby/object:Complex", false, Mapping.BLOCK));
+
+    for (const m of ["real", rbObjAsString(o.real), "image", rbObjAsString(o.imag)]) {
+      this.emitter.scalar(m, null, null, true, false, Scalar.ANY);
+    }
+
+    return this.emitter.endMapping();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:250-252`
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitBigDecimal(o: BigDecimal): Node {
+    return this.emitter.scalar(
+      o._dump(),
+      null,
+      "!ruby/object:BigDecimal",
+      false,
+      false,
+      Scalar.ANY,
     );
   }
 

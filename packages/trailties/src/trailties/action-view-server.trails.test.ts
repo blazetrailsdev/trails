@@ -8,6 +8,7 @@ import type { BuildViewsResult, WatchViewsOptions } from "@blazetrails/trails-ts
 import { Application } from "../application.js";
 import { Trails, _resetTrailsEnv } from "../trails.js";
 import "./action-view.js";
+import * as TrailsTsc from "@blazetrails/trails-tsc";
 
 const viewWatches = vi.hoisted(() => [] as WatchViewsOptions[]);
 const watchState = vi.hoisted(() => ({ initialError: null as Error | null, closed: 0 }));
@@ -22,6 +23,8 @@ vi.mock("@blazetrails/trails-tsc", () => ({
     };
   },
 }));
+
+Trails.TrailsTsc = TrailsTsc;
 
 describe("ActionView railtie server block (trails)", () => {
   const trailsEnv = env.TRAILS_ENV;

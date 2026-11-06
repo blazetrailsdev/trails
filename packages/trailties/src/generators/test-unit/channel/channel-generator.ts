@@ -17,7 +17,7 @@ export class ChannelGenerator extends NamedBase {
       "channel_test.ts",
       File.join(
         "test/channels",
-        ...this.classPathParts,
+        ...this.classPath(),
         `${dasherize(this.fileName)}-channel.test${this.ext()}`,
       ),
     );

@@ -93,20 +93,20 @@ class FT_TestController extends Base {
     push("clean_up", "ranAfterAction")(this);
   }
 }
-FT_TestController.beforeAction("ensureLogin");
-FT_TestController.afterAction("cleanUp");
+FT_TestController.beforeAction(":ensureLogin");
+FT_TestController.afterAction(":cleanUp");
 
 class FT_ChangingTheRequirementsController extends FT_TestController {
   async goWild() {
     await this.render({ plain: "gobble" });
   }
 }
-FT_ChangingTheRequirementsController.beforeAction("ensureLogin", { except: ["goWild"] });
+FT_ChangingTheRequirementsController.beforeAction(":ensureLogin", { except: ["goWild"] });
 
 class FT_TestMultipleFiltersController extends Base {}
-FT_TestMultipleFiltersController.beforeAction("try1");
-FT_TestMultipleFiltersController.beforeAction("try2");
-FT_TestMultipleFiltersController.beforeAction("try3");
+FT_TestMultipleFiltersController.beforeAction(":try1");
+FT_TestMultipleFiltersController.beforeAction(":try2");
+FT_TestMultipleFiltersController.beforeAction(":try3");
 for (const i of [1, 2, 3]) {
   Object.assign(FT_TestMultipleFiltersController.prototype, {
     async [`fail${i}`](this: Base) {
@@ -136,15 +136,15 @@ class FT_RenderingController extends Base {
     ivars(this).ranFilter!.push("unreached_after_action_after_render");
   }
 }
-FT_RenderingController.beforeAction("beforeActionRendering");
-FT_RenderingController.afterAction("unreachedAfterAction");
+FT_RenderingController.beforeAction(":beforeActionRendering");
+FT_RenderingController.afterAction(":unreachedAfterAction");
 
 class FT_RenderingForPrependAfterActionController extends FT_RenderingController {
   private unreachedPrependAfterAction() {
     ivars(this).ranFilter!.push("unreached_prepend_after_action_after_render");
   }
 }
-FT_RenderingForPrependAfterActionController.prependAfterAction("unreachedPrependAfterAction");
+FT_RenderingForPrependAfterActionController.prependAfterAction(":unreachedPrependAfterAction");
 
 class FT_BeforeActionRedirectionController extends Base {
   async show() {
@@ -167,8 +167,8 @@ class FT_BeforeActionRedirectionController extends Base {
   }
 }
 nameAs(FT_BeforeActionRedirectionController, "FilterTest::BeforeActionRedirectionController");
-FT_BeforeActionRedirectionController.beforeAction("beforeActionRedirects");
-FT_BeforeActionRedirectionController.afterAction("unreachedAfterAction");
+FT_BeforeActionRedirectionController.beforeAction(":beforeActionRedirects");
+FT_BeforeActionRedirectionController.afterAction(":unreachedAfterAction");
 
 class FT_BeforeActionRedirectionForPrependAfterActionController extends FT_BeforeActionRedirectionController {
   private unreachedPrependAfterActionAfterRedirection() {
@@ -180,7 +180,7 @@ nameAs(
   "FilterTest::BeforeActionRedirectionForPrependAfterActionController",
 );
 FT_BeforeActionRedirectionForPrependAfterActionController.prependAfterAction(
-  "unreachedPrependAfterActionAfterRedirection",
+  ":unreachedPrependAfterActionAfterRedirection",
 );
 
 class FT_PrependingController extends FT_TestController {
@@ -188,7 +188,7 @@ class FT_PrependingController extends FT_TestController {
     push("wonderful_life")(this);
   }
 }
-FT_PrependingController.prependBeforeAction("wonderfulLife");
+FT_PrependingController.prependBeforeAction(":wonderfulLife");
 
 class FT_SkippingAndLimitedController extends FT_TestController {
   async index() {
@@ -199,8 +199,8 @@ class FT_SkippingAndLimitedController extends FT_TestController {
     await this.render({ plain: "ok" });
   }
 }
-FT_SkippingAndLimitedController.skipBeforeAction("ensureLogin");
-FT_SkippingAndLimitedController.beforeAction("ensureLogin", { only: "index" });
+FT_SkippingAndLimitedController.skipBeforeAction(":ensureLogin");
+FT_SkippingAndLimitedController.beforeAction(":ensureLogin", { only: "index" });
 
 class FT_SkippingAndReorderingController extends FT_TestController {
   async index() {
@@ -211,9 +211,9 @@ class FT_SkippingAndReorderingController extends FT_TestController {
     push("find_record")(this);
   }
 }
-FT_SkippingAndReorderingController.skipBeforeAction("ensureLogin");
-FT_SkippingAndReorderingController.beforeAction("findRecord");
-FT_SkippingAndReorderingController.beforeAction("ensureLogin");
+FT_SkippingAndReorderingController.skipBeforeAction(":ensureLogin");
+FT_SkippingAndReorderingController.beforeAction(":findRecord");
+FT_SkippingAndReorderingController.beforeAction(":ensureLogin");
 
 class FT_ConditionalSkippingController extends FT_TestController {
   async login() {
@@ -228,9 +228,9 @@ class FT_ConditionalSkippingController extends FT_TestController {
     push("find_user")(this);
   }
 }
-FT_ConditionalSkippingController.skipBeforeAction("ensureLogin", { only: ["login"] });
-FT_ConditionalSkippingController.skipAfterAction("cleanUp", { only: ["login"] });
-FT_ConditionalSkippingController.beforeAction("findUser", { only: ["changePassword"] });
+FT_ConditionalSkippingController.skipBeforeAction(":ensureLogin", { only: ["login"] });
+FT_ConditionalSkippingController.skipAfterAction(":cleanUp", { only: ["login"] });
+FT_ConditionalSkippingController.beforeAction(":findUser", { only: ["changePassword"] });
 
 class FT_AroundFilter {
   executionLog?: string;
@@ -325,15 +325,15 @@ class FT_MixedSpecializationController extends Base {
     if (!ivars(this)._first) throw new OutOfOrder();
   }
 }
-FT_MixedSpecializationController.beforeAction("first");
-FT_MixedSpecializationController.beforeAction("second", { only: "foo" });
+FT_MixedSpecializationController.beforeAction(":first");
+FT_MixedSpecializationController.beforeAction(":second", { only: "foo" });
 
 class FT_DynamicDispatchController extends Base {
   private choose() {
     this.actionName = this.params.get("choose") as string;
   }
 }
-FT_DynamicDispatchController.beforeAction("choose");
+FT_DynamicDispatchController.beforeAction(":choose");
 for (const action of ["foo", "bar", "baz"]) {
   Object.assign(FT_DynamicDispatchController.prototype, {
     async [action](this: Base) {
@@ -359,10 +359,10 @@ class FT_PrependingBeforeAndAfterController extends Base {
     await this.render({ plain: "hello" });
   }
 }
-FT_PrependingBeforeAndAfterController.prependBeforeAction("beforeAll");
-FT_PrependingBeforeAndAfterController.prependAfterAction("afterAll");
-FT_PrependingBeforeAndAfterController.beforeAction("betweenBeforeAllAndAfterAll");
-FT_PrependingBeforeAndAfterController.afterAction("betweenBeforeAllAndAfterAll");
+FT_PrependingBeforeAndAfterController.prependBeforeAction(":beforeAll");
+FT_PrependingBeforeAndAfterController.prependAfterAction(":afterAll");
+FT_PrependingBeforeAndAfterController.beforeAction(":betweenBeforeAllAndAfterAll");
+FT_PrependingBeforeAndAfterController.afterAction(":betweenBeforeAllAndAfterAll");
 
 class ErrorToRescue extends Error {}
 nameAs(ErrorToRescue, "FilterTest::ErrorToRescue");
@@ -395,8 +395,8 @@ class FT_ImplicitActionsController extends Base {
   }
 }
 nameAs(FT_ImplicitActionsController, "FilterTest::ImplicitActionsController");
-FT_ImplicitActionsController.beforeAction("findOnly", { only: "edit" });
-FT_ImplicitActionsController.beforeAction("findExcept", { except: "edit" });
+FT_ImplicitActionsController.beforeAction(":findOnly", { only: "edit" });
+FT_ImplicitActionsController.beforeAction(":findExcept", { except: "edit" });
 
 class FT_NonYieldingAroundFilterController extends Base {
   async index() {
@@ -514,10 +514,10 @@ class FT_ConditionalOptionsSkipFilter extends FT_ConditionalFilterController {
     push("clean_up_tmp")(this);
   }
 }
-FT_ConditionalOptionsSkipFilter.beforeAction("ensureLogin");
-FT_ConditionalOptionsSkipFilter.beforeAction("cleanUpTmp");
-FT_ConditionalOptionsSkipFilter.skipBeforeAction("ensureLogin", { if: () => false });
-FT_ConditionalOptionsSkipFilter.skipBeforeAction("cleanUpTmp", { if: () => true });
+FT_ConditionalOptionsSkipFilter.beforeAction(":ensureLogin");
+FT_ConditionalOptionsSkipFilter.beforeAction(":cleanUpTmp");
+FT_ConditionalOptionsSkipFilter.skipBeforeAction(":ensureLogin", { if: () => false });
+FT_ConditionalOptionsSkipFilter.skipBeforeAction(":cleanUpTmp", { if: () => true });
 
 const _sfuoaEnsureLogin = push("ensure_login");
 const _sfuoaCleanUpTmp = push("clean_up_tmp");
@@ -561,23 +561,23 @@ class FT_ConditionalParentOfConditionalSkippingController extends FT_Conditional
     push("conditional_in_parent_after")(this);
   }
 }
-FT_ConditionalParentOfConditionalSkippingController.beforeAction("conditionalInParentBefore", {
+FT_ConditionalParentOfConditionalSkippingController.beforeAction(":conditionalInParentBefore", {
   only: ["show", "anotherAction"],
 });
-FT_ConditionalParentOfConditionalSkippingController.afterAction("conditionalInParentAfter", {
+FT_ConditionalParentOfConditionalSkippingController.afterAction(":conditionalInParentAfter", {
   only: ["show", "anotherAction"],
 });
 
 class FT_ChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
-FT_ChildOfConditionalParentController.skipBeforeAction("conditionalInParentBefore", {
+FT_ChildOfConditionalParentController.skipBeforeAction(":conditionalInParentBefore", {
   only: "anotherAction",
 });
-FT_ChildOfConditionalParentController.skipAfterAction("conditionalInParentAfter", {
+FT_ChildOfConditionalParentController.skipAfterAction(":conditionalInParentAfter", {
   only: "anotherAction",
 });
 
 class FT_AnotherChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
-FT_AnotherChildOfConditionalParentController.skipBeforeAction("conditionalInParentBefore", {
+FT_AnotherChildOfConditionalParentController.skipBeforeAction(":conditionalInParentBefore", {
   only: "show",
 });
 
@@ -979,9 +979,9 @@ class ControllerWithSymbolAsFilter extends PostsController {
     return wtf + 1;
   }
 }
-ControllerWithSymbolAsFilter.aroundAction("raiseBefore", { only: "raisesBefore" });
-ControllerWithSymbolAsFilter.aroundAction("raiseAfter", { only: "raisesAfter" });
-ControllerWithSymbolAsFilter.aroundAction("withoutException", { only: "noRaise" });
+ControllerWithSymbolAsFilter.aroundAction(":raiseBefore", { only: "raisesBefore" });
+ControllerWithSymbolAsFilter.aroundAction(":raiseAfter", { only: "raisesAfter" });
+ControllerWithSymbolAsFilter.aroundAction(":withoutException", { only: "noRaise" });
 
 class ControllerWithFilterClass extends PostsController {
   static YieldingFilter = class YieldingFilter {
@@ -1018,7 +1018,7 @@ ControllerWithProcFilter.aroundAction(
 );
 
 class ControllerWithNestedFilters extends ControllerWithSymbolAsFilter {}
-ControllerWithNestedFilters.aroundAction("raiseBefore", "raiseAfter", "withoutException", {
+ControllerWithNestedFilters.aroundAction(":raiseBefore", ":raiseAfter", ":withoutException", {
   only: "raisesBoth",
 });
 
@@ -1043,14 +1043,14 @@ class ControllerWithAllTypesOfFilters extends PostsController {
     ivars(this).ranFilter!.push("around_again (after yield)");
   }
 }
-ControllerWithAllTypesOfFilters.beforeAction("before");
-ControllerWithAllTypesOfFilters.aroundAction("around");
-ControllerWithAllTypesOfFilters.afterAction("after");
-ControllerWithAllTypesOfFilters.aroundAction("aroundAgain");
+ControllerWithAllTypesOfFilters.beforeAction(":before");
+ControllerWithAllTypesOfFilters.aroundAction(":around");
+ControllerWithAllTypesOfFilters.afterAction(":after");
+ControllerWithAllTypesOfFilters.aroundAction(":aroundAgain");
 
 class ControllerWithTwoLessFilters extends ControllerWithAllTypesOfFilters {}
-ControllerWithTwoLessFilters.skipAroundAction("aroundAgain");
-ControllerWithTwoLessFilters.skipAfterAction("after");
+ControllerWithTwoLessFilters.skipAroundAction(":aroundAgain");
+ControllerWithTwoLessFilters.skipAfterAction(":after");
 
 describe("YieldingAroundFiltersTest", () => {
   beforeEach(async ({ task }) => {

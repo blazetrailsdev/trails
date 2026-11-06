@@ -21,5 +21,6 @@
     { "path": "../ruby-compat" },
     { "path": "../trailties" },
     { "path": "../vitest-matchers" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts"]
 }

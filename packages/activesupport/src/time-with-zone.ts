@@ -17,7 +17,7 @@ import {
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
+import { zone as timeZone, findZone } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "./temporal.js";
@@ -40,7 +40,7 @@ import {
 import { advance as timeAdvance } from "./time-ext.js";
 import { since as datetimeSince } from "./core-ext/date-time/calculations.js";
 import { deprecator } from "./deprecator.js";
-import { inTimeZone } from "./core-ext/date-and-time/zones.js";
+import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import {
   preserveTimezone,
   utcToLocalReturnsUtcOffsetTimes,
@@ -462,15 +462,11 @@ export class TimeWithZone {
     return this.utc().toR();
   }
 
-  inTimeZone(newZone?: unknown): TimeWithZone {
-    if (newZone == null) {
-      const currentZone = timeZone();
-      if (!currentZone) return this;
-      newZone = currentZone;
-    }
+  inTimeZone(newZone: TimeZone | string): TimeWithZone;
+  inTimeZone(newZone?: unknown): TimeWithZone | Time;
+  inTimeZone(newZone: unknown = timeZone()): TimeWithZone | Time {
     if (rbEqual(this._timeZone, newZone)) return this;
-    const tz = findZoneBang(newZone) as TimeZone;
-    return new TimeWithZone(this._zoned.toInstant(), tz);
+    return this.utc().inTimeZone(newZone);
   }
 
   formattedOffset(colon = true, alternateUtcString?: string): string {
@@ -581,9 +577,9 @@ export class TimeWithZone {
           `Adding an instance of ${rbObjClassname(other)} to an instance of ${rbObjClassname(this)} is deprecated. This behavior will raise ` +
             "a `TypeError` in Rails 8.1.",
         );
-        inTimeZone(result as Time, this.timeZone);
+        inTimeZone.call(result as DateOrTime, this.timeZone);
       }
-      return inTimeZone(result as Time, this.timeZone) as TimeWithZone;
+      return inTimeZone.call(result as DateOrTime, this.timeZone) as TimeWithZone;
     }
   }
 
@@ -646,14 +642,13 @@ export class TimeWithZone {
     return this.plus(other);
   }
 
-  /** @missingRailsArgs in_time_zone — PERMANENT */
   advance(options: AdvanceOptions): TimeWithZone {
     if ([options.years, options.weeks, options.months, options.days].some((v) => v != null)) {
       return this._wrapWithTimeZone(
         timeAdvance(this._transferTimeValuesToUtcConstructor(this.time), options),
       ) as TimeWithZone;
     } else {
-      return inTimeZone(timeAdvance(this.utc(), options), this.timeZone) as TimeWithZone;
+      return timeAdvance(this.utc(), options).inTimeZone(this.timeZone) as TimeWithZone;
     }
   }
 

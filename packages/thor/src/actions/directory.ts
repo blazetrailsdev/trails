@@ -59,7 +59,6 @@ export class Directory extends EmptyDirectory {
 
   /**
    * @internal
-   * @missingRailsCall directory? — CONVERGEABLE call-gate-credits-is-directory-async
    * @inventedArm if — PERMANENT
    */
   protected async executeBang(): Promise<unknown> {

@@ -28,7 +28,7 @@ import { Flash as ControllerFlash } from "../metal/flash.js";
 
 class TestController extends Base {
   static {
-    this.beforeAction("haltAndRedir", { only: "filterHaltingAction" });
+    this.beforeAction(":haltAndRedir", { only: "filterHaltingAction" });
   }
 
   flashCopy!: Record<string, unknown>;

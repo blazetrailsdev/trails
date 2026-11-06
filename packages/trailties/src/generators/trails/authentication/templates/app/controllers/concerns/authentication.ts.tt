@@ -5,7 +5,7 @@ import { Session } from "../../models/session.ts";
 /** Rails' `class_methods do ... end` block. */
 export const ClassMethods = {
   allowUnauthenticatedAccess(this: any, options: Record<string, unknown> = {}): void {
-    this.skipBeforeAction("requireAuthentication", options);
+    this.skipBeforeAction(":requireAuthentication", options);
   },
 };
 
@@ -13,7 +13,7 @@ export const Authentication = defineModule(
   {
     [included](base: any): void {
       extend(base, ClassMethods);
-      base.beforeAction("requireAuthentication");
+      base.beforeAction(":requireAuthentication");
       base.helperMethod("authenticated");
     },
   },

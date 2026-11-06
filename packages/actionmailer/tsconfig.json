@@ -8,9 +8,13 @@
   "include": ["src"],
   "references": [
     { "path": "../actionpack" },
+    { "path": "../actionview" },
+    { "path": "../activejob" },
     { "path": "../activesupport" },
+    { "path": "../date" },
     { "path": "../i18n" },
     { "path": "../mail" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

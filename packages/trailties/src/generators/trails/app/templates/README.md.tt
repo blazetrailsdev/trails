@@ -1,0 +1,40 @@
+# README
+
+This application was generated with [trails](https://github.com/blazetrailsdev/blazetrails).
+
+## Getting started
+
+    bin/setup
+    bin/dev
+
+To reach a CLI command with no script of its own, use the `bin/trails` binstub:
+
+    bin/trails routes
+    bin/trails console
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `bin/dev` | Start the development server |
+| `bin/trails generate model NAME` | Generate a new model |
+| `bin/trails generate controller NAME` | Generate a new controller |
+| `bin/trails generate scaffold NAME` | Generate a full CRUD resource |
+| `bin/trails db:migrate` | Run pending database migrations |
+| `bin/trails db:seed` | Seed the database |
+| `bin/trails test` | Run the test suite |
+
+## Configuration
+
+- Database: `config/database.ts`
+- Routes: `config/routes.ts`
+- Environment-specific: `config/environments/`
+
+## Views and deployment
+
+`.tse` views are precompiled into `.trails/views/`. In development,
+`bin/dev` watches `app/views/`, rebuilds a changed view and
+re-imports it on the next render. In production templates load once from the
+deploy-time build, so the deploy must run `trails-tsc-views build --views
+app/views` (the `prepare` script) before the server boots; a view with no
+built module raises `LoadError`.

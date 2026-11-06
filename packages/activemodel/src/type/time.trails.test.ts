@@ -99,8 +99,8 @@ describe("TimeType userInputInTimeZone", () => {
   });
 
   it("user input in time zone answers a zoneless value when Time.zone is unset", () => {
-    const result = type.userInputInTimeZone("14:30:00") as Temporal.ZonedDateTime;
-    expect(result).toBeInstanceOf(Temporal.ZonedDateTime);
+    const result = type.userInputInTimeZone("14:30:00") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
     expect(result.hour).toBe(14);
   });
 

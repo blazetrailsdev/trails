@@ -6,6 +6,7 @@ import { _routes as abstractControllerRoutes } from "../../abstract-controller/u
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 
 import {
+  _routesIvar,
   _routesContext,
   _withRoutes,
   fullUrlFor,
@@ -36,14 +37,17 @@ function makeRoutes(): UrlForRoutes & {
 }
 
 function makeHost(overrides: Partial<UrlForHost> = {}): UrlForHost {
-  const host: UrlForHost = {
-    _routes: makeRoutes(),
+  const { _routes: routes = makeRoutes(), ...rest } = overrides;
+  const host = {
+    get _routes(): UrlForRoutes | null {
+      return (this as unknown as Record<symbol, UrlForRoutes | null>)[_routesIvar] ?? routes;
+    },
     defaultUrlOptions: {},
     urlOptions() {
       return urlOptions.call(this);
     },
-    ...overrides,
-  };
+    ...rest,
+  } as UrlForHost;
   return host;
 }
 

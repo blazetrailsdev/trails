@@ -124,7 +124,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     }
   });
 
-  // PERMANENT-SKIP: a method a class defines itself is not overwritten by a later include's copy (CLAUDE.md, "A module included by an open set of classes binds `super` at include time").
+  // PERMANENT-SKIP: a method a class defines itself is not overwritten by a later include's copy (CLAUDE.md, "A module's `initialize` is inlined into the constructor (`@inlinedFrom`)": a module included by an open set of classes binds `super` at include time).
   it.skip("reaches a module included onto ActionController::TestCase after test_help loads", async ({
     task,
   }) => {

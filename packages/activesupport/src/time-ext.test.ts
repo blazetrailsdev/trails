@@ -52,9 +52,8 @@ import {
 } from "./time-ext.js";
 import { isToday, isTomorrow, isYesterday } from "./core-ext/date-and-time/calculations.js";
 import { toFs, formattedOffset, xmlschema } from "./core-ext/time/conversions.js";
-import { toTime } from "./core-ext/time/compatibility.js";
+import { toTime } from "./core-ext/date-time/compatibility.js";
 import { withEnvTz } from "./time-zone-test-helpers.js";
-import { inTimeZone } from "./core-ext/date-and-time/zones.js";
 import { toTime as dateToTime } from "./core-ext/date/conversions.js";
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -582,7 +581,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("past with time current as time with zone", () => {
     withEnvTz("US/Eastern", () => {
-      const twz = inTimeZone(RubyTime.utc(2005, 2, 10, 15, 30, 45), "Central Time (US & Canada)");
+      const twz = RubyTime.utc(2005, 2, 10, 15, 30, 45).inTimeZone("Central Time (US & Canada)");
       const spy = vi.spyOn(RubyTime, "current").mockReturnValue(twz);
       try {
         expect(RubyTime.local(2005, 2, 10, 10, 30, 44).isPast()).toEqual(true);
@@ -599,7 +598,7 @@ describe("TimeExtCalculationsTest", () => {
 
   it("future with time current as time with zone", () => {
     withEnvTz("US/Eastern", () => {
-      const twz = inTimeZone(RubyTime.utc(2005, 2, 10, 15, 30, 45), "Central Time (US & Canada)");
+      const twz = RubyTime.utc(2005, 2, 10, 15, 30, 45).inTimeZone("Central Time (US & Canada)");
       const spy = vi.spyOn(RubyTime, "current").mockReturnValue(twz);
       try {
         expect(RubyTime.local(2005, 2, 10, 10, 30, 44).isFuture()).toEqual(false);
@@ -1181,19 +1180,23 @@ describe("DateTimeExtCalculationsTest", () => {
   it("to datetime", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(
+      dt.toZonedDateTime("UTC").epochNanoseconds,
+    );
   });
 
   it("to time", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10");
     const result = toTime(dt);
-    expect(result.epochNanoseconds).toBe(dt.toZonedDateTime("UTC").epochNanoseconds);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(
+      dt.toZonedDateTime("UTC").epochNanoseconds,
+    );
   });
 
   it("to time preserves fractional seconds", () => {
     const dt = Temporal.PlainDateTime.from("2005-02-22T10:10:10.5");
     const result = toTime(dt);
-    expect(result.millisecond).toBe(500);
+    expect(result.usec).toBe(500000);
   });
 
   it("middle of day", () => {

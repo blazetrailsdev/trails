@@ -34,6 +34,8 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.methodAdded("configureAuthenticationRoutes");
     this.methodAdded("enableBcrypt");
     this.methodAdded("addMigrations");
+
+    this.hookFor("testFramework");
   }
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
@@ -87,7 +89,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     await this.route(`this.resource("session");`);
   }
 
-  /** @missingRailsCall execute_command — CONVERGEABLE converge-generators-actions-generate-onto-rails-command */
+  /** @missingRailsCall execute_command — CONVERGEABLE authentication-enable-bcrypt-through-execute-command */
   async enableBcrypt(): Promise<void> {
     if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
     const full = File.join(this.destinationRoot, "package.json");

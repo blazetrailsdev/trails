@@ -85,7 +85,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
  *  spelling the artifact carries them. `hash`, `string`, `symbol`, `array` and
  *  `numeric` name the receiver's CLASS, and only where Ripper proved it; the
  *  rest name a shape whose class is unknown, so a receiver-keyed row can never
- *  match one. `formless` is a proven site on an arm no native form ports
+ *  match one. `class` is an `x.class` chain, whose value is a class. `formless` is a proven site on an arm no native form ports
  *  (extract-ruby-api.rb#FORM_ARMS). */
 export type ReceiverKind =
   | "hash"
@@ -99,6 +99,7 @@ export type ReceiverKind =
   | "ivar"
   | "const"
   | "expr"
+  | "class"
   | "formless";
 
 /**
@@ -239,7 +240,14 @@ export function rubyCompatExport(
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
 
-const UNPROVEN_RECEIVER_KINDS = new Set<string>(["self", "local", "ivar", "const", "expr"]);
+const UNPROVEN_RECEIVER_KINDS = new Set<string>([
+  "self",
+  "local",
+  "ivar",
+  "const",
+  "expr",
+  "class",
+]);
 
 const PORTED_NAMES_BY_EXPORT = (() => {
   const byExport = new Map<string, Set<string>>();

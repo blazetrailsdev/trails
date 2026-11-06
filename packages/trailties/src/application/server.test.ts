@@ -2,9 +2,12 @@ import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import { Dir, env, setEnv, StringIO } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rackup";
+import { Builder } from "@blazetrails/rack";
 import { Trails } from "../trails.js";
 import { Application } from "../application.js";
 import { assertOutput } from "../support/console-helpers.js";
+
+await Handler.get("node");
 
 vi.mock("../command/actions.js", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../command/actions.js")>()),
@@ -58,6 +61,11 @@ describe("ServerTest", () => {
     }) as never);
 
     vi.spyOn(Trails, "root").mockReturnValue(Dir.mktmpdir());
+    vi.spyOn(Builder, "parseFile").mockImplementation((async () => {
+      const app = await Trails.initialize();
+      await app.loadServer();
+      return app;
+    }) as never);
     await ServerCommand.perform("server", ["-b", "localhost"], {});
 
     const primary = new StringIO(output.join("\n"));

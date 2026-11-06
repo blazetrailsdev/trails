@@ -855,10 +855,7 @@ export class Application {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall directory? — PERMANENT
-   */
+  /** @internal */
   async rawLoadRakefile(): Promise<void> {
     const [rakefile, location] = (await this.findRakefileLocation()) ?? [null, null];
     if (

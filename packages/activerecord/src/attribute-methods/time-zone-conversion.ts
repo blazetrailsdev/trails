@@ -86,7 +86,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     if (value == null) return null;
 
     if (actsLike.call(value, "time")) {
-      return inTimeZone(value as DateOrTime);
+      return inTimeZone.call(value as DateOrTime);
     } else if (rbObjRespondTo(value, "isInfinite") && rtest(rbFSend(value, "isInfinite"))) {
       return value;
     } else {
@@ -99,7 +99,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
 function setTimeZoneWithoutConversion(value: unknown): unknown {
   if (value == null || value === false) return null;
   const utc = timeZone()!.localToUtc(value as RubyTime);
-  return utc == null ? null : inTimeZone(utc as DateOrTime);
+  return utc == null ? null : inTimeZone.call(utc as DateOrTime);
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {

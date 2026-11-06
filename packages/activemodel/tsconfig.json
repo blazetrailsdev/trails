@@ -10,5 +10,6 @@
     { "path": "../activesupport" },
     { "path": "../bcrypt" },
     { "path": "../ruby-compat" }
-  ]
+  ],
+  "exclude": ["src/**/*.test.ts", "src/**/*.bench.ts", "src/test-helpers"]
 }

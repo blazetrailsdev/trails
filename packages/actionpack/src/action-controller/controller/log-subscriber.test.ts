@@ -7,7 +7,12 @@ import {
   assertNoMatch,
   LogSubscriber as ActiveSupportLogSubscriber,
 } from "@blazetrails/activesupport";
-import { TestHelper, type MockLogger } from "@blazetrails/activesupport/log-subscriber/test-helper";
+import {
+  setup as testHelperSetup,
+  teardown as testHelperTeardown,
+  TestHelper,
+  type MockLogger,
+} from "@blazetrails/activesupport/log-subscriber/test-helper";
 import {
   Dir,
   Exception,
@@ -43,7 +48,7 @@ class LogSubscribersController extends Base {
       }),
     );
 
-    this.beforeAction("redirector", { only: "neverExecuted" });
+    this.beforeAction(":redirector", { only: "neverExecuted" });
   }
 
   lastPayload!: Record<string, unknown>;
@@ -154,7 +159,7 @@ class ACLogSubscriberTest extends TestCase {
   }
 
   override setup(): void {
-    super.setup();
+    testHelperSetup.call(this as never);
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = true;
 
     this.oldLogger = Base.logger;
@@ -166,7 +171,7 @@ class ACLogSubscriberTest extends TestCase {
   }
 
   override teardown(): void {
-    super.teardown();
+    testHelperTeardown.call(this as never);
     ActiveSupportLogSubscriber.logSubscribers().length = 0;
     FileUtils.rmRf(this.cachePath);
     Base.logger = this.oldLogger;

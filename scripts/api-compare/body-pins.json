@@ -891,13 +891,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "render_to_string",
-    "digest": "01c82edf8e6b62c2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "respond_to",
     "digest": "cfaaddf8fd55a5fc",
     "ref": "v8.0.2"
@@ -59144,13 +59137,6 @@
   },
   {
     "package": "activesupport",
-    "rubyFile": "core_ext/date_time/compatibility.rb",
-    "rubyName": "to_time",
-    "digest": "8336765ceb5192ea",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
     "rubyFile": "core_ext/date_time/conversions.rb",
     "rubyName": "civil_from_format",
     "digest": "79918ccb83b77d3c",
@@ -60638,13 +60624,6 @@
     "rubyFile": "core_ext/time/compatibility.rb",
     "rubyName": "system_local_time?",
     "digest": "489f110f8c2f58a6",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "core_ext/time/compatibility.rb",
-    "rubyName": "to_time",
-    "digest": "0f2de97da94aa2f9",
     "ref": "v8.0.2"
   },
   {

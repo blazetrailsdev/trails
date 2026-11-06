@@ -1,0 +1,23 @@
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper<%= this.ext() %>";
+import { ActionMailer } from "@blazetrails/actionmailer";
+import { <%= this.className().split("::").pop() %>Mailer } from "<%= "../".repeat(this.classPathParts.length + 2) %>app/mailers/<%= this.classPathParts.map((p) => p + "/").join("") %><%= ActiveSupport.Inflector.dasherize(this.fileName) %>-mailer<%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>MailerTest extends ActionMailer.TestCase {
+<% this.actions.forEach((action, index) => { -%>
+<% if (index !== 0) { -%>
+
+<% } -%>
+  // test("<%= action %>", () => {
+  //   const mail = <%= this.className().split("::").pop() %>Mailer.<%= action %>();
+  //   assertEqual(<%= JSON.stringify(ActiveSupport.Inflector.humanize(action)) %>, mail.subject);
+  //   assertEqual(["to@example.org"], mail.to);
+  //   assertEqual(["from@example.com"], mail.from);
+  //   assertMatch("Hi", mail.body.encoded);
+  // });
+<% }); -%>
+<% if (this.actions.length === 0) { -%>
+  // test("the truth", () => {
+  //   assert(true);
+  // });
+<% } -%>
+}

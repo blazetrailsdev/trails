@@ -1,8 +1,8 @@
 import "../constants.destroy.generated.js";
-import { Dir } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";
+import { root } from "../command.js";
 
 export class DestroyCommand extends Base {
   static {
@@ -28,7 +28,7 @@ export class DestroyCommand extends Base {
 
     await Generators.invoke(generator, this.args as string[], {
       behavior: "revoke",
-      destinationRoot: Dir.pwd(),
+      destinationRoot: root()?.toString(),
     });
   }
 }

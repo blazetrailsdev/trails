@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type RackEnv } from "@blazetrails/rack";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, extend } from "@blazetrails/ruby-compat";
 import { IntegrationTest, Session } from "./integration.js";
 import { RouteSet } from "../routing/route-set.js";
 
@@ -176,5 +176,20 @@ describe("IntegrationTest#app", () => {
 
     t.beforeSetup();
     expect(t.app).toBe(IntegrationTest.app);
+  });
+});
+
+describe("Integration::Session extended with url_helpers", () => {
+  it("reads the route set the extended helpers carry, as irb_console.rb's NewSession does", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("foo", { to: "foo#index" });
+    });
+    const session = new Session({ routes: () => routes });
+
+    extend(session, routes.urlHelpers());
+    extend(session, routes.mountedHelpers());
+
+    expect((session as unknown as { fooPath(): string }).fooPath()).toBe("/foo");
   });
 });

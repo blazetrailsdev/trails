@@ -147,6 +147,7 @@ describe("AppGenerator (trails-only)", () => {
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
     expect(pkg.dependencies["@blazetrails/trailties"]).toBe("*");
+    expect(pkg.dependencies["@blazetrails/rackup"]).toBe("*");
     expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
   });
 
@@ -223,7 +224,7 @@ describe("AppGenerator (trails-only)", () => {
     const content = await ci({});
     expect(content).toMatch(/ {2}lint:\n[^]*run: bin\/eslint --format stylish\n\n {2}test:/);
     expect(content).toMatch(/DATABASE_URL: postgres:\/\/postgres:postgres@localhost:5432/);
-    expect(content).toMatch(/run: bin\/trails db test:prepare && \w+ test\n/);
+    expect(content).toMatch(/run: bin\/trails db:test:prepare && \w+ test\n/);
     expect(await ci({ skipEslint: true })).not.toMatch(/lint:|eslint/);
     expect(await ci({ skipTest: true })).not.toMatch(/test:\s*runs-on/);
   });
@@ -311,9 +312,6 @@ describe("AppGenerator (trails-only)", () => {
       async rakefile(): Promise<void> {
         calls.push("rakefile");
       }
-      async rubyVersion(): Promise<void> {
-        calls.push("rubyVersion");
-      }
       async versionControl(): Promise<void> {
         calls.push("versionControl");
       }
@@ -327,15 +325,6 @@ describe("AppGenerator (trails-only)", () => {
     } finally {
       delete TopLevel.AppBuilder;
     }
-    expect(calls).toEqual(["rakefile", "rubyVersion", "versionControl"]);
-  });
-
-  it("writes .node-version twice without a conflict when usingNode", async () => {
-    await new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, javascript: "esbuild" },
-      { destinationRoot: tmpDir },
-    ).invokeAll();
-    expect(fs.readFileSync(path.join(tmpDir, "my-app/.node-version"), "utf-8")).toBe("24.16.0\n");
+    expect(calls).toEqual(["rakefile", "versionControl"]);
   });
 });

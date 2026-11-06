@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
-import { controllerPathHelpers } from "../../trails/controller/controller-paths.js";
+import { dasherize } from "../../base.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -20,10 +20,13 @@ export class ControllerGenerator extends Base {
 
   /**
    * @missingRailsArgs template — PERMANENT
-   * @missingRailsArgs join — PERMANENT
+   * @inventedArm dasherize — PERMANENT
    */
   async copyViewFiles(): Promise<void> {
-    const basePath = File.join("app/views", controllerPathHelpers(this.name).viewBase);
+    const basePath = File.join(
+      "app/views",
+      dasherize(File.join(...this.classPath(), this.fileName)),
+    );
     await this.emptyDirectory(basePath);
     for (const action of this.actions) {
       this._action = action;

@@ -25,7 +25,7 @@ class TestController extends ActionController.Base {
   }
 
   static {
-    this.beforeAction("addViewPath", { only: "helloWorldAtRequestTime" });
+    this.beforeAction(":addViewPath", { only: "helloWorldAtRequestTime" });
   }
 
   async helloWorld(): Promise<void> {}

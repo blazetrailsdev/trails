@@ -53,7 +53,7 @@ export class ControllerGenerator extends NamedBase {
       "controller.ts",
       File.join(
         "app/controllers",
-        ...this.classPathParts.map((p) => dasherize(p)),
+        ...this.classPath(),
         `${dasherize(this.fileName)}-controller${this.ext()}`,
       ),
     );

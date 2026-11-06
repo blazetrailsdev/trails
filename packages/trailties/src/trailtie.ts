@@ -146,8 +146,10 @@ export class Trailtie extends Initializable {
     return `#<${this.constructor.name}>`;
   }
 
-  runConsoleBlocks(app: unknown): void {
-    eachRegisteredBlock(this, "console", (b) => b.call(this, app));
+  async runConsoleBlocks(app: unknown): Promise<void> {
+    const blocks: TrailtieBlock[] = [];
+    eachRegisteredBlock(this, "console", (b) => blocks.push(b));
+    for (const b of blocks) await b.call(this, app);
   }
   runGeneratorsBlocks(app: unknown): void {
     eachRegisteredBlock(this, "generators", (b) => b.call(this, app));

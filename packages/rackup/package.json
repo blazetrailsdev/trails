@@ -24,6 +24,7 @@
     "node": ">=24"
   },
   "devDependencies": {
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "@types/node": "25.3.5"
   }
 }

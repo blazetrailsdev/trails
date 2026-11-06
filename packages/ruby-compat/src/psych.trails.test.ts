@@ -580,3 +580,85 @@ describe("YAMLTree through a TreeBuilder", () => {
     expect(Psych.dump([rbCString, rbCString])).toBe("---\n- &1 !ruby/class 'String'\n- *1\n");
   });
 });
+
+describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
+  it("round-trips a Rational as a !ruby/object:Rational mapping", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Rational } = await import("./rational.js");
+    const yaml = Psych.dump(new Rational(3, 4));
+    expect(yaml).toBe("--- !ruby/object:Rational\ndenominator: 4\nnumerator: 3\n");
+    const loaded = Psych.unsafeLoad(yaml) as InstanceType<typeof Rational>;
+    expect(loaded).toBeInstanceOf(Rational);
+    expect([loaded.numerator, loaded.denominator]).toEqual([3n, 4n]);
+  });
+
+  it("round-trips a Rational whose numerator is past 2**53", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Rational } = await import("./rational.js");
+    const r = Psych.unsafeLoad(Psych.dump(new Rational(9007199254740993n, 2n))) as InstanceType<
+      typeof Rational
+    >;
+    expect([r.numerator, r.denominator]).toEqual([9007199254740993n, 2n]);
+  });
+
+  it("parses a large hex, binary and octal integer at its radix", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.unsafeLoad("--- 0x20000000000001")).toBe(0x20000000000001n);
+    expect(Psych.unsafeLoad("--- -0b100000000000000000000000000000000000000000000000000001")).toBe(
+      -(2n ** 53n + 1n),
+    );
+    expect(Psych.unsafeLoad("--- 0400000000000000001")).toBe(0o400000000000000001n);
+  });
+
+  it("round-trips a Complex as a !ruby/object:Complex mapping", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Complex } = await import("./complex.js");
+    const yaml = Psych.dump(new Complex(1, 2));
+    expect(yaml).toBe("--- !ruby/object:Complex\nreal: 1\nimage: 2\n");
+    const loaded = Psych.unsafeLoad(yaml) as InstanceType<typeof Complex>;
+    expect(loaded).toBeInstanceOf(Complex);
+    expect([loaded.real, loaded.imag]).toEqual([1, 2]);
+  });
+
+  it("round-trips a BigDecimal through its _dump", async () => {
+    const { Psych } = await import("./psych.js");
+    const { BigDecimal, toD } = await import("./big-decimal.js");
+    const yaml = Psych.dump(toD("1.5"));
+    expect(yaml).toBe("--- !ruby/object:BigDecimal 18:0.15e1\n");
+    const loaded = Psych.unsafeLoad(yaml) as InstanceType<typeof BigDecimal>;
+    expect(loaded).toBeInstanceOf(BigDecimal);
+    expect(loaded.toString()).toBe("0.15e1");
+  });
+
+  it("loads a Complex and a Rational mapping under symbolize_names", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Complex } = await import("./complex.js");
+    const { Rational } = await import("./rational.js");
+    const c = Psych.unsafeLoad(Psych.dump(new Complex(1, 2)), {
+      symbolizeNames: true,
+    }) as InstanceType<typeof Complex>;
+    expect([c.real, c.imag]).toEqual([1, 2]);
+    const r = Psych.unsafeLoad(Psych.dump(new Rational(3, 4)), {
+      symbolizeNames: true,
+    }) as InstanceType<typeof Rational>;
+    expect([r.numerator, r.denominator]).toEqual([3n, 4n]);
+  });
+
+  it("round-trips an Encoding as !ruby/encoding", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Encoding } = await import("./encoding.js");
+    const yaml = Psych.dump(Encoding.UTF_8);
+    expect(yaml).toBe("--- !ruby/encoding UTF-8\n");
+    expect(Psych.unsafeLoad(yaml)).toBe(Encoding.UTF_8);
+  });
+
+  it("round-trips an exception's message as !ruby/exception", async () => {
+    const { Psych } = await import("./psych.js");
+    const { RuntimeError } = await import("./runtime-error.js");
+    const yaml = Psych.dump(new RuntimeError("boom"));
+    expect(yaml).toMatch(/^--- !ruby\/exception:RuntimeError\nmessage: boom\nbacktrace:/);
+    const loaded = Psych.unsafeLoad(yaml) as Error;
+    expect(loaded).toBeInstanceOf(RuntimeError);
+    expect(loaded.message).toBe("boom");
+  });
+});

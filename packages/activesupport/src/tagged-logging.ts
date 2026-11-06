@@ -18,12 +18,7 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 type Tag = string | number | boolean | null | undefined | readonly Tag[];
 
 export interface TaggedFormatter {
-  call(
-    severity: string,
-    timestamp: Temporal.Instant,
-    progname: string | null,
-    msg: unknown,
-  ): string;
+  call(severity: string, timestamp: Temporal.Instant, progname: unknown, msg: unknown): string;
   tagged<T>(...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T;
   pushTags(...tags: unknown[]): unknown[];
   popTags(count?: number): unknown[];
@@ -50,7 +45,7 @@ export const Formatter = {
     this: TaggedFormatter,
     severity: string,
     timestamp: Temporal.Instant,
-    progname: string | null,
+    progname: unknown,
     msg: unknown,
   ): string {
     return (Object.getPrototypeOf(this) as TaggedFormatter).call.call(

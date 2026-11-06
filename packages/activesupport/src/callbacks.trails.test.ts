@@ -1317,11 +1317,15 @@ describe("setCallback with a block (trails)", () => {
     target.runCallbacks("save");
     expect(target.ran).toEqual([]);
   });
+});
 
-  it("types run_callbacks as an instance method, not a property of the module object", () => {
-    // @ts-expect-error run_callbacks is an instance method (callbacks.rb:97)
-    expect(Callbacks.runCallbacks).toBeUndefined();
-    expect(Callbacks.instanceMethods()).toContain("runCallbacks");
+describe("Callbacks as a plain-object module (trails)", () => {
+  it("include copies run_callbacks and halted_callback_hook onto the includer", () => {
+    class Host {}
+    include(Host, Callbacks);
+    expect(Object.hasOwn(Host.prototype, "runCallbacks")).toBe(true);
+    expect(Object.hasOwn(Host.prototype, "haltedCallbackHook")).toBe(true);
+    expect(Object.hasOwn(Host.prototype, "ClassMethods")).toBe(false);
   });
 });
 
