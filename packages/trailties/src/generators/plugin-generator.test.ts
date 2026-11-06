@@ -158,6 +158,7 @@ describe("PluginGeneratorTest", () => {
     await t.assertFile("app/helpers");
     await t.assertFile("app/mailers");
     await t.assertFile("app/jobs");
+    await t.assertFile("bin/trails", /import "@blazetrails\/activesupport\/node"/);
     await t.assertFile("config/routes.ts", /Trails\.application\.routes\(\)\.draw/);
     await t.assertFile(
       "lib/bukkits/engine.ts",
@@ -238,6 +239,7 @@ describe("PluginGeneratorTest", () => {
       "bin/trails",
       /setAppPath\(File\.expandPath\("\.\.\/test\/dummy\/config\/application\.ts", __dir__\)\)/,
     );
+    await t.assertFile("bin/trails", /import "@blazetrails\/activesupport\/node"/);
     await t.assertFile("bin/trails", /await import\("@blazetrails\/trailties\/engine\/commands"\)/);
   });
 
@@ -310,11 +312,19 @@ describe("PluginGeneratorTest", () => {
   it("skipping gemspec", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-gemspec"]);
     t.assertNoFile("package.json");
+    await t.assertFile("pnpm-workspace.yaml", (contents: string) => {
+      assertNoMatch(/package\.json/, contents.replace(/^\s*#.*$/gm, ""));
+      expect(contents).toMatch(/- \./);
+    });
   });
 
   it("skipping gemspec in full mode", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-gemspec", "--full"]);
     t.assertNoFile("package.json");
+    await t.assertFile("pnpm-workspace.yaml", (contents: string) => {
+      assertNoMatch(/package\.json/, contents.replace(/^\s*#.*$/gm, ""));
+      expect(contents).toMatch(/- \./);
+    });
   });
 
   it("no details from git when skip git", async () => {
@@ -322,9 +332,12 @@ describe("PluginGeneratorTest", () => {
     const email = "TODO: Write your email address";
 
     await t.runGenerator([t.destinationRoot, "--skip-git"]);
+    await t.assertFile("MIT-LICENSE", (contents: string) => {
+      expect(contents).toMatch(name);
+    });
     await t.assertFile("package.json", (contents: string) => {
-      expect(contents).toContain(name);
-      expect(contents).toContain(email);
+      expect(contents).toMatch(name);
+      expect(contents).toMatch(email);
     });
     t.assertNoDirectory(".git");
   });
@@ -345,7 +358,7 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--mountable", "--api"]);
 
     await t.assertFile("app/controllers/bukkits/application_controller.ts", (content: string) => {
-      expect(content).toContain("ApplicationController extends ActionController.API");
+      expect(content).toMatch("ApplicationController extends ActionController.API");
     });
   });
 
@@ -353,7 +366,7 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--full", "--api"]);
 
     await t.assertFile("lib/bukkits/engine.ts", (content: string) => {
-      expect(content).toContain("this.config.generators.apiOnly = true");
+      expect(content).toMatch("this.config.generators.apiOnly = true");
     });
   });
 

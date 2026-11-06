@@ -1,6 +1,17 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:generators/plugin_generator_test.rb › PluginGeneratorTest › invalid plugin name raises an error":
+    [
+      {
+        kind: "assert_equal",
+        value:
+          "s:Invalid plugin name Digest, constant Digest is already in use. Please choose another plugin name.\n",
+        as: "assert_equal",
+        reason:
+          "plugin_generator_test.rb:103 collides with Ruby's stdlib Digest, which trails does not seat on TopLevel; the port collides with Trails",
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",

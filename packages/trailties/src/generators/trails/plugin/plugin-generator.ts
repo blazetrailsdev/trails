@@ -94,6 +94,8 @@ export class PluginBuilder {
   }
 
   async license(this: PluginBuilderHost): Promise<void> {
+    /** @inventedArm author — PERMANENT */
+    await this.author();
     if (!this.isInsideApplication()) await this.template("MIT-LICENSE");
   }
 
