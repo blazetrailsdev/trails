@@ -213,6 +213,33 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0(supports-color@8.1.1)
 
+  packages/actionmailbox:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../mail
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
+
   packages/actionmailer:
     dependencies:
       '@blazetrails/actionpack':
@@ -1218,6 +1245,9 @@ importers:
       '@blazetrails/actioncable':
         specifier: workspace:*
         version: link:../../packages/actioncable
+      '@blazetrails/actionmailbox':
+        specifier: workspace:*
+        version: link:../../packages/actionmailbox
       '@blazetrails/actionmailer':
         specifier: workspace:*
         version: link:../../packages/actionmailer

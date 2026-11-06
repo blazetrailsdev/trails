@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../actionpack" },
+    { "path": "../activejob" },
+    { "path": "../activerecord" },
+    { "path": "../activestorage" },
+    { "path": "../activesupport" },
+    { "path": "../mail" },
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
+  ],
+  "exclude": ["src/**/*.test.ts"]
+}

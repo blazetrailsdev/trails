@@ -182,6 +182,20 @@ export const SOURCES: readonly UpstreamSource[] = [
         compareTests: true,
       },
       {
+        name: "actionmailbox",
+        libPath: "actionmailbox/lib/action_mailbox",
+        libEntryFile: "actionmailbox/lib/action_mailbox.rb",
+        extraLibPaths: [
+          "actionmailbox/app/models/action_mailbox",
+          "actionmailbox/app/jobs/action_mailbox",
+          "actionmailbox/app/controllers/action_mailbox",
+          "actionmailbox/app/controllers/rails/conductor",
+        ],
+        testPath: "actionmailbox/test",
+        compareApi: true,
+        compareTests: true,
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
         testPath: "railties/test",

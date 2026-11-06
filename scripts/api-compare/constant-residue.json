@@ -36,6 +36,12 @@
       "remote-connections.ts::InvalidIdentifiersError": "ActionCable::RemoteConnections::RemoteConnection::InvalidIdentifiersError"
     }
   },
+  "actionmailbox": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "gem-version.ts::VERSION": "ActionMailbox::VERSION" }
+  },
   "actionmailer": {
     "rows": 25,
     "excluded": [],

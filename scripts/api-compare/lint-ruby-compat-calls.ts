@@ -87,6 +87,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "actionview",
   "activejob",
   "actionmailer",
+  "actionmailbox",
   "activestorage",
   "activemodel",
   "activerecord",

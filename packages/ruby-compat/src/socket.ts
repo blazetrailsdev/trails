@@ -1,5 +1,6 @@
 import type { HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
+import { StandardError } from "./standard-error.js";
 import { EOFError } from "./eof-error.js";
 import { Errno } from "./errno.js";
 import { IO } from "./io.js";
@@ -339,6 +340,26 @@ export class BasicSocket extends IO {
 }
 
 /**
+ * Ruby's `SocketError` (`vendor/ruby/v3.3.11/ext/socket/init.c:799`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's socket extension, which Rails rescues
+ * without defining.
+ */
+export class SocketError extends StandardError {}
+
+SocketError.prototype.name = "SocketError";
+
+/**
+ * `Socket::ResolutionError` (`vendor/ruby/v3.3.11/ext/socket/init.c:803`), what a
+ * failed `getaddrinfo` raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+class ResolutionError extends SocketError {}
+
+ResolutionError.prototype.name = "Socket::ResolutionError";
+
+/**
  * Ruby's `TCPSocket` (`vendor/ruby/v3.3.11/ext/socket/tcpsocket.c:108`), the
  * `BasicSocket` a Ruby server hands a `rack.hijack` caller.
  *
@@ -351,6 +372,9 @@ export class TCPSocket extends BasicSocket {}
  * (`vendor/ruby/v3.3.11/ext/socket/socket.c:1983`).
  */
 export class Socket extends BasicSocket {
+  /** @noRailsEquivalent PERMANENT */
+  static ResolutionError = ResolutionError;
+
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Socket.gethostname`
    * (`vendor/ruby/v3.3.11/ext/socket/socket.c:847`).

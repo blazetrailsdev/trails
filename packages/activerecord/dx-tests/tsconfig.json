@@ -72,7 +72,8 @@
       "@blazetrails/actioncable": ["../../actioncable/src/index.ts"],
       "@blazetrails/solid-queue": ["../../solid-queue/src/index.ts"],
       "@blazetrails/solid-cable": ["../../solid-cable/src/index.ts"],
-      "@blazetrails/activestorage": ["../../activestorage/src/index.ts"]
+      "@blazetrails/activestorage": ["../../activestorage/src/index.ts"],
+      "@blazetrails/actionmailbox": ["../../actionmailbox/src/index.ts"]
     }
   },
   "include": ["."]
