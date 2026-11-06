@@ -26,5 +26,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "optionalDependencies": {
+    "bcrypt": "^6.0.0"
   }
 }

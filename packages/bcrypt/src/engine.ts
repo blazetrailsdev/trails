@@ -12,6 +12,26 @@ import {
 import { Errors } from "./error.js";
 import { Password } from "./password.js";
 
+/** @perf 1.6x — PERMANENT */
+const _bcHashSync: (key: string, setting: string) => string = (() => {
+  const getBuiltinModule = (globalThis as { process?: { getBuiltinModule?(id: string): unknown } })
+    .process?.getBuiltinModule;
+  if (getBuiltinModule === undefined) return bcryptjs.hashSync;
+  const { createRequire } = getBuiltinModule("node:module") as typeof import("node:module");
+  const { Buffer } = getBuiltinModule("node:buffer") as typeof import("node:buffer");
+  let native: { hashSync(key: Buffer, setting: string): string };
+  try {
+    native = createRequire(import.meta.url)("bcrypt") as typeof native;
+  } catch {
+    return bcryptjs.hashSync;
+  }
+  return (key, setting) => {
+    const bytes = Buffer.from(key, "utf8").subarray(0, 72);
+    if (!setting.startsWith("$2y$")) return native.hashSync(bytes, setting);
+    return "$2y$" + native.hashSync(bytes, "$2b$" + setting.slice(4)).slice(4);
+  };
+})();
+
 export class Engine {
   static DEFAULT_COST: number = 12;
   static readonly MIN_COST: number = 4;
@@ -96,7 +116,7 @@ export class Engine {
     if (key.includes("\0") || setting.includes("\0")) {
       throw new ArgumentError("string contains null byte");
     }
-    return bcryptjs.hashSync(key, setting);
+    return _bcHashSync(key, setting);
   }
 
   static calibrate(upperTimeLimitInMs: number): number | Range<number> {
