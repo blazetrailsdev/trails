@@ -393,7 +393,10 @@ export class Constraints extends Endpoint {
     return this._strategy(this._app, req);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm length — PERMANENT
+   */
   private constraintArgs(constraint: ConstraintLike, request: Request): unknown[] {
     const arity = rbObjRespondTo(constraint, "arity")
       ? constraint.arity!

@@ -27,6 +27,13 @@ function fakeRequest(): ConstraintsRequest & Request {
 }
 
 describe("ActionDispatch::Routing::Mapper::Constraints", () => {
+  it("CALL dispatches an app's own call member with the env", () => {
+    const req = fakeRequest();
+    const app = { call: (env: unknown) => ["called", env] };
+    const c = new Constraints(app, [], Constraints.CALL);
+    expect(c.serve(req)).toEqual(["called", req.env]);
+  });
+
   it("hands each constraint the arguments its arity asks for", () => {
     const req = fakeRequest();
     const seen: unknown[][] = [];

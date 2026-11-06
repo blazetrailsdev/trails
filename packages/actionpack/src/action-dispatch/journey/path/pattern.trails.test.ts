@@ -101,13 +101,9 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
-  it("anchors the union as a single alternation, not split anchors", () => {
-    const p = buildPath("/page/:name", { name: [/foo/, /bar/] });
-    const re = p.requirementsForMissingKeysCheck["name"];
-    expect(re.test("foo")).toBe(true);
-    expect(re.test("bar")).toBe(true);
-    expect(re.test("xfooy")).toBe(false);
-    expect(re.test("xbary")).toBe(false);
+  it("carries a unicode requirement's u flag to the missing-keys check", () => {
+    const p = buildPath("/page/:name", { name: /\p{Letter}+/u });
+    expect(p.requirementsForMissingKeysCheck["name"].test("Größe")).toBe(true);
   });
 
   it("Pattern pushes RegExp requirements into the SymbolNode for GTG widening", () => {

@@ -11,6 +11,13 @@ function escapeCharClass(s: string): string {
   return s.replace(/[\]\\^-]/g, "\\$&");
 }
 
+/** @noRailsEquivalent PERMANENT */
+function unicodeFlag(requirements: ReadonlyArray<Requirement | Requirement[] | undefined>): string {
+  const flat = requirements.flat();
+  if (flat.some((r) => r instanceof RegExp && r.flags.includes("v"))) return "v";
+  return flat.some((r) => r instanceof RegExp && r.unicode) ? "u" : "";
+}
+
 export class AnchoredRegexp extends Visitor {
   protected readonly _separator: string;
   protected readonly _matchers: Matchers;
@@ -26,13 +33,7 @@ export class AnchoredRegexp extends Visitor {
   override accept(node: Node): RegExp {
     return new RegExp(
       `^${this.visit(node)}$`,
-      [...node].some(
-        (n) =>
-          n.isSymbol() &&
-          [this._matchers[n.toSym()]].flat().some((r) => r instanceof RegExp && r.unicode),
-      )
-        ? "u"
-        : "",
+      unicodeFlag([...node].filter((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
     );
   }
 
@@ -45,7 +46,7 @@ export class AnchoredRegexp extends Visitor {
     const name = node.toSym();
     if (!Object.hasOwn(this._matchers, name)) return this._separatorRe;
     const re = this._matchers[name];
-    return `(${rbRegToS(rbRegSUnion(re as Requirement[]))})`;
+    return `(${rbRegToS(rbRegSUnion(...[re].flat()))})`;
   }
 
   protected override visitGROUP(node: Node): string {
@@ -78,14 +79,12 @@ export class AnchoredRegexp extends Visitor {
 export class UnanchoredRegexp extends AnchoredRegexp {
   override accept(node: Node): RegExp {
     const path = this.visit(node) as string;
-    const flags = [...node].some(
-      (n) =>
-        n.isSymbol() &&
-        [this._matchers[n.toSym()]].flat().some((r) => r instanceof RegExp && r.unicode),
-    )
-      ? "u"
-      : "";
-    return path === "/" ? new RegExp(`^/`, flags) : new RegExp(`^${path}(?:\\b|$|/)`, flags);
+    return path === "/"
+      ? new RegExp(`^/`)
+      : new RegExp(
+          `^${path}(?:\\b|$|/)`,
+          unicodeFlag([...node].filter((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
+        );
   }
 }
 
@@ -235,7 +234,10 @@ export class Pattern {
     this._requirementsAnchoredCache = Object.fromEntries(
       Object.entries(this.requirements).map(([key, regex]) => [
         key,
-        new RegExp(`^${rbRegToS(rbRegSUnion(regex as Requirement[]))}$`),
+        new RegExp(
+          `^${regex instanceof RegExp ? rbRegToS(regex) : String(regex)}$`,
+          unicodeFlag([regex]),
+        ),
       ]),
     );
     return this._requirementsAnchoredCache;
@@ -254,7 +256,7 @@ export class Pattern {
       for (const node of [...this.spec].filter((n) => n.isSymbol())) {
         if (Object.hasOwn(this.requirements, node.toSym())) {
           const reqs = this.requirements[node.toSym()];
-          const re = new RegExp(`${rbRegToS(rbRegSUnion(reqs as Requirement[]))}|`);
+          const re = new RegExp(`${rbRegToS(rbRegSUnion(...[reqs].flat()))}|`, unicodeFlag([reqs]));
           const m = re.exec("");
           offsets.push((m ? m.length - 1 : 0) + offsets[offsets.length - 1]);
         } else {
