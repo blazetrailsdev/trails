@@ -383,7 +383,7 @@ describe("TestCase over a PostsController", () => {
 
     it("throws on unknown symbol", async () => {
       await tc.get("index");
-      expect(() => tc.assertResponse("banana")).toThrow(/Invalid response name: banana/);
+      expect(() => tc.assertResponse("banana")).toThrow(/Unrecognized status code :banana/);
     });
 
     it("accepts 'missing' for 4xx", async () => {

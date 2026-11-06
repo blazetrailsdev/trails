@@ -288,7 +288,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
       t.assertEnqueuedJobs(
         1,
         {
-          only: (job: Payload) => rbModName(fetch(job, ":job")) === "HelloJob",
+          only: (job: Payload) => rbModName(fetch(job, "job")) === "HelloJob",
         },
         helloAndTwoLogging,
       ),
@@ -306,7 +306,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
       t.assertEnqueuedJobs(
         1,
         {
-          except: (job: Payload) => rbModName(fetch(job, ":job")) === "LoggingJob",
+          except: (job: Payload) => rbModName(fetch(job, "job")) === "LoggingJob",
         },
         helloAndTwoLogging,
       ),
@@ -1450,7 +1450,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
     await t.performEnqueuedJobs();
 
     await t.assertPerformedJobs(1, {
-      only: (job: Record<string, unknown>) => rbModName(fetch(job, ":job")) === "HelloJob",
+      only: (job: Record<string, unknown>) => rbModName(fetch(job, "job")) === "HelloJob",
     });
   });
 
@@ -1507,7 +1507,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
     await t.performEnqueuedJobs();
 
     await t.assertPerformedJobs(1, {
-      except: (job: Record<string, unknown>) => rbModName(fetch(job, ":job")) === "HelloJob",
+      except: (job: Record<string, unknown>) => rbModName(fetch(job, "job")) === "HelloJob",
     });
   });
 

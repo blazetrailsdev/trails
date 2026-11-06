@@ -32,13 +32,9 @@ export class AssertionResponse {
 }
 
 /** @internal */
-function codeFromName(name: string): number | string | null {
+function codeFromName(name: string): number | string {
   if (Object.hasOwn(GENERIC_RESPONSE_CODES, name)) return GENERIC_RESPONSE_CODES[name];
-  try {
-    return rackStatusCode(name);
-  } catch {
-    return null;
-  }
+  return rackStatusCode(name);
 }
 
 /** @internal */

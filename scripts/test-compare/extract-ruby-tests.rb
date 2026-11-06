@@ -2208,8 +2208,17 @@ class TestExtractor
 
   # Is this node a receiver-form (`:call`/`:command_call`) assertion call?
   def receiver_call_assertion?(node)
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call
+      (@mock_expects ||= {}.compare_by_identity)[node[1]] = true if mock_expect_args?(node[2])
+      return false
+    end
     return false unless node[0] == :call || node[0] == :command_call
-    return false unless node[3] && assertion_method?(ident_name(node[3]))
+    name = node[3] && ident_name(node[3])
+    return false unless name && assertion_method?(name)
+    if name == "expect"
+      args = node[0] == :command_call ? node[4] : nil
+      return false unless @mock_expects&.key?(node) || (args && mock_expect_args?(args))
+    end
     mark_spec_value_receiver(node[1])
     true
   end
@@ -2539,6 +2548,13 @@ class TestExtractor
 
   # Positional argument nodes from an `:arg_paren` / `:args_add_block` wrapper, or
   # nil when the shape isn't a plain positional list.
+  def mock_expect_args?(args)
+    list = positional_args(args)
+    return false unless list && list.length >= 2
+    list[0].is_a?(Array) && list[0][0] == :symbol_literal &&
+      !(list[1].is_a?(Array) && %i[symbol_literal array hash bare_assoc_hash].include?(list[1][0]))
+  end
+
   def positional_args(node)
     return nil unless node.is_a?(Array)
     inner = node[0] == :arg_paren ? node[1] : node

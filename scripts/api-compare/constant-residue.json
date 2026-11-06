@@ -43,35 +43,33 @@
     "residue": { "gem-version.ts::VERSION": "ActionMailbox::VERSION" }
   },
   "actionmailer": {
-    "rows": 25,
+    "rows": 31,
     "excluded": [],
-    "unwalked": [],
+    "unwalked": [
+      "base.ts::Base.LateAttachmentsProxy",
+      "callbacks.ts::Callbacks",
+      "delivery-methods.ts::DeliveryMethods",
+      "form-builder.ts::FormBuilder",
+      "gem-version.ts::VERSION",
+      "mail-helper.ts::MailHelper",
+      "parameterized.ts::Parameterized",
+      "preview.ts::Previews",
+      "queued-delivery.ts::QueuedDelivery",
+      "rescuable.ts::Rescuable",
+      "test-helper.ts::TestHelper"
+    ],
     "residue": {
-      "base.ts::Base": "ActionMailer::Base",
-      "base.ts::Base.LateAttachmentsProxy": "ActionMailer::Base::LateAttachmentsProxy",
       "base.ts::NullMail": "ActionMailer::Base::NullMail",
-      "callbacks.ts::Callbacks": "ActionMailer::Callbacks",
       "callbacks.ts::ClassMethods": "ActionMailer::Callbacks::ClassMethods",
-      "collector.ts::Collector": "ActionMailer::Collector",
       "delivery-methods.ts::ClassMethods": "ActionMailer::DeliveryMethods::ClassMethods",
-      "delivery-methods.ts::DeliveryMethods": "ActionMailer::DeliveryMethods",
       "form-builder.ts::ClassMethods": "ActionMailer::FormBuilder::ClassMethods",
-      "form-builder.ts::FormBuilder": "ActionMailer::FormBuilder",
-      "gem-version.ts::VERSION": "ActionMailer::VERSION",
-      "inline-preview-interceptor.ts::InlinePreviewInterceptor": "ActionMailer::InlinePreviewInterceptor",
-      "log-subscriber.ts::LogSubscriber": "ActionMailer::LogSubscriber",
-      "mail-delivery-job.ts::MailDeliveryJob": "ActionMailer::MailDeliveryJob",
-      "mail-helper.ts::MailHelper": "ActionMailer::MailHelper",
-      "message-delivery.ts::MessageDelivery": "ActionMailer::MessageDelivery",
       "parameterized.ts::ClassMethods": "ActionMailer::Parameterized::ClassMethods",
       "parameterized.ts::Mailer": "ActionMailer::Parameterized::Mailer",
       "parameterized.ts::MessageDelivery": "ActionMailer::Parameterized::MessageDelivery",
-      "parameterized.ts::Parameterized": "ActionMailer::Parameterized",
       "preview.ts::ClassMethods": "ActionMailer::Previews::ClassMethods",
-      "preview.ts::Preview": "ActionMailer::Preview",
-      "preview.ts::Previews": "ActionMailer::Previews",
-      "queued-delivery.ts::QueuedDelivery": "ActionMailer::QueuedDelivery",
-      "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
+      "test-case.ts::Behavior": "ActionMailer::TestCase::Behavior",
+      "test-case.ts::ClassMethods": "ActionMailer::TestCase::Behavior::ClassMethods",
+      "test-case.ts::ClearTestDeliveries": "ActionMailer::TestCase::ClearTestDeliveries"
     }
   },
   "actionpack": {
@@ -365,7 +363,7 @@
     }
   },
   "activejob": {
-    "rows": 46,
+    "rows": 50,
     "excluded": [],
     "unwalked": [
       "arguments.ts::Arguments",
@@ -380,7 +378,8 @@
     "residue": {
       "arguments.ts::DeserializationError": "ActiveJob::DeserializationError",
       "arguments.ts::SerializationError": "ActiveJob::SerializationError",
-      "enqueuing.ts::EnqueueError": "ActiveJob::EnqueueError"
+      "enqueuing.ts::EnqueueError": "ActiveJob::EnqueueError",
+      "test-helper.ts::ClassMethods": "ActiveJob::TestHelper::TestQueueAdapter::ClassMethods"
     }
   },
   "activemodel": {

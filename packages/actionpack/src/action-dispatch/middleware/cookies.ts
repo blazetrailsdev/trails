@@ -20,6 +20,7 @@ import {
   rbFSend,
   type Block,
   rbProcCall,
+  update,
 } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
@@ -197,12 +198,10 @@ export class CookieJar implements Iterable<[string, string]> {
   static build<T extends CookieJar>(
     this: new (request: RequestCookieMethodsHost) => T,
     req: RequestCookieMethodsHost,
-    cookies: Record<string, string>,
+    cookies: Record<string, string> | Map<string, string>,
   ): T {
     const jar = new this(req);
-    for (const [k, v] of Object.entries(cookies ?? {})) {
-      jar._cookies.set(k, v);
-    }
+    jar.update(cookies);
     return jar;
   }
 
@@ -224,8 +223,8 @@ export class CookieJar implements Iterable<[string, string]> {
 
   declare toHash: CookieJar["toH"];
 
-  update(otherHash: Record<string, string>): this {
-    for (const [k, v] of Object.entries(otherHash)) this._cookies.set(k, v);
+  update(otherHash: Record<string, string> | Map<string, string>): this {
+    update(this._cookies, otherHash);
     return this;
   }
 

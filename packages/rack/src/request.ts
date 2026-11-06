@@ -45,6 +45,7 @@ import {
   block as rbBlock,
   fetch,
   hashDelete,
+  hashReplace,
   include,
   rbObjDup,
   warn,
@@ -321,8 +322,7 @@ export abstract class Helpers {
     const string = this.getHeader(HTTP_COOKIE);
 
     if (string !== this.getHeader(RACK_REQUEST_COOKIE_STRING)) {
-      for (const key of Object.keys(hash)) delete hash[key];
-      Object.assign(hash, parseCookiesHeader(string));
+      hashReplace(hash, parseCookiesHeader(string));
       this.setHeader(RACK_REQUEST_COOKIE_STRING, string);
     }
 

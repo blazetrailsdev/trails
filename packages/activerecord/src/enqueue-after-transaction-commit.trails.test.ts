@@ -33,7 +33,7 @@ describe("EnqueueAfterTransactionCommit with a real transaction", () => {
     });
 
     expect(adapter.enqueuedJobs.length).toBe(1);
-    expect(adapter.enqueuedJobs[0][":job"]).toBe(AfterCommitTopicJob);
+    expect(adapter.enqueuedJobs[0]["job"]).toBe(AfterCommitTopicJob);
   });
 
   it("records an enqueue error raised by the adapter when the transaction commits", async () => {

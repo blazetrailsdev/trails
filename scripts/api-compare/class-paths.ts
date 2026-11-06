@@ -46,7 +46,9 @@ const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {
+  actionmailer: "test-case.ts",
   actionpack: "system-testing.ts",
+  activejob: "test-case.ts",
   activerecord: "fixtures.ts",
   activestorage: "transformers/image-processing-transformer.ts",
 };

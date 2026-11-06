@@ -141,10 +141,21 @@ export function collectRequiredTests(content: string, file: string, name: string
 }
 
 function isReceiverExpect(call: ts.CallExpression): boolean {
+  if (
+    !ts.isPropertyAccessExpression(call.expression) ||
+    call.expression.name.text !== "expect" ||
+    expectChainMatcher(call) !== null
+  ) {
+    return false;
+  }
+  const [name, retval] = call.arguments;
   return (
-    ts.isPropertyAccessExpression(call.expression) &&
-    call.expression.name.text === "expect" &&
-    expectChainMatcher(call) === null
+    name !== undefined &&
+    retval !== undefined &&
+    ts.isStringLiteralLike(name) &&
+    !ts.isStringLiteralLike(retval) &&
+    !ts.isArrayLiteralExpression(retval) &&
+    !ts.isObjectLiteralExpression(retval)
   );
 }
 
