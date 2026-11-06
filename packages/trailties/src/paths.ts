@@ -18,6 +18,11 @@ export class Root {
     this.path = path;
   }
 
+  set(path: string, value: string | string[]): Path {
+    const glob = this.get(path) ? this.get(path)!.glob : undefined;
+    return this.add(path, { with: value, glob });
+  }
+
   add(path: string, options: PathOptions = {}): Path {
     const with_ =
       options.with === undefined

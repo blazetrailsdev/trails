@@ -1226,7 +1226,7 @@
     }
   },
   "trailties": {
-    "rows": 68,
+    "rows": 73,
     "excluded": [
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
@@ -1303,6 +1303,11 @@
       "rack.ts::Rack": "Trails::Rack",
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
+      "source-annotation-extractor.ts::Annotation": "Trails::SourceAnnotationExtractor::Annotation",
+      "source-annotation-extractor.ts::Parser": "Trails::SourceAnnotationExtractor::ParserExtractor::Parser",
+      "source-annotation-extractor.ts::ParserExtractor": "Trails::SourceAnnotationExtractor::ParserExtractor",
+      "source-annotation-extractor.ts::PatternExtractor": "Trails::SourceAnnotationExtractor::PatternExtractor",
+      "source-annotation-extractor.ts::SourceAnnotationExtractor": "Trails::SourceAnnotationExtractor",
       "trailtie.ts::Trailtie": "Trails::Trailtie",
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
       "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",

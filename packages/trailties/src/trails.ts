@@ -12,7 +12,6 @@ import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import type { Autoloaders } from "./autoloaders.js";
 import type { Generators } from "./generators.js";
-import type { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
@@ -26,6 +25,7 @@ import { HealthController } from "./health-controller.js";
 import { PwaController } from "./pwa-controller.js";
 import * as TrailsConfiguration from "./configuration.js";
 import * as Paths from "./paths.js";
+import { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 
 let _application: Application | null = null;
 
@@ -47,9 +47,9 @@ export class Trails {
   declare static WelcomeController: typeof WelcomeController;
   declare static Configuration: typeof TrailsConfiguration;
   declare static Paths: typeof Paths;
+  declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
   declare static Generators?: typeof Generators;
-  declare static SourceAnnotationExtractor?: typeof SourceAnnotationExtractor;
   /** @noRailsEquivalent PERMANENT */
   declare static TrailsTsc?: typeof TrailsTsc;
 
@@ -188,3 +188,4 @@ Trails.PwaController = PwaController;
 Trails.WelcomeController = WelcomeController;
 Trails.Configuration = TrailsConfiguration;
 Trails.Paths = Paths;
+Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;
