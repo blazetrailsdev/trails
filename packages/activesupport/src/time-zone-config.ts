@@ -8,23 +8,23 @@ import { ArgumentError } from "./hash-utils.js";
 (TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).inTimeZone = (self: unknown, zone?: unknown) =>
   inTimeZone.call(self as DateOrTime, zone);
 
-let _zoneDefault: TimeZone | null = null;
+let _zoneDefault: TimeZone | null | false = null;
 
 export function zone(): TimeZone | null {
   const timeZone = IsolatedExecutionState.get<TimeZone | null | false>(":time_zone");
   if (timeZone != null && timeZone !== false) return timeZone;
-  return _zoneDefault;
+  return _zoneDefault || null;
 }
 
 export function setZone(timeZone: TimeZone | string | number | Duration | null | false): void {
   IsolatedExecutionState.set(":time_zone", findZoneBang(timeZone));
 }
 
-export function zoneDefault(): TimeZone | null {
+export function zoneDefault(): TimeZone | null | false {
   return _zoneDefault;
 }
 
-export function setZoneDefault(zone: TimeZone | null): void {
+export function setZoneDefault(zone: TimeZone | null | false): void {
   _zoneDefault = zone;
 }
 

@@ -4,7 +4,7 @@ import { setZone, setZoneDefault, useZone, zone, zoneDefault } from "./time-zone
 import { TimeZone } from "./values/time-zone.js";
 
 describe("Time.use_zone", () => {
-  let oldZoneDefault: TimeZone | null;
+  let oldZoneDefault: TimeZone | null | false;
 
   beforeEach(() => {
     oldZoneDefault = zoneDefault();
