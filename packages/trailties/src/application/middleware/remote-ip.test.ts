@@ -5,6 +5,7 @@ import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/ke
 import { ActionDispatch } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { include } from "@blazetrails/ruby-compat";
+import { Application } from "../../application.js";
 import { Trails } from "../../trails.js";
 import type { Generation } from "../../test-helpers/isolation/abstract-unit.js";
 import "../../test-helpers/isolation/abstract-unit.js";
@@ -41,15 +42,13 @@ include(RemoteIpTest, Isolation);
 
 describe("ApplicationTests::RemoteIpTest", () => {
   let t: RemoteIpTest;
-  let prevApplication: typeof Trails.application;
-
   beforeEach(() => {
     t = new RemoteIpTest("test");
-    prevApplication = Trails.application;
   });
 
   afterEach(() => {
-    Trails.application = prevApplication;
+    Trails.application = null;
+    Application.appClass = null;
   });
 
   it("remote_ip works", async () => {
@@ -62,5 +61,21 @@ describe("ApplicationTests::RemoteIpTest", () => {
     await expect(
       t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "1.1.1.2" }),
     ).rejects.toMatchObject({ name: "IpSpoofAttackError" });
+  });
+
+  it("works with both headers individually", async () => {
+    await t.makeBasicApp();
+    expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1" })).toBe("1.1.1.1");
+    expect(await t.remoteIp({ HTTP_CLIENT_IP: "1.1.1.2" })).toBe("1.1.1.2");
+  });
+
+  it("can disable IP spoofing check", async () => {
+    await t.makeBasicApp((app) => {
+      app.config.actionDispatch.ipSpoofingCheck = false;
+    });
+
+    expect(await t.remoteIp({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "1.1.1.2" })).toBe(
+      "1.1.1.1",
+    );
   });
 });
