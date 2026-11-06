@@ -60,7 +60,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/builder", "../builder/src/builder.ts"),
       pkgAlias("@blazetrails/marcel", "../marcel/src/marcel.ts"),
       pkgAlias("@blazetrails/chronic", "../chronic/src/chronic.ts"),
-      pkgAlias("@blazetrails/tzinfo", "../tzinfo/src/index.ts"),
+      pkgAlias("@blazetrails/tzinfo", "../tzinfo/lib/index.ts"),
       pkgAlias("@blazetrails/et-orbi", "../et-orbi/src/et-orbi.ts"),
       pkgAlias("@blazetrails/raabro", "../raabro/src/raabro.ts"),
       pkgAlias("@blazetrails/msgpack", "../msgpack/src/index.ts"),

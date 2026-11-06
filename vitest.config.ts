@@ -398,7 +398,7 @@ const alias = {
   "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/src") + "/",
   "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/src") + "/",
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
-  "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/src/index.ts"),
+  "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
