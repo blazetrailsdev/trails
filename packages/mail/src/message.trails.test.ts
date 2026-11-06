@@ -70,4 +70,15 @@ describe("Mail::Message binary raw source", () => {
     const raw = new TextEncoder().encode("Message-ID: <a@b>\r\nSubject: hi\r\n\r\nabc");
     expect(new Mail.Message(raw).equals(new Mail.Message(raw))).toBe(true);
   });
+
+  it("encodes a multipart body with an 8-bit preamble as bytes", () => {
+    const raw = new Uint8Array([
+      0xe9,
+      ...new TextEncoder().encode("\r\n--b\r\nContent-Type: text/plain\r\n\r\nhi\r\n--b--\r\n"),
+    ]);
+    const body = new Body(raw).splitBang("b");
+    const encoded = body.encoded();
+    expect(encoded).toBeInstanceOf(Uint8Array);
+    expect((encoded as Uint8Array)[0]).toBe(0xe9);
+  });
 });

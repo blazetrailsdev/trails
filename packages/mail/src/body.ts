@@ -112,13 +112,14 @@ export class Body {
     if (this.isMultipart()) {
       this.sortPartsBang();
       const encodedParts = this.parts.map((p: PartsListPart) => p.encoded());
-      return (
-        [this.preamble, ...encodedParts]
-          .map((s) => (s instanceof Uint8Array ? binaryString(s) : s))
-          .join(this.crlfBoundary()) +
-        this.endBoundary() +
-        (this.epilogue instanceof Uint8Array ? binaryString(this.epilogue) : (this.epilogue ?? ""))
+      const pieces = [this.preamble, ...encodedParts, this.epilogue ?? ""];
+      const binary = pieces.some((s) => s instanceof Uint8Array);
+      const [preamble, ...rest] = pieces.map((s) =>
+        s instanceof Uint8Array ? binaryString(s) : s,
       );
+      const epilogue = rest.pop();
+      const encoded = [preamble, ...rest].join(this.crlfBoundary()) + this.endBoundary() + epilogue;
+      return binary ? binaryBytes(encoded) : encoded;
     } else {
       const dec = Encodings.getEncoding(this.encoding() as string) as typeof Identity | null;
       const enc = (

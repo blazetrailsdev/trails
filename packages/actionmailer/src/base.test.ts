@@ -1124,7 +1124,7 @@ describe("BaseTest", () => {
     expect(mailer.mailerName()).toBe("anonymous");
 
     expect((await mailer.welcome().message()).subject()).toBe("Welcome");
-    expect(((await mailer.welcome().message()).body().encoded() as string).trim()).toBe(
+    expect(String((await mailer.welcome().message()).body().encoded()).trim()).toBe(
       "Anonymous mailer body",
     );
   });
@@ -1166,7 +1166,7 @@ describe("BaseTest", () => {
       .message();
     expect(mail.subject()).toBe("subject");
     expect(Array.from(mail.to() as string[])).toEqual(["joe@example.com", "jane@example.com"]);
-    expect((mail.body().encoded() as string).trim()).toBe("hello world");
+    expect(String(mail.body().encoded()).trim()).toBe("hello world");
     expect(String(mail.get("X-Special-Header"))).toBe("special indeed!");
   });
 

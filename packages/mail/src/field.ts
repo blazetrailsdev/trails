@@ -310,8 +310,10 @@ export class Field implements Comparable {
     }
   }
 
-  /** @internal */
-  /** @inventedArm forceEncoding — CONVERGEABLE mail-structured-fields-parse-binary-values-without-utf8-decode */
+  /**
+   * @internal
+   * @inventedArm forceEncoding — CONVERGEABLE mail-structured-fields-parse-binary-values-without-utf8-decode
+   */
   private parseField(name: string, value: unknown, charset: string | Encoding | null): CommonField {
     if (typeof value === "string") value = this.unfold(value);
     if (value instanceof Uint8Array) {
