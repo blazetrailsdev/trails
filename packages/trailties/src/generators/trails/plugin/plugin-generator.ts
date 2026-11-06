@@ -45,7 +45,7 @@ interface PluginBuilderHost {
   isEngine(): boolean | undefined;
   isFull(): boolean | undefined;
   isMountable(): boolean | undefined;
-  isInsideApplication(): string | boolean | null;
+  isInsideApplication(): boolean | null;
   skipEslint(): boolean | undefined;
 }
 
@@ -508,13 +508,17 @@ export class PluginGenerator extends AppBase {
     return (this._modules ??= camelize(this.namespacedName()).split("::"));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   protected wrapInModules(unwrappedCode: string): string {
     unwrappedCode = `${unwrappedCode}`.trim().replace(/\s$\n/gm, "");
     return [...this.modules()].reverse().reduce((content, mod) => {
       let str = `export namespace ${mod} {\n`;
       str += content
         .split(/(?<=\n)/)
+        .filter((line) => line !== "")
         .map((line) => `  ${line}`)
         .join("");
       str += isPresent(content) ? "\n}" : "}";
@@ -623,9 +627,9 @@ export class PluginGenerator extends AppBase {
   }
 
   /** @internal */
-  protected isInsideApplication(): string | boolean | null {
+  protected isInsideApplication(): boolean | null {
     const trailsAppPath = this.trailsAppPath();
-    return trailsAppPath && this.destinationRoot.startsWith(trailsAppPath);
+    return trailsAppPath == null ? trailsAppPath : this.destinationRoot.startsWith(trailsAppPath);
   }
 
   /** @internal */
