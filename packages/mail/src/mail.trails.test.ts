@@ -27,3 +27,9 @@ describe("Mail seat", () => {
     expect(constGet(Object, "Mail::Message")).toBe(Mail.Message);
   });
 });
+
+describe("Mail::Message#identify_and_set_transfer_encoding", () => {
+  it("writes the negotiated encoding's NAME into the header", () => {
+    expect(Mail.new("x").encoded()).toContain("Content-Transfer-Encoding: 7bit\r\n");
+  });
+});

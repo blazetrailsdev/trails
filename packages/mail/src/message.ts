@@ -195,19 +195,20 @@ export class Message {
 
   equals(other: Message | null | undefined): boolean {
     if (typeof other?.encoded !== "function") return false;
+
     if (present(this.messageId()) && present(other.messageId())) {
       return this.encoded() === other.encoded();
     } else {
-      const m = new (this.constructor as typeof Message)(this.encoded());
+      const m = rbObjDup(this);
       m.setMessageId("<temp@test>");
-      const o = new (other.constructor as typeof Message)(other.encoded());
+      const o = rbObjDup(other);
       o.setMessageId("<temp@test>");
       return m.encoded() === o.encoded();
     }
   }
 
   initializeCopy(_original: Message): this {
-    this._header = this._header!.constructor === Header ? new Header(this._header.encoded()) : null;
+    this._header = rbObjDup(this._header!);
     return this;
   }
 

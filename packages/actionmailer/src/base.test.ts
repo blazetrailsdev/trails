@@ -1,15 +1,20 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
+import { DateTime, Time, strftime } from "@blazetrails/date";
 import {
+  ExecutionContext,
   I18n,
+  Notifications,
+  assertCalled,
   assertCalledWith,
   assertNotCalled,
   assertNothingRaised,
   assertRaises,
+  days,
   stub,
 } from "@blazetrails/activesupport";
-import type { Field, Message } from "@blazetrails/mail";
+import type { AddressContainer, Field, Message } from "@blazetrails/mail";
 import {
   ArgumentError,
   RuntimeError,
@@ -18,14 +23,18 @@ import {
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
-import type { MessageDelivery } from "./message-delivery.js";
 import { Preview } from "./preview.js";
+import type { MessageDelivery } from "./message-delivery.js";
 import { BaseMailer as BaseMailerClass } from "./test-helpers/mailers/base-mailer.js";
+import { ProcMailer as ProcMailerClass } from "./test-helpers/mailers/proc-mailer.js";
 
 I18n.setEnforceAvailableLocales(false);
 
+type Event = { name: string; payload: Record<string, unknown> };
+type ActionCallbacks = Record<"beforeAction" | "afterAction", (name: string) => void>;
 type Mailer<T> = T & Record<string, (...args: unknown[]) => MessageDelivery>;
 const BaseMailer = BaseMailerClass as Mailer<typeof BaseMailerClass>;
+const ProcMailer = ProcMailerClass as Mailer<typeof ProcMailerClass>;
 
 async function withDefault(
   klass: typeof Base,
@@ -121,9 +130,38 @@ describe("BaseTest", () => {
     expect(Array.from(email.to() as string[])).toEqual(["another@example.org"]);
   });
 
+  it("mail() with bcc, cc, content_type, charset, mime_version, reply_to and date", async () => {
+    const time = DateTime.parse(strftime(DateTime.now(), "%Y-%m-%d 00:00:00 %z"));
+    const email = await BaseMailer.welcome({
+      bcc: "bcc@test.lindsaar.net",
+      cc: "cc@test.lindsaar.net",
+      contentType: "multipart/mixed",
+      charset: "iso-8559-1",
+      mimeVersion: "2.0",
+      replyTo: "reply-to@test.lindsaar.net",
+      date: time,
+    }).message();
+    expect(Array.from(email.bcc() as string[])).toEqual(["bcc@test.lindsaar.net"]);
+    expect(Array.from(email.cc() as string[])).toEqual(["cc@test.lindsaar.net"]);
+    expect(email.contentType()).toBe("multipart/mixed; charset=iso-8559-1");
+    expect(email.charset).toBe("iso-8559-1");
+    expect(email.mimeVersion()).toBe("2.0");
+    expect(Array.from(email.replyTo() as string[])).toEqual(["reply-to@test.lindsaar.net"]);
+    expect((email.date() as DateTime).equals(time)).toBe(true);
+  });
+
   it("mail() renders the template using the method being processed", async () => {
     const email = await BaseMailer.welcome().message();
     expect(email.body().encoded()).toBe("Welcome");
+  });
+
+  it("mail() doesn't set the mailer as a controller in the execution context", async () => {
+    ExecutionContext.clear();
+    expect(ExecutionContext.toH().controller).toBeUndefined();
+    (
+      await BaseMailer.welcome({ from: "someone@example.com", to: "another@example.org" }).message()
+    ).to();
+    expect(ExecutionContext.toH().controller).toBeUndefined();
   });
 
   it("can pass in :body to the mail method hash", async () => {
@@ -186,6 +224,22 @@ describe("BaseTest", () => {
     const email = await BaseMailer.attachmentWithContent().message();
     expect(email.attachments().get(0)!.filename()).toBe("invoice.pdf");
     expect(email.attachments().get(0)!.mimeType()).toBe("application/pdf");
+  });
+
+  it("attachment with hash", async () => {
+    const email = await BaseMailer.attachmentWithHash().message();
+    expect(email.attachments().length).toBe(1);
+    expect(email.attachments().get(0)!.filename()).toBe("invoice.jpg");
+    const expected = new Uint8Array([0xca, 0x8b, 0xac, 0x9a, 0x29, 0x62]);
+    expect(email.attachments().get("invoice.jpg")!.decoded()).toEqual(expected);
+  });
+
+  it("attachment with hash using default mail encoding", async () => {
+    const email = await BaseMailer.attachmentWithHashDefaultEncoding().message();
+    expect(email.attachments().length).toBe(1);
+    expect(email.attachments().get(0)!.filename()).toBe("invoice.jpg");
+    const expected = new Uint8Array([0xca, 0x8b, 0xac, 0x9a, 0x29, 0x62]);
+    expect(email.attachments().get("invoice.jpg")!.decoded()).toEqual(expected);
   });
 
   it("sets mime type to multipart/mixed when attachment is included", async () => {
@@ -331,6 +385,30 @@ describe("BaseTest", () => {
     expect(e.message).toMatch(/Can't add attachments after `mail` was called./);
   });
 
+  it("can embed an inline attachment", async () => {
+    const email = await BaseMailer.inlineAttachment().message();
+    email.encoded();
+    expect(email.parts.length).toBe(2);
+    expect(email.mimeType()).toBe("multipart/related");
+    expect(email.parts[0].mimeType()).toBe("multipart/alternative");
+    expect(email.parts[0].parts[0].mimeType()).toBe("text/plain");
+    expect(email.parts[0].parts[1].mimeType()).toBe("text/html");
+    expect(email.parts[1].filename()).toBe("logo.png");
+  });
+
+  it("can embed an inline attachment and other attachments", async () => {
+    const email = await BaseMailer.inlineAndOtherAttachments().message();
+    email.encoded();
+    expect(email.parts.length).toBe(2);
+    expect(email.mimeType()).toBe("multipart/mixed");
+    expect(email.parts[0].mimeType()).toBe("multipart/related");
+    expect(email.parts[0].parts[0].mimeType()).toBe("multipart/alternative");
+    expect(email.parts[0].parts[0].parts[0].mimeType()).toBe("text/plain");
+    expect(email.parts[0].parts[0].parts[1].mimeType()).toBe("text/html");
+    expect(email.parts[0].parts[1].filename()).toBe("logo.png");
+    expect(email.parts[1].filename()).toBe("certificate.pdf");
+  });
+
   it("accessing inline attachments after mail was called works", async () => {
     class LateInlineAttachmentAccessorMailer extends Base {
       async welcome() {
@@ -341,6 +419,28 @@ describe("BaseTest", () => {
 
     await assertNothingRaised(() =>
       (LateInlineAttachmentAccessorMailer as Mailer<typeof LateInlineAttachmentAccessorMailer>)
+        .welcome()
+        .message(),
+    );
+  });
+
+  it("accessing attachments works after mail was called", async () => {
+    class LateAttachmentAccessorMailer extends Base {
+      async welcome() {
+        await this.attachments().set("invoice.pdf", "This is test File content");
+        await this.mail({ body: "yay", from: "welcome@example.com", to: "to@example.com" });
+
+        if (
+          JSON.stringify(this.attachments().map((a) => a.filename())) !==
+          JSON.stringify(["invoice.pdf"])
+        ) {
+          throw new Error("Should allow access to attachments");
+        }
+      }
+    }
+
+    await assertNothingRaised(() =>
+      (LateAttachmentAccessorMailer as Mailer<typeof LateAttachmentAccessorMailer>)
         .welcome()
         .message(),
     );
@@ -485,8 +585,25 @@ describe("BaseTest", () => {
     expect(error.message).toBe("You have to supply at least one format");
   });
 
-  // BLOCKED: mailer-collector-renders-each-format-before-the-next-is-set
-  it.skip("explicit multipart with one template has the expected format", async () => {
+  it("explicit multipart with format(Hash)", async () => {
+    const email = await BaseMailer.explicitMultipartWithOptions(true).message();
+    email.readyToSendBang();
+    expect(email.parts.length).toBe(2);
+    expect(email.mimeType()).toBe("multipart/alternative");
+    expect(email.parts[0].mimeType()).toBe("text/plain");
+    expect(email.parts[0].contentTransferEncoding()).toBe("base64");
+    expect(email.parts[1].mimeType()).toBe("text/html");
+    expect(email.parts[1].contentTransferEncoding()).toBe("7bit");
+  });
+
+  it("explicit multipart with one part is rendered as body and options are merged", async () => {
+    const email = await BaseMailer.explicitMultipartWithOptions().message();
+    expect(email.parts.length).toBe(0);
+    expect(email.mimeType()).toBe("text/plain");
+    expect(email.contentTransferEncoding()).toBe("base64");
+  });
+
+  it("explicit multipart with one template has the expected format", async () => {
     const email = await BaseMailer.explicitMultipartWithOneTemplate().message();
     expect(email.parts.length).toBe(2);
     expect(email.mimeType()).toBe("multipart/alternative");
@@ -520,6 +637,13 @@ describe("BaseTest", () => {
     const email = await BaseMailer.welcome().message();
     expect(BaseMailer.deliveries.length).toBe(0);
     expect(email.subject()).toBe("The first email on new API!");
+  });
+
+  it("calling deliver on the action should deliver the mail object", async () => {
+    await assertCalled(BaseMailer, "deliverMail", null, {}, async () => {
+      const mail = (await BaseMailer.welcome().deliverNow()) as Message;
+      expect(mail.subject()).toBe("The first email on new API!");
+    });
   });
 
   it("calling deliver on the action should increment the deliveries collection if using the test mailer", async () => {
@@ -730,6 +854,132 @@ describe("BaseTest", () => {
     }
   });
 
+  it("being able to put proc's into the defaults hash and they get evaluated on mail sending", async () => {
+    const mail1 = (await ProcMailer.welcome().message()).get("X-Proc-Method");
+    const yesterday = days(1).ago(Time.now());
+    await stub(Time, "now", yesterday, [], async () => {
+      const mail2 = (await ProcMailer.welcome().message()).get("X-Proc-Method");
+      expect(Number(String(mail1)) > Number(String(mail2))).toBeTruthy();
+    });
+  });
+
+  it("default values which have to_proc (e.g. symbols) should not be considered procs", async () => {
+    expect(
+      String((await ProcMailer.welcome().message()).get("x-has-to-proc")) === "symbol",
+    ).toBeTruthy();
+  });
+
+  it("proc default values can have arity of 1 where arg is a mailer instance", async () => {
+    expect(String((await ProcMailer.welcome().message()).get("X-Lambda-Arity-1-arg"))).toBe(
+      "complex_value",
+    );
+    expect(String((await ProcMailer.welcome().message()).get("X-Lambda-Arity-1-self"))).toBe(
+      "complex_value",
+    );
+  });
+
+  it("proc default values with fixed arity of 0 can be called", async () => {
+    expect(String((await ProcMailer.welcome().message()).get("X-Lambda-Arity-0"))).toBe("0");
+  });
+
+  it("we can call other defined methods on the class as needed", async () => {
+    const mail = await ProcMailer.welcome().message();
+    expect(mail.subject()).toBe("Thanks for signing up this afternoon");
+  });
+
+  it("proc default values are not evaluated when overridden", async () => {
+    const flunk = () => {
+      throw new Error("Epic Fail!");
+    };
+    await withDefault(BaseMailer, { from: () => flunk(), to: () => flunk() }, async () => {
+      const email = await BaseMailer.welcome({
+        from: "overridden-from@example.com",
+        to: "overridden-to@example.com",
+      }).message();
+      expect(Array.from(email.from() as string[])).toEqual(["overridden-from@example.com"]);
+      expect(Array.from(email.to() as string[])).toEqual(["overridden-to@example.com"]);
+    });
+  });
+
+  it("modifying the mail message with a before_action", async () => {
+    class BeforeActionMailer extends Base {
+      static {
+        (this as unknown as ActionCallbacks).beforeAction(":addSpecialHeaderBang");
+        this.prependViewPath(
+          new ActionView.FixtureResolver({ "before-action-mailer/welcome.html.tse": "" }),
+        );
+      }
+
+      welcome() {
+        return this.mail();
+      }
+
+      /** @internal */
+      private addSpecialHeaderBang() {
+        this.headers({ "X-Special-Header": "Wow, so special" });
+      }
+    }
+
+    const mail = await (BeforeActionMailer as Mailer<typeof BeforeActionMailer>)
+      .welcome()
+      .message();
+    expect(String(mail.get("X-Special-Header"))).toBe("Wow, so special");
+  });
+
+  it("modifying the mail message with an after_action", async () => {
+    class AfterActionMailer extends Base {
+      static {
+        (this as unknown as ActionCallbacks).afterAction(":addSpecialHeaderBang");
+        this.prependViewPath(
+          new ActionView.FixtureResolver({ "after-action-mailer/welcome.html.tse": "" }),
+        );
+      }
+
+      welcome() {
+        return this.mail();
+      }
+
+      /** @internal */
+      private addSpecialHeaderBang() {
+        this.headers({ "X-Special-Header": "Testing" });
+      }
+    }
+
+    const mail = await (AfterActionMailer as Mailer<typeof AfterActionMailer>).welcome().message();
+    expect(String(mail.get("X-Special-Header"))).toBe("Testing");
+  });
+
+  it("adding an inline attachment using a before_action", async () => {
+    class DefaultInlineAttachmentMailer extends Base {
+      static {
+        (this as unknown as ActionCallbacks).beforeAction(":addInlineAttachmentBang");
+        this.prependViewPath(
+          new ActionView.FixtureResolver({
+            "default-inline-attachment-mailer/welcome.html.tse": "",
+          }),
+        );
+      }
+
+      welcome() {
+        return this.mail();
+      }
+
+      /** @internal */
+      private async addInlineAttachmentBang() {
+        await this.attachments().inline().set("footer.jpg", "hey there");
+      }
+    }
+
+    const mail = await (
+      DefaultInlineAttachmentMailer as Mailer<typeof DefaultInlineAttachmentMailer>
+    )
+      .welcome()
+      .message();
+    expect(String(mail.attachments().inline()[0].get("Content-Type"))).toBe(
+      "image/jpeg; filename=footer.jpg",
+    );
+  });
+
   it("action methods should be refreshed after defining new method", () => {
     class FooMailer extends Base {
       static {
@@ -745,6 +995,140 @@ describe("BaseTest", () => {
   it("email_address_with_name escapes", () => {
     const address = BaseMailer.emailAddressWithName("test@example.org", 'I "<3" email');
     expect(address).toBe('"I \\"<3\\" email" <test@example.org>');
+  });
+
+  it("mailer can be anonymous", async () => {
+    const mailer = (() =>
+      class extends Base {
+        static {
+          this.prependViewPath(
+            new ActionView.FixtureResolver({ "anonymous/welcome.tse": "Anonymous mailer body\n" }),
+          );
+        }
+
+        welcome() {
+          return this.mail();
+        }
+      })() as unknown as Mailer<typeof Base>;
+
+    expect(mailer.mailerName()).toBe("anonymous");
+
+    expect((await mailer.welcome().message()).subject()).toBe("Welcome");
+    expect(((await mailer.welcome().message()).body().encoded() as string).trim()).toBe(
+      "Anonymous mailer body",
+    );
+  });
+
+  it("default_from can be set", async () => {
+    class DefaultFromMailer extends Base {
+      static {
+        this.default({ to: "system@test.lindsaar.net" });
+        this.defaultOptions = { from: "robert.pankowecki@gmail.com" };
+      }
+
+      welcome() {
+        return this.mail({ subject: "subject", body: "hello world" });
+      }
+    }
+
+    const mail = await (DefaultFromMailer as Mailer<typeof DefaultFromMailer>).welcome().message();
+    expect(Array.from(mail.from() as string[])).toEqual(["robert.pankowecki@gmail.com"]);
+  });
+
+  it("mail() without arguments serves as getter for the current mail message", async () => {
+    class MailerWithCallback extends Base {
+      static {
+        (this as unknown as ActionCallbacks).afterAction(":aCallback");
+      }
+
+      welcome() {
+        this.headers({ "X-Special-Header": "special indeed!" });
+        return this.mail({ subject: "subject", body: "hello world", to: ["joe@example.com"] });
+      }
+
+      async aCallback() {
+        ((await this.mail()).to() as AddressContainer).append("jane@example.com");
+      }
+    }
+
+    const mail = await (MailerWithCallback as Mailer<typeof MailerWithCallback>)
+      .welcome()
+      .message();
+    expect(mail.subject()).toBe("subject");
+    expect(Array.from(mail.to() as string[])).toEqual(["joe@example.com", "jane@example.com"]);
+    expect((mail.body().encoded() as string).trim()).toBe("hello world");
+    expect(String(mail.get("X-Special-Header"))).toBe("special indeed!");
+  });
+
+  it("notification for process", async () => {
+    const events: Event[] = [];
+    Notifications.subscribe("process.action_mailer", (event: Event) => events.push(event));
+    try {
+      await BaseMailer.welcome({ body: "Hello there" }).deliverNow();
+
+      expect(events.length).toBe(1);
+      expect(events[0].name).toBe("process.action_mailer");
+      expect(events[0].payload.mailer).toBe("BaseMailer");
+      expect(events[0].payload.action).toBe("welcome");
+      expect(events[0].payload.args).toEqual([{ body: "Hello there" }]);
+    } finally {
+      Notifications.unsubscribe("process.action_mailer");
+    }
+  });
+
+  it("notification for deliver", async () => {
+    const events: Event[] = [];
+    Notifications.subscribe("deliver.action_mailer", (event: Event) => events.push(event));
+    try {
+      await BaseMailer.welcome({ body: "Hello there" }).deliverNow();
+
+      expect(events.length).toBe(1);
+      expect(events[0].name).toBe("deliver.action_mailer");
+      expect(events[0].payload.messageId).not.toBeNull();
+    } finally {
+      Notifications.unsubscribe("deliver.action_mailer");
+    }
+  });
+});
+
+describe("PreviewTest", () => {
+  class A extends Preview {}
+
+  const B = {
+    A: class A extends Preview {},
+    C: class C extends Preview {},
+  };
+
+  class C extends Preview {}
+
+  const PreviewTestNamespace = {};
+  constSet(TopLevel, "PreviewTest", PreviewTestNamespace);
+  constSet(PreviewTestNamespace, "A", A);
+  constSet(PreviewTestNamespace, "B", B);
+  constSet(B, "A", B.A);
+  constSet(B, "C", B.C);
+  constSet(PreviewTestNamespace, "C", C);
+
+  it("all() returns mailers in alphabetical order", async () => {
+    await stub(Preview, "descendants", [C, A, B.C, B.A], [], async () => {
+      const mailers = await Preview.all();
+      expect(mailers).toEqual([A, B.A, B.C, C]);
+    });
+  });
+});
+
+describe("BasePreviewTest", () => {
+  class BaseMailerPreview extends Preview {
+    welcome() {
+      return BaseMailer.welcome(this.params);
+    }
+  }
+
+  it("has access to params", async () => {
+    const params = { name: "World" };
+
+    const message = await BaseMailerPreview.call("welcome", params);
+    expect((message.get("name") as Field).decoded()).toBe("World");
   });
 });
 
@@ -789,14 +1173,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor(MyInterceptor);
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -805,14 +1189,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor("BasePreviewInterceptorsTest::MyInterceptor");
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -821,14 +1205,14 @@ describe("BasePreviewInterceptorsTest", () => {
     const mail = BaseMailer.welcome();
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
-      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, () => {
-        BaseMailerPreview.call("welcome");
+      await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
+        await BaseMailerPreview.call("welcome");
       });
     });
 
     Base.unregisterPreviewInterceptor("base_preview_interceptors_test/my_interceptor");
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 
@@ -841,8 +1225,8 @@ describe("BasePreviewInterceptorsTest", () => {
     await mail.message();
     await stub(BaseMailerPreview.prototype, "welcome", mail, [], async () => {
       await assertCalledWith(MyInterceptor, "previewingEmail", [mail], {}, async () => {
-        await assertCalledWith(MySecondInterceptor, "previewingEmail", [mail], {}, () => {
-          BaseMailerPreview.call("welcome");
+        await assertCalledWith(MySecondInterceptor, "previewingEmail", [mail], {}, async () => {
+          await BaseMailerPreview.call("welcome");
         });
       });
     });
@@ -851,11 +1235,11 @@ describe("BasePreviewInterceptorsTest", () => {
       "BasePreviewInterceptorsTest::MyInterceptor",
       MySecondInterceptor,
     );
-    await assertNotCalled(MyInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MyInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
-    await assertNotCalled(MySecondInterceptor, "previewingEmail", null, () => {
-      BaseMailerPreview.call("welcome");
+    await assertNotCalled(MySecondInterceptor, "previewingEmail", null, async () => {
+      await BaseMailerPreview.call("welcome");
     });
   });
 });

@@ -34,6 +34,7 @@ import {
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { Collector } from "./collector.js";
+import { MailHelper } from "./mail-helper.js";
 import {
   DeliveryMethods,
   type ClassMethods as DeliveryMethodsClassMethods,
@@ -61,6 +62,7 @@ type Interceptor = Parameters<typeof Mail.registerInterceptor>[0];
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the `interface Base` below.
 export class Base extends AbstractController.Base {
   declare static NullMail: typeof NullMail;
+  declare static helper: (...args: unknown[]) => void;
   declare static prependViewPath: OmitThisParameter<
     typeof ActionView.ViewPaths.ClassMethods.prependViewPath
   >;
@@ -430,7 +432,6 @@ export class Base extends AbstractController.Base {
     ) as string;
     const collector = new Collector(this.lookupContext, () => this.render(templatesName));
     await block(collector);
-    for (const response of collector.responses) response.body = await response.body;
     return collector.responses;
   }
 
@@ -593,6 +594,9 @@ include(Base, AbstractController.Callbacks);
 include(Base, AbstractController.Caching);
 
 include(Base, ActionView.Layouts);
+
+Base.helper(MailHelper);
+
 classAttribute.call(Base, "defaultParams", {
   default: Object.freeze({
     mimeVersion: "1.0",
