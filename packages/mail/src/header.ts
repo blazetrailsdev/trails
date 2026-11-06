@@ -17,6 +17,8 @@ import { Field } from "./field.js";
 import { FieldList } from "./field-list.js";
 import { Utilities } from "./utilities.js";
 
+const LSTRIP_BYTES = [0, 9, 10, 11, 12, 13, 32];
+
 type ContentTypeParameters = Hash<string, string | Encoding>;
 type HasParameters = { parameters(): ContentTypeParameters | null };
 
@@ -33,19 +35,29 @@ export class Header {
   }
 
   /** @internal */
-  private _rawSource: string;
+  private _rawSource: string | Uint8Array;
   /** @internal */
   private _charset: string | Encoding | null;
   /** @internal */
   private _fields: FieldList | null = null;
 
-  constructor(headerText: string | null = null, charset: string | Encoding | null = null) {
+  constructor(
+    headerText: string | Uint8Array | null = null,
+    charset: string | Encoding | null = null,
+  ) {
     this._charset = charset;
-    this._rawSource = Utilities.toCrlf(headerText as string).replace(/^[\0\t\n\v\f\r ]+/, "");
+    const crlf = Utilities.toCrlf(headerText as string | Uint8Array);
+    if (crlf instanceof Uint8Array) {
+      let start = 0;
+      while (start < crlf.length && LSTRIP_BYTES.includes(crlf[start])) start++;
+      this._rawSource = crlf.subarray(start);
+    } else {
+      this._rawSource = crlf.replace(/^[\0\t\n\v\f\r ]+/, "");
+    }
     if (headerText != null) this.splitHeader();
   }
 
-  get rawSource(): string {
+  get rawSource(): string | Uint8Array {
     return this._rawSource;
   }
 
@@ -60,7 +72,7 @@ export class Header {
     return (this._fields ??= new FieldList());
   }
 
-  set fields(unfoldedFields: string[]) {
+  set fields(unfoldedFields: (string | Uint8Array)[]) {
     this._fields = new FieldList();
 
     if (unfoldedFields.length > (this.constructor as typeof Header).maximumAmount) {
@@ -70,8 +82,8 @@ export class Header {
       unfoldedFields = unfoldedFields.slice(0, (this.constructor as typeof Header).maximumAmount);
     }
 
-    for (let field of unfoldedFields as (string | Field | null)[]) {
-      field = Field.parse(field as string, this.charset);
+    for (let field of unfoldedFields as (string | Uint8Array | Field | null)[]) {
+      field = Field.parse(field as string | Uint8Array, this.charset);
       if (field != null) {
         this._fields.addField(field);
       }
@@ -173,7 +185,15 @@ export class Header {
 
   /** @internal */
   private splitHeader(): void {
-    this.fields = stringSplit(this._rawSource, Constants.HEADER_SPLIT);
+    const raw = this._rawSource;
+    if (raw instanceof Uint8Array) {
+      const scan = Array.from(raw, (b) => String.fromCharCode(b)).join("");
+      this.fields = stringSplit(scan, Constants.HEADER_SPLIT).map((f) =>
+        Uint8Array.from(f, (c) => c.charCodeAt(0)),
+      );
+    } else {
+      this.fields = stringSplit(raw, Constants.HEADER_SPLIT);
+    }
   }
 
   /** @internal */

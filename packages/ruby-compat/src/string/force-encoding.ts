@@ -78,12 +78,18 @@ export function forceEncoding(
  *
  * @noRailsEquivalent PERMANENT
  */
-export function isValidEncoding(string: string, encoding: string | Encoding | null): boolean {
+export function isValidEncoding(
+  string: string | Uint8Array,
+  encoding: string | Encoding | null,
+): boolean {
   const enc = encoding == null ? null : Encoding.find(encoding);
   if (enc === null || enc.decoderLabel === null) return true;
 
-  const bytes = new Uint8Array(string.length);
-  for (let i = 0; i < string.length; i++) bytes[i] = string.charCodeAt(i) & 0xff;
+  let bytes = string as Uint8Array;
+  if (typeof string === "string") {
+    bytes = new Uint8Array(string.length);
+    for (let i = 0; i < string.length; i++) bytes[i] = string.charCodeAt(i) & 0xff;
+  }
   try {
     new TextDecoder(enc.decoderLabel, { fatal: true, ignoreBOM: true }).decode(bytes);
     return true;

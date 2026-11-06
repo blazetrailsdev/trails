@@ -148,7 +148,10 @@ export class Field implements Comparable {
 
   static SyntaxError = class SyntaxError extends Field.FieldError {};
 
-  static parse(field: string, charset: string | Encoding | null = "utf-8"): Field | null {
+  static parse(
+    field: string | Uint8Array,
+    charset: string | Encoding | null = "utf-8",
+  ): Field | null {
     const split = Field.split(field);
     const [name, value] = Array.isArray(split) ? split : [split, null];
     if (name != null && value != null) {
@@ -157,13 +160,18 @@ export class Field implements Comparable {
     return null;
   }
 
-  static split(rawField: string): [string, string] | string | null {
+  static split(
+    rawField: string | Uint8Array,
+  ): [string, string | Uint8Array] | string | Uint8Array | null {
+    const binary = rawField instanceof Uint8Array;
+    const scan = binary ? Array.from(rawField, (b) => String.fromCharCode(b)).join("") : rawField;
+    const bytes = (str: string) => (binary ? Uint8Array.from(str, (c) => c.charCodeAt(0)) : str);
     try {
-      if (rawField.includes(Constants.COLON)) {
-        const [first, value] = stringSplit(rawField, Constants.COLON, 2);
+      if (scan.includes(Constants.COLON)) {
+        const [first, value] = stringSplit(scan, Constants.COLON, 2);
         const name = rstrip(first);
         if (new RegExp(`^${Constants.FIELD_NAME.source}$`).test(name)) {
-          return [rstrip(name), strip(value)];
+          return [rstrip(name), bytes(strip(value))];
         } else {
           warn(
             `WARNING: Ignoring unparsable header ${rbInspect(rawField)}: invalid header name syntax: ${rbInspect(name)}`,
@@ -171,7 +179,7 @@ export class Field implements Comparable {
           return null;
         }
       } else {
-        return strip(rawField);
+        return bytes(strip(scan));
       }
     } catch (error) {
       const e = error as Error;

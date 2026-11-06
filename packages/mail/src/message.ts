@@ -13,7 +13,19 @@ import {
   Exception,
   StandardError,
   rtest,
+  constGet,
+  eachPair,
+  Hash,
+  hashAref,
+  hashDelete,
+  NameError,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbDeclareIvar,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "./body.js";
 import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
@@ -32,6 +44,7 @@ import { IndifferentHash } from "./indifferent-hash.js";
 import { Mail } from "./mail.js";
 import type { PartsList } from "./parts-list.js";
 import { Utilities } from "./utilities.js";
+import { YAML as MailYAML } from "./yaml.js";
 
 type MessageBlock = ((this: Message, message: Message) => unknown) | undefined;
 
@@ -246,8 +259,8 @@ export class Message {
     return this._header!;
   }
 
-  headers(hash: Record<string, unknown> = {}): void {
-    for (const [k, v] of Object.entries(hash)) this.header().set(k, v);
+  headers(hash: Record<string, unknown> | Hash<string, unknown> = {}): void {
+    eachPair(hash, (k, v) => this.header().set(k, v));
   }
 
   errors(): unknown[] {
@@ -951,6 +964,50 @@ export class Message {
     return this;
   }
 
+  toYaml(opts: Record<string, unknown> = {}): string {
+    const hash: Record<string, unknown> = {};
+    hash["headers"] = {};
+    this.header().fields.forEach((field) => {
+      (hash["headers"] as Record<string, unknown>)[field.name] = field.value;
+    });
+    if (this.deliveryHandler != null && this.deliveryHandler !== false) {
+      hash["delivery_handler"] = rbObjAsString(this.deliveryHandler);
+    }
+    hash["transport_encoding"] = rbObjAsString(this.transportEncoding());
+    const specialVariables = ["@header", "@delivery_handler", "@transport_encoding"];
+    if (this.isMultipart()) {
+      hash["multipart_body"] = [];
+      this.body().parts.map((part) => (hash["multipart_body"] as string[]).push(part.toYaml()));
+      specialVariables.push("@body", "@text_part", "@html_part");
+    }
+    for (const v of rbObjInstanceVariables(this).filter((v) => !specialVariables.includes(v))) {
+      hash[v] = rbObjIvarGet(this, v);
+    }
+    return toYaml(hash, opts);
+  }
+
+  static fromYaml(str: string): Message {
+    const hash = MailYAML.load(str) as Hash<string, unknown>;
+    const m = new this({ headers: hashAref(hash, "headers") });
+    hashDelete(hash, "headers");
+    eachPair(hash, (k, v) => {
+      if (k === "delivery_handler") {
+        try {
+          if (!Utilities.isBlank(v)) m.deliveryHandler = constGet(TopLevel, v as string);
+        } catch (e) {
+          if (!(e instanceof NameError)) throw e;
+        }
+      } else if (k === "transport_encoding") {
+        m.transportEncoding(v);
+      } else if (k === "multipart_body") {
+        (v as string[]).map((part) => m.addPart(Mail.Part.fromYaml(part) as Part));
+      } else if (/^@/.test(k)) {
+        rbObjIvarSet(m, k, v);
+      }
+    });
+    return m;
+  }
+
   static fromHash(hash: Record<string, unknown>): Message {
     return new Message(hash);
   }
@@ -1257,3 +1314,21 @@ export class Message {
   }
 }
 Mail.Message = Message;
+rbDeclareIvar(Message, "@body", "_body");
+rbDeclareIvar(Message, "@body_raw", "_bodyRaw");
+rbDeclareIvar(Message, "@separate_parts", "_separateParts");
+rbDeclareIvar(Message, "@text_part", "_textPart");
+rbDeclareIvar(Message, "@html_part", "_htmlPart");
+rbDeclareIvar(Message, "@header", "_header");
+rbDeclareIvar(Message, "@charset", "_charset");
+rbDeclareIvar(Message, "@defaulted_charset", "_defaultedCharset");
+rbDeclareIvar(Message, "@smtp_envelope_from", "_smtpEnvelopeFrom");
+rbDeclareIvar(Message, "@smtp_envelope_to", "_smtpEnvelopeTo");
+rbDeclareIvar(Message, "@transport_encoding", "_transportEncoding");
+rbDeclareIvar(Message, "@mark_for_delete", "_markForDelete");
+rbDeclareIvar(Message, "@raw_source", "_rawSource");
+rbDeclareIvar(Message, "@raw_envelope", "_rawEnvelope");
+rbDeclareIvar(Message, "@envelope", "_envelope");
+rbDeclareIvar(Message, "@delivery_status_part", "_deliveryStatusPart");
+rbDeclareIvar(Message, "@attachment", "_attachment");
+rbDeclareIvar(Message, "@delivery_method", "_deliveryMethod");

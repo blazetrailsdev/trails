@@ -4,6 +4,7 @@ import {
   isAsciiOnly,
   matchOperator,
   rbObjAsString,
+  rbDeclareIvar,
   rbObjIvarSet,
   rbObjRespondTo,
   RuntimeError,
@@ -17,6 +18,7 @@ import { TransferEncoding } from "./encodings/transfer-encoding.js";
 import { Mail } from "./mail.js";
 import { PartsList, type PartsListPart } from "./parts-list.js";
 import { Utilities } from "./utilities.js";
+import type { YAML } from "@blazetrails/ruby-compat/yaml";
 
 export class Body {
   /** @internal */
@@ -55,12 +57,9 @@ export class Body {
     this.setCharset();
   }
 
-  initWith(coder: { map: Record<string, unknown>; get(key: string): unknown }): void {
-    for (const [k, v] of Object.entries(coder.map)) {
-      const name = k.replace(/_(\w)/g, (_m, c: string) => c.toUpperCase());
-      rbObjIvarSet(this, `_${name}` in this ? `@_${name}` : `@${name}`, v);
-    }
-    this._parts = new PartsList(coder.get("parts"));
+  initWith(coder: YAML.Coder): void {
+    for (const [k, v] of Object.entries(coder)) rbObjIvarSet(this, `@${k}`, v);
+    this._parts = new PartsList(coder["parts"] as PartsListPart[]);
   }
 
   equals(other: unknown): boolean {
@@ -243,3 +242,8 @@ export class Body {
     this.charset = this.isAsciiOnly() ? "US-ASCII" : null;
   }
 }
+rbDeclareIvar(Body, "@part_sort_order", "_partSortOrder");
+rbDeclareIvar(Body, "@parts", "_parts");
+rbDeclareIvar(Body, "@raw_source", "_rawSource");
+rbDeclareIvar(Body, "@encoding", "_encoding");
+rbDeclareIvar(Body, "@ascii_only", "_asciiOnly");

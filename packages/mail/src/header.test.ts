@@ -1,8 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
-import { ArgumentError, rbObjDup, stderr, toA } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ArgumentError, rbInspect, rbObjDup, stderr, toA } from "@blazetrails/ruby-compat";
 import { Field, Header, Mail, Utilities } from "./index.js";
 
 const one = (field: unknown) => field as Field;
+
+function ascii(from = 33, to = 126): string[] {
+  const chars = Array.from({ length: to - from + 1 }, (_, i) => String.fromCharCode(from + i));
+  const boring = new Set("bcdefghijklnopqrstuvwxyBCDEFGHIJKLNOPQRSTUVWXY1234678");
+  return chars.filter((c) => !boring.has(c));
+}
 
 describe("Mail::Header", () => {
   describe("instance methods", () => {
@@ -382,6 +388,293 @@ describe("Mail::Header", () => {
         write.mockRestore();
         Header.maximumAmount = old;
       }
+    });
+  });
+
+  describe("initialization", () => {
+    it("should instantiate empty", () => {
+      expect(() => new Header()).not.toThrow();
+    });
+  });
+
+  describe("instance methods", () => {
+    it("should save away the raw source of the header that it is passed", () => {
+      expect(new Header("To: Mikel\r\nFrom: bob\r\n").rawSource).toEqual(
+        "To: Mikel\r\nFrom: bob\r\n",
+      );
+    });
+
+    it("should say if it has a message_id field defined", () => {
+      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasMessageId()).toBe(false);
+    });
+
+    it("should say if it has a message_id field defined", () => {
+      expect(new Header("To: Mikel\r\nFrom: bob\r\nMessage-ID: 1234").hasMessageId()).toBe(true);
+    });
+
+    it("should say if it has a content_id field defined", () => {
+      expect(new Header("To: Mikel\r\nFrom: bob\r\n").hasContentId()).toBe(false);
+    });
+
+    it("should say if it has a content_id field defined", () => {
+      const header = new Header("To: Mikel\r\nFrom: bob\r\nContent-ID: <1234@me.com>");
+      expect(header.hasContentId()).toBe(true);
+    });
+
+    it("should know its own charset", () => {
+      const header = new Header("To: Mikel\r\nFrom: bob\r\nContent-ID: <1234@me.com>");
+      expect(header.charset).toBeNull();
+    });
+
+    it("should know its own charset if set", () => {
+      const header = new Header();
+      header.set("content-type", "text/plain; charset=utf-8");
+      expect(header.charset).toEqual("utf-8");
+    });
+
+    it("should not unset previously set charset if content-type is set without charset", () => {
+      const header = new Header(null, "utf-8");
+      header.set("content-type", "text/plain");
+      expect(header.charset).toEqual("utf-8");
+    });
+
+    it("shouldn't die when queried for a charset and the content-type header is invalid", () => {
+      const header = new Header();
+      header.set("Content-Type", 'invalid/invalid; charset="iso-8859-1"');
+      expect(() => header.charset).not.toThrow();
+    });
+  });
+
+  describe("creating fields", () => {
+    it("should recognise a content-disposition field", () => {
+      const header = new Header();
+      header.set("content-disposition", "attachment; filename=File");
+      expect(one(header.get("content-disposition")).field.constructor).toBe(
+        Mail.ContentDispositionField,
+      );
+    });
+
+    it("should recognise an inline content-disposition field", () => {
+      const header = new Header();
+      header.set("content-disposition", "inline");
+      expect(one(header.get("content-disposition")).field.constructor).toBe(
+        Mail.ContentDispositionField,
+      );
+    });
+
+    it("should recognise a content-id field", () => {
+      const header = new Header();
+      header.set("content-id", "<1234@test.lindsaar.net>");
+      expect(one(header.get("content-id")).field.constructor).toBe(Mail.ContentIdField);
+    });
+
+    it("should recognise a content-type field", () => {
+      const header = new Header();
+      header.set("content-type", "text/plain");
+      expect(one(header.get("content-type")).field.constructor).toBe(Mail.ContentTypeField);
+    });
+
+    it("should recognise a received field", () => {
+      const header = new Header();
+      header.set(
+        "received",
+        "from xxx.xxxx.xxx by xxx.xxxx.xxx with ESMTP id C1B953B4CB6 for <xxxxx@Exxx.xxxx.xxx>; Tue, 10 May 2005 15:27:05 -0500",
+      );
+      expect(one(header.get("received")).field.constructor).toBe(Mail.ReceivedField);
+    });
+  });
+
+  describe("parsing", () => {
+    it("should not split a wrapped header in two", () => {
+      const header = new Header(
+        "To: mikel lindsaar\r\n <mikel@lindsaar>\r\nFrom: bob\r\nSubject: This is\r\n a long\r\n  \t \t \t    badly formatted             \r\n       \t\t  \t       field",
+      );
+      expect(header.fields.length).toEqual(3);
+    });
+
+    it("should accept any valid header field name", () => {
+      const testName = ascii()
+        .filter((c) => c !== ":")
+        .join("");
+      expect(() => new Header(`${testName}: This is a crazy name`)).not.toThrow();
+    });
+
+    it("should accept any valid header field value", () => {
+      const testValue = ascii().filter((c) => c !== ":");
+      testValue.push(" ");
+      testValue.push("\\r\\n");
+      expect(() => new Header(`header: ${rbInspect(testValue)}`)).not.toThrow();
+    });
+
+    it("should split each field into an name and value - even if whitespace is missing", () => {
+      const header = new Header("To: Mikel\r\nFrom:bob\r\n");
+      expect(header.fields[0].name).toEqual("From");
+      expect(header.fields[0].value).toEqual("bob");
+      expect(header.fields[1].name).toEqual("To");
+      expect(header.fields[1].value).toEqual("Mikel");
+    });
+
+    it("should allow you to reference each field and value by literal string name", () => {
+      const header = new Header("To: Mikel\r\nFrom: bob\r\n");
+      expect(one(header.get("To")).value).toEqual("Mikel");
+      expect(one(header.get("From")).value).toEqual("bob");
+    });
+
+    it("should return an array of fields if there is more than one match", () => {
+      const header = new Header();
+      header.fields = ["From: mikel@me.com", "X-Mail-SPAM: 15", "X-Mail-SPAM: 23"];
+      expect((header.get("X-Mail-SPAM") as Field[]).map((x) => x.value)).toEqual(["15", "23"]);
+    });
+
+    it("should allow you to pass in an array of raw fields", () => {
+      const header = new Header();
+      header.fields = ["From: mikel@test.lindsaar.net", "To: bob@you.com"];
+      expect(one(header.get("To")).value).toEqual("bob@you.com");
+      expect(one(header.get("From")).value).toEqual("mikel@test.lindsaar.net");
+    });
+
+    it("should return nil if asked for the value of a non existent field", () => {
+      expect(new Header().get("Bobs-Field")).toBeNull();
+    });
+  });
+
+  describe("folding and unfolding", () => {
+    const received = (nl: string) =>
+      [
+        "Received: from [127.0.220.158] (helo=fg-out-1718.google.com)",
+        "\tby smtp.totallyrandom.com with esmtp (Exim 4.68)",
+        "\t(envelope-from <stuff+caf_=support=aaa.somewhere.com@gmail.com>)",
+        "\tid 1K4JeQ-0005Nd-Ij",
+        "\tfor support@aaa.somewhere.com; Thu, 05 Jun 2008 10:53:29 -0700",
+        "",
+      ].join(nl);
+    const unfolded =
+      "from [127.0.220.158] (helo=fg-out-1718.google.com)\tby smtp.totallyrandom.com with esmtp (Exim 4.68)\t(envelope-from <stuff+caf_=support=aaa.somewhere.com@gmail.com>)\tid 1K4JeQ-0005Nd-Ij\tfor support@aaa.somewhere.com; Thu, 05 Jun 2008 10:53:29 -0700";
+
+    it("should handle a crazy long folded header", () => {
+      expect(one(new Header(received("\n")).get("Received")).value).toEqual(unfolded);
+    });
+
+    it("should convert all lonesome LFs to CRLF", () => {
+      expect(one(new Header(received("\n")).get("Received")).value).toEqual(unfolded);
+    });
+
+    it("should convert all lonesome LFs to CRLF in UTF-8 too", () => {
+      const header = new Header(`Subject: Iñtërnâtiônàlizætiøn\n${received("\n")}`);
+      expect(one(header.get("Received")).value).toEqual(unfolded);
+    });
+
+    it("should convert all lonesome CRs to CRLF", () => {
+      expect(one(new Header(received("\r")).get("Received")).value).toEqual(unfolded);
+    });
+  });
+
+  describe("handling date fields with multiple values", () => {
+    it("should know which fields can only appear once", () => {
+      for (const field of ["date"]) {
+        const header = new Header();
+        header.set(field, "Thu, 05 Jun 2008 10:53:29 -0700");
+        header.set(field, "Mon, 15 Nov 2010 11:05:29 -1100");
+        expect(one(header.get(field)).value).toEqual("Mon, 15 Nov 2010 11:05:29 -1100");
+      }
+    });
+
+    it("should know which fields can only appear once", () => {
+      for (const field of ["from", "sender", "reply-to", "to", "cc", "bcc"]) {
+        const header = new Header();
+        header.set(field, "mikel@test.lindsaar.net");
+        header.set(field, "ada@test.lindsaar.net");
+        expect(one(header.get(field)).value).toEqual("ada@test.lindsaar.net");
+      }
+    });
+
+    it("should enforce appear-once rule even with mass assigned header", () => {
+      const header = new Header("Content-Type: multipart/alternative\nContent-Type: text/plain\n");
+      expect(Array.isArray(header.get("content-type"))).toBe(false);
+    });
+  });
+
+  describe("handling trace fields", () => {
+    let tracedHeader: Header;
+    beforeEach(() => {
+      tracedHeader = new Header(
+        [
+          "Return-Path: <xxx@xxxx.xxxtest>",
+          "Received: from xxx.xxxx.xxx by xxx.xxxx.xxx with ESMTP id 6AAEE3B4D23 for <xxx@xxxx.xxx>; Sun, 8 May 2005 12:30:23 -0500",
+          "Received: from xxx.xxxx.xxx by xxx.xxxx.xxx with ESMTP id j48HUC213279 for <xxx@xxxx.xxx>; Sun, 8 May 2005 12:30:13 -0500",
+          "Received: from conversion-xxx.xxxx.xxx.net by xxx.xxxx.xxx id <0IG600901LQ64I@xxx.xxxx.xxx> for <xxx@xxxx.xxx>; Sun, 8 May 2005 12:30:12 -0500",
+          "Received: from agw1 by xxx.xxxx.xxx with ESMTP id <0IG600JFYLYCAxxx@xxxx.xxx> for <xxx@xxxx.xxx>; Sun, 8 May 2005 12:30:12 -0500",
+          "",
+        ].join("\n"),
+      );
+    });
+
+    it("should instantiate one trace field object per header", () => {
+      expect(tracedHeader.fields.length).toEqual(5);
+    });
+
+    it("should add a new received header after the other received headers if they exist", () => {
+      tracedHeader.set("To", "Mikel");
+      tracedHeader.set("Received", "from agw2 by xxx.xxxx.xxx; Sun, 8 May 2005 12:30:13 -0500");
+      const fields = tracedHeader.fields as unknown as Record<string, () => unknown>[];
+      expect([...(fields[0].addresses() as string[])]).toEqual(["xxx@xxxx.xxxtest"]);
+      expect(fields[1].info()).toEqual(
+        "from xxx.xxxx.xxx by xxx.xxxx.xxx with ESMTP id 6AAEE3B4D23 for <xxx@xxxx.xxx>",
+      );
+      expect(fields[2].info()).toEqual(
+        "from xxx.xxxx.xxx by xxx.xxxx.xxx with ESMTP id j48HUC213279 for <xxx@xxxx.xxx>",
+      );
+      expect(fields[3].info()).toEqual(
+        "from conversion-xxx.xxxx.xxx.net by xxx.xxxx.xxx id <0IG600901LQ64I@xxx.xxxx.xxx> for <xxx@xxxx.xxx>",
+      );
+      expect(fields[5].info()).toEqual("from agw2 by xxx.xxxx.xxx");
+      expect(tracedHeader.fields[6].field.constructor).toBe(Mail.ToField);
+    });
+  });
+
+  describe("encoding", () => {
+    it("should not blow up on encoding mismatches", () => {
+      const junk = new Uint8Array([...new TextEncoder().encode("Subject: "), 0xaf]);
+      const header = new Header(junk, "utf-8");
+      expect(header.encoded()).toEqual("Subject: =?UTF-8?Q?=EF=BF=BD?=\r\n");
+    });
+  });
+
+  describe("detecting required fields", () => {
+    it("should say it has a date id if it does", () => {
+      expect(new Header("Date: Mon, 24 Nov 1997 14:22:01 -0800").hasDate()).toBe(true);
+    });
+
+    it("should say it has a date id if it does", () => {
+      expect(new Header("Mime-Version: 1.0").hasMimeVersion()).toBe(true);
+    });
+  });
+
+  describe("mime version handling", () => {
+    it("should return the mime version of the email", () => {
+      expect(one(new Header("Mime-Version: 1.0").get("mime-version")).value).toEqual("1.0");
+    });
+
+    it("should return nil if no mime-version header field", () => {
+      expect(new Header("To: bob").get("mime_version")).toBeNull();
+    });
+
+    it("should return the transfer-encoding of the email", () => {
+      const header = new Header("Content-Transfer-Encoding: Base64");
+      expect(one(header.get("content-transfer-encoding")).value).toEqual("Base64");
+    });
+
+    it("should return nil if no transfer-encoding header field", () => {
+      expect(new Header().get("content-transfer-encoding")).toBeNull();
+    });
+
+    it("should return the content-description of the email", () => {
+      const header = new Header("Content-Description: This is a description");
+      expect(one(header.get("Content-Description")).value).toEqual("This is a description");
+    });
+
+    it("should return nil if no content-description header field", () => {
+      expect(new Header().get("Content-Description")).toBeNull();
     });
   });
 });
