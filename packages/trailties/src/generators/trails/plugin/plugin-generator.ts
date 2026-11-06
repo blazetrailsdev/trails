@@ -94,9 +94,11 @@ export class PluginBuilder {
   }
 
   async license(this: PluginBuilderHost): Promise<void> {
-    /** @inventedArm author — PERMANENT */
-    await this.author();
-    if (!this.isInsideApplication()) await this.template("MIT-LICENSE");
+    if (!this.isInsideApplication()) {
+      /** @inventedArm author — PERMANENT */
+      await this.author();
+      await this.template("MIT-LICENSE");
+    }
   }
 
   /** @missingRailsArgs template — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
