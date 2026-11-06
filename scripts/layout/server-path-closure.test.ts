@@ -78,9 +78,12 @@ describe("server-path-closure", () => {
     expect(wildcardMatch("./dist/*.js", "lib/a.js")).toBe(null);
   });
 
-  it("names a story on every exclude row", async () => {
-    const rows = JSON.parse(await readFile(EXCLUDE_JSON, "utf-8")) as { story?: unknown }[];
-    expect(rows.filter((row) => typeof row.story !== "string" || row.story === "")).toEqual([]);
+  it("keys every exclude row by a story id", async () => {
+    const ledger = JSON.parse(await readFile(EXCLUDE_JSON, "utf-8")) as Record<string, unknown>;
+    for (const [story, modules] of Object.entries(ledger)) {
+      expect(story).toMatch(/^[a-z0-9][a-z0-9-]*$/);
+      expect(Array.isArray(modules) && modules.length > 0).toBe(true);
+    }
   });
 
   it("matches the built tree to its only-shrink exclude list", async () => {

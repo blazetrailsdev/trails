@@ -187,16 +187,13 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
   return [...found.values()].sort((a, b) => a.module.localeCompare(b.module));
 }
 
-/** One only-shrink row: a testing module on the server path, and the story that removes it. */
-export interface ExcludeRow {
-  module: string;
-  story: string;
-}
+/** The only-shrink ledger: each story id, and the testing modules on the server path it removes. */
+export type ExcludeList = Record<string, string[]>;
 
 export async function main(root = ROOT_DIR): Promise<string> {
   const violations = await findViolations(root);
-  const rows = JSON.parse(await fs.readFile(EXCLUDE_JSON, "utf-8")) as ExcludeRow[];
-  const listed = new Set(rows.map((row) => row.module));
+  const ledger = JSON.parse(await fs.readFile(EXCLUDE_JSON, "utf-8")) as ExcludeList;
+  const listed = new Set(Object.values(ledger).flat());
   const added = violations.filter((v) => !listed.has(v.module));
   const current = new Set(violations.map((v) => v.module));
   const stale = [...listed].filter((m) => !current.has(m));

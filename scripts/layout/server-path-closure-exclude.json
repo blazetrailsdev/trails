@@ -1,238 +1,79 @@
-[
-  {
-    "module": "packages/actioncable/dist/channel/test-case.js",
-    "story": "server-path-actioncable-testing"
-  },
-  {
-    "module": "packages/actioncable/dist/connection/test-case.js",
-    "story": "server-path-actioncable-testing"
-  },
-  {
-    "module": "packages/actioncable/dist/subscription-adapter/test.js",
-    "story": "server-path-actioncable-testing"
-  },
-  {
-    "module": "packages/actioncable/dist/test-helper.js",
-    "story": "server-path-actioncable-testing"
-  },
-  {
-    "module": "packages/actionmailer/dist/test-case.js",
-    "story": "server-path-actionmailer-testing"
-  },
-  {
-    "module": "packages/actionmailer/dist/test-helper.js",
-    "story": "server-path-actionmailer-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/assertion-response.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/assertions.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/assertions/response.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/assertions/routing.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/integration.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/request-encoder.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/test-helpers/page-dump-helper.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/test-process.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/test-request.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionpack/dist/action-dispatch/testing/test-response.js",
-    "story": "server-path-actionpack-testing"
-  },
-  {
-    "module": "packages/actionview/dist/rails-dom-testing/assertions.js",
-    "story": "server-path-actionview-test-case"
-  },
-  {
-    "module": "packages/actionview/dist/test-case.js",
-    "story": "server-path-actionview-test-case"
-  },
-  {
-    "module": "packages/actionview/dist/testing/resolvers.js",
-    "story": "server-path-actionview-testing-resolvers"
-  },
-  {
-    "module": "packages/activejob/dist/queue-adapters/test-adapter.js",
-    "story": "server-path-activejob-testing"
-  },
-  {
-    "module": "packages/activejob/dist/test-case.js",
-    "story": "server-path-activejob-testing"
-  },
-  {
-    "module": "packages/activejob/dist/test-helper.js",
-    "story": "server-path-activejob-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/cases/helper.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/encryption/test-helpers.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/async-helper.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/describe-if-mysql-adapter.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/describe-if-pg.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/describe-if-postgresql-adapter.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/describe-if-sqlite.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/setup-second-pool.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/support/supports.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/test-adapter.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/test-helpers/models/arunit2-model.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/test-helpers/models/index.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/test-helpers/test-schema.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activerecord/dist/testing/query-assertions.js",
-    "story": "server-path-activerecord-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-delete-matched-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-increment-decrement-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-instrumentation-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-store-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-store-coder-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-store-compression-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/cache-store-serializer-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/cache/behaviors/local-cache-behavior.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/executor/test-helper.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/test-case.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/assertions.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/constant-lookup.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/deprecation.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/error-reporter-assertions.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/file-fixtures.js",
-    "story": "server-path-activesupport-test-case-and-behaviors"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/isolation.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/method-call-assertions.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/setup-and-teardown.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/stream.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/tagged-logging.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/activesupport/dist/testing/time-helpers.js",
-    "story": "server-path-activesupport-index-testing"
-  },
-  {
-    "module": "packages/mail/dist/network/delivery-methods/test-mailer.js",
-    "story": "server-path-mail-test-mailer"
-  },
-  {
-    "module": "packages/trailties/dist/test-unit/trailtie.js",
-    "story": "server-path-trailties-test-unit-trailtie-vitest"
-  }
-]
+{
+  "server-path-actioncable-testing": [
+    "packages/actioncable/dist/channel/test-case.js",
+    "packages/actioncable/dist/connection/test-case.js",
+    "packages/actioncable/dist/subscription-adapter/test.js",
+    "packages/actioncable/dist/test-helper.js"
+  ],
+  "server-path-actionmailer-testing": [
+    "packages/actionmailer/dist/test-case.js",
+    "packages/actionmailer/dist/test-helper.js"
+  ],
+  "server-path-actionpack-testing": [
+    "packages/actionpack/dist/action-dispatch/testing/assertion-response.js",
+    "packages/actionpack/dist/action-dispatch/testing/assertions.js",
+    "packages/actionpack/dist/action-dispatch/testing/assertions/response.js",
+    "packages/actionpack/dist/action-dispatch/testing/assertions/routing.js",
+    "packages/actionpack/dist/action-dispatch/testing/integration.js",
+    "packages/actionpack/dist/action-dispatch/testing/request-encoder.js",
+    "packages/actionpack/dist/action-dispatch/testing/test-helpers/page-dump-helper.js",
+    "packages/actionpack/dist/action-dispatch/testing/test-process.js",
+    "packages/actionpack/dist/action-dispatch/testing/test-request.js",
+    "packages/actionpack/dist/action-dispatch/testing/test-response.js"
+  ],
+  "server-path-actionview-test-case": [
+    "packages/actionview/dist/rails-dom-testing/assertions.js",
+    "packages/actionview/dist/test-case.js"
+  ],
+  "server-path-actionview-testing-resolvers": ["packages/actionview/dist/testing/resolvers.js"],
+  "server-path-activejob-testing": [
+    "packages/activejob/dist/queue-adapters/test-adapter.js",
+    "packages/activejob/dist/test-case.js",
+    "packages/activejob/dist/test-helper.js"
+  ],
+  "server-path-activerecord-testing": [
+    "packages/activerecord/dist/cases/helper.js",
+    "packages/activerecord/dist/encryption/test-helpers.js",
+    "packages/activerecord/dist/support/async-helper.js",
+    "packages/activerecord/dist/support/describe-if-mysql-adapter.js",
+    "packages/activerecord/dist/support/describe-if-pg.js",
+    "packages/activerecord/dist/support/describe-if-postgresql-adapter.js",
+    "packages/activerecord/dist/support/describe-if-sqlite.js",
+    "packages/activerecord/dist/support/setup-second-pool.js",
+    "packages/activerecord/dist/support/supports.js",
+    "packages/activerecord/dist/test-adapter.js",
+    "packages/activerecord/dist/test-helpers/models/arunit2-model.js",
+    "packages/activerecord/dist/test-helpers/models/index.js",
+    "packages/activerecord/dist/test-helpers/test-schema.js",
+    "packages/activerecord/dist/testing/query-assertions.js"
+  ],
+  "server-path-activesupport-index-testing": [
+    "packages/activesupport/dist/testing/assertions.js",
+    "packages/activesupport/dist/testing/constant-lookup.js",
+    "packages/activesupport/dist/testing/deprecation.js",
+    "packages/activesupport/dist/testing/error-reporter-assertions.js",
+    "packages/activesupport/dist/testing/isolation.js",
+    "packages/activesupport/dist/testing/method-call-assertions.js",
+    "packages/activesupport/dist/testing/setup-and-teardown.js",
+    "packages/activesupport/dist/testing/stream.js",
+    "packages/activesupport/dist/testing/tagged-logging.js",
+    "packages/activesupport/dist/testing/time-helpers.js"
+  ],
+  "server-path-activesupport-test-case-and-behaviors": [
+    "packages/activesupport/dist/cache/behaviors/cache-delete-matched-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-increment-decrement-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-instrumentation-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-store-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-store-coder-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-store-compression-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/cache-store-serializer-behavior.js",
+    "packages/activesupport/dist/cache/behaviors/local-cache-behavior.js",
+    "packages/activesupport/dist/executor/test-helper.js",
+    "packages/activesupport/dist/test-case.js",
+    "packages/activesupport/dist/testing/file-fixtures.js"
+  ],
+  "server-path-mail-test-mailer": ["packages/mail/dist/network/delivery-methods/test-mailer.js"],
+  "server-path-trailties-test-unit-trailtie-vitest": [
+    "packages/trailties/dist/test-unit/trailtie.js"
+  ]
+}
