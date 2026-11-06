@@ -60,7 +60,7 @@ export class TestAdapter extends AbstractAdapter {
   }
 
   override async enqueueAt(job: TestAdapterJob, timestamp: unknown): Promise<unknown> {
-    const jobData = this.jobToHash(job, { ":at": timestamp });
+    const jobData = this.jobToHash(job, { at: timestamp });
     return await this.performOrEnqueue(
       this.performEnqueuedAtJobs != null &&
         this.performEnqueuedAtJobs !== false &&
@@ -76,10 +76,10 @@ export class TestAdapter extends AbstractAdapter {
     extras: Record<string, unknown> = {},
   ): Record<string, unknown> {
     const jobData = job.serialize();
-    jobData[":job"] = rbObjClass(job);
-    jobData[":args"] = fetch(jobData, "arguments");
-    jobData[":queue"] = fetch(jobData, "queue_name");
-    jobData[":priority"] = fetch(jobData, "priority");
+    jobData["job"] = rbObjClass(job);
+    jobData["args"] = fetch(jobData, "arguments");
+    jobData["queue"] = fetch(jobData, "queue_name");
+    jobData["priority"] = fetch(jobData, "priority");
     return { ...jobData, ...extras };
   }
 
