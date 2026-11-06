@@ -466,7 +466,7 @@ export class TimeWithZone {
   inTimeZone(newZone?: unknown): TimeWithZone | Time;
   inTimeZone(newZone: unknown = timeZone()): TimeWithZone | Time {
     if (rbEqual(this._timeZone, newZone)) return this;
-    return inTimeZone(this.utc(), newZone);
+    return this.utc().inTimeZone(newZone);
   }
 
   formattedOffset(colon = true, alternateUtcString?: string): string {
