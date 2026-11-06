@@ -210,7 +210,7 @@ export class Response extends DispatchResponse {
 }
 
 export interface LiveControllerHost {
-  request: { getHeader?(name: string): string | undefined; format?: unknown };
+  request: { getHeader?(name: string): string | undefined; format(): { symbol?: string } };
   response: Response;
   newControllerThread(block: () => void | Promise<void>): Promise<void>;
   cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
@@ -235,7 +235,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
       const resp = this.response;
       if (resp.committed) {
         try {
-          if ((this.request.format as { symbol?: string } | undefined)?.symbol === ":html") {
+          if (this.request.format().symbol === ":html") {
             (resp.stream as Buffer).write(ActionViewBase.streamingCompletionOnException);
           }
           (resp.stream as Buffer).callOnError();

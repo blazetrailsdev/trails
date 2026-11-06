@@ -161,9 +161,13 @@ export class RemoteIp {
 
   readonly checkIp: boolean;
   readonly proxies: readonly Proxy[];
-  private readonly app: RackApp;
+  private readonly app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp, ipSpoofingCheck = true, customProxies?: CustomProxies | null) {
+  constructor(
+    app: RackApp | { call: RackApp },
+    ipSpoofingCheck = true,
+    customProxies?: CustomProxies | null,
+  ) {
     this.app = app;
     this.checkIp = ipSpoofingCheck;
     const raw = customProxies as unknown;
@@ -201,7 +205,7 @@ Note that passing an enumerable will *replace* the default set of trusted proxie
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
     req.remoteIp = new GetIp(req, this.checkIp, this.proxies);
-    return await (rbProcCall(this.app, req.env) as ReturnType<typeof this.app>);
+    return await (rbProcCall(this.app, req.env) as Promise<RackResponse>);
   }
 }
 

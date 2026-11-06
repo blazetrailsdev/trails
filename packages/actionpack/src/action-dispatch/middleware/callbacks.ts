@@ -13,9 +13,9 @@ export class Callbacks {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -32,7 +32,7 @@ export class Callbacks {
     let error: unknown = null;
     await this.runCallbacks("call", async () => {
       try {
-        result = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+        result = await (rbProcCall(this.app, env) as Promise<RackResponse>);
       } catch (e) {
         error = e;
       }

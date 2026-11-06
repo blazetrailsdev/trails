@@ -22,11 +22,11 @@ export interface LoggerOptions {
 const NOOP_LOGGER: RackLoggerLike = {};
 
 export class Logger {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private logger: RackLoggerLike;
   private taggers: Tagger[];
 
-  constructor(app: RackApp, taggers: LoggerOptions = {}) {
+  constructor(app: RackApp | { call: RackApp }, taggers: LoggerOptions = {}) {
     this.app = app;
     this.logger = taggers.logger ?? NOOP_LOGGER;
     this.taggers = taggers.taggers ?? [];

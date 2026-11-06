@@ -19,10 +19,10 @@ export interface ExecutorLike {
 }
 
 export class Executor {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private executor: ExecutorLike;
 
-  constructor(app: RackApp, executor: ExecutorLike) {
+  constructor(app: RackApp | { call: RackApp }, executor: ExecutorLike) {
     this.app = app;
     this.executor = executor;
   }
@@ -31,7 +31,7 @@ export class Executor {
     const state = await this.executor.runBang({ reset: true });
     let returned: RackResponse | null = null;
     try {
-      const response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+      const response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
 
       if (env["action_dispatch.report_exception"]) {
         const error = env["action_dispatch.exception"];

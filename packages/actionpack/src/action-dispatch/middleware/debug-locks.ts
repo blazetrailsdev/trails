@@ -6,10 +6,10 @@ import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
 export class DebugLocks {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private path: string;
 
-  constructor(app: RackApp, path = "/trails/locks") {
+  constructor(app: RackApp | { call: RackApp }, path = "/trails/locks") {
     this.app = app;
     this.path = path;
   }
@@ -24,7 +24,7 @@ export class DebugLocks {
       }
     }
 
-    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as Promise<RackResponse>;
   }
 
   /** @internal */

@@ -12,7 +12,7 @@ export interface ImplicitRenderHost {
   constructor: { name: string };
   request?: {
     isGet?(): boolean;
-    format?: { symbol?: string | null };
+    format(): { symbol?: string | null };
     xhr?: boolean;
     formats?: ReadonlyArray<{ toString(): string }>;
     variant?: unknown;
@@ -92,7 +92,7 @@ export function methodForAction(this: ImplicitRenderHost, actionName: string): s
 export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const req = this.request;
   if (!req) return false;
-  return req.isGet?.() === true && req.format?.symbol === ":html" && req.xhr !== true;
+  return req.isGet?.() === true && req.format().symbol === ":html" && req.xhr !== true;
 }
 
 export const ImplicitRender = { defaultRender, methodForAction, isInteractiveBrowserRequest };

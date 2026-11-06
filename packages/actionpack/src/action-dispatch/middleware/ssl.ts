@@ -33,7 +33,7 @@ const HSTS_EXPIRES_IN = 63072000;
 const PERMANENT_REDIRECT_REQUEST_METHODS = ["GET", "HEAD"];
 
 export class SSL {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private redirect: false | null | RedirectOptions;
   private exclude: (request: Request) => boolean;
   private secureCookies: boolean;
@@ -45,7 +45,7 @@ export class SSL {
   }
 
   constructor(
-    app: RackApp,
+    app: RackApp | { call: RackApp },
     {
       redirect = {},
       hsts = {},

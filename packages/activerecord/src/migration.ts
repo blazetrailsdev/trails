@@ -1,3 +1,4 @@
+import type { RackApp, RackResponse } from "@blazetrails/rack";
 import { groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat";
 import {
   getEnv,
@@ -2093,14 +2094,14 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
 }
 
 export class CheckPending {
-  private app: (env: Record<string, unknown>) => Promise<unknown>;
+  private app: RackApp | { call: RackApp };
   private needsCheck: boolean;
   private mutex: Monitor;
   private fileWatcher: typeof FileUpdateChecker;
   private watcher?: FileUpdateChecker;
 
   constructor(
-    app: (env: Record<string, unknown>) => Promise<unknown>,
+    app: RackApp | { call: RackApp },
     { fileWatcher = FileUpdateChecker }: { fileWatcher?: typeof FileUpdateChecker } = {},
   ) {
     this.app = app;
@@ -2124,7 +2125,7 @@ export class CheckPending {
       }
     });
 
-    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as Promise<RackResponse>;
   }
 
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {

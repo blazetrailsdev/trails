@@ -15,66 +15,66 @@ import type { RackEnv, RackResponse } from "@blazetrails/rack";
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
 class FooMiddleware {
-  private app: RackApp;
-  constructor(app: RackApp) {
+  private app: RackApp | { call: RackApp };
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 
 class BarMiddleware {
-  private app: RackApp;
-  constructor(app: RackApp) {
+  private app: RackApp | { call: RackApp };
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 
 class BazMiddleware {
-  private app: RackApp;
-  constructor(app: RackApp) {
+  private app: RackApp | { call: RackApp };
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 
 class HiyaMiddleware {
-  private app: RackApp;
-  constructor(app: RackApp) {
+  private app: RackApp | { call: RackApp };
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 
 class QuxMiddleware {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private prefix: string;
-  constructor(app: RackApp, prefix: string) {
+  constructor(app: RackApp | { call: RackApp }, prefix: string) {
     this.app = app;
     this.prefix = prefix;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 
 class BlockMiddleware {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   readonly block?: MiddlewareBlock;
-  constructor(app: RackApp, block?: MiddlewareBlock) {
+  constructor(app: RackApp | { call: RackApp }, block?: MiddlewareBlock) {
     this.app = app;
     this.block = block;
   }
   async call(env: RackEnv): Promise<RackResponse> {
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as Promise<RackResponse>;
   }
 }
 

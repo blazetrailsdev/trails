@@ -312,7 +312,7 @@ function makeHost() {
 }
 
 class Host {
-  request = { getHeader: () => undefined as string | undefined };
+  request = { getHeader: () => undefined as string | undefined, format: () => ({}) };
   response = makeResponse();
   body: unknown = undefined;
   action: (name: string) => void | Promise<void> = () => {};

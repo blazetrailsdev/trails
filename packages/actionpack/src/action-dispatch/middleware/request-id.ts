@@ -9,11 +9,11 @@ export interface RequestIdOptions {
 }
 
 export class RequestId {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private header: string;
   private envHeader: string;
 
-  constructor(app: RackApp, options: RequestIdOptions = {}) {
+  constructor(app: RackApp | { call: RackApp }, options: RequestIdOptions = {}) {
     this.app = app;
     this.header = options.header ?? "X-Request-Id";
     this.envHeader = `HTTP_${this.header.toUpperCase().replaceAll("-", "_")}`;
@@ -22,9 +22,7 @@ export class RequestId {
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
     req.requestId = this.makeRequestId(req.getHeader(this.envHeader) as string | undefined);
-    const [status, headers, body] = await (rbProcCall(this.app, env) as ReturnType<
-      typeof this.app
-    >);
+    const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
     headers[this.header.toLowerCase()] = req.requestId!;
     return [status, headers, body];
   }

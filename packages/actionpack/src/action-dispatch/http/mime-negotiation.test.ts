@@ -83,7 +83,7 @@ describe("MimeNegotiation writers", () => {
   it("format= forces the format regardless of the path extension", () => {
     const req = new Request({ PATH_INFO: "/posts/5.html" });
     req.setFormat("xml");
-    expect(req.format.toString()).toBe("application/xml");
+    expect(req.format().toString()).toBe("application/xml");
     expect(req.params["format"]).toBe("xml");
   });
 
@@ -91,6 +91,6 @@ describe("MimeNegotiation writers", () => {
     const req = new Request({ PATH_INFO: "/posts/5.html" });
     req.formats = ["json", "xml"];
     expect(req.formats.map((f) => f.toString())).toEqual(["application/json", "application/xml"]);
-    expect(req.format.toString()).toBe("application/json");
+    expect(req.format().toString()).toBe("application/json");
   });
 });

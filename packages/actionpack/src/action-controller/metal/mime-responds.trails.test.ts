@@ -140,6 +140,12 @@ describe("Base#respondTo", () => {
     expect(() => controller("application/json").respondTo("json")).not.toThrow(UnknownFormat);
   });
 
+  it("raises UnknownFormat for an unregistered format", () => {
+    expect(() => controller("application/json").respondTo("unregistered_format")).toThrow(
+      UnknownFormat,
+    );
+  });
+
   it("registers each mime it was called with", () => {
     let called = false;
     controller("application/json").respondTo((format) => {

@@ -2,9 +2,9 @@ import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
 export class AssumeSSL {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -14,6 +14,6 @@ export class AssumeSSL {
     env["HTTP_X_FORWARDED_PROTO"] = "https";
     env["rack.url_scheme"] = "https";
 
-    return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
+    return rbProcCall(this.app, env) as Promise<RackResponse>;
   }
 }

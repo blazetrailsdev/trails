@@ -64,7 +64,7 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(events[0].request).toBe(request);
     expect(events[0].method).toBe("GET");
     expect(events[0].path).toBe(request.filteredPath());
-    expect(events[0].format).toBe(request.format.ref());
+    expect(events[0].format).toBe(request.format().ref());
     expect(events[0].format).toBe(":html");
     expect(isSymbol(events[0].format)).toBe(true);
   });

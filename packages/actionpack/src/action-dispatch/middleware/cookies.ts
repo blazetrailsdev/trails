@@ -627,17 +627,18 @@ export class Cookies {
   static readonly COOKIES_SAME_SITE_PROTECTION = "action_dispatch.cookies_same_site_protection";
   static readonly USE_COOKIES_WITH_METADATA = "action_dispatch.use_cookies_with_metadata";
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new ActionDispatch.Request(env) as CookiesRequest;
-    let response: RackResponse | Response = await (rbProcCall(this.app, env) as ReturnType<
-      typeof this.app
-    >);
+    let response: RackResponse | Response = await (rbProcCall(
+      this.app,
+      env,
+    ) as Promise<RackResponse>);
 
     if (request.isHaveCookieJar()) {
       const cookieJar = request.cookieJar();

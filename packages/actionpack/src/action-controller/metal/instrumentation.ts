@@ -61,7 +61,7 @@ export async function processAction(
     request: this.request,
     params: this.request.filteredParameters(),
     headers: this.request.headers,
-    format: this.request.format.ref(),
+    format: this.request.format().ref(),
     method: this.request.requestMethod,
     path: this.request.filteredPath(),
   };

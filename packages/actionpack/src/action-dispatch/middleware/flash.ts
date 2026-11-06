@@ -276,7 +276,7 @@ export class Flash {
   static readonly FlashNow = FlashNow;
   static readonly FlashHash = FlashHash;
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     return app as unknown as Flash;
   }
 }

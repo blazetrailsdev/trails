@@ -28,14 +28,14 @@ const MAPPINGS: Record<string, string> = {
 export type PolicySource = string | ((context: unknown) => string);
 
 export class Middleware {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const response = await (rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+    const response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
     const [, headers] = response;
 
     if (this.policyPresent(headers)) return response;

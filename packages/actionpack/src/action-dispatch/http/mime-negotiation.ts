@@ -2,7 +2,7 @@ import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesuppo
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbEqual } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
@@ -137,17 +137,16 @@ export function variant(
 
 export function negotiateMime(
   this: MimeNegotiationHost,
-  order: MimeType[],
+  order: (MimeType | undefined)[],
 ): MimeType | NullType | null {
-  const isAll = (m: MimeType): boolean => m.string === "*/*";
   for (const priority of formats.call(this)) {
-    if (isAll(priority)) {
+    if (rbEqual(priority, MimeType.ALL)) {
       return order[0] ?? null;
-    } else if (order.some((o) => o.equals(priority))) {
+    } else if (order.some((o) => rbEqual(o, priority))) {
       return priority;
     }
   }
-  return order.some(isAll) ? format.call(this) : null;
+  return order.some((o) => rbEqual(o, MimeType.ALL)) ? format.call(this) : null;
 }
 
 /** @internal */

@@ -10,9 +10,9 @@ import { ActionDispatch } from "../../namespaces.js";
 export class ActionableExceptions {
   static endpoint: string;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -23,7 +23,7 @@ export class ActionableExceptions {
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
     if (!this.actionableRequest(request)) {
-      return rbProcCall(this.app, env) as ReturnType<typeof this.app>;
+      return rbProcCall(this.app, env) as Promise<RackResponse>;
     }
 
     const params = request.params;
