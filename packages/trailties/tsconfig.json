@@ -17,6 +17,7 @@
     { "path": "../actionmailer" },
     { "path": "../activerecord-cli" },
     { "path": "../rack" },
+    { "path": "../rack-test" },
     { "path": "../rackup" },
     { "path": "../actioncable" },
     { "path": "../actionpack" },

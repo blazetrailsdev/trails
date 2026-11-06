@@ -1,6 +1,6 @@
 import "./active-job.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
-import { AbstractController, ActionDispatch } from "@blazetrails/actionpack";
+import { AbstractController } from "@blazetrails/actionpack";
 import { ActionMailer, Base, deprecator } from "@blazetrails/actionmailer";
 import { TestHelper } from "@blazetrails/actionmailer/test-helper";
 import { ClearTestDeliveries } from "@blazetrails/actionmailer/test-case";
@@ -72,8 +72,7 @@ export class Trailtie extends BaseTrailtie {
 
       onLoad("action_mailer", function (this: MailerClass) {
         const routes = app.routes() as AppRoutes;
-        /** @missingRailsCall AbstractController::UrlFor — CONVERGEABLE abstract-controller-url-for-module */
-        include(this as never, ActionDispatch.Routing.UrlFor as never);
+        include(this as never, AbstractController.UrlFor as never);
         AbstractController.Trailties.RoutesHelpers.with(routes, false)(this as never);
         include(this as never, routes.mountedHelpers() as never);
 
