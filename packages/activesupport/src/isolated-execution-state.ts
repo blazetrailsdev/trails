@@ -144,7 +144,7 @@ export const IsolatedExecutionState = {
   context(): Thread | Fiber {
     return IsolatedExecutionState.scope.current();
   },
-  /** @noRailsEquivalent CONVERGEABLE isolated-execution-state-fork-needs-owner-ruling */
+  /** @noRailsEquivalent PERMANENT */
   fork<T>(key: IsolatedKey, block: () => T): T {
     const value = IsolatedExecutionState.get(key);
     return forks().run(

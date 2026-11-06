@@ -20,7 +20,7 @@ export class Contexts {
     threadMattrAccessor.call(base, "customContexts");
   }
 
-  /** @inventedArm fork — CONVERGEABLE isolated-execution-state-fork-needs-owner-ruling */
+  /** @inventedArm fork — PERMANENT */
   static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
     this.customContexts ||= [];
     return IsolatedExecutionState.fork(this["@__thread_mattr_customContexts" as never], () =>
