@@ -1245,12 +1245,36 @@ export class IO {
   }
 
   /**
-   * {@link read}'s length form over the backend's async read.
+   * {@link read} over the backend's async read: with no length, the rest of
+   * the stream in the external encoding, as {@link readAll}.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/v3.3.11/io.c:3774`).
    */
-  async readAsync(length: number): Promise<Uint8Array | null> {
+  async readAsync(): Promise<string | Uint8Array>;
+  async readAsync(length: number): Promise<Uint8Array | null>;
+  async readAsync(length?: number | null): Promise<string | Uint8Array | null> {
+    if (length == null) {
+      const chunk = new Uint8Array(READ_CHUNK);
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      for (;;) {
+        const read = await getFs().readAsync(this.fd, chunk, 0, chunk.length, this._pos);
+        if (read === 0) break;
+        this._pos += read;
+        chunks.push(chunk.slice(0, read));
+        total += read;
+      }
+      const bytes = new Uint8Array(total);
+      let at = 0;
+      for (const c of chunks) {
+        bytes.set(c, at);
+        at += c.length;
+      }
+      if (this.enc2 === null) return ioEncStr(bytes, total, this.ioReadEncoding());
+      return ioEncStr(bytes, total, this.enc2, this.ioReadEncoding());
+    }
+
     const buffer = new Uint8Array(length);
     let n = 0;
     while (n < length) {
