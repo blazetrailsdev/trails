@@ -23,8 +23,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
-import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
-import { PKG_SRC_DIRS, rubyToConventionTs } from "../test-compare/compare.js";
+import { PKG_SRC_DIRS, rubyTestDirToTs, rubyToConventionTs } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -85,15 +84,7 @@ export interface Plan {
 function rubyPathToTs(rubyFile: string, comparePkg: string): string {
   const dir = path.dirname(rubyFile);
   const base = path.basename(rubyToConventionTs(rubyFile, comparePkg));
-  if (dir === ".") return base;
-  const tsDir = dir
-    .split("/")
-    .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
-    .join("/")
-    .replace(/_/g, "-")
-    .replace(/\berb\b/g, "tse")
-    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
-  return `${tsDir}/${base}`;
+  return dir === "." ? base : `${rubyTestDirToTs(dir)}/${base}`;
 }
 
 function supportHome(file: string): string | null {
@@ -104,6 +95,12 @@ function supportHome(file: string): string | null {
   if (rest.length > 1 && RAILS_SUPPORT_DIRS.has(rest[0])) return `test/${rest.join("/")}`;
   if (parts[at] === "__fixtures__") return `test/fixtures/${rest.join("/")}`;
   return `test/support/${rest.join("/")}`;
+}
+
+/** A test, or a shared test-behavior module (the twin of Rails'
+ *  `test/**\/behaviors/*_behavior.rb`, which test-compare counts as a test). */
+function isTestFile(file: string): boolean {
+  return file.endsWith(".test.ts") || /(^|\/)behaviors\/[^/]+-behavior\.ts$/.test(file);
 }
 
 export function planTestMoves(input: PlanInput): Plan {
@@ -135,10 +132,10 @@ export function planTestMoves(input: PlanInput): Plan {
   for (const file of files) {
     if (placed.has(file)) continue;
     const home = supportHome(file);
-    if (home !== null && !file.endsWith(".test.ts")) {
+    if (home !== null && !isTestFile(file)) {
       if (input.libImported.has(file)) flagged.push(`${libDir}/${file}`);
       else placed.set(file, home);
-    } else if (file.endsWith(".test.ts")) {
+    } else if (isTestFile(file)) {
       placed.set(file, home ?? `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
     }
   }
@@ -168,7 +165,7 @@ async function libImportedFiles(libPath: string, files: readonly string[]): Prom
   const present = new Set(files);
   const imported = new Set<string>();
   for (const file of files) {
-    if (file.endsWith(".test.ts") || supportHome(file) !== null) continue;
+    if (isTestFile(file) || supportHome(file) !== null) continue;
     const source = await fs.readFile(path.join(libPath, file), "utf-8");
     for (const { specifier } of moduleSpecifiers(source)) {
       if (!specifier.startsWith(".")) continue;

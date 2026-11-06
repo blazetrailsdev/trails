@@ -258,25 +258,30 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   const kebab = base.replace(/_/g, "-");
   const tsFile = /_behavior$/.test(rawBase) ? kebab + ".ts" : kebab + ".test.ts";
 
-  let tsDir =
-    dir === "."
-      ? ""
-      : dir
-          .split("/")
-          .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
-          .join("/")
-          .replace(/_/g, "-");
-
-  // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
-  tsDir = tsDir
-    .replace(/\berb\b/g, "tse")
-    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
-  const mappedTsFile = tsFile
-    .replace(/\berb\b/g, "tse")
-    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+  const tsDir = dir === "." ? "" : rubyTestDirToTs(dir);
+  const mappedTsFile = renameErbAndRails(tsFile);
 
   if (!tsDir) return mappedTsFile;
   return path.join(tsDir, mappedTsFile);
+}
+
+// Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
+function renameErbAndRails(segment: string): string {
+  return segment
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+}
+
+/** A Ruby test directory (`connection_adapters/erb`) as the TS directory the
+ *  conventions table puts it at (`connection-adapters/tse`). */
+export function rubyTestDirToTs(dir: string): string {
+  return renameErbAndRails(
+    dir
+      .split("/")
+      .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
+      .join("/")
+      .replace(/_/g, "-"),
+  );
 }
 
 /**

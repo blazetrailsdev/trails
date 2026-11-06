@@ -57,9 +57,15 @@ describe("planTestMoves", () => {
 
   it("uses a flat test/ for a gem without a main test subdirectory, and the lib root after the rename", () => {
     const plan = planTestMoves(
-      fixture({ pkg: "arel", libDir: "lib", files: ["x.test.ts", "y.test.ts"], comparison: [] }),
+      fixture({
+        pkg: "arel",
+        libDir: "lib",
+        files: ["x.test.ts", "y.test.ts", "cache/behaviors/store-behavior.ts", "cache/store.ts"],
+        comparison: [],
+      }),
     );
     expect(plan.moves).toEqual([
+      ["lib/cache/behaviors/store-behavior.ts", "test/cache/behaviors/store-behavior.ts"],
       ["lib/x.test.ts", "test/x.test.ts"],
       ["lib/y.test.ts", "test/y.test.ts"],
     ]);

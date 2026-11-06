@@ -57,6 +57,26 @@ function runtimeTarget(target: ExportTarget | undefined): string | null {
   return runtimeTarget(target.import ?? target.node ?? target.default);
 }
 
+/** The text a pattern's single `*` stands for in `value`, or null when it does not match. */
+export function wildcardMatch(pattern: string, value: string): string | null {
+  const [head, tail] = pattern.replace(/^\.\//, "").split("*");
+  const v = value.replace(/^\.\//, "");
+  if (tail === undefined || !v.startsWith(head) || !v.endsWith(tail)) return null;
+  if (v.length < head.length + tail.length) return null;
+  return v.slice(head.length, v.length - tail.length);
+}
+
+async function jsFilesUnder(dir: string, rel: string): Promise<string[]> {
+  const out: string[] = [];
+  const entries = await fs.readdir(path.join(dir, rel), { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const child = `${rel}/${entry.name}`;
+    if (entry.isDirectory()) out.push(...(await jsFilesUnder(dir, child)));
+    else if (entry.name.endsWith(".js")) out.push(child);
+  }
+  return out;
+}
+
 export async function readPackages(root = ROOT_DIR): Promise<Map<string, PackageExports>> {
   const out = new Map<string, PackageExports>();
   for (const entry of await fs.readdir(path.join(root, "packages"))) {
@@ -75,9 +95,27 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
         ? { ".": declared as ExportTarget }
         : (declared as Record<string, ExportTarget>);
     const exports: Record<string, string> = {};
+    const patterns: [string, string | null][] = [];
     for (const [key, target] of Object.entries(raw)) {
       const file = runtimeTarget(target);
-      if (file !== null && !key.includes("*")) exports[key] = path.join(dir, file);
+      if (key.includes("*")) patterns.push([key, file]);
+      else if (file !== null) exports[key] = path.join(dir, file);
+    }
+    if (patterns.length > 0) {
+      const built = await jsFilesUnder(dir, "dist");
+      const excluded = patterns.filter(([, file]) => file === null).map(([key]) => key);
+      for (const [key, file] of patterns) {
+        if (file === null) continue;
+        for (const rel of built) {
+          const stem = wildcardMatch(file, rel);
+          if (stem === null) continue;
+          const expanded = key.replace("*", stem);
+          if (expanded in exports || excluded.some((k) => wildcardMatch(k, expanded) !== null)) {
+            continue;
+          }
+          exports[expanded] = path.join(dir, rel);
+        }
+      }
     }
     out.set(manifest.name, { name: manifest.name, dir, exports });
   }
@@ -149,9 +187,16 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
   return [...found.values()].sort((a, b) => a.module.localeCompare(b.module));
 }
 
+/** One only-shrink row: a testing module on the server path, and the story that removes it. */
+export interface ExcludeRow {
+  module: string;
+  story: string;
+}
+
 export async function main(root = ROOT_DIR): Promise<string> {
   const violations = await findViolations(root);
-  const listed = new Set<string>(JSON.parse(await fs.readFile(EXCLUDE_JSON, "utf-8")));
+  const rows = JSON.parse(await fs.readFile(EXCLUDE_JSON, "utf-8")) as ExcludeRow[];
+  const listed = new Set(rows.map((row) => row.module));
   const added = violations.filter((v) => !listed.has(v.module));
   const current = new Set(violations.map((v) => v.module));
   const stale = [...listed].filter((m) => !current.has(m));
