@@ -1,7 +1,7 @@
 import type { ConfiguredJob } from "./configured-job.js";
-import { constantize, I18n, seconds, zone, type TimeZone } from "@blazetrails/activesupport";
+import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
 import { Arguments } from "./arguments.js";
 import { ActiveJob } from "./namespaces.js";
 
@@ -161,6 +161,7 @@ export class Core {
     };
   }
 
+  /** @inventedArm throw — PERMANENT */
   deserialize(jobData: JobData): void {
     this.jobId = jobData["job_id"] as string;
     this.providerJobId = jobData["provider_job_id"];
@@ -170,10 +171,12 @@ export class Core {
     this.executions = jobData["executions"] as number;
     this.exceptionExecutions = jobData["exception_executions"] as Record<string, number>;
     this.locale = (jobData["locale"] as string | null | undefined) ?? String(I18n.locale());
+    const timeZone = zone();
+    if (jobData["timezone"] == null && timeZone === false) {
+      throw new NoMethodError("undefined method `name' for false", "name");
+    }
     this.timezone =
-      (jobData["timezone"] as string | null | undefined) ??
-      (zone() as TimeZone | null)?.name ??
-      null;
+      (jobData["timezone"] as string | null | undefined) ?? (timeZone || null)?.name ?? null;
     if (jobData["enqueued_at"] != null && jobData["enqueued_at"] !== false)
       this.enqueuedAt = Time.iso8601(jobData["enqueued_at"] as string);
     if (jobData["scheduled_at"] != null && jobData["scheduled_at"] !== false)
