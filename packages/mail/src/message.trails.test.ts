@@ -65,4 +65,9 @@ describe("Mail::Message binary raw source", () => {
     expect(encoded).toBeInstanceOf(Uint8Array);
     expect(new TextDecoder().decode(encoded)).toMatch(/\r\n\r\nabc$/);
   });
+
+  it("compares binary-source messages by their encoded bytes", () => {
+    const raw = new TextEncoder().encode("Message-ID: <a@b>\r\nSubject: hi\r\n\r\nabc");
+    expect(new Mail.Message(raw).equals(new Mail.Message(raw))).toBe(true);
+  });
 });

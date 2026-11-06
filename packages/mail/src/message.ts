@@ -1,4 +1,5 @@
 import {
+  rbEqual,
   binaryBytes,
   binaryString,
   cmp,
@@ -214,13 +215,13 @@ export class Message {
     if (typeof other?.encoded !== "function") return false;
 
     if (present(this.messageId()) && present(other.messageId())) {
-      return this.encoded() === other.encoded();
+      return rbEqual(this.encoded(), other.encoded());
     } else {
       const m = rbObjDup(this);
       m.setMessageId("<temp@test>");
       const o = rbObjDup(other);
       o.setMessageId("<temp@test>");
-      return m.encoded() === o.encoded();
+      return rbEqual(m.encoded(), o.encoded());
     }
   }
 
