@@ -1,4 +1,6 @@
 import { Dir, File, FileUtils, TSE, rbFBinding } from "@blazetrails/ruby-compat";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { assertFile } from "./testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import type { TestCase } from "./test-case.js";
@@ -13,6 +15,62 @@ export async function copyRoutes(this: TestCase): Promise<void> {
   const destination = File.join(this.destinationRoot, "config");
   FileUtils.mkdirP(destination);
   File.write(File.join(destination, "routes.ts"), routes);
+}
+
+export async function copyDockerfile(this: TestCase): Promise<void> {
+  const dockerfile = File.expandPath(
+    "../__fixtures__/generators/Dockerfile.test",
+    import.meta.dirname,
+  );
+  const destination = File.join(this.destinationRoot);
+  File.write(File.join(destination, "Dockerfile"), await File.readAsync(dockerfile));
+}
+
+export async function copyDevcontainerFiles(this: TestCase): Promise<void> {
+  const destination = File.join(this.destinationRoot, ".devcontainer");
+  FileUtils.mkdirP(destination);
+
+  const devcontainerJson = await File.readAsync(
+    File.expandPath(
+      "../__fixtures__/generators/.devcontainer/devcontainer.json",
+      import.meta.dirname,
+    ),
+  );
+  File.write(File.join(destination, "devcontainer.json"), devcontainerJson);
+
+  const composeYaml = await File.readAsync(
+    File.expandPath("../__fixtures__/generators/.devcontainer/compose.yaml", import.meta.dirname),
+  );
+  File.write(File.join(destination, "compose.yaml"), composeYaml);
+}
+
+export async function copyMinimalDevcontainerComposeFile(this: TestCase): Promise<void> {
+  const destination = File.join(this.destinationRoot, ".devcontainer");
+  FileUtils.mkdirP(destination);
+
+  const composeYaml = await File.readAsync(
+    File.expandPath(
+      "../__fixtures__/generators/.devcontainer/compose-minimal.yaml",
+      import.meta.dirname,
+    ),
+  );
+  File.write(File.join(destination, "compose.yaml"), composeYaml);
+}
+
+export async function assertComposeFile(
+  this: TestCase,
+  block: (composeConfig: any) => unknown,
+): Promise<void> {
+  await assertFile.call(this, ".devcontainer/compose.yaml", (content) => block(YAML.load(content)));
+}
+
+export async function assertDevcontainerJsonFile(
+  this: TestCase,
+  block: (content: any) => unknown,
+): Promise<void> {
+  await assertFile.call(this, ".devcontainer/devcontainer.json", (content) =>
+    block(JSON.parse(content)),
+  );
 }
 
 export async function withDatabaseConfiguration(
