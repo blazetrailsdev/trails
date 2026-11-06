@@ -117,6 +117,24 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["named routes array"]).toBe(3);
   });
 
+  it("counts an assert-named test-class method called through an instance once", () => {
+    const src = `
+      class C {
+        assertRouting(): void {
+          expect(a).toBe(1);
+          expect(b).toBe(2);
+        }
+      }
+      describe("C", () => {
+        let tc: C;
+        it("routing", () => {
+          tc.assertRouting();
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["routing"]).toBe(1);
+  });
+
   it("still expands a helper declared outside the test body per call site", () => {
     const src = `
       describe("s", () => {

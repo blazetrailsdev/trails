@@ -73,8 +73,9 @@ interface HelperDef {
  * longer collide — each suite's tests expand their own. The Ruby side resolves
  * symmetrically, by innermost enclosing class/module rather than source range.
  *
- * Still static: receiver calls (`obj.foo()`) and runtime-dispatched helpers are
- * out of scope, which is fine for a report-only count.
+ * Still static: a receiver call (`obj.foo()`) folds only where `obj` is declared
+ * as an instance of a same-file class ({@link addInstanceMethods}); other
+ * receivers and runtime-dispatched helpers are out of scope.
  */
 export type HelperMap = Map<string, HelperDef[]>;
 
