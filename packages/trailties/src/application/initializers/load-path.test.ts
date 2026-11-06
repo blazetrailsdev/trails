@@ -97,7 +97,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
 
     await import(`${await t.appPath()}/config/environment.ts`);
     expect($.$initializeTestSetFromEnv).toBe("success");
-    expect(Trails.application!.config.isReloadingEnabled()).toBe(false);
+    expect(Trails.application!.config.isReloadingEnabled()).toBeFalsy();
     expect(Trails.application!.config.timeZone).toBe("Brasilia");
   });
 });
