@@ -1,5 +1,6 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
+import { getPackageManager } from "../../../package-manager.js";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
@@ -90,8 +91,11 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   async enableBcrypt(): Promise<void> {
     const json = JSON.parse(await File.readAsync(File.join(this.destinationRoot, "package.json")));
-    const executor: string = json.packageManager?.split("@")[0] ?? "pnpm";
-    if (json.dependencies?.["bcryptjs"] != null) {
+    const executor = getPackageManager(this.destinationRoot).name;
+    if (
+      json.dependencies?.["bcryptjs"] != null &&
+      json.dependencies?.["@blazetrails/bcrypt"] != null
+    ) {
       await this.executeCommand(executor, "install --silent");
     } else {
       await this.executeCommand(executor, "add bcryptjs @blazetrails/bcrypt", { capture: true });
