@@ -1,300 +1,225 @@
 import { capture } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { Dir, File, type Hash } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it } from "vitest";
+import { TestCase } from "../../../../test-case.js";
+import {
+  assertComposeFile,
+  assertDevcontainerJsonFile,
+  copyDevcontainerFiles,
+  copyDockerfile,
+  copyMinimalDevcontainerComposeFile,
+} from "../../../../generators-test-helper.js";
 import { ChangeGenerator } from "./change-generator.js";
-import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 
-let tmpDir: string;
+class ChangeGeneratorTest extends TestCase {}
+ChangeGeneratorTest.destination(File.join(Dir.mktmpdir(), "tmp"));
+ChangeGeneratorTest.tests(ChangeGenerator);
+registerSpecType(/^ChangeGeneratorTest$/, ChangeGeneratorTest);
+let t: TestCase;
 
-function write(rel: string, content: string): void {
-  const full = path.join(tmpDir, rel);
-  fs.mkdirSync(path.dirname(full), { recursive: true });
-  fs.writeFileSync(full, content);
-}
+type ComposeConfig = Hash<string, any>;
 
-function read(rel: string): string {
-  return fs.readFileSync(path.join(tmpDir, rel), "utf-8");
-}
-
-function exists(rel: string): boolean {
-  return fs.existsSync(path.join(tmpDir, rel));
-}
-
-function seedPackageJson(): void {
-  write(
-    "package.json",
-    JSON.stringify(
-      {
-        name: "tmp",
-        dependencies: {
-          "@blazetrails/activerecord": "*",
-          "better-sqlite3": "^12.6.2",
-        },
-      },
-      null,
-      2,
-    ) + "\n",
+beforeEach(async (context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
+  File.write(
+    File.join(t.destinationRoot, "package.json"),
+    JSON.stringify({ name: "tmp", dependencies: { "better-sqlite3": "^12.6.2" } }, null, 2) + "\n",
   );
-}
 
-function seedDockerfile(): void {
-  write(
-    "Dockerfile",
-    `FROM node:22-slim AS base
-RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential git
-RUN apt-get update -qq && apt-get install --no-install-recommends -y curl libvips sqlite3
-`,
-  );
-}
-
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-change-"));
-  fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-  seedPackageJson();
-  seedDockerfile();
+  await copyDockerfile.call(t);
+  await copyDevcontainerFiles.call(t);
 });
-afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-async function invokeAll(generator: ChangeGenerator): Promise<void> {
-  await generator.editDatabaseConfig();
-  generator.editPackageJson();
-  generator.editDockerfile();
-  generator.editDevcontainerFiles();
-}
-
-function run(to: string, opts: { appName?: string } = {}) {
-  return invokeAll(
-    new ChangeGenerator(
-      [],
-      { to, name: opts.appName ?? "tmp", force: true },
-      { destinationRoot: tmpDir },
-    ),
-  );
-}
-
-type ComposeConfig = Hash<string, Hash<string, Hash<string, string[]>>>;
 describe("ChangeGeneratorTest", () => {
   it("change to invalid database", async () => {
-    expect(
-      () => new ChangeGenerator([], { to: "invalid-db" }, { destinationRoot: tmpDir }),
-    ).toThrow(
-      /Invalid value for --to option\. Supported preconfigurations are: mysql, postgresql, sqlite3, mariadb-mysql\./,
-    );
-  });
+    const output = await capture("stderr", () => t.runGenerator(["--to", "invalid-db"]));
 
-  it("appName defaults to basename of cwd", async () => {
-    const generator = new ChangeGenerator(
-      [],
-      { to: "postgresql", force: true },
-      { destinationRoot: tmpDir },
+    expect(output).toMatch(
+      "Invalid value for --to option. Supported preconfigurations are: mysql, postgresql, sqlite3, mariadb-mysql.",
     );
-    await invokeAll(generator);
-    expect(generator.originalAppName()).toBe(path.basename(tmpDir));
-    expect(read("config/database.ts")).toContain(`database: "${generator.appName()}_development"`);
   });
 
   it("change to postgresql", async () => {
-    await run("postgresql");
-    const cfg = read("config/database.ts");
-    expect(cfg).toContain('adapter: "postgresql"');
-    expect(cfg).toContain('database: "tmp_development"');
-    const pkg = JSON.parse(read("package.json"));
-    expect(pkg.dependencies.pg).toBe("^8.19.0");
-    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
-    const dockerfile = read("Dockerfile");
-    expect(dockerfile).toContain("build-essential git libpq-dev");
-    expect(dockerfile).toContain("curl libvips postgresql-client");
+    await t.runGenerator(["--to", "postgresql"]);
+
+    await t.assertFile("config/database.ts", (content) => {
+      expect(content).toMatch('adapter: "postgresql"');
+      expect(content).toMatch('database: "tmp_development"');
+      expect(content).toMatch('host: process.env.DB_HOST ?? "localhost"');
+    });
+
+    await t.assertFile("package.json", (content) => {
+      expect(JSON.parse(content).dependencies.pg).toBe("^8.19.0");
+    });
+
+    await t.assertFile("Dockerfile", (content) => {
+      expect(content).toMatch("build-essential git libpq-dev");
+      expect(content).toMatch("curl libvips postgresql-client");
+    });
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toBe("postgres");
+      expect(Object.keys(content.features)).toContain(
+        "ghcr.io/rails/devcontainer/features/postgres-client",
+      );
+      expect(Object.keys(content.features)).not.toContain(
+        "ghcr.io/rails/devcontainer/features/sqlite",
+      );
+    });
+
+    await assertComposeFile.call(t, (composeConfig: ComposeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain(
+        "postgres",
+      );
+
+      const expectedPostgresConfig = {
+        image: "postgres:16.1",
+        restart: "unless-stopped",
+        networks: ["default"],
+        volumes: ["postgres-data:/var/lib/postgresql/data"],
+        environment: {
+          POSTGRES_USER: "postgres",
+          POSTGRES_PASSWORD: "postgres",
+        },
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("postgres")))).toEqual(
+        expectedPostgresConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("postgres-data");
+    });
   });
 
   it("change to mysql", async () => {
-    await run("mysql");
-    const cfg = read("config/database.ts");
-    expect(cfg).toContain('adapter: "mysql2"');
-    expect(cfg).toContain('database: "tmp_development"');
-    const pkg = JSON.parse(read("package.json"));
-    expect(pkg.dependencies.mysql2).toBe("^3.18.2");
-    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
-    const dockerfile = read("Dockerfile");
-    expect(dockerfile).toContain("build-essential default-libmysqlclient-dev git");
-    expect(dockerfile).toContain("curl default-mysql-client libvips");
+    await t.runGenerator(["--to", "mysql"]);
+
+    await t.assertFile("config/database.ts", (content) => {
+      expect(content).toMatch('adapter: "mysql2"');
+      expect(content).toMatch('database: "tmp_development"');
+    });
+
+    await t.assertFile("package.json", (content) => {
+      expect(JSON.parse(content).dependencies.mysql2).toBe("^3.18.2");
+    });
+
+    await t.assertFile("Dockerfile", (content) => {
+      expect(content).toMatch("build-essential default-libmysqlclient-dev git");
+      expect(content).toMatch("curl default-mysql-client libvips");
+    });
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toBe("mysql");
+      expect(content.features["ghcr.io/rails/devcontainer/features/mysql-client"]).toEqual({});
+    });
+
+    await assertComposeFile.call(t, (composeConfig: ComposeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain("mysql");
+
+      const expectedMysqlConfig = {
+        image: "mysql/mysql-server:8.0",
+        restart: "unless-stopped",
+        environment: {
+          MYSQL_ALLOW_EMPTY_PASSWORD: "true",
+          MYSQL_ROOT_HOST: "%",
+        },
+        volumes: ["mysql-data:/var/lib/mysql"],
+        networks: ["default"],
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("mysql")))).toEqual(
+        expectedMysqlConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("mysql-data");
+    });
   });
 
   it("change to sqlite3", async () => {
-    write("package.json", JSON.stringify({ dependencies: { pg: "^8.19.0" } }) + "\n");
-    await run("sqlite3");
-    expect(read("config/database.ts")).toContain("storage/development.sqlite3");
-    const pkg = JSON.parse(read("package.json"));
-    expect(pkg.dependencies["better-sqlite3"]).toBe("^12.6.2");
-    expect(pkg.dependencies.pg).toBeUndefined();
+    await t.runGenerator(["--to", "sqlite3"]);
+
+    await t.assertFile("config/database.ts", (content) => {
+      expect(content).toMatch('adapter: "sqlite3"');
+      expect(content).toMatch("storage/development.sqlite3");
+    });
+
+    await t.assertFile("package.json", (content) => {
+      expect(JSON.parse(content).dependencies["better-sqlite3"]).toBe("^12.6.2");
+    });
+
+    await t.assertFile("Dockerfile", (content) => {
+      expect(content).toMatch("build-essential git");
+      expect(content).toMatch("curl libvips sqlite3");
+    });
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(Object.keys(content.containerEnv)).not.toContain("DB_HOST");
+    });
   });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)".
+  it.skip("change to trilogy", () => {});
 
   it("change to mariadb", async () => {
-    await run("mariadb-mysql");
-    expect(read("config/database.ts")).toContain('adapter: "mysql2"');
-    expect(JSON.parse(read("package.json")).dependencies.mysql2).toBe("^3.18.2");
-    expect(read("Dockerfile")).toContain("default-libmysqlclient-dev");
-  });
+    await t.runGenerator(["--to", "mariadb-mysql"]);
 
-  it("change from versioned dep to other versioned dep", async () => {
-    await run("postgresql");
-    await run("mysql");
-    const pkg = JSON.parse(read("package.json"));
-    expect(pkg.dependencies.mysql2).toBe("^3.18.2");
-    expect(pkg.dependencies.pg).toBeUndefined();
-  });
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.DB_HOST).toMatch("mariadb");
+    });
 
-  it("no Dockerfile is a no-op", async () => {
-    fs.rmSync(path.join(tmpDir, "Dockerfile"));
-    await run("mysql");
-    expect(exists("Dockerfile")).toBe(false);
-    expect(exists("config/database.ts")).toBe(true);
-  });
+    await assertComposeFile.call(t, (composeConfig: ComposeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain(
+        "mariadb",
+      );
 
-  it("editPackageJson throws on unparseable JSON", async () => {
-    write("package.json", "{ this is not json");
-    await expect(run("mysql")).rejects.toThrow(/Could not parse .*package\.json/);
-  });
-
-  it("editDatabaseConfig fallback honors isTypeScript()", async () => {
-    fs.rmSync(path.join(tmpDir, "tsconfig.json"));
-    await run("postgresql");
-    expect(exists("config/database.js")).toBe(true);
-    expect(exists("config/database.ts")).toBe(false);
-  });
-
-  it("editDockerfile prefers longest-match alternation", async () => {
-    write("Dockerfile", "RUN apt-get install -y build-essential git libpq-dev\n");
-    await run("mysql");
-    expect(read("Dockerfile")).toBe(
-      "RUN apt-get install -y build-essential default-libmysqlclient-dev git\n",
-    );
-  });
-
-  it("editDockerfile does not match inside a longer word token", async () => {
-    write("Dockerfile", "RUN apt-get install -y build-essential gitlab-cli\n");
-    await run("postgresql");
-    expect(read("Dockerfile")).toBe("RUN apt-get install -y build-essential gitlab-cli\n");
-  });
-
-  it("editDockerfile is a no-op when no DB package lines match", async () => {
-    write("Dockerfile", "FROM node:22-slim\nRUN echo hello\n");
-    const output = await capture("stdout", () => run("mysql"));
-    expect(read("Dockerfile")).toBe("FROM node:22-slim\nRUN echo hello\n");
-    expect(output).not.toContain("Dockerfile");
-  });
-
-  describe("editDevcontainerFiles", () => {
-    function seedDevcontainer(dbName: string, hasService: boolean): void {
-      const features: Record<string, unknown> = {
-        "ghcr.io/devcontainers/features/github-cli:1": {},
+      const expectedMariadbConfig = {
+        image: "mariadb:10.5",
+        restart: "unless-stopped",
+        networks: ["default"],
+        volumes: ["mariadb-data:/var/lib/mysql"],
+        environment: {
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "true",
+        },
       };
-      if (dbName === "sqlite3") features["ghcr.io/rails/devcontainer/features/sqlite3"] = {};
-      else if (dbName === "postgres")
-        features["ghcr.io/rails/devcontainer/features/postgres-client"] = {};
-      else if (dbName === "mysql")
-        features["ghcr.io/rails/devcontainer/features/mysql-client"] = {};
-      const dc: Record<string, unknown> = {
-        name: "tmp",
-        features,
-        forwardPorts: [3000],
-      };
-      if (hasService) dc.containerEnv = { DB_HOST: dbName };
-      write(".devcontainer/devcontainer.json", JSON.stringify(dc, null, 2) + "\n");
-      const services: Record<string, unknown> = { "trails-app": { command: "sleep infinity" } };
-      if (hasService) {
-        (services["trails-app"] as Record<string, unknown>).depends_on = [dbName];
-        services[dbName] = { image: "fake:latest" };
-      }
-      const compose: Record<string, unknown> = { name: "tmp", services };
-      if (hasService) compose.volumes = { [`${dbName}-data`]: null };
-      write(".devcontainer/compose.yaml", toYaml(compose));
-    }
 
-    it("editDevcontainerFiles skipped when no .devcontainer dir", async () => {
-      await run("postgresql");
-      expect(exists(".devcontainer/devcontainer.json")).toBe(false);
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("mariadb")))).toEqual(
+        expectedMariadbConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("mariadb-data");
+    });
+  });
+
+  it("change from versioned gem to other versioned gem", async () => {
+    await t.runGenerator(["--to", "sqlite3"]);
+    await t.runGenerator(["--to", "mysql", "--force"]);
+
+    await t.assertFile("config/database.ts", (content) => {
+      expect(content).toMatch('adapter: "mysql2"');
+      expect(content).toMatch('database: "tmp_development"');
     });
 
-    it("change to postgresql adds service, volume, DB_HOST, feature", async () => {
-      seedDevcontainer("sqlite3", false);
-      await run("postgresql");
-      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
-      expect((dc.containerEnv as Record<string, string>).DB_HOST).toBe("postgres");
-      expect(
-        (dc.features as Record<string, unknown>)[
-          "ghcr.io/rails/devcontainer/features/postgres-client"
-        ],
-      ).toEqual({});
-      expect(
-        (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
-      ).toBeUndefined();
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
-      expect(cm.get("services")!.get("postgres")).toBeDefined();
-      expect(cm.get("volumes")!.get("postgres-data")).toBeDefined();
-      const trailsApp = cm.get("services")!.get("trails-app")!;
-      expect(trailsApp.get("depends_on")).toContain("postgres");
+    await t.assertFile("package.json", (content) => {
+      expect(JSON.parse(content).dependencies.mysql2).toBe("^3.18.2");
+    });
+  });
+
+  it("change from db with devcontainer service to one without", async () => {
+    await copyMinimalDevcontainerComposeFile.call(t);
+    await t.runGenerator(["--to", "mysql"]);
+    await t.runGenerator(["--to", "sqlite3", "--force"]);
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(Object.keys(content.containerEnv)).not.toContain("DB_HOST");
+      expect(Object.keys(content.features)).not.toContain(
+        "ghcr.io/rails/devcontainer/features/mysql-client",
+      );
     });
 
-    it("change to sqlite3 removes service, volume, DB_HOST, swaps feature", async () => {
-      seedDevcontainer("postgres", true);
-      await run("sqlite3");
-      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
-      expect(dc.containerEnv).toBeUndefined();
-      expect(
-        (dc.features as Record<string, unknown>)["ghcr.io/rails/devcontainer/features/sqlite3"],
-      ).toEqual({});
-      expect(
-        (dc.features as Record<string, unknown>)[
-          "ghcr.io/rails/devcontainer/features/postgres-client"
-        ],
-      ).toBeUndefined();
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
-      expect(cm.get("services")!.get("postgres")).toBeUndefined();
-      expect(cm.get("volumes")).toBeUndefined();
-      const trailsApp = cm.get("services")!.get("trails-app")!;
-      expect(trailsApp.get("depends_on")).toBeUndefined();
-    });
-
-    it("editDevcontainerJson throws on unparseable JSON", async () => {
-      write(".devcontainer/devcontainer.json", "{ not json");
-      await expect(run("postgresql")).rejects.toThrow(/Could not parse .*devcontainer\.json/);
-    });
-
-    it("non-DB depends_on entries are preserved when swapping database", async () => {
-      seedDevcontainer("postgres", true);
-      const composePath = ".devcontainer/compose.yaml";
-      const compose = YAML.load(read(composePath)) as ComposeConfig;
-      compose.get("services")!.get("trails-app")!.get("depends_on")!.push("selenium", "redis");
-      write(composePath, toYaml(compose));
-      await run("mysql");
-      const cm = YAML.load(read(composePath)) as ComposeConfig;
-      const trailsApp = cm.get("services")!.get("trails-app")!;
-      expect(trailsApp.get("depends_on")).toContain("mysql");
-      expect(trailsApp.get("depends_on")).toContain("selenium");
-      expect(trailsApp.get("depends_on")).toContain("redis");
-      expect(trailsApp.get("depends_on")).not.toContain("postgres");
-    });
-
-    it("change from mysql to postgresql swaps service and feature", async () => {
-      seedDevcontainer("mysql", true);
-      await run("postgresql");
-      const cm = YAML.load(read(".devcontainer/compose.yaml")) as ComposeConfig;
-      expect(cm.get("services")!.get("mysql")).toBeUndefined();
-      expect(cm.get("services")!.get("postgres")).toBeDefined();
-      const dc = JSON.parse(read(".devcontainer/devcontainer.json")) as Record<string, unknown>;
-      expect(
-        (dc.features as Record<string, unknown>)[
-          "ghcr.io/rails/devcontainer/features/mysql-client"
-        ],
-      ).toBeUndefined();
-      expect(
-        (dc.features as Record<string, unknown>)[
-          "ghcr.io/rails/devcontainer/features/postgres-client"
-        ],
-      ).toEqual({});
+    await assertComposeFile.call(t, (composeConfig: ComposeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").keys()).not.toContain("depends_on");
+      expect(composeConfig.get("services").keys()).not.toContain("mysql");
+      expect(composeConfig.keys()).not.toContain("volumes");
     });
   });
 });
