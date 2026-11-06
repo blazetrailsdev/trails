@@ -14,7 +14,7 @@ import { Configuration } from "./configuration.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
 
-interface MailConstants {
+export interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
   SMTP: typeof import("./network/delivery-methods/smtp.js").SMTP;
