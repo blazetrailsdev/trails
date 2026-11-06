@@ -1,6 +1,7 @@
 import { Errno } from "../errno.js";
 import { getHttpAsync, type HttpClientConnection } from "../http-adapter.js";
 import { IOError } from "../io-error.js";
+import { IPAddr } from "../ipaddr.js";
 import { NotImplementedError } from "../not-implemented-error.js";
 import { OpenSSL } from "../openssl.js";
 import { Socket } from "../socket.js";
@@ -112,6 +113,13 @@ export class HTTP {
     const connAddr = this.address;
     const connPort = this.port;
 
+    let sslHostAddress: string | null = null;
+    try {
+      new IPAddr(connAddr);
+    } catch {
+      sslHostAddress = connAddr;
+    }
+
     const adapter = await getHttpAsync();
     if (adapter.connect === undefined) {
       throw new NotImplementedError("the HTTP adapter has no client connect");
@@ -122,6 +130,7 @@ export class HTTP {
           host: connAddr,
           port: connPort,
           useSsl: this.isUseSsl(),
+          sslHostAddress,
           verifyPeer: this.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
         });
       } catch (e) {

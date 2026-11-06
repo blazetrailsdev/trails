@@ -73,6 +73,7 @@ export interface HttpConnectOptions {
   host: string;
   port: number;
   useSsl: boolean;
+  sslHostAddress: string | null;
   verifyPeer: boolean;
 }
 
@@ -152,7 +153,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
       ? tls.connect({
           host: options.host,
           port: options.port,
-          servername: options.host,
+          ...(options.sslHostAddress !== null && { servername: options.sslHostAddress }),
           rejectUnauthorized: options.verifyPeer,
         })
       : net.connect({ host: options.host, port: options.port });
