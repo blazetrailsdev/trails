@@ -734,7 +734,7 @@ describe("BaseTest", () => {
       notify() {}
     }
 
-    expect(new Set(FooMailer.actionMethods())).toEqual(new Set(["notify"]));
+    expect(FooMailer.actionMethods()).toEqual(new Set(["notify"]));
   });
 
   it("email_address_with_name escapes", () => {

@@ -351,6 +351,6 @@ class Me6 extends AbstractController.Base {
 
 describe("TestActionMethodsReloading", () => {
   test("action_methods should be reloaded after defining a new method", () => {
-    expect(new Set(Me6.actionMethods())).toEqual(new Set(["index"]));
+    expect(Me6.actionMethods()).toEqual(new Set(["index"]));
   });
 });

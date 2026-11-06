@@ -891,13 +891,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "render_to_string",
-    "digest": "01c82edf8e6b62c2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "respond_to",
     "digest": "cfaaddf8fd55a5fc",
     "ref": "v8.0.2"

@@ -54,7 +54,7 @@ export class ActionNotFound extends StandardError {
     }
     const ctor = this.controller.constructor as typeof Base;
     this.#cachedCorrections = new SpellChecker({
-      dictionary: ctor.actionMethods(),
+      dictionary: [...ctor.actionMethods()],
     }).correct(this.action);
     return this.#cachedCorrections;
   }
@@ -119,7 +119,7 @@ export class Base {
     "rateLimiting",
   ]);
 
-  private static _actionMethodCache?: Set<string>;
+  private static _actionMethodCache?: ReadonlySet<string>;
 
   protected static _abstract: boolean = false;
 
@@ -192,7 +192,7 @@ export class Base {
     this.actionMethods();
   }
 
-  static actionMethods(): string[] {
+  static actionMethods(): ReadonlySet<string> {
     if (!Object.hasOwn(this, "_actionMethodCache") || !this._actionMethodCache) {
       const internalMethods = new Set(this.internalMethods());
       const methods = allPublicMethodNames(this.prototype).filter(
@@ -201,7 +201,7 @@ export class Base {
       methods.push(...ownPublicMethodNames(this.prototype));
       this._actionMethodCache = new Set(methods);
     }
-    return [...this._actionMethodCache];
+    return this._actionMethodCache;
   }
 
   /** @internal */
@@ -235,7 +235,7 @@ export class Base {
     return (this.constructor as typeof Base).controllerPath();
   }
 
-  actionMethods(): string[] {
+  actionMethods(): ReadonlySet<string> {
     return (this.constructor as typeof Base).actionMethods();
   }
 
@@ -249,7 +249,7 @@ export class Base {
 
   /** @internal */
   isActionMethod(name: string): boolean {
-    return (this.constructor as typeof Base).actionMethods().includes(name);
+    return (this.constructor as typeof Base).actionMethods().has(name);
   }
 
   /** @internal */

@@ -17,7 +17,7 @@ import {
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
-import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js";
+import { zone as timeZone, findZone } from "./time-zone-config.js";
 import { DateTime, Temporal } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "./temporal.js";
@@ -462,15 +462,11 @@ export class TimeWithZone {
     return this.utc().toR();
   }
 
-  inTimeZone(newZone?: unknown): TimeWithZone {
-    if (newZone == null) {
-      const currentZone = timeZone();
-      if (!currentZone) return this;
-      newZone = currentZone;
-    }
+  inTimeZone(newZone: TimeZone | string): TimeWithZone;
+  inTimeZone(newZone?: unknown): TimeWithZone | Time;
+  inTimeZone(newZone: unknown = timeZone()): TimeWithZone | Time {
     if (rbEqual(this._timeZone, newZone)) return this;
-    const tz = findZoneBang(newZone) as TimeZone;
-    return new TimeWithZone(this._zoned.toInstant(), tz);
+    return this.utc().inTimeZone(newZone);
   }
 
   formattedOffset(colon = true, alternateUtcString?: string): string {

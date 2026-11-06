@@ -177,7 +177,6 @@ import {
   _processVariant,
   _normalizeOptions,
   Rendering,
-  renderToString,
 } from "./metal/rendering.js";
 import type { Renderer, RendererController } from "./renderer.js";
 import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
@@ -309,6 +308,7 @@ export interface Base
     Included<typeof HttpAuthentication.Token.ControllerMethods>,
     RequestForgeryProtectionPrivate {
   render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void>;
+  renderToString<P extends string = string>(...args: RenderArgs<P>): string | Promise<string>;
   /** @internal */
   renderToBody(options?: Record<string, unknown>): unknown;
   get params(): StrongParameters;
@@ -633,7 +633,6 @@ export class Base extends Metal {
   declare _normalizeArgs: typeof _normalizeArgs;
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
-  declare renderToString: typeof renderToString;
   declare renderedFormat: OmitThisParameter<typeof renderedFormat>;
   /** @internal */
   declare _setHtmlContentType: typeof _setHtmlContentType;
