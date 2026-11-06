@@ -1,10 +1,10 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { Handler } from "@blazetrails/rackup";
 import type { HttpRequest, HttpResponse, HttpSocket } from "@blazetrails/ruby-compat";
-import type { RackApp } from "@blazetrails/actionpack";
+import type { RackApp, RackMiddleware } from "@blazetrails/rack";
 
 export interface TrailsPluginOptions {
-  app: RackApp;
+  app: RackApp | RackMiddleware;
 }
 
 export function trailsPlugin(options: TrailsPluginOptions): Plugin {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import type { RackApp } from "@blazetrails/actionpack";
+import type { RackApp, RackMiddleware } from "@blazetrails/rack";
 import { trailsPlugin } from "./vite-plugin.js";
 
 const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, ["ok"]];
@@ -122,5 +122,28 @@ describe("trailsPlugin", () => {
       expect(err).toBeInstanceOf(Error);
       expect((err as Error).message).toContain("too large");
     }
+  });
+
+  it("serves an app object that responds to call", async () => {
+    const app: RackMiddleware = { call: okApp };
+    const plugin = trailsPlugin({ app });
+    const middlewares: any[] = [];
+    const fakeServer = {
+      config: { server: { port: 3000 } },
+      httpServer: { address: () => ({ port: 3000 }), on: () => {} },
+      middlewares: { use: (fn: any) => middlewares.push(fn) },
+    };
+    const registerFn = await (plugin as any).configureServer(fakeServer);
+    registerFn();
+
+    const res = new ServerResponse(createMockReq({}));
+    res.writeHead = vi.fn().mockReturnValue(res);
+    res.end = vi.fn().mockReturnValue(res);
+    const next = vi.fn();
+
+    await middlewares[0](createMockReq({}), res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.writeHead).toHaveBeenCalledWith(200, expect.anything());
   });
 });
