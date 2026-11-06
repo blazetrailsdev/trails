@@ -1,5 +1,5 @@
 import type { ThorClass } from "@blazetrails/thor";
-import { File, rbRegSUnion } from "@blazetrails/ruby-compat";
+import { File, included, rbRegSUnion } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
@@ -117,22 +117,42 @@ export class ActionMethods {
     ](...args);
   }
 
-  /** @internal */
   methodMissing(key: string | symbol): unknown {
     const value = (this.generator as unknown as Record<string | symbol, unknown>)[key];
     return typeof value === "function" ? value.bind(this.generator) : value;
   }
 }
 
+const spliced = new WeakSet<object>();
+
+const METHOD_MISSING_HANDLER: ProxyHandler<object> = {
+  get: (target, key, receiver: ActionMethods) =>
+    key in target || !Object.hasOwn(receiver, "generator")
+      ? Reflect.get(target, key, receiver)
+      : receiver.methodMissing(key),
+};
+
 Object.setPrototypeOf(
   ActionMethods.prototype,
-  new Proxy(Object.create(Object.getPrototypeOf(ActionMethods.prototype) as object) as object, {
-    get: (target, key, receiver: ActionMethods) =>
-      key in target || !Object.hasOwn(receiver, "generator")
-        ? Reflect.get(target, key, receiver)
-        : receiver.methodMissing(key),
-  }),
+  new Proxy(
+    Object.create(Object.getPrototypeOf(ActionMethods.prototype) as object) as object,
+    METHOD_MISSING_HANDLER,
+  ),
 );
+
+(ActionMethods as unknown as Record<symbol, unknown>)[included] = (base: {
+  prototype: object;
+}): void => {
+  if (base.prototype instanceof ActionMethods || spliced.has(base.prototype)) return;
+  spliced.add(base.prototype);
+  Object.setPrototypeOf(
+    base.prototype,
+    new Proxy(
+      Object.create(Object.getPrototypeOf(base.prototype) as object) as object,
+      METHOD_MISSING_HANDLER,
+    ),
+  );
+};
 
 Trails.ActionMethods = ActionMethods;
 

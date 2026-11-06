@@ -172,7 +172,6 @@ export class BroadcastLogger extends Logger {
     return true;
   }
 
-  /** @internal */
   methodMissing(name: string, ...args: unknown[]): unknown {
     const loggers = this.broadcasts.filter((logger) => rbObjRespondTo(logger, name));
 
@@ -189,7 +188,6 @@ export class BroadcastLogger extends Logger {
     }
   }
 
-  /** @internal */
   respondToMissing(method: string, includeAll: boolean): boolean {
     return this.broadcasts.some((logger) => rbObjRespondTo(logger, method));
   }
