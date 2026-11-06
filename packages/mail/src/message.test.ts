@@ -275,7 +275,7 @@ describe("Mail::Message", () => {
       const m = await readFixture("emails", "error_emails", "cant_parse_from.eml");
       expect(m.from()).not.toBeNull();
       expect([...(m.from() as string[])]).toEqual(["News@InsideApple.Apple.com"]);
-      expect(m.isMultipart()).toBe(true);
+      expect(m.isMultipart()).toBeTruthy();
     });
   });
 
@@ -774,7 +774,7 @@ describe("Mail::Message", () => {
             this.subject("This is a test email");
             this.body("This is a body of the email");
           });
-          expect(mail.hasMessageId()).toBe(false);
+          expect(mail.hasMessageId()).toBeFalsy();
         });
 
         it("should preserve any message id that you pass it if add_message_id is called explicitly", () => {
@@ -808,7 +808,7 @@ describe("Mail::Message", () => {
             this.subject("This is a test email");
             this.body("This is a body of the email");
           });
-          expect(mail.toString()).toMatch(/Message-ID: <.+@.+.mail>/i);
+          expect(mail.toString().match(/Message-ID: <.+@.+.mail>/i)).not.toBeNull();
         });
 
         it("should add the message id to the message permanently once sent to_s", () => {
@@ -819,7 +819,7 @@ describe("Mail::Message", () => {
             this.body("This is a body of the email");
           });
           mail.toString();
-          expect(mail.hasMessageId()).toBe(true);
+          expect(mail.hasMessageId()).toBeTruthy();
         });
 
         it("should add a body part if it is missing", () => {
@@ -837,7 +837,7 @@ describe("Mail::Message", () => {
             this.subject("This is a test email");
             this.body("This is a body of the email");
           });
-          expect(mail.hasDate()).toBe(false);
+          expect(mail.hasDate()).toBeFalsy();
         });
 
         it("should preserve any date that you pass it if add_date is called explicitly", () => {
@@ -884,7 +884,7 @@ describe("Mail::Message", () => {
             this.body("This is a body of the email");
           });
           mail.toString();
-          expect(mail.hasDate()).toBe(true);
+          expect(mail.hasDate()).toBeTruthy();
         });
       });
     });
