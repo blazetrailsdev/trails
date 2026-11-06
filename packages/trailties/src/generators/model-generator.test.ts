@@ -1,8 +1,9 @@
-import { File, Dir } from "@blazetrails/ruby-compat";
+import { File, Dir, FileUtils } from "@blazetrails/ruby-compat";
 import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
+import { buildTemplates } from "@blazetrails/trails-tsc";
 import { Base, setTimestampedMigrations } from "@blazetrails/activerecord";
 import { ModelHelpers } from "./model-helpers.js";
 import { Application } from "../application.js";
@@ -20,6 +21,8 @@ registerSpecType(/^ModelGeneratorTest$/, ModelGeneratorTest);
 let ModelGenerator: typeof import("./trails/model/model-generator.js").ModelGenerator;
 let t: TestCase & { generatorClass?: typeof ModelGenerator };
 let oldBelongsToRequiredByDefault: boolean | undefined;
+const fixtures = Dir.mktmpdir();
+ModelGeneratorApp.instance().config.generators().templates = [File.join(fixtures, "lib/templates")];
 
 beforeAll(async () => {
   await ModelGeneratorApp.instance().loadGenerators();
@@ -33,6 +36,7 @@ beforeEach(async (context) => {
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
   await copyRoutes.call(t);
   Trails.application = ModelGeneratorApp.instance();
+  Trails.application.config.setRoot(fixtures);
   ModelHelpers.skipWarn = false;
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
@@ -67,7 +71,30 @@ describe("ModelGeneratorTest", () => {
     );
   });
 
-  it.skip("migration source paths", () => {});
+  it("migration source paths", async () => {
+    const template = File.join(
+      Trails.root()!,
+      "lib",
+      "templates",
+      "active_record",
+      "migration",
+      "create_table_migration.ts.tt",
+    );
+
+    try {
+      FileUtils.mkdirP(File.dirname(template));
+      File.write(template, "custom content");
+      await buildTemplates([template]);
+
+      await t.runGenerator(["product"]);
+
+      await t.assertMigration("db/migrate/create_products.ts", (m) => {
+        expect(m).toBe("custom content");
+      });
+    } finally {
+      FileUtils.rmRf(File.dirname(template));
+    }
+  });
 
   it("invokes default orm", async () => {
     await t.runGenerator(["Account", "name:string", "age:integer"]);
