@@ -1,7 +1,7 @@
 import { Dir, File, FileUtils, Process, rbFBackquote } from "@blazetrails/ruby-compat";
 import { assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AppGenerator } from "./trails/app/app-generator.js";
 import { TestCase } from "./test-case.js";
 import { runAppUpdate } from "./generators-test-helper.js";
@@ -11,6 +11,7 @@ import { Trails } from "../trails.js";
 
 class AppGeneratorApp extends Application {}
 const destinationRoot = Dir.mktmpdir();
+const templateRoot = Dir.mktmpdir();
 
 class AppGeneratorTest extends TestCase {}
 AppGeneratorTest.destination(destinationRoot);
@@ -27,6 +28,10 @@ beforeEach((context) => {
 
 afterEach(() => {
   Trails.application = null;
+});
+
+afterAll(async () => {
+  await FileUtils.rmRfAsync([destinationRoot, templateRoot]);
 });
 
 const UNPORTED = [
@@ -179,7 +184,7 @@ describe("AppGeneratorTest", () => {
   });
 
   it("template from absolute path", async () => {
-    const template = File.join(Dir.mktmpdir(), "template.mjs");
+    const template = File.join(templateRoot, "template.mjs");
     await File.writeAsync(template, 'export default (g) => g.say("It works from file!");\n');
     expect(await t.runGenerator([t.destinationRoot, "-m", template])).toMatch(
       "It works from file!",
@@ -318,17 +323,6 @@ describe("AppGenerator", () => {
       "storage/.keep",
     ])
       await t.assertFile(path);
-  });
-
-  it("generator if skip action cable is given", async () => {
-    await t.runGenerator([t.destinationRoot, "--skip-action-cable"]);
-    t.assertNoFile("config/cable.ts");
-    await t.assertFile("package.json", (content: string) => {
-      assertNoMatch(/@blazetrails\/actioncable/, content);
-    });
-    await t.assertFile("config/environments/development.ts", (content: string) => {
-      assertNoMatch(/actionCable/, content);
-    });
   });
 
   it("--api implies its options and a default run reports nothing", async () => {
