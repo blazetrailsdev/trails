@@ -215,6 +215,21 @@ export class SubtreeProxy {
     return value;
   }
 
+  isA(klass: unknown): boolean {
+    return Hash === klass || (typeof klass === "function" && this instanceof klass);
+  }
+
+  isKindOf(klass: unknown): boolean {
+    return this.isA(klass);
+  }
+
+  isInstanceOf(klass: unknown): boolean {
+    return (
+      Hash === klass ||
+      Object.getPrototypeOf(this) === (klass as { prototype?: unknown })?.prototype
+    );
+  }
+
   isNil(): boolean {
     return this.#subtree == null;
   }

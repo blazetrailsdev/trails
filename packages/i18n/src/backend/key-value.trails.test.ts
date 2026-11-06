@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { SubtreeProxy } from "./key-value.js";
 
 describe("prototype-chain method_missing", () => {
@@ -22,5 +23,10 @@ describe("prototype-chain method_missing", () => {
     expect(sub.hasKey("missing")).toBe(false);
     expect(sub.isNil()).toBe(false);
     expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+    expect(sub.isA(Hash)).toBe(true);
+    expect(sub.isKindOf(SubtreeProxy)).toBe(true);
+    expect(sub.isInstanceOf(Hash)).toBe(true);
+    expect(sub.isInstanceOf(Sub)).toBe(true);
+    expect(sub.isInstanceOf(SubtreeProxy)).toBe(false);
   });
 });

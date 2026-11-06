@@ -138,6 +138,7 @@ export class Image {
     return this._tempfile;
   }
 
+  /** @missingRailsName path — PERMANENT */
   constructor(
     inputPath: string | Pathname,
     tempfile: Tempfile | null = null,
@@ -145,7 +146,7 @@ export class Image {
   ) {
     this._path = String(inputPath);
     this._tempfile = tempfile;
-    this._info = new Info(this.path);
+    this._info = new Info(this._path);
     if (block != null) {
       (this._info._pending = this.combineOptions(block)).catch(() => {});
     }
