@@ -1,4 +1,4 @@
-import { Module, camelize, underscore } from "@blazetrails/activesupport";
+import { Module, underscore } from "@blazetrails/activesupport";
 import {
   KERNEL_METHODS,
   NoMethodError,
@@ -34,7 +34,10 @@ export const Collector = new Module((mod) => {
             return value;
           }
           if (KERNEL_METHODS.has(prop) || PROTOCOL_PROBES.has(prop)) return value;
-          return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+          const symbol = underscore(prop);
+          const defined = Reflect.get(target, symbol, receiver);
+          if (typeof defined === "function") return defined;
+          return (...args: unknown[]) => receiver.methodMissing(symbol, ...args);
         },
       }),
     );
@@ -47,7 +50,7 @@ Collector.generateMethodForMime = generateMethodForMime;
 function generateMethodForMime(mime: MimeType | string): void {
   const sym = typeof mime === "string" ? mime : mime.toSym()!;
   Collector.defineMethod(
-    camelize(symbolToS(sym), false),
+    symbolToS(sym),
     function (
       this: { custom(mime: MimeType | undefined, ...args: unknown[]): unknown },
       ...args: unknown[]
@@ -62,14 +65,14 @@ MimeType.SET.each((mime) => {
 });
 
 MimeType.registerCallback((mime) => {
-  if (!Collector.instanceMethods().includes(camelize(symbolToS(mime.toSym()!), false))) {
+  if (!Collector.instanceMethods().includes(symbolToS(mime.toSym()!))) {
     generateMethodForMime(mime);
   }
 });
 
 /** @internal */
 export function methodMissing(this: object, symbol: string, ...args: unknown[]): unknown {
-  const mimeConstant = Mime.get(underscore(symbol));
+  const mimeConstant = Mime.get(symbol);
   if (mimeConstant == null) {
     throw new NoMethodError(
       "To respond to a custom format, register it as a MIME type first: " +
@@ -82,7 +85,7 @@ export function methodMissing(this: object, symbol: string, ...args: unknown[]):
 
   if (MimeType.SET.isInclude(mimeConstant)) {
     Collector.generateMethodForMime(mimeConstant);
-    return rbFSend(this, camelize(symbol, false), ...args);
+    return rbFSend(this, symbol, ...args);
   } else {
     const super_ = Collector.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(symbol, ...args);

@@ -1161,7 +1161,7 @@ describe("UrlOptionsIntegrationTest", () => {
       assertResponse("success");
       expect(t.foosUrl()).toBe("http://foobar.com/foo");
     } finally {
-      t.defaultUrlOptions = originalHost;
+      Session.defaultUrlOptions = t.defaultUrlOptions = originalHost;
     }
   });
 

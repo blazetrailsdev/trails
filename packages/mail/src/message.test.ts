@@ -1,4 +1,5 @@
 import type {} from "@blazetrails/vitest-matchers";
+import { sort } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { hashAref, hashAset, Hash } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
@@ -20,6 +21,10 @@ class DeliveryAgent {
     return block();
   }
 }
+
+const fixturePath = (...path: string[]) =>
+  new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
+const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
 
 describe("Mail::Message", () => {
   function basicEmail() {
@@ -413,6 +418,16 @@ describe("Mail::Message", () => {
     });
   });
   describe("helper methods", () => {
+    it("should implement the spaceship operator on the date field", () => {
+      const now = new Date();
+      const mail1 = Mail.new(function (this: Message) {
+        this.date(now);
+      });
+      const mail2 = Mail.new(function (this: Message) {
+        this.date(new Date(now.getTime() - 10_000));
+      });
+      expect(sort([mail2, mail1])).toEqual([mail2, mail1]);
+    });
     describe("==", () => {
       it("should be implemented", () => {
         expect(() => Mail.new().equals(Mail.new())).not.toThrow();
@@ -565,6 +580,109 @@ describe("Mail::Message", () => {
         });
       }
     }
+  });
+
+  describe("text messages", () => {
+    function messageWithIso88591Charset() {
+      return (
+        "From: test@example.com\r\n" +
+        "Content-Type: text/plain; charset=iso-8859-1\r\n" +
+        "Content-Transfer-Encoding: quoted-printable\r\n" +
+        "Date: Tue, 27 Sep 2011 16:59:48 +0100 (BST)\r\n" +
+        "Subject: test\r\n\r\n" +
+        "Am=E9rica"
+      );
+    }
+
+    function withEncoder(encoder: typeof Utilities.charsetEncoder, block: () => void) {
+      const old = Utilities.charsetEncoder;
+      Utilities.charsetEncoder = encoder;
+      try {
+        block();
+      } finally {
+        Utilities.charsetEncoder = old;
+      }
+    }
+
+    let message: Message;
+    beforeEach(() => {
+      message = Mail.new(messageWithIso88591Charset());
+    });
+
+    it("should be decoded using content type charset", () => {
+      expect(message.decoded()).toBe("América");
+    });
+
+    it("should respond true to text?", () => {
+      expect(message.isText()).toBe(true);
+    });
+
+    it("inspect_structure should return the same as inspect (no attachments)", () => {
+      expect(message.inspectStructure()).toBe(message.inspect());
+    });
+
+    it("uses the Utilities charset encoder", () => {
+      withEncoder(new Utilities.BestEffortCharsetEncoder(), () => {
+        const message = Mail.new(
+          "Content-Type: text/plain;\r\n charset=windows-1258\r\nContent-Transfer-Encoding: base64\r\n\r\nSGkglg==\r\n",
+        );
+        expect(message.decoded()).toBe("Hi –");
+      });
+    });
+  });
+
+  describe("ordering messages", () => {
+    it("should put all attachments as the last item", async () => {
+      const mail = Mail.new();
+      await mail.attachments().set("image.png", new Uint8Array([0xc2, 0xc2, 0xc2, 0xc2]));
+      const p = new Part({ contentType: "multipart/alternative" });
+      p.addPart(new Part({ contentType: "text/html", body: "HTML TEXT" }));
+      p.addPart(new Part({ contentType: "text/plain", body: "PLAIN TEXT" }));
+      mail.addPart(p);
+      mail.encoded();
+      expect(mail.parts[0].mimeType()).toBe("multipart/alternative");
+      expect(mail.parts[0].parts[0].mimeType()).toBe("text/plain");
+      expect(mail.parts[0].parts[1].mimeType()).toBe("text/html");
+      expect(mail.parts[1].mimeType()).toBe("image/png");
+    });
+
+    it("should allow overwriting sort order", async () => {
+      const mail = Mail.new();
+      mail.body().setSortOrder([]);
+      await mail.attachments().set("image.png", new Uint8Array([0xc2, 0xc2, 0xc2, 0xc2]));
+      const p = new Part({ contentType: "multipart/alternative" });
+      p.addPart(new Part({ contentType: "text/plain", body: "PLAIN TEXT" }));
+      p.addPart(new Part({ contentType: "text/html", body: "HTML TEXT" }));
+      mail.addPart(p);
+      mail.encoded();
+      expect(mail.parts[0].mimeType()).toBe("multipart/alternative");
+      expect(mail.parts[0].parts[0].mimeType()).toBe("text/plain");
+      expect(mail.parts[0].parts[1].mimeType()).toBe("text/html");
+      expect(mail.parts[1].mimeType()).toBe("image/png");
+    });
+  });
+
+  describe("without_attachments!", () => {
+    it("should delete all attachments", async () => {
+      const emailsWithAttachments = [
+        ["attachment_emails", "attachment_content_disposition.eml"],
+        ["attachment_emails", "attachment_content_location.eml"],
+        ["attachment_emails", "attachment_pdf.eml"],
+        ["attachment_emails", "attachment_with_encoded_name.eml"],
+        ["attachment_emails", "attachment_with_quoted_filename.eml"],
+        ["mime_emails", "raw_email7.eml"],
+      ];
+
+      for (const fileName of emailsWithAttachments) {
+        const mail = await readFixture("emails", ...fileName);
+        const nonAttachmentParts = mail.allParts().filter((p) => !p.isAttachment());
+        expect(mail.hasAttachments()).toBeTruthy();
+        mail.withoutAttachmentsBang();
+
+        expect(mail.allParts()).toEqualRuby(nonAttachmentParts);
+        expect(mail.hasAttachments()).toBeFalsy();
+      }
+    });
   });
 
   describe("attachment query methods", () => {
