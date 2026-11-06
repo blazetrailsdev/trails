@@ -1,4 +1,5 @@
 import { ArgumentError } from "../../argument-error.js";
+import { Generic } from "../../uri/generic.js";
 import { HTTP as URIHTTP } from "../../uri/http.js";
 
 /**
@@ -32,7 +33,7 @@ export class HTTPRequest {
    * @missingRailsCall dup — CONVERGEABLE ruby-compat-net-http-full-transport
    * @noRailsEquivalent PERMANENT
    */
-  constructor(path: string | URIHTTP, initheader: Record<string, string> | null = null) {
+  constructor(path: string | Generic, initheader: Record<string, string> | null = null) {
     const klass = this.constructor as typeof HTTPRequest;
     this.method = klass.METHOD;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
@@ -45,6 +46,8 @@ export class HTTPRequest {
       const requestUri = path.requestUri();
       if (requestUri == null) throw new ArgumentError("no HTTP request path given");
       this.path = requestUri;
+    } else if (path instanceof Generic) {
+      throw new ArgumentError("not an HTTP URI");
     } else {
       if (path == null) throw new ArgumentError("no HTTP request path given");
       if (path.length === 0) throw new ArgumentError("HTTP request path is empty");
