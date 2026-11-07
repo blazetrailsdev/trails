@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -50,6 +50,15 @@ describe("ConfigurationTest", () => {
   const trailsEnv = env.TRAILS_ENV;
   const sanitizerVendor = SanitizeHelper.sanitizerVendor;
   const actionMailbox = { ...ActionMailboxEngine.config.actionMailbox };
+  let trailsApplication: Application | null;
+
+  beforeAll(() => {
+    trailsApplication = Trails.application;
+  });
+
+  afterAll(() => {
+    Trails.application = trailsApplication;
+  });
 
   beforeEach(async () => {
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
