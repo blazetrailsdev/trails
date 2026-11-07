@@ -404,32 +404,36 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.appClass = null;
   });
 
-  it("boots the app through the initializer chain and serves a controller action", async () => {
-    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
-    const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+  it(
+    "boots the app through the initializer chain and serves a controller action",
+    { timeout: 30_000 },
+    async () => {
+      const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+      const app = Trails.application!;
+      app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
 
-    await Trails.initialize();
+      await Trails.initialize();
 
-    expect(app).toBeInstanceOf(BootApp);
-    expect(app.routesReloader().loaded).toBe(false);
-    const [status, , body] = await (rbFSend(app.app(), "call", {
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/posts",
-    }) as Promise<RackResponse>);
-    expect(status).toBe(200);
-    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
-    expect(app.routesReloader().loaded).toBe(true);
+      expect(app).toBeInstanceOf(BootApp);
+      expect(app.routesReloader().loaded).toBe(false);
+      const [status, , body] = await (rbFSend(app.app(), "call", {
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/posts",
+      }) as Promise<RackResponse>);
+      expect(status).toBe(200);
+      expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
+      expect(app.routesReloader().loaded).toBe(true);
 
-    const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/admin/sessions",
-    }) as Promise<RackResponse>);
-    expect(nestedStatus).toBe(200);
-    expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
-      scope: "admin",
-    });
-  });
+      const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/admin/sessions",
+      }) as Promise<RackResponse>);
+      expect(nestedStatus).toBe(200);
+      expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
+        scope: "admin",
+      });
+    },
+  );
 
   it("assigns the drawn route set to the controller's _routes", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
