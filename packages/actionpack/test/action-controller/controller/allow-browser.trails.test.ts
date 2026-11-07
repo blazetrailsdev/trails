@@ -18,7 +18,7 @@ describe("AllowBrowser default block", () => {
     }
     ModernController.allowBrowser({ versions: "modern" });
 
-    const fixtures = `${File.dirname(new URL(import.meta.url).pathname)}/../../test-helpers/fixtures`;
+    const fixtures = `${File.dirname(new URL(import.meta.url).pathname)}/../../fixtures`;
     const trails = TopLevel.Trails;
     TopLevel.Trails = { root: () => fixtures } as unknown as typeof trails;
     try {

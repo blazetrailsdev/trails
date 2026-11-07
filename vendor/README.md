@@ -91,7 +91,7 @@ the package and flips both on.
 "rack-test", ">= 0.6.3"`
 (`vendor/rails/actionpack/actionpack.gemspec:41`), resolved to **2.2.0** by
 `vendor/rails/Gemfile.lock:443` — and the `Rack::Test` citations in
-`packages/actionpack/src/action-dispatch/testing/integration.ts:1065-1070`,
+`packages/actionpack/lib/action-dispatch/testing/integration.ts:1065-1070`,
 `.../action-controller/test-case.ts:670` and
 `.../action-dispatch/testing/test-process.ts:63,88` resolve against this clone:
 `Session` at `lib/rack/test.rb:53`, `Error` `:45`, `Cookie`

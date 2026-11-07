@@ -17,7 +17,7 @@ async function entryPoints(): Promise<string[]> {
     .map((target) => (typeof target === "string" ? target : target.default))
     .filter((target) => target.startsWith("./dist/"))
     .map((target) =>
-      getPath().join(packageRoot, target.replace(/^\.\/dist\//, "src/").replace(/\.js$/, ".ts")),
+      getPath().join(packageRoot, target.replace(/^\.\/dist\//, "lib/").replace(/\.js$/, ".ts")),
     );
 }
 

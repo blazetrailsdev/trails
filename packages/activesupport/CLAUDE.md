@@ -38,7 +38,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
 § "Constant lookup is an import or a registry"), not the seat.
 
 - `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
-  `actionpack/src/namespaces.ts` hold the `ActiveSupport`, `ActionView` and
+  `actionpack/lib/namespaces.ts` hold the `ActiveSupport`, `ActionView` and
   `ActionDispatch` namespace objects. Autoloaded and seated there:
   `ActionView.Base` (`action_view.rb:37`; read by `handlers/erb.rb:86`,
   `log_subscriber.rb:59`, `digestor.rb:39`); `ActionDispatch.Request`
@@ -61,7 +61,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
   (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /
-  `TopLevel.ActionController` (`actionpack/src/namespaces.ts`), and
+  `TopLevel.ActionController` (`actionpack/lib/namespaces.ts`), and
   `TopLevel.BCrypt` (`bcrypt/lib/index.ts`; an unseated `BCrypt` is
   `has_secure_password`'s `LoadError` arm, `secure_password.rb:120-125`). A
   reader names it at call time: `TopLevel.Trails!.env` (`engine.rb:592`),

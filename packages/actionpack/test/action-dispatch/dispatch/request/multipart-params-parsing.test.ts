@@ -64,10 +64,7 @@ describe("MultipartParamsParsingTest", () => {
   }
   constSetPath("MultipartParamsParsingTest::TestController", TestController);
 
-  const FIXTURE_PATH = File.expandPath(
-    "../../../test-helpers/fixtures/multipart",
-    import.meta.dirname,
-  );
+  const FIXTURE_PATH = File.expandPath("../../../fixtures/multipart", import.meta.dirname);
 
   let t: MultipartParamsParsingTest;
   beforeEach(({ testCase }) => {

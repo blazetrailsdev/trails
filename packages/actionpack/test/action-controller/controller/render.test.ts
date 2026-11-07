@@ -517,11 +517,11 @@ describe("ExpiresInRenderTest", () => {
   it("dynamic render with file", async () => {
     expect(
       await File.isExistAsync(
-        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+        File.expandPath("../../support/abstract-unit.ts", import.meta.dirname),
       ),
     ).toBeTruthy();
     await expect(
-      tc.get("dynamicRenderWithFile", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+      tc.get("dynamicRenderWithFile", { params: { id: "../\\../test/support/abstract-unit.ts" } }),
     ).rejects.toThrow(ArgumentError);
   });
 
@@ -542,23 +542,23 @@ describe("ExpiresInRenderTest", () => {
   it("dynamic render", async () => {
     expect(
       await File.isExistAsync(
-        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+        File.expandPath("../../support/abstract-unit.ts", import.meta.dirname),
       ),
     ).toBeTruthy();
     await expect(
-      tc.get("dynamicRender", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+      tc.get("dynamicRender", { params: { id: "../\\../test/support/abstract-unit.ts" } }),
     ).rejects.toThrow(MissingTemplate);
   });
 
   it("permitted dynamic render file hash", async () => {
     expect(
       await File.isExistAsync(
-        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+        File.expandPath("../../support/abstract-unit.ts", import.meta.dirname),
       ),
     ).toBeTruthy();
     await expect(
       tc.get("dynamicRenderPermit", {
-        params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
+        params: { id: { file: "../\\../test/support/abstract-unit.ts" } },
       }),
     ).rejects.toThrow(ArgumentError);
   });
@@ -566,7 +566,7 @@ describe("ExpiresInRenderTest", () => {
   it("dynamic render file hash", async () => {
     await expect(
       tc.get("dynamicRender", {
-        params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
+        params: { id: { file: "../\\../test/support/abstract-unit.ts" } },
       }),
     ).rejects.toThrow(ArgumentError);
   });

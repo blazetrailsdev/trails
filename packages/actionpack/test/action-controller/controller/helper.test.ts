@@ -24,7 +24,7 @@ import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { ActionPackTestSuiteUtils } from "../../support/abstract-unit.js";
 
 const thisFile = new URL(import.meta.url).pathname;
-const fixtures = File.expandPath("../../test-helpers/fixtures", File.dirname(thisFile));
+const fixtures = File.expandPath("../../fixtures", File.dirname(thisFile));
 
 Base.helpersPath = File.expandPath("helpers", fixtures);
 

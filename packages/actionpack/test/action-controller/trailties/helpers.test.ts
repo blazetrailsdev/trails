@@ -11,7 +11,7 @@ import {
 import { FooHelper } from "../../fixtures/alternate-helpers/foo-helper.js";
 
 const alternateHelpers = File.expandPath(
-  "../../test-helpers/fixtures/alternate-helpers",
+  "../../fixtures/alternate-helpers",
   File.dirname(new URL(import.meta.url).pathname),
 );
 

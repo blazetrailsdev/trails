@@ -14,10 +14,7 @@ class BasicController extends Base {
 
   async index(): Promise<void> {
     await this.render({
-      file: File.expandPath(
-        "../../../test-helpers/fixtures/test/hello-world.tse",
-        import.meta.dirname,
-      ),
+      file: File.expandPath("../../../fixtures/test/hello-world.tse", import.meta.dirname),
     });
   }
 
@@ -26,7 +23,7 @@ class BasicController extends Base {
       file: new Pathname(
         File.join(
           import.meta.dirname,
-          ...["..", "..", "..", "test-helpers", "fixtures", "test", "dot.directory"],
+          ...["..", "..", "..", "fixtures", "test", "dot.directory"],
           "render_file_with_ivar.tse",
         ),
       ),

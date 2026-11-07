@@ -1519,7 +1519,7 @@ describe("IntegrationFileUploadTest", () => {
     }
 
     static override get fileFixturePath(): string {
-      return File.expandPath("../../test-helpers/fixtures/multipart", import.meta.dirname);
+      return File.expandPath("../../fixtures/multipart", import.meta.dirname);
     }
 
     static {

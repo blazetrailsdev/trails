@@ -5,10 +5,7 @@ import { FooHelper } from "../../fixtures/alternate-helpers/foo-helper.js";
 import { AbcHelper } from "../../fixtures/helpers/abc-helper.js";
 import { Base } from "../../../lib/action-controller/base.js";
 
-const fixtures = File.expandPath(
-  "../../test-helpers/fixtures",
-  File.dirname(new URL(import.meta.url).pathname),
-);
+const fixtures = File.expandPath("../../fixtures", File.dirname(new URL(import.meta.url).pathname));
 
 class AlternateHelpersController extends Base {
   static {

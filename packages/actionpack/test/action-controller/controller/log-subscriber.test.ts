@@ -405,7 +405,7 @@ describe("ACLogSubscriberTest", () => {
 
     assertEqual(3, tc.logs().length);
     assertMatch(/Sent file/, tc.logs()[1]);
-    assertMatch(/test-helpers\/fixtures\/company\.rb/, tc.logs()[1]);
+    assertMatch(/test\/fixtures\/company\.rb/, tc.logs()[1]);
   });
 
   it("with fragment cache", async () => {

@@ -74,15 +74,15 @@ export const ActionPackTestSuiteUtils = {
 };
 
 await ActionPackTestSuiteUtils.requireHelpers(
-  new URL("./fixtures/helpers", import.meta.url).pathname,
+  new URL("../fixtures/helpers", import.meta.url).pathname,
 );
 await ActionPackTestSuiteUtils.requireHelpers(
-  new URL("./fixtures/alternate-helpers", import.meta.url).pathname,
+  new URL("../fixtures/alternate-helpers", import.meta.url).pathname,
 );
 
 I18n.setEnforceAvailableLocales(false);
 
-export const FIXTURE_LOAD_PATH = new URL("./fixtures", import.meta.url).pathname;
+export const FIXTURE_LOAD_PATH = new URL("../fixtures", import.meta.url).pathname;
 
 export const SharedTestRoutes = new RouteSet();
 

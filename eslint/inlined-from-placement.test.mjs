@@ -50,7 +50,7 @@ tester.run("inlined-from-placement", rule, {
       code: onConstructor(
         "ActionController::Metal#initialize rails/v8.0.2/actionpack/lib/action_controller/metal.rb:210-222",
       ),
-      filename: "/repo/packages/actionpack/src/metal.ts",
+      filename: "/repo/packages/actionpack/lib/metal.ts",
     },
   ],
   invalid: [
@@ -138,7 +138,7 @@ tester.run("inlined-from-placement", rule, {
       code: onConstructor(
         "ActionController::Metal#initialize rails/v8.0.2/actionpack/lib/action_controller/metal.rb:210-222",
       ),
-      filename: "/repo/packages/actionpack/src/action-controller/metal.ts",
+      filename: "/repo/packages/actionpack/lib/action-controller/metal.ts",
       errors: [{ messageId: "redundant" }],
     },
     {
