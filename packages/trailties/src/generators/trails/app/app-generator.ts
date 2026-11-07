@@ -8,6 +8,8 @@ import { GeneratorError } from "../../generated-attribute.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 import { VERSION } from "../../../gem-version.js";
+import { CredentialsGenerator } from "../credentials/credentials-generator.js";
+import { MasterKeyGenerator } from "../master-key/master-key-generator.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -156,6 +158,7 @@ Object.setPrototypeOf(
 Trails.ActionMethods = ActionMethods;
 
 export class AppBuilder extends ActionMethods {
+  declare readonly options: AppBaseOptions & AppGeneratorOptions;
   /** @internal */
   declare private readonly database: AppGenerator["database"];
   /** @internal */
@@ -345,6 +348,23 @@ export class AppBuilder extends ActionMethods {
   }
 
   /** @missingRailsArgs template — PERMANENT */
+  async masterKey(): Promise<void> {
+    if (this.options.pretend || this.options.dummyApp) return;
+
+    const masterKeyGenerator = new MasterKeyGenerator([], {
+      quiet: this.options.quiet,
+      force: this.options.force,
+    });
+    await masterKeyGenerator.addMasterKeyFileSilently();
+    await masterKeyGenerator.ignoreMasterKeyFileSilently();
+  }
+
+  async credentials(): Promise<void> {
+    if (this.options.pretend || this.options.dummyApp) return;
+
+    await new CredentialsGenerator([], { quiet: true }).addCredentialsFile();
+  }
+
   async databaseYml(): Promise<void> {
     await this.template(this.database.template, "config/database.ts");
   }
@@ -503,6 +523,8 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createConfigFiles");
     this.methodAdded("updateConfigFiles");
     this.removeCommand("updateConfigFiles");
+    this.methodAdded("createMasterKey");
+    this.methodAdded("createCredentials");
     this.methodAdded("createBootFile");
     this.methodAdded("createActiveRecordFiles");
     this.methodAdded("createDbFiles");
@@ -618,6 +640,14 @@ export class AppGenerator extends AppBase {
 
   async updateConfigFiles(): Promise<void> {
     await this.build("configWhenUpdating");
+  }
+
+  async createMasterKey(): Promise<void> {
+    await this.build("masterKey");
+  }
+
+  async createCredentials(): Promise<void> {
+    await this.build("credentials");
   }
 
   /** @missingRailsArgs template — PERMANENT */

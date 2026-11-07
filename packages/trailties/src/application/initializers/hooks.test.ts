@@ -90,7 +90,7 @@ describe("HooksTest", { timeout: 120_000 }, () => {
     expect($.$order).toEqual(["to_prepare", "after_initialize"]);
   });
 
-  // BLOCKED: app-generator-adds-master-key-and-credentials
+  // BLOCKED: secret-key-base-credentials-arm
   it.skip("after_initialize happens after to_prepare in production", async () => {
     $.$order = [];
     await t.addToConfig(`

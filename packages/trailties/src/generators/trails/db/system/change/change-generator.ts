@@ -6,14 +6,19 @@ import {
   include,
   type Included,
   rbObjDup,
-  FileUtils,
   flatten,
   Hash,
+  JSON,
   hashDelete,
 } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
-import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
+import {
+  Database,
+  DATABASES,
+  type DatabaseName,
+  type PkgDependency,
+} from "../../../../database.js";
 import { AppName } from "../../../../app-name.js";
 import { GeneratorError } from "../../../../generated-attribute.js";
 
@@ -50,6 +55,7 @@ export class ChangeGenerator extends GeneratorBase {
 
   private _database?: Database;
   private _devcontainer?: boolean;
+  private _devcontainerJson?: Record<string, unknown>;
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
@@ -93,115 +99,103 @@ export class ChangeGenerator extends GeneratorBase {
     await this.template(this.database.template, target);
   }
 
-  editPackageJson(): void {
-    if (!File.isExist(File.join(this.destinationRoot, "package.json"))) return;
-    const fullPath = File.join(this.destinationRoot, "package.json");
-    const raw = File.read(fullPath);
-    let pkg: { dependencies?: unknown } & Record<string, unknown>;
-    try {
-      pkg = JSON.parse(raw);
-    } catch (e) {
-      throw new Error(
-        `Could not parse ${fullPath}: ${(e as Error).message}. Fix the file and re-run.`,
-        { cause: e },
-      );
-    }
-    if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) {
-      throw new Error(`Expected ${fullPath} to be a JSON object.`);
-    }
-    const rawDeps = pkg.dependencies;
-    if (
-      rawDeps !== undefined &&
-      (rawDeps === null || typeof rawDeps !== "object" || Array.isArray(rawDeps))
-    ) {
-      throw new Error(`Expected ${fullPath} "dependencies" to be an object.`);
-    }
-    const deps = (rawDeps ?? {}) as Record<string, string>;
-    for (const d of Database.all()) delete deps[d.pkgDependency.name];
-    const target = this.database.pkgDependency;
-    deps[target.name] = target.version;
-    pkg.dependencies = deps;
-    this.writeOrUpdate("package.json", JSON.stringify(pkg, null, 2) + "\n");
-  }
-
-  editDockerfile(): void {
-    if (!File.isExist(File.join(this.destinationRoot, "Dockerfile"))) return;
-    const fullPath = File.join(this.destinationRoot, "Dockerfile");
-    const before = File.read(fullPath);
-    let after = before.replace(
-      dockerPackagesRegex(BASE_PACKAGES, (d) => d.basePackage),
-      dockerPackages(BASE_PACKAGES, this.database.basePackage),
+  async editPackageJson(): Promise<void> {
+    const { name, version } = this.database.pkgDependency;
+    await this.gsubFile("package.json", this.allDatabaseGemsRegex(), name);
+    await this.gsubFile(
+      "package.json",
+      this.gemEntryRegexFor(name),
+      this.gemEntryFor(name, version),
     );
-    after = after.replace(
-      dockerPackagesRegex(BUILD_PACKAGES, (d) => d.buildPackage),
-      dockerPackages(BUILD_PACKAGES, this.database.buildPackage),
+  }
+
+  async editDockerfile(): Promise<void> {
+    const dockerfilePath = File.expandPath("Dockerfile", this.destinationRoot);
+    if (!File.isExist(dockerfilePath)) return;
+
+    await this.gsubFile(
+      "Dockerfile",
+      this.allDockerBasesRegex(),
+      this.dockerBasePackages(this.database.basePackage),
     );
-    if (after === before) return;
-    this.writeOrUpdate("Dockerfile", after);
+    await this.gsubFile(
+      "Dockerfile",
+      this.allDockerBuildsRegex(),
+      this.dockerBuildPackages(this.database.buildPackage),
+    );
   }
 
-  private writeOrUpdate(relativePath: string, content: string): void {
-    const full = File.join(this.destinationRoot, relativePath);
-    const existed = File.isExist(File.join(this.destinationRoot, relativePath));
-    if (existed && File.read(full) === content) {
-      this.sayStatus("identical", relativePath);
-      return;
-    }
-    FileUtils.mkdirP(File.dirname(full));
-    File.write(full, content);
-    if (existed) {
-      this.sayStatus("update", relativePath);
-    } else {
-      this.sayStatus("create", relativePath);
-    }
-  }
-
-  editDevcontainerFiles(): void {
+  async editDevcontainerFiles(): Promise<void> {
     if (!this.isDevcontainer()) return;
-    this.editDevcontainerJson();
+
+    await this.editDevcontainerJson();
     this.editComposeYaml();
   }
 
-  private editDevcontainerJson(): void {
-    const rel = ".devcontainer/devcontainer.json";
-    if (!File.isExist(File.join(this.destinationRoot, rel))) return;
-    const full = File.join(this.destinationRoot, rel);
-    let json: Record<string, unknown>;
-    try {
-      json = JSON.parse(File.read(full)) as Record<string, unknown>;
-    } catch (e) {
-      throw new Error(
-        `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
-        {
-          cause: e,
-        },
-      );
-    }
+  /** @internal */
+  private allDatabaseGems(): PkgDependency[] {
+    return Database.all().map((database) => database.pkgDependency);
+  }
 
-    const env = (json.containerEnv ?? {}) as Record<string, string>;
-    if (this.database.service) {
-      env.DB_HOST = this.database.name;
-    } else {
-      delete env.DB_HOST;
-    }
-    if (Object.keys(env).length > 0) {
-      json.containerEnv = env;
-    } else {
-      delete json.containerEnv;
-    }
+  /** @internal */
+  private allDockerBases(): string[] {
+    return [
+      ...new Set(Database.all().map((database) => this.dockerBasePackages(database.basePackage))),
+    ];
+  }
 
-    const features = (json.features ?? {}) as Record<string, unknown>;
-    for (const d of Database.all()) {
-      if (d.featureName) delete features[d.featureName];
-    }
-    if (this.database.feature) Object.assign(features, this.database.feature);
-    if (Object.keys(features).length > 0) {
-      json.features = features;
-    } else {
-      delete json.features;
-    }
+  /** @internal */
+  private dockerBasePackages(databasePackage: string | undefined): string {
+    return (databasePackage ? [databasePackage, ...BASE_PACKAGES].sort() : BASE_PACKAGES).join(" ");
+  }
 
-    this.writeOrUpdate(rel, JSON.stringify(json, null, 2) + "\n");
+  /** @internal */
+  private allDockerBuilds(): string[] {
+    return [
+      ...new Set(Database.all().map((database) => this.dockerBuildPackages(database.buildPackage))),
+    ];
+  }
+
+  /** @internal */
+  private dockerBuildPackages(databasePackage: string | undefined): string {
+    return (databasePackage ? [databasePackage, ...BUILD_PACKAGES].sort() : BUILD_PACKAGES).join(
+      " ",
+    );
+  }
+
+  /** @internal */
+  private allDatabaseGemsRegex(): RegExp {
+    const allDatabaseGemNames = this.allDatabaseGems().map((gem) => gem.name);
+    return new RegExp(`(\\b${allDatabaseGemNames.join("\\b|\\b")}\\b)`);
+  }
+
+  /** @internal */
+  private allDockerBasesRegex(): RegExp {
+    return new RegExp(`(\\b${this.allDockerBases().join("\\b|\\b")}\\b)`);
+  }
+
+  /** @internal */
+  private allDockerBuildsRegex(): RegExp {
+    return new RegExp(`(\\b${this.allDockerBuilds().join("\\b|\\b")}\\b)`);
+  }
+
+  /** @internal */
+  private gemEntryRegexFor(gemName: string): RegExp {
+    return new RegExp(`"${gemName}"\\s*:\\s*"[^"]*"`);
+  }
+
+  /** @internal */
+  private gemEntryFor(...gemNameAndVersion: string[]): string {
+    gemNameAndVersion = gemNameAndVersion.map((segment) => `"${segment}"`);
+    return gemNameAndVersion.join(": ");
+  }
+
+  /** @internal */
+  private async editDevcontainerJson(): Promise<void> {
+    if (!this.devcontainerJson()) return;
+
+    await this.updateDevcontainerDbHost();
+    await this.updateDevcontainerDbFeature();
   }
 
   private editComposeYaml(): void {
@@ -247,16 +241,65 @@ export class ChangeGenerator extends GeneratorBase {
 
     File.write(composeYamlPath, toYaml(composeConfig));
   }
-}
 
-function dockerPackages(base: string[], extra: string | undefined): string {
-  return (extra ? [extra, ...base].sort() : [...base]).join(" ");
-}
+  /** @internal */
+  private async updateDevcontainerDbHost(): Promise<void> {
+    const containerEnv = this.devcontainerJson()!.containerEnv as Record<string, string>;
+    const dbName = this.database.name;
 
-function dockerPackagesRegex(base: string[], pick: (d: Database) => string | undefined): RegExp {
-  const alts = [...new Set(Database.all().map((d) => dockerPackages(base, pick(d))))].sort(
-    (a, b) => b.length - a.length,
-  );
-  const escaped = alts.map((s) => `\\b${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
-  return new RegExp(escaped.join("|"), "g");
+    if (containerEnv.DB_HOST != null) {
+      if (this.database.service) {
+        containerEnv.DB_HOST = dbName;
+      } else {
+        delete containerEnv.DB_HOST;
+      }
+    } else {
+      if (this.database.service) {
+        containerEnv.DB_HOST = dbName;
+      }
+    }
+
+    const newJson = globalThis.JSON.stringify(containerEnv, null, 2).replaceAll("\n", "\n  ");
+
+    await this.gsubFile(
+      ".devcontainer/devcontainer.json",
+      /("containerEnv"\s*:\s*)(.|\n)*?(^\s{2}})/m,
+      `\\1${newJson}`,
+    );
+  }
+
+  /** @internal */
+  private async updateDevcontainerDbFeature(): Promise<void> {
+    const features = this.devcontainerJson()!.features as Record<string, unknown>;
+    const dbFeature = this.database.feature;
+
+    for (const database of Database.all()) {
+      if (database.featureName != null) delete features[database.featureName];
+    }
+
+    if (dbFeature) Object.assign(features, dbFeature);
+
+    const newJson = globalThis.JSON.stringify(features, null, 2).replaceAll("\n", "\n  ");
+
+    await this.gsubFile(
+      ".devcontainer/devcontainer.json",
+      /("features"\s*:\s*)(.|\n)*?(^\s{2}})/m,
+      `\\1${newJson}`,
+    );
+  }
+
+  /** @internal */
+  private devcontainerJson(): Record<string, unknown> | undefined {
+    if (!File.isExist(this.devcontainerJsonPath())) return;
+
+    return (this._devcontainerJson ??= JSON.parse(File.read(this.devcontainerJsonPath())) as Record<
+      string,
+      unknown
+    >);
+  }
+
+  /** @internal */
+  private devcontainerJsonPath(): string {
+    return File.expandPath(".devcontainer/devcontainer.json", this.destinationRoot);
+  }
 }
