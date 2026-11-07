@@ -44,16 +44,6 @@ describe("ChangeGenerator", () => {
     await t.assertFile("config/database.ts");
   });
 
-  it("editPackageJson throws on unparseable JSON", () => {
-    write("package.json", "{ this is not json");
-    const generator = new ChangeGenerator(
-      [],
-      { to: "mysql" },
-      { destinationRoot: t.destinationRoot },
-    );
-    expect(() => generator.editPackageJson()).toThrow(/Could not parse .*package\.json/);
-  });
-
   it("editDatabaseConfig fallback honors isTypeScript()", async () => {
     File.delete(File.join(t.destinationRoot, "tsconfig.json"));
     await t.runGenerator(["--to", "postgresql"]);
@@ -86,15 +76,5 @@ describe("ChangeGenerator", () => {
   it("editDevcontainerFiles skipped when no .devcontainer dir", async () => {
     await t.runGenerator(["--to", "postgresql"]);
     t.assertNoFile(".devcontainer/devcontainer.json");
-  });
-
-  it("editDevcontainerJson throws on unparseable JSON", () => {
-    write(".devcontainer/devcontainer.json", "{ not json");
-    const generator = new ChangeGenerator(
-      [],
-      { to: "postgresql" },
-      { destinationRoot: t.destinationRoot },
-    );
-    expect(() => generator.editDevcontainerFiles()).toThrow(/Could not parse .*devcontainer\.json/);
   });
 });

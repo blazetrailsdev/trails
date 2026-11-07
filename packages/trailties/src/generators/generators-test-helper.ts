@@ -1,4 +1,4 @@
-import { Dir, File, FileUtils, TSE, rbFBinding, type Hash } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, JSON, TSE, rbFBinding, type Hash } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "./testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
@@ -71,7 +71,7 @@ export async function assertDevcontainerJsonFile(
   block: (content: Record<string, any>) => unknown,
 ): Promise<void> {
   await assertFile.call(this, ".devcontainer/devcontainer.json", (content) =>
-    block(JSON.parse(content)),
+    block(JSON.parse(content) as Record<string, any>),
   );
 }
 

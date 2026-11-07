@@ -16,8 +16,7 @@ import {
   setVerbose,
   type Method,
 } from "@blazetrails/ruby-compat";
-import type * as TestParserModule from "./test-parser.js";
-import { Trails } from "../trails.js";
+import { TestParser } from "./test-parser.js";
 
 interface Runnable {
   isMethodDefined(method: string): boolean;
@@ -214,7 +213,7 @@ export class Runner {
 
   /** @internal */
   private static async testLocations(tests: string[], name: RegExp | null): Promise<string[]> {
-    ({ TestParser } = await import("./test-parser.js"));
+    await TestParser.requireParser();
     const locations: string[] = [];
     for (const path of tests) {
       const patterns = this.filters.filter(([file]) => file === path);
@@ -358,11 +357,6 @@ export class Filter {
 
   /** @internal */
   private definitionFor(method: Pick<Method, "sourceLocation">): [string, Range<number>] | null {
-    return TestParser!.definitionFor(method);
+    return TestParser.definitionFor(method);
   }
 }
-
-/** @noRailsEquivalent PERMANENT */
-let TestParser: typeof TestParserModule.TestParser | undefined;
-
-Trails.TestUnit = { Runner };

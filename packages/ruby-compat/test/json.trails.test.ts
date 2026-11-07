@@ -66,3 +66,14 @@ describe("JSON.parse comments", () => {
     expect(() => RbJSON.parse("1/*")).toThrow(SyntaxError);
   });
 });
+
+describe("JSON.prettyGenerate", () => {
+  it("answers as MRI's json 2.7.2 does", () => {
+    expect(JSON.prettyGenerate({ a: {}, b: [1, { c: [] }], d: "x" })).toBe(
+      '{\n  "a": {\n  },\n  "b": [\n    1,\n    {\n      "c": [\n\n      ]\n    }\n  ],\n  "d": "x"\n}',
+    );
+    expect(JSON.prettyGenerate({ e: "1", f: { g: {} } }, { indent: "  ", objectNl: "\n  " })).toBe(
+      '{\n    "e": "1",\n    "f": {\n      "g": {\n      }\n    }\n  }',
+    );
+  });
+});

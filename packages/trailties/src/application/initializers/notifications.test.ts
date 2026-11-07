@@ -53,7 +53,7 @@ describe("NotificationsTest", { timeout: 120_000 }, () => {
     expect(logger.logged(":debug").at(-1)).toMatch(/SHOW tables/);
   });
 
-  // BLOCKED: app-generator-adds-master-key-and-credentials
+  // BLOCKED: secret-key-base-credentials-arm
   it.skip("trails load_config_initializer event is instrumented", async () => {
     await t.appFile("config/initializers/foo.ts", "");
 
