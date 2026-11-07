@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+  rbObjRespondTo,
   ArgumentError,
   NoMethodError,
   rbObjMethod,
@@ -14,6 +15,7 @@ import { DelegationError } from "../delegation.js";
 import { callerLocations } from "../deprecation.js";
 import {
   assert,
+  assertNot,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
@@ -501,6 +503,10 @@ describe("ModuleTest", () => {
     assertRespondTo(decorated(), "name");
     assertNotRespondTo(decorated(), "privateName");
     assertNotRespondTo(decorated(), "myFakeMethod");
+
+    assert(rbObjRespondTo(decorated(), "name"));
+    assertNot(rbObjRespondTo(decorated(), "privateName"));
+    assertNot(rbObjRespondTo(decorated(), "myFakeMethod"));
   });
 
   it("delegate missing to respects superclass missing", () => {
