@@ -19,7 +19,16 @@ boots the application through `setup_main_autoloader`, with each loader's
 `setup` and `eager_load` stubbed so no application file is imported, runs the
 same walk, and writes `manifest.json`, `imports.generated.js` and `constants.generated.d.ts` to
 `.trails/autoload/<tag>/` for each loader, with paths relative to
-`Loader#manifestRoot`, the application root. Every path names the file the walk
+`Loader#manifestRoot`, the application root. For an application it also writes
+`.trails/autoload/install.generated.js`, which imports `config/application`
+and assigns each of `Trails.autoloaders`' `imports` from its tag's map, and
+`.trails/entry.generated.js`, which imports that and re-exports
+`config/environment`. An ahead-of-time compiler starts from the entry: every
+`require` then reaches its file through a literal `import()` it can see, where
+`importer`'s `import(url)` is opaque to it. The install module imports
+`config/application` itself rather than relying on the entry's import order,
+because `config/application` awaits at top level and a sibling import that does
+not depend on it runs before it finishes. Every path names the file the walk
 found: Node runs a `.ts` file as it stands, and a bundler resolves it.
 The digest leaves the tag out, so an untagged loader's manifest still matches
 when it is named by path. A namespace's load is what reveals the constants below it in

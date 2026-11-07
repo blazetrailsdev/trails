@@ -1,6 +1,6 @@
 import { Dir, File, FileUtils, TopLevel } from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildAutoload } from "../lib/build-autoload.js";
 
 describe("buildAutoload", () => {
@@ -59,6 +59,102 @@ describe("buildAutoload", () => {
       );
       expect(Object.hasOwn(main, "setup")).toBe(false);
       expect(Object.hasOwn(main, "eagerLoad")).toBe(false);
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("writes an entry that installs each loader's imports before the environment boots", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app");
+      FileUtils.mkdirP("config");
+      File.write("app/widget.ts", 'throw new Error("imported at build time");');
+      File.write(
+        "config/application.ts",
+        "await new Promise((resolve) => setTimeout(resolve));\nglobalThis.__applicationLoaded = true;\nexport {};\n",
+      );
+      File.write("config/environment.ts", "export default null;\n");
+      const main = new Loader();
+      main.tag = "trails.main";
+      seats.Trails = {
+        application: {
+          config: { root: Dir.pwd() },
+          autoloaders: { main },
+          initializers: {
+            tsort: () => [
+              {
+                name: "setup_main_autoloader",
+                belongsTo: () => true,
+                run: async () => {
+                  await main.pushDir("app");
+                  await main.setup();
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await buildAutoload();
+
+      expect(File.read(".trails/entry.generated.js")).toEqual(
+        [
+          'import "./autoload/install.generated.js";',
+          'export { default } from "../config/environment.ts";',
+          "",
+        ].join("\n"),
+      );
+      const install = File.read(".trails/autoload/install.generated.js");
+      expect(install).toContain('import "../../config/application.ts";');
+      expect(install).toContain(
+        'import { imports as imports0 } from "./trails.main/imports.generated.js";',
+      );
+      expect(install).toContain('"trails.main": imports0,');
+      expect(install).toContain("loader.imports = byTag[loader.tag]");
+
+      let sawApplication: unknown;
+      vi.doMock("@blazetrails/trailties", () => ({
+        Trails: {
+          autoloaders: {
+            each: (block: (loader: Loader) => void) => {
+              sawApplication = (globalThis as Record<string, unknown>).__applicationLoaded;
+              block(main);
+            },
+          },
+        },
+      }));
+      const globals = globalThis as Record<string, unknown>;
+      delete globals.__applicationLoaded;
+      vi.resetModules();
+      try {
+        await import(File.expandPath(".trails/autoload/install.generated.js"));
+        expect(sawApplication).toBe(true);
+        expect(Object.keys(main.imports!)).toEqual(["Widget"]);
+      } finally {
+        vi.doUnmock("@blazetrails/trailties");
+        delete globals.__applicationLoaded;
+      }
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("writes no entry when there is no application", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app");
+      const main = new Loader();
+      main.tag = "main";
+      await main.pushDir("app");
+
+      await buildAutoload();
+
+      expect(File.isExist(".trails/entry.generated.js")).toBe(false);
     } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
