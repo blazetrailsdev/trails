@@ -515,6 +515,10 @@ ${requireStatements.join("\n")}`;
     if (this.options.dev) {
       const path = this.trailsDevPackages()[name];
       return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
+    } else if (this.options.edge) {
+      return `github:blazetrailsdev/trails#${this.edgeBranch()}${packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : ""}`;
+    } else if (this.options.main) {
+      return `github:blazetrailsdev/trails#main${packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : ""}`;
     } else {
       return "*";
     }
