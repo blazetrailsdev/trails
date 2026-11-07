@@ -1936,8 +1936,8 @@ describe("RackRequestTest", () => {
         return block ? this.req.fetchHeader(name, block) : this.req.fetchHeader(name);
       }
 
-      eachHeader(callback: (key: string, value: any) => void): void {
-        this.req.eachHeader(callback);
+      eachHeader(block?: (key: string, value: any) => void): any {
+        return block ? this.req.eachHeader(block) : this.req.eachHeader();
       }
 
       setHeader(name: string, v: any): any {
