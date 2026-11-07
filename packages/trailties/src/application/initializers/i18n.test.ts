@@ -3,23 +3,21 @@ import { I18n } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { FileUtils, include, includedModules } from "@blazetrails/ruby-compat";
-import type { Generation, Rack } from "../../test-helpers/isolation/abstract-unit.js";
-import "../../test-helpers/isolation/abstract-unit.js";
+import { FileUtils, Pathname, include, includedModules } from "@blazetrails/ruby-compat";
+import { Rack, type Generation } from "../../test-helpers/isolation/abstract-unit.js";
+import { Trailtie as I18nRailtie } from "../../trailties/i18n.js";
 import { Trails } from "../../trails.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-interface I18nTest extends Generation, Rack {}
+interface I18nTest extends Generation, Pick<Rack, "_app" | "get" | "extractBody"> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class I18nTest extends TestCase {
-  declare _appInstance: unknown;
-
   async loadApp(): Promise<void> {
     await import(`${await this.appPath()}/config/environment.ts`);
   }
 
   app(): unknown {
-    return (this._appInstance ??= Trails.application);
+    return (this._app ??= Trails.application as never);
   }
 
   assertFallbacks(fallbacks: Record<string, string[]>): void {
@@ -39,9 +37,8 @@ class I18nTest extends TestCase {
   }
 }
 include(I18nTest, Isolation);
+include(I18nTest, Rack);
 registerSpecType(/^I18nTest$/, I18nTest);
-
-const i18nConfig = () => Trails.application!.config.i18n as Record<string, unknown>;
 
 describe("I18nTest", { timeout: 120_000 }, () => {
   let t: I18nTest;
@@ -55,7 +52,6 @@ describe("I18nTest", { timeout: 120_000 }, () => {
 
   afterEach(() => t.teardownApp());
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("setting another default locale", async () => {
     await t.addToConfig(`
         this.config.i18n.defaultLocale = "de";
@@ -71,7 +67,6 @@ describe("I18nTest", { timeout: 120_000 }, () => {
     expect(Trails.application!.config.i18n.loadPath).toEqual([]);
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("locale files should be added to the load path", async () => {
     await t.appFile("config/another_locale.yml", "en:\nfoo: ~");
 
@@ -90,7 +85,6 @@ describe("I18nTest", { timeout: 120_000 }, () => {
     expect(I18n.loadPath()).toContain(`${appPath}/config/another_locale.yml`);
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("load_path handles Pathname argument correctly", async () => {
     await t.appFile("config/another_locale.yml", "en:\nfoo: ~");
 
@@ -100,16 +94,15 @@ describe("I18nTest", { timeout: 120_000 }, () => {
 
     await t.loadApp();
     const appPath = await t.appPath();
-    expect(Trails.application!.config.i18n.loadPath.map(String)).toEqual([
+    expect(Trails.application!.config.i18n.loadPath).toEqual([
       `${appPath}/config/locales/en.yml`,
-      `${appPath}/config/another_locale.yml`,
+      new Pathname(`${appPath}/config/another_locale.yml`),
     ]);
 
-    expect(I18n.loadPath().map(String)).toContain(`${appPath}/config/locales/en.yml`);
-    expect(I18n.loadPath().map(String)).toContain(`${appPath}/config/another_locale.yml`);
+    expect(I18n.loadPath()).toContain(`${appPath}/config/locales/en.yml`);
+    expect(I18n.loadPath()).toContainEqual(new Pathname(`${appPath}/config/another_locale.yml`));
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("load_path is populated before eager loaded models", async () => {
     await t.addToConfig(`
         this.config.enableReloading = false;
@@ -137,13 +130,12 @@ Trails.application.routes.draw(function () {
     );
 
     await t.loadApp();
-    t._app = Trails.application as never;
+    t.app();
 
     const response = await t.get("/i18n");
     expect(await t.extractBody(response)).toBe("1");
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("locales are reloaded if they change between requests", async () => {
     await t.addToConfig(`
         this.config.enableReloading = true;
@@ -162,7 +154,7 @@ Trails.application.routes.draw(function () {
     );
 
     await t.loadApp();
-    t._app = Trails.application as never;
+    t.app();
 
     expect(await t.extractBody(await t.get("/i18n"))).toBe("1");
 
@@ -173,7 +165,6 @@ Trails.application.routes.draw(function () {
     expect(await t.extractBody(await t.get("/i18n"))).toBe("2");
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("new locale files are loaded", async () => {
     await t.addToConfig(`
         this.config.enableReloading = true;
@@ -192,7 +183,7 @@ Trails.application.routes.draw(function () {
     );
 
     await t.loadApp();
-    t._app = Trails.application as never;
+    t.app();
 
     expect(await t.extractBody(await t.get("/i18n"))).toBe("1");
 
@@ -204,7 +195,6 @@ Trails.application.routes.draw(function () {
     expect(await t.extractBody(await t.get("/i18n"))).toBe("2");
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("I18n.load_path is reloaded", async () => {
     await t.addToConfig(`
         this.config.enableReloading = true;
@@ -223,7 +213,7 @@ Trails.application.routes.draw(function () {
     );
 
     await t.loadApp();
-    t._app = Trails.application as never;
+    t.app();
 
     let body = await t.extractBody(await t.get("/i18n"));
 
@@ -238,16 +228,14 @@ Trails.application.routes.draw(function () {
     expect(body).toMatch("en.yml");
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("not using config.i18n.fallbacks does not initialize I18n.fallbacks", async () => {
     I18n.setBackend(new (class extends I18n.Simple {})());
     await t.loadApp();
     t.assertNoFallbacks();
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("config.i18n.fallbacks = true initializes I18n.fallbacks with default settings", async () => {
-    i18nConfig().fallbacks = true;
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = true;
     await t.loadApp();
     expect(includedModules(I18n.backend().constructor as { prototype: object })).toContain(
       I18n.Fallbacks,
@@ -255,10 +243,10 @@ Trails.application.routes.draw(function () {
     t.assertFallbacks({ de: ["de", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("config.i18n.fallbacks = true initializes I18n.fallbacks with default settings even when backend changes", async () => {
-    i18nConfig().fallbacks = true;
-    i18nConfig().backend = new (class extends I18n.Simple {})();
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = true;
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).backend = new (class
+      extends I18n.Simple {})();
     await t.loadApp();
     expect(includedModules(I18n.backend().constructor as { prototype: object })).toContain(
       I18n.Fallbacks,
@@ -266,49 +254,55 @@ Trails.application.routes.draw(function () {
     t.assertFallbacks({ de: ["de", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("config.i18n.fallbacks.defaults = [:'en-US'] initializes fallbacks with en-US as a fallback default", async () => {
-    (i18nConfig().fallbacks as Record<string, unknown>).defaults = ["en-US"];
+    (
+      (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks as Record<
+        string,
+        unknown
+      >
+    ).defaults = ["en-US"];
     await t.loadApp();
     t.assertFallbacks({ de: ["de", "en-US", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("config.i18n.fallbacks.map = { :ca => :'es-ES' } initializes fallbacks with a mapping ca => es-ES", async () => {
-    (i18nConfig().fallbacks as Record<string, unknown>).map = { ca: "es-ES" };
+    (
+      (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks as Record<
+        string,
+        unknown
+      >
+    ).map = { ca: "es-ES" };
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("[shortcut] config.i18n.fallbacks = [:'en-US'] initializes fallbacks with en-US as a fallback default", async () => {
-    i18nConfig().fallbacks = ["en-US"];
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = ["en-US"];
     await t.loadApp();
     t.assertFallbacks({ de: ["de", "en-US", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("[shortcut] config.i18n.fallbacks = [{ :ca => :'es-ES' }] initializes fallbacks with a mapping ca => es-ES", async () => {
-    i18nConfig().fallbacks = [{ ca: "es-ES" }];
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = [{ ca: "es-ES" }];
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("[shortcut] config.i18n.fallbacks = [:'en-US', { :ca => :'es-ES' }] initializes fallbacks with the given arguments", async () => {
-    i18nConfig().fallbacks = ["en-US", { ca: "es-ES" }];
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = [
+      "en-US",
+      { ca: "es-ES" },
+    ];
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "es-ES", "es", "en-US", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("[shortcut] config.i18n.fallbacks = { ca: :en } initializes fallbacks with a mapping ca => :en", async () => {
-    i18nConfig().fallbacks = { ca: "en" };
+    (I18nRailtie.config.i18n as unknown as Record<string, unknown>).fallbacks = { ca: "en" };
     await t.loadApp();
     t.assertFallbacks({ ca: ["ca", "en"] });
   });
 
-  // BLOCKED: i18n-railtie-initializers-unported
   it.skip("disable config.i18n.enforce_available_locales", async () => {
     await t.addToConfig(`
         this.config.i18n.enforceAvailableLocales = false;
