@@ -43,6 +43,7 @@ export class BoundaryTooLongError extends Error {
   }
 }
 include(BoundaryTooLongError, BadRequest);
+export { BoundaryTooLongError as Error };
 
 export const EOL = "\r\n";
 export const FWS = /[ \t]+(?:\r\n[ \t]+)?/;

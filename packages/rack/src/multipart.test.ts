@@ -1181,3 +1181,6 @@ Content-Type: application/octet-stream;\r
   expect(params["upload"].filename).toBe("test\t.txt");
   expect(params["upload"].type).toBe('application/octet-stream; name="file.php"');
 });
+
+// PERMANENT-SKIP: asserts an ISO-2022-JP String encoding; CLAUDE.md, "A String has no encoding tag either".
+it.skip("supports ISO-2022-JP-encoded part", () => {});

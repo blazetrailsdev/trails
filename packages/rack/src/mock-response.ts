@@ -8,6 +8,7 @@
 import { Time } from "@blazetrails/date";
 import {
   StringIO,
+  rbFSend,
   fetch,
   rbFArray,
   rbObjRespondTo,
@@ -36,8 +37,9 @@ export class Cookie {
   }
 
   methodMissing(methodName: string, ...args: unknown[]): any {
-    const member = (this.value as any)[methodName];
-    return typeof member === "function" ? member.apply(this.value, args) : member;
+    return rbObjRespondTo(this.value, methodName)
+      ? rbFSend(this.value, methodName, ...args)
+      : this.value[methodName as unknown as number];
   }
 
   respondToMissing(methodName: string, _includeAll = false): boolean {
