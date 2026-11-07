@@ -18,6 +18,7 @@ import {
   excSetupMessage,
   rbObjDup,
   constSet,
+  rbModName,
 } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -427,7 +428,7 @@ export class Request {
   }
 
   inspect(): string {
-    return `#<ActionDispatch::Request ${this.method} ${rbStrDump(this.originalUrl)} for ${this.remoteIp ?? ""}>`;
+    return `#<${rbModName(this.constructor)} ${this.method} ${rbStrDump(this.originalUrl)} for ${this.remoteIp ?? ""}>`;
   }
 
   get session(): Session {
