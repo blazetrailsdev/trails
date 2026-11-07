@@ -21,7 +21,7 @@ export function clearInstanceVariablesBetweenRequests(this: Metal): void {
 export function recycleBang(this: Metal & { formats: unknown }): void {
   rbObjIvarSet(this, "@_url_options", null);
   this.formats = null;
-  this.params = null as unknown as Metal["params"];
+  this.params = null;
 }
 
 export const Functional = { clearInstanceVariablesBetweenRequests, recycleBang };
