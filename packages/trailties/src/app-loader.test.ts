@@ -1,9 +1,14 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Dir, File, FileUtils, exec } from "@blazetrails/ruby-compat";
 import { AppLoader } from "./app-loader.js";
 
+vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+  exec: vi.fn(),
+}));
+
 describe("AppLoaderTest", () => {
-  let loader: typeof AppLoader & { execArguments?: string[] };
+  const loader = AppLoader;
   let tmp: string;
   let cwd: string;
 
@@ -13,14 +18,11 @@ describe("AppLoaderTest", () => {
   };
 
   const expectsExec = (exe: string) => {
-    expect(loader.execArguments).toEqual([AppLoader.RUBY, exe]);
+    expect(vi.mocked(exec).mock.lastCall).toEqual([AppLoader.RUBY, exe]);
   };
 
   beforeEach(() => {
-    loader = Object.create(AppLoader);
-    loader.exec = (...args: string[]) => {
-      loader.execArguments = args;
-    };
+    vi.mocked(exec).mockClear();
     tmp = Dir.mktmpdir("railties-rails-loader-test-suite");
     cwd = Dir.pwd();
     Dir.chdir(tmp);
@@ -43,7 +45,7 @@ describe("AppLoaderTest", () => {
     expect(loader.execApp()).toBeFalsy();
   });
 
-  for (const keyword of ["setAppPath", "setEnginePath"]) {
+  for (const keyword of ["APP_PATH", "ENGINE_PATH"]) {
     it(`is in a Rails application if ${exe} exists and contains ${keyword}`, () => {
       write(exe, keyword);
 

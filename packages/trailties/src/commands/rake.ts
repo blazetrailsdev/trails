@@ -22,7 +22,7 @@ export class RakeCommand extends Base {
       .map((task) => [task.nameWithArgs(), task.comment]);
   }
 
-  /** @inventedArm if — CONVERGEABLE trails-cli-has-no-app-loader-exec-app */
+  /** @inventedArm if — CONVERGEABLE trails-cli-outside-app-dispatch-mirrors-cli-rb */
   static override async perform(
     task: string,
     args: string[],
@@ -80,7 +80,7 @@ export class RakeCommand extends Base {
 
   /**
    * @internal
-   * @inventedArm if — CONVERGEABLE trails-cli-has-no-app-loader-exec-app
+   * @inventedArm if — CONVERGEABLE trails-cli-outside-app-dispatch-mirrors-cli-rb
    */
   private static async rakeTasks(): Promise<RakeApplication["tasks"]> {
     if ((await Rake.application!.findRakefileLocation()) == null) return [];

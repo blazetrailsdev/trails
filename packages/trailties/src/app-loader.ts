@@ -5,9 +5,6 @@ export const AppLoader = {
   RUBY: Gem.ruby(),
   EXECUTABLES: ["bin/trails"],
 
-  /** @noRailsEquivalent PERMANENT */
-  exec: exec as (...argv: [exePath: string, ...args: string[]]) => void,
-
   execApp(): undefined {
     const originalCwd = Dir.pwd();
 
@@ -16,8 +13,8 @@ export const AppLoader = {
       if (exe != null) {
         const contents = File.read(exe);
 
-        if (/set(App|Engine)Path/.test(contents)) {
-          this.exec(this.RUBY, exe, ...rbArgv());
+        if (/(APP|ENGINE)_PATH/.test(contents)) {
+          exec(this.RUBY, exe, ...rbArgv());
           break;
         }
       }
