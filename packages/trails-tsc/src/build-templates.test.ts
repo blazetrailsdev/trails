@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils, NameError } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, NameError, TopLevel } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "./build-templates.js";
 
 describe("buildTemplates", () => {
@@ -62,5 +62,19 @@ describe("buildTemplates", () => {
     const binding = { title: "member" };
     expect(await render('<% title = "local" %><%= title %>', binding)).toBe("local");
     expect(binding.title).toBe("member");
+  });
+
+  it("resolves a top-level constant after the binding's self", async () => {
+    const constants = TopLevel as Record<string, unknown>;
+    constants.TemplateShared = "constant";
+    constants.TemplateOnly = "top";
+    try {
+      expect(
+        await render("<%= TemplateShared %> <%= TemplateOnly %>", { TemplateShared: "member" }),
+      ).toBe("member top");
+    } finally {
+      delete constants.TemplateShared;
+      delete constants.TemplateOnly;
+    }
   });
 });

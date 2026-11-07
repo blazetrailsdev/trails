@@ -80,19 +80,31 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
 }
 
 /**
- * `Kernel#binding` (`vendor/ruby/v3.3.11/proc.c:376` `rb_f_binding`): the scope
- * a template is evaluated in. JS cannot capture a scope, so the binding is
- * `self` with the top-level constants behind it, which is where a constant
- * named in a binding resolves once its cref misses.
+ * Ruby's `Binding` (`vendor/ruby/v3.3.11/proc.c:4439`). JS cannot capture a
+ * scope, so a binding carries its `self` only; a constant named in it
+ * resolves through the `TopLevel` table once its cref misses, which a
+ * precompiled template reads itself.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbFBinding<T extends object>(self: T): T {
-  return new Proxy(self, {
-    has: (target, key) => key in target || (typeof key === "string" && key in tbl),
-    get: (target, key, receiver) =>
-      key in target || typeof key !== "string" ? Reflect.get(target, key, receiver) : tbl[key],
-  });
+export class Binding {
+  /** @noRailsEquivalent PERMANENT */
+  readonly receiver: object;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(receiver: object) {
+    this.receiver = receiver;
+  }
+}
+
+/**
+ * `Kernel#binding` (`vendor/ruby/v3.3.11/proc.c:376` `rb_f_binding`): the scope
+ * a template is evaluated in, with `self` as its receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFBinding(self: object): Binding {
+  return new Binding(self);
 }
 
 /**

@@ -7,6 +7,8 @@ import {
   rbModName,
   rbModToS,
   rbObjClass,
+  rbFSend,
+  rbObjRespondTo,
   nameErrMesgReceiver,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -254,27 +256,38 @@ export namespace Delegation {
     return methodNames;
   }
 
+  const methodMissingLayers = new WeakSet<object>();
+
   /**
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
    */
-  export function generateMethodMissing<T extends object>(
-    owner: T,
+  export function generateMethodMissing(
+    owner: { prototype: object },
     target: string,
     { allowNil }: { allowNil?: boolean } = {},
-  ): T {
+  ): void {
     if (RESERVED_METHOD_NAMES.has(target) || target === "__target") target = `self.${target}`;
 
     const targetName = target.startsWith("self.") ? target.slice("self.".length) : target;
+    let parent = Object.getPrototypeOf(owner.prototype) as object;
+    if (methodMissingLayers.has(parent)) parent = Object.getPrototypeOf(parent) as object;
 
-    return new Proxy(owner, {
-      has(obj, prop) {
-        if (prop === "marshal_dump" || prop === "_dump") return false;
-        if (Reflect.has(obj, prop)) return true;
-        if (Object.hasOwn(obj, "constructor")) return false;
-        const __target = (obj as Record<string, unknown>)[targetName];
-        return __target != null && prop in Object(__target);
+    Object.defineProperty(owner.prototype, "respondToMissing", {
+      configurable: true,
+      writable: true,
+      value(this: Record<string, unknown>, name: string, includePrivate = false): boolean {
+        if (name === "marshal_dump" || name === "_dump") return false;
+        if (rbObjRespondTo(this[targetName], name)) return true;
+        let sup: unknown;
+        for (let o: object | null = parent; o && sup === undefined; o = Object.getPrototypeOf(o)) {
+          sup = Object.getOwnPropertyDescriptor(o, "respondToMissing")?.value;
+        }
+        return typeof sup === "function" ? sup.call(this, name, includePrivate) : false;
       },
+    });
+
+    const layer = new Proxy(Object.create(parent) as object, {
       get(obj, prop, receiver) {
         if (
           prop in obj ||
@@ -287,23 +300,28 @@ export namespace Delegation {
           return Reflect.get(obj, prop, receiver);
         }
         const __target = (receiver as Record<string, unknown>)[targetName];
-        if (__target == null) {
+        if (__target == null && !rbObjRespondTo(null, prop)) {
           if (allowNil) return undefined;
-          throw DelegationError.nilTarget(globalThis.String(prop), target);
+          throw DelegationError.nilTarget(prop, target);
         }
-        if (!(globalThis.String(prop) in Object(__target))) {
-          if (PROTOCOL_PROBES.has(globalThis.String(prop))) return undefined;
+        if (__target == null) return (...args: unknown[]) => rbFSend(null, prop, ...args);
+        if (!(prop in Object(__target))) {
+          const sup = Reflect.get(obj, prop, receiver);
+          if (sup !== undefined) return sup;
+          if (PROTOCOL_PROBES.has(prop)) return undefined;
           return () => {
             throw new NoMethodError(
-              `undefined method '${globalThis.String(prop)}' for an instance of ${
-                (obj as object).constructor.name
+              `undefined method '${prop}' for an instance of ${
+                (receiver as object).constructor.name
               }`,
             );
           };
         }
-        const value = (__target as Record<string, unknown>)[globalThis.String(prop)];
+        const value = (__target as Record<string, unknown>)[prop];
         return typeof value === "function" ? value.bind(__target) : value;
       },
     });
+    methodMissingLayers.add(layer);
+    Object.setPrototypeOf(owner.prototype, layer);
   }
 }

@@ -101,14 +101,14 @@ export const psychAdapterConfig = {
 
 /**
  * The backend behind `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`
- * `require 'psych.so'`, resolved member by member on first read, so importing
- * this module never loads it.
+ * `require 'psych.so'`, resolved at each call, so importing this module never
+ * loads it.
  *
  * @noRailsEquivalent PERMANENT
  */
-export const yaml: PsychAdapter = new Proxy({} as PsychAdapter, {
-  get: (_target, member) => (resolve() as unknown as Record<PropertyKey, unknown>)[member],
-});
+export function yaml(): PsychAdapter {
+  return resolve();
+}
 
 /**
  * The backend's own value parser, behind `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`

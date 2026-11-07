@@ -1,4 +1,10 @@
-import { File, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import {
+  type Binding,
+  File,
+  RuntimeError,
+  StandardError,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
@@ -27,13 +33,13 @@ export class ConfigurationFile {
   /** @missingRailsCall load — PERMANENT */
   static parse(
     contentPath: string,
-    options: { context?: object; [option: string]: unknown } = {},
+    options: { context?: Binding; [option: string]: unknown } = {},
   ): unknown {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
   /** @missingRailsCall load — PERMANENT */
-  parse({ context, ...options }: { context?: object; [option: string]: unknown } = {}): unknown {
+  parse({ context, ...options }: { context?: Binding; [option: string]: unknown } = {}): unknown {
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
       const parsed: unknown = yamlParse(source, options);
@@ -58,7 +64,7 @@ export class ConfigurationFile {
     return content;
   }
 
-  private render(context?: object): string {
+  private render(context?: Binding): string {
     const { nodes } = tseParse(this.content);
     let body = 'let __out = "";\n';
     for (const node of nodes) {
@@ -77,10 +83,12 @@ export class ConfigurationFile {
       }
     }
     body += `return __out;\n//# sourceURL=${this.contentPath}\n`;
-    const template = new Function("__binding", `with (__binding) {\n${body}}`) as (
-      binding: object,
-    ) => string;
-    return context ? template(context) : template({});
+    const template = new Function(
+      "__receiver",
+      "__topLevel",
+      `with (__topLevel) with (__receiver) {\n${body}}`,
+    ) as (receiver: object, topLevel: object) => string;
+    return context ? template(context.receiver, TopLevel) : template({}, TopLevel);
   }
 
   static FormatError = FormatError;

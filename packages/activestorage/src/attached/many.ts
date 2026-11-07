@@ -71,14 +71,6 @@ export class Many extends Attached {
   }
 }
 
-Object.setPrototypeOf(
-  Many.prototype,
-  delegateMissingTo.call(
-    Object.create(Object.getPrototypeOf(Many.prototype) as object, {
-      constructor: { value: Many },
-    }),
-    "attachments",
-  ),
-);
+delegateMissingTo.call(Many, "attachments");
 
 Attached.Many = Many;

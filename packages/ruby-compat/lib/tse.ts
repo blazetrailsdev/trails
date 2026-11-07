@@ -1,4 +1,5 @@
 import { LoadError } from "./load-error.js";
+import type { Binding } from "./variable.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface TSECompiler {
@@ -50,11 +51,11 @@ export class TSE {
   /**
    * `ERB#result` (`vendor/ruby/v3.3.11/lib/erb.rb:425-430`) evals `@src` in
    * `b`; here the precompiled module's default export runs with `this` bound
-   * to `b`.
+   * to `b`'s receiver.
    *
    * @noRailsEquivalent PERMANENT
    */
-  async result(b: object): Promise<string> {
+  async result(b: Binding): Promise<string> {
     if (this.filename == null) throw new LoadError("cannot load such file -- (erb)");
     const compiled = `${this.filename}.js`;
     const url = new URL(compiled.replace(/[%#?]/g, encodeURIComponent), "file:///");
@@ -72,6 +73,6 @@ export class TSE {
       }
       throw new LoadError(`cannot load such file -- ${compiled}`);
     }
-    return mod.default.call(b);
+    return mod.default.call(b.receiver);
   }
 }

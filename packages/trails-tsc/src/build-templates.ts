@@ -4,7 +4,7 @@ import ts from "typescript-5";
 import { chainLineMappings } from "./build-views.js";
 import { freeIdentifiers, tseLookupTransformer } from "./plugins/tse.js";
 
-const IMPORTED = new Set(["StringIO", "rbObjAsString", "NameError", "rbObjClassname"]);
+const IMPORTED = new Set(["StringIO", "rbObjAsString", "NameError", "rbObjClassname", "TopLevel"]);
 
 /** @noRailsEquivalent PERMANENT */
 export async function buildTemplates(paths: readonly string[]): Promise<string[]> {
@@ -42,7 +42,7 @@ function compileTemplate(source: string, base: string): string {
   const free = freeIdentifiers(render.split("\n")).filter((name) => !IMPORTED.has(name));
   const preamble = [
     "const __own = Object.create(null);",
-    "const __lookup = (name, guarded = false) => { for (const scope of [__own, this, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === \"function\" ? value.bind(this) : value; } if (guarded) return undefined; throw new NameError(`undefined local variable or method '${name}' for an instance of ${rbObjClassname(this)}`, name, { receiver: this }); };",
+    "const __lookup = (name, guarded = false) => { for (const scope of [__own, this, TopLevel, globalThis]) if (name in scope) { const value = scope[name]; return scope === this && typeof value === \"function\" ? value.bind(this) : value; } if (guarded) return undefined; throw new NameError(`undefined local variable or method '${name}' for an instance of ${rbObjClassname(this)}`, name, { receiver: this }); };",
     "const __assign = (name, value) => { __own[name] = value; return value; };",
     "const __sink = new Proxy({}, { set: (_target, name, value) => (__assign(name, value), true) });",
     ...free.map((name) => `let ${name} = __lookup(${JSON.stringify(name)});`),
@@ -56,7 +56,7 @@ function compileTemplate(source: string, base: string): string {
   const body = compiled.code;
   const { outputText, sourceMapText } = ts.transpileModule(
     [
-      'import { StringIO, rbObjAsString, NameError, rbObjClassname } from "@blazetrails/ruby-compat";',
+      'import { StringIO, rbObjAsString, NameError, rbObjClassname, TopLevel } from "@blazetrails/ruby-compat";',
       body.replace(/^export default /u, ""),
       "export default function () {",
       "  this.outputBuffer = new StringIO();",
