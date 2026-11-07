@@ -1,6 +1,6 @@
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { File, Pathname } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "../../base.js";
+import { Base as GeneratorBase } from "../../base.js";
 
 export class EncryptionKeyFileGenerator extends GeneratorBase {
   static {

@@ -12,7 +12,7 @@ import {
 import { AppGenerator } from "../app/app-generator.js";
 import { AppBase, type AppBaseOptions } from "../../app-base.js";
 import { AppName } from "../../app-name.js";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { Trails } from "../../../trails.js";
 import { APP_PATH } from "../../../app-path.js";
 

@@ -2,7 +2,7 @@ import { capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { GeneratorError } from "../../../../generated-attribute.js";
+import { Error as GeneratorError } from "../../../../base.js";
 import { TestCase } from "../../../../test-case.js";
 import { ChangeGenerator } from "./change-generator.js";
 

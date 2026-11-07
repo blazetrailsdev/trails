@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedConfiguration } from "@blazetrails/activesupport";
 import { SecureRandom } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { Base as GeneratorBase, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {
   skipSecretKeyBase?: boolean;

@@ -9,7 +9,7 @@ import {
 
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorConfig } from "./base.js";
+import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 

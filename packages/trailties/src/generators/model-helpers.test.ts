@@ -1,7 +1,7 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "./model-helpers.js";
-import { GeneratorError } from "./generated-attribute.js";
+import { Error as GeneratorError } from "./base.js";
 import { ModelGenerator, type ModelGeneratorOptions } from "./trails/model/model-generator.js";
 
 const build = (name: string, forcePlural?: boolean) =>

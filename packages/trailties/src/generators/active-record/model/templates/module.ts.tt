@@ -1,0 +1,5 @@
+export const <%= ActiveSupport.Inflector.camelize(this.regularClassPath().at(-1)) %> = {
+  get tableNamePrefix(): string {
+    return "<%= this.isNamespaced() ? this.namespacedClassPath().join("_") : this.classPath().join("_") %>_";
+  },
+};

@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "../../base.js";
+import { Base as GeneratorBase } from "../../base.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 

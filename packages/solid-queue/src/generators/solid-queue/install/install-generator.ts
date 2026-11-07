@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { chmod, gsubFile, prependToFile } from "@blazetrails/thor/actions/file-manipulation";
-import { GeneratorBase } from "@blazetrails/trailties/generators";
+import { Base as GeneratorBase } from "@blazetrails/trailties/generators";
 
 export class InstallGenerator extends GeneratorBase {
   static {

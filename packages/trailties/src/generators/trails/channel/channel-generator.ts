@@ -73,10 +73,7 @@ export class ChannelGenerator extends NamedBase {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing
-   */
+  /** @internal */
   private async createChannelFile(): Promise<void> {
     await this.template(
       "channel.ts",
@@ -130,7 +127,7 @@ export class ChannelGenerator extends NamedBase {
     if (await this.isUsingBun()) {
       await this.run("bun add @rails/actioncable");
     } else if (await this.isUsingNode()) {
-      await this.run("pnpm add @rails/actioncable");
+      await this.run("yarn add @rails/actioncable");
     }
   }
 

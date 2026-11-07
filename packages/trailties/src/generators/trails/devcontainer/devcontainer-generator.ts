@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
+import { Base as GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
 

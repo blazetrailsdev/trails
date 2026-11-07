@@ -211,6 +211,14 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "trailties",
         libPath: "railties/lib/rails",
+        // Generators other gems ship under `lib/rails/generators/`, which
+        // trailties ports in `src/generators/` beside railties' own.
+        extraLibPaths: [
+          "activerecord/lib/rails",
+          "actioncable/lib/rails",
+          "activejob/lib/rails",
+          "actionmailer/lib/rails",
+        ],
         testPath: "railties/test",
       },
     ],

@@ -1,6 +1,6 @@
 import { Pathname } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase } from "../../base.js";
+import { Base as GeneratorBase } from "../../base.js";
 import { EncryptionKeyFileGenerator } from "../encryption-key-file/encryption-key-file-generator.js";
 
 const MASTER_KEY_PATH = new Pathname("config/master.key");

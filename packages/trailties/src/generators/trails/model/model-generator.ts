@@ -8,7 +8,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { format } from "@blazetrails/ruby-compat";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 

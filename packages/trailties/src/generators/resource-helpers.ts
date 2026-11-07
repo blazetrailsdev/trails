@@ -2,7 +2,7 @@ import { NameError, camelize, constantize, underscore } from "@blazetrails/activ
 import { include, included } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ModelHelpers } from "./model-helpers.js";
-import type { GeneratorBase } from "./base.js";
+import type { Base as GeneratorBase } from "./base.js";
 import type { NamedBase } from "./named-base.js";
 
 export interface ResourceHelpersHost extends NamedBase {

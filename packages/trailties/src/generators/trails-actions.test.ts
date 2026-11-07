@@ -5,7 +5,7 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "./base.js";
+import { Base as GeneratorBase } from "./base.js";
 
 class TestGenerator extends GeneratorBase {}
 

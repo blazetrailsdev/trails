@@ -1,6 +1,6 @@
 import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/ruby-compat";
-import type { GeneratorBase } from "./base.js";
+import type { Base as GeneratorBase } from "./base.js";
 import type { NamedBase } from "./named-base.js";
 
 // prettier-ignore

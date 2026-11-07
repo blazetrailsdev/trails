@@ -1,7 +1,7 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { getPackageManager } from "../../../package-manager.js";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
+import { Base as GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));

@@ -1,7 +1,7 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorConfig } from "./base.js";
+import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators, type GeneratorClass } from "../generators.js";
 
 class Host extends GeneratorBase {}

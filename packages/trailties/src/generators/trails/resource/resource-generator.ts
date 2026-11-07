@@ -2,7 +2,7 @@
 import { include, type Included, pluralize } from "@blazetrails/activesupport";
 import { ModelGenerator, type ModelGeneratorOptions } from "../model/model-generator.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
-import type { GeneratorBase, GeneratorConfig } from "../../base.js";
+import type { Base as GeneratorBase, GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 export interface ResourceGeneratorOptions extends ModelGeneratorOptions {

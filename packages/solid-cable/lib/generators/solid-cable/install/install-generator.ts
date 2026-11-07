@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "@blazetrails/trailties/generators";
+import { Base as GeneratorBase } from "@blazetrails/trailties/generators";
 
 export class InstallGenerator extends GeneratorBase {
   static {

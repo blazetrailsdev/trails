@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase } from "../../base.js";
+import { Base as GeneratorBase } from "../../base.js";
 
 const DEFAULT_TEMPLATE = `# aws:
 #   access_key_id: 123

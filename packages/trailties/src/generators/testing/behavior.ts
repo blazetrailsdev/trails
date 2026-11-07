@@ -9,7 +9,7 @@ import {
   type FileUtils,
 } from "@blazetrails/ruby-compat";
 import { Stream, capture, classAttribute } from "@blazetrails/activesupport";
-import type { GeneratorBase, GeneratorConfig } from "../base.js";
+import type { Base as GeneratorBase, GeneratorConfig } from "../base.js";
 import { GeneratedAttribute } from "../generated-attribute.js";
 
 type GeneratorClassHost = {

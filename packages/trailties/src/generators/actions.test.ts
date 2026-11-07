@@ -25,7 +25,7 @@ import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { GeneratorBase } from "./base.js";
+import { Base as GeneratorBase } from "./base.js";
 import * as Assertions from "./testing/assertions.js";
 
 class TestGenerator extends GeneratorBase {}

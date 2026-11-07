@@ -1,4 +1,4 @@
-import { GeneratorBase } from "../../base.js";
+import { Base as GeneratorBase } from "../../base.js";
 
 type DescHost = { desc(description?: string | null): Promise<string | null> };
 

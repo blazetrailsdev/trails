@@ -12,7 +12,11 @@ import {
   hashDelete,
 } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
+import {
+  Base as GeneratorBase,
+  type GeneratorOptions,
+  type GeneratorConfig,
+} from "../../../../base.js";
 import {
   Database,
   DATABASES,
@@ -20,7 +24,7 @@ import {
   type PkgDependency,
 } from "../../../../database.js";
 import { AppName } from "../../../../app-name.js";
-import { GeneratorError } from "../../../../generated-attribute.js";
+import { Error as GeneratorError } from "../../../../base.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
