@@ -36,12 +36,14 @@ export class Cookie {
     this.secure = args["secure"];
   }
 
+  /** @inventedArm if — PERMANENT */
   methodMissing(methodName: string, ...args: unknown[]): any {
     return rbObjRespondTo(this.value, methodName)
       ? rbFSend(this.value, methodName, ...args)
       : Reflect.get(this.value, methodName);
   }
 
+  /** @inventedArm if — PERMANENT */
   respondToMissing(methodName: string, _includeAll = false): boolean {
     return rbObjRespondTo(this.value, methodName) || methodName in this.value;
   }
