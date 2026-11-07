@@ -220,7 +220,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rack/rack.git",
-      ref: "v3.1.14",
+      ref: "v3.2.8",
     },
     // libPath points at `lib/rack/` (the Rack module root) for symmetry with
     // how Rails subgems are mapped — see e.g. activerecord/lib/active_record.
