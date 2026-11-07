@@ -123,6 +123,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     await (t as unknown as Rack).app("development");
     expect(Base.connectionPool().isActiveConnection()).toBeNull();
   });
+
   it.skip("includes URL helpers as action methods", () => {
     // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
   });
