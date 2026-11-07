@@ -141,6 +141,7 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
@@ -149,10 +150,14 @@
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {
+    "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/actionmailbox": {
+      "optional": true
+    },
     "@blazetrails/activestorage": {
       "optional": true
     },

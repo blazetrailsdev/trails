@@ -82,6 +82,7 @@ export function read(config: InstanceType<typeof Application>["config"]) {
       "actionController",
       "actionView",
       "actionMailer",
+      "actionMailbox",
     ]) {
       expect(app.deprecators.get(framework), framework).toBeDefined();
     }
