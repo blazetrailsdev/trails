@@ -1232,6 +1232,7 @@
   "trailties": {
     "rows": 73,
     "excluded": [
+      "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
       "commands/build.ts::BuildCommand",
