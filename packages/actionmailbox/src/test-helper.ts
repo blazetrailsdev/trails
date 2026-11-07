@@ -57,7 +57,8 @@ export const TestHelper: TestHelper & ThisType<TestHelper> = {
     kwargs: MailOptions | MailBlock = {},
     block: MailBlock | null = null,
   ): Promise<InboundEmail | null> {
-    const inboundEmail = await this.createInboundEmailFromMail(kwargs as MailOptions, block);
+    if (typeof kwargs === "function") [kwargs, block] = [{}, kwargs];
+    const inboundEmail = await this.createInboundEmailFromMail(kwargs, block);
     await inboundEmail!.route();
     return inboundEmail;
   },
