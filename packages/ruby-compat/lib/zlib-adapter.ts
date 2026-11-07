@@ -78,7 +78,7 @@ export interface GzipReaderHandle {
  * Ruby stdlib's `Zlib::GzipWriter` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`), the
  * streaming counterpart of one-shot `Zlib.gzip` — `Rack::Deflater::GzipStream#each`
  * writes into it and reads the compressed bytes back through the io it wraps
- * (`vendor/rack/v3.1.14/lib/rack/deflater.rb:101`). Node's gzip stream is asynchronous,
+ * (`vendor/rack/v3.2.8/lib/rack/deflater.rb:101`). Node's gzip stream is asynchronous,
  * so `finish` is awaited where Ruby's returns.
  *
  * @noRailsEquivalent PERMANENT — the platform seam under Ruby stdlib `Zlib`

@@ -206,7 +206,7 @@ export class Request {
   declare _port: number | null;
 
   /**
-   * @inlinedFrom Rack::Request::Env#initialize rack/v3.1.14/lib/rack/request.rb:86-91
+   * @inlinedFrom Rack::Request::Env#initialize rack/v3.2.8/lib/rack/request.rb:86-91
    * @inlinedFrom ActionDispatch::Http::URL#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/url.rb:181-185
    * @inlinedFrom ActionDispatch::Http::FilterParameters#initialize rails/v8.0.2/actionpack/lib/action_dispatch/http/filter_parameters.rb:24-30
    */
