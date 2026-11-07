@@ -23,17 +23,17 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   it("isConnected() reflects the raw pg.Client finished? state", () => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
 
-    adapter._rawConnection = { _queryable: true, _ending: false, _ended: false };
+    adapter._rawConnection = pgConnection({ _queryable: true, _ending: false, _ended: false });
     expect(adapter.isConnected()).toBe(true);
 
-    adapter._rawConnection = { _ending: true };
+    adapter._rawConnection = pgConnection({ _ending: true });
     expect(adapter.isConnected()).toBe(false);
-    adapter._rawConnection = { _ended: true };
+    adapter._rawConnection = pgConnection({ _ended: true });
     expect(adapter.isConnected()).toBe(false);
 
-    adapter._rawConnection = { _queryable: false };
+    adapter._rawConnection = pgConnection({ _queryable: false });
     expect(adapter.isConnected()).toBe(true);
-    adapter._rawConnection = { _connectionError: true };
+    adapter._rawConnection = pgConnection({ _connectionError: true });
     expect(adapter.isConnected()).toBe(true);
 
     adapter._rawConnection = null;
