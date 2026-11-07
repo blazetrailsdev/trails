@@ -171,6 +171,7 @@ describe("vendor/sources.ts", () => {
         libPath: "lib",
         testPath: "spec/ruby",
         compareApi: false,
+        apiExcludedReason: expect.stringContaining("trails-only"),
       },
     ]);
     expect(apiComparePackages()).not.toContain("ruby-compat");

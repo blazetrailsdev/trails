@@ -64,7 +64,7 @@ function cjs<T extends object>(ns: T): T {
   return "default" in ns ? (ns.default as T) : ns;
 }
 const { rowsOfKind } = cjs(callMismatchBaselineModule);
-const { PACKAGE_DIR_OVERRIDES } = cjs(apiCompareConfigModule);
+const { PACKAGE_DIR_OVERRIDES, TS_ONLY_PACKAGES } = cjs(apiCompareConfigModule);
 const { libRoot } = cjs(packageRootsModule);
 
 export function packageDirOf(key: string): string {
@@ -102,6 +102,7 @@ export interface Ratio {
 export interface PackageSummary {
   name: string;
   railsCounterpart: string | null;
+  compareKeys: string[];
   description: string | null;
   claudeMd: string | null;
   tags: Record<Tag, { PERMANENT: number; CONVERGEABLE: number; none: number }>;
@@ -315,13 +316,45 @@ const isSource = (n: string) =>
   n.endsWith(".ts") && !n.endsWith(".test.ts") && !n.endsWith(".d.ts");
 const isTest = (n: string) => n.endsWith(".test.ts");
 
-/** The gem directory api-compare pairs `dir` with: its own key's entry first. */
+/** The `vendor/sources.ts` entries whose port lives in `packages/<dir>`. */
+function entriesOf(dir: string) {
+  return SOURCES.flatMap((s) => s.packages.map((p) => ({ source: s.name, p }))).filter(
+    (e) => (e.p.portedBy ?? packageDirOf(e.p.name)) === dir,
+  );
+}
+
+/**
+ * The gem `dir` ports: its own key's entry first. An entry api-compare skips
+ * still names one, since the package is a port all the same; only
+ * {@link TS_ONLY_PACKAGES} have none.
+ */
 export function railsCounterpartOf(dir: string): string | null {
-  const entries = SOURCES.flatMap((s) => s.packages.map((p) => ({ source: s.name, p })));
-  const own = entries.filter((e) => packageDirOf(e.p.name) === dir && e.p.compareApi !== false);
+  if ((TS_ONLY_PACKAGES as readonly string[]).includes(dir)) return null;
+  const own = entriesOf(dir);
   const pick = own.find((e) => e.p.name === dir) ?? own[0];
   if (pick === undefined) return null;
   return pick.source === "rails" ? pick.p.libPath.split("/")[0] : pick.source;
+}
+
+/**
+ * The keys api:compare and test:compare write `dir`'s rows under
+ * (`actionpack` → `actiondispatch`, `actioncontroller`, ...), so a reader can
+ * sum them; a package no source names is keyed by its own name.
+ */
+export function compareKeysOf(dir: string): string[] {
+  const keys = entriesOf(dir).map((e) => e.p.name);
+  return keys.length > 0 ? keys : [dir];
+}
+
+/** A package's description, with the reason api-compare skips it appended. */
+function withExclusion(description: string | null, excluded: string | null): string | null {
+  if (excluded === null) return description;
+  return `${description ?? ""}${description ? " " : ""}(Not in api:compare: ${excluded})`;
+}
+
+/** Why api-compare skips `dir`'s own entry, if it does. */
+export function apiExcludedReasonOf(dir: string): string | null {
+  return entriesOf(dir).find((e) => e.p.compareApi === false)?.p.apiExcludedReason ?? null;
 }
 
 interface ApiComparison {
@@ -482,7 +515,8 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
     packages.push({
       name,
       railsCounterpart: railsCounterpartOf(name),
-      description: pkgJson.description ?? null,
+      compareKeys: compareKeysOf(name),
+      description: withExclusion(pkgJson.description ?? null, apiExcludedReasonOf(name)),
       claudeMd,
       tags,
       marks: {

@@ -2,7 +2,15 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { githubAnchor, main, summarize } from "./package-summary.js";
+import { SOURCES } from "../../vendor/sources.js";
+import {
+  ROOT_DIR,
+  compareKeysOf,
+  githubAnchor,
+  main,
+  railsCounterpartOf,
+  summarize,
+} from "./package-summary.js";
 
 let root: string;
 
@@ -225,6 +233,38 @@ describe("package-summary", () => {
     expect(vm.claudeMd).toBeNull();
     expect(vm.params).toBeNull();
     expect(vm.marks.extraSurfaceNovel).toBeNull();
+  });
+
+  it("names a counterpart for every package but the trails-only ones", async () => {
+    const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+    expect(dirs.filter((dir) => railsCounterpartOf(dir) === null).sort()).toEqual([
+      "activerecord-cli",
+      "ruby-compat",
+      "trails-tsc",
+      "tse-compiler",
+      "vitest-matchers",
+      "website",
+    ]);
+  });
+
+  it("enrolls every test:compare package in api:compare or records why not", () => {
+    const unexplained = SOURCES.flatMap((s) => s.packages)
+      .filter((p) => p.testPath && p.compareTests !== false)
+      .filter((p) => p.compareApi === false && !p.apiExcludedReason)
+      .map((p) => p.name);
+    expect(unexplained).toEqual([]);
+  });
+
+  it("lists the compare keys that fold onto a package directory", () => {
+    expect(compareKeysOf("actionpack").sort()).toEqual([
+      "abstractcontroller",
+      "actioncontroller",
+      "actiondispatch",
+      "actionpackversion",
+    ]);
+    expect(compareKeysOf("vitest-matchers")).toEqual(["vitest-matchers"]);
   });
 
   it("counts line-leading JSDoc tags only, split by receipt", async () => {
