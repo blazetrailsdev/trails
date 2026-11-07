@@ -25,22 +25,14 @@ import {
   TRACE,
   UNLINK,
   RACK_REQUEST_QUERY_HASH,
-  RACK_REQUEST_QUERY_STRING,
   RACK_REQUEST_FORM_HASH,
-  RACK_REQUEST_FORM_INPUT,
   RACK_REQUEST_FORM_VARS,
   RACK_REQUEST_FORM_PAIRS,
   RACK_REQUEST_FORM_ERROR,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
 } from "./constants.js";
-import {
-  forwardedValues,
-  defaultQueryParser,
-  parseCookiesHeader,
-  QueryParser,
-  unescape,
-} from "./utils.js";
+import { forwardedValues, defaultQueryParser, parseCookiesHeader, QueryParser } from "./utils.js";
 import type { Enumerator } from "@blazetrails/ruby-compat";
 import {
   block as rbBlock,
@@ -74,7 +66,7 @@ const AUTHORITY = new RegExp(
     ipv6 +
     ")\\]" +
     "|" +
-    "(?<address>[^\\p{Cc}\\p{Cn}\\p{Cs}\\p{White_Space}\\[\\]]*?)" +
+    "(?<address>[-a-zA-Z0-9._~%!$&'()*+,;=]*?)" +
     ")" +
     "(:(?<port>\\d+))?$",
   "u",
@@ -181,6 +173,7 @@ export abstract class Env {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
 export interface Helpers {
   readonly env: Record<string, any>;
+  _queryParser?: QueryParser | null;
   getHeader(name: string): any;
   setHeader(name: string, v: any): any;
   fetchHeader(name: string, block?: (key: string) => any): any;
@@ -352,8 +345,10 @@ export abstract class Helpers {
   }
 
   hostWithPort(authority: string | null = this.authority): string | null {
-    const [host, , port] = this.splitAuthority(authority);
+    const parts = this.splitAuthority(authority);
+    if (parts.length === 0) return null;
 
+    const [host, , port] = parts;
     if ((port ?? null) === (DEFAULT_PORTS[this.scheme] ?? null)) {
       return host ?? null;
     } else {
@@ -422,10 +417,13 @@ export abstract class Helpers {
         const forwarded = this.getHttpForwarded("host");
         if (forwarded) return forwarded[forwarded.length - 1];
       } else if (type === "x_forwarded") {
-        const value = this.getHeader(HTTP_X_FORWARDED_HOST);
-        if (value) {
-          const parts = this.splitHeader(value);
-          return parts.length ? this.wrapIpv6(parts[parts.length - 1]) : null;
+        let value: string | null;
+        let xForwardedHost: string | undefined;
+        if (
+          (value = this.getHeader(HTTP_X_FORWARDED_HOST)) != null &&
+          (xForwardedHost = this.splitHeader(value).at(-1)) != null
+        ) {
+          return this.wrapIpv6(xForwardedHost);
         }
       }
     }
@@ -438,16 +436,17 @@ export abstract class Helpers {
 
   get ip(): string | null {
     const remoteAddresses = this.splitHeader(this.getHeader("REMOTE_ADDR"));
-    const externalAddresses = this.rejectTrustedIpAddresses(remoteAddresses);
 
-    if (externalAddresses.length !== 0) {
-      return externalAddresses[externalAddresses.length - 1];
+    for (const ip of remoteAddresses.slice().reverse()) {
+      if (!this.trustedProxy(ip)) return ip;
     }
 
     const forwardedFor = this.forwardedFor;
-    if (forwardedFor && forwardedFor.length !== 0) {
-      const external = this.rejectTrustedIpAddresses(forwardedFor);
-      return external[external.length - 1] ?? forwardedFor[0] ?? null;
+    if (forwardedFor != null && forwardedFor.length !== 0) {
+      for (const ip of forwardedFor.slice().reverse()) {
+        if (!this.trustedProxy(ip)) return ip ?? null;
+      }
+      return forwardedFor[0] ?? null;
     }
 
     return remoteAddresses[0] ?? null;
@@ -481,79 +480,67 @@ export abstract class Helpers {
   }
 
   get GET(): Record<string, any> {
-    const rrQueryString = this.getHeader(RACK_REQUEST_QUERY_STRING);
-    const queryString = this.queryString;
-    if (rrQueryString === queryString) {
-      return this.getHeader(RACK_REQUEST_QUERY_HASH);
-    } else {
-      if (rrQueryString != null) {
-        warn(
-          "query string used for GET parsing different from current query string. Starting in Rack 3.2, Rack will used the cached GET value instead of parsing the current query string.",
-          { uplevel: 1 },
-        );
-      }
-      const queryHash = this.parseQuery(queryString, "&");
-      this.setHeader(RACK_REQUEST_QUERY_STRING, queryString);
-      this.setHeader(RACK_REQUEST_QUERY_HASH, queryHash);
-      return queryHash;
-    }
+    return (
+      this.getHeader(RACK_REQUEST_QUERY_HASH) ??
+      this.setHeader(RACK_REQUEST_QUERY_HASH, this.parseQuery(this.queryString, "&"))
+    );
   }
 
-  get POST(): Record<string, any> {
-    const error = this.getHeader(RACK_REQUEST_FORM_ERROR);
-    if (error) {
+  get formPairs(): [string, any][] {
+    let pairs: [string, any][] | null;
+    let error: any;
+    if ((pairs = this.getHeader(RACK_REQUEST_FORM_PAIRS)) != null) {
+      return pairs;
+    } else if ((error = this.getHeader(RACK_REQUEST_FORM_ERROR)) != null) {
       throw new (error.constructor as ErrorConstructor)(error.message, { cause: error.cause });
     }
 
     try {
       const rackInput = this.getHeader(RACK_INPUT);
 
-      const formHash = this.getHeader(RACK_REQUEST_FORM_HASH);
-      if (formHash) {
-        const formInput = this.getHeader(RACK_REQUEST_FORM_INPUT);
-        if (formInput === rackInput) {
-          return formHash;
-        } else if (formInput) {
-          warn(
-            "input stream used for POST parsing different from current input stream. Starting in Rack 3.2, Rack will used the cached POST value instead of parsing the current input stream.",
-            { uplevel: 1 },
-          );
-        }
-      }
-
       if (rackInput == null) {
-        this.setHeader(RACK_REQUEST_FORM_INPUT, null);
-        this.setHeader(RACK_REQUEST_FORM_HASH, {});
-        return this.getHeader(RACK_REQUEST_FORM_HASH);
+        return this.setHeader(RACK_REQUEST_FORM_PAIRS, []);
       } else if (this.isFormData || this.isParseableData()) {
-        const pairs = Multipart.parseMultipart(
-          this.env,
-          Multipart.ParamList as unknown as QueryParser,
-        ) as unknown as Array<[string, any]> | null;
-        if (pairs) {
-          this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
-          this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
+        if (
+          (pairs = Multipart.parseMultipart(
+            this.env,
+            Multipart.ParamList as unknown as QueryParser,
+          ) as unknown as [string, any][] | null) != null
+        ) {
+          return this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
         } else {
-          const input: string | Uint8Array = this.getHeader(RACK_INPUT).read();
-          let formVars = typeof input === "string" ? input : strNew(Array.from(input));
+          const input: string | Uint8Array | null = this.getHeader(RACK_INPUT).read(
+            this.queryParser().bytesizeLimit + 2,
+          );
+          let formVars =
+            input == null ? "" : typeof input === "string" ? input : strNew(Array.from(input));
 
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 
           this.setHeader(RACK_REQUEST_FORM_VARS, formVars);
-          this.setHeader(RACK_REQUEST_FORM_HASH, this.parseQuery(formVars, "&"));
+          pairs = this.queryParser().parseQueryPairs(formVars, "&");
+          return this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
         }
-
-        this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
-        return this.getHeader(RACK_REQUEST_FORM_HASH);
       } else {
-        this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
-        this.setHeader(RACK_REQUEST_FORM_HASH, {});
-        return this.getHeader(RACK_REQUEST_FORM_HASH);
+        return this.setHeader(RACK_REQUEST_FORM_PAIRS, []);
       }
     } catch (error) {
       this.setHeader(RACK_REQUEST_FORM_ERROR, error);
       throw error;
     }
+  }
+
+  get POST(): Record<string, any> {
+    let formHash: Record<string, any> | null;
+    let error: any;
+    if ((formHash = this.getHeader(RACK_REQUEST_FORM_HASH)) != null) {
+      return formHash;
+    } else if ((error = this.getHeader(RACK_REQUEST_FORM_ERROR)) != null) {
+      throw new (error.constructor as ErrorConstructor)(error.message, { cause: error.cause });
+    }
+
+    const pairs = this.formPairs;
+    return this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
   }
 
   get params(): Record<string, any> {
@@ -581,7 +568,8 @@ export abstract class Helpers {
   }
 
   get baseUrl(): string {
-    return `${this.scheme}://${this.hostWithPort()}`;
+    const hostport = this.hostWithPort() ?? this.hostWithPort(this.serverAuthority);
+    return `${this.scheme}://${hostport}`;
   }
 
   get url(): string {
@@ -604,17 +592,12 @@ export abstract class Helpers {
     return this.parseHttpAcceptHeader(this.getHeader("HTTP_ACCEPT_LANGUAGE"));
   }
 
-  trustedProxy(ip: string | undefined): boolean {
-    return Request.ipFilter(ip);
+  setQueryParser(queryParser: QueryParser | null): void {
+    this._queryParser = queryParser;
   }
 
-  valuesAt(...keys: string[]): any[] {
-    warn(
-      "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
-      { uplevel: 1 },
-    );
-
-    return keys.map((key) => this.params[key]);
+  trustedProxy(ip: string | undefined): boolean {
+    return Request.ipFilter(ip);
   }
 
   /** @internal */
@@ -656,7 +639,7 @@ export abstract class Helpers {
 
   /** @internal */
   queryParser(): QueryParser {
-    return defaultQueryParser();
+    return this._queryParser ?? defaultQueryParser();
   }
 
   /** @internal */
@@ -666,6 +649,10 @@ export abstract class Helpers {
 
   /** @internal */
   parseMultipart(): Record<string, any> | null {
+    warn(
+      "Rack::Request#parse_multipart is deprecated and will be removed in a future version of Rack.",
+      { uplevel: 1 },
+    );
     return Multipart.extractMultipart(this, this.queryParser());
   }
 
@@ -685,7 +672,7 @@ export abstract class Helpers {
 
   /** @internal */
   splitHeader(value: string | null | undefined): string[] {
-    return value ? value.trim().split(/[,\s]+/) : [];
+    return value ? value.trim().split(/[, \t]+/) : [];
   }
 
   /** @internal */
@@ -695,11 +682,6 @@ export abstract class Helpers {
     if (!match) return [];
     const port = match.groups!.port;
     return [match.groups!.host, match.groups!.address, port != null ? parseInt(port, 10) : null];
-  }
-
-  /** @internal */
-  rejectTrustedIpAddresses<T extends string | undefined>(ipAddresses: T[]): T[] {
-    return ipAddresses.filter((ip) => !this.trustedProxy(ip));
   }
 
   /** @internal */
@@ -765,9 +747,33 @@ export class Request {
   /** @internal */
   private _params: Record<string, any> | null;
 
+  /** @internal */
+  private _ip: string | null;
+
   constructor(env: Record<string, any>) {
     this.env = env;
+    this._ip = null;
     this._params = null;
+  }
+
+  get ip(): string | null {
+    return (this._ip ??= (() => {
+      const remoteAddresses = this.splitHeader(this.getHeader("REMOTE_ADDR"));
+
+      for (const ip of remoteAddresses.slice().reverse()) {
+        if (!this.trustedProxy(ip)) return ip;
+      }
+
+      const forwardedFor = this.forwardedFor;
+      if (forwardedFor != null && forwardedFor.length !== 0) {
+        for (const ip of forwardedFor.slice().reverse()) {
+          if (!this.trustedProxy(ip)) return ip ?? null;
+        }
+        return forwardedFor[0] ?? null;
+      }
+
+      return remoteAddresses[0] ?? null;
+    })());
   }
 
   get params(): Record<string, any> {
@@ -795,27 +801,6 @@ export class Request {
     const v = postValue != null && postValue !== false ? postValue : getValue;
     this._params = null;
     return v;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */
-  get formPairs(): [string, any][] {
-    void this.POST;
-
-    const pairs = this.getHeader(RACK_REQUEST_FORM_PAIRS);
-    if (pairs) return pairs;
-
-    const formVars = this.getHeader(RACK_REQUEST_FORM_VARS);
-    if (formVars == null) return [];
-
-    return formVars
-      .split("&")
-      .filter((part: string) => part !== "")
-      .map((part: string): [string, string] => {
-        const eq = part.indexOf("=");
-        return eq === -1
-          ? [unescape(part), ""]
-          : [unescape(part.slice(0, eq)), unescape(part.slice(eq + 1))];
-      });
   }
 }
 
