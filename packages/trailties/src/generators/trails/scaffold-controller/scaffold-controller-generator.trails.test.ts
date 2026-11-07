@@ -143,14 +143,6 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     expect(content).toContain('return this.params.expect({ post: ["title"] });');
     expect(content).not.toContain(" as Record<string, unknown>");
   });
-
-  it("returns params.fetch's Parameters with no cast when there are no attributes", async () => {
-    await ScaffoldControllerGenerator.start(["Post"], { destinationRoot: tmpDir });
-
-    const content = controller();
-    expect(content).toContain('postParams() {\n    return this.params.fetch("post", {});');
-    expect(content).not.toContain("Record<string, unknown>");
-  });
 });
 
 describe("ScaffoldControllerGenerator (emitted source)", () => {

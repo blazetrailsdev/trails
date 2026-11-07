@@ -45,7 +45,7 @@ describe("ScreenshotHelperTest", () => {
     vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
     trails = TopLevel.Trails;
-    TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(Dir.pwd()) } as unknown as typeof TopLevel.Trails;
   });
 
   afterEach(() => {

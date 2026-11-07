@@ -87,9 +87,6 @@ export class RoutesProxy implements UrlForHost {
   get _routes(): UrlForRoutes {
     return this.routes;
   }
-  set _routes(value: UrlForRoutes) {
-    this.routes = value;
-  }
 
   urlOptions(): Record<string, unknown> {
     return _withRoutes.call<

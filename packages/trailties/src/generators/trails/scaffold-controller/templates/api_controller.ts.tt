@@ -62,8 +62,8 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
 
   // Only allow a list of trusted parameters through.
 <% if (this.attributesNames().length === 0) { -%>
-  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
-    return this.params.fetch("<%= singular %>", {});
+  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params()<%= ts ? ": Record<string, unknown>" : "" %> {
+    return this.params.fetch("<%= singular %>", {})<%= ts ? " as Record<string, unknown>" : "" %>;
   }
 <% } else { -%>
   <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
