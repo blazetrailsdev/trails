@@ -789,10 +789,6 @@ export class Request {
     return v;
   }
 
-  dup(): Request {
-    return new (this.constructor as typeof Request)({ ...this.env });
-  }
-
   /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */
   get formPairs(): [string, any][] {
     void this.POST;

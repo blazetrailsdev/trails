@@ -51,7 +51,7 @@ export {
 export { Builder } from "./builder.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
-export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
+export { DEFAULT_PORTS, Request, Env as RequestEnv, Helpers as RequestHelpers } from "./request.js";
 export { Response, Raw, Helpers as ResponseHelpers } from "./response.js";
 export {
   CONTENT_TYPE,

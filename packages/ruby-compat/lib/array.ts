@@ -1310,6 +1310,8 @@ type Block = (...args: unknown[]) => unknown;
 export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Object.create(null), {
   /** `rb_ary_to_a` (`vendor/ruby/v3.3.11/array.c:2952`). */
   toA: (self) => toA(self),
+  /** `rb_ary_to_ary_m` (`vendor/ruby/v3.3.11/array.c:3019`). */
+  toAry: (self) => self,
   /** `rb_ary_plus` (`vendor/ruby/v3.3.11/array.c:4879`). */
   plus: (self, y: unknown) => rbPlus(self, y),
   /** `rb_ary_difference_multi` (`vendor/ruby/v3.3.11/array.c:5430`), over `rb_ary_diff` (`:5384`). */

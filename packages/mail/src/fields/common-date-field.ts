@@ -1,5 +1,5 @@
 import { ArgumentError, DateTime, strftime } from "@blazetrails/date";
-import { rbObjAsString, type Encoding } from "@blazetrails/ruby-compat";
+import { binaryString, rbObjAsString, type Encoding } from "@blazetrails/ruby-compat";
 import { DateTimeElement } from "../elements/date-time-element.js";
 import { Utilities } from "../utilities.js";
 import { NamedStructuredField } from "./named-structured-field.js";
@@ -9,12 +9,14 @@ export class CommonDateField extends NamedStructuredField {
     return true;
   }
 
+  /** @inventedArm binaryString — PERMANENT */
   static normalizeDatetime(string: unknown): unknown {
     let datetime: ReturnType<typeof DateTime.parse> | undefined;
     if (Utilities.isBlank(string)) {
       datetime = DateTime.now();
     } else {
-      const stripped = rbObjAsString(string)
+      const str = rbObjAsString(string) as string | Uint8Array;
+      const stripped = (str instanceof Uint8Array ? binaryString(str) : str)
         .replace(/\(.*?\)/g, "")
         .replace(/ +/g, " ");
       try {

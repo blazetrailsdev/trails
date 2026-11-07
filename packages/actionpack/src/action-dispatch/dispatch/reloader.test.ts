@@ -1,62 +1,60 @@
-import { describe, it, expect } from "vitest";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import { describe, it, expect, afterEach } from "vitest";
+import { Lint, MockRequest } from "@blazetrails/rack";
+import type { RackApp } from "@blazetrails/rack";
+import {
+  Reloader as ActiveSupportReloader,
+  assert,
+  assertNil,
+  assertNot,
+  assertRespondTo,
+} from "@blazetrails/activesupport";
 import { Reloader } from "../middleware/reloader.js";
-import type { ExecutorLike, ExecutorState } from "../middleware/executor.js";
-import { assert, assertNil, assertNot, assertRespondTo } from "@blazetrails/activesupport";
-
-class StubReloader implements ExecutorLike {
-  prepareHooks: Array<() => void> = [];
-  completeHooks: Array<() => void> = [];
-  check: () => boolean = () => true;
-
-  toPrepare(fn: () => void) {
-    this.prepareHooks.push(fn);
-  }
-  toComplete(fn: () => void) {
-    this.completeHooks.push(fn);
-  }
-
-  runBang(_opts?: { reset?: boolean }): ExecutorState {
-    const shouldRun = this.check();
-    if (shouldRun) for (const h of this.prepareHooks) h();
-    return {
-      completeBang: () => {
-        if (shouldRun) this.completeHooks.forEach((h) => h());
-      },
-    };
-  }
-
-  errorReporter(): { report(): void } {
-    return { report() {} };
-  }
-}
-
-async function callAndReturnBody(reloader: StubReloader, app?: RackApp): Promise<any> {
-  const innerApp: RackApp = app ?? (async () => [200, {}, "response"] as unknown as RackResponse);
-  const mw = new Reloader(innerApp, reloader);
-  const [, , body] = await mw.call({} as RackEnv);
-  return body;
-}
 
 describe("ReloaderTest", () => {
+  afterEach(() => {
+    ActiveSupportReloader.resetCallbacks("prepare");
+    ActiveSupportReloader.resetCallbacks("complete");
+    _reloader = undefined;
+  });
+
+  class MyBody extends Array {
+    private onClose: (() => void) | undefined;
+
+    constructor(block?: () => void) {
+      super();
+      this.onClose = block;
+    }
+
+    foo(): string {
+      return "foo";
+    }
+
+    bar(): string {
+      return "bar";
+    }
+
+    close(): void {
+      if (this.onClose) this.onClose();
+    }
+  }
+
   it("prepare callbacks", async () => {
-    const r = new StubReloader();
     let a: number | null = null;
     let b: number | null = null;
     let c: number | null = null;
-    r.toPrepare(() => {
+    reloader().toPrepare(() => {
       a = b = c = 1;
     });
-    r.toPrepare(() => {
+    reloader().toPrepare(() => {
       b = c = 2;
     });
-    r.toPrepare(() => {
+    reloader().toPrepare(() => {
       c = 3;
     });
 
     assertNil(a ?? b ?? c);
 
-    await callAndReturnBody(r);
+    await callAndReturnBody();
 
     expect(a).toBe(1);
     expect(b).toBe(2);
@@ -64,36 +62,37 @@ describe("ReloaderTest", () => {
   });
 
   it("returned body object always responds to close", async () => {
-    const body = await callAndReturnBody(new StubReloader());
+    const body = await callAndReturnBody();
     assertRespondTo(body, "close");
   });
 
   it("returned body object always responds to close even if called twice", async () => {
-    const r = new StubReloader();
-    let body = await callAndReturnBody(r);
+    let body = await callAndReturnBody();
     assertRespondTo(body, "close");
-    body.close();
+    await body.close();
 
-    body = await callAndReturnBody(r);
+    body = await callAndReturnBody();
     assertRespondTo(body, "close");
-    body.close();
+    await body.close();
   });
 
   it("condition specifies when to reload", async () => {
-    const r = new StubReloader();
     let i = 0;
     let j = 0;
-    r.check = () => i < 3;
+
+    const r = reloader(() => i < 3);
     r.toPrepare(() => {
       i += 1;
     });
     r.toComplete(() => {
       j += 1;
     });
-    const mw = new Reloader(async () => [200, {}, []] as unknown as RackResponse, r);
+
+    const app = middleware((async () => [200, {}, []]) as unknown as RackApp, r);
+    const env = MockRequest.envFor("", {});
     for (let n = 0; n < 5; n++) {
-      const [, , body] = await mw.call({} as RackEnv);
-      (body as any).close();
+      const resp = await app.call(env);
+      await resp[2].close();
     }
     expect(i).toBe(3);
     expect(j).toBe(3);
@@ -101,52 +100,73 @@ describe("ReloaderTest", () => {
 
   it("it calls close on underlying object when close is called on body", async () => {
     let closeCalled = false;
-    const innerBody = {
-      close: () => {
+    const body = await callAndReturnBody((async () => {
+      const b = new MyBody(() => {
         closeCalled = true;
-      },
-    };
-    const body = await callAndReturnBody(
-      new StubReloader(),
-      async () => [200, { "content-type": "text/html" }, innerBody] as unknown as RackResponse,
-    );
-    body.close();
+      });
+      return [200, { "content-type": "text/html" }, b];
+    }) as unknown as RackApp);
+    await body.close();
     assert(closeCalled);
   });
 
   it("complete callbacks are called when body is closed", async () => {
-    const r = new StubReloader();
     let completed = false;
-    r.toComplete(() => {
+    reloader().toComplete(() => {
       completed = true;
     });
-    const body = await callAndReturnBody(r);
+
+    const body = await callAndReturnBody();
     assertNot(completed);
-    body.close();
+
+    await body.close();
     assert(completed);
   });
 
   it("prepare callbacks arent called when body is closed", async () => {
-    const r = new StubReloader();
     let prepared: boolean;
-    r.toPrepare(() => {
+    reloader().toPrepare(() => {
       prepared = true;
     });
-    const body = await callAndReturnBody(r);
+
+    const body = await callAndReturnBody();
     prepared = false;
-    body.close();
+
+    await body.close();
     assertNot(prepared);
   });
 
   it("complete callbacks are called on exceptions", async () => {
-    const r = new StubReloader();
     let completed = false;
-    r.toComplete(() => {
+    reloader().toComplete(() => {
       completed = true;
     });
-    await callAndReturnBody(r, async () => {
+
+    await callAndReturnBody((async () => {
       throw new Error("error");
-    }).catch(() => null);
+    }) as unknown as RackApp).catch(() => null);
+
     assert(completed);
   });
+
+  async function callAndReturnBody(block?: RackApp): Promise<any> {
+    const app = block ?? ((async () => [200, {}, "response"]) as unknown as RackApp);
+    const env = MockRequest.envFor("", {});
+    const [, , body] = await middleware(app).call(env);
+    return body;
+  }
+
+  function middleware(innerApp: RackApp, r: typeof ActiveSupportReloader = reloader()): Lint {
+    return new Lint(new Reloader(new Lint(innerApp) as never, r as never) as never);
+  }
+
+  let _reloader: typeof ActiveSupportReloader | undefined;
+
+  function reloader(check: () => boolean = () => true): typeof ActiveSupportReloader {
+    return (_reloader ??= (() => {
+      const reloader = class extends ActiveSupportReloader {};
+      reloader.check = check;
+      return reloader;
+    })());
+  }
 });
