@@ -1,4 +1,4 @@
-import { excBacktrace, stderr, rbProcCall } from "@blazetrails/ruby-compat";
+import { excBacktrace, stderr, rbObjDup, rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";
@@ -31,7 +31,7 @@ export class ShowExceptions {
       request.setHeader("action_dispatch.report_exception", !wrapper.rescueResponse());
 
       if (wrapper.isShow(request)) {
-        return this.renderException(request.dup(), wrapper);
+        return this.renderException(rbObjDup(request), wrapper);
       } else {
         throw exception;
       }

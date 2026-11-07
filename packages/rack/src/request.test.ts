@@ -24,6 +24,7 @@ import {
   b,
   hashAref,
   hashAset,
+  rbObjDup,
 } from "@blazetrails/ruby-compat";
 import {
   escape,
@@ -76,7 +77,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
 
     ctx.skip(req.isDelegate(), "delegate requests don't dup environments");
 
-    expect(req.dup().env).not.toBe(req.env);
+    expect(rbObjDup(req).env).not.toBe(req.env);
   });
 
   it("can check if something has been set", () => {

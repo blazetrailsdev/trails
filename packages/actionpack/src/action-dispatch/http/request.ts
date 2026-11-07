@@ -25,6 +25,7 @@ import {
   RACK_SESSION,
   RACK_SESSION_OPTIONS,
   Request as RackRequest,
+  RequestEnv,
   RequestHelpers,
 } from "@blazetrails/rack";
 import { BadRequest, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
@@ -195,11 +196,13 @@ export class Request {
     }
   }
 
-  readonly env: RackEnv;
+  env: RackEnv;
   declare readonly ssl: boolean;
 
-  #method?: string;
-  #requestMethod?: string;
+  /** @internal */
+  private _method?: string;
+  /** @internal */
+  private _requestMethod?: string;
   /** @internal */
   declare _protocol: string | null;
   /** @internal */
@@ -221,21 +224,21 @@ export class Request {
   }
 
   get method(): string {
-    this.#method ??= this.checkMethod(
+    this._method ??= this.checkMethod(
       this.getHeader("rack.methodoverride.original_method") ?? this.getHeader("REQUEST_METHOD"),
     );
-    return this.#method as string;
+    return this._method as string;
   }
 
   get requestMethod(): string {
-    this.#requestMethod ??= this.checkMethod(this.rawRequestMethod);
-    return this.#requestMethod as string;
+    this._requestMethod ??= this.checkMethod(this.rawRequestMethod);
+    return this._requestMethod as string;
   }
 
   /** @internal */
   set requestMethod(requestMethod: string) {
     if (this.checkMethod(requestMethod)) {
-      this.#requestMethod = this.setHeader("REQUEST_METHOD", requestMethod) as string;
+      this._requestMethod = this.setHeader("REQUEST_METHOD", requestMethod) as string;
     }
   }
 
@@ -855,10 +858,10 @@ include(Request, PermissionsPolicyRequest);
 include(Request, CacheRequest);
 include(Request, HttpURL);
 include(Request, FlashRequestMethods);
+include(Request, RequestEnv);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {
-  dup(): Request;
   get formats(): MimeType[];
   set formats(extensions: unknown[]);
   get variant(): ArrayInquirer<string> & Record<string, () => boolean>;
@@ -866,7 +869,6 @@ export interface Request {
   get pathParameters(): Record<string, unknown>;
   set pathParameters(parameters: Record<string, unknown>);
 }
-Request.prototype.dup = RackRequest.prototype.dup as unknown as () => Request;
 
 Object.defineProperty(Request.prototype, "contentMimeType", {
   get(this: Request) {

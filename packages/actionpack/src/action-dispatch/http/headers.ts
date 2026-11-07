@@ -1,5 +1,5 @@
 import { Request } from "./request.js";
-import { KeyError, eachPair } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair, rbObjDup } from "@blazetrails/ruby-compat";
 
 const CGI_VARIABLES = new Set([
   "AUTH_TYPE",
@@ -85,7 +85,7 @@ export class Headers {
   }
 
   merge(headersOrEnv: Record<string, unknown> | Headers): Headers {
-    const headers = this._req.dup().headers;
+    const headers = rbObjDup(this._req).headers;
     headers.mergeBang(headersOrEnv);
     return headers;
   }

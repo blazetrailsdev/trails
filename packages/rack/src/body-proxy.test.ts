@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { NoMethodError, StringIO, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { BodyProxy } from "./body-proxy.js";
 
 it("call each on the wrapped body", () => {
@@ -65,7 +65,7 @@ it("call the passed block on close even if there is an exception", () => {
 
 it("allow multiple arguments in respond_to?", () => {
   const proxy = new BodyProxy([], () => {});
-  expect(proxy.respondToMissing("foo")).toBe(false);
+  expect(rbObjRespondTo(proxy, "foo")).toBe(false);
 });
 
 it("allows #method to work with delegated methods", () => {
@@ -93,9 +93,9 @@ it("respond to :to_ary if body does responds to it, and have to_ary call close",
   const proxy = new BodyProxy([], () => {
     proxyClosed = true;
   });
-  expect(proxy.respondToMissing("to_ary")).toBe(true);
+  expect(rbObjRespondTo(proxy, "toAry")).toBe(true);
   expect(proxyClosed).toBe(false);
-  expect(proxy.toArray()).toEqual([]);
+  expect((proxy as any).toAry()).toEqual([]);
   expect(proxyClosed).toBe(true);
 });
 
@@ -106,20 +106,20 @@ it("not respond to :to_ary if body does not respond to it", () => {
     },
   };
   const proxy = new BodyProxy(body, () => {});
-  expect(proxy.respondToMissing("to_ary")).toBe(false);
-  expect(() => proxy.methodMissing("to_ary")).toThrow(TypeError);
+  expect(rbObjRespondTo(proxy, "toAry")).toBe(false);
+  expect(() => proxy.methodMissing("toAry")).toThrow(NoMethodError);
 });
 
 it("not respond to :to_str", () => {
   const proxy = new BodyProxy("string body", () => {});
-  expect(proxy.respondToMissing("to_str")).toBe(false);
-  expect(() => proxy.methodMissing("to_str")).toThrow();
+  expect(rbObjRespondTo(proxy, "toStr")).toBe(false);
+  expect(() => proxy.methodMissing("toStr")).toThrow(NoMethodError);
 });
 
 it("not respond to :to_path if body does not respond to it", () => {
   const proxy = new BodyProxy("string body", () => {});
-  expect(proxy.respondToMissing("to_path")).toBe(false);
-  expect(() => proxy.methodMissing("to_path")).toThrow();
+  expect(rbObjRespondTo(proxy, "toPath")).toBe(false);
+  expect(() => proxy.methodMissing("toPath")).toThrow(NoMethodError);
 });
 
 it("not close more than one time", () => {

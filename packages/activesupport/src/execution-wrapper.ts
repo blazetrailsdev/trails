@@ -46,6 +46,7 @@ export class ExecutionWrapper {
 
   declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+  declare static resetCallbacks: Extended<typeof Callbacks.ClassMethods>["resetCallbacks"];
 
   static {
     include(this, Callbacks);
