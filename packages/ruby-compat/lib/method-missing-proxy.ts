@@ -194,3 +194,45 @@ export function methodMissingProxy<T extends object>(
     },
   });
 }
+
+/**
+ * Mirrors the dispatch to `method_missing` (`vendor/ruby/v3.3.11/vm_eval.c:2570`) for a
+ * class whose `methodMissing` forwards to a delegate. A name the delegate answers
+ * is read off it, so a reader returns its value; any other name returns a
+ * function calling `receiver.methodMissing`. A read off a prototype (an own
+ * `constructor`) and an `_`-prefixed name, trails' private spelling, are not
+ * dispatched, as `respondsTo` above answers neither.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function methodMissingPrototype<
+  T extends { methodMissing(m: string, ...args: unknown[]): unknown },
+>(klass: { prototype: T }, options: { delegate: (receiver: T) => unknown }): void {
+  const { delegate: readDelegate } = options;
+  const parent = Object.getPrototypeOf(klass.prototype) as object;
+  Object.setPrototypeOf(
+    klass.prototype,
+    new Proxy(Object.create(parent) as object, {
+      get(target, prop, receiver: T) {
+        if (
+          Reflect.has(target, prop) ||
+          Object.hasOwn(receiver, "constructor") ||
+          (typeof prop === "string" && prop.startsWith("_"))
+        ) {
+          return Reflect.get(target, prop, receiver);
+        }
+        const delegate = readDelegate(receiver);
+        if (respondsTo(delegate, prop)) {
+          const value = (delegate as Record<string | symbol, unknown>)[prop];
+          return typeof value === "function" && isMethod(delegate as object, prop)
+            ? value.bind(delegate)
+            : value;
+        }
+        if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) {
+          return undefined;
+        }
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      },
+    }),
+  );
+}

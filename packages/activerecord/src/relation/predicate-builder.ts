@@ -274,7 +274,12 @@ function entriesOf(attributes: string[] | Attributes): [string | string[], unkno
 }
 
 function respondsToId(value: unknown): value is { id: unknown } {
-  return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
+  return (
+    value != null &&
+    typeof value === "object" &&
+    !isPlainObject(value) &&
+    rbObjRespondTo(value, "id")
+  );
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

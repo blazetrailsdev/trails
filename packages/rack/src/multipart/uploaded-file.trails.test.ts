@@ -44,4 +44,18 @@ describe("Rack::Multipart::UploadedFile", () => {
       String(Buffer.from(env["rack.input"].string(), "latin1").length),
     );
   });
+
+  it("keeps a subclass's #private field reachable and delegates to its tempfile", () => {
+    class Sub extends UploadedFile {
+      #tag = "x";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const file = new Sub(logo, "image/png");
+    expect(file.tag()).toBe("x");
+    expect(file.read()).toBeDefined();
+    expect(file instanceof UploadedFile).toBe(true);
+    expect(Object.getPrototypeOf(file)).toBe(Sub.prototype);
+  });
 });
