@@ -320,10 +320,10 @@ export class Parser {
   private endBoundarySize: number;
   private rxMaxSize: number;
   private headRegex: RegExp;
-  private bodyRetained: boolean | null;
-  private retainedSize: number;
-  private totalBytesRead: number | null;
-  private contentDispositionQuotedEscapes: number;
+  private _bodyRetained: boolean | null;
+  private _retainedSize: number;
+  private _totalBytesRead: number | null;
+  private _contentDispositionQuotedEscapes: number;
 
   static parseBoundary(contentType: string | null | undefined): string | null {
     if (!contentType) return null;
@@ -384,10 +384,10 @@ export class Parser {
     this.queryParser = queryParser;
     this.params = queryParser.makeParams();
     this.bufsize = bufsize;
-    this.bodyRetained = null;
-    this.retainedSize = 0;
-    this.totalBytesRead = Parser.PARSER_BYTESIZE_LIMIT != null ? 0 : null;
-    this.contentDispositionQuotedEscapes = 0;
+    this._bodyRetained = null;
+    this._retainedSize = 0;
+    this._totalBytesRead = Parser.PARSER_BYTESIZE_LIMIT != null ? 0 : null;
+    this._contentDispositionQuotedEscapes = 0;
     this.collector = new Collector(tempfile);
     this.sbuf = new SBuf(rbObjDup(""));
     const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -399,7 +399,7 @@ export class Parser {
   }
 
   parse(io: { read(n: number, outbuf?: string): string | Uint8Array | null }) {
-    if (io instanceof BoundedIO && this.totalBytesRead != null) this.totalBytesRead = null;
+    if (io instanceof BoundedIO && this._totalBytesRead != null) this._totalBytesRead = null;
     const outbuf = "";
     this.readData(io, outbuf);
     while (true) {
@@ -434,9 +434,9 @@ export class Parser {
   ) {
     const content = io.read(this.bufsize, outbuf);
     this.handleEmptyContentBang(content);
-    if (this.totalBytesRead != null) {
-      this.totalBytesRead += _byteLength(content!);
-      if (this.totalBytesRead > Parser.PARSER_BYTESIZE_LIMIT!) {
+    if (this._totalBytesRead != null) {
+      this._totalBytesRead += _byteLength(content!);
+      if (this._totalBytesRead > Parser.PARSER_BYTESIZE_LIMIT!) {
         throw new BoundaryTooLongError(
           `multipart upload exceeds limit of ${Parser.PARSER_BYTESIZE_LIMIT} bytes`,
         );
@@ -517,9 +517,9 @@ export class Parser {
 
               if (c === '"') break;
 
-              this.contentDispositionQuotedEscapes += 1;
+              this._contentDispositionQuotedEscapes += 1;
               if (
-                this.contentDispositionQuotedEscapes >
+                this._contentDispositionQuotedEscapes >
                 Parser.CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT
               ) {
                 throw new BoundaryTooLongError(
@@ -583,7 +583,7 @@ export class Parser {
 
       this.updateRetainedSize(_byteLength(head));
 
-      this.bodyRetained = filename == null;
+      this._bodyRetained = filename == null;
 
       this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
       this.state = "MIME_BODY";
@@ -601,7 +601,7 @@ export class Parser {
     const bodyWithBoundary = this.sbuf.checkUntil(this.bodyRegex);
     if (bodyWithBoundary != null) {
       const body = bodyWithBoundary.replace(this.bodyRegexAtEnd, "");
-      if (this.bodyRetained) this.updateRetainedSize(_byteLength(body));
+      if (this._bodyRetained) this.updateRetainedSize(_byteLength(body));
       this.collector.onMimeBody(this.mimeIndex, body);
       this.sbuf.pos += body.length + 2;
       this.state = "CONSUME_TOKEN";
@@ -610,7 +610,7 @@ export class Parser {
       if (this.rxMaxSize < this.sbuf.restSize) {
         const delta = this.sbuf.restSize - this.rxMaxSize;
         const body = this.sbuf.peek(delta);
-        if (this.bodyRetained) this.updateRetainedSize(_byteLength(body));
+        if (this._bodyRetained) this.updateRetainedSize(_byteLength(body));
         this.collector.onMimeBody(this.mimeIndex, body);
         this.sbuf.pos += delta;
       }
@@ -620,8 +620,8 @@ export class Parser {
   }
 
   /** @internal */ private updateRetainedSize(size: number) {
-    this.retainedSize += size;
-    if (this.retainedSize > Parser.BUFFERED_UPLOAD_BYTESIZE_LIMIT) {
+    this._retainedSize += size;
+    if (this._retainedSize > Parser.BUFFERED_UPLOAD_BYTESIZE_LIMIT) {
       throw new BoundaryTooLongError("multipart data over retained size limit");
     }
   }
