@@ -12,6 +12,8 @@ type Parse5Document = DefaultTreeAdapterMap["document"];
 export class Document {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => Node | undefined;
+  declare xpath: (...args: unknown[]) => NodeSet;
+  declare atXpath: (...args: unknown[]) => Node | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 

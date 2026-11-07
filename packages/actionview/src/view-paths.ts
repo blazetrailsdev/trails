@@ -41,12 +41,10 @@ export class ClassMethods {
   /** @internal */
   static _prefixes(this: ViewPathsClass): string[] {
     if (Object.hasOwn(this, "_prefixesMemo")) return this._prefixesMemo!;
-    const superclass = rbClassSuperclass(this);
-    const local = this.localPrefixes();
-    return (this._prefixesMemo =
-      !superclass || typeof superclass.isAbstract !== "function" || superclass.isAbstract()
-        ? local
-        : [...local, ...superclass._prefixes()]);
+    const superclass = rbClassSuperclass(this) as ViewPathsClass;
+    if (superclass.isAbstract()) return this.localPrefixes();
+
+    return (this._prefixesMemo = [...this.localPrefixes(), ...superclass._prefixes()]);
   }
 
   /** @internal */

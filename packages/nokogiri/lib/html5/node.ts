@@ -35,6 +35,8 @@ export function parse5PointerId(node: object): number {
 export class Node {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => Node | undefined;
+  declare xpath: (...args: unknown[]) => NodeSet;
+  declare atXpath: (...args: unknown[]) => Node | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
   static readonly ELEMENT_NODE = 1;

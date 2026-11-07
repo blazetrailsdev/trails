@@ -11,6 +11,7 @@ export interface SearchableHost {
   readonly document: unknown;
   readonly _node: unknown;
   css(...args: unknown[]): NodeSet;
+  xpath(...args: unknown[]): NodeSet;
   /** @internal */
   extractParams: typeof extractParams;
   /** @internal */
@@ -33,6 +34,16 @@ export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
 
 export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefined {
   return this.css(...args).first();
+}
+
+export function xpath(this: SearchableHost, ...args: unknown[]): NodeSet {
+  const [paths, handler, ns, binds] = this.extractParams(args);
+
+  return this.xpathInternal(this, paths, handler, ns, binds ?? null);
+}
+
+export function atXpath(this: SearchableHost, ...args: unknown[]): Node | undefined {
+  return this.xpath(...args).first();
 }
 
 /** @internal */

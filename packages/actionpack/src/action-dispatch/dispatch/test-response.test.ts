@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertEqual, assertKindOf, HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Range } from "@blazetrails/ruby-compat";
+import type { Html5Document } from "@blazetrails/nokogiri";
 import { TestResponse } from "../testing/test-response.js";
 
 describe("TestResponseTest", () => {
@@ -36,6 +37,19 @@ describe("TestResponseTest", () => {
     );
     assertKindOf(HashWithIndifferentAccess, response.parsedBody);
     assertEqual({ foo: "fighters" }, response.parsedBody);
+
+    response = TestResponse.create(
+      200,
+      { "Content-Type": "text/html" },
+      `<html>
+  <head></head>
+  <body>
+    <div>Content</div>
+  </body>
+</html>
+`,
+    );
+    assertEqual("Content", (response.parsedBody as Html5Document).atXpath("/html/body/div")!.text);
   });
 
   it("JSON response Hash pattern matching", () => {
@@ -64,6 +78,6 @@ describe("TestResponseTest", () => {
     ]);
   });
 
-  // BLOCKED: test-response-html-parsed-body-at-xpath
+  // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
   it.skip("HTML response pattern matching", () => {});
 });
