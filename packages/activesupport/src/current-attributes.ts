@@ -1,4 +1,9 @@
-import { ArgumentError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  methodMissingPrototype,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
@@ -166,14 +171,6 @@ export abstract class CurrentAttributes {
     this.currentInstances().clear();
   }
 
-  static methodMissing(name: string, ...args: unknown[]): unknown {
-    return rbFSend(this.instance(), name, ...args);
-  }
-
-  static respondToMissing(name: string, _includePrivate: boolean): boolean {
-    return rbObjRespondTo(this.instance(), name);
-  }
-
   /** @internal */
   private static currentInstances(): Map<string, CurrentAttributes> {
     return (
@@ -188,6 +185,23 @@ export abstract class CurrentAttributes {
       (this as CurrentAttributesClass)._currentInstancesKey = this.name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
+  }
+
+  /** @internal */
+  private static methodMissing(name: string, ...args: unknown[]): unknown {
+    return rbFSend(this.instance(), name, ...args);
+  }
+
+  /** @internal */
+  private static respondToMissing(name: string, _includePrivate: boolean): boolean {
+    return rbObjRespondTo(this.instance(), name);
+  }
+
+  static {
+    methodMissingPrototype(
+      { prototype: this as unknown as { methodMissing(m: string, ...args: unknown[]): unknown } },
+      { delegate: (klass) => (klass as unknown as typeof CurrentAttributes).instance() },
+    );
   }
 
   /** @missingRailsCall with — PERMANENT */
@@ -213,28 +227,6 @@ export abstract class CurrentAttributes {
     return result;
   }
 }
-
-Object.setPrototypeOf(
-  CurrentAttributes,
-  new Proxy(Object.getPrototypeOf(CurrentAttributes) as object, {
-    get(target, prop, receiver: typeof CurrentAttributes) {
-      const value = Reflect.get(target, prop, receiver);
-      if (
-        value !== undefined ||
-        typeof prop === "symbol" ||
-        Reflect.has(target, prop) ||
-        !Object.prototype.isPrototypeOf.call(CurrentAttributes, receiver)
-      ) {
-        return value;
-      }
-      if (!receiver.respondToMissing(prop, false)) return value;
-      const instance = receiver.instance() as unknown as Record<string, unknown>;
-      return typeof instance[prop] === "function"
-        ? (...args: unknown[]) => receiver.methodMissing(prop, ...args)
-        : receiver.methodMissing(prop);
-    },
-  }),
-);
 
 /** @internal */
 function dup(value: unknown): unknown {
