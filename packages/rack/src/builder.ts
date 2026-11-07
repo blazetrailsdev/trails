@@ -66,10 +66,7 @@ export class Builder {
 
     config = config.replace(/^#(?!\\)[^\n]*\n/gm, "\n");
 
-    const endMatch = config.match(/^__END__\s*$/m);
-    if (endMatch && typeof endMatch.index === "number") {
-      config = config.substring(0, endMatch.index);
-    }
+    config = config.replace(/^__END__\n[\s\S]*(?![\s\S])/m, "");
 
     return this.newFromString(config, path, options);
   }

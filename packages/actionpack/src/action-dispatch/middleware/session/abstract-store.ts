@@ -5,6 +5,7 @@ import {
   NameError,
   SecureRandom,
   hashDelete,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
@@ -51,11 +52,18 @@ export const StaleSessionCheck = {
     this: StaleSessionCheckHost,
     env: PersistedRequest,
   ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
-    return this.staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
+    return this.staleSessionCheckBang(
+      () =>
+        rbCallSuper(this, StaleSessionCheck.loadSession, env) as
+          | [unknown, Record<string, unknown>]
+          | Promise<[unknown, Record<string, unknown>]>,
+    );
   },
 
   extractSessionId(this: StaleSessionCheckHost, env: PersistedRequest): unknown {
-    return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
+    return this.staleSessionCheckBang(() =>
+      rbCallSuper(this, StaleSessionCheck.extractSessionId, env),
+    );
   },
 
   /**

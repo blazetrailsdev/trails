@@ -127,7 +127,8 @@ const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
   (value) => value instanceof RackTestUploadedFile,
 ];
 
-type PermitFilter = string | Record<string, unknown> | (string | Record<string, unknown>)[];
+type ScalarOrHashFilter = string | Record<string, unknown>;
+type PermitFilter = ScalarOrHashFilter | readonly PermitFilter[];
 
 type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
 
@@ -232,11 +233,14 @@ export class Parameters {
   expect<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
   expect(key: string): unknown;
   expect(...keys: [string, string, ...string[]]): unknown[];
-  expect(...filters: (string | Record<string, unknown>)[]): unknown;
-  expect(...filters: (string | Record<string, unknown>)[]): unknown {
-    const flatFilters = filters.flat();
+  expect(keys: readonly [string]): unknown;
+  expect(keys: readonly [string, string, ...string[]]): unknown[];
+  expect(...filters: PermitFilter[]): unknown;
+  expect(...filters: PermitFilter[]): unknown {
     const params = this.permitFilters(filters);
-    const keys = flatFilters.flatMap((f) => (typeof f === "string" ? [f] : Object.keys(f)));
+    const keys = (filters.flat(Infinity as 1) as ScalarOrHashFilter[]).flatMap((f) =>
+      typeof f === "string" ? [f] : Object.keys(f),
+    );
     const values = params.require(keys);
     return values.length === 1 ? values[0] : values;
   }
@@ -244,8 +248,10 @@ export class Parameters {
   expectBang<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
   expectBang(key: string): unknown;
   expectBang(...keys: [string, string, ...string[]]): unknown[];
-  expectBang(...filters: (string | Record<string, unknown>)[]): unknown;
-  expectBang(...filters: (string | Record<string, unknown>)[]): unknown {
+  expectBang(keys: readonly [string]): unknown;
+  expectBang(keys: readonly [string, string, ...string[]]): unknown[];
+  expectBang(...filters: PermitFilter[]): unknown;
+  expectBang(...filters: PermitFilter[]): unknown {
     try {
       return this.expect(...filters);
     } catch (e) {
@@ -687,7 +693,7 @@ export class Parameters {
   ): Parameters {
     const params = new Parameters();
 
-    for (const filter of filters.flat()) {
+    for (const filter of filters.flat(Infinity as 1) as ScalarOrHashFilter[]) {
       if (typeof filter === "string") {
         this.permittedScalarFilter(params, filter);
       } else if (typeof filter === "object" && filter !== null) {

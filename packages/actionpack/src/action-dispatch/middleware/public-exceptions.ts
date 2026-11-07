@@ -8,8 +8,6 @@ import { InvalidType } from "../http/mime-negotiation.js";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
-const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
-
 type ErrorBody = { status: number; error: string };
 
 export class PublicExceptions {
@@ -64,19 +62,11 @@ export class PublicExceptions {
   }
 
   private renderHtml(status: number): RackResponse {
-    const currentLocale = I18n.locale();
-    const locale =
-      typeof currentLocale === "string" && LOCALE_RE.test(currentLocale) ? currentLocale : null;
-    let path: string | null = locale
-      ? File.join(this.publicPath, `${status}.${locale}.html`)
-      : null;
-    let found = path != null && File.isExist(path);
-    if (!found) {
-      path = File.join(this.publicPath, `${status}.html`);
-      found = File.isExist(path);
-    }
+    let path = `${this.publicPath}/${status}.${I18n.locale()}.html`;
+    let found: boolean;
+    if (!(found = File.isExist(path))) path = `${this.publicPath}/${status}.html`;
 
-    if (found && path != null) {
+    if (found || File.isExist(path)) {
       return this.renderFormat(status, "text/html", File.read(path));
     }
     return [404, { [X_CASCADE]: "pass" }, []];
