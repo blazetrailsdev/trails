@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { assertMatch, capture } from "@blazetrails/activesupport";
 import {
   Dir,
@@ -25,6 +25,8 @@ async function tempfile(...lines: string[]): Promise<string> {
 }
 
 describe("ARGVScrubberTest", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("version", async () => {
     vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
       throw new SystemExit(code ?? 0);
@@ -43,7 +45,6 @@ describe("ARGVScrubberTest", () => {
       expect(output.trimEnd()).toBe(`Trails ${VERSION.STRING}`);
       expect(exitCode).toBe(0);
     }
-    vi.restoreAllMocks();
   });
 
   it("default help", async () => {
