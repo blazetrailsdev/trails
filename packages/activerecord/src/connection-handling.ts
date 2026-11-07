@@ -328,6 +328,7 @@ export function isSharded(this: typeof Base): boolean {
 /**
  * @internal
  * @inventedArm if — CONVERGEABLE with-role-and-shard-loads-an-async-blocks-relation-without-an-invented-arm
+ * @inventedArm then — CONVERGEABLE with-role-and-shard-loads-an-async-blocks-relation-without-an-invented-arm
  */
 export function withRoleAndShard<T>(
   this: typeof Base,
