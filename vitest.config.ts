@@ -329,10 +329,10 @@ const alias = {
     "packages/activerecord-cli/src/index.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
-  "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/src") + "/",
-  "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/src/index.ts"),
-  "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
-  "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
+  "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/lib") + "/",
+  "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/lib/index.ts"),
+  "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/lib") + "/",
+  "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/lib/index.ts"),
   "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/lib") + "/",
   "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/lib/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
@@ -364,7 +364,7 @@ const alias = {
   "@blazetrails/actionmailbox": path.resolve(__dirname, "packages/actionmailbox/src/index.ts"),
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
-  "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
+  "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/lib/index.ts"),
   "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/src/all.ts"),
   "@blazetrails/trailties/trailties/":
     path.resolve(__dirname, "packages/trailties/src/trailties") + "/",
@@ -376,35 +376,35 @@ const alias = {
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/lib") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/lib/index.ts"),
-  "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
+  "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/lib/index.ts"),
   "@blazetrails/vitest-matchers/setup": path.resolve(
     __dirname,
     "packages/vitest-matchers/lib/setup.ts",
   ),
   "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/lib/index.ts"),
-  "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
-  "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
+  "@blazetrails/date": path.resolve(__dirname, "packages/date/lib/index.ts"),
+  "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/lib/index.ts"),
   "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/src") + "/",
   "@blazetrails/mail": path.resolve(__dirname, "packages/mail/src/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
-  "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
+  "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/lib/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/lib/builder.ts"),
-  "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/src/magic.ts"),
-  "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
+  "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/lib/magic.ts"),
+  "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/lib/marcel.ts"),
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/lib/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/lib/smtp.ts"),
   "@blazetrails/rake": path.resolve(__dirname, "packages/rake/src/rake.ts"),
   "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/lib") + "/",
   "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/lib") + "/",
-  "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
+  "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/lib/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
-  "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
+  "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/lib/index.ts"),
 };
 
 // Reporting-only code-coverage config (v8 provider — no instrumentation step,
@@ -443,7 +443,7 @@ const COVERAGE_INCLUDE = AR_COVERAGE
   : AR_CLI_COVERAGE
     ? ["packages/activerecord-cli/src/**/*.ts", "packages/activerecord-cli/src/**/*.mts"]
     : TRAILS_TSC_COVERAGE
-      ? ["packages/trails-tsc/src/**/*.ts", "packages/trails-tsc/src/**/*.mts"]
+      ? ["packages/trails-tsc/lib/**/*.ts", "packages/trails-tsc/lib/**/*.mts"]
       : ["packages/*/{src,lib}/**/*.ts", "packages/*/{src,lib}/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
@@ -599,7 +599,7 @@ export default defineConfig({
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
-            "./packages/bcrypt/src/index.ts",
+            "./packages/bcrypt/lib/index.ts",
             "./packages/actionview/src/test-helpers/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]

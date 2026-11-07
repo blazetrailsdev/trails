@@ -869,7 +869,7 @@ describe("CI runs every tooling test suite", () => {
         ),
         "vitest.config.ts": VITEST_BEFORE.replace(
           '  "@blazetrails/rack": ',
-          '  "@blazetrails/rack-session/": "packages/rack-session/src/",\n  "@blazetrails/rack": ',
+          '  "@blazetrails/rack-session/": "packages/rack-session/lib/",\n  "@blazetrails/rack": ',
         ),
       }),
     );
@@ -1480,7 +1480,7 @@ describe("CI runs every tooling test suite", () => {
       expect(storage.activerecord_affected).toBe("true");
       expect(storage.ar_scope).toBe("packages/activestorage");
       expect(storage.sqlite_only).toBe("false");
-      expect((await runGate("packages/trails-tsc/src/index.ts")).ar_scope).toBe(
+      expect((await runGate("packages/trails-tsc/lib/index.ts")).ar_scope).toBe(
         "packages/activerecord-cli packages/solid-cable packages/solid-queue",
       );
       expect(

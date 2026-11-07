@@ -82,7 +82,7 @@ import {
   unconsumedAssertionReceipts,
 } from "./assertion-receipts.js";
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
-import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
@@ -164,7 +164,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
     // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
-    // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
+    // as rack-session above, so both sides land on `packages/rack-test/lib/<x>`.
     let rest = rubyFile;
     if (pkg === "rack-test") {
       if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);
@@ -233,7 +233,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     // `test`, so every spec repeats that root as a leading `session_` segment
     // (`spec_session_pool.rb` mirrors `lib/rack/session/pool.rb`). Drop it, the
     // same redundant-leading-segment case as the i18n branch below, so both
-    // sides land on `packages/rack-session/src/pool`.
+    // sides land on `packages/rack-session/lib/pool`.
     let base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
     if (pkg === "rack-session") base = base.replace(/^session_/, "");
     const kebab = base.replace(/_/g, "-");
@@ -1735,16 +1735,16 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/src/",
   rack: "packages/rack/src/",
-  "rack-session": "packages/rack-session/src/",
-  "rack-test": "packages/rack-test/src/",
+  "rack-session": "packages/rack-session/test/",
+  "rack-test": "packages/rack-test/test/",
   rackup: "packages/rackup/test/",
-  bcrypt: "packages/bcrypt/src/",
-  msgpack: "packages/msgpack/src/",
-  marcel: "packages/marcel/src/",
+  bcrypt: "packages/bcrypt/test/",
+  msgpack: "packages/msgpack/test/",
+  marcel: "packages/marcel/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",
   rake: "packages/rake/src/",
-  chronic: "packages/chronic/src/",
+  chronic: "packages/chronic/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
   raabro: "packages/raabro/src/",
@@ -1761,9 +1761,9 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activestorage: "packages/activestorage/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",
-  "did-you-mean": "packages/did-you-mean/src/",
+  "did-you-mean": "packages/did-you-mean/test/",
   i18n: "packages/i18n/src/",
-  date: "packages/date/src/",
+  date: "packages/date/test/",
   "ruby-compat": "packages/ruby-compat/test/",
   thor: "packages/thor/src/",
   mail: "packages/mail/src/",

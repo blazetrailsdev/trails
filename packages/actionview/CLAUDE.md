@@ -55,7 +55,7 @@ environment, and shipped code has no eval pipeline.** The split is:
 - **`compileJs` is the Erubi step.** `@blazetrails/tse-compiler` turns TSE
   into JS, as Erubi turns ERB into Ruby.
 - **The typed stand-in is `compiled_source`.** `virtualizeTse`
-  (`packages/trails-tsc/src/plugins/tse.ts`) writes the method body, its
+  (`packages/trails-tsc/lib/plugins/tse.ts`) writes the method body, its
   locals binding (Rails' `locals_code`) and its strict-locals signature as a
   TypeScript module, and `build-views` (`trails-tsc-views build`) writes one
   for every `.tse` file, partials and unused templates included, into

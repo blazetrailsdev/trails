@@ -16,8 +16,8 @@ so the base classes need a port of their own, not scaffolding inside actionpack.
 
 | gem                               | trails               | status                                                                                                                                                                             |
 | --------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `lib/rack/session/abstract/id.rb` | `src/abstract/id.ts` | Ported: `SessionId`, `SessionHash`, `Persisted`, `PersistedSecure` (with its `SecureSessionHash`) and `DEFAULT_OPTIONS`. `ActionDispatch::Session::AbstractStore` builds on these. |
-| `lib/rack/session/pool.rb`        | `src/pool.ts`        | Ported: `Rack::Session::Pool`, the in-memory store.                                                                                                                                |
+| `lib/rack/session/abstract/id.rb` | `lib/abstract/id.ts` | Ported: `SessionId`, `SessionHash`, `Persisted`, `PersistedSecure` (with its `SecureSessionHash`) and `DEFAULT_OPTIONS`. `ActionDispatch::Session::AbstractStore` builds on these. |
+| `lib/rack/session/pool.rb`        | `lib/pool.ts`        | Ported: `Rack::Session::Pool`, the in-memory store.                                                                                                                                |
 | `lib/rack/session/constants.rb`   | none                 | `RACK_SESSION` and `RACK_SESSION_OPTIONS` are read from `@blazetrails/rack`'s constants. `RACK_SESSION_UNPACKED_COOKIE_DATA` is used only by the unported cookie store.            |
 | `lib/rack/session/cookie.rb`      | none                 | Not ported, by decision (RFC 0133 non-goal). Rails' `CookieStore` does not use `Rack::Session::Cookie`. Its tests are `PERMANENT-SKIP` stubs.                                      |
 | `lib/rack/session/encryptor.rb`   | none                 | Not ported, same reason: it serves only `Rack::Session::Cookie`.                                                                                                                   |
@@ -54,6 +54,6 @@ stores, not directly.
 
 ## Source layout
 
-`src/**` mirrors `lib/rack/session/**` under the gem's module root, matching how
+`lib/**` mirrors `lib/rack/session/**` under the gem's module root, matching how
 `packages/rack/src/**` mirrors `lib/rack/**`. A new file lands at the path the
 table above gives it.

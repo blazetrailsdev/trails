@@ -280,7 +280,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `json.ts`, `ActiveSupport::JSON::Encoding` on `json/encoding.ts`.
   "activesupport:json/decoding.rb": "json.ts",
   // The `Time` arm is the reopening of `Time` itself, ported onto trails'
-  // `Time` (`packages/date/src/time.ts`) by the mixin idiom, so it has its own
+  // `Time` (`packages/date/lib/time.ts`) by the mixin idiom, so it has its own
   // file; the entry splits the bucket off `object/blank.rb` (Time's first
   // reopening).
   "activesupport:core_ext/time/calculations.rb": "core-ext/time/calculations.ts",
@@ -1110,7 +1110,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "it so `Object#acts_like?` can find it with `respond_to?`. Two things " +
       "follow, and they differ by receiver. (1) `Time#acts_like_time?` IS " +
       "ported, as a real marker method: trails' `::Time` is a class the port " +
-      "owns (packages/date/src/time.ts), so the reopening ports literally and " +
+      "owns (packages/date/lib/time.ts), so the reopening ports literally and " +
       "`Object.actsLike` answers its `:time` arm through `respond_to?` exactly " +
       "as Ruby does. It is skipped HERE only because activesupport cannot " +
       "reopen another package's class, so the member lands at that class rather " +
@@ -1120,7 +1120,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "no reopening to define a marker in at all, and RFC 0098 " +
       "(`time-with-zone-residue-structural-blockers`) landed the decision that " +
       "`@blazetrails/date` answers for them with the `actsLikeDate` / " +
-      "`actsLikeTime` predicates (packages/date/src/acts-like.ts) that " +
+      "`actsLikeTime` predicates (packages/date/lib/acts-like.ts) that " +
       "`Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing " +
       "markers on the `Temporal` polyfill prototypes at import time was rejected " +
       "as a global side effect on a third-party package; the cost recorded there " +

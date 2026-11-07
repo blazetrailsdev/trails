@@ -37,7 +37,7 @@ So bumping to current stable would leave a reviewer chasing
 `range_include_internal` through code `ruby-compat/lib/range.ts` was never
 written against.
 The host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA
-this ref resolves to — and `packages/date/src/date.ts:1229-1231` states its
+this ref resolves to — and `packages/date/lib/date.ts:1229-1231` states its
 claim as "on ruby 3.3.11".
 
 `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`, which
@@ -81,7 +81,7 @@ or `minitest` (no TS package the port could ever key onto) that is temporary:
 both extractors already run over this clone unmodified — `extract-ruby-api.rb`
 reports 19 classes, 3 modules, 78 public methods, and
 `extract-ruby-tests.rb` reports 7 files, 124 tests. They stay off only until
-`packages/rack-session/src` exists, because both compares key a package onto a
+`packages/rack-session/lib` exists, because both compares key a package onto a
 TS workspace dir. RFC 0133's `enroll-rack-session-in-compare-tooling` creates
 the package and flips both on.
 
@@ -144,7 +144,7 @@ differences from the gem:
 - `Engine.hash_secret` omits `secret.byteslice(0, MAX_SECRET_BYTESIZE)`
   (`lib/bcrypt/engine.rb:63-64`). A slice that splits a character is not a JS
   string; `bcryptjs` truncates the encoded bytes at 72 itself, which matches
-  the gem (`packages/bcrypt/src/engine.trails.test.ts`).
+  the gem (`packages/bcrypt/lib/engine.trails.test.ts`).
 - A `$2x$` salt raises `Invalid salt revision`, where the gem hashes it.
 - A secret holding invalid UTF-8 (`"\xa3"`) cannot be passed at all, so 23 of
   the 68 vectors in `spec/bcrypt/engine_spec.rb:80-155` are not ported; the
