@@ -39,7 +39,7 @@ export class Cookie {
   methodMissing(methodName: string, ...args: unknown[]): any {
     return rbObjRespondTo(this.value, methodName)
       ? rbFSend(this.value, methodName, ...args)
-      : this.value[methodName as unknown as number];
+      : Reflect.get(this.value, methodName);
   }
 
   respondToMissing(methodName: string, _includeAll = false): boolean {
