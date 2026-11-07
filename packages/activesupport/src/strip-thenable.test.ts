@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FrozenError, TypeError } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./strip-thenable.js";
 
 class Lazy {
@@ -46,7 +47,7 @@ describe("stripThenable", () => {
   });
 
   it("raises on a non-extensible object", () => {
-    expect(() => stripThenable(Object.freeze(new Lazy()))).toThrow(TypeError);
+    expect(() => stripThenable(Object.freeze(new Lazy()))).toThrow(FrozenError);
   });
 
   it("raises on an object with its own then", () => {

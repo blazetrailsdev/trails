@@ -1,3 +1,5 @@
+import { FrozenError, TypeError } from "@blazetrails/ruby-compat";
+
 function hiddenThen(this: object): undefined {
   if (Object.getOwnPropertyDescriptor(this, "then")?.get === hiddenThen) {
     Reflect.deleteProperty(this, "then");
@@ -8,7 +10,7 @@ function hiddenThen(this: object): undefined {
 /** @noRailsEquivalent PERMANENT */
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   if (!Object.isExtensible(obj)) {
-    throw new TypeError("stripThenable: cannot hide `then` on a non-extensible object");
+    throw new FrozenError("can't modify frozen object", { receiver: obj });
   }
   const own = Object.getOwnPropertyDescriptor(obj, "then");
   if (own && own.get !== hiddenThen) {

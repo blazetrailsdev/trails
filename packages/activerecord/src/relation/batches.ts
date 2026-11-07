@@ -9,7 +9,6 @@ import {
   slice,
   eachSlice,
 } from "@blazetrails/ruby-compat";
-import { stripThenable } from "@blazetrails/activesupport";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
 import type { FindEachOptions, InBatchesOptions, LoadedRelation, Relation } from "../relation.js";
@@ -461,7 +460,7 @@ export async function batchOnLoadedRelation(
     const subrelation = relation.spawn();
     subrelation.loadRecords(subrecords);
 
-    await block(stripThenable(subrelation));
+    await block(_thenlessView(subrelation));
   }
 
   return null;
@@ -546,7 +545,7 @@ export async function batchOnUnloadedRelation(
       );
     }
 
-    await block(stripThenable(yieldedRelation));
+    await block(_thenlessView(yieldedRelation));
 
     if (values.length < batchLimit) break;
 
@@ -572,4 +571,19 @@ export async function batchOnUnloadedRelation(
   }
 
   return null;
+}
+
+/** @noRailsEquivalent CONVERGEABLE in-batches-yields-a-relation-without-a-proxy-view */
+function _thenlessView<T extends object>(obj: T): Omit<T, "then"> {
+  return new Proxy(obj, {
+    get(target, prop) {
+      return prop === "then" ? undefined : Reflect.get(target, prop, target);
+    },
+    set(target, prop, value) {
+      return Reflect.set(target, prop, value, target);
+    },
+    has(target, prop) {
+      return prop === "then" ? false : Reflect.has(target, prop);
+    },
+  });
 }
