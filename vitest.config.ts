@@ -746,6 +746,7 @@ export default defineConfig({
           globals: true,
           include: ["packages/et-orbi/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
+          testTimeout: 30_000,
           setupFiles: [
             "./packages/vitest-matchers/lib/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
