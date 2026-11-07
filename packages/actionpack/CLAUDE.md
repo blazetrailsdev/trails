@@ -89,7 +89,7 @@ under `layouts` and drop the prefix. A layout the application names itself is
 looked up as written.
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
-template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
+template a controller's `render` call names (`trails-tsc/lib/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal
 `template:` as written. The conversion sits at these call sites and not inside
 the template resolver, because the resolver is also handed names an application

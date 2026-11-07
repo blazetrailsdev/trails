@@ -16,7 +16,7 @@ const TZDATA_ABBREVIATIONS = path.join(
   REPO_ROOT,
   "packages",
   "date",
-  "src",
+  "lib",
   "tzdata-abbreviations.ts",
 );
 

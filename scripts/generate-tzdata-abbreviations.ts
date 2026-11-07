@@ -1,5 +1,5 @@
 /**
- * Regenerates `TZDATA_ABBREVIATIONS` (packages/date/src/tzdata-abbreviations.ts),
+ * Regenerates `TZDATA_ABBREVIATIONS` (packages/date/lib/tzdata-abbreviations.ts),
  * the abbreviation MRI's `Time#zone` (`ruby/time.c` `time_zone`, which answers
  * `tm.tm_zone`) and `TZInfo::TimezoneOffset#abbreviation` both read off the
  * zone's transition records — the zic `FORMAT` column with its rule `LETTER`
@@ -11,7 +11,7 @@
  * sibling table.
  *
  * Run with `pnpm tsx scripts/generate-tzdata-abbreviations.ts` to print the
- * module for writing over packages/date/src/tzdata-abbreviations.ts.
+ * module for writing over packages/date/lib/tzdata-abbreviations.ts.
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";

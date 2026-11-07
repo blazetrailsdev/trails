@@ -21,9 +21,9 @@
       "@blazetrails/ruby-compat/enumerable": ["../../ruby-compat/lib/enumerable.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/lib/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
-      "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
-      "@blazetrails/msgpack": ["../../msgpack/src/index.ts"],
-      "@blazetrails/date": ["../../date/src/index.ts"],
+      "@blazetrails/bcrypt": ["../../bcrypt/lib/index.ts"],
+      "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
+      "@blazetrails/date": ["../../date/lib/index.ts"],
       "@blazetrails/tzinfo": ["../../tzinfo/lib/index.ts"],
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/src/message-verifier.ts"

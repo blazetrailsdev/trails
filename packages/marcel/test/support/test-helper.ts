@@ -6,7 +6,7 @@ export function files(name: string) {
 }
 
 export function fixturePath(name: string) {
-  return File.expandPath(`../fixtures/${name}`, import.meta.filename);
+  return File.expandPath(`../../fixtures/${name}`, import.meta.filename);
 }
 
 export function eachContentTypeFixture(

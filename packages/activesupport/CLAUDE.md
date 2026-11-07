@@ -62,7 +62,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
   (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /
   `TopLevel.ActionController` (`actionpack/src/namespaces.ts`), and
-  `TopLevel.BCrypt` (`bcrypt/src/index.ts`; an unseated `BCrypt` is
+  `TopLevel.BCrypt` (`bcrypt/lib/index.ts`; an unseated `BCrypt` is
   `has_secure_password`'s `LoadError` arm, `secure_password.rb:120-125`). A
   reader names it at call time: `TopLevel.Trails!.env` (`engine.rb:592`),
   `new TopLevel.ActionDispatch!.Request(env)` (`shard_selector.rb:41`,

@@ -657,8 +657,8 @@ export default defineConfig(
           files: [
             "packages/actionview/src/**/*.test.ts",
             "packages/arel/src/**/*.test.ts",
-            "packages/date/lib/**/*.test.ts",
-            "packages/did-you-mean/lib/**/*.test.ts",
+            "packages/date/test/**/*.test.ts",
+            "packages/did-you-mean/test/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
             "packages/i18n/src/**/*.test.ts",
           ],

@@ -6,7 +6,7 @@
     "paths": {
       "@blazetrails/rack": ["../src/index.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
-      "@blazetrails/date": ["../../date/src/index.ts"]
+      "@blazetrails/date": ["../../date/lib/index.ts"]
     }
   },
   "include": ["./**/*.test-d.ts"]

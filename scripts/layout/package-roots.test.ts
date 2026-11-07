@@ -27,7 +27,7 @@ describe("package-roots", () => {
     const re = new RegExp(srcReferencePattern("rack"));
     expect(re.test("see packages/rack/src/index.ts")).toBe(true);
     expect(re.test('"packages/rack/src"')).toBe(true);
-    expect(re.test("packages/rack-test/src/x.ts")).toBe(false);
+    expect(re.test("packages/rack-test/lib/x.ts")).toBe(false);
     expect(re.test("packages/rack/srcs")).toBe(false);
   });
 });

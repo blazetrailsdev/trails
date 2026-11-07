@@ -48,7 +48,7 @@ describe("TS extractor assertion-count collection", () => {
         wontBe(x, "isNil");
       });
     `;
-    const info = extractTestsFromSource(src, "packages/rack-test/src/x.test.ts");
+    const info = extractTestsFromSource(src, "packages/rack-test/test/x.test.ts");
     expect(info.testCases[0].assertionKinds).toEqual([
       "assertPredicate",
       "refutePredicate",

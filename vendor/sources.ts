@@ -285,7 +285,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // TS-side workspace dir is `packages/did-you-mean/src`; api-compare
+        // TS-side workspace dir is `packages/did-you-mean/lib`; api-compare
         // derives that from the package name, so use the kebab form.
         name: "did-you-mean",
         libPath: "lib/did_you_mean",
@@ -718,7 +718,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       // `git diff v3_3_11 v3_4_10 -- rational.c range.c re.c object.c` is
       // +581/-285. The host toolchain is `ruby 3.3.11 (2026-03-26 revision
       // 1f2d15125a)` — the SHA this ref resolves to — and
-      // `packages/date/src/date.ts:1229-1231` writes its behavioural claim as
+      // `packages/date/lib/date.ts:1229-1231` writes its behavioural claim as
       // "on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`".
       //
       // `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
