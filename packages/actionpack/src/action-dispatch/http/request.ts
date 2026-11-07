@@ -49,18 +49,7 @@ import {
   notModified as _notModified,
   type CacheResponseLike,
 } from "./cache.js";
-import {
-  accepts as _accepts,
-  contentMimeType as _contentMimeType,
-  formatFromPathExtension as _formatFromPathExtension,
-  hasContentType as _hasContentType,
-  MimeNegotiation as _MimeNegotiation,
-  negotiateMime as _negotiateMime,
-  isParamsReadable as _isParamsReadable,
-  shouldApplyVaryHeader as _shouldApplyVaryHeader,
-  useAcceptHeader as _useAcceptHeader,
-  validAcceptHeader as _validAcceptHeader,
-} from "./mime-negotiation.js";
+import { MimeNegotiation as _MimeNegotiation } from "./mime-negotiation.js";
 import {
   include,
   runLoadHooks,
@@ -869,27 +858,6 @@ export interface Request {
   set pathParameters(parameters: Record<string, unknown>);
 }
 
-Object.defineProperty(Request.prototype, "contentMimeType", {
-  get(this: Request) {
-    return _contentMimeType.call(this);
-  },
-  configurable: true,
-});
-Object.defineProperty(Request.prototype, "accepts", {
-  get(this: Request) {
-    return _accepts.call(this);
-  },
-  configurable: true,
-});
-Request.prototype.hasContentType = function (this: Request) {
-  return _hasContentType.call(this);
-};
-Request.prototype.negotiateMime = function (this: Request, order: (MimeType | undefined)[]) {
-  return _negotiateMime.call(this, order);
-};
-Request.prototype.shouldApplyVaryHeader = function (this: Request) {
-  return _shouldApplyVaryHeader.call(this);
-};
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `ActiveSupport.on_load(:action_dispatch_request) { include RequestCookieMethods }` (`action_dispatch/middleware/cookies.rb:93-95`). */
 export interface Request extends Included<typeof RequestCookieMethods> {}
@@ -925,16 +893,6 @@ export class PASS_NOT_FOUND {
     return false;
   }
 }
-Request.prototype.validAcceptHeader = function (this: Request) {
-  return _validAcceptHeader.call(this);
-};
-Request.prototype.useAcceptHeader = function (this: Request) {
-  return _useAcceptHeader.call(this);
-};
-Request.prototype.formatFromPathExtension = function (this: Request) {
-  return _formatFromPathExtension.call(this);
-};
-Request.prototype.isParamsReadable = _isParamsReadable;
 
 ActionDispatch.Request = Request;
 Request.Utils = Utils;

@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { Request } from "./request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { InvalidType, isParamsReadable, type MimeNegotiationHost } from "./mime-negotiation.js";
+import { InvalidType, MimeNegotiation } from "./mime-negotiation.js";
 import { ParseError } from "./parameters.js";
 
-function makeHost(parameters: () => unknown): MimeNegotiationHost {
+function makeHost(parameters: () => unknown): MimeNegotiation {
   return {
     getHeader: () => undefined,
     setHeader: () => undefined,
@@ -15,39 +15,39 @@ function makeHost(parameters: () => unknown): MimeNegotiationHost {
     },
     accept: "",
     isXhr: () => false,
-  } as MimeNegotiationHost;
+  } as unknown as MimeNegotiation;
 }
 
 describe("MimeNegotiation.paramsReadable", () => {
   it("returns true when parameters[:format] is set", () => {
     const host = makeHost(() => ({ format: "json" }));
-    expect(isParamsReadable.call(host)).toBe(true);
+    expect(MimeNegotiation.prototype.isParamsReadable.call(host)).toBe(true);
   });
 
   it("returns false when parameters[:format] is absent", () => {
     const host = makeHost(() => ({}));
-    expect(isParamsReadable.call(host)).toBe(false);
+    expect(MimeNegotiation.prototype.isParamsReadable.call(host)).toBe(false);
   });
 
   it("swallows ActionController::BadRequest (Rails RESCUABLE_MIME_FORMAT_ERRORS)", () => {
     const host = makeHost(() => {
       throw new BadRequest("bad");
     });
-    expect(isParamsReadable.call(host)).toBe(false);
+    expect(MimeNegotiation.prototype.isParamsReadable.call(host)).toBe(false);
   });
 
   it("swallows ActionDispatch::Http::Parameters::ParseError", () => {
     const host = makeHost(() => {
       throw new ParseError("invalid JSON");
     });
-    expect(isParamsReadable.call(host)).toBe(false);
+    expect(MimeNegotiation.prototype.isParamsReadable.call(host)).toBe(false);
   });
 
   it("propagates unrelated exceptions (does NOT blanket-catch)", () => {
     const host = makeHost(() => {
       throw new RangeError("not a rescuable mime format error");
     });
-    expect(() => isParamsReadable.call(host)).toThrow(RangeError);
+    expect(() => MimeNegotiation.prototype.isParamsReadable.call(host)).toThrow(RangeError);
   });
 });
 
@@ -82,7 +82,7 @@ describe("MimeNegotiation writers", () => {
 
   it("format= forces the format regardless of the path extension", () => {
     const req = new Request({ PATH_INFO: "/posts/5.html" });
-    req.format = "xml";
+    req.setFormat("xml");
     expect(req.format().toString()).toBe("application/xml");
     expect(req.params["format"]).toBe("xml");
   });
