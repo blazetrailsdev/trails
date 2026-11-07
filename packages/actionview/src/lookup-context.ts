@@ -1,4 +1,4 @@
-import { I18n, camelize, isPresent, kernelArray } from "@blazetrails/activesupport";
+import { I18n, camelize, isPresent, kernelArray, presence } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   Module,
@@ -315,7 +315,7 @@ export class LookupContext {
 
   find(
     name: string,
-    prefixes: ReadonlyArray<string> = [],
+    prefixes: ReadonlyArray<string> | null = [],
     partial = false,
     keys: ReadonlyArray<string> = [],
     options: Record<string, DetailValue> = {},
@@ -327,7 +327,7 @@ export class LookupContext {
 
   findTemplate(
     name: string,
-    prefixes: ReadonlyArray<string> = [],
+    prefixes: ReadonlyArray<string> | null = [],
     partial = false,
     keys: ReadonlyArray<string> = [],
     options: Record<string, DetailValue> = {},
@@ -399,13 +399,17 @@ export class LookupContext {
   }
 
   /** @internal */
-  normalizeName(name: string, prefixes: ReadonlyArray<string>): [string, ReadonlyArray<string>] {
+  normalizeName(
+    name: string,
+    prefixes: ReadonlyArray<string> | null,
+  ): [string, ReadonlyArray<string>] {
     const idx = name.lastIndexOf("/");
-    if (idx < 0) return [name, prefixes.length > 0 ? prefixes : [""]];
+    if (idx < 0) return [name, presence(prefixes) ?? [""]];
     let pathPrefix = name.slice(0, idx);
     if (pathPrefix.startsWith("/")) pathPrefix = pathPrefix.slice(1);
     const base = name.slice(idx + 1);
-    const pfxs = prefixes.length === 0 ? [pathPrefix] : prefixes.map((p) => `${p}/${pathPrefix}`);
+    const pfxs =
+      !prefixes || prefixes.length === 0 ? [pathPrefix] : prefixes.map((p) => `${p}/${pathPrefix}`);
     return [base, pfxs];
   }
 

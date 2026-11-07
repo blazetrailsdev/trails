@@ -34,51 +34,54 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
   private determineTemplate(
     options: RenderOptions & { isKey?(key: string): boolean },
   ): RenderableTemplate {
-    const keys = options.locals ? Object.keys(options.locals) : [];
+    const keys = hasKey(options, "locals")
+      ? Object.keys(hashAref(options, "locals") as object)
+      : [];
 
     if (hasKey(options, "body")) {
-      return new Text(options.body);
+      return new Text(hashAref(options, "body"));
     }
     if (hasKey(options, "plain")) {
-      return new Text(options.plain);
+      return new Text(hashAref(options, "plain"));
     }
     if (hasKey(options, "html")) {
-      return new HTML(options.html, this.formats[0]);
+      return new HTML(hashAref(options, "html"), this.formats[0]);
     }
     if (hasKey(options, "file")) {
-      const file = hashAref(options, "file") as string;
-      if (File.isExist(file)) {
-        return new RawFile(file);
+      if (File.isExist(hashAref(options, "file") as string)) {
+        return new RawFile(hashAref(options, "file") as string);
       } else {
-        if (File.isAbsolutePath(file)) {
-          throw new ArgumentError(`File ${file} does not exist`);
+        if (File.isAbsolutePath(hashAref(options, "file") as string)) {
+          throw new ArgumentError(`File ${hashAref(options, "file") as string} does not exist`);
         } else {
           throw new ArgumentError(
-            `\`render file:\` should be given the absolute path to a file. '${file}' was given instead`,
+            `\`render file:\` should be given the absolute path to a file. '${hashAref(options, "file") as string}' was given instead`,
           );
         }
       }
     }
     if (hasKey(options, "inline")) {
-      const handler = Template.handlerForExtension(options.type ?? "tse");
+      const handler = Template.handlerForExtension(
+        (hashAref(options, "type") as string | null) ?? "tse",
+      );
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
         : ((this.lookupContext.formats[0] as string | undefined) ?? null);
-      return new Inline(options.inline as string, "inline template", handler!, {
+      return new Inline(hashAref(options, "inline") as string, "inline template", handler!, {
         locals: keys,
         format,
       });
     }
     if (hasKey(options, "renderable")) {
-      return new Renderable(options.renderable);
+      return new Renderable(hashAref(options, "renderable"));
     }
     if (hasKey(options, "template")) {
-      if (rbObjRespondTo(options.template, "render")) {
-        return options.template as RenderableTemplate;
+      if (rbObjRespondTo(hashAref(options, "template"), "render")) {
+        return hashAref(options, "template") as RenderableTemplate;
       }
       return this.lookupContext.findTemplate(
-        options.template as string,
-        options.prefixes,
+        hashAref(options, "template") as string,
+        hashAref(options, "prefixes") as readonly string[] | null,
         false,
         keys,
         this.details,
