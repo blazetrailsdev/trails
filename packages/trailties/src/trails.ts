@@ -12,7 +12,6 @@ import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import type { Autoloaders } from "./autoloaders.js";
 import type { Generators } from "./generators.js";
-import type { Runner } from "./test-unit/runner.js";
 import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
@@ -53,7 +52,6 @@ export class Trails {
   declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
   declare static Generators?: typeof Generators;
-  declare static TestUnit?: { Runner: typeof Runner };
   /** @noRailsEquivalent PERMANENT */
   declare static TrailsTsc?: typeof TrailsTsc;
 

@@ -443,7 +443,7 @@ export { bytes, strNew } from "./string/bytes.js";
 import "./exc-detailed-message.js";
 export { byteslice, rbStrByteslice, rbStrGetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
-export { capitalize, casecmp, upcase } from "./string/case-mapping.js";
+export { capitalize, casecmp, isCasecmp, upcase } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
 export { rbStrEnumerateLines } from "./string/each.js";
 export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";

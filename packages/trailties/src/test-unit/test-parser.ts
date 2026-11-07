@@ -1,14 +1,17 @@
-import { Range, getFs, type Method } from "@blazetrails/ruby-compat";
-import { API } from "typescript/unstable/sync";
-import * as ts from "typescript/unstable/ast";
+import { Range, getFs, rbFRequire, rbRequireLoaded, type Method } from "@blazetrails/ruby-compat";
+import type * as Ast from "typescript/unstable/ast";
+import type * as Sync from "typescript/unstable/sync";
 
-let api: API | undefined;
+const PARSER_FEATURES = ["typescript/unstable/ast", "typescript/unstable/sync"] as const;
+
+let ts: typeof Ast;
+let api: Sync.API | undefined;
 
 /** @noRailsEquivalent PERMANENT */
-function renderedTitles(node: ts.CallExpression, title: string): string[] | null {
+function renderedTitles(node: Ast.CallExpression, title: string): string[] | null {
   if (title === "") return null;
   const table = node.expression;
-  const isEach = (expression: ts.Node) =>
+  const isEach = (expression: Ast.Node) =>
     ts.isPropertyAccessExpression(expression) && expression.name.text === "each";
   const tagged = ts.isTaggedTemplateExpression(table) && isEach(table.tag);
   const called = ts.isCallExpression(table) && isEach(table.expression);
@@ -55,6 +58,16 @@ function renderedTitles(node: ts.CallExpression, title: string): string[] | null
 }
 
 export class TestParser {
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static async requireParser(): Promise<void> {
+    for (const feature of PARSER_FEATURES)
+      await rbFRequire({ [feature]: () => import(feature) }, feature);
+    ts = rbRequireLoaded("typescript/unstable/ast") as unknown as typeof Ast;
+  }
+
   /** @internal */
   private static beginsToEnds: Record<string, Record<number, number>> = {};
 
@@ -69,12 +82,12 @@ export class TestParser {
 
   /** @internal */
   static ranges(filepath: string): Record<number, number> {
-    api ??= new API();
+    api ??= new (rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync).API();
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-    const queue: ts.Node[] = [sourceFile];
+    const queue: Ast.Node[] = [sourceFile];
     const beginsToEnds: Record<number, number> = {};
-    let node: ts.Node | undefined;
+    let node: Ast.Node | undefined;
     while ((node = queue.shift())) {
       if (
         ts.isMethodDeclaration(node) ||
@@ -99,14 +112,14 @@ export class TestParser {
    * @noRailsEquivalent PERMANENT
    */
   static calls(filepath: string): [number, number, string][] {
-    api ??= new API();
+    api ??= new (rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync).API();
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
     const calls: [number, number, string][] = [];
-    const visit = (node: ts.Node, names: (string | null)[], isCallee: boolean): void => {
+    const visit = (node: Ast.Node, names: (string | null)[], isCallee: boolean): void => {
       let scope = names;
       if (ts.isCallExpression(node) && !isCallee) {
-        let callee: ts.Node = node.expression;
+        let callee: Ast.Node = node.expression;
         while (
           ts.isCallExpression(callee) ||
           ts.isPropertyAccessExpression(callee) ||

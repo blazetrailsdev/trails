@@ -82,6 +82,9 @@ describe("STRING_METHOD_TABLE", () => {
   it("String#casecmp? answers as MRI does", () => {
     const rows: Row[] = [
       ["Straße", "isCasecmp", ["STRASSE"], { res: true, recv: { s: "Straße" } }],
+      ["ß", "isCasecmp", ["SS"], { res: true, recv: { s: "ß" } }],
+      ["ǅ", "isCasecmp", ["ǆ"], { res: true, recv: { s: "ǅ" } }],
+      ["a", "isCasecmp", [1], { res: null, recv: { s: "a" } }],
     ];
     for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
   });

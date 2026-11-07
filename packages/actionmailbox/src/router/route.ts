@@ -1,5 +1,5 @@
 import { camelize, constantize } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, isCasecmp, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { InboundEmail } from "../inbound-email.js";
 
 export type RouteAddress =
@@ -25,7 +25,7 @@ export class Route {
     } else if (typeof address === "string") {
       return (await inboundEmail.mail())
         .recipients()
-        .some((recipient) => address.toLowerCase() === (recipient as string).toLowerCase());
+        .some((recipient) => isCasecmp(address, recipient));
     } else if (address instanceof RegExp) {
       return (await inboundEmail.mail())
         .recipients()
