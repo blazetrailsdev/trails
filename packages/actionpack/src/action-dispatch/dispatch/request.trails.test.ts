@@ -350,7 +350,10 @@ describe("RequestParametersList", () => {
   });
 
   it("parses rack.request.form_vars via QueryParser.eachPair", () => {
-    const req = new Request({ "rack.request.form_vars": "a=1&b=2" });
+    const req = new Request({
+      "rack.request.form_hash": { a: "1", b: "2" },
+      "rack.request.form_vars": "a=1&b=2",
+    });
     expect(req.requestParametersList()).toEqual([
       ["a", "1"],
       ["b", "2"],
