@@ -2030,8 +2030,16 @@ content-transfer-encoding: base64\r
 
   it("raise same error for form_pairs as POST with invalid encoding", () => {
     const req = makeRequest(MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "a%=1" }));
-    expect(() => req.formPairs).toThrowError(InvalidParameterError);
-    expect(() => req.formPairs).toThrowError("invalid %-encoding (a%)");
+    let error!: Error;
+    expect(() => {
+      try {
+        void req.formPairs;
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrowError(InvalidParameterError);
+    expect(error.message).toBe("invalid %-encoding (a%)");
   });
 
   it("return form_pairs for multipart form data", () => {

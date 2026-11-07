@@ -19,24 +19,4 @@ export const rack: Record<string, AssertionReceipt[]> = {
         'spec_multipart.rb:517 `must_be_instance_of String` — a Ruby String is a JS string primitive, which is not `instanceof String`, so its `typeof` is asserted (CLAUDE.md, "Ruby Strings are JS string primitives")',
     },
   ],
-  "rack:spec_request.rb › RackRequestTest › TestProxyRequest › return values for the keys in the order given from values_at":
-    [
-      {
-        kind: "assert_output",
-        value: "x:nil",
-        as: "assert_match",
-        reason:
-          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
-      },
-    ],
-  "rack:spec_request.rb › RackRequestTest › return values for the keys in the order given from values_at":
-    [
-      {
-        kind: "assert_output",
-        value: "x:nil",
-        as: "assert_match",
-        reason:
-          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
-      },
-    ],
 };

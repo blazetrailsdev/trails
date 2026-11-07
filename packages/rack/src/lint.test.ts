@@ -1026,8 +1026,16 @@ it("notices when rack.hijack env entry does not return an IO", async () => {
     { "content-type": "text/plain", "content-length": "0" },
     [],
   ]).call(e);
-  expect(() => e["rack.hijack"]()).toThrowError(LintError);
-  expect(() => e["rack.hijack"]()).toThrowError("rack.hijack must return an IO instance");
+  let error!: Error;
+  expect(() => {
+    try {
+      e["rack.hijack"]();
+    } catch (err) {
+      error = err as Error;
+      throw err;
+    }
+  }).toThrowError(LintError);
+  expect(error.message).toBe("rack.hijack must return an IO instance");
 });
 
 it("handles valid rack.hijack response header", async () => {

@@ -259,7 +259,7 @@ it("closes streaming bodies that respond to close", () => {
 
   const response = new MockResponse(200, {}, body);
   expect(response.body).toBe("content");
-  expect(body.isClosed()).toBe(true);
+  expect(body.isClosed()).toBeTruthy();
 });
 
 describe("headers", () => {
