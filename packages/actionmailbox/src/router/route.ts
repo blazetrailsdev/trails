@@ -20,16 +20,16 @@ export class Route {
 
   async isMatch(inboundEmail: InboundEmail): Promise<unknown> {
     const address = this.address;
-    if (address === "all") {
+    if (address === ":all") {
       return true;
     } else if (typeof address === "string") {
       return (await inboundEmail.mail())
         .recipients()
-        .some((recipient) => address.toLowerCase() === String(recipient).toLowerCase());
+        .some((recipient) => address.toLowerCase() === (recipient as string).toLowerCase());
     } else if (address instanceof RegExp) {
       return (await inboundEmail.mail())
         .recipients()
-        .some((recipient) => address.test(String(recipient)));
+        .some((recipient) => (recipient as string).search(address) !== -1);
     } else if (typeof address === "function") {
       return await address(inboundEmail);
     } else {

@@ -178,7 +178,7 @@ describe("ActionMailbox::RouterTest", () => {
   });
 
   it("all as the only route", async () => {
-    router.addRoute("all", { to: "first" });
+    router.addRoute(":all", { to: "first" });
     await router.route(
       await createInboundEmailFromMail({
         to: "replies-class@example.com",
@@ -190,7 +190,7 @@ describe("ActionMailbox::RouterTest", () => {
 
   it("all as the second route", async () => {
     router.addRoute(new FirstMailboxAddress(), { to: "first" });
-    router.addRoute("all", { to: "second" });
+    router.addRoute(":all", { to: "second" });
 
     await router.route(
       await createInboundEmailFromMail({

@@ -3,14 +3,12 @@ import { ActionMailbox } from "./action-mailbox.js";
 import type { InboundEmail } from "./inbound-email.js";
 import { Route, type RouteAddress } from "./router/route.js";
 
-class RoutingError extends StandardError {}
-
 interface Mailbox {
   receive(inboundEmail: InboundEmail): unknown;
 }
 
 export class Router {
-  static RoutingError = RoutingError;
+  static RoutingError = class RoutingError extends StandardError {};
   static Route = Route;
 
   /** @internal */
@@ -28,7 +26,7 @@ export class Router {
   }
 
   addRoute(address: RouteAddress, { to }: { to: string }): void {
-    this.routes.push(new Route(address, { to: to }));
+    this.routes.push(new Route(address, { to }));
   }
 
   async route(inboundEmail: InboundEmail): Promise<unknown> {
@@ -38,7 +36,7 @@ export class Router {
     } else {
       await inboundEmail.bouncedBang();
 
-      throw new RoutingError();
+      throw new Router.RoutingError();
     }
   }
 
