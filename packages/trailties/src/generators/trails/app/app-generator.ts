@@ -349,7 +349,6 @@ export class AppBuilder extends ActionMethods {
     }
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async masterKey(): Promise<void> {
     if (this.options.pretend || this.options.dummyApp) return;
 

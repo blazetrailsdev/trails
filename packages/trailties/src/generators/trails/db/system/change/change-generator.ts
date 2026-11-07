@@ -259,7 +259,7 @@ export class ChangeGenerator extends GeneratorBase {
       }
     }
 
-    const newJson = globalThis.JSON.stringify(containerEnv, null, 2).replaceAll("\n", "\n  ");
+    const newJson = JSON.prettyGenerate(containerEnv, { indent: "  ", objectNl: "\n  " });
 
     await this.gsubFile(
       ".devcontainer/devcontainer.json",
@@ -274,12 +274,12 @@ export class ChangeGenerator extends GeneratorBase {
     const dbFeature = this.database.feature;
 
     for (const database of Database.all()) {
-      if (database.featureName != null) delete features[database.featureName];
+      delete features[database.featureName!];
     }
 
     if (dbFeature) Object.assign(features, dbFeature);
 
-    const newJson = globalThis.JSON.stringify(features, null, 2).replaceAll("\n", "\n  ");
+    const newJson = JSON.prettyGenerate(features, { indent: "  ", objectNl: "\n  " });
 
     await this.gsubFile(
       ".devcontainer/devcontainer.json",

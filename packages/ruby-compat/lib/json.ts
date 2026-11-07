@@ -122,6 +122,48 @@ export namespace JSON {
     }
   }
 
+  /**
+   * `JSON.pretty_generate` (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:374`) over
+   * `generate_json_object` / `generate_json_array` and `json_object_i`
+   * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:837-950`), with the pretty
+   * state's defaults (`common.rb:352-355`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function prettyGenerate(
+    obj: unknown,
+    {
+      indent = "  ",
+      space = " ",
+      objectNl = "\n",
+      arrayNl = "\n",
+    }: { indent?: string; space?: string; objectNl?: string; arrayNl?: string } = {},
+  ): string {
+    const generate = (value: unknown, depth: number): string => {
+      if (Array.isArray(value)) {
+        depth += 1;
+        let buffer = "[" + arrayNl;
+        value.forEach((element, i) => {
+          if (i > 0) buffer += "," + arrayNl;
+          buffer += indent.repeat(depth) + generate(element, depth);
+        });
+        return buffer + arrayNl + indent.repeat(depth - 1) + "]";
+      }
+      if (value !== null && typeof value === "object") {
+        depth += 1;
+        let buffer = "{";
+        Object.entries(value).forEach(([key, val], i) => {
+          if (i > 0) buffer += ",";
+          buffer += objectNl + indent.repeat(depth);
+          buffer += globalJSON.stringify(key) + ":" + space + generate(val, depth);
+        });
+        return buffer + objectNl + indent.repeat(depth - 1) + "}";
+      }
+      return globalJSON.stringify(value) ?? "null";
+    };
+    return generate(obj, 0);
+  }
+
   export function dump(value: unknown): string {
     return globalJSON.stringify(value) ?? "null";
   }
