@@ -233,6 +233,9 @@ importers:
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../mail
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

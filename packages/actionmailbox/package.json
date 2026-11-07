@@ -28,6 +28,7 @@
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/mail": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
