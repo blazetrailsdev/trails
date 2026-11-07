@@ -100,7 +100,7 @@ import {
   isTestHelperFile,
   packageSrcDir,
 } from "./config.js";
-import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {

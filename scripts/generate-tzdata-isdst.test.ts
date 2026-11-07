@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { TZDATA_VERSION, tzdataIsdst } from "../packages/date/src/tzdata-isdst.js";
+import { TZDATA_VERSION, tzdataIsdst } from "../packages/date/lib/tzdata-isdst.js";
 import { zoneinfo, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);

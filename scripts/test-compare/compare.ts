@@ -82,7 +82,7 @@ import {
   unconsumedAssertionReceipts,
 } from "./assertion-receipts.js";
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
-import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 

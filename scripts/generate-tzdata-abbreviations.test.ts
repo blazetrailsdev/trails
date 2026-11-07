@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { TZDATA_VERSION } from "../packages/date/src/tzdata-abbreviations.js";
+import { TZDATA_VERSION } from "../packages/date/lib/tzdata-abbreviations.js";
 import { zoneinfo } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);

@@ -155,7 +155,7 @@ export default defineConfig(
       "packages/actionpack/src/test-helpers/fixtures/public/**",
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
-      "packages/marcel/src/test-helpers/fixtures/**",
+      "packages/marcel/lib/test-helpers/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
@@ -449,8 +449,8 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],
@@ -476,8 +476,8 @@ export default defineConfig(
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
@@ -535,14 +535,14 @@ export default defineConfig(
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
-      "packages/date/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
+      "packages/date/lib/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/msgpack/src/**/*.ts",
-      "packages/rack-session/src/**/*.ts",
-      "packages/rack-test/src/**/*.ts",
+      "packages/msgpack/lib/**/*.ts",
+      "packages/rack-session/lib/**/*.ts",
+      "packages/rack-test/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
@@ -657,8 +657,8 @@ export default defineConfig(
           files: [
             "packages/actionview/src/**/*.test.ts",
             "packages/arel/src/**/*.test.ts",
-            "packages/date/src/**/*.test.ts",
-            "packages/did-you-mean/src/**/*.test.ts",
+            "packages/date/lib/**/*.test.ts",
+            "packages/did-you-mean/lib/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
             "packages/i18n/src/**/*.test.ts",
           ],
@@ -994,7 +994,7 @@ export default defineConfig(
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/rack-session/src/**/*.ts",
+      "packages/rack-session/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
@@ -1090,13 +1090,13 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/marcel/src/extension.test.ts"],
+    files: ["packages/marcel/lib/extension.test.ts"],
     rules: {
       "vitest/no-conditional-tests": "off",
     },
   },
   {
-    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
+    files: ["packages/marcel/lib/test-helpers/test-helper.ts"],
     rules: {
       "no-useless-assignment": "off",
       "prefer-const": ["error", { destructuring: "all" }],

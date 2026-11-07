@@ -21,7 +21,7 @@
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Temporal } from "../packages/date/src/index.js";
+import { Temporal } from "../packages/date/lib/index.js";
 import { RUBY_ZONEINFO_PREAMBLE, tzdataVersion, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);

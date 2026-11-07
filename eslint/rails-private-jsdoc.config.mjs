@@ -20,7 +20,7 @@ import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 export default [
   {
     ignores: [
-      "packages/marcel/src/test-helpers/fixtures/**",
+      "packages/marcel/lib/test-helpers/fixtures/**",
       "packages/mini-magick/test/fixtures/**",
       "packages/activestorage/src/test-helpers/fixtures/files/**",
       "packages/rack/test/cgi/assets/**",
@@ -52,8 +52,8 @@ export default [
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],
@@ -83,8 +83,8 @@ export default [
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
