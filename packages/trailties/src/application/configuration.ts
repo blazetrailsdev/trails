@@ -570,7 +570,7 @@ export class Configuration extends EngineConfiguration {
     return paths;
   }
 
-  /** @internal */
+  /** @missingRailsCall parse — PERMANENT */
   async loadDatabaseYaml(): Promise<Record<string, unknown>> {
     let path: string | undefined;
     if ((path = (await this.paths().get("config/database")!.existent())[0]) !== undefined) {
