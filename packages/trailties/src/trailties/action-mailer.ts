@@ -30,7 +30,6 @@ type AppRoutes = Parameters<typeof AbstractController.Trailties.RoutesHelpers.wi
 };
 
 type MailerClass = typeof Base & {
-  smtpSettings: Record<string, unknown> | null;
   logger?: unknown;
 };
 

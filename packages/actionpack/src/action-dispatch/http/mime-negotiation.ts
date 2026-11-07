@@ -10,18 +10,13 @@ const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 
 export class InvalidType extends MimeType.InvalidMimeType {}
 
-export interface MimeNegotiationHost {
-  getHeader(key: string): unknown;
-  setHeader(key: string, value: unknown): unknown;
-  fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
-  parameters: Record<string, unknown>;
-  accept: string | undefined;
-  isXhr(): boolean;
-}
-
 export class MimeNegotiation {
-  declare protected setHeader: MimeNegotiationHost["setHeader"];
-  declare protected parameters: MimeNegotiationHost["parameters"];
+  declare protected getHeader: (key: string) => unknown;
+  declare protected setHeader: (key: string, value: unknown) => unknown;
+  declare protected fetchHeader: <T>(key: string, fallback: (key: string) => T) => unknown;
+  declare protected parameters: Record<string, unknown>;
+  declare protected accept: string | undefined;
+  declare protected isXhr: () => boolean;
   /** @internal */
   declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 
@@ -29,8 +24,61 @@ export class MimeNegotiation {
     mattrAccessor.call(base, "ignoreAcceptHeader", { default: false });
   }
 
-  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
-    return variant.call(this as unknown as MimeNegotiationHost);
+  /** @missingRailsName downcase — PERMANENT */
+  get contentMimeType(): MimeType | null {
+    return this.fetchHeader("action_dispatch.request.content_type", (k) => {
+      try {
+        const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
+        const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
+        return this.setHeader(k, v);
+      } catch (e) {
+        if (!(e instanceof MimeType.InvalidMimeType)) throw e;
+        throw new InvalidType(e.message);
+      }
+    }) as MimeType | null;
+  }
+
+  /** @internal */
+  hasContentType(): unknown {
+    return this.getHeader("CONTENT_TYPE");
+  }
+
+  get accepts(): MimeType[] {
+    return this.fetchHeader("action_dispatch.request.accepts", (k) => {
+      try {
+        const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
+        const v: MimeType[] =
+          header === "" ? ([this.contentMimeType] as MimeType[]) : MimeType.parse(header);
+        return this.setHeader(k, v);
+      } catch (e) {
+        if (!(e instanceof MimeType.InvalidMimeType)) throw e;
+        throw new InvalidType(e.message);
+      }
+    }) as MimeType[];
+  }
+
+  get formats(): MimeType[] {
+    return this.fetchHeader("action_dispatch.request.formats", (k) => {
+      let v: MimeType[];
+      let extType: MimeType | undefined;
+      if (this.isParamsReadable()) {
+        const f = this.parameters["format"];
+        const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
+        v = found ? [found] : [];
+      } else if (this.useAcceptHeader() && this.validAcceptHeader()) {
+        v = [...this.accepts];
+      } else if ((extType = this.formatFromPathExtension())) {
+        v = [extType];
+      } else if (this.isXhr()) {
+        const js = MimeType.lookupByExtension("js");
+        v = js ? [js] : [];
+      } else {
+        const html = MimeType.lookupByExtension("html");
+        v = html ? [html] : [];
+      }
+      v = v.filter((f) => f.symbol || f.ref() === "*/*");
+      return this.setHeader(k, v);
+    }) as MimeType[];
   }
 
   set variant(value: string | string[] | null | undefined) {
@@ -40,6 +88,11 @@ export class MimeNegotiation {
     }
     this._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
       Record<string, () => boolean>;
+  }
+
+  get variant(): ArrayInquirer<string> & Record<string, () => boolean> {
+    return (this._variant ??= new ArrayInquirer<string>() as ArrayInquirer<string> &
+      Record<string, () => boolean>);
   }
 
   get format(): (_viewPath?: unknown) => MimeType | NullType {
@@ -53,10 +106,6 @@ export class MimeNegotiation {
     ]);
   }
 
-  get formats(): MimeType[] {
-    return formats.call(this as unknown as MimeNegotiationHost);
-  }
-
   set formats(extensions: unknown[]) {
     this.parameters["format"] = extensions[0] == null ? "" : String(extensions[0]);
     this.setHeader(
@@ -64,136 +113,65 @@ export class MimeNegotiation {
       extensions.map((ext) => MimeType.lookupByExtension(String(ext))),
     );
   }
+
+  negotiateMime(order: (MimeType | undefined)[]): MimeType | NullType | null {
+    for (const priority of this.formats) {
+      if (rbEqual(priority, MimeType.ALL)) {
+        return order[0] ?? null;
+      } else if (order.some((o) => rbEqual(o, priority))) {
+        return priority;
+      }
+    }
+    return order.some((o) => rbEqual(o, MimeType.ALL)) ? format.call(this) : null;
+  }
+
+  /** @internal */
+  shouldApplyVaryHeader(): boolean {
+    return !this.isParamsReadable() && this.useAcceptHeader() && this.validAcceptHeader();
+  }
+
+  /** @internal */
+  isParamsReadable(): boolean {
+    try {
+      return this.parameters["format"] != null;
+    } catch (err) {
+      if (RESCUABLE_MIME_FORMAT_ERRORS.some((cls) => err instanceof cls)) {
+        return false;
+      }
+      throw err;
+    }
+  }
+
+  /** @internal */
+  validAcceptHeader(): boolean {
+    const a = this.accept;
+    const present = a != null && a !== "";
+    return (
+      (this.isXhr() && (present || this.contentMimeType != null)) ||
+      (present && !BROWSER_LIKE_ACCEPTS.test(a))
+    );
+  }
+
+  /** @internal */
+  useAcceptHeader(): boolean {
+    return !(this.constructor as { ignoreAcceptHeader?: boolean }).ignoreAcceptHeader;
+  }
+
+  /** @internal */
+  formatFromPathExtension(): MimeType | undefined {
+    const path =
+      (this.getHeader("action_dispatch.original_path") as string | undefined) ||
+      (this.getHeader("PATH_INFO") as string | undefined);
+    const match = path && path.match(/\.(\w+)$/);
+    if (match) return MimeType.lookupByExtension(match[1]);
+    return undefined;
+  }
+}
+
+function format(this: MimeNegotiation, _viewPath?: unknown): MimeType | NullType {
+  return this.formats[0] ?? NullType.instance;
 }
 
 const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
-
-/** @missingRailsName downcase — PERMANENT */
-export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
-  return this.fetchHeader("action_dispatch.request.content_type", (k) => {
-    try {
-      const match = (this.getHeader("CONTENT_TYPE") as string | undefined)?.match(/^([^,;]*)/);
-      const v = match ? MimeType.lookup(match[1].trim().toLowerCase()) : null;
-      return this.setHeader(k, v);
-    } catch (e) {
-      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
-      throw new InvalidType(e.message);
-    }
-  }) as MimeType | null;
-}
-
-/** @internal */
-export function hasContentType(this: MimeNegotiationHost): boolean {
-  return this.getHeader("CONTENT_TYPE") != null;
-}
-
-export function accepts(this: MimeNegotiationHost): MimeType[] {
-  return this.fetchHeader("action_dispatch.request.accepts", (k) => {
-    try {
-      const header = String(this.getHeader("HTTP_ACCEPT") ?? "").trim();
-      const v: MimeType[] =
-        header === "" ? ([contentMimeType.call(this)] as MimeType[]) : MimeType.parse(header);
-      return this.setHeader(k, v);
-    } catch (e) {
-      if (!(e instanceof MimeType.InvalidMimeType)) throw e;
-      throw new InvalidType(e.message);
-    }
-  }) as MimeType[];
-}
-
-export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType | NullType {
-  return formats.call(this)[0] ?? NullType.instance;
-}
-
-export function formats(this: MimeNegotiationHost): MimeType[] {
-  return this.fetchHeader("action_dispatch.request.formats", (k) => {
-    let v: MimeType[];
-    let extType: MimeType | undefined;
-    if (isParamsReadable.call(this)) {
-      const f = this.parameters["format"];
-      const found = f != null ? MimeType.lookupByExtension(String(f)) : undefined;
-      v = found ? [found] : [];
-    } else if (useAcceptHeader.call(this) && validAcceptHeader.call(this)) {
-      v = [...accepts.call(this)];
-    } else if ((extType = formatFromPathExtension.call(this))) {
-      v = [extType];
-    } else if (this.isXhr()) {
-      const js = MimeType.lookupByExtension("js");
-      v = js ? [js] : [];
-    } else {
-      const html = MimeType.lookupByExtension("html");
-      v = html ? [html] : [];
-    }
-    v = v.filter((f) => f.symbol || f.ref() === "*/*");
-    return this.setHeader(k, v);
-  }) as MimeType[];
-}
-
-export function variant(
-  this: MimeNegotiationHost,
-): ArrayInquirer<string> & Record<string, () => boolean> {
-  const host = this as MimeNegotiationHost & {
-    _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
-  };
-  return (host._variant ??= new ArrayInquirer<string>() as ArrayInquirer<string> &
-    Record<string, () => boolean>);
-}
-
-export function negotiateMime(
-  this: MimeNegotiationHost,
-  order: (MimeType | undefined)[],
-): MimeType | NullType | null {
-  for (const priority of formats.call(this)) {
-    if (rbEqual(priority, MimeType.ALL)) {
-      return order[0] ?? null;
-    } else if (order.some((o) => rbEqual(o, priority))) {
-      return priority;
-    }
-  }
-  return order.some((o) => rbEqual(o, MimeType.ALL)) ? format.call(this) : null;
-}
-
-/** @internal */
-export function shouldApplyVaryHeader(this: MimeNegotiationHost): boolean {
-  return !isParamsReadable.call(this) && useAcceptHeader.call(this) && validAcceptHeader.call(this);
-}
-
-/** @internal */
-export function isParamsReadable(this: MimeNegotiationHost): boolean {
-  try {
-    return this.parameters["format"] != null;
-  } catch (err) {
-    if (RESCUABLE_MIME_FORMAT_ERRORS.some((cls) => err instanceof cls)) {
-      return false;
-    }
-    throw err;
-  }
-}
-
-/** @internal */
-export function validAcceptHeader(this: MimeNegotiationHost): boolean {
-  const a = this.accept;
-  const present = a != null && a !== "";
-  return (
-    (this.isXhr() && (present || contentMimeType.call(this) != null)) ||
-    (present && !BROWSER_LIKE_ACCEPTS.test(a))
-  );
-}
-
-/** @internal */
-export function useAcceptHeader(this: MimeNegotiationHost): boolean {
-  return !(this.constructor as typeof MimeNegotiation & { ignoreAcceptHeader: boolean })
-    .ignoreAcceptHeader;
-}
-
-/** @internal */
-export function formatFromPathExtension(this: MimeNegotiationHost): MimeType | undefined {
-  const path =
-    (this.getHeader("action_dispatch.original_path") as string | undefined) ||
-    (this.getHeader("PATH_INFO") as string | undefined);
-  const match = path && path.match(/\.(\w+)$/);
-  if (match) return MimeType.lookupByExtension(match[1]);
-  return undefined;
-}
 
 ActionDispatch.Http.MimeNegotiation = MimeNegotiation;

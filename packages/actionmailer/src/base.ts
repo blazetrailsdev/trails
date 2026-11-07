@@ -77,6 +77,10 @@ export class Base extends AbstractController.Base {
   declare static performDeliveries: DeliveryMethodsClass["performDeliveries"];
   declare static raiseDeliveryErrors: DeliveryMethodsClass["raiseDeliveryErrors"];
   declare static deliveries: typeof TestMailer.deliveries;
+  declare static smtpSettings: DeliveryMethodsClass[`${string}Settings`];
+  declare static fileSettings: DeliveryMethodsClass[`${string}Settings`];
+  declare static sendmailSettings: DeliveryMethodsClass[`${string}Settings`];
+  declare static testSettings: DeliveryMethodsClass[`${string}Settings`];
   declare static addDeliveryMethod: typeof DeliveryMethodsClassMethods.addDeliveryMethod;
   /** @internal */
   declare static wrapDeliveryBehavior: typeof DeliveryMethodsClassMethods.wrapDeliveryBehavior;

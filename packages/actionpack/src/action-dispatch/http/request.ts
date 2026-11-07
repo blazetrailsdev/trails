@@ -49,18 +49,7 @@ import {
   notModified as _notModified,
   type CacheResponseLike,
 } from "./cache.js";
-import {
-  accepts as _accepts,
-  contentMimeType as _contentMimeType,
-  formatFromPathExtension as _formatFromPathExtension,
-  hasContentType as _hasContentType,
-  MimeNegotiation as _MimeNegotiation,
-  negotiateMime as _negotiateMime,
-  isParamsReadable as _isParamsReadable,
-  shouldApplyVaryHeader as _shouldApplyVaryHeader,
-  useAcceptHeader as _useAcceptHeader,
-  validAcceptHeader as _validAcceptHeader,
-} from "./mime-negotiation.js";
+import { MimeNegotiation as _MimeNegotiation } from "./mime-negotiation.js";
 import {
   include,
   runLoadHooks,
@@ -198,10 +187,19 @@ export class Request {
   env: RackEnv;
   declare readonly ssl: boolean;
 
+  readonly rackRequest: RackRequest;
   /** @internal */
-  private _method?: string;
+  private _method: string | null | undefined;
   /** @internal */
-  private _requestMethod?: string;
+  private _requestMethod: string | null | undefined;
+  /** @internal */
+  private _remoteIp: string | null;
+  /** @internal */
+  private _originalFullpath: string | null;
+  /** @internal */
+  private _fullpath: string | null;
+  /** @internal */
+  private _ip: string | null;
   /** @internal */
   declare _protocol: string | null;
   /** @internal */
@@ -220,6 +218,15 @@ export class Request {
     this._parameterFilter = null;
     this._protocol = null;
     this._port = null;
+
+    this.rackRequest = new RackRequest(env);
+
+    this._method = null;
+    this._requestMethod = null;
+    this._remoteIp = null;
+    this._originalFullpath = null;
+    this._fullpath = null;
+    this._ip = null;
   }
 
   get method(): string {
@@ -246,12 +253,13 @@ export class Request {
   }
 
   get fullpath(): string {
-    const qs = this.queryString;
-    return qs ? `${this.path}?${qs}` : this.path;
+    return (this._fullpath ??= this.rackRequest.fullpath);
   }
 
   get originalFullpath(): string {
-    return (this.getHeader("ORIGINAL_FULLPATH") as string) || this.fullpath;
+    const originalFullpath = this.getHeader("ORIGINAL_FULLPATH") as string | null | false;
+    return (this._originalFullpath ??=
+      originalFullpath != null && originalFullpath !== false ? originalFullpath : this.fullpath);
   }
 
   get originalUrl(): string {
@@ -276,7 +284,7 @@ export class Request {
 
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
-  declare hasContentType: () => boolean;
+  declare hasContentType: () => unknown;
   declare negotiateMime: (order: (MimeType | undefined)[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
 
@@ -305,21 +313,20 @@ export class Request {
     return this.isXmlHttpRequest;
   }
 
-  get remoteIp(): string | null {
-    const v = this.getHeader("action_dispatch.remote_ip");
-    if (v != null) {
-      if (typeof v === "object") return (v as { toString(): string | null }).toString();
-      return typeof v === "string" ? v : String(v);
-    }
-    return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
-  }
-
-  set remoteIp(value: string | GetIp | null) {
-    this.setHeader("action_dispatch.remote_ip", value);
-  }
-
   get ip(): string | null {
-    return this.remoteIp;
+    return (this._ip ??= this.rackRequest.ip);
+  }
+
+  get remoteIp(): string | null {
+    const remoteIp = this.getHeader("action_dispatch.remote_ip") as string | GetIp | null | false;
+    return (this._remoteIp ??= (
+      (remoteIp != null && remoteIp !== false ? remoteIp : this.ip) ?? ""
+    ).toString());
+  }
+
+  set remoteIp(remoteIp: string | GetIp | null) {
+    this._remoteIp = null;
+    this.setHeader("action_dispatch.remote_ip", remoteIp);
   }
 
   get body(): StringIO {
@@ -674,14 +681,6 @@ export class Request {
     );
   }
 
-  get rackRequest(): RackRequest {
-    const cached = this.env["action_dispatch.rack_request"] as RackRequest | undefined;
-    if (cached) return cached;
-    const r = new RackRequest(this.env);
-    this.env["action_dispatch.rack_request"] = r;
-    return r;
-  }
-
   /** @internal */
   declare validAcceptHeader: () => boolean;
   /** @internal */
@@ -869,28 +868,6 @@ export interface Request {
   set pathParameters(parameters: Record<string, unknown>);
 }
 
-Object.defineProperty(Request.prototype, "contentMimeType", {
-  get(this: Request) {
-    return _contentMimeType.call(this);
-  },
-  configurable: true,
-});
-Object.defineProperty(Request.prototype, "accepts", {
-  get(this: Request) {
-    return _accepts.call(this);
-  },
-  configurable: true,
-});
-Request.prototype.hasContentType = function (this: Request) {
-  return _hasContentType.call(this);
-};
-Request.prototype.negotiateMime = function (this: Request, order: (MimeType | undefined)[]) {
-  return _negotiateMime.call(this, order);
-};
-Request.prototype.shouldApplyVaryHeader = function (this: Request) {
-  return _shouldApplyVaryHeader.call(this);
-};
-
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `ActiveSupport.on_load(:action_dispatch_request) { include RequestCookieMethods }` (`action_dispatch/middleware/cookies.rb:93-95`). */
 export interface Request extends Included<typeof RequestCookieMethods> {}
 
@@ -925,16 +902,6 @@ export class PASS_NOT_FOUND {
     return false;
   }
 }
-Request.prototype.validAcceptHeader = function (this: Request) {
-  return _validAcceptHeader.call(this);
-};
-Request.prototype.useAcceptHeader = function (this: Request) {
-  return _useAcceptHeader.call(this);
-};
-Request.prototype.formatFromPathExtension = function (this: Request) {
-  return _formatFromPathExtension.call(this);
-};
-Request.prototype.isParamsReadable = _isParamsReadable;
 
 ActionDispatch.Request = Request;
 Request.Utils = Utils;

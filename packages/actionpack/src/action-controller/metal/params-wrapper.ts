@@ -168,7 +168,7 @@ export interface WrapModel {
 /** @internal */
 export interface ParamsWrapperHost {
   request: {
-    hasContentType(): boolean;
+    hasContentType(): unknown;
     contentMimeType: { ref(): string | null } | null;
     requestParameters: Record<string, unknown>;
     filteredParameters(): Record<string, unknown>;
@@ -296,7 +296,7 @@ export function _wrapParameters(
 /** @internal */
 export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
   try {
-    if (!this.request.hasContentType()) return false;
+    if (this.request.hasContentType() == null) return false;
 
     const ref = this.request.contentMimeType!.ref();
 
