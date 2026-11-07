@@ -43,7 +43,7 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
     const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await adapter.beginDbTransaction();
-      await (client(adapter) as { end(): Promise<void> }).end();
+      await (client(adapter) as { close(): Promise<void> }).close();
 
       await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(/connection is closed/);
 

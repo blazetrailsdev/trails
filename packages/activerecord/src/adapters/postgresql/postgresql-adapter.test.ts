@@ -720,7 +720,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const listener = (notice: { severity?: string; message?: string }) => {
           err += `${notice.severity}:  ${notice.message}\n`;
         };
-        const raw = (await adapter.rawConnection()) as any;
+        const raw = ((await adapter.rawConnection()) as any).client;
         raw.on("notice", listener);
         try {
           const result = await adapter.execute("do $$ BEGIN RAISE WARNING 'foo'; END; $$");

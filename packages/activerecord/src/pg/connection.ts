@@ -204,6 +204,14 @@ export class Connection {
     return this.asyncExec(sql);
   }
 
+  isFinished(): boolean {
+    return this.client._ending === true || this.client._ended === true;
+  }
+
+  escapeIdentifier(str: string): string {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+
   escapeString(str: string): string {
     const escaped = str.replace(/'/g, "''");
     return this.parameterStatuses["standard_conforming_strings"] === "off"

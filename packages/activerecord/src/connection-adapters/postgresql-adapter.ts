@@ -202,11 +202,6 @@ import { dbWarningsAction } from "../active-record.js";
 
 type SessionVariables = Record<string, string | number | boolean | null | ":default">;
 
-interface PgClientLiveness {
-  _ending?: boolean;
-  _ended?: boolean;
-}
-
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;
   try {
@@ -535,7 +530,7 @@ export class PostgreSQLAdapter
   }
 
   override isConnected(): boolean {
-    return this._rawConnection !== null && !this._rawConnectionFinished();
+    return !(this._rawConnection == null || this._rawConnection.isFinished());
   }
 
   override async active(): Promise<boolean> {
@@ -1428,13 +1423,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
 
   static override quoteTableName(name: unknown): string {
     return pgQuoteTableName(name);
-  }
-
-  /** @internal */
-  private _rawConnectionFinished(): boolean {
-    const client = this._rawConnection as PgClientLiveness | null;
-    if (client === null) return false;
-    return client._ending === true || client._ended === true;
   }
 
   /** @internal */

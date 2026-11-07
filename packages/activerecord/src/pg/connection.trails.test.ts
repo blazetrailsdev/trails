@@ -431,3 +431,17 @@ describe("pgConnection without a returned Proxy", () => {
     expect(result.errorField(PG.PG_DIAG_SEVERITY)).toBe("WARNING");
   });
 });
+
+describe("PG::Connection#escape_identifier", () => {
+  it("quotes the identifier and doubles embedded double quotes", () => {
+    expect(pgConnection({}).escapeIdentifier('my"chan')).toBe('"my""chan"');
+  });
+});
+
+describe("PG::Connection#finished?", () => {
+  it("is true once the client is ending or has ended", () => {
+    expect(pgConnection({}).isFinished()).toBe(false);
+    expect(pgConnection({ _ending: true }).isFinished()).toBe(true);
+    expect(pgConnection({ _ended: true }).isFinished()).toBe(true);
+  });
+});
