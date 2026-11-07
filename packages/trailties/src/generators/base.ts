@@ -110,6 +110,18 @@ export abstract class Base extends (Group as unknown as (abstract new (
   /** @internal */
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
+  /** @internal */
+  private _indentation?: number;
+
+  /**
+   * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
+   * @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85
+   */
+  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, localOptions, config);
+    this._indentation = 0;
+  }
+
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
 
