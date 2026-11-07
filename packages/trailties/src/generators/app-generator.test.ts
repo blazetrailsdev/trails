@@ -123,8 +123,7 @@ describe("AppGeneratorTest", () => {
     await t.assertFile("public/406-unsupported-browser.html");
   });
 
-  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
-  it.skip("app update preserves skip active job", async () => {
+  it("app update preserves skip active job", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
 
     await Dir.chdir(t.destinationRoot, async () => {
@@ -138,8 +137,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
-  it.skip("app update preserves skip action mailbox", async () => {
+  it("app update preserves skip action mailbox", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
 
     await Dir.chdir(t.destinationRoot, async () => {
@@ -153,8 +151,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
-  it.skip("app update preserves skip action text", async () => {
+  it("app update preserves skip action text", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
 
     await Dir.chdir(t.destinationRoot, async () => {
@@ -207,8 +204,7 @@ describe("AppGeneratorTest", () => {
     });
   });
 
-  // BLOCKED: run-app-update-runs-app-update-in-a-subprocess
-  it.skip("app update preserves skip test", async () => {
+  it("app update preserves skip test", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-test"]);
 
     await Dir.chdir(t.destinationRoot, async () => {

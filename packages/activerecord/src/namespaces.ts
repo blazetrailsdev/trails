@@ -273,6 +273,7 @@ export const ActiveRecord = {
   SecureToken: typeof import("./secure-token.js");
   Store: typeof import("./store.js");
   Trailties: { name: string };
+  Railtie?: unknown;
   Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
