@@ -365,6 +365,7 @@ export class AppBuilder extends ActionMethods {
     await new CredentialsGenerator([], { quiet: true }).addCredentialsFile();
   }
 
+  /** @missingRailsArgs template — PERMANENT */
   async databaseYml(): Promise<void> {
     await this.template(this.database.template, "config/database.ts");
   }
