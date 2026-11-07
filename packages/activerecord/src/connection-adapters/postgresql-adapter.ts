@@ -202,11 +202,6 @@ import { dbWarningsAction } from "../active-record.js";
 
 type SessionVariables = Record<string, string | number | boolean | null | ":default">;
 
-interface PgClientLiveness {
-  _ending?: boolean;
-  _ended?: boolean;
-}
-
 function toError(value: unknown): Error {
   if (value instanceof Error) return value;
   try {
@@ -230,7 +225,7 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
-  static async newClient(connParams: Record<string, unknown>): Promise<pg.Client> {
+  static async newClient(connParams: Record<string, unknown>): Promise<PGConnection> {
     try {
       return await PG.connect(connParams);
     } catch (error) {
@@ -535,7 +530,7 @@ export class PostgreSQLAdapter
   }
 
   override isConnected(): boolean {
-    return this._rawConnection !== null && !this._rawConnectionFinished();
+    return !(this._rawConnection == null || this._rawConnection.isFinished());
   }
 
   override async active(): Promise<boolean> {
@@ -587,7 +582,7 @@ export class PostgreSQLAdapter
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
       try {
-        await this._rawConnection?.end();
+        await this._rawConnection?.close();
       } catch {}
       this._rawConnection = null;
     });
@@ -1193,9 +1188,9 @@ export class PostgreSQLAdapter
    */
   async connect(): Promise<void> {
     try {
-      this._rawConnection = (await (this.constructor as typeof PostgreSQLAdapter).newClient(
+      this._rawConnection = await (this.constructor as typeof PostgreSQLAdapter).newClient(
         this._connectionParameters,
-      )) as PGConnection;
+      );
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1219,9 +1214,7 @@ export class PostgreSQLAdapter
     await super.configureConnection();
 
     if (rtest(this._config.encoding)) {
-      await this._rawConnection!.query(
-        `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
-      );
+      await this._rawConnection!.setClientEncoding(String(this._config.encoding));
     }
 
     await this.setClientMinMessages(
@@ -1232,18 +1225,14 @@ export class PostgreSQLAdapter
     );
 
     if (dbWarningsAction() != null) {
-      this._rawConnection!.removeAllListeners("notice");
-      this._rawConnection!.on(
-        "notice",
-        (result: { severity?: string; message?: string; code?: string }) => {
-          const message = result.message;
-          const code = result.code ?? null;
-          const level = result.severity ?? null;
-          this._noticeReceiverSqlWarnings.push(
-            new SQLWarning(message, code, level, undefined, this.pool),
-          );
-        },
-      );
+      this._rawConnection!.setNoticeReceiver((result) => {
+        const message = result.errorField(PG.PG_DIAG_MESSAGE_PRIMARY);
+        const code = result.errorField(PG.PG_DIAG_SQLSTATE);
+        const level = result.errorField(PG.PG_DIAG_SEVERITY);
+        this._noticeReceiverSqlWarnings.push(
+          new SQLWarning(message, code, level, undefined, this.pool),
+        );
+      });
     }
 
     await this.setStandardConformingStrings();
@@ -1437,13 +1426,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  private _rawConnectionFinished(): boolean {
-    const client = this._rawConnection as PgClientLiveness | null;
-    if (client === null) return false;
-    return client._ending === true || client._ended === true;
-  }
-
-  /** @internal */
   declare _rawConnection: PGConnection | null;
 
   private _captureRegtypeOids(records: PgTypeRow[]): void {
@@ -1618,7 +1600,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  _rawConnectionForTest(): pg.Client | null {
+  _rawConnectionForTest(): PGConnection | null {
     return this._rawConnection;
   }
 }
