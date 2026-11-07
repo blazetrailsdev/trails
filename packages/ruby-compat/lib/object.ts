@@ -694,7 +694,7 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * name falls through to the receiver's `respond_to_missing?`
  * (`basic_obj_respond_to_missing`, `vm_method.c:2850-2861`).
  * Like `callable_method_entry` there, the entry is found by descriptor lookup,
- * never by a property read a `methodMissingProxy` `get` trap would answer.
+ * never by a property read a `methodMissingPrototype` `get` trap would answer.
  * `isEmpty` is bound for the core receivers `ruby-empty.ts`'s `isEmpty` answers
  * `empty?` for (`array.c:2686`, `hash.c:3023`, `string.c:2243`), whose JS
  * values carry no such member. `isInclude` is bound for the same receivers and

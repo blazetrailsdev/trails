@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import { rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export function mustBe(actual: object, operator: string): void {
@@ -22,7 +22,7 @@ function resolve(actual: object, operator: string): unknown {
 /** @internal */
 export function mustRespondTo(obj: object, meth: string): void {
   expect(
-    meth in obj,
+    rbObjRespondTo(obj, meth),
     `Expected ${inspect(obj)} (${rbObjClassname(obj)}) to respond to #${meth}`,
   ).toBe(true);
 }

@@ -1,6 +1,6 @@
 import { defineModule, include, isPlainObject } from "@blazetrails/activesupport";
 import { escape, escapePath, unescape } from "@blazetrails/rack";
-import { ArgumentError, Encoding, StringIO, b } from "@blazetrails/ruby-compat";
+import { ArgumentError, Encoding, StringIO, b, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "./uploaded-file.js";
 import { END_BOUNDARY, START_BOUNDARY, Session } from "./test.js";
 
@@ -140,7 +140,7 @@ function buildFilePart(
   buffer.write(b(String(uploadedFile.size())));
   buffer.write("\r\n\r\n");
 
-  if ("setEncoding" in uploadedFile) {
+  if (rbObjRespondTo(uploadedFile, "setEncoding")) {
     uploadedFile.setEncoding(Encoding.BINARY);
     uploadedFile.appendTo(buffer);
   }
