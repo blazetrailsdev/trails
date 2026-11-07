@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Env, Helpers, Request } from "./request.js";
 import {
   InvalidParameterError,
+  QueryLimitError,
   ParameterTypeError,
   Params,
   ParamsTooDeepError,
@@ -20,7 +21,6 @@ import {
   isEmpty,
   rbInspect,
   strNew,
-  warn,
   b,
   hashAref,
   hashAset,
@@ -34,23 +34,6 @@ import {
   setParamDepthLimit,
 } from "./utils.js";
 import { MultipartPartLimitError, MultipartTotalPartLimitError } from "./multipart.js";
-
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
-  return { ...actual, warn: vi.fn(actual.warn) };
-});
-
-function captureWarnings(yieldBlock: (warnings: unknown[][]) => void): void {
-  const warnings: unknown[][] = [];
-  vi.mocked(warn).mockImplementation((...args: unknown[]) => {
-    warnings.push(args);
-  });
-  try {
-    yieldBlock(warnings);
-  } finally {
-    vi.mocked(warn).mockReset();
-  }
-}
 
 function assertEmpty(obj: object) {
   expect(Object.keys(obj)).toHaveLength(0);
@@ -204,20 +187,36 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
     expect(req.hostname).toBe("123foo.example.com");
 
     req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "\u2661.com" }));
-    expect(req.host).toBe("\u2661.com");
-    expect(req.hostname).toBe("\u2661.com");
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "xn--c6h.com" }));
+    expect(req.host).toBe("xn--c6h.com");
+    expect(req.hostname).toBe("xn--c6h.com");
 
     req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "\u2661.com:80" }));
-    expect(req.host).toBe("\u2661.com");
-    expect(req.hostname).toBe("\u2661.com");
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "xn--c6h.com:80" }));
+    expect(req.host).toBe("xn--c6h.com");
+    expect(req.hostname).toBe("xn--c6h.com");
 
     req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.\u8c37\u6b4c" }));
-    expect(req.host).toBe("nic.\u8c37\u6b4c");
-    expect(req.hostname).toBe("nic.\u8c37\u6b4c");
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.xn--flw351e" }));
+    expect(req.host).toBe("nic.xn--flw351e");
+    expect(req.hostname).toBe("nic.xn--flw351e");
 
     req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.\u8c37\u6b4c:80" }));
-    expect(req.host).toBe("nic.\u8c37\u6b4c");
-    expect(req.hostname).toBe("nic.\u8c37\u6b4c");
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.xn--flw351e:80" }));
+    expect(req.host).toBe("nic.xn--flw351e");
+    expect(req.hostname).toBe("nic.xn--flw351e");
 
     req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "technically_invalid.example.com" }));
     expect(req.host).toBe("technically_invalid.example.com");
@@ -653,6 +652,35 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
     expect(hwp({ ...org, HTTP_FORWARDED: "host=example.com:9292", SERVER_PORT: "9393" })).toBe(
       "example.com:9292",
     );
+
+    expect(hwp({ HTTP_HOST: "example.org", HTTP_X_FORWARDED_HOST: "" })).toBe("example.org");
+  });
+
+  it("does not leak invalid Host through host_with_port; base_url uses SERVER_NAME", () => {
+    let req;
+    for (const host of ["evil.com@attacker", "evil.com/path", "evil.com#frag", "evil.com?x=1"]) {
+      req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: host }));
+      expect(req.host).toBeNull();
+      expect(req.hostWithPort()).toBeNull();
+      expect(req.baseUrl).toBe("http://example.org");
+      expect(req.url).toBe("http://example.org/");
+    }
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "good.example",
+        HTTP_X_FORWARDED_HOST: "evil.com@attacker",
+      }),
+    );
+    expect(req.host).toBeNull();
+    expect(req.hostWithPort()).toBeNull();
+    expect(req.baseUrl).toBe("http://example.org");
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "evil.com@attacker", SERVER_PORT: "9292" }),
+    );
+    expect(req.hostWithPort()).toBeNull();
+    expect(req.baseUrl).toBe("http://example.org:9292");
   });
 
   it("parse the query string", () => {
@@ -689,11 +717,8 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   });
 
   it("should use the query_parser for query parsing", () => {
-    const parser = new QueryParser(Params, 100);
-    const c = class extends Request {
-      override queryParser = (): QueryParser => parser;
-    };
-    const req = new c(MockRequest.envFor("/?foo=bar&quux=bla"));
+    const req = new Request(MockRequest.envFor("/?foo=bar&quux=bla"));
+    req.setQueryParser(new QueryParser(Params, 100));
     expect(req.GET["foo"]).toBe("bar");
     expect(req.GET["quux"]).toBe("bla");
     expect(req.params["foo"]).toBe("bar");
@@ -844,7 +869,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   it("safely accepts POST requests with empty body", () => {
     const mr = MockRequest.envFor("/", {
       REQUEST_METHOD: "POST",
-      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: "0",
       ":input": null,
     });
@@ -1237,7 +1262,7 @@ content-transfer-encoding: base64\r
 `;
     const req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1277,7 +1302,7 @@ content-transfer-encoding: base64
 `;
     const req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1301,7 +1326,7 @@ content-transfer-encoding: base64\r
 `;
     const req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1335,7 +1360,7 @@ content-transfer-encoding: base64\r
     const input = `--AaB03x--\r
 `;
     const mr = MockRequest.envFor("/", {
-      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: input.length,
       ":input": input,
     });
@@ -1438,7 +1463,7 @@ content-disposition: form-data; name="mean"; filename="mean"\r
 `;
     const req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1465,7 +1490,7 @@ content-transfer-encoding: base64\r
 --AaB03x--\r
 `;
     const env = MockRequest.envFor("/", {
-      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: input.length,
       ":input": input,
     });
@@ -1480,7 +1505,7 @@ content-disposition: form-data; name="huge"; filename="huge"\r
 `;
     let req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1495,7 +1520,7 @@ foo\r
 `;
     req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1510,7 +1535,7 @@ foo\r
 `;
     req = makeRequest(
       MockRequest.envFor("/", {
-        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
         CONTENT_LENGTH: input.length,
         ":input": input,
       }),
@@ -1604,7 +1629,7 @@ content-transfer-encoding: base64\r
 --AaB03x--\r
 `;
     const res = await new MockRequest(new Lint(app)).get("/", {
-      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: String(input.length),
       "rack.input": new StringIO(input),
     });
@@ -1877,26 +1902,236 @@ content-transfer-encoding: base64\r
     expect(new c(h).env).toBe(h);
   });
 
-  it("return values for the keys in the order given from values_at", () => {
-    const req = makeRequest(MockRequest.envFor("?foo=baz&wun=der&bar=ful"));
+  it("limit POST body read to bytesize_limit when parsing url-encoded data", () => {
+    const reads: (number | null)[] = [];
+    const mockInput = {
+      read(len: number | null = null) {
+        reads.push(len);
+        return "foo=bar";
+      },
+    };
 
-    captureWarnings((warnings) => {
-      expect(req.valuesAt("foo")).toEqual(["baz"]);
-      expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
-      expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
-      expect(String(warnings.at(-1)![0])).toMatch(/deprecated/);
-    });
+    const request = makeRequest(
+      MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        "rack.input": mockInput,
+      }),
+    );
 
-    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors spec_request.rb:808 `next if self.class == TestProxyRequest`
-    if (req.isDelegate()) return;
+    expect(request.POST).toEqual({ foo: "bar" });
 
-    captureWarnings((warnings) => {
-      expect(req.valuesAt("foo")).toEqual(["baz"]);
-      expect(warnings.pop()).toEqual([
-        "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
-        { uplevel: 1 },
-      ]);
-    });
+    expect(reads.length).toBe(1);
+    expect(reads[0]).not.toBeNull();
+    expect(reads[0]).toBe(request.queryParser().bytesizeLimit + 2);
+  });
+
+  it("handle nil return from rack.input.read when parsing url-encoded data", () => {
+    const mockInput = {
+      read(_len: number | null = null) {
+        return null;
+      },
+    };
+
+    const request = makeRequest(
+      MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        "rack.input": mockInput,
+      }),
+    );
+
+    expect(request.POST).toEqual({});
+  });
+
+  it("truncate POST body at bytesize_limit when parsing url-encoded data", () => {
+    const largeBody = "a=1&".repeat(1000000);
+
+    const request = makeRequest(
+      MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        ":input": largeBody,
+      }),
+    );
+
+    expect(() => request.POST).toThrowError(QueryLimitError);
+  });
+
+  it("clean up Safari's ajax POST body with limited read", () => {
+    const reads: (number | null)[] = [];
+    const mockInput = {
+      read(len: number | null = null) {
+        reads.push(len);
+        return "foo=bar\0";
+      },
+    };
+
+    const request = makeRequest(
+      MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        "rack.input": mockInput,
+      }),
+    );
+
+    expect(request.POST).toEqual({ foo: "bar" });
+
+    expect(reads[0]).not.toBeNull();
+  });
+
+  it("return form_pairs for url-encoded POST data", () => {
+    const req = makeRequest(
+      MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "foo=bar&quux=bla" }),
+    );
+    expect(req.formPairs).toEqual([
+      ["foo", "bar"],
+      ["quux", "bla"],
+    ]);
+  });
+
+  it("preserve duplicate keys in form_pairs", () => {
+    const req = makeRequest(
+      MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "foo=1&foo=2&bar=3" }),
+    );
+    expect(req.formPairs).toEqual([
+      ["foo", "1"],
+      ["foo", "2"],
+      ["bar", "3"],
+    ]);
+  });
+
+  it("handle empty values in form_pairs", () => {
+    const req = makeRequest(
+      MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "foo=&bar=baz&empty" }),
+    );
+    expect(req.formPairs).toEqual([
+      ["foo", ""],
+      ["bar", "baz"],
+      ["empty", null],
+    ]);
+  });
+
+  it("return empty array for form_pairs with no POST data", () => {
+    const req = makeRequest(MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "" }));
+    expect(req.formPairs).toEqual([]);
+  });
+
+  it("return empty array for form_pairs with non-form content type", () => {
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "text/plain",
+        ":input": "foo=bar",
+      }),
+    );
+    expect(req.formPairs).toEqual([]);
+  });
+
+  it("raise same error for form_pairs as POST with invalid encoding", () => {
+    const req = makeRequest(MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "a%=1" }));
+    expect(() => req.formPairs).toThrowError(InvalidParameterError);
+    expect(() => req.formPairs).toThrowError("invalid %-encoding (a%)");
+  });
+
+  it("return form_pairs for multipart form data", () => {
+    const input = `--AaB03x\r
+content-disposition: form-data; name="reply"\r
+\r
+yes\r
+--AaB03x\r
+content-disposition: form-data; name="name"\r
+\r
+John\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    const pairs = req.formPairs;
+    expect(pairs).toEqual([
+      ["reply", "yes"],
+      ["name", "John"],
+    ]);
+  });
+
+  it("preserve duplicate keys in multipart form_pairs", () => {
+    const input = `--AaB03x\r
+content-disposition: form-data; name="item"\r
+\r
+first\r
+--AaB03x\r
+content-disposition: form-data; name="item"\r
+\r
+second\r
+--AaB03x\r
+content-disposition: form-data; name="other"\r
+\r
+value\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    const pairs = req.formPairs;
+    expect(pairs).toEqual([
+      ["item", "first"],
+      ["item", "second"],
+      ["other", "value"],
+    ]);
+  });
+
+  it("include file uploads in multipart form_pairs", () => {
+    const input = `--AaB03x\r
+content-disposition: form-data; name="reply"\r
+\r
+yes\r
+--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="test.txt"\r
+content-type: text/plain\r
+\r
+file content\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    const pairs = req.formPairs;
+    expect(pairs.length).toBe(2);
+    expect(pairs[0]).toEqual(["reply", "yes"]);
+    expect(pairs[1][0]).toBe("fileupload");
+    expect(pairs[1][1]).toBeTypeOf("object");
+    expect(pairs[1][1].filename).toBe("test.txt");
+    expect(pairs[1][1].type).toBe("text/plain");
+  });
+
+  it("return empty array for empty multipart form_pairs", () => {
+    const input = `--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(req.formPairs).toEqual([]);
   });
 }
 describe("RackRequestTest", () => {
@@ -1950,10 +2185,6 @@ describe("RackRequestTest", () => {
 
       deleteHeader(name: string): any {
         return this.req.deleteHeader(name);
-      }
-
-      valuesAt(...keys: string[]): any[] {
-        return this.req.valuesAt(...keys);
       }
 
       isDelegate(): boolean {
