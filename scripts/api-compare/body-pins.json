@@ -24973,13 +24973,6 @@
   {
     "package": "activemodel",
     "rubyFile": "validations.rb",
-    "rubyName": "_merge_attributes",
-    "digest": "9ad332c79d0a93aa",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
-    "rubyFile": "validations.rb",
     "rubyName": "attribute_method?",
     "digest": "c9797d238adbb4bb",
     "ref": "v8.0.2"
