@@ -74222,7 +74222,7 @@
     "rubyName": "request",
     "digest": "7e4f834956e33e0d",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74349,7 +74349,7 @@
     "rubyName": "map",
     "digest": "495eef6b93e15cb2",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74371,7 +74371,7 @@
     "rubyName": "run",
     "digest": "abf3b56dd23d3b6a",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74386,7 +74386,7 @@
     "rubyName": "use",
     "digest": "8dea06a83e687e90",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74457,7 +74457,7 @@
     "rubyName": "call",
     "digest": "54d8c4b81c499bb9",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74605,7 +74605,7 @@
     "rubyName": "check_forbidden",
     "digest": "f00d1d556faf25b9",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74613,7 +74613,7 @@
     "rubyName": "each",
     "digest": "fbbdc96780dd28f6",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74642,7 +74642,7 @@
     "rubyName": "initialize",
     "digest": "8cf9d8fce53856dd",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74818,7 +74818,7 @@
     "rubyName": "fail",
     "digest": "8d241506f80c9561",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74875,7 +74875,7 @@
     "rubyName": "call",
     "digest": "2e383793db084c01",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75058,7 +75058,7 @@
     "rubyName": "check_error_stream",
     "digest": "a8728c91dd42fad4",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-lint"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75066,7 +75066,7 @@
     "rubyName": "check_header_value",
     "digest": "1d8f783ad876ba6b",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-lint"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75074,7 +75074,7 @@
     "rubyName": "check_headers",
     "digest": "d42eb6d3cb4d588e",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-lint"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75089,7 +75089,7 @@
     "rubyName": "initialize",
     "digest": "1759f66f50d2f7ef",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-lint"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75118,7 +75118,7 @@
     "rubyName": "params",
     "digest": "4b2de86220c65e32",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75133,7 +75133,7 @@
     "rubyName": "type",
     "digest": "d75b2c610f7d163f",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75295,7 +75295,7 @@
     "rubyName": "body",
     "digest": "1997086a350e6bdb",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75317,7 +75317,7 @@
     "rubyName": "identify_cookie_attributes",
     "digest": "5675165f48ed8072",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75339,7 +75339,7 @@
     "rubyName": "parse_cookies_from_header",
     "digest": "9021d0ceae47408b",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75508,7 +75508,7 @@
     "rubyName": "handle_fast_forward",
     "digest": "729d2e1e53bca510",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75516,7 +75516,7 @@
     "rubyName": "handle_mime_body",
     "digest": "f0f34ccaf04a8e84",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75524,7 +75524,7 @@
     "rubyName": "handle_mime_head",
     "digest": "db0863c2ec6753e2",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75532,7 +75532,7 @@
     "rubyName": "initialize",
     "digest": "506d49f313fa46e5",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75568,7 +75568,7 @@
     "rubyName": "parse",
     "digest": "7fc68964ae869cd3",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75576,7 +75576,7 @@
     "rubyName": "parse_boundary",
     "digest": "697ab389367e602d",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75591,7 +75591,7 @@
     "rubyName": "read_data",
     "digest": "c9f8c5a4b11b1020",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75599,7 +75599,7 @@
     "rubyName": "result",
     "digest": "518619f1e53585dd",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-multipart"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75908,7 +75908,7 @@
     "rubyName": "parse_nested_query",
     "digest": "11871ede794a4613",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75916,7 +75916,7 @@
     "rubyName": "parse_query",
     "digest": "6e0cf8033619c61e",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76008,7 +76008,7 @@
     "rubyName": "GET",
     "digest": "85cc30d1b2daf189",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76016,7 +76016,7 @@
     "rubyName": "POST",
     "digest": "37ec3bb18006b0b1",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76059,7 +76059,7 @@
     "rubyName": "base_url",
     "digest": "a97189654d9ee3c7",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76158,7 +76158,7 @@
     "rubyName": "forwarded_authority",
     "digest": "8c5f27173531aaa9",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76250,7 +76250,7 @@
     "rubyName": "host_with_port",
     "digest": "7c97291ead6be6e8",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76265,7 +76265,7 @@
     "rubyName": "initialize",
     "digest": "36d8c4f1d07ee640",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76280,7 +76280,7 @@
     "rubyName": "ip",
     "digest": "e018136ea62ca724",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76337,7 +76337,7 @@
     "rubyName": "parse_multipart",
     "digest": "3a315f4f6bad1fd7",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76408,7 +76408,7 @@
     "rubyName": "query_parser",
     "digest": "2736d7f27f5c924f",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76507,7 +76507,7 @@
     "rubyName": "split_header",
     "digest": "45923182759ca946",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-request-rb"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76977,7 +76977,7 @@
     "rubyName": "call",
     "digest": "244fb91295eb34c8",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77069,7 +77069,7 @@
     "rubyName": "initialize",
     "digest": "c6d2ba431363363c",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77077,7 +77077,7 @@
     "rubyName": "map_accel_path",
     "digest": "ced875ba28f20d4b",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77085,7 +77085,7 @@
     "rubyName": "variation",
     "digest": "f5126ff79fe4e654",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77177,7 +77177,7 @@
     "rubyName": "applicable_rules",
     "digest": "d1447650447f2cb2",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77199,7 +77199,7 @@
     "rubyName": "initialize",
     "digest": "57219441cfd830c0",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77214,7 +77214,7 @@
     "rubyName": "route_file",
     "digest": "be5d2034cadfa4aa",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77285,7 +77285,7 @@
     "rubyName": "byte_ranges",
     "digest": "a55d0ee6263457f0",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77363,7 +77363,7 @@
     "rubyName": "forwarded_values",
     "digest": "c313365faebe480c",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77371,7 +77371,7 @@
     "rubyName": "get_byte_ranges",
     "digest": "4bae7afbecccde06",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77456,7 +77456,7 @@
     "rubyName": "select_best_encoding",
     "digest": "4f6b9e39a7291427",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77464,7 +77464,7 @@
     "rubyName": "set_cookie_header",
     "digest": "65ab4700ce485593",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77479,7 +77479,7 @@
     "rubyName": "status_code",
     "digest": "73b9357403e2157d",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-utils-and-query-parser"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77508,7 +77508,7 @@
     "rubyName": "release",
     "digest": "78fbb2454335fe13",
     "ref": "v3.2.8",
-    "reason": "re-pinned unverified on the v3.2.8 bump; rack-3-2-reverify-middleware-bodies"
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack-session",
