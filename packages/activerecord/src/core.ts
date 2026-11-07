@@ -22,6 +22,7 @@ import {
   rbObjSingletonClass,
   rbCallSuper,
   filterMap,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -975,7 +976,7 @@ function respondsToId(value: unknown): boolean {
 }
 
 function respondsTo(value: unknown, name: string): boolean {
-  return value != null && typeof value === "object" && name in value;
+  return value != null && typeof value === "object" && rbObjRespondTo(value, name);
 }
 
 /** @internal */

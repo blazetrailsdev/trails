@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
 import { DelegateClass, SimpleDelegator } from "../lib/delegate.js";
+import { rbObjRespondTo } from "../lib/object.js";
 
 class Target {
   _stored = "initial";
@@ -82,7 +83,7 @@ describe("TestDelegateClass", () => {
     const simple = new SimpleDelegator([]);
     expect(simple).not.toBeInstanceOf(Array);
     expect(simple.constructor).toBe(SimpleDelegator);
-    expect("push" in simple).toBe(true);
+    expect(rbObjRespondTo(simple, "push")).toBe(true);
     expect((simple as unknown as unknown[]).length).toBe(0);
   });
 
