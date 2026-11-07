@@ -4,7 +4,6 @@ import {
   FileUtils,
   StringIO,
   Tempfile,
-  basicObjRespondTo,
   methodMissingPrototype,
   rbFSend,
   rbObjRespondTo,
@@ -77,8 +76,8 @@ export class UploadedFile {
     return this.path;
   }
 
-  isRespondTo(name: string): boolean {
-    return basicObjRespondTo(this, name) || rbObjRespondTo(this._tempfile, name);
+  respondToMissing(name: string, _includeAll = false): boolean {
+    return rbObjRespondTo(this._tempfile, name);
   }
 
   methodMissing(methodName: string, ...args: unknown[]): unknown {
