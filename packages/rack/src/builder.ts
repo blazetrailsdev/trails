@@ -88,7 +88,7 @@ export class Builder {
     return builder.toApp();
   }
 
-  use(middleware: any, ...args: any[]): this {
+  use(middleware: any, ...args: any[]): null {
     const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
     if (this._map) {
       const mapping = this._map;
@@ -104,23 +104,26 @@ export class Builder {
             ...(block ? [block] : []),
           ),
     );
-    return this;
+
+    return null;
   }
 
-  run(app: RackApp): this;
-  run(app: null, block: RackApp): this;
-  run(app: RackApp | null, block?: RackApp): this {
+  run(app: RackApp): null;
+  run(app: null, block: RackApp): null;
+  run(app: RackApp | null, block?: RackApp): null {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
     this._run = app || block!;
-    return this;
+
+    return null;
   }
 
-  map(path: string, block: (builder: Builder) => void): this {
+  map(path: string, block: (builder: Builder) => void): null {
     this._map ??= {};
     this._map[path] = block;
-    return this;
+
+    return null;
   }
 
   warmup(prc: (app: RackApp) => void): this {

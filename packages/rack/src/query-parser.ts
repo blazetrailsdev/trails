@@ -135,7 +135,7 @@ export class QueryParser {
   ): [string, string | null][] {
     const pairs: [string, string | null][] = [];
 
-    this.eachQueryPair(qs, separator, null, (k, v) => {
+    this.eachQueryPair(qs, separator, (k, v) => {
       pairs.push([k, v]);
     });
 
@@ -148,7 +148,7 @@ export class QueryParser {
   ): Record<string, any> {
     const params = this.makeParams();
 
-    this.eachQueryPair(qs, separator, null, (k, v) => {
+    this.eachQueryPair(qs, separator, (k, v) => {
       this._normalizeParams(params, k, v, 0);
     });
 
@@ -170,9 +170,13 @@ export class QueryParser {
   private eachQueryPair(
     qs: string | null | undefined,
     separator: string | null,
-    unescaper: ((s: string) => string) | null,
-    block: (k: string, v: string | null) => void,
+    ...args: [
+      ...([unescaper: ((s: string) => string) | null] | []),
+      block: (k: string, v: string | null) => void,
+    ]
   ): void {
+    const block = args.pop() as (k: string, v: string | null) => void;
+    const unescaper = (args[0] ?? null) as ((s: string) => string) | null;
     try {
       if (qs == null || qs.length === 0) return;
 
