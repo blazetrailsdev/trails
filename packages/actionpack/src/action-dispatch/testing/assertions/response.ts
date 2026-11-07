@@ -16,7 +16,6 @@ export interface AssertionResponseHost {
 }
 
 export interface AssertionResponseLike {
-  status: number;
   responseCode: number;
   body?: string;
   location?: string;

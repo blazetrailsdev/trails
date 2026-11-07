@@ -4,7 +4,6 @@ import { assertRedirectedTo, assertResponse, type AssertionResponseHost } from "
 function host(status: number, headers: Record<string, string> = {}): AssertionResponseHost {
   return {
     response: {
-      status,
       responseCode: status,
       isSuccessful: status >= 200 && status <= 299,
       isNotFound: status === 404,
