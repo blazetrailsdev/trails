@@ -6,10 +6,9 @@ export class WelcomeController extends ApplicationController {
   }
 
   static {
+    this.skipForgeryProtection();
     this.layout(false);
   }
 
   index(): void {}
 }
-
-WelcomeController.skipBeforeAction(":verifyAuthenticityToken", { raise: false });

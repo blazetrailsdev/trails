@@ -2114,3 +2114,27 @@ export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
   });
   return val;
 }
+
+/**
+ * `Kernel#remove_instance_variable` (`rb_obj_remove_instance_variable`,
+ * `vendor/ruby/v3.3.11/variable.c:2314`): deletes `obj`'s own field for ivar
+ * `iv` and answers its value, raising `NameError` when it is not defined.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#remove_instance_variable`
+ * (`vendor/ruby/v3.3.11/variable.c:2314`).
+ */
+export function rbObjRemoveInstanceVariable(obj: object, iv: string): unknown {
+  const id = idForVar(obj, iv);
+  if (Object.isFrozen(obj)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
+      receiver: obj,
+    });
+  }
+  const field = ivarField(obj, id);
+  if (Object.hasOwn(obj, field)) {
+    const val = (obj as Record<string, unknown>)[field];
+    delete (obj as Record<string, unknown>)[field];
+    return val;
+  }
+  throw new NameError(`instance variable ${iv} not defined`, iv, { receiver: obj });
+}

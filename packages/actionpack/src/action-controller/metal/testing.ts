@@ -1,17 +1,25 @@
+import {
+  rbObjInstanceVariables,
+  rbObjIvarDefined,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbObjRemoveInstanceVariable,
+} from "@blazetrails/ruby-compat";
 import { ActionController } from "../../namespaces.js";
+import type { Metal } from "../metal.js";
 
-export function clearInstanceVariablesBetweenRequests(this: Record<string, unknown>): void {
-  if (Object.hasOwn(this, "_ivars")) {
-    const ivars = this._ivars as string[];
-    const newIvars = Object.getOwnPropertyNames(this).filter((ivar) => !ivars.includes(ivar));
-    for (const ivar of newIvars) delete this[ivar];
+export function clearInstanceVariablesBetweenRequests(this: Metal): void {
+  if (rbObjIvarDefined(this, "@_ivars")) {
+    const ivars = rbObjIvarGet(this, "@_ivars") as string[];
+    const newIvars = rbObjInstanceVariables(this).filter((ivar) => !ivars.includes(ivar));
+    newIvars.forEach((ivar) => rbObjRemoveInstanceVariable(this, ivar));
   }
 
-  this._ivars = Object.getOwnPropertyNames(this);
+  rbObjIvarSet(this, "@_ivars", rbObjInstanceVariables(this));
 }
 
-export function recycleBang(this: Record<string, unknown>): void {
-  this._urlOptions = null;
+export function recycleBang(this: Metal): void {
+  rbObjIvarSet(this, "@_url_options", null);
   this.formats = null;
   this.params = null;
 }
