@@ -153,6 +153,9 @@ it("returns 404 if it can't find the file", async () => {
   expect(res.isNotFound).toBeTruthy();
 });
 
+// PERMANENT-SKIP: asserts `env["PATH_INFO"].encoding`; CLAUDE.md, "A String has no encoding tag either".
+it.skip("uses bytesize not size for Content-Length in error responses with multibyte UTF-8", () => {});
+
 it("detects SystemCallErrors", async () => {
   const res = await new MockRequest(files(DOCROOT)).get("/cgi");
 

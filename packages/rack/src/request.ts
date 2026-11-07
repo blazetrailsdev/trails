@@ -757,23 +757,7 @@ export class Request {
   }
 
   get ip(): string | null {
-    return (this._ip ??= (() => {
-      const remoteAddresses = this.splitHeader(this.getHeader("REMOTE_ADDR"));
-
-      for (const ip of remoteAddresses.slice().reverse()) {
-        if (!this.trustedProxy(ip)) return ip;
-      }
-
-      const forwardedFor = this.forwardedFor;
-      if (forwardedFor != null && forwardedFor.length !== 0) {
-        for (const ip of forwardedFor.slice().reverse()) {
-          if (!this.trustedProxy(ip)) return ip ?? null;
-        }
-        return forwardedFor[0] ?? null;
-      }
-
-      return remoteAddresses[0] ?? null;
-    })());
+    return (this._ip ??= Object.getOwnPropertyDescriptor(Helpers.prototype, "ip")!.get!.call(this));
   }
 
   get params(): Record<string, any> {
