@@ -1,0 +1,9 @@
+[
+  {
+    "package": "nokogiri",
+    "tsFile": "xml/node.ts",
+    "rubyName": "children=",
+    "call": "coerce",
+    "reason": "The port declares only the `children` reader; the comparator pairs it with Ruby's `children=` writer (node.rb:385), whose `coerce` belongs to a writer the read-only port does not define."
+  }
+]

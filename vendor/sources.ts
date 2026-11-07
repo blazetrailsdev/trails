@@ -485,9 +485,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/image_processing",
         libEntryFile: "lib/image_processing.rb",
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason:
-          "image_processing shells out to libvips and ImageMagick; the port is a thin wrapper with no method-for-method surface to score yet.",
         compareTests: false,
       },
     ],
@@ -558,22 +555,19 @@ export const SOURCES: readonly UpstreamSource[] = [
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
-        // api-compare would extract once it is enrolled.
+        // api-compare extracts.
         name: "date",
         libPath: "lib",
         testPath: "test/date",
-        // Vendored-only: the gem's surface is implemented in C, so the Ruby
-        // extractor sees almost nothing. Measured by RFC 0088-date-gem-port's
+        // The gem's surface is implemented in C, so the Ruby extractor sees
+        // almost nothing. Measured by RFC 0088-date-gem-port's
         // `date-c-source-extractor-decision` spike, running
         // `scripts/api-compare/extract-ruby-api.rb` against this `libPath`:
         // `date: 2 classes, 0 modules, 12 public methods (1 internal)` — all of
         // `lib/date.rb`'s `Date#infinite?` and the `:nodoc:` `Date::Infinity`,
-        // against 2,805 lines of port. So `compareApi` stays off; the C sources
-        // are a read-anchor, and they need no `UNPORTED_FILES` entry because
-        // the extractor globs `**/*.rb` and never sees them.
-        compareApi: false,
-        apiExcludedReason:
-          "the gem's surface is implemented in C (ext/date), so the Ruby extractor sees only lib/date.rb's two classes.",
+        // against 2,805 lines of port. parity:api scores what matches there;
+        // the C sources are a read-anchor, and they need no `UNPORTED_FILES`
+        // entry because the extractor globs `**/*.rb` and never sees them.
         // `test/date/` is the gate for this cluster — 12 files, 145 `def test_`
         // methods — and it is the only fidelity measure the date port has:
         // per RFC 0088 the gem's test suite is the measure, not a
@@ -650,9 +644,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "nokogiri",
         libPath: "lib/nokogiri",
-        compareApi: false,
-        apiExcludedReason:
-          "most of nokogiri's surface is C and Java extension code the Ruby extractor cannot read; lib/nokogiri is a read-anchor.",
         compareTests: false,
       },
     ],
@@ -671,9 +662,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "racc",
         libPath: "lib/racc",
-        compareApi: false,
-        apiExcludedReason:
-          "a runtime nokogiri's generated parser runs on, ported inside packages/nokogiri/lib/racc, not a package of its own.",
         compareTests: false,
       },
     ],
@@ -690,9 +678,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "rails-html-sanitizer",
         libPath: "lib/rails/html",
         portedBy: "html-sanitizer",
-        compareApi: false,
-        apiExcludedReason:
-          "a read-anchor for packages/html-sanitizer, which composes loofah and crass rather than mirroring rails-html-sanitizer file for file.",
         compareTests: false,
       },
     ],
@@ -708,8 +693,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "loofah",
         libPath: "lib/loofah",
-        compareApi: false,
-        apiExcludedReason: "ported inside packages/html-sanitizer, not a package of its own.",
         compareTests: false,
       },
     ],
@@ -725,8 +708,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "crass",
         libPath: "lib/crass",
-        compareApi: false,
-        apiExcludedReason: "ported inside packages/html-sanitizer, not a package of its own.",
         compareTests: false,
       },
     ],
@@ -878,9 +859,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "tzinfo",
         libPath: "lib/tzinfo",
         libEntryFile: "lib/tzinfo.rb",
-        compareApi: false,
-        apiExcludedReason:
-          "packages/tzinfo stands in for the gem over the platform's Intl time zone data and has no src/ for the extractor to pair with lib/tzinfo.",
         compareTests: false,
       },
     ],

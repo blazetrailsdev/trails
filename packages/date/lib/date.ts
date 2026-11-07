@@ -4422,10 +4422,7 @@ function checkNumeric(obj: unknown, field: string): asserts obj is number | bigi
   if (!kNumericP(obj)) throw new TypeError(`invalid ${field} (not numeric)`);
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE plain-date-seat-equals-date-is-not-symmetric
- */
+/** @internal */
 function cmpGen(self: Date, other: unknown): number | null {
   if (kNumericP(other)) return self.ajd.cmp(other);
   else if (other instanceof Date) return self.ajd.cmp(other.ajd);

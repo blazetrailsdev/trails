@@ -42,8 +42,24 @@ const GENERATED = "constants.generated.ts";
 /** The table for the classes in files outside the package entry's graph, which those files import. */
 const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 
-/** The api-compare packages whose classes are not loaded from the package entry. */
-const SKIPPED = new Set(["activerecord-test-support"]);
+/**
+ * The api-compare packages with no constant table: `activerecord-test-support`,
+ * whose classes are not loaded from the package entry, and the gem ports scored
+ * by `parity:api` before their top-level Ruby module (`Nokogiri`, `Racc`,
+ * `Crass`, `Loofah`, `Rails::HTML`, `ImageProcessing`, `Date`, `TZInfo`) is
+ * seated with `constSet`, which `constGet` needs to resolve any path under it.
+ */
+const SKIPPED = new Set([
+  "activerecord-test-support",
+  "crass",
+  "date",
+  "image-processing",
+  "loofah",
+  "nokogiri",
+  "racc",
+  "rails-html-sanitizer",
+  "tzinfo",
+]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {

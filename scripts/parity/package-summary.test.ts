@@ -94,7 +94,7 @@ beforeEach(async () => {
     'import { Module } from "@blazetrails/ruby-compat";\nnew Module();\n',
   );
   await write("packages/vitest-matchers/package.json", "{}");
-  await write("packages/date/package.json", '{"description":"Date for Trails"}');
+  await write("packages/solid-cache/package.json", '{"description":"Solid Cache for Trails"}');
   await write("packages/not-a-package/README.md", "");
   await write(
     "scripts/api-compare/call-mismatches-exclude/activerecord/a.json",
@@ -226,7 +226,7 @@ describe("package-summary", () => {
 
   it("emits one entry per package.json with its metadata", async () => {
     const { packages } = await summarize(root);
-    expect(packages.map((p) => p.name)).toEqual(["activerecord", "date", "vitest-matchers"]);
+    expect(packages.map((p) => p.name)).toEqual(["activerecord", "solid-cache", "vitest-matchers"]);
     const [ar, , vm] = packages;
     expect(ar.railsCounterpart).toBe("activerecord");
     expect(ar.description).toBe("ORM layer");
@@ -239,12 +239,13 @@ describe("package-summary", () => {
   });
 
   it("appends why parity:api skips a package to its description", async () => {
-    const date = (await summarize(root)).packages.find((p) => p.name === "date")!;
-    expect(date.railsCounterpart).toBe("date");
-    expect(date.description).toBe(
-      `Date for Trails (Not in parity:api: ${apiExcludedReasonOf("date")})`,
+    const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
+    expect(cache.railsCounterpart).toBe("solid_cache");
+    expect(cache.description).toBe(
+      `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")})`,
     );
-    expect(apiExcludedReasonOf("date")).toContain("implemented in C");
+    expect(apiExcludedReasonOf("solid-cache")).toContain("no packages/solid-cache");
+    expect(apiExcludedReasonOf("date")).toBeNull();
     expect(apiExcludedReasonOf("activerecord")).toBeNull();
   });
 

@@ -1,0 +1,11 @@
+[
+  {
+    "package": "loofah",
+    "tsFile": "html5/scrub.ts",
+    "rubyName": "scrub_css",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [],
+    "reason": "Ruby `Array#join` defaults to an empty separator (scrub.rb:110); JS `Array.prototype.join` defaults to a comma, so the port passes `\"\"` to say the same thing."
+  }
+]

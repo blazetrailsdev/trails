@@ -1,0 +1,16 @@
+[
+  {
+    "package": "nokogiri",
+    "tsFile": "html5/document-fragment.ts",
+    "rubyName": "parse",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:document",
+      "ref:input",
+      "ref:context",
+      "ref:options"
+    ],
+    "reason": "`HTML5::DocumentFragment.parse` calls `new(document, input, context, options)` and lets `initialize` parse; the port parses first and hands the finished children to the constructor, so the arguments differ by design."
+  }
+]
