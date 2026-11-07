@@ -16,6 +16,7 @@ export class DocumentFragment {
     readonly _node: Parse5Parent,
   ) {}
 
+  /** @missingRailsArgs new — CONVERGEABLE nokogiri-parse-constructs-through-new */
   static parse(tags: string): DocumentFragment {
     const document = new Document();
     document.encoding = "UTF-8";

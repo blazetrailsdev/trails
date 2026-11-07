@@ -62,6 +62,7 @@ export class Tokenizer {
   private _input: string;
   private _options: TokenizerOptions;
 
+  /** @missingRailsCall new — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner */
   constructor(input: string, options: TokenizerOptions = {}) {
     this._input = this.preprocess(input);
     this._options = options;
@@ -236,6 +237,10 @@ export class Tokenizer {
     return null;
   }
 
+  /**
+   * @missingRailsArgs consume_escaped — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   * @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   */
   private consumeBadUrl(s: StringScanner): string {
     let text = "";
 
@@ -254,6 +259,7 @@ export class Tokenizer {
     return text;
   }
 
+  /** @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner */
   private consumeEscaped(s: StringScanner): string {
     if (s.isEos()) return "\ufffd";
 
@@ -273,6 +279,12 @@ export class Tokenizer {
     return s.scan(RE_CHAR)!;
   }
 
+  /**
+   * @missingRailsCall create_token — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   * @missingRailsArgs consume_bad_url — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   * @missingRailsArgs consume_escaped — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   * @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
+   */
   private consumeUrl(s: StringScanner): { error?: true; value: string } {
     let value = "";
 

@@ -132,10 +132,7 @@ describe("vendor/sources.ts", () => {
     ]);
   });
 
-  it("declares the date source, enrolled in test-compare only", () => {
-    // api-compare stays off deliberately: the gem's surface is C
-    // (ext/date/date_core.c), so extract-ruby-api.rb credits only the 12
-    // methods in lib/date.rb. RFC 0088 `date-c-source-extractor-decision`.
+  it("declares the date source, enrolled in api-compare and test-compare", () => {
     const date = SOURCES.find((s) => s.name === "date");
     expect(date).toBeDefined();
     expect(date!.origin).toEqual({
@@ -143,8 +140,8 @@ describe("vendor/sources.ts", () => {
       url: "https://github.com/ruby/date.git",
       ref: "v3.4.1",
     });
-    expect(apiComparePackages()).not.toContain("date");
-    expect(Object.keys(libPathsManifest())).not.toContain("date");
+    expect(apiComparePackages()).toContain("date");
+    expect(Object.keys(libPathsManifest())).toContain("date");
     expect(Object.keys(testPathsManifest())).toContain("date");
     expect(resolvePath("date", "test").endsWith("vendor/date/v3.4.1/test/date")).toBe(true);
   });
@@ -171,6 +168,7 @@ describe("vendor/sources.ts", () => {
         libPath: "lib",
         testPath: "spec/ruby",
         compareApi: false,
+        apiExcludedReason: expect.stringContaining("trails-only"),
       },
     ]);
     expect(apiComparePackages()).not.toContain("ruby-compat");
@@ -214,11 +212,13 @@ describe("vendor/sources.ts", () => {
       "marcel",
       "builder",
       "mini-magick",
+      "image-processing",
       "rake",
       "thor",
       "zeitwerk",
       "rails-dom-testing",
       "i18n",
+      "tzinfo",
       "solid-queue",
       "solid-cable",
       "et-orbi",
@@ -403,11 +403,15 @@ describe("vendor/sources.ts", () => {
         "bcrypt",
         "builder",
         "chronic",
+        "crass",
+        "date",
         "did-you-mean",
         "et-orbi",
         "fugit",
         "globalid",
         "i18n",
+        "image-processing",
+        "loofah",
         "mail",
         "marcel",
         "mini-magick",
@@ -415,19 +419,23 @@ describe("vendor/sources.ts", () => {
         "msgpack",
         "mysql2",
         "net-smtp",
+        "nokogiri",
         "pg",
         "raabro",
+        "racc",
         "rack",
         "rack-session",
         "rack-test",
         "rackup",
         "rails-dom-testing",
+        "rails-html-sanitizer",
         "rake",
         "sqlite3",
         "solid-cable",
         "solid-queue",
         "thor",
         "trailties",
+        "tzinfo",
         "zeitwerk",
       ].sort(),
     );

@@ -75,6 +75,7 @@ export class XmlNode {
     return this._node.content ?? "";
   }
 
+  /** @missingRailsCall coerce — CONVERGEABLE nokogiri-xml-node-children-writer */
   get children(): XmlNode[] {
     if (!(this._node instanceof LibXmlElement)) return [];
     const result: XmlNode[] = [];

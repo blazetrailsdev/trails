@@ -2,7 +2,17 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { githubAnchor, main, summarize } from "./package-summary.js";
+import { SOURCES } from "../../vendor/sources.js";
+import { TS_ONLY_PACKAGES } from "../api-compare/config.js";
+import {
+  ROOT_DIR,
+  apiExcludedReasonOf,
+  compareKeysOf,
+  githubAnchor,
+  main,
+  railsCounterpartOf,
+  summarize,
+} from "./package-summary.js";
 
 let root: string;
 
@@ -84,6 +94,7 @@ beforeEach(async () => {
     'import { Module } from "@blazetrails/ruby-compat";\nnew Module();\n',
   );
   await write("packages/vitest-matchers/package.json", "{}");
+  await write("packages/solid-cache/package.json", '{"description":"Solid Cache for Trails"}');
   await write("packages/not-a-package/README.md", "");
   await write(
     "scripts/api-compare/call-mismatches-exclude/activerecord/a.json",
@@ -215,8 +226,8 @@ describe("package-summary", () => {
 
   it("emits one entry per package.json with its metadata", async () => {
     const { packages } = await summarize(root);
-    expect(packages.map((p) => p.name)).toEqual(["activerecord", "vitest-matchers"]);
-    const [ar, vm] = packages;
+    expect(packages.map((p) => p.name)).toEqual(["activerecord", "solid-cache", "vitest-matchers"]);
+    const [ar, , vm] = packages;
     expect(ar.railsCounterpart).toBe("activerecord");
     expect(ar.description).toBe("ORM layer");
     expect(ar.claudeMd).toBe("packages/activerecord/CLAUDE.md");
@@ -225,6 +236,52 @@ describe("package-summary", () => {
     expect(vm.claudeMd).toBeNull();
     expect(vm.params).toBeNull();
     expect(vm.marks.extraSurfaceNovel).toBeNull();
+  });
+
+  it("appends why parity:api skips a package to its description", async () => {
+    const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
+    expect(cache.railsCounterpart).toBe("solid_cache");
+    expect(cache.description).toBe(
+      `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")})`,
+    );
+    expect(apiExcludedReasonOf("solid-cache")).toContain("no packages/solid-cache");
+    expect(apiExcludedReasonOf("date")).toBeNull();
+    expect(apiExcludedReasonOf("activerecord")).toBeNull();
+  });
+
+  it("names a counterpart for every package but the trails-only ones", async () => {
+    const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+    const tooling = [
+      "activerecord-cli",
+      "trails-tsc",
+      "tse-compiler",
+      "vitest-matchers",
+      "website",
+    ];
+    expect(
+      dirs.filter((dir) => railsCounterpartOf(dir) === null).sort(),
+      "a new package that ports no gem belongs in `tooling` here; a gem port needs a vendor/sources.ts entry",
+    ).toEqual([...TS_ONLY_PACKAGES, ...tooling].sort());
+  });
+
+  it("enrolls every parity:test package in parity:api or records why not", () => {
+    const unexplained = SOURCES.flatMap((s) => s.packages)
+      .filter((p) => p.testPath && p.compareTests !== false)
+      .filter((p) => p.compareApi === false && !p.apiExcludedReason)
+      .map((p) => p.name);
+    expect(unexplained).toEqual([]);
+  });
+
+  it("lists the compare keys that fold onto a package directory", () => {
+    expect(compareKeysOf("actionpack").sort()).toEqual([
+      "abstractcontroller",
+      "actioncontroller",
+      "actiondispatch",
+      "actionpackversion",
+    ]);
+    expect(compareKeysOf("vitest-matchers")).toEqual(["vitest-matchers"]);
   });
 
   it("counts line-leading JSDoc tags only, split by receipt", async () => {
@@ -349,7 +406,7 @@ describe("package-summary", () => {
   });
 
   it("writes the summary file", async () => {
-    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
+    expect(await main(root)).toMatch(/3 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
     const out = JSON.parse(
       await fs.readFile(path.join(root, "scripts/parity/output/package-summary.json"), "utf-8"),
     );

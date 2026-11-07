@@ -55,6 +55,19 @@ export interface PackageEntry {
    */
   compareApi?: boolean;
   /**
+   * Why `compareApi` is false, in one sentence. Required whenever it is:
+   * `validateSources` refuses an exclusion with no reason, and the package
+   * summary appends it to the package's description, so `/packages/<name>`
+   * says why its API tile is empty.
+   */
+  apiExcludedReason?: string;
+  /**
+   * The `packages/<dir>` that ports this entry, when it is not the entry's own
+   * name (`rails-html-sanitizer` → `html-sanitizer`). Read only by the package
+   * summary's counterpart lookup; api-compare keys on `name`.
+   */
+  portedBy?: string;
+  /**
    * Default true. Mirror of `compareApi` for test-compare. globalid sets this
    * to false in wave 5 (its tests aren't wired into test-compare yet); wave 6
    * flips it on alongside its api-compare wiring.
@@ -472,7 +485,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/image_processing",
         libEntryFile: "lib/image_processing.rb",
         testPath: "test",
-        compareApi: false,
         compareTests: false,
       },
     ],
@@ -543,20 +555,19 @@ export const SOURCES: readonly UpstreamSource[] = [
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
-        // api-compare would extract once it is enrolled.
+        // api-compare extracts.
         name: "date",
         libPath: "lib",
         testPath: "test/date",
-        // Vendored-only: the gem's surface is implemented in C, so the Ruby
-        // extractor sees almost nothing. Measured by RFC 0088-date-gem-port's
+        // The gem's surface is implemented in C, so the Ruby extractor sees
+        // almost nothing. Measured by RFC 0088-date-gem-port's
         // `date-c-source-extractor-decision` spike, running
         // `scripts/api-compare/extract-ruby-api.rb` against this `libPath`:
         // `date: 2 classes, 0 modules, 12 public methods (1 internal)` — all of
         // `lib/date.rb`'s `Date#infinite?` and the `:nodoc:` `Date::Infinity`,
-        // against 2,805 lines of port. So `compareApi` stays off; the C sources
-        // are a read-anchor, and they need no `UNPORTED_FILES` entry because
-        // the extractor globs `**/*.rb` and never sees them.
-        compareApi: false,
+        // against 2,805 lines of port. parity:api scores what matches there;
+        // the C sources are a read-anchor, and they need no `UNPORTED_FILES`
+        // entry because the extractor globs `**/*.rb` and never sees them.
         // `test/date/` is the gate for this cluster — 12 files, 145 `def test_`
         // methods — and it is the only fidelity measure the date port has:
         // per RFC 0088 the gem's test suite is the measure, not a
@@ -597,6 +608,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on
         // those members then dropped, is its own story (RFC 0098).
         compareApi: false,
+        apiExcludedReason:
+          "no packages/minitest exists; the port is a slice of activesupport's testing/assertions.ts.",
         compareTests: false,
       },
     ],
@@ -631,7 +644,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "nokogiri",
         libPath: "lib/nokogiri",
-        compareApi: false,
         compareTests: false,
       },
     ],
@@ -650,7 +662,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "racc",
         libPath: "lib/racc",
-        compareApi: false,
         compareTests: false,
       },
     ],
@@ -666,7 +677,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "rails-html-sanitizer",
         libPath: "lib/rails/html",
-        compareApi: false,
+        portedBy: "html-sanitizer",
         compareTests: false,
       },
     ],
@@ -682,7 +693,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "loofah",
         libPath: "lib/loofah",
-        compareApi: false,
         compareTests: false,
       },
     ],
@@ -698,7 +708,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "crass",
         libPath: "lib/crass",
-        compareApi: false,
         compareTests: false,
       },
     ],
@@ -788,6 +797,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         // points at. `compareApi` stays off permanently; no later story flips
         // it.
         compareApi: false,
+        apiExcludedReason:
+          "a port of Ruby itself, not of a gem: trails-only (see TS_ONLY_PACKAGES in scripts/api-compare/config.ts).",
       },
     ],
   },
@@ -831,6 +842,23 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/solid_cache",
         testPath: "test",
         compareApi: false,
+        apiExcludedReason: "no packages/solid-cache exists yet.",
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "tzinfo",
+    origin: {
+      type: "git",
+      url: "https://github.com/tzinfo/tzinfo.git",
+      ref: "v2.0.6",
+    },
+    packages: [
+      {
+        name: "tzinfo",
+        libPath: "lib/tzinfo",
+        libEntryFile: "lib/tzinfo.rb",
         compareTests: false,
       },
     ],
@@ -1025,6 +1053,11 @@ export function validateSources(sources: readonly UpstreamSource[]): void {
       packageNames.add(pkg.name);
       if (!pkg.libPath) {
         throw new Error(`vendor/sources.ts: package "${pkg.name}" missing libPath`);
+      }
+      if (pkg.compareApi === false && !pkg.apiExcludedReason) {
+        throw new Error(
+          `vendor/sources.ts: package "${pkg.name}" sets compareApi: false without an apiExcludedReason`,
+        );
       }
     }
   }

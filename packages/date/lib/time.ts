@@ -179,7 +179,6 @@ function ndigitsDenominator(ndigits: number): number | Rational {
 
 const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-/** @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number */
 function obj2vint(obj: number | string): number {
   if (typeof obj !== "string") return Math.trunc(obj);
   return Number(kernelInteger(obj, 10));
@@ -440,10 +439,7 @@ interface ZoneOffsetInterval {
 
 const zoneOffsetIntervals = new Map<string, ZoneOffsetInterval[]>();
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number {
   if (!localZone) {
     const seconds = ns / 1_000_000_000n - (ns % 1_000_000_000n < 0n ? 1n : 0n);

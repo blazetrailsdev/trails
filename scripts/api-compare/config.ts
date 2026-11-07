@@ -48,6 +48,10 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   mysql2: "activerecord",
   pg: "activerecord",
   sqlite3: "activerecord",
+  racc: "nokogiri",
+  "rails-html-sanitizer": "html-sanitizer",
+  loofah: "html-sanitizer",
+  crass: "html-sanitizer",
 };
 
 /**
@@ -114,6 +118,9 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   mysql2: "mysql2",
   pg: "pg",
   sqlite3: "sqlite",
+  racc: "racc",
+  loofah: "loofah",
+  crass: "crass",
 };
 
 /**
@@ -224,9 +231,9 @@ export const MANIFEST_PACKAGES = [
  * Ports permanently outside `eslint/rails-private-methods.json`, because there
  * is no Ruby source the privates projection can run over:
  *
- * - `date` — vendored, but `compareApi: false` (vendor/sources.ts): the Ruby
- *   `Date`/`DateTime` surface lives in C (`ext/date/date_core.c`), so the
- *   extractor sees no method visibilities to project.
+ * - `date` — api-compared, but its Ruby `Date`/`DateTime` surface lives in C
+ *   (`ext/date/date_core.c`), so the extractor sees almost no method
+ *   visibilities to project.
  * - `html-sanitizer`, `activerecord-cli` — not vendored sources at all; they
  *   have no gem counterpart in `vendor/`.
  *
