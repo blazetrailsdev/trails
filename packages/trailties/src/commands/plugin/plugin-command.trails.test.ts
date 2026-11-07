@@ -15,4 +15,11 @@ describe("Trails::Command::PluginCommand", () => {
     const output = await capture(":stdout", () => invoke("plugin", ["--rc", railsrc]));
     expect(output).toContain(`Using --skip-git --skip-test from ${railsrc}`);
   }, 30_000);
+
+  it("invoke plugin --no-rc skips the --rc file", async () => {
+    const railsrc = File.join(Dir.mktmpdir("plugin-command"), ".trailsrc");
+    await File.writeAsync(railsrc, "--skip-git\n");
+    const output = await capture(":stdout", () => invoke("plugin", ["--rc", railsrc, "--no-rc"]));
+    expect(output).not.toContain("Using --skip-git");
+  }, 30_000);
 });

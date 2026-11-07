@@ -35,7 +35,7 @@ export class PluginCommand extends Base {
   async perform(type: string | null = null, ...pluginArgs: string[]): Promise<void> {
     if (type !== "new") pluginArgs.push("--help");
 
-    if (!Object.hasOwn(this.options, "noRc")) {
+    if (!this.options.hasKey("noRc")) {
       const railsrc = File.expandPath(this.options.rc as string);
 
       if (await File.isExistAsync(railsrc)) {
