@@ -33,44 +33,46 @@ describe("AppLoaderTest", () => {
     FileUtils.rmRf(tmp);
   });
 
-  const exe = "bin/trails";
+  for (const scriptDir of ["bin", "script"]) {
+    const exe = `${scriptDir}/trails`;
 
-  it(`is not in a Rails application if ${exe} is not found in the current or parent directories`, () => {
-    expect(loader.execApp()).toBeFalsy();
-  });
-
-  it(`is not in a Rails application if ${exe} exists but is a folder`, () => {
-    FileUtils.mkdirP(exe);
-
-    expect(loader.execApp()).toBeFalsy();
-  });
-
-  for (const keyword of ["APP_PATH", "ENGINE_PATH"]) {
-    it(`is in a Rails application if ${exe} exists and contains ${keyword}`, () => {
-      write(exe, keyword);
-
-      loader.execApp();
-
-      expectsExec(exe);
+    it(`is not in a Rails application if ${exe} is not found in the current or parent directories`, () => {
+      expect(loader.execApp()).toBeFalsy();
     });
 
-    it(`is not in a Rails application if ${exe} exists but doesn't contain ${keyword}`, () => {
-      write(exe);
+    it(`is not in a Rails application if ${exe} exists but is a folder`, () => {
+      FileUtils.mkdirP(exe);
 
       expect(loader.execApp()).toBeFalsy();
     });
 
-    it(`is in a Rails application if parent directory has ${exe} containing ${keyword} and chdirs to the root directory`, () => {
-      write(`foo/bar/${exe}`);
-      write(`foo/${exe}`, keyword);
+    for (const keyword of ["APP_PATH", "ENGINE_PATH"]) {
+      it(`is in a Rails application if ${exe} exists and contains ${keyword}`, () => {
+        write(exe, keyword);
 
-      Dir.chdir("foo/bar");
+        loader.execApp();
 
-      loader.execApp();
+        expectsExec(exe);
+      });
 
-      expectsExec(exe);
+      it(`is not in a Rails application if ${exe} exists but doesn't contain ${keyword}`, () => {
+        write(exe);
 
-      expect(File.realpath(Dir.pwd())).toBe(File.realpath(`${tmp}/foo`));
-    });
+        expect(loader.execApp()).toBeFalsy();
+      });
+
+      it(`is in a Rails application if parent directory has ${exe} containing ${keyword} and chdirs to the root directory`, () => {
+        write(`foo/bar/${exe}`);
+        write(`foo/${exe}`, keyword);
+
+        Dir.chdir("foo/bar");
+
+        loader.execApp();
+
+        expectsExec(exe);
+
+        expect(File.realpath(Dir.pwd())).toBe(File.realpath(`${tmp}/foo`));
+      });
+    }
   }
 });

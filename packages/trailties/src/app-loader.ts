@@ -3,7 +3,7 @@ import { Dir, File, Gem, Pathname, exec, rbArgv } from "@blazetrails/ruby-compat
 /** @internal */
 export const AppLoader = {
   RUBY: Gem.ruby(),
-  EXECUTABLES: ["bin/trails"],
+  EXECUTABLES: ["bin/trails", "script/trails"],
 
   execApp(): undefined {
     const originalCwd = Dir.pwd();
