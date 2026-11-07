@@ -232,12 +232,12 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--full"]);
     await t.assertFile(
       "bin/trails",
-      /setEnginePath\(File\.expandPath\("\.\.\/lib\/bukkits\/engine\.ts", __dir__\)\)/,
+      /ENGINE_PATH = File\.expandPath\("\.\.\/lib\/bukkits\/engine\.ts", __dir__\)/,
     );
-    await t.assertFile("bin/trails", /setEngineRoot\(File\.expandPath\("\.\.", __dir__\)\)/);
+    await t.assertFile("bin/trails", /ENGINE_ROOT = File\.expandPath\("\.\.", __dir__\)/);
     await t.assertFile(
       "bin/trails",
-      /setAppPath\(File\.expandPath\("\.\.\/test\/dummy\/config\/application\.ts", __dir__\)\)/,
+      /APP_PATH = File\.expandPath\("\.\.\/test\/dummy\/config\/application\.ts", __dir__\)/,
     );
     await t.assertFile("bin/trails", /import "@blazetrails\/activesupport\/node"/);
     await t.assertFile("bin/trails", /await import\("@blazetrails\/trailties\/engine\/commands"\)/);
