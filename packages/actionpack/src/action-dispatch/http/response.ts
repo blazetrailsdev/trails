@@ -619,9 +619,9 @@ export class Response {
 
   /** @internal */
   beforeSending(): void {
-    if (!this._committed) this.commitBang();
-    const req = this.request as (Request & { commitCookieJarBang?: () => void }) | null;
-    if (req && typeof req.commitCookieJarBang === "function") req.commitCookieJarBang();
+    if (!this.committed) this.commitBang();
+
+    if (!this.committed) this.request!.commitCookieJarBang();
   }
 
   /** @internal */
