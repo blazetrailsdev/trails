@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, it, expect } from "vitest";
-import { StringIO, b, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { StringIO, b, rbObjClassname, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { RewindableInput } from "./rewindable-input.js";
 import { RACK_INPUT } from "./constants.js";
 
@@ -138,4 +138,11 @@ it("wraps rack.input in RewindableInput", async () => {
   expect(app.call({ [RACK_INPUT]: new StringIO("") })[2]).toEqual(["StringIO"]);
   app = new RewindableInput.Middleware(app);
   expect((await app.call({ [RACK_INPUT]: new StringIO("") }))[2]).toEqual(["RewindableInput"]);
+});
+
+it("preserves a nil rack.input", async () => {
+  let app: any = { call: (env: any) => [200, {}, [rbObjClassname(env[RACK_INPUT])]] };
+  expect(app.call({ [RACK_INPUT]: null })[2]).toEqual(["NilClass"]);
+  app = new RewindableInput.Middleware(app);
+  expect((await app.call({ [RACK_INPUT]: null }))[2]).toEqual(["NilClass"]);
 });
