@@ -29,6 +29,8 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "builder",
   "tse-compiler",
   "bcrypt",
+  "actioncable",
+  "actionmailer",
   "did-you-mean",
   "marcel",
   "trails-tsc",
