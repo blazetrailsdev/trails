@@ -18,6 +18,7 @@ import {
   Process,
   RFC2396_PARSER,
   URI,
+  Encoding,
   isSymbol,
   rbInspect,
   stringToSym,
@@ -85,8 +86,8 @@ export function unescapePath(s: string): string {
   return URI_PARSER.unescape(s);
 }
 
-export function unescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, " "));
+export function unescape(s: string, encoding: Encoding = Encoding.UTF_8): string {
+  return URI.decodeWwwFormComponent(s, encoding);
 }
 
 export function parseQuery(qs: string, d?: string): Record<string, string | string[] | null> {

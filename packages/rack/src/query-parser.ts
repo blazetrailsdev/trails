@@ -1,10 +1,10 @@
 import {
   ArgumentError,
-  bytes,
+  Encoding,
   include,
   rbObjClassname,
-  strNew,
   stringSplit,
+  URI,
 } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
 export class ParameterTypeError extends TypeError {
@@ -291,17 +291,6 @@ export class QueryParser {
  *
  * @internal
  */
-function unescape(string: string): string {
-  if (/%(?![0-9a-fA-F]{2})/.test(string)) throw new ArgumentError(`invalid %-encoding (${string})`);
-  const b = bytes(string.replace(/\+/g, " "));
-  const decoded: number[] = [];
-  for (let i = 0; i < b.length; i++) {
-    if (b[i] === 0x25) {
-      decoded.push(parseInt(String.fromCharCode(b[i + 1], b[i + 2]), 16));
-      i += 2;
-    } else {
-      decoded.push(b[i]);
-    }
-  }
-  return strNew(decoded);
+function unescape(string: string, encoding: Encoding = Encoding.UTF_8): string {
+  return URI.decodeWwwFormComponent(string, encoding);
 }

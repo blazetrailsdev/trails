@@ -1,7 +1,7 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { QueryParser as RackQueryParser } from "@blazetrails/rack";
-import { ArgumentError, bytes, strNew, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
+import { toEnum, URI, type Enumerator } from "@blazetrails/ruby-compat";
 
 const DEFAULT_SEP = /& */;
 const COMPAT_SEP = /[&;] */;
@@ -70,8 +70,8 @@ export class QueryParser {
         v = part.slice(eq + 1);
       }
 
-      k = decodeFormComponent(k);
-      if (v !== null) v = decodeFormComponent(v);
+      k = URI.decodeWwwFormComponent(k);
+      if (v !== null) v = URI.decodeWwwFormComponent(v);
 
       block(k, v);
     }
@@ -82,20 +82,4 @@ export class QueryParser {
 
 function escapeChars(s: string): string {
   return s.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-}
-
-/** `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`, `:399-402`). */
-function decodeFormComponent(str: string): string {
-  if (/%(?![0-9a-fA-F]{2})/.test(str)) throw new ArgumentError(`invalid %-encoding (${str})`);
-  const b = bytes(str.replace(/\+/g, " "));
-  const decoded: number[] = [];
-  for (let i = 0; i < b.length; i++) {
-    if (b[i] === 0x25) {
-      decoded.push(parseInt(String.fromCharCode(b[i + 1], b[i + 2]), 16));
-      i += 2;
-    } else {
-      decoded.push(b[i]);
-    }
-  }
-  return strNew(decoded);
 }
