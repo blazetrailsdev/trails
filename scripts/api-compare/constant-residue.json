@@ -1231,7 +1231,7 @@
     }
   },
   "trailties": {
-    "rows": 73,
+    "rows": 74,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1261,6 +1261,7 @@
       "command.ts::CorrectableNameError": "Trails::Command::CorrectableNameError",
       "command.ts::UnrecognizedCommandError": "Trails::Command::UnrecognizedCommandError",
       "commands/app/update-command.ts::UpdateCommand": "Trails::Command::App::UpdateCommand",
+      "commands/application.ts::ApplicationCommand": "Trails::Command::ApplicationCommand",
       "commands/console.ts::Console": "Trails::Console",
       "commands/console.ts::ConsoleCommand": "Trails::Command::ConsoleCommand",
       "commands/console/irb-console.ts::AppInstance": "Trails::Console::AppInstance",
