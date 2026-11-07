@@ -13,7 +13,8 @@ import {
   rbObjClass,
   rbObjIsProc,
 } from "@blazetrails/ruby-compat";
-import { Base } from "./base.js";
+import type { Base } from "./base.js";
+import "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { Mailer as ParameterizedMailer } from "./parameterized.js";
 
@@ -106,7 +107,7 @@ export const TestHelper = {
   deliveryJobFilter(this: TestHelper, job: unknown): boolean {
     const jobClass = isPlainHash(job) ? fetch(job, "job") : rbObjClass(job);
 
-    return [Base, ...(Base as typeof Base & { descendants: (typeof Base)[] }).descendants]
+    return ActionMailer.Base.descendants
       .map((klass) => klass.deliveryJob)
       .includes(jobClass as typeof Base.deliveryJob);
   },

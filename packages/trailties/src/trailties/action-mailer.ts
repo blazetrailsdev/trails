@@ -1,10 +1,9 @@
 import "./active-job.js";
-import "../mailers-controller.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { AbstractController } from "@blazetrails/actionpack";
-import { ActionMailer, Base, deprecator } from "@blazetrails/actionmailer";
-import { TestHelper } from "@blazetrails/actionmailer/test-helper";
-import { ClearTestDeliveries } from "@blazetrails/actionmailer/test-case";
+import type { Base } from "@blazetrails/actionmailer";
+import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
+import { deprecator } from "@blazetrails/actionmailer/deprecator";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -35,6 +34,7 @@ type MailerClass = typeof Base & {
   logger?: unknown;
 };
 
+/** @inventedArm import — PERMANENT */
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -102,11 +102,6 @@ export class Trailtie extends BaseTrailtie {
           rbFSend(this, `${k}=`, v);
         });
       });
-
-      onLoad("action_dispatch_integration_test", function (this: new () => object) {
-        include(this, TestHelper);
-        include(this, ClearTestDeliveries);
-      });
     });
 
     this.initializer(
@@ -123,6 +118,16 @@ export class Trailtie extends BaseTrailtie {
         if (rbObjRespondTo(this.config, "compileMethods")) {
           (this.config as { compileMethods(): void }).compileMethods();
         }
+      });
+    });
+
+    this.initializer("action_mailer.base", { after: "make_routes_lazy" }, async () => {
+      const { TestHelper } = await import("@blazetrails/actionmailer/test-helper");
+      const { ClearTestDeliveries } = await import("@blazetrails/actionmailer/test-case");
+      await import("../mailers-controller.js");
+      onLoad("action_dispatch_integration_test", function (this: new () => object) {
+        include(this, TestHelper);
+        include(this, ClearTestDeliveries);
       });
     });
 
