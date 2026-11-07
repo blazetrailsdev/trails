@@ -38,4 +38,14 @@ describe("stripThenable", () => {
     expect(await Promise.resolve(obj)).toBe(obj);
     expect(await obj).toBe("loaded");
   });
+
+  it("is consumed by the first read of then, incidental or not", async () => {
+    const obj = stripThenable(new Lazy()) as Lazy;
+    expect(typeof obj.then).toBe("undefined");
+    expect(await Promise.resolve(obj)).toBe("loaded");
+  });
+
+  it("raises on a non-extensible object", () => {
+    expect(() => stripThenable(Object.freeze(new Lazy()))).toThrow(TypeError);
+  });
 });

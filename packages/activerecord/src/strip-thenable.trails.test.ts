@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { presence } from "@blazetrails/activesupport";
+import { presence, stripThenable } from "@blazetrails/activesupport";
 import { Relation } from "./relation.js";
+import { Base } from "./index.js";
 import { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 import { UniquenessValidator } from "./validations/uniqueness.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -80,5 +81,27 @@ describe("stripThenable callers hand on the original object", () => {
     const present = (await presence(relation)) as SecretRelation;
     expect(present).toBe(relation);
     expect(present.secret).toBe("kept");
+  });
+
+  it("withRoleAndShard loads a relation the block returns and settles to it", async () => {
+    const sync = new SecretRelation(Post);
+    const fromSync = await Base.connectedTo({ role: "writing" }, () => sync);
+    expect(fromSync).toBe(sync);
+    expect((fromSync as unknown as SecretRelation).secret).toBe("kept");
+    expect(sync.isLoaded).toBe(true);
+
+    const async = new SecretRelation(Post);
+    const fromAsync = await Base.connectedTo({ role: "writing" }, async () => stripThenable(async));
+    expect(fromAsync).toBe(async);
+    expect(async.isLoaded).toBe(true);
+
+    expect(Base.connectedTo({ role: "writing" }, () => 7)).toBe(7);
+    expect(await Base.connectedTo({ role: "writing" }, async () => 7)).toBe(7);
+  });
+
+  it("CollectionProxy#concat resolves to the proxy itself", async () => {
+    const author = await Author.first();
+    const posts = author!.posts as any;
+    expect(await posts.concat()).toBe(posts);
   });
 });

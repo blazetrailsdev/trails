@@ -7,7 +7,10 @@ function hiddenThen(this: object): undefined {
 
 /** @noRailsEquivalent PERMANENT */
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
-  if (Object.isExtensible(obj) && !Object.hasOwn(obj, "then")) {
+  if (!Object.isExtensible(obj)) {
+    throw new TypeError("stripThenable: cannot hide `then` on a non-extensible object");
+  }
+  if (!Object.hasOwn(obj, "then")) {
     Object.defineProperty(obj, "then", { configurable: true, enumerable: false, get: hiddenThen });
   }
   return obj;

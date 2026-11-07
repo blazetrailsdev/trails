@@ -351,8 +351,8 @@ export function withRoleAndShard<T>(
       };
       const returnValue = fn();
       if (returnValue instanceof Promise) return returnValue.then(load);
-      const loaded = load(returnValue);
-      return loaded instanceof Promise ? loaded : returnValue;
+      if (returnValue instanceof ActiveRecord.Relation) return load(returnValue);
+      return returnValue;
     },
     () => {
       const stack = connectedToStack();
