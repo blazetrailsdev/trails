@@ -96,7 +96,7 @@ export const Migration = {
     const numberedDestination = File.join(dir, ["%migration_number%", base].join("_"));
 
     const file = await this.createMigration(numberedDestination, null, config, async () => {
-      const erb = new TSE(strNew(Array.from((await File.binreadAsync(source))!)), {
+      const erb = new TSE(strNew(Array.from(await File.binreadAsync(source))), {
         trimMode: "-",
         eoutvar: "@output_buffer",
       });

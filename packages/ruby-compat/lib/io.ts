@@ -883,6 +883,12 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binread`
    * (`vendor/ruby/v3.3.11/io.c:12242`).
    */
+  static binreadAsync(name: string): Promise<Uint8Array>;
+  static binreadAsync(
+    name: string,
+    length?: number | null,
+    offset?: number | null,
+  ): Promise<Uint8Array | null>;
   static async binreadAsync(
     name: string,
     length: number | null = null,
