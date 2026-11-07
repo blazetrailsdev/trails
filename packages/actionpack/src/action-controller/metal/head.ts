@@ -23,7 +23,7 @@ export function head(
     throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
   }
 
-  if (status == null || status === false) status = "ok";
+  if (status == null || status === false) status = ":ok";
 
   let location: unknown;
   let contentType: unknown;

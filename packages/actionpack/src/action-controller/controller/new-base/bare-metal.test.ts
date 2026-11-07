@@ -142,7 +142,7 @@ class HeadController extends Metal {
   declare head: Included<typeof Head>["head"];
 
   index(): void {
-    this.head("not_found");
+    this.head(":not_found");
   }
 
   continue(): void {

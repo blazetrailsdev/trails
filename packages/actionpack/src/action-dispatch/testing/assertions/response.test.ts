@@ -6,6 +6,10 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
     response: {
       status,
       responseCode: status,
+      isSuccessful: status >= 200 && status <= 299,
+      isNotFound: status === 404,
+      isRedirection: status >= 300 && status <= 399,
+      isServerError: status >= 500 && status <= 599,
       body: "",
       location: headers["location"],
       getHeader: (k) => headers[k.toLowerCase()],
@@ -53,13 +57,13 @@ describe("assertRedirectedTo", () => {
   it("honors :status override (asserts the exact code)", () => {
     expect(() =>
       assertRedirectedTo.call(host(301, { location: "/foo" }), "/foo", {
-        status: "moved_permanently",
+        status: ":moved_permanently",
       }),
     ).not.toThrow();
 
     expect(() =>
       assertRedirectedTo.call(host(302, { location: "/foo" }), "/foo", {
-        status: "moved_permanently",
+        status: ":moved_permanently",
       }),
     ).toThrow();
   });

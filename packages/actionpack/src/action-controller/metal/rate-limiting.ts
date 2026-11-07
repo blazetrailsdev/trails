@@ -35,7 +35,7 @@ export const ClassMethods = {
         return this.request.remoteIp;
       },
       with: with_ = function (this: RateLimitingHost) {
-        return this.head("too_many_requests");
+        return this.head(":too_many_requests");
       },
       store = this.cacheStore!,
       name = null,

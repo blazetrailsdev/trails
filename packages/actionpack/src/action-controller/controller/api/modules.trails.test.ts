@@ -84,7 +84,7 @@ describe("AbstractController::Callbacks#process_action", () => {
 
     index() {
       calls.push("index");
-      this.head("ok");
+      this.head(":ok");
     }
   }
 
@@ -99,7 +99,7 @@ describe("AbstractController::Callbacks#process_action", () => {
 
     index() {
       calls.push("index");
-      this.head("ok");
+      this.head(":ok");
     }
   }
 

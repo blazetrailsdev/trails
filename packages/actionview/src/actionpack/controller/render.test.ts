@@ -224,7 +224,7 @@ class TestController extends ActionController.Base {
   }
 
   async renderingNothingOnLayout(): Promise<void> {
-    await this.head("ok");
+    await this.head(":ok");
   }
 
   async accessingParamsInTemplateWithLayout(): Promise<void> {

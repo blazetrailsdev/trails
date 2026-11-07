@@ -88,7 +88,7 @@ class TestController extends Base {
 
   stdAction(): void {
     this.flashCopy = { ...this.flash.toHash() };
-    this.head("ok");
+    this.head(":ok");
   }
 
   filterHaltingAction(): void {
@@ -316,12 +316,12 @@ class FlashIntegrationTestController extends Base {
 
   setFlash(): void {
     this.flash.set("that", "hello");
-    this.head("ok");
+    this.head(":ok");
   }
 
   setFlashNow(): void {
     this.flash.now.set("that", "hello");
-    this.head("ok");
+    this.head(":ok");
   }
 
   async useFlash(): Promise<void> {
@@ -337,7 +337,7 @@ class FlashIntegrationTestController extends Base {
 
   async setBar(): Promise<void> {
     this.flash.set("bar", "for great justice");
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

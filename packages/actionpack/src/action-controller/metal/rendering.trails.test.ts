@@ -22,7 +22,7 @@ const _normalizeOptions = (options: Record<string, unknown>): Record<string, unk
 
 describe("Rendering#_normalize_options status", () => {
   it("maps both spellings of a Rack status symbol that RenderOptions admits", () => {
-    expect(_normalizeOptions({ status: "unprocessable_entity" }).status).toBe(422);
+    expect(_normalizeOptions({ status: ":unprocessable_entity" }).status).toBe(422);
     expect(_normalizeOptions({ status: ":created" }).status).toBe(201);
     expect(_normalizeOptions({ status: "404 Not Found" }).status).toBe(404);
   });
@@ -33,7 +33,7 @@ describe("Head#head option keys (head.rb:33-35)", () => {
     for (const key of ["xCustomHeader", "x_custom_header", "x-custom-header"]) {
       class KeyController extends Base {
         async show(): Promise<void> {
-          this.head("ok", { [key]: "1", ETag: "e", "WWW-Authenticate": "w", ContentMD5: "m" });
+          this.head(":ok", { [key]: "1", ETag: "e", "WWW-Authenticate": "w", ContentMD5: "m" });
         }
       }
       const controller = new KeyController();
@@ -55,10 +55,10 @@ describe("Rendering#render types", () => {
     const typed = (controller: Base, post: ToModel): void => {
       controller.render();
       controller.render("new");
-      controller.render("new", { status: "unprocessable_entity", layout: false });
+      controller.render("new", { status: ":unprocessable_entity", layout: false });
       controller.render(post);
       controller.render(controller.params.permit("action"));
-      controller.render({ action: "new", status: "unprocessable_entity" });
+      controller.render({ action: "new", status: ":unprocessable_entity" });
       controller.render({ template: "posts/show", formats: ["html"], layout: "admin" });
       controller.render({ partial: "form", locals: { post }, status: 422 });
       controller.render({ plain: "ok", status: ":created", contentType: "text/plain" });
@@ -95,7 +95,7 @@ describe("Rendering#render_to_string types", () => {
     const typed = (controller: Base): void => {
       controller.renderToString();
       controller.renderToString("new");
-      controller.renderToString({ action: "new", status: "unprocessable_entity" });
+      controller.renderToString({ action: "new", status: ":unprocessable_entity" });
       controller.renderToString({ partial: "render_types/post", locals: { post: "Hello" } });
       // @ts-expect-error a misspelled option key
       controller.renderToString({ acton: "new" });

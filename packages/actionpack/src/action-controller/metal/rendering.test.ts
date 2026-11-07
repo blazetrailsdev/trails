@@ -69,7 +69,7 @@ describe("_normalizeOptions", () => {
   test("html-escapes :html, resolves symbolic status, runs _normalize_text first", () => {
     const out = normalizeOptions({
       html: "<b>&\"'</b>",
-      status: "not_found",
+      status: ":not_found",
       plain: { toText: () => "<plain>" },
     });
     expect(String(out.html)).toBe("&lt;b&gt;&amp;&quot;&#39;&lt;/b&gt;");
@@ -177,7 +177,7 @@ describe("_processOptions", () => {
       urlFor: (s: string) => `/url/${s}`,
     });
     host._processOptions({
-      status: "created",
+      status: ":created",
       contentType: "text/plain",
       location: "post-1",
     });

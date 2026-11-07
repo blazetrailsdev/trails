@@ -17,7 +17,7 @@ import { Parameters, ParameterMissing, UnfilteredParameters } from "../metal/str
 class BooksController extends Base {
   create() {
     (this.params.require("book") as Parameters).require("name");
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

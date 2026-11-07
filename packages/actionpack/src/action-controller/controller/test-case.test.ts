@@ -1186,11 +1186,11 @@ describe("TestCaseTest", () => {
 class ResponseDefaultHeadersTestController extends Base {
   async removeHeader() {
     this.headers.delete(this.params.get("header") as string);
-    this.head("ok", { C: "3" });
+    this.head(":ok", { C: "3" });
   }
 
   async leaveAlone() {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 Object.defineProperty(ResponseDefaultHeadersTestController, "name", {

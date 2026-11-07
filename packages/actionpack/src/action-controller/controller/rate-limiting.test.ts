@@ -14,7 +14,7 @@ class RateLimitedController extends Base {
   }
 
   limited(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 
   static {
@@ -25,14 +25,14 @@ class RateLimitedController extends Base {
         return this.params.get("rate_limit_key") as string | undefined;
       },
       with(this: RateLimitedController) {
-        this.head("forbidden");
+        this.head(":forbidden");
       },
       only: "limitedWith",
     });
   }
 
   limitedWith(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

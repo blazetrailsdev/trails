@@ -56,7 +56,7 @@ describe("ParamsWrapperTest", () => {
         "controller",
         "action",
       );
-      this.head("ok");
+      this.head(":ok");
     }
   }
   Object.defineProperty(UsersController, "name", { value: "ParamsWrapperTest::UsersController" });
@@ -394,7 +394,7 @@ describe("NamespacedParamsWrapperTest", () => {
         "controller",
         "action",
       );
-      this.head("ok");
+      this.head(":ok");
     }
   }
   Object.defineProperty(UsersController, "name", {
@@ -512,7 +512,7 @@ describe("AnonymousControllerParamsWrapperTest", () => {
               "controller",
               "action",
             );
-            this.head("ok");
+            this.head(":ok");
           }
         },
       );
@@ -569,7 +569,7 @@ describe("IrregularInflectionParamsWrapperTest", () => {
         "controller",
         "action",
       );
-      this.head("ok");
+      this.head(":ok");
     }
   }
   Object.defineProperty(ParamswrappernewsController, "name", {

@@ -95,7 +95,7 @@ describe("ControllerInstanceTests", () => {
   it("render with status symbol", async () => {
     class StatusSymController extends Base {
       async index() {
-        await this.render({ json: {}, status: "created" });
+        await this.render({ json: {}, status: ":created" });
       }
     }
     const c = new StatusSymController();
@@ -199,7 +199,7 @@ describe("ActionController::Base redirecting", () => {
   it("redirectTo with symbol status", async () => {
     class RedirectSymController extends Base {
       async index() {
-        this.redirectTo("/see", { status: "see_other" });
+        this.redirectTo("/see", { status: ":see_other" });
       }
     }
     const c = new RedirectSymController();
@@ -473,7 +473,7 @@ describe("ActionController::API", () => {
   it("render with status", async () => {
     class ApiStatusController extends API {
       async index() {
-        await this.render({ json: {}, status: "created" });
+        await this.render({ json: {}, status: ":created" });
       }
     }
     const c = new ApiStatusController();

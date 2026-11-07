@@ -87,7 +87,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async create() {
         const title = this.params.get("title");
-        await this.render({ json: { title }, status: "created" });
+        await this.render({ json: { title }, status: ":created" });
       }
     }
 
@@ -170,7 +170,7 @@ describe("Controller JSON rendering integration", () => {
         await this.render({ json: { created: true }, status: 201 });
       }
       async destroy() {
-        this.head("no_content");
+        this.head(":no_content");
       }
     }
 

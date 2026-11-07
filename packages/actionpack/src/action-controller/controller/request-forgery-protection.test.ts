@@ -148,17 +148,17 @@ RequestForgeryProtectionControllerUsingException.protectFromForgery({
 class RequestForgeryProtectionControllerUsingNullSession extends Base {
   async signed(): Promise<void> {
     this.cookies().signed.set("foo", "bar");
-    this.head("ok");
+    this.head(":ok");
   }
 
   async encrypted(): Promise<void> {
     this.cookies().encrypted.set("foo", "bar");
-    this.head("ok");
+    this.head(":ok");
   }
 
   async tryToResetSession(): Promise<void> {
     this.resetSession();
-    this.head("ok");
+    this.head(":ok");
   }
 }
 RequestForgeryProtectionControllerUsingNullSession.protectFromForgery({ with: "null_session" });
@@ -269,7 +269,7 @@ SkipProtectionWhenUnprotectedController.skipForgeryProtection();
 class CookieCsrfTokenStorageStrategyController extends Base {
   async reset(): Promise<void> {
     this.resetCsrfToken(this.request);
-    this.head("ok");
+    this.head(":ok");
   }
 
   async cookie(): Promise<void> {

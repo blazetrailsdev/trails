@@ -74,7 +74,7 @@ export async function freshWhen(
   if (public_) this.response.cacheControl.public = true;
   mergeBang(this.response.cacheControl, cacheControl);
 
-  if (this.request.fresh(this.response)) this.head("not_modified");
+  if (this.request.fresh(this.response)) this.head(":not_modified");
 }
 
 export async function isStale(

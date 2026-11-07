@@ -40,7 +40,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       async destroy(): Promise<void> {
         this.redirectTo(this.postsPath(), {
           notice: "Post was successfully destroyed.",
-          status: "see_other",
+          status: ":see_other",
         });
       }
     }

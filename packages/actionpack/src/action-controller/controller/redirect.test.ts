@@ -85,7 +85,7 @@ class RedirectController extends Base {
   }
 
   urlRedirectWithStatus() {
-    this.redirectTo("http://www.example.com", { status: "moved_permanently" });
+    this.redirectTo("http://www.example.com", { status: ":moved_permanently" });
   }
 
   urlRedirectWithStatusHash() {
@@ -93,7 +93,7 @@ class RedirectController extends Base {
   }
 
   relativeUrlRedirectWithStatus() {
-    this.redirectTo("/things/stuff", { status: "found" });
+    this.redirectTo("/things/stuff", { status: ":found" });
   }
 
   relativeUrlRedirectWithStatusHash() {

@@ -60,7 +60,7 @@ class PostsController extends Base {
     const title = this.params.get("title");
     this.flash.set("notice", "Post created!");
     this.session.set("lastPost", title);
-    this.status = "created";
+    this.status = ":created";
     await this.render({ json: { title, created: true } });
   }
 
@@ -142,7 +142,7 @@ class CommentsController extends Base {
 
   async create() {
     const postId = this.params.get("post_id");
-    this.status = "created";
+    this.status = ":created";
     await this.render({ json: { postId, created: true } });
   }
 }

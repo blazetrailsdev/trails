@@ -67,7 +67,7 @@ describe("ActionController::Railtie action_controller.set_configs", () => {
 describe("ActionController::Railtie action_controller.request_forgery_protection", () => {
   class PostsController extends ActionController.Base {
     create() {
-      this.head("created");
+      this.head(":created");
     }
   }
 

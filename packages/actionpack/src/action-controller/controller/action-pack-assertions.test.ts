@@ -119,7 +119,7 @@ class InnerModuleController extends Base {
   declare topLevelPath: (id: string) => string;
 
   index() {
-    this.head("ok");
+    this.head(":ok");
   }
 
   redirectToIndex() {
@@ -438,25 +438,25 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with status", async () => {
     await tc.process("redirectToPath");
-    assertRedirectedTo("http://test.host/some/path", { status: "found" });
+    assertRedirectedTo("http://test.host/some/path", { status: ":found" });
     await assertRaise([Assertion], {}, () => {
-      assertRedirectedTo("http://test.host/some/path", { status: "moved_permanently" });
+      assertRedirectedTo("http://test.host/some/path", { status: ":moved_permanently" });
     });
     await assertRaise([Assertion], {}, () => {
       assertRedirectedTo(
         "http://test.host/some/path",
-        { status: "moved_permanently" },
+        { status: ":moved_permanently" },
         "Custom message",
       );
     });
 
     await tc.process("redirectPermanently");
-    assertRedirectedTo("http://test.host/some/path", { status: "moved_permanently" });
+    assertRedirectedTo("http://test.host/some/path", { status: ":moved_permanently" });
     await assertRaise([Assertion], {}, () => {
-      assertRedirectedTo("http://test.host/some/path", { status: "found" });
+      assertRedirectedTo("http://test.host/some/path", { status: ":found" });
     });
     await assertRaise([Assertion], {}, () => {
-      assertRedirectedTo("http://test.host/some/path", { status: "found" }, "Custom message");
+      assertRedirectedTo("http://test.host/some/path", { status: ":found" }, "Custom message");
     });
   });
 

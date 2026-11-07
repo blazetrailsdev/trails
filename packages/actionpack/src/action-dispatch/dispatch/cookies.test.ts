@@ -972,38 +972,38 @@ describe("CookiesTest", () => {
   class TestController extends Base {
     async authenticate(): Promise<void> {
       this.cookies().set("user_name", "david");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async authenticateForFourteenDays(): Promise<void> {
       this.cookies().set("user_name", { value: "david", expires: Time.utc(2005, 10, 10, 5) });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async authenticateForFourteenDaysWithSymbols(): Promise<void> {
       this.cookies().set("user_name", { value: "david", expires: Time.utc(2005, 10, 10, 5) });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setMultipleCookies(): Promise<void> {
       this.cookies().set("user_name", { value: "david", expires: Time.utc(2005, 10, 10, 5) });
       this.cookies().set("login", "XJ-122");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async accessFrozenCookies(): Promise<void> {
       this.cookies().set("will", "work");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieIfNotPresent(): Promise<void> {
       if (!isPresent(this.cookies().get("user_name"))) this.cookies().set("user_name", "alice");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async logout(): Promise<void> {
       this.cookies().delete("user_name");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     declare deleteCookie: TestController["logout"];
@@ -1013,74 +1013,74 @@ describe("CookiesTest", () => {
 
     async deleteCookieWithPath(): Promise<void> {
       this.cookies().delete("user_name", { path: "/beaten" });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async authenticateWithHttpOnly(): Promise<void> {
       this.cookies().set("user_name", { value: "david", httpOnly: true });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async authenticateWithSecure(): Promise<void> {
       this.cookies().set("user_name", { value: "david", secure: true });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setPermanentCookie(): Promise<void> {
       this.cookies().permanent.set("user_name", "Jamie");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setSignedCookie(): Promise<void> {
       this.cookies().signed.set("user_id", 45);
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async getSignedCookie(): Promise<void> {
       this.cookies().signed.get("user_id");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setEncryptedCookie(): Promise<void> {
       this.cookies().encrypted.set("foo", "bar");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async getEncryptedCookie(): Promise<void> {
       this.cookies().encrypted.get("foo");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setInvalidEncryptedCookie(): Promise<void> {
       this.cookies().set("invalid_cookie", "invalid--9170e00a57cfc27083363b5c75b835e477bd90cf");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async raiseDataOverflow(): Promise<void> {
       this.cookies().signed.set("foo", "bye!".repeat(1024));
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async tamperedCookies(): Promise<void> {
       this.cookies().set("tampered", "BAh7BjoIZm9vIghiYXI%3D--123456780");
       this.cookies().signed.get("tampered");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setPermanentSignedCookie(): Promise<void> {
       this.cookies().permanent.signed.set("remember_me", 100);
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async deleteAndSetCookie(): Promise<void> {
       this.cookies().delete("user_name");
       this.cookies().set("user_name", { value: "david", expires: Time.utc(2005, 10, 10, 5) });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomain(): Promise<void> {
       this.cookies().set("user_name", { value: "rizwanreza", domain: ":all" });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomainProc(): Promise<void> {
@@ -1088,7 +1088,7 @@ describe("CookiesTest", () => {
         value: "braindeaf",
         domain: () => ".sub.www.nextangle.com",
       });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomainProcWithRequest(): Promise<void> {
@@ -1096,61 +1096,61 @@ describe("CookiesTest", () => {
         value: "braindeaf",
         domain: (req) => `.sub.${(req as { host: string }).host}`,
       });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async deleteCookieWithDomain(): Promise<void> {
       this.cookies().delete("user_name", { domain: ":all" });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomainAndTld(): Promise<void> {
       this.cookies().set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 2 });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomainAndLongerTld(): Promise<void> {
       this.cookies().set("user_name", { value: "rizwanreza", domain: ":all", tldLength: 4 });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async deleteCookieWithDomainAndTld(): Promise<void> {
       this.cookies().delete("user_name", { domain: ":all", tldLength: 2 });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setCookieWithDomains(): Promise<void> {
       this.cookies().set("user_name", { value: "rizwanreza", domain: DOMAINS });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async deleteCookieWithDomains(): Promise<void> {
       this.cookies().delete("user_name", { domain: DOMAINS });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async symbolKey(): Promise<void> {
       this.cookies().set("user_name", "david");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async stringKey(): Promise<void> {
       this.cookies().set("user_name", "dhh");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async symbolKeyMock(): Promise<void> {
       if (this.cookies().get("user_name") === "andrew") this.cookies().set("user_name", "david");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async stringKeyMock(): Promise<void> {
       if (this.cookies().get("user_name") === "andrew") this.cookies().set("user_name", "david");
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async noop(): Promise<void> {
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     encryptedCookie(): unknown {
@@ -1159,21 +1159,21 @@ describe("CookiesTest", () => {
 
     async cookieExpiresInTwoHours(): Promise<void> {
       this.cookies().set("user_name", { value: "assain", expires: Duration.hours(2) });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async encryptedDiscountAndUserIdCookie(): Promise<void> {
       this.cookies().encrypted.set("user_id", { value: 50, expires: Duration.hours(1) });
       this.cookies().encrypted.set("discount_percentage", 10);
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async signedDiscountAndUserIdCookie(): Promise<void> {
       this.cookies().signed.set("user_id", { value: 50, expires: Duration.hours(1) });
       this.cookies().signed.set("discount_percentage", 10);
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn(): Promise<void> {
@@ -1182,7 +1182,7 @@ describe("CookiesTest", () => {
         "KvH5lIHvX5vPQkLIK63r/NuIMwzWky8M0Zwk8SZ6DwUv8+srf36geR4nWq5KmhsZIYXA8NRdCZYIfxMKJsOFlz77Gf+Fq8vBBCWJTp95rx39A28TCUTJEyMhCNJO5eie7Skef76Qt5Jo/SCnIADAhzyGQkGBopKRcA==--qXZZFWGbCy6N8AGy--WswoH+xHrNh9MzSXDpB2fA==",
       );
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOff(): Promise<void> {
@@ -1191,7 +1191,7 @@ describe("CookiesTest", () => {
         "rTG4zs5UufEFAr+ppKwh+MDMymKyAUMOSaWyYa3uUVmD8sMQqyiyQBxgYeAncDHVZIlo4y+kDVSzp66u1/7BNYpnmFe8ES/YT2m8ckNA23jBDmnRZ9CTNfMIRXjFtfxO9YxEOzzhn0ZiA0/zFtr5wkluXtxplOz959Q7MgLOyvTze2h9p8A=--QHOS3rAEGq/HCxXs--xQNra8dk24Idc2qBtpMLpg==",
       );
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn(): Promise<void> {
@@ -1200,7 +1200,7 @@ describe("CookiesTest", () => {
         "eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaEpJaUUxTFRJdFUzUmhZbXhsSUVOb2IyTnZJRU5vYVhBZ1EyOXZhMmxsQmpvR1JWUT0iLCJleHAiOiIzMDE4LTA3LTExVDE2OjExOjI2Ljc1M1oiLCJwdXIiOm51bGx9fQ==--7df5d885b78b70a501d6e82140ae91b24060ac00",
       );
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async rails52StableSignedCookieWithAuthenticatedEncryptionFlagOff(): Promise<void> {
@@ -1209,17 +1209,17 @@ describe("CookiesTest", () => {
         "BAhJIiE1LTItU3RhYmxlIENob2NvIENoaXAgQ29va2llBjoGRVQ=--50bbdbf8d64f5a3ec3e54878f54d4f55b6cb3aff",
       );
 
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setSameSiteStrict(): Promise<void> {
       this.cookies().set("user_name", { value: "david", sameSite: ":strict" });
-      await this.head("ok");
+      await this.head(":ok");
     }
 
     async setSameSiteNil(): Promise<void> {
       this.cookies().set("user_name", { value: "david", sameSite: null });
-      await this.head("ok");
+      await this.head(":ok");
     }
   }
 

@@ -56,7 +56,7 @@ class LogSubscribersController extends Base {
   neverExecuted() {}
 
   show() {
-    this.head("ok");
+    this.head(":ok");
   }
 
   redirector() {

@@ -457,7 +457,7 @@ export abstract class Helpers {
     return this.mediaTypeParams["charset"] ?? null;
   }
 
-  get formData(): boolean {
+  get isFormData(): boolean {
     const type = this.mediaType;
     const meth =
       this.getHeader(RACK_METHODOVERRIDE_ORIGINAL_METHOD) ?? this.getHeader(REQUEST_METHOD);
@@ -517,7 +517,7 @@ export abstract class Helpers {
         this.setHeader(RACK_REQUEST_FORM_INPUT, null);
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
         return this.getHeader(RACK_REQUEST_FORM_HASH);
-      } else if (this.formData || this.isParseableData()) {
+      } else if (this.isFormData || this.isParseableData()) {
         const pairs = Multipart.parseMultipart(
           this.env,
           Multipart.ParamList as unknown as QueryParser,

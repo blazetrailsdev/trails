@@ -49,7 +49,7 @@ export class MethodOverride {
 
   private methodOverrideParam(req: Request): string | null {
     try {
-      if (req.formData || req.isParseableData()) {
+      if (req.isFormData || req.isParseableData()) {
         return req.POST[METHOD_OVERRIDE_PARAM_KEY] ?? null;
       }
       return null;

@@ -33,7 +33,7 @@ describe("RenderToStringTest", () => {
 
     async renderHeadOkWithInlineTemplateAndXmlFormat() {
       await this.renderToString({ inline: "<language>Ruby</language>", formats: [":xml"] });
-      this.head("ok");
+      this.head(":ok");
     }
   }
 

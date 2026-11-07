@@ -1194,7 +1194,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
           'text/plain; foo=BAR,baz=bizzle dizzle;BLING=bam;blong="boo";zump="zoo\\"o";weird=lol"',
       }),
     );
-    expect(req.formData).toBeFalsy();
+    expect(req.isFormData).toBeFalsy();
     expect(Object.keys(req.mediaTypeParams)).toContain("foo");
     expect(req.mediaTypeParams["foo"]).toBe("BAR");
     expect(Object.keys(req.mediaTypeParams)).toContain("baz");
@@ -1246,7 +1246,7 @@ content-transfer-encoding: base64\r
     expect(Object.keys(req.POST)).toContain("fileupload");
     expect(Object.keys(req.POST)).toContain("reply");
 
-    expect(req.formData).toBeTruthy();
+    expect(req.isFormData).toBeTruthy();
     expect(req.contentLength).toBe(input.length);
     expect(req.mediaType).toBe("multipart/form-data");
     expect(Object.keys(req.mediaTypeParams)).toContain("boundary");
@@ -1310,7 +1310,7 @@ content-transfer-encoding: base64\r
     expect(Object.keys(req.POST)).toContain("fileupload");
     expect(Object.keys(req.POST)).toContain("reply");
 
-    expect(req.formData).toBeTruthy();
+    expect(req.isFormData).toBeTruthy();
     expect(req.contentLength).toBe(input.length);
     expect(req.mediaType).toBe("multipart/form-data");
     expect(Object.keys(req.mediaTypeParams)).toContain("boundary");

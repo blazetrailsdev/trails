@@ -25,7 +25,10 @@ function fakeResponse(
   return {
     status,
     responseCode: status,
+    isSuccessful: status >= 200 && status <= 299,
+    isNotFound: status === 404,
     isRedirection: status >= 300 && status <= 399,
+    isServerError: status >= 500 && status <= 599,
     location,
     body,
     getHeader: (key) => (key.toLowerCase() === "location" ? location : undefined),

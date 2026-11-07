@@ -20,11 +20,11 @@ class PolicyController extends Base {
   seen: PermissionsPolicy | null = null;
 
   index(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 
   bare(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

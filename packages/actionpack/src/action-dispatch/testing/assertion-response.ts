@@ -1,5 +1,5 @@
 import { ActionDispatch } from "../../namespaces.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, stringToSym } from "@blazetrails/ruby-compat";
 import { HTTP_STATUS_CODES, statusCode as rackStatusCode } from "@blazetrails/rack";
 
 const GENERIC_RESPONSE_CODES: Record<string, string> = {
@@ -34,7 +34,7 @@ export class AssertionResponse {
 /** @internal */
 function codeFromName(name: string): number | string {
   if (Object.hasOwn(GENERIC_RESPONSE_CODES, name)) return GENERIC_RESPONSE_CODES[name];
-  return rackStatusCode(name);
+  return rackStatusCode(stringToSym(name));
 }
 
 /** @internal */

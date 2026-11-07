@@ -1332,14 +1332,20 @@ describe("RequestFormData", () => {
   it("media_type is from the FORM_DATA_MEDIA_TYPES array", async () => {
     assertPredicate(
       await stubRequest({ CONTENT_TYPE: "application/x-www-form-urlencoded" }),
-      (r) => r.formData,
+      (r) => r.isFormData,
     );
-    assertPredicate(await stubRequest({ CONTENT_TYPE: "multipart/form-data" }), (r) => r.formData);
+    assertPredicate(
+      await stubRequest({ CONTENT_TYPE: "multipart/form-data" }),
+      (r) => r.isFormData,
+    );
   });
 
   it("media_type is not from the FORM_DATA_MEDIA_TYPES array", async () => {
-    assertNotPredicate(await stubRequest({ CONTENT_TYPE: "application/xml" }), (r) => r.formData);
-    assertNotPredicate(await stubRequest({ CONTENT_TYPE: "multipart/related" }), (r) => r.formData);
+    assertNotPredicate(await stubRequest({ CONTENT_TYPE: "application/xml" }), (r) => r.isFormData);
+    assertNotPredicate(
+      await stubRequest({ CONTENT_TYPE: "multipart/related" }),
+      (r) => r.isFormData,
+    );
   });
 
   it("no Content-Type header is provided and the request_method is POST", async () => {
@@ -1347,7 +1353,7 @@ describe("RequestFormData", () => {
 
     assertNil(request.mediaType);
     assertEqual("POST", request.requestMethod);
-    assertNotPredicate(request, (r) => r.formData);
+    assertNotPredicate(request, (r) => r.isFormData);
   });
 });
 

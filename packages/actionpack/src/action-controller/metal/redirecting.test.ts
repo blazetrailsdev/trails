@@ -53,7 +53,7 @@ describe("_allowOtherHost", () => {
 
 describe("_extractRedirectToStatus", () => {
   it("drains :status from a hash and resolves symbols", () => {
-    const opts: Record<string, unknown> = { status: "see_other", id: 1 };
+    const opts: Record<string, unknown> = { status: ":see_other", id: 1 };
     expect(host()._extractRedirectToStatus(opts, {})).toBe(303);
     expect(opts).toEqual({ id: 1 });
   });

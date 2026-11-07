@@ -35,7 +35,7 @@ class MilestonesController extends Base {
   declare show: () => void;
 
   index(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 
   static {
