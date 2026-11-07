@@ -1,0 +1,81 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { File } from "@blazetrails/ruby-compat";
+import { describe, expect, it } from "vitest";
+
+import { FlashHash } from "../../../lib/action-dispatch/middleware/flash.js";
+import { CookieJar } from "../../../lib/action-dispatch/middleware/cookies.js";
+import { Session } from "../../../lib/action-dispatch/request/session.js";
+import {
+  TestProcess,
+  cookies,
+  flash,
+  redirectToUrl,
+  session,
+  assigns,
+  fileFixtureUpload,
+  type TestProcessHost,
+} from "../../../lib/action-dispatch/testing/test-process.js";
+
+function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
+  return {
+    request: {
+      env: {},
+      getHeader: () => undefined,
+      hasHeader: () => false,
+      fetchHeader: (_name: string, block: (name: string) => unknown) => block(_name),
+      setHeader: () => undefined,
+      session: new Session(null, { env: {} }),
+      flash: new FlashHash(),
+      cookies: { a: "1" },
+    },
+    response: { redirectUrl: "/somewhere" },
+    constructor: { fileFixturePath: null },
+    ...overrides,
+  };
+}
+
+describe("TestProcess", () => {
+  it("exposes a Rails-shaped module of helpers", () => {
+    expect(Object.keys(TestProcess).sort()).toEqual(
+      [
+        "assigns",
+        "cookies",
+        "fileFixtureUpload",
+        "fixtureFileUpload",
+        "flash",
+        "redirectToUrl",
+        "session",
+      ].sort(),
+    );
+  });
+
+  it("session/flash/redirectToUrl delegate to request/response", () => {
+    const host = makeHost();
+    expect(session.call(host)).toBe(host.request.session);
+    expect(flash.call(host)).toBeInstanceOf(FlashHash);
+    expect(redirectToUrl.call(host)).toBe("/somewhere");
+  });
+
+  it("cookies memoizes a CookieJar built from request cookies", () => {
+    const host = makeHost();
+    const jar = cookies.call(host);
+    expect(jar).toBeInstanceOf(CookieJar);
+    expect(jar.get("a")).toBe("1");
+    expect(cookies.call(host)).toBe(jar);
+  });
+
+  it("assigns raises the extracted-gem error", () => {
+    expect(() => assigns.call(makeHost())).toThrow(/extracted to a gem/);
+  });
+
+  it("fileFixtureUpload returns an UploadedFile with the given mime type", () => {
+    const dir = mkdtempSync(File.join(tmpdir(), "trails-tp-"));
+    const file = File.join(dir, "david.png");
+    File.write(file, "x");
+    const host = makeHost();
+    const upload = fileFixtureUpload.call(host, file, "image/png");
+    expect(upload.contentType).toBe("image/png");
+    expect(upload.originalFilename).toBe("david.png");
+  });
+});

@@ -1,0 +1,646 @@
+import { describe, it, expect } from "vitest";
+import { htmlSafe } from "@blazetrails/activesupport";
+import { FixtureResolver } from "@blazetrails/actionview";
+import { Base, DoubleRenderError } from "../../lib/action-controller/base.js";
+import { API } from "../../lib/action-controller/api.js";
+import { Metal } from "../../lib/action-controller/metal.js";
+import { Head } from "../../lib/action-controller/metal/head.js";
+import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
+import { Request } from "../../lib/action-dispatch/http/request.js";
+import { Response } from "../../lib/action-dispatch/http/response.js";
+
+function makeRequest(opts: Record<string, string> = {}): Request {
+  return new Request({
+    REQUEST_METHOD: opts.method ?? "GET",
+    PATH_INFO: opts.path ?? "/",
+    HTTP_HOST: opts.host ?? "localhost",
+    ...opts,
+  });
+}
+class HeadMetal extends Metal {
+  declare head: Included<typeof Head>["head"];
+}
+include(HeadMetal, Head);
+
+function makeResponse(): Response {
+  return new Response();
+}
+
+describe("ActionController rendering", () => {
+  describe("render json", () => {
+    it("renders object as JSON", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: { a: 1 } });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(JSON.parse(c.responseBody as string)).toEqual({ a: 1 });
+      expect(c.contentType).toBe("application/json; charset=utf-8");
+    });
+
+    it("renders array as JSON", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: [1, 2, 3] });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(JSON.parse(c.responseBody as string)).toEqual([1, 2, 3]);
+    });
+
+    it("renders JSON string directly", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: '{"custom":true}' });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe('{"custom":true}');
+    });
+
+    it("renders null as JSON", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: null });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("null");
+    });
+
+    it("renders with custom status", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: {}, status: 201 });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(201);
+    });
+
+    it("renders with custom content type", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: {}, contentType: "application/vnd.api+json" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
+    });
+  });
+
+  describe("render plain", () => {
+    it("renders plain text", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "hello world" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("hello world");
+      expect(c.contentType).toBe("text/plain; charset=utf-8");
+    });
+
+    it("renders empty plain", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("");
+    });
+  });
+
+  describe("render html", () => {
+    it("renders HTML string", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ html: htmlSafe("<b>bold</b>") });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("<b>bold</b>");
+      expect(c.contentType).toBe("text/html; charset=utf-8");
+    });
+  });
+
+  describe("render body", () => {
+    it("renders raw body", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ body: "raw" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("raw");
+      expect(c.contentType).toBe("text/plain; charset=utf-8");
+    });
+  });
+
+  describe("render with status", () => {
+    it("accepts numeric status", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "ok", status: 202 });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(202);
+    });
+
+    it("accepts symbol status", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "created", status: ":created" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(201);
+    });
+
+    it("accepts not_found status", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "nope", status: ":not_found" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(404);
+    });
+
+    it("accepts unprocessable_entity status", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ json: { errors: [] }, status: ":unprocessable_entity" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(422);
+    });
+  });
+
+  describe("head", () => {
+    it("head raises ArgumentError for a Hash status", () => {
+      const c = new HeadMetal();
+      c.setResponseBang(makeResponse());
+      expect(() => c.head({ location: "/" } as never)).toThrow(ArgumentError);
+      expect(() => c.head(new Map() as never)).toThrow(ArgumentError);
+    });
+
+    it("head with numeric status", async () => {
+      class C extends HeadMetal {
+        async index() {
+          this.head(204);
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(204);
+      expect(c.responseBody).toBe("");
+    });
+
+    it("head with symbol status", async () => {
+      class C extends HeadMetal {
+        async index() {
+          this.head(":not_found");
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(404);
+    });
+
+    it("head with ok", async () => {
+      class C extends HeadMetal {
+        async index() {
+          this.head(":ok");
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(200);
+    });
+
+    it("head marks as performed", async () => {
+      class C extends HeadMetal {
+        async index() {
+          this.head(200);
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.performed).toBe(true);
+    });
+  });
+
+  describe("renderToString", () => {
+    it("returns rendered content without committing", async () => {
+      class C extends Base {
+        preview: unknown = "";
+        async index() {
+          this.preview = await this.renderToString({ json: { preview: true } });
+          await this.render({ json: { final: true } });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.preview).toBe('{"preview":true}');
+      expect(c.responseBody).toBe('{"final":true}');
+    });
+
+    it("renderToString with plain text", async () => {
+      class C extends Base {
+        preview: unknown = "";
+        async index() {
+          this.preview = await this.renderToString({ plain: "preview" });
+          await this.render({ plain: "final" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.preview).toBe("preview");
+      expect(c.responseBody).toBe("final");
+    });
+  });
+
+  describe("double render prevention", () => {
+    it("raises on render after render", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "first" });
+          await this.render({ plain: "second" });
+        }
+      }
+      const c = new C();
+      await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+        DoubleRenderError,
+      );
+    });
+
+    it("raises on render after redirect", async () => {
+      class C extends Base {
+        async index() {
+          this.redirectTo("/other");
+          await this.render({ plain: "oops" });
+        }
+      }
+      const c = new C();
+      await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+        DoubleRenderError,
+      );
+    });
+
+    it("raises on redirect after render", async () => {
+      class C extends Base {
+        async index() {
+          await this.render({ plain: "ok" });
+          this.redirectTo("/other");
+        }
+      }
+      const c = new C();
+      await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+        DoubleRenderError,
+      );
+    });
+
+    it("raises on redirect after redirect", async () => {
+      class C extends Base {
+        async index() {
+          this.redirectTo("/a");
+          this.redirectTo("/b");
+        }
+      }
+      const c = new C();
+      await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+        DoubleRenderError,
+      );
+    });
+  });
+
+  describe("implicit render", () => {
+    it("renders empty HTML without template resolver", async () => {
+      class C extends Base {
+        async index() {
+          await this.render();
+        }
+      }
+      C.prependViewPath(new FixtureResolver({ "c/index.html.tse": "" }));
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.contentType).toBe("text/html; charset=utf-8");
+      expect(c.responseBody).toBe("");
+    });
+
+    it("uses template resolver when available", async () => {
+      class TemplateController extends Base {
+        async index() {
+          await this.render();
+        }
+      }
+      TemplateController.prependViewPath(
+        new FixtureResolver({ "template/index.html.tse": "<div>index</div>" }),
+      );
+      const c = new TemplateController();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("<div>index</div>");
+    });
+  });
+
+  describe("API controller rendering", () => {
+    it("renders JSON", async () => {
+      class C extends API {
+        async index() {
+          await this.render({ json: { api: true } });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(JSON.parse(c.responseBody as string)).toEqual({ api: true });
+    });
+
+    it("renders plain text", async () => {
+      class C extends API {
+        async index() {
+          await this.render({ plain: "api text" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("api text");
+    });
+
+    it("renders with status", async () => {
+      class C extends API {
+        async index() {
+          await this.render({ json: {}, status: ":created" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.status).toBe(201);
+    });
+
+    it("renders body", async () => {
+      class C extends API {
+        async index() {
+          await this.render({ body: "raw" });
+        }
+      }
+      const c = new C();
+      await c.dispatch("index", makeRequest(), makeResponse());
+      expect(c.responseBody).toBe("raw");
+    });
+  });
+});
+
+describe("ActionController sendData", () => {
+  it("sends string data with default content type", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("hello", { filename: "test.txt" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.responseBody).toBe("hello");
+    expect(c.contentType).toBe("text/plain");
+  });
+
+  it("sets content-disposition with filename", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("data", { filename: "report.csv" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.headers.get("content-disposition")).toBe(
+      "attachment; filename=\"report.csv\"; filename*=UTF-8''report.csv",
+    );
+  });
+
+  it("sets custom content type", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("data", { type: "text/csv", filename: "r.csv" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.contentType).toBe("text/csv");
+  });
+
+  it("sets inline disposition", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("<pdf>", { filename: "doc.pdf", disposition: "inline" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.headers.get("content-disposition")).toBe(
+      "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
+    );
+  });
+
+  it("sends Buffer data", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData(Buffer.from("binary"), { filename: "test.bin" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.responseBody).toEqual(Buffer.from("binary"));
+  });
+
+  it("marks action as performed", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("x", { filename: "f" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.performed).toBe(true);
+  });
+
+  it("disposition only when no filename", async () => {
+    class C extends Base {
+      async download() {
+        await this.sendData("x", { disposition: "inline" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("download", makeRequest(), makeResponse());
+    expect(c.headers.get("content-disposition")).toBe("inline");
+  });
+});
+
+describe("ActionController render edge cases", () => {
+  it("render with custom content type", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: {}, contentType: "application/vnd.api+json" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
+  });
+
+  it("render json null", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: null });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.responseBody).toBe("null");
+  });
+
+  it("render json array", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: [1, 2, 3] });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(JSON.parse(c.responseBody as string)).toEqual([1, 2, 3]);
+  });
+
+  it("render json string is used as-is", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: '{"raw":true}' });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.responseBody).toBe('{"raw":true}');
+  });
+
+  it("render with status number", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: {}, status: 422 });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(422);
+  });
+
+  it("render with status symbol", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ json: {}, status: ":not_found" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(404);
+  });
+
+  it("render body sets text/plain content type", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ body: "raw" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.contentType).toContain("text/plain");
+  });
+
+  it("head with status symbol", async () => {
+    class C extends Base {
+      async index() {
+        this.head(":not_found");
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(404);
+    expect(c.responseBody).toBe("");
+  });
+
+  it("head with status number", async () => {
+    class C extends Base {
+      async index() {
+        this.head(204);
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.status).toBe(204);
+  });
+
+  it("render sets performed flag", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ plain: "hi" });
+      }
+    }
+    const c = new C();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.performed).toBe(true);
+  });
+
+  it("multiple render throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ plain: "first" });
+        await this.render({ plain: "second" });
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
+  });
+
+  it("render then redirect throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        await this.render({ plain: "hi" });
+        this.redirectTo("/other");
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
+  });
+
+  it("redirect then render throws DoubleRenderError", async () => {
+    class C extends Base {
+      async index() {
+        this.redirectTo("/other");
+        await this.render({ plain: "hi" });
+      }
+    }
+    const c = new C();
+    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+      DoubleRenderError,
+    );
+  });
+});

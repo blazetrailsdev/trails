@@ -2,13 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
+    "rootDir": ".",
     "paths": {
       "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"],
       "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
     }
   },
   "exclude": [],
-  "include": ["lib/**/*.test.ts", "lib/test-helpers/**/*"],
+  "include": ["test"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../ruby-compat" },

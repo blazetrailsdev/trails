@@ -1,0 +1,570 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  Buffer,
+  ClientDisconnected,
+  Live,
+  Response,
+  SSE,
+  cleanUpThreadLocals,
+  liveThreadPoolExecutor,
+  logError,
+  newControllerThread,
+  sendStream,
+  type LiveControllerHost,
+} from "../../../lib/action-controller/metal/live.js";
+import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
+import { Base } from "../../../lib/action-controller/base.js";
+
+function makeResponse() {
+  const response = new Response();
+  response.request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
+  return response;
+}
+
+async function drain(stream: AsyncIterable<unknown>): Promise<unknown[]> {
+  const chunks: unknown[] = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return chunks;
+}
+
+describe("ActionController::Live::Buffer", () => {
+  it("write pushes chunks and sets Cache-Control/Content-Length on uncommitted response", () => {
+    const res = makeResponse();
+    res.setHeader("content-length", "42");
+    const buf = new Buffer(res);
+    buf.write("hello");
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(res.headers.get("content-length")).toBeUndefined();
+  });
+
+  it("write does not touch headers once response is committed", () => {
+    const res = makeResponse();
+    res.close();
+    const buf = new Buffer(res);
+    buf.write("x");
+    expect(res.headers.get("cache-control")).toBeUndefined();
+  });
+
+  it("writeln appends a newline only when missing", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.writeln("a");
+    buf.writeln("b\n");
+    buf.close();
+    expect(await drain(buf)).toEqual(["a\n", "b\n"]);
+  });
+
+  it("close pushes a null sentinel; eachChunk stops there", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("one");
+    buf.write("two");
+    buf.close();
+    expect(await drain(buf)).toEqual(["one", "two"]);
+    expect(buf.isClosed).toBe(true);
+  });
+
+  it("write after close raises (matches Rails IOError-on-closed-stream)", () => {
+    const buf = new Buffer(makeResponse());
+    buf.close();
+    expect(() => buf.write("x")).toThrow(IOError);
+  });
+
+  it("close commits the underlying response", () => {
+    const res = makeResponse();
+    const buf = new Buffer(res);
+    buf.close();
+    expect(res.committed).toBe(true);
+  });
+
+  it("abort clears the queue, isConnected flips to false", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    buf.abort();
+    expect(buf.isConnected).toBe(false);
+    buf.close();
+    expect(await drain(buf)).toEqual([]);
+  });
+
+  it("ClientDisconnected is a RuntimeError, not an IOError", () => {
+    const buf = new Buffer(makeResponse());
+    buf.abort();
+    let raised: unknown;
+    try {
+      buf.write("x");
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(RuntimeError);
+    expect(raised).not.toBeInstanceOf(IOError);
+  });
+
+  it("write after abort raises ClientDisconnected by default", () => {
+    const buf = new Buffer(makeResponse());
+    buf.abort();
+    expect(() => buf.write("x")).toThrow(ClientDisconnected);
+  });
+
+  it("ignoreDisconnect=true silently swallows writes after abort", () => {
+    const buf = new Buffer(makeResponse());
+    buf.ignoreDisconnect = true;
+    buf.abort();
+    expect(() => buf.write("x")).not.toThrow();
+  });
+
+  it("onError + callOnError fires the registered callback", () => {
+    const buf = new Buffer(makeResponse());
+    const cb = vi.fn();
+    buf.onError(cb);
+    buf.callOnError();
+    expect(cb).toHaveBeenCalledOnce();
+  });
+
+  it("default error callback is a no-op", () => {
+    const buf = new Buffer(makeResponse());
+    expect(() => buf.callOnError()).not.toThrow();
+  });
+
+  it("eachChunk awaits chunks written after the reader starts, until close", async () => {
+    const buf = new Buffer(makeResponse());
+    const read = drain(buf);
+    buf.write("one");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    buf.write("two");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    buf.close();
+    expect(await read).toEqual(["one", "two"]);
+  });
+
+  it("buildQueue honours queueSize: a full queue holds later writes until a chunk is read", () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 1;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    expect(queue).toBeInstanceOf(SizedQueue);
+    expect(queue.max).toBe(1);
+    buf.write("one");
+    buf.write("two");
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("one");
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("two");
+  });
+
+  it("an async reader takes one chunk at a time, leaving the queue bound in force", async () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 1;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    const reader = buf[Symbol.asyncIterator]();
+    expect((await reader.next()).value).toBe("one");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("two");
+  });
+
+  it("a sync read of a closed live buffer reads every chunk, including writes held by a full queue", () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 2;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    buf.close();
+    const parts: unknown[] = [];
+    buf.each((part) => parts.push(part));
+    expect(parts).toEqual(["one", "two", "three"]);
+  });
+
+  it("a sync read of a live buffer raises rather than blocking before close", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("one");
+    expect(() => buf.each(() => {})).toThrow(ThreadError);
+  });
+});
+
+describe("ActionController::Live::SSE", () => {
+  function captureStream() {
+    const writes: string[] = [];
+    let closed = false;
+    return {
+      stream: {
+        write: (s: string) => writes.push(s),
+        close: () => {
+          closed = true;
+        },
+      },
+      writes,
+      isClosed: () => closed,
+    };
+  }
+
+  it("writes a string payload with data: prefix", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write("hello");
+    expect(cap.writes.join("")).toBe("data: hello\n\n");
+  });
+
+  it("encodes objects as JSON", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write({ name: "John" });
+    expect(cap.writes.join("")).toBe(`data: ${JSON.stringify({ name: "John" })}\n\n`);
+  });
+
+  it("emits permitted options (event, id, retry) per write", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write("hi", { event: "x", id: "1", retry: 500 });
+    const joined = cap.writes.join("");
+    expect(joined).toContain("event: x\n");
+    expect(joined).toContain("id: 1\n");
+    expect(joined).toContain("retry: 500\n");
+    expect(joined.endsWith("data: hi\n\n")).toBe(true);
+  });
+
+  it("constructor options apply to every write unless overridden", () => {
+    const cap = captureStream();
+    const sse = new SSE(cap.stream, { event: "default", retry: 100 });
+    sse.write("a");
+    sse.write("b", { event: "override" });
+    const joined = cap.writes.join("");
+    expect(joined).toContain("event: default\n");
+    expect(joined).toContain("event: override\n");
+  });
+
+  it("emits an empty id: line when id is the empty string (Last-Event-ID reset)", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write("hi", { id: "" });
+    expect(cap.writes.join("")).toContain("id: \n");
+  });
+
+  it("splits embedded newlines into multiple data: lines", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).write("line1\nline2");
+    expect(cap.writes.join("")).toBe("data: line1\ndata: line2\n\n");
+  });
+
+  it("close closes the underlying stream", () => {
+    const cap = captureStream();
+    new SSE(cap.stream).close();
+    expect(cap.isClosed()).toBe(true);
+  });
+});
+
+describe("ActionController::Live::Response", () => {
+  it("constructs a Buffer as its stream", () => {
+    const res = new Response();
+    expect(res.stream).toBeInstanceOf(Buffer);
+  });
+
+  it("stream writes flow through the live Buffer", async () => {
+    const res = makeResponse();
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).write("b");
+    (res.stream as Buffer).close();
+    expect(await drain(res.stream as Buffer)).toEqual(["a", "b"]);
+  });
+
+  it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
+    const res = new Response(201, { "x-test": "1" }, []);
+    res.request = makeResponse().request;
+    (res.stream as Buffer).write("seed");
+    (res.stream as Buffer).close();
+    expect(res.status).toBe(201);
+    expect(res.headers.get("x-test")).toBe("1");
+    expect(res.body).toBe("seed");
+    expect(res.stream).toBeInstanceOf(Buffer);
+  });
+
+  it("before_committed writes the request's cookie jar onto the response", () => {
+    const res = makeResponse();
+    res.request!.cookieJar().set("hello", "world");
+    (res.stream as Buffer).write("a");
+    (res.stream as Buffer).close();
+    expect(res.committed).toBe(true);
+    expect(res.cookies).toEqual({ hello: "world" });
+  });
+
+  it("await_sent waits on sent!'s broadcast", async () => {
+    const res = makeResponse();
+    let sent = false;
+    const waiting = res.awaitSent().then(() => (sent = true));
+    await Promise.resolve();
+    expect(sent).toBe(false);
+    res.sentBang();
+    await waiting;
+    expect(sent).toBe(true);
+  });
+});
+
+function makeHost() {
+  return {
+    request: { getHeader: () => undefined as string | undefined },
+    response: makeResponse(),
+  } as unknown as LiveControllerHost;
+}
+
+class Host {
+  request = { getHeader: () => undefined as string | undefined, format: () => ({}) };
+  response = makeResponse();
+  body: unknown = undefined;
+  action: (name: string) => void | Promise<void> = () => {};
+
+  process(name: string): void | Promise<void> {
+    return this.action(name);
+  }
+
+  get responseBody(): unknown {
+    return this.body;
+  }
+  set responseBody(body: unknown) {
+    this.body = body;
+  }
+}
+class LiveHost extends Host {}
+include(LiveHost, Live);
+
+describe("ActionController::Live#process", () => {
+  it("awaits the action and commits the response", async () => {
+    const host = new LiveHost();
+    const seen: string[] = [];
+    host.action = async (n) => {
+      seen.push(n);
+      (host.response.stream as Buffer).write("hi");
+    };
+    await host.process("show");
+    expect(seen).toEqual(["show"]);
+    expect(host.response.committed).toBe(true);
+  });
+
+  it("re-raises pre-commit errors; routes post-commit errors through onError", async () => {
+    const raising = new LiveHost();
+    raising.action = () => {
+      throw new Error("boom");
+    };
+    await expect(raising.process("show")).rejects.toThrow("boom");
+
+    const host = new LiveHost();
+    const fired = vi.fn();
+    (host.response.stream as Buffer).onError(fired);
+    host.action = async () => {
+      (host.response.stream as Buffer).write("partial");
+      host.response.close();
+      throw new Error("post");
+    };
+    await host.process("show");
+    expect(fired).toHaveBeenCalledOnce();
+  });
+
+  it("copies the thread locals and execution state onto the controller thread, then clears them", async () => {
+    await new Thread(async () => {
+      const t1 = Thread.current();
+      t1.set("live_local", "copied");
+      IsolatedExecutionState.set("live_state", "shared");
+
+      const host = new LiveHost();
+      Object.assign(host, { newControllerThread, cleanUpThreadLocals });
+      let t2!: Thread;
+      const seen: unknown[] = [];
+      host.action = () => {
+        t2 = Thread.current();
+        seen.push(t2.get("live_local"), IsolatedExecutionState.get("live_state"));
+        IsolatedExecutionState.set("live_state", "child");
+      };
+      await host.process("show");
+
+      expect(t2).not.toBe(t1);
+      expect(seen).toEqual(["copied", "shared"]);
+      expect(t2.keys()).toEqual([]);
+      expect(t2.activeSupportExecutionState()!.size).toBe(0);
+      expect(t1.get("live_local")).toBe("copied");
+      expect(IsolatedExecutionState.get("live_state")).toBe("shared");
+    }).join();
+  });
+
+  it("dispatches new_controller_thread on the receiver", async () => {
+    const host = new LiveHost() as LiveHost & LiveControllerHost;
+    const threads: string[] = [];
+    host.newControllerThread = async (block) => {
+      threads.push("own");
+      await block();
+    };
+    await host.process("show");
+    expect(threads).toEqual(["own"]);
+  });
+});
+
+describe("ActionController::Live#response_body=", () => {
+  it("assigns the body through super and closes the response", () => {
+    const host = new LiveHost();
+    host.responseBody = "payload";
+    expect(host.body).toBe("payload");
+    expect(host.responseBody).toBe("payload");
+    expect(host.response.committed).toBe(true);
+  });
+});
+
+describe("ActionController::Live#send_stream", () => {
+  it("sets headers from filename, yields the stream, falls back to octet-stream", async () => {
+    const a = makeHost();
+    await sendStream.call(a, { filename: "subscribers.csv" }, (s) => s.write("x\n"));
+    expect(a.response.headers.get("content-type")).toMatch(/csv/);
+    expect(a.response.headers.get("content-disposition")).toContain("subscribers.csv");
+    expect(a.response.headers.get("content-disposition")).toContain("attachment");
+
+    const b = makeHost();
+    await sendStream.call(b, { filename: "blob.zzz" }, () => {});
+    expect(b.response.headers.get("content-type")).toBe("application/octet-stream");
+  });
+
+  it("accepts an explicit type string", async () => {
+    const host = makeHost();
+    await sendStream.call(host, { filename: "data.bin", type: "application/x-foo" }, () => {});
+    expect(host.response.headers.get("content-type")).toBe("application/x-foo");
+  });
+
+  it("instruments send_stream.action_controller with the payload", async () => {
+    const payloads: unknown[] = [];
+    const subscriber = Notifications.subscribe("send_stream.action_controller", (event) => {
+      payloads.push(event.payload);
+    });
+    try {
+      const host = makeHost();
+      await sendStream.call(host, { filename: "export.csv", type: ":csv" }, () => {});
+      expect(host.response.headers.get("content-type")).toBe("text/csv");
+      expect(payloads).toEqual([
+        { filename: "export.csv", disposition: "attachment", type: ":csv" },
+      ]);
+    } finally {
+      Notifications.unsubscribe(subscriber);
+    }
+  });
+
+  it("closes the stream even when the block throws", async () => {
+    const host = makeHost();
+    await expect(
+      sendStream.call(host, { filename: "x.csv" }, () => {
+        throw new Error("write failed");
+      }),
+    ).rejects.toThrow("write failed");
+    expect((host.response.stream as Buffer).isClosed).toBe(true);
+  });
+});
+
+describe("ActionController::Live private helpers", () => {
+  it("newControllerThread invokes the block on the next microtask", async () => {
+    const host = makeHost();
+    const order: string[] = [];
+    const p = newControllerThread.call(host, () => {
+      order.push("inside");
+    });
+    order.push("after-call");
+    expect(order).toEqual(["after-call"]);
+    await p;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual(["after-call", "inside"]);
+  });
+
+  it("newControllerThread runs the block on a thread of its own, aborting on exception", async () => {
+    let t2: Thread | undefined;
+    await newControllerThread.call(makeHost(), () => {
+      t2 = Thread.current();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(t2).not.toBe(Thread.current());
+    expect(t2!.abortOnException).toBe(true);
+  });
+
+  it("cleanUpThreadLocals clears the copied locals; pool is a singleton", () => {
+    const thread = new Thread(() => null);
+    thread.set("copied", 1);
+    thread.set("kept", 2);
+    cleanUpThreadLocals.call(makeHost(), [["copied", 1]], thread);
+    expect(thread.keys()).toEqual(["kept"]);
+    expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
+  });
+
+  it("a body read before the stream closes keeps the chunks it popped", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    buf.write("b");
+    expect(() => buf.body).toThrow(ThreadError);
+    buf.close();
+    expect(buf.body).toBe("ab");
+  });
+
+  it("awaitBody waits for the stream to close", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    const body = buf.awaitBody();
+    buf.write("b");
+    buf.close();
+    expect(await body).toBe("ab");
+    expect(buf.body).toBe("ab");
+  });
+
+  it("logError writes the class, the annotated source and the joined backtrace to Base.logger", () => {
+    const fatal = vi.fn();
+    const oldLogger = Base.logger;
+    Base.logger = { fatal } as unknown as typeof Base.logger;
+    try {
+      const exception = Object.assign(new ClientDisconnected("oops"), {
+        annotatedSourceCode: () => "source\n",
+      });
+      logError.call(makeHost(), exception);
+    } finally {
+      Base.logger = oldLogger;
+    }
+    expect(fatal).toHaveBeenCalledOnce();
+    const rendered = (fatal.mock.calls[0][1] as () => string)();
+    expect(rendered).toMatch(
+      /^\nActionController::Live::ClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /,
+    );
+    expect(rendered.endsWith("\n\n")).toBe(true);
+  });
+
+  it("logError silently no-ops when no logger is configured", () => {
+    const oldLogger = Base.logger;
+    Base.logger = null;
+    try {
+      expect(() => logError.call(makeHost(), new Error("oops"))).not.toThrow();
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+});
+
+describe("ActionController::Live::ClassMethods#make_response!", () => {
+  const sentinel = new Response();
+  class Parent {
+    static makeResponseBang(_request: Request): unknown {
+      return sentinel;
+    }
+  }
+  class LiveController extends Parent {}
+  include(LiveController, Live);
+
+  function mkReq(protocol: string): Request {
+    return {
+      getHeader: (n: string) => (n === "SERVER_PROTOCOL" ? protocol : undefined),
+    } as unknown as Request;
+  }
+
+  it("returns a Live::Response for HTTP/1.1+ requests", () => {
+    const res = LiveController.makeResponseBang(mkReq("HTTP/1.1"));
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).stream).toBeInstanceOf(Buffer);
+    expect(res).not.toBe(sentinel);
+  });
+
+  it("defers to the parent factory for HTTP/1.0 requests", () => {
+    expect(LiveController.makeResponseBang(mkReq("HTTP/1.0"))).toBe(sentinel);
+  });
+});

@@ -1,0 +1,233 @@
+import { describe, expect, it } from "vitest";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+
+import {
+  CookieJar,
+  cookieJar,
+  setCookieJar,
+} from "../../../lib/action-dispatch/middleware/cookies.js";
+import { Response } from "@blazetrails/rack";
+import { SessionHash, SessionId } from "@blazetrails/rack-session";
+import {
+  CookieStore,
+  type CsrfRequest,
+  NullCookieJar,
+  Exception,
+  NullSession,
+  NullSessionHash,
+  SessionStore,
+  type NullSessionRequest,
+} from "../../../lib/action-controller/metal/request-forgery-protection.js";
+import { Base } from "../../../lib/action-controller/base.js";
+import { TestCase } from "../../../lib/action-controller/test-case.js";
+import "../../support/abstract-unit.js";
+
+function buildRequest(): NullSessionRequest {
+  const env: Record<string, unknown> = {
+    "action_dispatch.key_generator": new KeyGenerator("x".repeat(32), { iterations: 2 }),
+    "action_dispatch.cookies_rotations": new RotationConfiguration(),
+    "action_dispatch.encrypted_cookie_salt": "encrypted cookie",
+    "action_dispatch.encrypted_signed_cookie_salt": "signed encrypted cookie",
+  };
+  return {
+    env,
+    getHeader: (name: string) => env[name],
+    hasHeader: (name: string) => name in env,
+    fetchHeader: (name: string, block: (name: string) => unknown) =>
+      name in env ? env[name] : block(name),
+    setHeader: (name: string, value: unknown) => (env[name] = value),
+    cookies: {},
+    session: undefined,
+    flash: { note: "hi" },
+    sessionOptions: {},
+  } as unknown as NullSessionRequest;
+}
+
+describe("NullSession", () => {
+  it("handle_unverified_request writes the null session, flash, options and cookie jar onto the request", () => {
+    const request = buildRequest();
+    new NullSession({ request }).handleUnverifiedRequest();
+
+    expect(request.session).toBeInstanceOf(NullSessionHash);
+    expect(request.flash).toBeNull();
+    expect(request.sessionOptions).toEqual({ skip: true });
+    expect(cookieJar.call(request)).toBeInstanceOf(NullCookieJar);
+  });
+
+  it("NullSessionHash is a loaded, existing, disabled session that ignores destroy", () => {
+    const hash = new NullSessionHash(buildRequest());
+
+    expect(hash).toBeInstanceOf(SessionHash);
+    expect(hash.isLoaded()).toBe(true);
+    expect(hash.isExists()).toBe(true);
+    expect(hash.isEnabled()).toBe(false);
+    expect(() => hash.destroy()).not.toThrow();
+  });
+
+  it("NullSessionHash#inspect renders its own Ruby constant path when not yet loaded", () => {
+    const unloaded = Object.create(NullSessionHash.prototype) as { inspect(): string };
+
+    expect(unloaded.inspect()).toMatch(
+      /^#<ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash:0x[0-9a-f]+ not yet loaded>$/,
+    );
+  });
+
+  it("NullCookieJar writes nothing", () => {
+    const jar = NullCookieJar.build(buildRequest(), {});
+    jar.set("user_name", "david");
+
+    expect(jar).toBeInstanceOf(CookieJar);
+    const response = new Response();
+    jar.write(response);
+    expect(response.headers["set-cookie"]).toBeUndefined();
+  });
+  it("CookieStore round-trips the token through the encrypted jar, bound to the session id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar(request);
+    setCookieJar.call(request, jar);
+    const session = {
+      id: () => new SessionId("sid-1"),
+      idWas: () => new SessionId("sid-1"),
+    };
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session,
+    } as unknown as CsrfRequest;
+    const store = new CookieStore("csrf_token");
+
+    store.store(csrfRequest, "the-token");
+
+    expect(jar.get("csrf_token")).not.toContain("the-token");
+    expect(store.fetch(csrfRequest)).toBe("the-token");
+
+    store.reset(csrfRequest);
+    expect(store.fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore ignores a token stored under another session id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar(request);
+    setCookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => new SessionId("sid-1"), idWas: () => new SessionId("sid-2") },
+    } as unknown as CsrfRequest;
+    const store = new CookieStore("csrf_token");
+
+    store.store(csrfRequest, "the-token");
+
+    expect(store.fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore returns null for cookie contents that are not JSON", () => {
+    const request = buildRequest();
+    const jar = new CookieJar(request);
+    setCookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => null, idWas: () => null },
+    } as unknown as CsrfRequest;
+    jar.encrypted.set("csrf_token", "not json");
+
+    expect(new CookieStore("csrf_token").fetch(csrfRequest)).toBeNull();
+  });
+
+  it("CookieStore writes the envelope Rails writes, keyed session_id / public_id", () => {
+    const request = buildRequest();
+    const jar = new CookieJar(request);
+    setCookieJar.call(request, jar);
+    const csrfRequest = {
+      method: "POST",
+      baseUrl: "https://example.com",
+      cookieJar: () => jar,
+      session: { id: () => new SessionId("sid-1"), idWas: () => new SessionId("sid-1") },
+    } as unknown as CsrfRequest;
+
+    new CookieStore("csrf_token").store(csrfRequest, "the-token");
+
+    expect(jar.encrypted.get("csrf_token")).toBe(
+      '{"token":"the-token","session_id":{"public_id":"sid-1"}}',
+    );
+  });
+});
+
+describe("ActionController::Base#verify_authenticity_token", () => {
+  const token = Buffer.from("railstestrailstestrailstestrails").toString("base64url");
+
+  class PostsController extends Base {
+    create(): void {
+      this.head(":created");
+    }
+  }
+  PostsController.protectFromForgery({ with: "exception" });
+
+  it("accepts a valid X-CSRF-Token even when the form token is wrong", async ({ task }) => {
+    const tc = new TestCase(task.name);
+    tc.controller = new PostsController();
+    await tc.beforeSetup();
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = token;
+    await tc.post("create", {
+      session: { _csrf_token: token },
+      params: { authenticity_token: "bogus" },
+    });
+    tc.assertResponse("created");
+  });
+
+  it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async ({ task }) => {
+    PostsController.forgeryProtectionOriginCheck = true;
+    try {
+      const tc = new TestCase(task.name);
+      tc.controller = new PostsController();
+      await tc.beforeSetup();
+      tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
+      await expect(
+        tc.post("create", {
+          session: { _csrf_token: token },
+          params: { authenticity_token: token },
+        }),
+      ).rejects.toThrow(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    } finally {
+      PostsController.forgeryProtectionOriginCheck = false;
+    }
+  });
+
+  it("protect_from_forgery configures only the receiving class", () => {
+    class A extends Base {}
+    class B extends Base {}
+    A.protectFromForgery({ with: "exception", store: "cookie" });
+    expect(A.forgeryProtectionStrategy).toBe(Exception);
+    expect(B.forgeryProtectionStrategy).toBeNull();
+    expect(B.csrfTokenStorageStrategy).toBe(Base.csrfTokenStorageStrategy);
+  });
+
+  it("falls back to null_session and SessionStore for false options", () => {
+    class C extends Base {}
+    C.protectFromForgery({ with: false, store: false });
+    expect(C.forgeryProtectionStrategy).toBe(NullSession);
+    expect(C.csrfTokenStorageStrategy).toBeInstanceOf(SessionStore);
+  });
+
+  it("reset_session delegates to the controller and drops the CSRF token", async ({ task }) => {
+    class ResetController extends Base {
+      create(): void {
+        this.head(":created");
+      }
+    }
+    ResetController.protectFromForgery({ with: "reset_session" });
+    const tc = new TestCase(task.name);
+    tc.controller = new ResetController();
+    await tc.beforeSetup();
+    await tc.post("create", { session: { _csrf_token: token, user_id: 1 } });
+    expect(tc.session().get("user_id")).toBeUndefined();
+    expect(tc.session().get("_csrf_token")).toBeUndefined();
+  });
+});

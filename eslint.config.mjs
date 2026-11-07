@@ -152,8 +152,8 @@ export default defineConfig(
       // reads all three off disk (transition_table.rb:128-131).
       "packages/actionpack/lib/action-dispatch/journey/visualizer/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
-      "packages/actionpack/lib/test-helpers/fixtures/public/**",
-      "packages/actionpack/lib/test-helpers/fixtures/公共/**",
+      "packages/actionpack/test/fixtures/public/**",
+      "packages/actionpack/test/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/test/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
@@ -1154,7 +1154,7 @@ export default defineConfig(
   // ── actionpack + trailties ──
   {
     files: [
-      "packages/actionpack/lib/**/*.ts",
+      "packages/actionpack/{lib,test}/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],

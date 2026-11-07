@@ -1,0 +1,290 @@
+import { describe, it, expect, afterEach } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
+import { isSymbol } from "@blazetrails/ruby-compat";
+import { Base } from "../../../lib/action-controller/base.js";
+import { API } from "../../../lib/action-controller/api.js";
+import { logProcessAction } from "../../../lib/action-controller/metal/instrumentation.js";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
+import { Response } from "../../../lib/action-dispatch/http/response.js";
+import { ParseError } from "../../../lib/action-dispatch/http/parameters.js";
+import { FixtureResolver, Template } from "@blazetrails/actionview";
+
+function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
+  const subscriber = Notifications.subscribe(
+    name,
+    (event: { payload: Record<string, unknown> }) => {
+      sink.push({ ...event.payload });
+    },
+  );
+  return () => Notifications.unsubscribe(subscriber);
+}
+
+function newRequest(): Request {
+  return new Request({
+    REQUEST_METHOD: "GET",
+    PATH_INFO: "/widgets",
+    QUERY_STRING: "token=secret",
+    HTTP_HOST: "localhost",
+    HTTP_ACCEPT: "text/html",
+  });
+}
+
+describe("ActionController::Instrumentation#process_action", () => {
+  const teardown: Array<() => void> = [];
+  afterEach(() => {
+    while (teardown.length > 0) teardown.pop()!();
+  });
+
+  it("publishes start_processing with the eight-key raw_payload", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("start_processing.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        this.head(204);
+      }
+    }
+    const request = newRequest();
+    await new WidgetsController().dispatch("index", request, new Response());
+
+    expect(events).toHaveLength(1);
+    expect(Object.keys(events[0])).toEqual([
+      "controller",
+      "action",
+      "request",
+      "params",
+      "headers",
+      "format",
+      "method",
+      "path",
+    ]);
+    expect(events[0].controller).toBe("WidgetsController");
+    expect(events[0].action).toBe("index");
+    expect(events[0].request).toBe(request);
+    expect(events[0].method).toBe("GET");
+    expect(events[0].path).toBe(request.filteredPath());
+    expect(events[0].format).toBe(request.format().ref());
+    expect(events[0].format).toBe(":html");
+    expect(isSymbol(events[0].format)).toBe(true);
+  });
+
+  it("publishes process_action with the response status", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        this.head(204);
+      }
+    }
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(204);
+    expect(events[0].response).toBe(response);
+  });
+
+  it("publishes process_action with the status mapped from the raised error's class name", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        throw new ParseError("bad param");
+      }
+    }
+    await expect(
+      new WidgetsController().dispatch("index", newRequest(), new Response()),
+    ).rejects.toThrow(ParseError);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(400);
+  });
+
+  it("publishes process_action with the view_runtime the render measured", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      async index(): Promise<void> {
+        await this.render({ plain: "hello" });
+      }
+    }
+    await new WidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(typeof events[0].view_runtime).toBe("number");
+    expect(events[0].view_runtime).toBeGreaterThanOrEqual(0);
+  });
+
+  it("publishes a view_runtime that covers a template render deferred to renderAsync", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    Template.registerTemplateHandler("html", {
+      call: (_template: unknown, source: string) => {
+        const until = Date.now() + 20;
+        while (Date.now() < until);
+        return `return ${JSON.stringify(source)};`;
+      },
+    });
+    class SlowWidgetsController extends Base {
+      static actions = ["index"];
+      async index(): Promise<void> {
+        await this.render({ template: "slow_widgets/index" });
+      }
+    }
+    SlowWidgetsController.layout(false);
+    SlowWidgetsController.prependViewPath(
+      new FixtureResolver({ "slow_widgets/index.html.html": "hello" }),
+    );
+
+    await new SlowWidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(events[0].view_runtime).toBeGreaterThanOrEqual(20);
+  });
+
+  it("log_process_action formats a String view_runtime through to_f", () => {
+    expect(logProcessAction({ view_runtime: "12.5" })).toEqual(["Views: 12.5ms"]);
+    expect(logProcessAction({ view_runtime: "abc" })).toEqual(["Views: 0.0ms"]);
+    expect(logProcessAction({})).toEqual([]);
+  });
+});
+
+describe("ActionController::API process_action chain (api.rb:139-143)", () => {
+  const teardown: Array<() => void> = [];
+  afterEach(() => {
+    while (teardown.length > 0) teardown.pop()!();
+  });
+
+  it("publishes process_action from the Instrumentation module API includes", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        this.head(204);
+      }
+    }
+    await new WidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(events[0].controller).toBe("WidgetsController");
+    expect(events[0].status).toBe(204);
+  });
+
+  it("instruments send_data through the DataStreaming module beneath it", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("send_data.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        this.sendData("hello", { filename: "hello.txt" });
+      }
+    }
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].filename).toBe("hello.txt");
+    expect(response.body).toBe("hello");
+  });
+
+  it("rescues an action's error through the Rescue module API includes", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        throw new ParseError("bad param");
+      }
+    }
+    (WidgetsController as unknown as typeof Base).rescueFrom(ParseError, {
+      with(this: API) {
+        this.head(400);
+      },
+    });
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(response.status).toBe(400);
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(400);
+  });
+});
+
+describe("ActionController::Instrumentation#redirect_to", () => {
+  const teardown: Array<() => void> = [];
+  afterEach(() => {
+    while (teardown.length > 0) teardown.pop()!();
+  });
+
+  it("publishes redirect_to with the request, status and filtered location", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("redirect_to.action_controller", events));
+    class RedirectorController extends Base {
+      filterableRedirector(): void {
+        this.redirectTo("http://secret.foo.bar/", { status: 301 });
+      }
+    }
+    const request = newRequest();
+    request.env["action_dispatch.redirect_filter"] = ["secret"];
+    const controller = new RedirectorController();
+    await controller.dispatch(
+      "filterableRedirector",
+      request,
+      RedirectorController.makeResponseBang(request),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0].request).toBe(controller.request);
+    expect(events[0].status).toBe(301);
+    expect(events[0].location).toBe("[FILTERED]");
+  });
+
+  it("returns the status redirect_to assigns", async () => {
+    let result: unknown;
+    class RedirectorController extends Base {
+      redirector(): void {
+        result = this.redirectTo("http://foo.bar/");
+      }
+    }
+    await new RedirectorController().dispatch("redirector", newRequest(), new Response());
+    expect(result).toBe(302);
+  });
+});
+
+describe("ActionController::Instrumentation#send_file / #send_data (instrumentation.rb:36-47)", () => {
+  it("instruments send_data with the options and send_file with the path merged in", async () => {
+    const data: Record<string, unknown>[] = [];
+    const file: Record<string, unknown>[] = [];
+    const offData = subscribeOnce("send_data.action_controller", data);
+    const offFile = subscribeOnce("send_file.action_controller", file);
+    try {
+      const c = new (class extends Base {})();
+      c.setRequestBang(newRequest());
+      c.setResponseBang(new Response());
+      await c.sendData("hi", { filename: "a.txt" });
+      expect(data).toEqual([{ filename: "a.txt" }]);
+
+      const missing = new (class extends Base {})();
+      missing.setResponseBang(new Response());
+      expect(() => missing.sendFile("/nonexistent/file", { type: "text/plain" })).toThrow(
+        /Cannot read file/,
+      );
+      expect(file[0]).toMatchObject({ type: "text/plain", path: "/nonexistent/file" });
+    } finally {
+      offData();
+      offFile();
+    }
+  });
+});

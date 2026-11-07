@@ -1,0 +1,337 @@
+import { describe, it, expect, vi } from "vitest";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { OpenSSL } from "@blazetrails/ruby-compat";
+import { Base } from "../../../lib/action-controller/base.js";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
+import { HttpAuthentication } from "../../../lib/action-controller/metal/http-authentication.js";
+
+const { Basic, Digest, Token } = HttpAuthentication;
+const { authenticate, authenticationRequest, authParam, authScheme, decodeCredentials } = Basic;
+const { encodeCredentials, hasBasicCredentials, userNameAndPassword } = Basic;
+const { authenticateOrRequestWithHttpBasic, authenticateWithHttpBasic } = Basic.ControllerMethods;
+const { httpBasicAuthenticateOrRequestWith, requestHttpBasicAuthentication } =
+  Basic.ControllerMethods;
+const { httpBasicAuthenticateWith } = Basic.ControllerMethods.ClassMethods;
+const { expectedResponse, ha1, nonce, validateNonce, opaque, secretToken } = Digest;
+const { validateDigestResponse } = Digest;
+const { requestHttpDigestAuthentication } = Digest.ControllerMethods;
+
+class TestController extends Base {}
+
+const req = (auth?: string) => new Request(auth === undefined ? {} : { HTTP_AUTHORIZATION: auth });
+
+function controllerFor(request: Request): TestController {
+  const controller = new TestController();
+  controller.setRequestBang(request);
+  controller.setResponseBang(TestController.makeResponseBang(request));
+  return controller;
+}
+
+const ctrl = (auth?: string): TestController => controllerFor(req(auth));
+
+describe("HttpAuthentication::Basic", () => {
+  it("encode/decode round-trip, including colons in password", () => {
+    const header = encodeCredentials("admin", "se:cret");
+    expect(decodeCredentials(req(header))).toBe("admin:se:cret");
+    expect(userNameAndPassword(req(header))).toEqual(["admin", "se:cret"]);
+  });
+
+  it("authScheme + authParam mirror Ruby split(' ', 2) — ignores leading + collapses runs", () => {
+    expect([authScheme(req("Basic Zm9v")), authParam(req("Basic Zm9v"))]).toEqual([
+      "Basic",
+      "Zm9v",
+    ]);
+    expect(authParam(req("Bearer"))).toBeUndefined();
+    expect([authScheme(req("  Basic   Zm9v")), authParam(req("  Basic   Zm9v"))]).toEqual([
+      "Basic",
+      "Zm9v",
+    ]);
+  });
+
+  it("hasBasicCredentials is case-insensitive, rejects empty/whitespace/wrong scheme", () => {
+    expect(hasBasicCredentials(req("basic Zm9vOmJhcg=="))).toBe(true);
+    expect(hasBasicCredentials(req("Bearer abc"))).toBe(false);
+    expect(hasBasicCredentials(req())).toBe(false);
+    expect(hasBasicCredentials(req("   "))).toBe(false);
+  });
+
+  it("authenticate invokes login_procedure with decoded user+pass, else returns undefined", () => {
+    const verify = vi.fn((u: string | undefined, p: string | undefined) => `${u}/${p}`);
+    expect(authenticate(req(encodeCredentials("dhh", "secret")), verify)).toBe("dhh/secret");
+    expect(authenticate(req(), verify)).toBeUndefined();
+  });
+
+  it("authenticate hands login_procedure nil for a credential with no colon", () => {
+    const noColon = req(`Basic ${Buffer.from("George").toString("base64")}`);
+    expect(authenticate(noColon, (u, p) => [u, p])).toEqual(["George", undefined]);
+    // @ts-expect-error password is nil for a credential with no colon
+    expect(() => authenticate(noColon, (_u, p) => p.length)).toThrow(TypeError);
+  });
+
+  it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", () => {
+    const c = ctrl();
+    authenticationRequest(c, 'Evil"Realm', null);
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="EvilRealm"');
+    expect(c.status).toBe(401);
+    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
+  });
+});
+
+describe("HttpAuthentication::Basic::ControllerMethods", () => {
+  it("authenticateWithHttpBasic delegates to authenticate using this.request", () => {
+    const c = ctrl(encodeCredentials("u", "p"));
+    expect(authenticateWithHttpBasic.call(c, (u, p) => ({ u, p }))).toEqual({ u: "u", p: "p" });
+  });
+
+  it("authenticateOrRequestWithHttpBasic returns login result, else issues 401", () => {
+    const ok = ctrl(encodeCredentials("u", "p"));
+    expect(authenticateOrRequestWithHttpBasic.call(ok, null, null, () => "OK")).toBe("OK");
+    const fail = ctrl();
+    expect(authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(
+      "HTTP Basic: Access denied.\n",
+    );
+    expect(fail.status).toBe(401);
+    expect(fail.headers.get("WWW-Authenticate")).toBe('Basic realm="Application"');
+  });
+
+  it("requestHttpBasicAuthentication uses provided realm + message", () => {
+    const c = ctrl();
+    requestHttpBasicAuthentication.call(c, "Zone", "nope");
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="Zone"');
+    expect(c.responseBody).toBe("nope");
+  });
+
+  it("httpBasicAuthenticateOrRequestWith succeeds only on matching credentials", () => {
+    const ok = ctrl(encodeCredentials("dhh", "secret"));
+    expect(httpBasicAuthenticateOrRequestWith.call(ok, { name: "dhh", password: "secret" })).toBe(
+      true,
+    );
+    const bad = ctrl(encodeCredentials("dhh", "wrong"));
+    expect(httpBasicAuthenticateOrRequestWith.call(bad, { name: "dhh", password: "secret" })).toBe(
+      "HTTP Basic: Access denied.\n",
+    );
+    expect(bad.status).toBe(401);
+  });
+});
+
+describe("HttpAuthentication::Basic::ControllerMethods::ClassMethods", () => {
+  it("httpBasicAuthenticateWith registers a beforeAction filter and forwards filter options", () => {
+    const beforeAction = vi.fn();
+    httpBasicAuthenticateWith.call({ beforeAction }, { name: "dhh", password: "s", only: "edit" });
+    const [cb, opts] = beforeAction.mock.calls[0];
+    expect(opts).toEqual({ only: "edit" });
+    expect(cb(ctrl(encodeCredentials("dhh", "s")))).toBe(true);
+  });
+
+  it("httpBasicAuthenticateWith rejects non-string name/password", () => {
+    const ba = vi.fn();
+    expect(() =>
+      httpBasicAuthenticateWith.call({ beforeAction: ba }, { name: 1 as never, password: "x" }),
+    ).toThrow(/Expected name/);
+    expect(() =>
+      httpBasicAuthenticateWith.call({ beforeAction: ba }, { name: "x", password: null as never }),
+    ).toThrow(/Expected password/);
+  });
+});
+
+const SECRET = "4fb45da9e4ab4ddeb7580d6a35503d99";
+const SALT = "http authentication";
+
+function makeKeyGenerator(secret: string) {
+  return {
+    generateKey(salt: string): string {
+      return `${secret}${salt}`;
+    },
+  };
+}
+
+function makeDigestRequest(auth?: string): Request {
+  const env: Record<string, unknown> = {
+    "action_dispatch.key_generator": makeKeyGenerator(SECRET),
+    "action_dispatch.http_auth_salt": SALT,
+  };
+  if (auth !== undefined) env["HTTP_AUTHORIZATION"] = auth;
+  return new Request(env);
+}
+
+function makeDigestCtrl(auth?: string): TestController {
+  return controllerFor(makeDigestRequest(auth));
+}
+
+describe("HttpAuthentication::Digest", () => {
+  it("decode_credentials parses Digest header into key-value record", () => {
+    const header =
+      'Digest username="lifo", realm="SuperSecret", nonce="abc", uri="/", response="xyz"';
+    const creds = Digest.decodeCredentials(header);
+    expect(creds.get("username")).toBe("lifo");
+    expect(creds.get("realm")).toBe("SuperSecret");
+    expect(creds.get("nonce")).toBe("abc");
+  });
+
+  it("decode_credentials handles quoted and unquoted values", () => {
+    const header = 'Digest username="user", nc=00000001';
+    const creds = Digest.decodeCredentials(header);
+    expect(creds.get("username")).toBe("user");
+    expect(creds.get("nc")).toBe("00000001");
+  });
+
+  it("opaque is MD5 of secret key", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const opaqueVal = opaque(secretKey);
+    expect(opaqueVal).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("nonce encodes timestamp + MD5 in base64", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const nonceVal = nonce(secretKey, 1000000);
+    const decoded = Buffer.from(nonceVal, "base64").toString("utf-8");
+    expect(decoded).toMatch(/^1000000:/);
+  });
+
+  it("validate_nonce accepts a freshly generated nonce", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const nonceVal = nonce(secretKey);
+    expect(validateNonce(secretKey, makeDigestRequest(), nonceVal)).toBe(true);
+  });
+
+  it("validate_nonce rejects nil", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    expect(validateNonce(secretKey, makeDigestRequest(), null)).toBe(false);
+  });
+
+  it("validate_nonce rejects stale nonce", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const staleTime = Math.floor(Date.now() / 1000) - 400;
+    const nonceVal = nonce(secretKey, staleTime);
+    expect(validateNonce(secretKey, makeDigestRequest(), nonceVal, 300)).toBe(false);
+  });
+
+  it("expected_response matches ha1+ha2 digest computation", () => {
+    const creds = new HashWithIndifferentAccess<string | undefined>({
+      username: "lifo",
+      realm: "SuperSecret",
+      nonce: "abc",
+      nc: "00000001",
+      cnonce: "xyz",
+      qop: "auth",
+      uri: "/",
+    });
+    const password = "world";
+    const ha1Val = ha1(creds, password);
+    const response1 = expectedResponse("GET", "/", creds, password, false);
+    const response2 = expectedResponse("GET", "/", creds, ha1Val, true);
+    expect(response1).toBe(response2);
+    expect(response1).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("encode_credentials returns Digest header string with response field", () => {
+    const creds = new HashWithIndifferentAccess<string | undefined>({
+      username: "lifo",
+      realm: "SuperSecret",
+      nonce: "abc",
+      nc: "00000001",
+      cnonce: "xyz",
+      qop: "auth",
+      uri: "/",
+    });
+    const encoded = Digest.encodeCredentials("GET", creds, "world", false);
+    expect(encoded).toMatch(/^Digest /);
+    expect(encoded).toMatch(/response=/);
+  });
+
+  it("authentication_request sets 401 + WWW-Authenticate Digest header", () => {
+    const c = makeDigestCtrl();
+    Digest.authenticationRequest(c, "SuperSecret", null);
+    expect(c.status).toBe(401);
+    expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
+    expect(c.responseBody).toBe("HTTP Digest: Access denied.\n");
+  });
+
+  it("authentication_request uses provided message", () => {
+    const c = makeDigestCtrl();
+    Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
+    expect(c.responseBody).toBe("Authentication Failed");
+  });
+});
+
+describe("HttpAuthentication::Digest::ControllerMethods", () => {
+  it("requestHttpDigestAuthentication sets 401 + Digest WWW-Authenticate header", () => {
+    const c = makeDigestCtrl();
+    requestHttpDigestAuthentication.call(c, "SuperSecret", "Auth Failed");
+    expect(c.status).toBe(401);
+    expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
+    expect(c.responseBody).toBe("Auth Failed");
+  });
+});
+
+describe("HttpAuthentication::Token::ControllerMethods", () => {
+  it("authenticateWithHttpToken yields the token and its options", () => {
+    const c = ctrl(Token.encodeCredentials("lifo", { algorithm: "test" }));
+    expect(
+      c.authenticateWithHttpToken((token, options) => [token, options.get("algorithm")]),
+    ).toEqual(["lifo", "test"]);
+    expect(ctrl("Bearer lifo").authenticateWithHttpToken((token) => token)).toBe("lifo");
+    expect(ctrl("Basic lifo").authenticateWithHttpToken((token) => token)).toBeUndefined();
+  });
+
+  it("authenticateOrRequestWithHttpToken renders 401 with the Token challenge", async () => {
+    const c = ctrl('Token token="nope"');
+    await c.authenticateOrRequestWithHttpToken(
+      'Super"Secret',
+      "Authentication Failed\n",
+      () => false,
+    );
+    expect(c.status).toBe(401);
+    expect(c.headers.get("WWW-Authenticate")).toBe('Token realm="SuperSecret"');
+    expect(c.responseBody).toBe("Authentication Failed\n");
+  });
+
+  it("encodeCredentials inspects the token and each option", () => {
+    expect(Token.encodeCredentials('"quote" pretty', { nonce: 1 })).toBe(
+      'Token token="\\"quote\\" pretty", nonce="1"',
+    );
+  });
+});
+
+describe("HttpAuthentication review regressions", () => {
+  it("Digest hashes the key generator's bytes, not their UTF-8 spelling", () => {
+    const key = Buffer.from([0x80, 0xff, 0x41]);
+    const request = new Request({
+      "action_dispatch.key_generator": { generateKey: () => key },
+      "action_dispatch.http_auth_salt": SALT,
+    });
+    const secretKey = secretToken(request);
+    expect(opaque(secretKey)).toBe(OpenSSL.Digest.MD5.hexdigest(key));
+    const digest = OpenSSL.Digest.MD5.hexdigest(Buffer.concat([Buffer.from("1000:"), key]));
+    expect(nonce(secretKey, 1000.9)).toBe(Buffer.from(`1000:${digest}`).toString("base64"));
+  });
+
+  it("Digest hashes a String key by its UTF-8 bytes", () => {
+    const request = new Request({
+      "action_dispatch.key_generator": { generateKey: () => "é" },
+      "action_dispatch.http_auth_salt": SALT,
+    });
+    const secretKey = secretToken(request);
+    expect(opaque(secretKey)).toBe(OpenSSL.Digest.MD5.hexdigest(Buffer.from([0xc3, 0xa9])));
+    const digest = OpenSSL.Digest.MD5.hexdigest(Buffer.from("1000:é", "utf-8"));
+    expect(nonce(secretKey, 1000)).toBe(Buffer.from(`1000:${digest}`).toString("base64"));
+  });
+
+  it("Digest rejects a password procedure answering false, and raises without a uri", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonce(secretKey)}", opaque="${opaque(secretKey)}"`;
+    const request = makeDigestRequest(header);
+    expect(validateDigestResponse(request, "SuperSecret", () => false as never)).toBe(false);
+    expect(() => validateDigestResponse(request, "SuperSecret", () => "world")).toThrow(TypeError);
+  });
+
+  it("Basic keeps a credential's bytes when they are not valid UTF-8", () => {
+    const invalid = req(`Basic ${Buffer.from([0x75, 0xff, 0x3a, 0x70]).toString("base64")}`);
+    expect(userNameAndPassword(invalid)).toEqual(["u\xff", "p"]);
+    expect(userNameAndPassword(req(encodeCredentials("é", "ü")))).toEqual(["é", "ü"]);
+  });
+
+  it("Token reads the scheme at the start of any line, as Ruby's ^ does", () => {
+    expect(Token.tokenAndOptions(req("Basic x\nToken token=secret"))![0]).toBe("Basic x");
+  });
+});
