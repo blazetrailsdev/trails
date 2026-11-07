@@ -1,6 +1,5 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
-/** @internal */
 export class DummyConfig {
   private config: object;
 
@@ -8,7 +7,8 @@ export class DummyConfig {
     this.config = config;
     return new Proxy(this, {
       get(target, key, receiver) {
-        if (typeof key !== "string" || key in target) return Reflect.get(target, key, receiver);
+        if (typeof key !== "string" || key in DummyConfig.prototype)
+          return Reflect.get(target, key, receiver);
         return target.methodMissing(key);
       },
     });
