@@ -238,11 +238,11 @@ describe("package-summary", () => {
     expect(vm.marks.extraSurfaceNovel).toBeNull();
   });
 
-  it("appends why api:compare skips a package to its description", async () => {
+  it("appends why parity:api skips a package to its description", async () => {
     const date = (await summarize(root)).packages.find((p) => p.name === "date")!;
     expect(date.railsCounterpart).toBe("date");
     expect(date.description).toBe(
-      `Date for Trails (Not in api:compare: ${apiExcludedReasonOf("date")})`,
+      `Date for Trails (Not in parity:api: ${apiExcludedReasonOf("date")})`,
     );
     expect(apiExcludedReasonOf("date")).toContain("implemented in C");
     expect(apiExcludedReasonOf("activerecord")).toBeNull();
@@ -265,7 +265,7 @@ describe("package-summary", () => {
     ).toEqual([...TS_ONLY_PACKAGES, ...tooling].sort());
   });
 
-  it("enrolls every test:compare package in api:compare or records why not", () => {
+  it("enrolls every parity:test package in parity:api or records why not", () => {
     const unexplained = SOURCES.flatMap((s) => s.packages)
       .filter((p) => p.testPath && p.compareTests !== false)
       .filter((p) => p.compareApi === false && !p.apiExcludedReason)

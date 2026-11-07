@@ -336,7 +336,7 @@ export function railsCounterpartOf(dir: string): string | null {
 }
 
 /**
- * The keys api:compare and test:compare write `dir`'s rows under
+ * The keys parity:api and parity:test write `dir`'s rows under
  * (`actionpack` → `actiondispatch`, `actioncontroller`, ...), so a reader can
  * sum them; a package no source names is keyed by its own name.
  */
@@ -347,7 +347,7 @@ export function compareKeysOf(dir: string): string[] {
 
 function withExclusion(description: string | null, excluded: string | null): string | null {
   if (excluded === null) return description;
-  return `${description ?? ""}${description ? " " : ""}(Not in api:compare: ${excluded})`;
+  return `${description ?? ""}${description ? " " : ""}(Not in parity:api: ${excluded})`;
 }
 
 /** Why api-compare skips `dir`'s own entry, if it does. */
