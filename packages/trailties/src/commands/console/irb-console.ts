@@ -89,11 +89,11 @@ export class IRBConsole {
   }
 
   /**
-   * @missingRailsCall key? — CONVERGEABLE irb-console-start-receipts-and-db-alias
-   * @missingRailsCall filter — CONVERGEABLE irb-console-start-receipts-and-db-alias
-   * @missingRailsCall run — CONVERGEABLE irb-console-start-receipts-and-db-alias
-   * @inventedArm loadModels — CONVERGEABLE irb-console-start-receipts-and-db-alias
-   * @inventedArm clearAllConnectionsBang — CONVERGEABLE irb-console-start-receipts-and-db-alias
+   * @missingRailsCall key? — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
+   * @missingRailsCall filter — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
+   * @missingRailsCall run — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
+   * @inventedArm loadModels — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
+   * @inventedArm clearAllConnectionsBang — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
    */
   async start(): Promise<void> {
     const { Base: ActiveRecordBase, Migration } = await import("@blazetrails/activerecord");
