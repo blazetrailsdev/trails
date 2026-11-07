@@ -598,7 +598,7 @@ export class SQLWarning extends AdapterError {
   sql?: unknown;
 
   constructor(
-    message?: string,
+    message?: string | null,
     code?: string | null,
     level?: string | null,
     sql?: unknown,

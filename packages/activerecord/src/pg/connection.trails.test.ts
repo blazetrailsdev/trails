@@ -388,6 +388,15 @@ describe("pgConnection without a returned Proxy", () => {
     expect("escapeLiteral" in conn).toBe(false);
   });
 
+  it("query rejects when the client throws synchronously", async () => {
+    const conn = pgConnection({
+      query: () => {
+        throw new Error("Client was closed and is not queryable");
+      },
+    });
+    await expect(conn.query("SELECT 1")).rejects.toBeInstanceOf(PG.Error);
+  });
+
   it("close ends the client", async () => {
     const end = vi.fn(() => Promise.resolve());
     await pgConnection({ end }).close();
@@ -398,6 +407,8 @@ describe("pgConnection without a returned Proxy", () => {
     const query = vi.fn(() => Promise.resolve({ rows: [] }));
     await pgConnection({ query }).setClientEncoding("utf8");
     expect(query).toHaveBeenCalledWith("SET client_encoding TO 'utf8'");
+    await pgConnection({ query }).setClientEncoding("it's");
+    expect(query).toHaveBeenLastCalledWith("SET client_encoding TO 'it''s'");
   });
 
   it("set_notice_receiver replaces the previous receiver", () => {
@@ -414,6 +425,9 @@ describe("pgConnection without a returned Proxy", () => {
     conn.setNoticeReceiver(second);
     client.emit("notice", { message: "hi", code: "01000", severity: "WARNING" });
     expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledWith({ message: "hi", code: "01000", severity: "WARNING" });
+    const result = second.mock.calls[0][0];
+    expect(result.errorField(PG.PG_DIAG_MESSAGE_PRIMARY)).toBe("hi");
+    expect(result.errorField(PG.PG_DIAG_SQLSTATE)).toBe("01000");
+    expect(result.errorField(PG.PG_DIAG_SEVERITY)).toBe("WARNING");
   });
 });

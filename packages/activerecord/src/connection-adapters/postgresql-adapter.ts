@@ -1231,9 +1231,9 @@ export class PostgreSQLAdapter
 
     if (dbWarningsAction() != null) {
       this._rawConnection!.setNoticeReceiver((result) => {
-        const message = result.message;
-        const code = result.code ?? null;
-        const level = result.severity ?? null;
+        const message = result.errorField(PG.PG_DIAG_MESSAGE_PRIMARY);
+        const code = result.errorField(PG.PG_DIAG_SQLSTATE);
+        const level = result.errorField(PG.PG_DIAG_SEVERITY);
         this._noticeReceiverSqlWarnings.push(
           new SQLWarning(message, code, level, undefined, this.pool),
         );

@@ -1,5 +1,7 @@
 export const PG_DIAG_SQLSTATE = 67;
 export const PG_DIAG_SOURCE_FUNCTION = 82;
+export const PG_DIAG_MESSAGE_PRIMARY = 77;
+export const PG_DIAG_SEVERITY = 83;
 
 type ErrorField = (fieldcode: number) => string | null;
 

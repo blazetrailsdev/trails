@@ -3,6 +3,8 @@ import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decode
 import {
   ConnectionBad,
   Error as PGError,
+  PG_DIAG_MESSAGE_PRIMARY,
+  PG_DIAG_SEVERITY,
   PG_DIAG_SOURCE_FUNCTION,
   PG_DIAG_SQLSTATE,
   ServerError,
@@ -10,35 +12,7 @@ import {
 } from "./exceptions.js";
 import { PG } from "./pg.js";
 
-export interface PGConnection {
-  prepare(stmtName: string, sql: string): Promise<void>;
-  execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result>;
-  asyncExec(sql: string | null): Promise<PG.Result>;
-  sendQuery(sql: string): void;
-  getLastResult(): Promise<PG.Result | null>;
-  execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
-  exec(sql: string | null): Promise<PG.Result>;
-  escapeString(str: string): string;
-  query(...args: unknown[]): Promise<pg.QueryResult>;
-  close(): Promise<void>;
-  setClientEncoding(encoding: string): Promise<void>;
-  setNoticeReceiver(
-    block: (result: { severity?: string; message?: string; code?: string }) => void,
-  ): void;
-  waitForNotify(
-    timeout?: number | null,
-    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
-  ): Promise<string | null>;
-  unescapeBytea(value: string | Uint8Array): Buffer;
-  transactionStatus(): number;
-  status(): number;
-  reset(): Promise<void>;
-  cancel(): Promise<string | null>;
-  asyncCancel(): Promise<string | null>;
-  block(timeout?: number | null): Promise<boolean>;
-  socketIo(): { reopen(path: string): void } | null;
-  typeMapForResults: PGTypeMapByOid;
-}
+export type PGConnection = Connection;
 
 type QueryConfig = string | Record<string, unknown> | null;
 type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>;
@@ -104,7 +78,7 @@ export class Connection {
         (this.client.query as unknown as (...args: unknown[]) => unknown)(...args),
       ).catch((error: unknown) => raise(this, error)) as Promise<pg.QueryResult>;
     } catch (error) {
-      raise(this, error);
+      return Promise.reject(pgError(this, error));
     }
   }
 
@@ -121,10 +95,20 @@ export class Connection {
   }
 
   setNoticeReceiver(
-    block: (result: { severity?: string; message?: string; code?: string }) => void,
+    block: (result: { errorField(fieldcode: number): string | null }) => void,
   ): void {
     this.client.removeAllListeners("notice");
-    this.client.on("notice", block);
+    this.client.on("notice", (notice: { message?: string; code?: string; severity?: string }) => {
+      const errorField = (fieldcode: number): string | null =>
+        fieldcode === PG_DIAG_MESSAGE_PRIMARY
+          ? (notice.message ?? null)
+          : fieldcode === PG_DIAG_SQLSTATE
+            ? (notice.code ?? null)
+            : fieldcode === PG_DIAG_SEVERITY
+              ? (notice.severity ?? null)
+              : null;
+      block({ errorField });
+    });
   }
 
   connect(): Promise<unknown> {
