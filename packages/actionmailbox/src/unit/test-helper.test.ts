@@ -26,7 +26,7 @@ describe("ActionMailbox::TestHelperTest", () => {
       });
     });
 
-    const mail = await inboundEmail.mail();
+    const mail = await inboundEmail!.mail();
 
     const expectedMailTextPart =
       "Content-Type: text/plain;\r\n charset=UTF-8\r\nContent-Transfer-Encoding: 7bit\r\n\r\nHello, world";
