@@ -3,10 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"],
+  "include": ["lib"],
+  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"],
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../actionview" },

@@ -44,7 +44,7 @@ export default [
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       "packages/activejob/src/**/*.ts",

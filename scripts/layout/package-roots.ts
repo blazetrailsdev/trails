@@ -31,6 +31,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "bcrypt",
   "actioncable",
   "actionmailer",
+  "actionpack",
   "did-you-mean",
   "marcel",
   "trails-tsc",
