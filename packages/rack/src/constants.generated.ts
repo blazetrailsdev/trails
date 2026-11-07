@@ -55,6 +55,7 @@ defineConstants([
   [() => m14.FatalWarner, "Rack::MockRequest::FatalWarner"],
   [() => m14.FatalWarning, "Rack::MockRequest::FatalWarning"],
   [() => m15.MockResponse, "Rack::MockResponse"],
+  [() => m15.Cookie, "Rack::MockResponse::Cookie"],
   [() => m16.Multipart, "Rack::Multipart"],
   [() => m18.BoundaryTooLongError, "Rack::Multipart::BoundaryTooLongError"],
   [() => m18.EmptyContentError, "Rack::Multipart::EmptyContentError"],

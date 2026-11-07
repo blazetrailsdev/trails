@@ -68,6 +68,8 @@ Object.setPrototypeOf(
 );
 
 export class MockResponse extends Response {
+  static Cookie = Cookie;
+
   originalHeaders: Record<string, any>;
   cookies: Record<string, Cookie>;
   private _errors: any;

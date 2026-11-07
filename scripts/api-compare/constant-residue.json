@@ -1116,7 +1116,7 @@
   },
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
   "rack": {
-    "rows": 59,
+    "rows": 60,
     "excluded": [],
     "unwalked": ["bad-request.ts::BadRequest", "multipart.ts::Multipart"],
     "residue": {
