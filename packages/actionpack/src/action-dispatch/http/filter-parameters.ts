@@ -41,45 +41,35 @@ interface CachedState {
 
 export function filteredParameters(this: FilterParametersHost): Record<string, unknown> {
   const host = this as FilterParametersHost & CachedState;
-  if (host._filteredParameters != null) return host._filteredParameters;
   try {
-    host._filteredParameters = parameterFilter.call(this).filter(this.parameters);
+    return (host._filteredParameters ||= parameterFilter.call(this).filter(this.parameters));
   } catch (e) {
     if (e instanceof ParseError) {
-      host._filteredParameters = {};
+      return (host._filteredParameters = {});
     } else {
       throw e;
     }
   }
-  return host._filteredParameters;
 }
 
 export function filteredEnv(this: FilterParametersHost): Record<string, unknown> {
   const host = this as FilterParametersHost & CachedState;
-  if (host._filteredEnv != null) return host._filteredEnv;
-  host._filteredEnv = envFilter.call(this).filter(this.env);
-  return host._filteredEnv;
+  return (host._filteredEnv ||= envFilter.call(this).filter(this.env));
 }
 
 export function filteredPath(this: FilterParametersHost): string {
   const host = this as FilterParametersHost & CachedState;
-  if (host._filteredPath != null) return host._filteredPath;
-  host._filteredPath =
-    this.queryString.length === 0 ? this.path : `${this.path}?${filteredQueryString.call(this)}`;
-  return host._filteredPath;
+  return (host._filteredPath ||=
+    this.queryString.length === 0 ? this.path : `${this.path}?${filteredQueryString.call(this)}`);
 }
 
 export function parameterFilter(this: FilterParametersHost): ParameterFilter {
   const host = this as FilterParametersHost & CachedState;
-  if (host._parameterFilter != null) return host._parameterFilter;
-  if (this.hasHeader("action_dispatch.parameter_filter")) {
-    host._parameterFilter = parameterFilterFor(
-      this.getHeader("action_dispatch.parameter_filter") as Array<string | RegExp>,
-    );
-  } else {
-    host._parameterFilter = NULL_PARAM_FILTER;
-  }
-  return host._parameterFilter;
+  return (host._parameterFilter ||= this.hasHeader("action_dispatch.parameter_filter")
+    ? parameterFilterFor(
+        this.getHeader("action_dispatch.parameter_filter") as Array<string | RegExp>,
+      )
+    : NULL_PARAM_FILTER);
 }
 
 /** @internal */

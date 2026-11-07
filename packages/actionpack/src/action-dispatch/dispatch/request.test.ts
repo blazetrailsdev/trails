@@ -172,9 +172,9 @@ describe("RequestIP", () => {
     assertEqual("2.3.4.5", request.remoteIp);
   });
 
-  it("remote ip middleware not present still returns an IP", () => {
-    const req = new Request({});
-    expect(req.remoteIp).toBe("127.0.0.1");
+  it("remote ip middleware not present still returns an IP", async () => {
+    const request = await stubRequest({ REMOTE_ADDR: "127.0.0.1" });
+    assertEqual("127.0.0.1", request.remoteIp);
   });
 
   it("remote ip v6", async () => {

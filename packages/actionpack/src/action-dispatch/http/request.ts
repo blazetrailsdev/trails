@@ -187,10 +187,19 @@ export class Request {
   env: RackEnv;
   declare readonly ssl: boolean;
 
+  readonly rackRequest: RackRequest;
   /** @internal */
-  private _method?: string;
+  private _method: string | null | undefined;
   /** @internal */
-  private _requestMethod?: string;
+  private _requestMethod: string | null | undefined;
+  /** @internal */
+  private _remoteIp: string | null;
+  /** @internal */
+  private _originalFullpath: string | null;
+  /** @internal */
+  private _fullpath: string | null;
+  /** @internal */
+  private _ip: string | null;
   /** @internal */
   declare _protocol: string | null;
   /** @internal */
@@ -209,17 +218,26 @@ export class Request {
     this._parameterFilter = null;
     this._protocol = null;
     this._port = null;
+
+    this.rackRequest = new RackRequest(env);
+
+    this._method = null;
+    this._requestMethod = null;
+    this._remoteIp = null;
+    this._originalFullpath = null;
+    this._fullpath = null;
+    this._ip = null;
   }
 
   get method(): string {
-    this._method ??= this.checkMethod(
+    this._method ||= this.checkMethod(
       this.getHeader("rack.methodoverride.original_method") ?? this.getHeader("REQUEST_METHOD"),
     );
     return this._method as string;
   }
 
   get requestMethod(): string {
-    this._requestMethod ??= this.checkMethod(this.rawRequestMethod);
+    this._requestMethod ||= this.checkMethod(this.rawRequestMethod);
     return this._requestMethod as string;
   }
 
@@ -235,12 +253,13 @@ export class Request {
   }
 
   get fullpath(): string {
-    const qs = this.queryString;
-    return qs ? `${this.path}?${qs}` : this.path;
+    return (this._fullpath ||=
+      this.queryString === "" ? this.path : `${this.path}?${this.queryString}`);
   }
 
   get originalFullpath(): string {
-    return (this.getHeader("ORIGINAL_FULLPATH") as string) || this.fullpath;
+    return (this._originalFullpath ||=
+      (this.getHeader("ORIGINAL_FULLPATH") as string | null) || this.fullpath);
   }
 
   get originalUrl(): string {
@@ -294,21 +313,21 @@ export class Request {
     return this.isXmlHttpRequest;
   }
 
-  get remoteIp(): string | null {
-    const v = this.getHeader("action_dispatch.remote_ip");
-    if (v != null) {
-      if (typeof v === "object") return (v as { toString(): string | null }).toString();
-      return typeof v === "string" ? v : String(v);
-    }
-    return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
-  }
-
-  set remoteIp(value: string | GetIp | null) {
-    this.setHeader("action_dispatch.remote_ip", value);
-  }
-
   get ip(): string | null {
-    return this.remoteIp;
+    return (this._ip ||= this.rackRequest.ip);
+  }
+
+  get remoteIp(): string | null {
+    return (this._remoteIp ||= (
+      (this.getHeader("action_dispatch.remote_ip") as string | GetIp | null) ??
+      this.ip ??
+      ""
+    ).toString());
+  }
+
+  set remoteIp(remoteIp: string | GetIp | null) {
+    this._remoteIp = null;
+    this.setHeader("action_dispatch.remote_ip", remoteIp);
   }
 
   get body(): StringIO {
@@ -661,14 +680,6 @@ export class Request {
       null,
       links,
     );
-  }
-
-  get rackRequest(): RackRequest {
-    const cached = this.env["action_dispatch.rack_request"] as RackRequest | undefined;
-    if (cached) return cached;
-    const r = new RackRequest(this.env);
-    this.env["action_dispatch.rack_request"] = r;
-    return r;
   }
 
   /** @internal */
