@@ -48,6 +48,8 @@ const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
  * by `parity:api` before their top-level Ruby module (`Nokogiri`, `Racc`,
  * `Crass`, `Loofah`, `Rails::HTML`, `ImageProcessing`, `Date`, `TZInfo`) is
  * seated with `constSet`, which `constGet` needs to resolve any path under it.
+ * Those eight leave this set with story
+ * `gem-ports-seat-top-level-modules-for-class-paths`.
  */
 const SKIPPED = new Set([
   "activerecord-test-support",

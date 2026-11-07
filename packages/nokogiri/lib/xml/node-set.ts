@@ -55,6 +55,7 @@ export class NodeSet implements Iterable<Node> {
     return new NodeSet(this.document, list);
   }
 
+  /** @missingRailsArgs to_enum — PERMANENT */
   each(block?: (node: Node) => void): this | Enumerator<Node> {
     if (block === undefined) return toEnum(this, "each");
 
@@ -84,6 +85,7 @@ export class NodeSet implements Iterable<Node> {
     return this.map((node) => node.text).join("");
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   toString(): string {
     return this.map((node) => node.toString()).join("");
   }

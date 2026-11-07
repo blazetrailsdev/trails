@@ -1,13 +1,11 @@
 import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
-import { ActionView as RailsHtmlSanitizer, HTML4 } from "@blazetrails/html-sanitizer";
+import {
+  ActionView as RailsHtmlSanitizer,
+  HTML4,
+  type Sanitizer as HtmlSanitizer,
+} from "@blazetrails/html-sanitizer";
 
-export interface Sanitizer {
-  sanitize(
-    html: string | null | undefined,
-    options?: Record<string, unknown>,
-  ): string | null | undefined;
-  sanitizeCss?(style: string): string;
-}
+export type Sanitizer = Pick<HtmlSanitizer, "sanitize"> & { sanitizeCss?(style: string): string };
 
 export interface SanitizerClass {
   new (): Sanitizer;

@@ -84,6 +84,7 @@ export const Scrub = {
     if (style) style.value = this.scrubCss(style.value);
   },
 
+  /** @missingRailsArgs join — PERMANENT */
   scrubCss(style: string): string {
     const urlFlags = ["url", "bad_url"];
     const styleTree = Crass.parseProperties(style);

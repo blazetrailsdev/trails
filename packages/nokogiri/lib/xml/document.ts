@@ -24,6 +24,7 @@ export class XmlDocument {
     this._root = doc !== null ? new XmlNode(doc.root, this) : null;
   }
 
+  /** @missingRailsArgs new — CONVERGEABLE nokogiri-parse-constructs-through-new */
   static parse(data: string | Readable): XmlDocument {
     const errors: SyntaxError[] = [];
     try {

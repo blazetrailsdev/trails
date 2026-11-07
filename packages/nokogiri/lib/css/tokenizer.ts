@@ -35,7 +35,10 @@ export class Tokenizer {
     return token;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs string — PERMANENT
+   */
   _nextToken(): [string, string] | undefined {
     let text: string | null = this._ss.peek(1);
     if (text === "\n") this.lineno += 1;
