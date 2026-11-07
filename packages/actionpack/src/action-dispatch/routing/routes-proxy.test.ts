@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { RouteSet } from "./route-set.js";
@@ -119,7 +120,7 @@ describe("RoutesProxy", () => {
       routes.urlHelpers() as unknown as Record<string, unknown>,
     ) as RoutesProxyInstance;
 
-    expect("postPath" in proxy).toBe(true);
+    expect(rbObjRespondTo(proxy, "postPath")).toBe(true);
     expect(proxy.postPath(1)).toBe("/posts/1");
   });
 
@@ -138,7 +139,7 @@ describe("RoutesProxy", () => {
       new Helpers() as unknown as Record<string, unknown>,
     ) as RoutesProxyInstance;
 
-    expect("dynamicPath" in proxy).toBe(true);
+    expect(rbObjRespondTo(proxy, "dynamicPath")).toBe(true);
     expect(proxy.dynamicPath()).toBe("/dynamic");
   });
 });

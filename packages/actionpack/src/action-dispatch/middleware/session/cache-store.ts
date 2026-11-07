@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { SessionId, type PersistedRequest } from "@blazetrails/rack-session";
@@ -58,11 +59,14 @@ export class CacheStore extends AbstractSecureStore {
     _env: unknown,
     sid: SessionId,
     session: Record<string, unknown> | null,
-    options?: Record<string, unknown>,
+    options?: object,
   ): Promise<SessionId> {
     const key = this.cacheKey(sid.privateId);
     if (session) {
-      const expireAfter = options?.["expireAfter"] as number | undefined;
+      const expireAfter = (options == null ? undefined : hashAref(options, "expireAfter")) as
+        | number
+        | null
+        | undefined;
       const expiresIn = expireAfter != null ? expireAfter * 1000 : undefined;
       await this.cache.write(key, session, { expiresIn });
     } else {
@@ -71,11 +75,7 @@ export class CacheStore extends AbstractSecureStore {
     return sid;
   }
 
-  async deleteSession(
-    _env: unknown,
-    sid: SessionId,
-    _options?: Record<string, unknown>,
-  ): Promise<SessionId> {
+  async deleteSession(_env: unknown, sid: SessionId, _options?: object): Promise<SessionId> {
     await this.cache.delete(this.cacheKey(sid.privateId));
     await this.cache.delete(this.cacheKey(sid.publicId));
     return this.generateSid();

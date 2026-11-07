@@ -29,38 +29,6 @@ export class Chars {
   /** @missingRailsCall dup — PERMANENT */
   constructor(string: string) {
     this.wrappedString = string;
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target) return Reflect.get(target, prop, receiver);
-        if (Object.hasOwn(OBJECT_METHOD_TABLE, prop)) {
-          const method = OBJECT_METHOD_TABLE[prop] as (
-            self: unknown,
-            ...args: unknown[]
-          ) => unknown;
-          return (...args: unknown[]) => method(receiver, ...args);
-        }
-        if (KERNEL_METHODS.has(prop) || !target.respondToMissing(prop, false)) {
-          if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return undefined;
-          return () => {
-            throw new NoMethodError(`undefined method '${prop}' for an instance of Chars`);
-          };
-        }
-        const member = (target.wrappedString as unknown as Record<string, unknown>)[prop];
-        if (
-          typeof member !== "function" &&
-          (member !== undefined || !(prop in STRING_METHOD_TABLE))
-        ) {
-          return target.methodMissing.call(receiver, prop);
-        }
-        return (...args: unknown[]) => target.methodMissing.call(receiver, prop, ...args);
-      },
-      has(target, prop) {
-        if (prop in target) return true;
-        if (typeof prop !== "string" || KERNEL_METHODS.has(prop)) return false;
-        if (Object.hasOwn(OBJECT_METHOD_TABLE, prop)) return true;
-        return target.respondToMissing(prop, false);
-      },
-    });
   }
 
   toS(): string {
@@ -179,6 +147,40 @@ export class Chars {
     return new (this.constructor as typeof Chars)(string);
   }
 }
+
+Object.setPrototypeOf(
+  Chars.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Chars.prototype) as object) as object, {
+    get(target, prop, receiver: Chars) {
+      if (typeof prop === "symbol" || prop in target || receiver === Chars.prototype) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (Object.hasOwn(OBJECT_METHOD_TABLE, prop)) {
+        const method = OBJECT_METHOD_TABLE[prop] as (self: unknown, ...args: unknown[]) => unknown;
+        return (...args: unknown[]) => method(receiver, ...args);
+      }
+      if (KERNEL_METHODS.has(prop) || !receiver.respondToMissing(prop, false)) {
+        if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return undefined;
+        return () => {
+          throw new NoMethodError(`undefined method '${prop}' for an instance of Chars`);
+        };
+      }
+      const member = (receiver.wrappedString as unknown as Record<string, unknown>)[prop];
+      if (
+        typeof member !== "function" &&
+        (member !== undefined || !(prop in STRING_METHOD_TABLE))
+      ) {
+        return receiver.methodMissing(prop);
+      }
+      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+    },
+    has(target, prop) {
+      if (prop in target) return true;
+      if (typeof prop !== "string" || KERNEL_METHODS.has(prop)) return false;
+      return Object.hasOwn(OBJECT_METHOD_TABLE, prop);
+    },
+  }),
+);
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
 const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");

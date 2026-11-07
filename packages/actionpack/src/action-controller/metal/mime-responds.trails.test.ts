@@ -286,3 +286,22 @@ describe("ActionView::Rendering#_process_format", () => {
     expect(controller.responseBody).toBe("JSON");
   });
 });
+
+describe("VariantCollector method_missing in the prototype chain", () => {
+  it("lets a subclass with a #private field construct and collect variants", async () => {
+    const { VariantCollector } = await import("./mime-responds.js");
+    class Sub extends VariantCollector {
+      #tag = "sub";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const collector = new Sub([":phone"]);
+    const block = () => {};
+    (collector as unknown as { phone(b: () => void): void }).phone(block);
+    expect(collector.tag()).toBe("sub");
+    expect(collector.variant).toBe(block);
+    expect(collector instanceof Sub).toBe(true);
+    expect(Object.getPrototypeOf(collector)).toBe(Sub.prototype);
+  });
+});

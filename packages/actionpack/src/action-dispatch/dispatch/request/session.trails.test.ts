@@ -9,15 +9,15 @@ describe("Session::Options", () => {
   it("answers the Hash-shaped reads Rack::Session::Abstract::Persisted makes", async () => {
     const options = new Options(null, { skip: true, expireAfter: 60 });
 
-    expect(options["skip"]).toBe(true);
-    expect(["maxAge", "renew", "drop", "defer", "expireAfter"].map((k) => options[k])).toEqual([
+    expect(options.get("skip")).toBe(true);
+    expect(["maxAge", "renew", "drop", "defer", "expireAfter"].map((k) => options.get(k))).toEqual([
       undefined,
       undefined,
       undefined,
       undefined,
       60,
     ]);
-    expect({ ...options }).toEqual({ skip: true, expireAfter: 60 });
+    expect(options.toHash()).toEqual({ skip: true, expireAfter: 60 });
     expect(options.get("skip")).toBe(true);
   });
 

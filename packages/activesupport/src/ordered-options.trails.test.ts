@@ -39,3 +39,22 @@ describe("OrderedOptions", () => {
     expect(a.set("bar", 2).get("bar")).toBe(2);
   });
 });
+
+describe("OrderedOptions method_missing in the prototype chain", () => {
+  it("lets a subclass with a #private field construct and answer dynamic names", () => {
+    class Sub extends OrderedOptions {
+      #tag = "sub";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const options = new Sub() as Sub & Record<string, unknown>;
+    options.foo = 1;
+    expect(options.tag()).toBe("sub");
+    expect(options.foo).toBe(1);
+    expect(options.get("foo")).toBe(1);
+    expect(Object.keys(options)).not.toContain("foo");
+    expect(options instanceof Sub).toBe(true);
+    expect(Object.getPrototypeOf(options)).toBe(Sub.prototype);
+  });
+});

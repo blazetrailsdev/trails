@@ -15,36 +15,6 @@ export class OrderedOptions {
   constructor(defaultBlock?: (key: string) => unknown) {
     this.data = new Map();
     this.defaultBlock = defaultBlock;
-    return new Proxy(this, {
-      get(target, method: string | symbol, receiver) {
-        if (typeof method === "symbol" || method in target) {
-          const value = (target as any)[method];
-          return typeof value === "function" && method !== "constructor"
-            ? value.bind(receiver)
-            : value;
-        }
-        if (method.endsWith("!")) {
-          const nameString = method.slice(0, -1);
-          return () => {
-            const value = presence(target.get(nameString));
-            if (value == null) throw new KeyError(`:${nameString} is blank`);
-            return value;
-          };
-        }
-        return target.get(method);
-      },
-      set(target, method: string | symbol, value: unknown) {
-        if (typeof method === "symbol" || method in target) {
-          (target as any)[method] = value;
-          return true;
-        }
-        target.set(method, value);
-        return true;
-      },
-      has() {
-        return true;
-      },
-    });
   }
 
   protected _get(key: string): unknown {
@@ -184,6 +154,36 @@ export class OrderedOptions {
     return copy;
   }
 }
+
+Object.setPrototypeOf(
+  OrderedOptions.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(OrderedOptions.prototype) as object) as object, {
+    get(target, method: string | symbol, receiver: OrderedOptions) {
+      if (typeof method === "symbol" || method in target || receiver === OrderedOptions.prototype) {
+        return Reflect.get(target, method, receiver);
+      }
+      if (method.endsWith("!")) {
+        const nameString = method.slice(0, -1);
+        return () => {
+          const value = presence(receiver.get(nameString));
+          if (value == null) throw new KeyError(`:${nameString} is blank`);
+          return value;
+        };
+      }
+      return receiver.get(method);
+    },
+    set(target, method: string | symbol, value: unknown, receiver: OrderedOptions) {
+      if (typeof method === "symbol" || method in target) {
+        return Reflect.set(target, method, value, receiver);
+      }
+      receiver.set(method, value);
+      return true;
+    },
+    has() {
+      return true;
+    },
+  }),
+);
 
 export class InheritableOptions extends OrderedOptions {
   static toString(): string {
