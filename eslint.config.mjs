@@ -160,7 +160,7 @@ export default defineConfig(
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
       "packages/activestorage/src/test-helpers/fixtures/files/**",
-      // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
+      // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
       "**/.trails/**",
