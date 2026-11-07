@@ -12,6 +12,7 @@ defineConstants([
   [() => m2.Relayer.Result, "ActionMailbox::Relayer::Result"],
   [() => m3.Router, "ActionMailbox::Router"],
   [() => m4.Route, "ActionMailbox::Router::Route"],
+  [() => m3.Router.RoutingError, "ActionMailbox::Router::RoutingError"],
   [() => m5.RoutingJob, "ActionMailbox::RoutingJob"],
   [() => m0.VERSION, "ActionMailbox::VERSION"],
 ]);
