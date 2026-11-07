@@ -65,6 +65,76 @@ describe("buildAutoload", () => {
     }
   });
 
+  it("writes an entry that installs each loader's imports before the environment boots", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app");
+      FileUtils.mkdirP("config");
+      File.write("app/widget.ts", 'throw new Error("imported at build time");');
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      const main = new Loader();
+      main.tag = "trails.main";
+      seats.Trails = {
+        application: {
+          config: { root: Dir.pwd() },
+          autoloaders: { main },
+          initializers: {
+            tsort: () => [
+              {
+                name: "setup_main_autoloader",
+                belongsTo: () => true,
+                run: async () => {
+                  await main.pushDir("app");
+                  await main.setup();
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await buildAutoload();
+
+      expect(File.read(".trails/entry.generated.js")).toEqual(
+        [
+          'import "./autoload/install.generated.js";',
+          'export { default } from "../config/environment.ts";',
+          "",
+        ].join("\n"),
+      );
+      const install = File.read(".trails/autoload/install.generated.js");
+      expect(install).toContain('import "../../config/application.ts";');
+      expect(install).toContain(
+        'import { imports as imports0 } from "./trails.main/imports.generated.js";',
+      );
+      expect(install).toContain('"trails.main": imports0,');
+      expect(install).toContain("loader.imports = byTag[loader.tag]");
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("writes no entry when there is no application", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app");
+      const main = new Loader();
+      main.tag = "main";
+      await main.pushDir("app");
+
+      await buildAutoload();
+
+      expect(File.isExist(".trails/entry.generated.js")).toBe(false);
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
   it("walks the once loader without importing its files", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);

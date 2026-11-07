@@ -1,4 +1,4 @@
-import { Dir, File, TopLevel, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, TopLevel, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Registry, writeArtifacts } from "@blazetrails/zeitwerk";
 
 interface BootInitializer {
@@ -20,9 +20,11 @@ interface BootApplication {
 
 /** @noRailsEquivalent PERMANENT */
 export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}): Promise<string[]> {
+  let applicationFile: string | undefined;
   for (const ext of ["ts", "js"]) {
     const application = File.join(cwd, `config/application.${ext}`);
     if (await File.isExistAsync(application)) {
+      applicationFile = application;
       await import(getPath().pathToFileURL!(application).href);
       break;
     }
@@ -52,10 +54,60 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     }
   }
 
+  const root = application?.config.root ?? cwd;
   const dirs: string[] = [];
+  const tagged: [string, string][] = [];
   for (const loader of [...Registry.loaders]) {
-    loader.manifestRoot ??= application?.config.root ?? cwd;
-    dirs.push(await writeArtifacts(loader));
+    loader.manifestRoot ??= root;
+    const dir = await writeArtifacts(loader);
+    dirs.push(dir);
+    tagged.push([loader.tag, dir]);
+  }
+  if (application != null && applicationFile !== undefined) {
+    await writeEntry(File.expandPath(".trails", root), applicationFile, tagged);
   }
   return dirs;
+}
+
+function specifier(from: string, to: string): string {
+  const relative = getPath().relative!(from, to);
+  return relative.startsWith(".") ? relative : `./${relative}`;
+}
+
+async function writeEntry(
+  trailsDir: string,
+  applicationFile: string,
+  tagged: [string, string][],
+): Promise<void> {
+  const autoloadDir = File.join(trailsDir, "autoload");
+  const imports = tagged.map(
+    ([, dir], i) =>
+      `import { imports as imports${i} } from ${JSON.stringify(specifier(autoloadDir, File.join(dir, "imports.generated.js")))};`,
+  );
+  const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: imports${i},`);
+  const install = [
+    'import { Trails } from "@blazetrails/trailties";',
+    `import ${JSON.stringify(specifier(autoloadDir, applicationFile))};`,
+    ...imports,
+    "",
+    `const byTag = {\n${byTag.join("\n")}\n};`,
+    "",
+    "Trails.autoloaders.each((loader) => {",
+    "  if (Object.hasOwn(byTag, loader.tag)) loader.imports = byTag[loader.tag];",
+    "});",
+    "",
+  ].join("\n");
+  const environmentFile = File.join(
+    File.dirname(applicationFile),
+    `environment${File.extname(applicationFile)}`,
+  );
+  const entry = [
+    'import "./autoload/install.generated.js";',
+    `export { default } from ${JSON.stringify(specifier(trailsDir, environmentFile))};`,
+    "",
+  ].join("\n");
+  const fs = getFs();
+  await fs.mkdir!(autoloadDir, { recursive: true });
+  await fs.writeFile!(File.join(autoloadDir, "install.generated.js"), install);
+  await fs.writeFile!(File.join(trailsDir, "entry.generated.js"), entry);
 }
