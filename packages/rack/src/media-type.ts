@@ -9,7 +9,7 @@ export class MediaType {
   }
 
   static params(contentType: string | null | undefined): Record<string, string> {
-    if (contentType == null) return {};
+    if (contentType == null || contentType.length === 0) return {};
 
     const hsh: Record<string, string> = {};
     for (let s of contentType.split(MediaType.SPLIT_PATTERN).slice(1)) {
