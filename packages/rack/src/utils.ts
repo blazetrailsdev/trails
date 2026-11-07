@@ -292,8 +292,11 @@ export function setCookieHeader(
     if (value.expires != null && value.expires !== false)
       expires = `; expires=${httpDate(value.expires)}`;
     if (value.secure != null && value.secure !== false) secure = "; secure";
-    const httponlyValue = "httponly" in value ? value.httponly : value.httpOnly;
-    if (httponlyValue != null && httponlyValue !== false) httponly = "; httponly";
+    if (
+      ("httponly" in value ? value.httponly : value.httpOnly) != null &&
+      ("httponly" in value ? value.httponly : value.httpOnly) !== false
+    )
+      httponly = "; httponly";
     if (value.sameSite !== undefined && value.sameSite !== false && value.sameSite !== null) {
       const ss = value.sameSite;
       if (ss === ":none" || ss === "None" || ss === ":None") sameSite = "; samesite=none";
