@@ -20,7 +20,7 @@ export type TempfileBasename = string | [string, string];
  * The `**options` of `Tempfile.new` (`vendor/ruby/v3.3.11/lib/tempfile.rb:150`), which
  * Ruby forwards to `File.open` (`tempfile.rb:157`) — `Rack::Multipart::
  * UploadedFile` passes `encoding: Encoding::BINARY`
- * (`vendor/rack/v3.1.14/lib/rack/multipart/uploaded_file.rb:24`).
+ * (`vendor/rack/v3.2.8/lib/rack/multipart/uploaded_file.rb:57`).
  *
  * @noRailsEquivalent PERMANENT — the option hash of Ruby stdlib
  * `Tempfile.new` (`vendor/ruby/v3.3.11/lib/tempfile.rb:150`), which Rails calls

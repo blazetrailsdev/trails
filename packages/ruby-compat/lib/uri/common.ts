@@ -22,7 +22,7 @@ export const RFC3986_PARSER = new RFC3986Parser();
 
 /**
  * `URI::RFC2396_PARSER` (`vendor/ruby/v3.3.11/lib/uri/common.rb:22`), which
- * `Rack::Utils::URI_PARSER` (`vendor/rack/v3.1.14/lib/rack/utils.rb:27`) and
+ * `Rack::Utils::URI_PARSER` (`vendor/rack/v3.2.8/lib/rack/utils.rb:27`) and
  * `RoutesInspector#normalize_filter` (`inspector.rb:104`) escape through.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC2396_PARSER`

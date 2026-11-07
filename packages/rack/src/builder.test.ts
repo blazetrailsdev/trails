@@ -1,6 +1,6 @@
 import { it, expect, describe } from "vitest";
 import { Builder } from "./builder.js";
-import { File, RuntimeError, block, rbObjId } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, RuntimeError, block, rbObjId } from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 import { ContentLength } from "./content-length.js";
@@ -42,6 +42,18 @@ describe("Rack::Builder", () => {
       b.run(null, (_env) => [200, { "content-type": "text/plain" }, ["OK"]]);
     });
     expect((await new MockRequest(app).get("/")).body.toString()).toEqual("OK");
+  });
+
+  it("raises if #run provided both app and block", () => {
+    expect(() => {
+      builderToApp((b) => {
+        (b as any).run(new (class Object {})(), async () => [
+          200,
+          { "content-type": "text/plain" },
+          ["OK"],
+        ]);
+      });
+    }).toThrowError(ArgumentError);
   });
 
   it("supports mapping", async () => {

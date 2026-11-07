@@ -43,15 +43,24 @@ export class BoundaryTooLongError extends Error {
   }
 }
 include(BoundaryTooLongError, BadRequest);
+export { BoundaryTooLongError as Error };
 
 export const EOL = "\r\n";
-export const MULTIPART = /^multipart\/[^\n]*boundary="?([^";,]+)"?/i;
-export const MULTIPART_CONTENT_TYPE = new RegExp(`Content-Type: ([^\n]*)${EOL}`, "i");
-export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
-  `Content-Disposition:([^\\n]*)(?=${EOL}(\\S|$))`,
-  "i",
+export const FWS = /[ \t]+(?:\r\n[ \t]+)?/;
+export const HEADER_VALUE = "(?:[^\r\n]|\r\n[ \t])*";
+export const MULTIPART = /^multipart\/.*?boundary(\s*)="?([^";,]+)"?/i;
+export const MULTIPART_CONTENT_TYPE = new RegExp(
+  `^Content-Type:(?:${FWS.source})?(${HEADER_VALUE})`,
+  "im",
 );
-export const MULTIPART_CONTENT_ID = new RegExp(`Content-ID:\\s*([^${EOL}]*)`, "i");
+export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
+  `^Content-Disposition:(?:${FWS.source})?(${HEADER_VALUE})`,
+  "im",
+);
+export const MULTIPART_CONTENT_ID = new RegExp(
+  `^Content-ID:(?:${FWS.source})?(${HEADER_VALUE})`,
+  "im",
+);
 
 export class MultipartInfo {
   params: Record<string, any> | null;
@@ -116,6 +125,9 @@ class SBuf {
   }
   concat(s: string) {
     this.s += s;
+  }
+  get string() {
+    return this.s;
   }
   terminate() {
     this.p = this.s.length;
@@ -278,9 +290,19 @@ include(Collector, Enumerable);
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
 const CONTENT_DISPOSITION_MAX_PARAMS = 16;
 const CONTENT_DISPOSITION_MAX_BYTES = 1536;
+const _bytesizeLimit = 10 * 1024 * 1024 * 1024;
+
+const _byteLength = (content: string | Uint8Array): number =>
+  content instanceof Uint8Array ? content.length : new TextEncoder().encode(content).length;
 
 export class Parser {
   static readonly BUFSIZE = 1_048_576;
+  static readonly BOUNDARY_START_LIMIT = 16 * 1024;
+  static readonly MIME_HEADER_BYTESIZE_LIMIT = 64 * 1024;
+  static readonly BUFFERED_UPLOAD_BYTESIZE_LIMIT = 16 * 1024 * 1024;
+  static readonly PARSER_BYTESIZE_LIMIT: number | null = _bytesizeLimit > 0 ? _bytesizeLimit : null;
+  static readonly CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT = 8 * 1024;
+  static readonly OBS_UNFOLD = /\r\n([ \t])/g;
   static readonly TEXT_PLAIN = "text/plain";
   static readonly TEMPFILE_FACTORY = (filename: string, _contentType: string): Tempfile => {
     const extension = File.extname(filename.replace(/\0/g, "%00")).slice(0, 129);
@@ -299,12 +321,26 @@ export class Parser {
   private endBoundarySize: number;
   private rxMaxSize: number;
   private headRegex: RegExp;
+  private _bodyRetained: boolean | null;
+  private _retainedSize: number;
+  private _totalBytesRead: number | null;
+  private _contentDispositionQuotedEscapes: number;
 
   static parseBoundary(contentType: string | null | undefined): string | null {
     if (!contentType) return null;
     const data = MULTIPART.exec(contentType);
     if (!data) return null;
-    return data[1];
+
+    if (data[1].length !== 0) {
+      throw new BoundaryTooLongError("whitespace between boundary parameter name and equal sign");
+    }
+    if ((contentType.match(/boundary(?:\*\d*\*?)?\s*=/gi) ?? []).length > 1) {
+      throw new BoundaryTooLongError(
+        "multiple boundary parameters found in multipart content type",
+      );
+    }
+
+    return data[2];
   }
 
   static parse(
@@ -318,6 +354,17 @@ export class Parser {
     if (contentLength === 0) return EMPTY;
     const boundary = Parser.parseBoundary(contentType);
     if (!boundary) return EMPTY;
+
+    if (
+      Parser.PARSER_BYTESIZE_LIMIT != null &&
+      contentLength != null &&
+      contentLength > Parser.PARSER_BYTESIZE_LIMIT
+    ) {
+      throw new BoundaryTooLongError(
+        `multipart Content-Length ${contentLength} exceeds limit of ${Parser.PARSER_BYTESIZE_LIMIT} bytes`,
+      );
+    }
+
     if (boundary.length > 70)
       throw new BoundaryTooLongError(
         `multipart boundary size too large (${boundary.length} characters)`,
@@ -338,6 +385,10 @@ export class Parser {
     this.queryParser = queryParser;
     this.params = queryParser.makeParams();
     this.bufsize = bufsize;
+    this._bodyRetained = null;
+    this._retainedSize = 0;
+    this._totalBytesRead = Parser.PARSER_BYTESIZE_LIMIT != null ? 0 : null;
+    this._contentDispositionQuotedEscapes = 0;
     this.collector = new Collector(tempfile);
     this.sbuf = new SBuf(rbObjDup(""));
     const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -349,6 +400,7 @@ export class Parser {
   }
 
   parse(io: { read(n: number, outbuf?: string): string | Uint8Array | null }) {
+    if (io instanceof BoundedIO && this._totalBytesRead != null) this._totalBytesRead = null;
     const outbuf = "";
     this.readData(io, outbuf);
     while (true) {
@@ -367,6 +419,7 @@ export class Parser {
       part.getData((data) => {
         let name: string;
         [name, data] = this.tagMultipartEncoding(part.filename, part.contentType, part.name, data);
+        [name, data] = this.handleDummyEncoding(name, data);
         this.queryParser.normalizeParams(this.params, name, data);
       }),
     );
@@ -376,18 +429,20 @@ export class Parser {
     );
   }
 
-  /** @internal */
-  dequote(str: string): string {
-    const m = /^"([^\n]*)"(?=\n?$)/.exec(str);
-    return (m ? m[1] : str).replace(/\\([^\n])/g, "$1");
-  }
-
   /** @internal */ private readData(
     io: { read(n: number, outbuf?: string): string | Uint8Array | null },
     outbuf: string,
   ) {
     const content = io.read(this.bufsize, outbuf);
     this.handleEmptyContentBang(content);
+    if (this._totalBytesRead != null) {
+      this._totalBytesRead += _byteLength(content!);
+      if (this._totalBytesRead > Parser.PARSER_BYTESIZE_LIMIT!) {
+        throw new BoundaryTooLongError(
+          `multipart upload exceeds limit of ${Parser.PARSER_BYTESIZE_LIMIT} bytes`,
+        );
+      }
+    }
     this.sbuf.concat(
       content instanceof Uint8Array ? Buffer.from(content).toString("latin1") : content!,
     );
@@ -405,7 +460,13 @@ export class Parser {
           this.state = "DONE";
           return;
         }
-      } else return "want_read";
+      } else {
+        if (this.sbuf.string.length > Parser.BOUNDARY_START_LIMIT) {
+          throw new BoundaryTooLongError("multipart boundary not found within limit");
+        }
+
+        return "want_read";
+      }
     }
   }
 
@@ -417,10 +478,14 @@ export class Parser {
   /** @internal */ private handleMimeHead(): void | "want_read" {
     if (this.sbuf.scanUntil(this.headRegex)) {
       const head = this.sbuf.cap(1);
-      const contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
+      let contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
+      if (contentType != null) contentType = contentType.replace(Parser.OBS_UNFOLD, "$1");
+
       let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
       let disposition = MULTIPART_CONTENT_DISPOSITION.exec(head)?.[1];
-      if (disposition != null && Buffer.byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
+      if (disposition != null && _byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
+        disposition = disposition.replace(Parser.OBS_UNFOLD, "$1");
+
         let i = disposition.indexOf(";");
         if (i === -1) throw new NoMethodError("undefined method `+' for nil");
         disposition = disposition.slice(i + 1);
@@ -452,6 +517,16 @@ export class Parser {
               disposition = disposition.slice(1);
 
               if (c === '"') break;
+
+              this._contentDispositionQuotedEscapes += 1;
+              if (
+                this._contentDispositionQuotedEscapes >
+                Parser.CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT
+              ) {
+                throw new BoundaryTooLongError(
+                  "number of quoted escapes during content disposition parsing exceeds limit",
+                );
+              }
 
               const escapedChar = disposition.slice(0, 1);
               disposition = disposition.slice(1);
@@ -507,9 +582,18 @@ export class Parser {
         name = filename ?? `${contentType ?? Parser.TEXT_PLAIN}[]`;
       }
 
+      this.updateRetainedSize(_byteLength(head));
+
+      this._bodyRetained = filename == null;
+
       this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
       this.state = "MIME_BODY";
     } else {
+      if (_byteLength(this.sbuf.rest) > Parser.MIME_HEADER_BYTESIZE_LIMIT) {
+        throw new BoundaryTooLongError("multipart mime part header too large");
+      }
+
+      this.sbuf.string = this.sbuf.rest;
       return "want_read";
     }
   }
@@ -518,6 +602,7 @@ export class Parser {
     const bodyWithBoundary = this.sbuf.checkUntil(this.bodyRegex);
     if (bodyWithBoundary != null) {
       const body = bodyWithBoundary.replace(this.bodyRegexAtEnd, "");
+      if (this._bodyRetained) this.updateRetainedSize(_byteLength(body));
       this.collector.onMimeBody(this.mimeIndex, body);
       this.sbuf.pos += body.length + 2;
       this.state = "CONSUME_TOKEN";
@@ -525,11 +610,20 @@ export class Parser {
     } else {
       if (this.rxMaxSize < this.sbuf.restSize) {
         const delta = this.sbuf.restSize - this.rxMaxSize;
-        this.collector.onMimeBody(this.mimeIndex, this.sbuf.peek(delta));
+        const body = this.sbuf.peek(delta);
+        if (this._bodyRetained) this.updateRetainedSize(_byteLength(body));
+        this.collector.onMimeBody(this.mimeIndex, body);
         this.sbuf.pos += delta;
-        this.sbuf.string = this.sbuf.rest;
       }
+      this.sbuf.string = this.sbuf.rest;
       return "want_read";
+    }
+  }
+
+  /** @internal */ private updateRetainedSize(size: number) {
+    this._retainedSize += size;
+    if (this._retainedSize > Parser.BUFFERED_UPLOAD_BYTESIZE_LIMIT) {
+      throw new BoundaryTooLongError("multipart data over retained size limit");
     }
   }
 
@@ -588,6 +682,11 @@ export class Parser {
       return Encoding.BINARY;
     }
   }
+  /** @internal */
+  private handleDummyEncoding(name: string, body: any): [string, any] {
+    return [name, body];
+  }
+
   /** @internal */ private handleEmptyContentBang(content: string | Uint8Array | null | undefined) {
     if (content == null || content.length === 0) throw new EmptyContentError();
   }

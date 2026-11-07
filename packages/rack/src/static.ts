@@ -1,8 +1,8 @@
-import { Dir, File, Hash, rbObjIsKindOf, rbProcCall } from "@blazetrails/ruby-compat";
+import { Dir, File, Hash, rbObjIsKindOf, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
-import { cleanPathInfo, unescape, unescapePath } from "./utils.js";
+import { cleanPathInfo, unescapePath } from "./utils.js";
 import { Rack } from "./namespaces.js";
 
 export interface StaticOptions {
@@ -17,7 +17,7 @@ export interface StaticOptions {
 
 export class Static {
   private app: any;
-  private urls: string[] | Record<string, string>;
+  private urls: readonly (readonly [string, string])[] | Record<string, string>;
   private index: string | undefined;
   private cascade: boolean;
   private gzip: boolean;
@@ -26,7 +26,14 @@ export class Static {
 
   constructor(app: any, options: StaticOptions = {}) {
     this.app = app;
-    this.urls = options.urls ?? ["/favicon.ico"];
+    const urls = options.urls ?? ["/favicon.ico"];
+    this.urls = rbObjIsKindOf(urls, Array)
+      ? Object.freeze(
+          (urls as string[]).map((url) =>
+            Object.freeze([url, url.endsWith("/") ? url : `${url}/`] as const),
+          ),
+        )
+      : (urls as Record<string, string>);
     this.index = options.index;
     this.cascade = options.cascade ?? false;
     this.gzip = options.gzip ?? false;
@@ -52,7 +59,9 @@ export class Static {
   routeFile(path: string): boolean {
     return (
       rbObjIsKindOf(this.urls, Array) &&
-      (this.urls as string[]).some((url) => path.indexOf(url) === 0)
+      (this.urls as readonly (readonly [string, string])[]).some(
+        ([url, urlSlash]) => path === url || path.startsWith(urlSlash),
+      )
     );
   }
 
@@ -112,14 +121,19 @@ export class Static {
   }
 
   applicableRules(path: string): [unknown, Record<string, string>][] {
+    path = cleanPathInfo(unescapePath(path));
+
     return this.headerRules.filter(([rule]) => {
       if (rule === "all") return true;
       if (rule === "fonts") return /\.(?:ttf|otf|eot|woff2|woff|svg)$/.test(path);
       if (typeof rule === "string") {
-        path = unescape(path);
         return path.startsWith(rule) || path.startsWith("/" + rule);
       }
-      if (Array.isArray(rule)) return new RegExp(`\\.(${rule.join("|")})$`).test(path);
+      if (Array.isArray(rule)) {
+        return new RegExp(`\\.(?:${rule.map((r: string) => regexpEscape(r)).join("|")})$`).test(
+          path,
+        );
+      }
       if (rule instanceof RegExp) return rule.test(path);
       return false;
     });

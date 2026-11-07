@@ -1,4 +1,10 @@
-import { Exception, StandardError, rbProcCall } from "@blazetrails/ruby-compat";
+import {
+  Exception,
+  StandardError,
+  basicObjRespondTo,
+  rbObjRespondTo,
+  rbProcCall,
+} from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackHeaders, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -41,6 +47,21 @@ export class EventedBodyProxy extends BodyProxy {
   override each(callback: (item: any) => void): void {
     [...this.handlers].reverse().forEach((handler) => handler.onSend(this.request, this.response));
     super.each(callback);
+  }
+
+  call(stream: unknown): unknown {
+    [...this.handlers].reverse().forEach((handler) => handler.onSend(this.request, this.response));
+    return this.methodMissing("call", stream);
+  }
+
+  isRespondTo(methodName: string, _includeAll = false): boolean {
+    switch (methodName) {
+      case "each":
+      case "call":
+        return rbObjRespondTo(this.body, methodName);
+      default:
+        return basicObjRespondTo(this, methodName);
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */

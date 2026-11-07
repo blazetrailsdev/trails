@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { File, rbStrSub, rbProcCall } from "@blazetrails/ruby-compat";
+import { File, rbStrSub, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -19,7 +19,7 @@ export class Sendfile {
     this.app = app;
     this._variation = variation ?? null;
     this.mappings = (mappings || []).map(([internal, external]) => [
-      new RegExp("^" + internal, "im"),
+      new RegExp("^" + internal, "i"),
       external,
     ]);
   }
@@ -63,7 +63,15 @@ export class Sendfile {
 
   /** @internal */
   private variation(env: Record<string, any>): string | null {
-    return this._variation ?? env["sendfile.type"] ?? env["HTTP_X_SENDFILE_TYPE"] ?? null;
+    return this._variation ?? env["sendfile.type"] ?? null;
+  }
+
+  /** @internal */
+  private xAccelMapping(env: Record<string, any>): string | null {
+    if (!(this._variation != null && /x-accel-redirect/i.test(this._variation))) return null;
+    if (this.mappings.length !== 0) return null;
+
+    return env["HTTP_X_ACCEL_MAPPING"] ?? null;
   }
 
   /** @internal */
@@ -73,10 +81,14 @@ export class Sendfile {
     );
     if (mapping !== undefined) {
       return rbStrSub({ string: path }, ...mapping);
-    } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"] as string | undefined) != null) {
+    } else if ((mapping = this.xAccelMapping(env) ?? undefined) != null) {
       for (const m of mapping.split(",").map((s) => s.trim())) {
         const [internal, external] = m.split("=", 2).map((s) => s.trim());
-        const newPath = rbStrSub({ string: path }, new RegExp("^" + internal, "im"), external);
+        const newPath = rbStrSub(
+          { string: path },
+          new RegExp("^" + regexpEscape(internal), "i"),
+          external,
+        );
         if (newPath !== path) return newPath;
       }
       return path;
