@@ -19,7 +19,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import * as packageRootsModule from "../layout/package-roots.js";
 
-const { libRoot } = (
+const { sourceRoots } = (
   "default" in packageRootsModule ? packageRootsModule.default : packageRootsModule
 ) as typeof packageRootsModule;
 
@@ -69,12 +69,14 @@ export async function measure(root = ROOT_DIR): Promise<Marks> {
   const packagesDir = path.join(root, "packages");
   for (const pkg of (await fs.readdir(packagesDir)).sort()) {
     if (pkg === "ruby-compat") continue;
-    const src = path.join(packagesDir, pkg, libRoot(pkg));
-    if (!(await fs.stat(src).catch(() => null))?.isDirectory()) continue;
     const counts: Counts = { newModule: 0, superMethod: 0, moduleImport: 0 };
-    for (const file of await listSources(src)) {
-      const c = countText(await fs.readFile(file, "utf-8"));
-      for (const k of KINDS) counts[k] += c[k];
+    for (const root of sourceRoots(pkg)) {
+      const src = path.join(packagesDir, pkg, root);
+      if (!(await fs.stat(src).catch(() => null))?.isDirectory()) continue;
+      for (const file of await listSources(src)) {
+        const c = countText(await fs.readFile(file, "utf-8"));
+        for (const k of KINDS) counts[k] += c[k];
+      }
     }
     if (KINDS.some((k) => counts[k] > 0)) out[pkg] = counts;
   }
