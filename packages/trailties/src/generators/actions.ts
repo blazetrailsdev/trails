@@ -171,6 +171,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export interface TrailsCommandOptions extends RakeOptions {
   inline?: boolean;
+  shell?: unknown;
 }
 
 /** @inventedArm rbFRequire — PERMANENT */

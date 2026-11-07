@@ -49,7 +49,7 @@ const TRAILS = "trails";
 export class ActionMethods {
   declare readonly options: AppBaseOptions;
   /** @internal */
-  declare private generator: AppGenerator;
+  declare protected generator: AppGenerator;
 
   constructor(generator: AppGenerator) {
     this.generator = generator;
@@ -171,6 +171,8 @@ export class AppBuilder extends ActionMethods {
   declare private readonly skipThruster: () => boolean | undefined;
   /** @internal */
   declare private readonly skipBrakeman: () => boolean | undefined;
+  /** @internal */
+  declare private readonly trailsCommand: OmitThisParameter<AppGenerator["trailsCommand"]>;
   /** @internal */
   declare private readonly gitInitCommand: () => Promise<string>;
   /** @internal */
@@ -363,6 +365,17 @@ export class AppBuilder extends ActionMethods {
     if (this.options.pretend || this.options.dummyApp) return;
 
     await new CredentialsGenerator([], { quiet: true }).addCredentialsFile();
+  }
+
+  async credentialsDiffEnroll(): Promise<void> {
+    if (this.options.skipDecryptedDiffs || this.options.dummyApp || this.options.pretend) return;
+
+    await this.generator.shell.mute(() =>
+      this.trailsCommand("credentials:diff --enroll", {
+        inline: true,
+        shell: this.generator.shell,
+      }),
+    );
   }
 
   /** @missingRailsArgs template — PERMANENT */
@@ -649,6 +662,7 @@ export class AppGenerator extends AppBase {
 
   async createCredentials(): Promise<void> {
     await this.build("credentials");
+    await this.build("credentialsDiffEnroll");
   }
 
   /** @missingRailsArgs template — PERMANENT */
