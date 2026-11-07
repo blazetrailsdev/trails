@@ -18,7 +18,15 @@ import {
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
-import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  Base64,
+  SecureRandom,
+  binaryBytes,
+  block,
+  rbFSend,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
+import type { NodeSet } from "@blazetrails/nokogiri";
 import { Base } from "../base.js";
 import { TestCase, TestSession } from "../test-case.js";
 import {
@@ -26,7 +34,6 @@ import {
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
   RequestForgeryProtection,
-  decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 
@@ -1159,15 +1166,23 @@ describe("PerFormTokensControllerTest", () => {
   });
 
   function assertPresenceAndFetchFormCsrfToken(): string {
-    const input = tc.response.body.match(/<input[^>]*name="custom_authenticity_token"[^>]*>/);
-    expect(input).not.toBeNull();
-    const formCsrfToken = input![0].match(/value="([^"]*)"/)?.[1];
-    expect(formCsrfToken).not.toBeNull();
+    let formCsrfToken: string | null = null;
+    tc.assertSelect(
+      'input[name="custom_authenticity_token"]',
+      block((input: NodeSet) => {
+        formCsrfToken = input.first()!.get("value");
+        expect(formCsrfToken).not.toBeNull();
+      }),
+    );
     return formCsrfToken!;
   }
 
   function assertMatchesSessionTokenOnServer(formToken: string, method = "post"): void {
-    const actual = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(formToken));
+    const actual = rbFSend(
+      tc.controller,
+      "unmaskToken",
+      binaryBytes(Base64.urlsafeDecode64(formToken)),
+    );
     const expected = rbFSend(
       tc.controller,
       "perFormCsrfToken",
@@ -1313,7 +1328,11 @@ describe("PerFormTokensControllerTest", () => {
 
     const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
 
-    const unmaskedToken = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(token));
+    const unmaskedToken = rbFSend(
+      tc.controller,
+      "unmaskToken",
+      binaryBytes(Base64.urlsafeDecode64(token)),
+    );
 
     expect(unmaskedToken).not.toEqual(rbFSend(tc.controller, "realCsrfToken"));
   });
@@ -1323,7 +1342,11 @@ describe("PerFormTokensControllerTest", () => {
 
     const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
 
-    const unmaskedToken = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(token));
+    const unmaskedToken = rbFSend(
+      tc.controller,
+      "unmaskToken",
+      binaryBytes(Base64.urlsafeDecode64(token)),
+    );
 
     expect(unmaskedToken).toEqual(rbFSend(tc.controller, "globalCsrfToken"));
   });

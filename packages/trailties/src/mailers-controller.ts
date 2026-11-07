@@ -31,7 +31,7 @@ export class MailersController extends ApplicationController {
   async download(): Promise<void> {
     this.emailAction = File.basename(this.params.get("path") as string);
     if (this._preview.isEmailExists(this.emailAction)) {
-      this.email = await this._preview.call(this.emailAction, this.params as never);
+      this.email = await this._preview.call(this.emailAction, this.params);
       this.sendData(this.email.toString(), { filename: `${this.emailAction}.eml` });
     } else {
       throw new AbstractController.ActionNotFound(
@@ -49,7 +49,7 @@ export class MailersController extends ApplicationController {
 
       if (this._preview.isEmailExists(this.emailAction)) {
         this.pageTitle = `Mailer Preview for ${this._preview.previewName()}#${this.emailAction}`;
-        this.email = await this._preview.call(this.emailAction, this.params as never);
+        this.email = await this._preview.call(this.emailAction, this.params);
         this.attachments = Object.fromEntries(
           Object.entries(this.attachmentsFor(this.email)).filter(
             ([_filename, attachment]) => !attachment.isInline(),
