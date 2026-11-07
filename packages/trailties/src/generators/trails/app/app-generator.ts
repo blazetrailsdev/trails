@@ -812,7 +812,7 @@ export class ARGVScrubber {
   /** @internal */
   private argv: string[];
 
-  constructor(argv: string[]) {
+  constructor(argv: string[] = rbArgv()) {
     this.argv = argv;
   }
 
