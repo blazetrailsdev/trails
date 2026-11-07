@@ -1342,7 +1342,7 @@ describe("IntegrationRequestEncodersTest", () => {
         });
       });
 
-      await t.post(`/foos_${as}`, { params: { foo: "fighters" }, as });
+      await t.post(`/foos_${as.slice(1)}`, { params: { foo: "fighters" }, as });
 
       block();
     });
@@ -1367,7 +1367,7 @@ describe("IntegrationRequestEncodersTest", () => {
   });
 
   it("encoding as json", async () => {
-    await postToFoos("json", () => {
+    await postToFoos(":json", () => {
       assertResponse("success");
       expect(t.request.mediaType).toBe("application/json");
       expect(t.request.accepts[0].toString()).toBe("application/json");
@@ -1388,21 +1388,21 @@ describe("IntegrationRequestEncodersTest", () => {
       await t.post("/foos");
       expect(t.request.path).toBe("/foos");
 
-      await t.post("/foos_json", { as: "json" });
+      await t.post("/foos_json", { as: ":json" });
       expect(t.request.path).toBe("/foos_json");
     });
   });
 
   it("encoding as without mime registration", () => {
-    expect(() => IntegrationTest.registerEncoder("wibble")).toThrow(ArgumentError);
+    expect(() => IntegrationTest.registerEncoder(":wibble")).toThrow(ArgumentError);
   });
 
   it("registering custom encoder", async () => {
     MimeType.register("text/wibble", ":wibble");
     try {
-      IntegrationTest.registerEncoder("wibble", { paramEncoder: (params) => params });
+      IntegrationTest.registerEncoder(":wibble", { paramEncoder: (params) => params });
 
-      await postToFoos("wibble", () => {
+      await postToFoos(":wibble", () => {
         assertResponse("success");
         expect(t.request.path).toBe("/foos_wibble");
         expect(t.request.mediaType).toBe("text/wibble");
@@ -1421,9 +1421,9 @@ describe("IntegrationRequestEncodersTest", () => {
       'application/vnd.api+json; profile="https://jsonapi.org/profiles/ethanresnick/cursor-pagination/"; ext="https://jsonapi.org/ext/atomic"';
     MimeType.register(acceptHeader, ":json_api");
     try {
-      IntegrationTest.registerEncoder("json_api", { paramEncoder: (params) => params });
+      IntegrationTest.registerEncoder(":json_api", { paramEncoder: (params) => params });
 
-      await postToFoos("json_api", () => {
+      await postToFoos(":json_api", () => {
         assertResponse("success");
         expect(t.request.path).toBe("/foos_json_api");
         expect(t.request.mediaType).toBe("application/vnd.api+json");
@@ -1459,7 +1459,7 @@ describe("IntegrationRequestEncodersTest", () => {
         });
       });
 
-      await t.get("/foos_json?foo=heyo", { as: "json" });
+      await t.get("/foos_json?foo=heyo", { as: ":json" });
 
       assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
@@ -1473,7 +1473,7 @@ describe("IntegrationRequestEncodersTest", () => {
         });
       });
 
-      await t.get("/foos_json", { params: { foo: "heyo" }, as: "json" });
+      await t.get("/foos_json", { params: { foo: "heyo" }, as: ":json" });
 
       expect(t.request.method).toBe("POST");
       expect(t.request.headers.get("X-Http-Method-Override")).toBe("GET");
@@ -1489,7 +1489,7 @@ describe("IntegrationRequestEncodersTest", () => {
         });
       });
 
-      await t.get("/foos_json", { as: "json" });
+      await t.get("/foos_json", { as: ":json" });
 
       expect(t.request.url).toBe("http://www.example.com/foos_json");
     });

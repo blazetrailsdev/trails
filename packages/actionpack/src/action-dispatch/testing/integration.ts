@@ -302,7 +302,7 @@ export class Session {
     const headers: Record<string, unknown> = { ...(options.headers ?? {}) };
     const params = options.params;
 
-    if (method === "GET" && options.as === "json" && params != null) {
+    if (method === "GET" && options.as === ":json" && params != null) {
       headers["X-Http-Method-Override"] = "GET";
       method = "POST";
     }

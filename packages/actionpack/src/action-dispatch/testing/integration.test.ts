@@ -444,7 +444,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("as option is alias for format", async () => {
-      await app.get("/posts", { as: "json" });
+      await app.get("/posts", { as: ":json" });
       expect(app.request.accept).toContain("application/json");
     });
   });

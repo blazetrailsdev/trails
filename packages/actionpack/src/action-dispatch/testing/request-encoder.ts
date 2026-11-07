@@ -28,7 +28,7 @@ export class IdentityEncoder {
 
 export class RequestEncoder {
   private static encoders: Map<string, RequestEncoder | IdentityEncoder> = new Map([
-    ["identity", new IdentityEncoder()],
+    [":identity", new IdentityEncoder()],
   ]);
 
   private readonly _mime: MimeType;
@@ -75,13 +75,13 @@ export class RequestEncoder {
   }
 
   static parser(contentType: string | null | undefined): ResponseParser {
-    const symbol = contentType ? MimeType.lookup(contentType).symbol : null;
-    const type = symbol != null ? symbolToS(symbol) : undefined;
+    let type: string | undefined;
+    if (contentType) type = MimeType.lookup(contentType).ref();
     return RequestEncoder.encoder(type).responseParser;
   }
 
   static encoder(name: string | undefined): RequestEncoder | IdentityEncoder {
-    return (name && RequestEncoder.encoders.get(name)) || RequestEncoder.encoders.get("identity")!;
+    return (name && RequestEncoder.encoders.get(name)) || RequestEncoder.encoders.get(":identity")!;
   }
 
   static registerEncoder(
@@ -95,9 +95,9 @@ export class RequestEncoder {
   }
 }
 
-RequestEncoder.registerEncoder("html", {
+RequestEncoder.registerEncoder(":html", {
   responseParser: (body) => Testing.htmlDocument().parse(body),
 });
-RequestEncoder.registerEncoder("json", {
+RequestEncoder.registerEncoder(":json", {
   responseParser: (body) => JSON.parse(body, { objectClass: HashWithIndifferentAccess }),
 });
