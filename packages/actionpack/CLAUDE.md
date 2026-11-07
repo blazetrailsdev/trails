@@ -69,7 +69,7 @@ name becomes a file name or a locale key, and each site carries
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
 - `ActionMailer::Base#collectResponsesFromTemplates`
-  (`actionmailer/src/base.ts`; `base.rb:991-1002`), which also dasherizes the
+  (`actionmailer/lib/base.ts`; `base.rb:991-1002`), which also dasherizes the
   default `mailer_name` directory, as `localPrefixes` does
 
 The DIRECTORY a controller's templates are looked up in is kebab-case too.

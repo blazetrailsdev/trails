@@ -352,10 +352,12 @@ const alias = {
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
-  "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/src") + "/",
-  "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/src/index.ts"),
-  "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
-  "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
+  "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/lib") + "/",
+  "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/lib/index.ts"),
+  "@blazetrails/actioncable/test-helpers/":
+    path.resolve(__dirname, "packages/actioncable/test/support") + "/",
+  "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/lib") + "/",
+  "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
   "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
   "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/src") + "/",
@@ -682,10 +684,10 @@ export default defineConfig({
             "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
-              : ["packages/actioncable/src/subscription-adapter/postgresql.test.ts"]),
+              : ["packages/actioncable/test/subscription-adapter/postgresql.test.ts"]),
             ...(process.env.REDIS_URL
               ? []
-              : ["packages/actioncable/src/subscription-adapter/redis.test.ts"]),
+              : ["packages/actioncable/test/subscription-adapter/redis.test.ts"]),
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
