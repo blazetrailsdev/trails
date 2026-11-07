@@ -158,7 +158,7 @@
     },
     "tzinfo": {
       "ref": "v2.0.6",
-      "sha": "0da0b36a9effb93c9fea912909c47baef5863609"
+      "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
     },
     "zeitwerk": {
       "ref": "v2.7.2",

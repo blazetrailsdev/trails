@@ -3,8 +3,10 @@ import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SOURCES } from "../../vendor/sources.js";
+import { TS_ONLY_PACKAGES } from "../api-compare/config.js";
 import {
   ROOT_DIR,
+  apiExcludedReasonOf,
   compareKeysOf,
   githubAnchor,
   main,
@@ -92,6 +94,7 @@ beforeEach(async () => {
     'import { Module } from "@blazetrails/ruby-compat";\nnew Module();\n',
   );
   await write("packages/vitest-matchers/package.json", "{}");
+  await write("packages/date/package.json", '{"description":"Date for Trails"}');
   await write("packages/not-a-package/README.md", "");
   await write(
     "scripts/api-compare/call-mismatches-exclude/activerecord/a.json",
@@ -223,8 +226,8 @@ describe("package-summary", () => {
 
   it("emits one entry per package.json with its metadata", async () => {
     const { packages } = await summarize(root);
-    expect(packages.map((p) => p.name)).toEqual(["activerecord", "vitest-matchers"]);
-    const [ar, vm] = packages;
+    expect(packages.map((p) => p.name)).toEqual(["activerecord", "date", "vitest-matchers"]);
+    const [ar, , vm] = packages;
     expect(ar.railsCounterpart).toBe("activerecord");
     expect(ar.description).toBe("ORM layer");
     expect(ar.claudeMd).toBe("packages/activerecord/CLAUDE.md");
@@ -235,18 +238,31 @@ describe("package-summary", () => {
     expect(vm.marks.extraSurfaceNovel).toBeNull();
   });
 
+  it("appends why api:compare skips a package to its description", async () => {
+    const date = (await summarize(root)).packages.find((p) => p.name === "date")!;
+    expect(date.railsCounterpart).toBe("date");
+    expect(date.description).toBe(
+      `Date for Trails (Not in api:compare: ${apiExcludedReasonOf("date")})`,
+    );
+    expect(apiExcludedReasonOf("date")).toContain("implemented in C");
+    expect(apiExcludedReasonOf("activerecord")).toBeNull();
+  });
+
   it("names a counterpart for every package but the trails-only ones", async () => {
     const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
-    expect(dirs.filter((dir) => railsCounterpartOf(dir) === null).sort()).toEqual([
+    const tooling = [
       "activerecord-cli",
-      "ruby-compat",
       "trails-tsc",
       "tse-compiler",
       "vitest-matchers",
       "website",
-    ]);
+    ];
+    expect(
+      dirs.filter((dir) => railsCounterpartOf(dir) === null).sort(),
+      "a new package that ports no gem belongs in `tooling` here; a gem port needs a vendor/sources.ts entry",
+    ).toEqual([...TS_ONLY_PACKAGES, ...tooling].sort());
   });
 
   it("enrolls every test:compare package in api:compare or records why not", () => {
@@ -389,7 +405,7 @@ describe("package-summary", () => {
   });
 
   it("writes the summary file", async () => {
-    expect(await main(root)).toMatch(/2 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
+    expect(await main(root)).toMatch(/3 packages, 6 tag sites, 4 files, 4 CLAUDE.md sections/);
     const out = JSON.parse(
       await fs.readFile(path.join(root, "scripts/parity/output/package-summary.json"), "utf-8"),
     );
