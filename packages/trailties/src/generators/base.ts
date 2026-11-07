@@ -117,8 +117,8 @@ export abstract class Base extends (Group as unknown as (abstract new (
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
    * @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85
    */
-  constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
-    super(args, localOptions, config);
+  constructor(args: unknown[] = [], options: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, options, config);
     this._indentation = 0;
   }
 
