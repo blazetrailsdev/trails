@@ -48,10 +48,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-type AppRoutes = Parameters<typeof AbstractController.Trailties.RoutesHelpers.with>[0] & {
-  mountedHelpers(): object;
-};
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);

@@ -481,6 +481,8 @@ export class Parameters {
     return this;
   }
 
+  fetch(key: string, defaultValue: Record<string, unknown>): Parameters;
+  fetch(key: string, ...args: unknown[]): unknown;
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
     return this.convertValueToParameters(
