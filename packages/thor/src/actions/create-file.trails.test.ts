@@ -30,7 +30,7 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
     const content = "a\udcffb";
     await capture(":stdout", () => host().createFile("binary", content));
     const written = await File.binreadAsync(`${root}/binary`);
-    expect([...written!]).toEqual([0x61, 0xff, 0x62]);
+    expect([...written]).toEqual([0x61, 0xff, 0x62]);
     const out = await capture(":stdout", () => host().createFile("binary", content));
     expect(out).toContain("identical");
   });

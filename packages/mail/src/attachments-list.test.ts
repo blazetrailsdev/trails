@@ -10,7 +10,7 @@ import { Utilities } from "./utilities.js";
 const fixturePath = (...path: string[]) =>
   new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
 const readRawFixture = async (...path: string[]) =>
-  (await IO.binreadAsync(decodeURIComponent(fixturePath(...path))))!;
+  await IO.binreadAsync(decodeURIComponent(fixturePath(...path)));
 const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
 
 function encodeBase64(str: unknown) {
