@@ -40,6 +40,7 @@ async function app(trailsEnv: string): Promise<Application> {
   class A extends Application {}
   Application.register(A, appPath);
   const application = A.instance();
+  Trails.application = application;
   await application.root();
   return application;
 }
