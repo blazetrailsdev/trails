@@ -12,11 +12,7 @@ import {
   hashDelete,
 } from "@blazetrails/ruby-compat";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
-import {
-  Base as GeneratorBase,
-  type GeneratorOptions,
-  type GeneratorConfig,
-} from "../../../../base.js";
+import { Base, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import {
   Database,
   DATABASES,
@@ -37,7 +33,7 @@ export interface ChangeGeneratorOptions extends GeneratorOptions {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ChangeGenerator extends Included<typeof AppName> {}
 
-export class ChangeGenerator extends GeneratorBase {
+export class ChangeGenerator extends Base {
   static override readonly name = "Trails::Generators::Db::System::ChangeGenerator";
 
   static {

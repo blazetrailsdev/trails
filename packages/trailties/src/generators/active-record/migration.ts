@@ -15,6 +15,7 @@ export function nextMigrationNumber(
   return Migration.nextMigrationNumber(nextMigrationNumber);
 }
 
+/** @internal */
 export function dbMigratePath(this: MigrationHost): string {
   if (TopLevel.Trails?.application != null) {
     return this.configuredMigratePath() ?? this.defaultMigratePath();
@@ -23,10 +24,12 @@ export function dbMigratePath(this: MigrationHost): string {
   }
 }
 
+/** @internal */
 export function defaultMigratePath(this: MigrationHost): string {
   return TopLevel.Trails!.application!.config.paths().get("db/migrate")!.toAry()[0];
 }
 
+/** @internal */
 export function configuredMigratePath(this: MigrationHost): string | undefined {
   const database = this.options.database;
   if (database == null) return;

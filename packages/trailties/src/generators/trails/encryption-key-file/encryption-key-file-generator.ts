@@ -1,8 +1,8 @@
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { File, Pathname } from "@blazetrails/ruby-compat";
-import { Base as GeneratorBase } from "../../base.js";
+import { Base } from "../../base.js";
 
-export class EncryptionKeyFileGenerator extends GeneratorBase {
+export class EncryptionKeyFileGenerator extends Base {
   static {
     this.methodAdded("addKeyFile");
     this.methodAdded("addKeyFileSilently");

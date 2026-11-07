@@ -1,8 +1,8 @@
 import { File } from "@blazetrails/ruby-compat";
 import { chmod, gsubFile, prependToFile } from "@blazetrails/thor/actions/file-manipulation";
-import { Base as GeneratorBase } from "@blazetrails/trailties/generators";
+import { Base } from "@blazetrails/trailties/generators";
 
-export class InstallGenerator extends GeneratorBase {
+export class InstallGenerator extends Base {
   static {
     void this.sourceRoot(
       File.expandPath("templates", decodeURIComponent(new URL(".", import.meta.url).pathname)),

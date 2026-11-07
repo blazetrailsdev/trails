@@ -2,7 +2,7 @@
 import { include, type Included, pluralize } from "@blazetrails/activesupport";
 import { ModelGenerator, type ModelGeneratorOptions } from "../model/model-generator.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
-import type { Base as GeneratorBase, GeneratorConfig } from "../../base.js";
+import type { Base, GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 export interface ResourceGeneratorOptions extends ModelGeneratorOptions {
@@ -41,7 +41,7 @@ include(ResourceGenerator, ResourceHelpers);
 ResourceGenerator.hookFor(
   "resourceController",
   { required: true },
-  function (this: GeneratorBase, controller: GeneratorClass) {
+  function (this: Base, controller: GeneratorClass) {
     return this.invoke(controller, [
       (this as ResourceGenerator).controllerName,
       (this.options as ResourceGeneratorOptions).actions,

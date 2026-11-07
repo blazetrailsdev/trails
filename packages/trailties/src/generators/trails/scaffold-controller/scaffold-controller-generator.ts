@@ -9,12 +9,7 @@ import {
 import { Error as GeneratorError } from "../../base.js";
 import { ModelHelpers } from "../../model-helpers.js";
 import { File, format, partition } from "@blazetrails/ruby-compat";
-import {
-  dasherize,
-  type Base as GeneratorBase,
-  type GeneratorConfig,
-  type GeneratorOptions,
-} from "../../base.js";
+import { dasherize, type Base, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
@@ -141,7 +136,7 @@ ScaffoldControllerGenerator.methodAdded("createControllerFiles");
 ScaffoldControllerGenerator.hookFor(
   "templateEngine",
   { as: "scaffold" },
-  function (this: GeneratorBase, templateEngine: GeneratorClass) {
+  function (this: Base, templateEngine: GeneratorClass) {
     if (!(this.options as ScaffoldControllerGeneratorOptions).api)
       return this.invoke(templateEngine);
   },
@@ -149,7 +144,7 @@ ScaffoldControllerGenerator.hookFor(
 ScaffoldControllerGenerator.hookFor(
   "resourceRoute",
   { required: true },
-  function (this: GeneratorBase, route: GeneratorClass) {
+  function (this: Base, route: GeneratorClass) {
     if (!(this.options as ScaffoldControllerGeneratorOptions).skipRoutes) return this.invoke(route);
   },
 );
@@ -157,7 +152,7 @@ ScaffoldControllerGenerator.hookFor("testFramework", { as: "scaffold" });
 ScaffoldControllerGenerator.hookFor(
   "helper",
   { as: "scaffold" },
-  function (this: GeneratorBase, invoked: GeneratorClass) {
+  function (this: Base, invoked: GeneratorClass) {
     return this.invoke(invoked, [(this as ScaffoldControllerGenerator).controllerName]);
   },
 );

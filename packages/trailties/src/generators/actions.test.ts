@@ -25,10 +25,10 @@ import { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { Base as GeneratorBase } from "./base.js";
+import { Base } from "./base.js";
 import * as Assertions from "./testing/assertions.js";
 
-class TestGenerator extends GeneratorBase {}
+class TestGenerator extends Base {}
 class ActionsTestApp extends Application {}
 
 let mock: Mock | null;
