@@ -109,6 +109,7 @@ export function DelegateClass<T extends MixinBase>(
   delegator.prototype = superclass.prototype;
   const klass = class extends delegator {
     declare delegateDcObj: unknown;
+    declare methodMissing: (m: string, ...args: unknown[]) => unknown;
 
     constructor(obj: unknown) {
       super();

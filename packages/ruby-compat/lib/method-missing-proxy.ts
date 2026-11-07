@@ -196,14 +196,18 @@ export function methodMissingProxy<T extends object>(
 }
 
 /**
- * Mirrors `BasicObject#method_missing` (`vendor/ruby/v3.3.11/vm_eval.c:2570`).
+ * Mirrors the dispatch to `method_missing` (`vendor/ruby/v3.3.11/vm_eval.c:2570`) for a
+ * class whose `methodMissing` forwards to a delegate. A name the delegate answers
+ * is read off it, so a reader returns its value; any other name returns a
+ * function calling `receiver.methodMissing`. A read off a prototype (an own
+ * `constructor`) and an `_`-prefixed name, trails' private spelling, are not
+ * dispatched, as `respondsTo` above answers neither.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function methodMissingPrototype<T extends object>(
-  klass: { prototype: T },
-  options: { delegate: (receiver: T) => unknown },
-): void {
+export function methodMissingPrototype<
+  T extends { methodMissing(m: string, ...args: unknown[]): unknown },
+>(klass: { prototype: T }, options: { delegate: (receiver: T) => unknown }): void {
   const { delegate: readDelegate } = options;
   const parent = Object.getPrototypeOf(klass.prototype) as object;
   Object.setPrototypeOf(
@@ -227,15 +231,7 @@ export function methodMissingPrototype<T extends object>(
         if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) {
           return undefined;
         }
-        return (...args: unknown[]) => {
-          throw new NoMethodError(
-            `undefined method '${prop}' for an instance of ${receiver.constructor.name}`,
-            prop,
-            args,
-            false,
-            { receiver },
-          );
-        };
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
       },
     }),
   );

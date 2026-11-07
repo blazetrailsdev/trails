@@ -6,6 +6,7 @@ import {
   Tempfile,
   basicObjRespondTo,
   methodMissingPrototype,
+  rbFSend,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 
@@ -30,8 +31,7 @@ export class UploadedFile {
   readonly originalFilename: string;
   contentType: string;
 
-  /** @internal */
-  _tempfile: Tempfile | StringIO;
+  private _tempfile: Tempfile | StringIO;
 
   constructor(
     filepath?: string | UploadedFileOptions | null,
@@ -80,6 +80,12 @@ export class UploadedFile {
   isRespondTo(name: string): boolean {
     return basicObjRespondTo(this, name) || rbObjRespondTo(this._tempfile, name);
   }
-}
 
-methodMissingPrototype(UploadedFile, { delegate: (uploadedFile) => uploadedFile._tempfile });
+  methodMissing(methodName: string, ...args: unknown[]): unknown {
+    return rbFSend(this._tempfile, methodName, ...args);
+  }
+
+  static {
+    methodMissingPrototype(this, { delegate: (uploadedFile) => uploadedFile._tempfile });
+  }
+}
