@@ -5,6 +5,7 @@ import {
   env,
   exit,
   included,
+  rbArgv,
   rbRegSUnion,
   stringSplit,
 } from "@blazetrails/ruby-compat";
