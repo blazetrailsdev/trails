@@ -78,7 +78,7 @@ export class QueryParser {
   static readonly DEFAULT_SEP = DEFAULT_SEP;
 
   readonly paramDepthLimit: number;
-  private readonly bytesizeLimit: number;
+  readonly bytesizeLimit: number;
   private readonly paramsLimit: number;
   private readonly paramsClass: typeof Params;
 
@@ -108,48 +108,49 @@ export class QueryParser {
 
   parseQuery(
     qs: string | null | undefined,
-    separator?: string | null,
+    separator: string | null = null,
+    unescaper: ((s: string) => string) | null = null,
   ): Record<string, string | string[] | null> {
-    if (!qs) return Object.create(null);
-    const str = this.checkQueryString(qs, separator);
-    const sep = separator ? (COMMON_SEP[separator] ?? escapedSepRe(separator)) : DEFAULT_SEP;
-    const result: Record<string, string | string[] | null> = Object.create(null);
-
-    for (const p of str.split(sep)) {
-      if (p.length === 0) continue;
-      const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
-      if (Object.hasOwn(result, k)) {
-        const cur = result[k];
-        if (Array.isArray(cur)) {
-          cur.push(v as string);
-        } else {
-          result[k] = [cur as string, v as string];
-        }
-      } else {
-        result[k] = v;
-      }
-    }
-    return result;
-  }
-
-  parseNestedQuery(qs: string | null | undefined, separator?: string | null): Record<string, any> {
-    if (!qs) return Object.create(null);
     const params = this.makeParams();
 
-    try {
-      const str = this.checkQueryString(qs, separator);
-      const sep = separator ? (COMMON_SEP[separator] ?? escapedSepRe(separator)) : DEFAULT_SEP;
+    this.eachQueryPair(qs, separator, unescaper, (k, v) => {
+      const cur = params[k];
+      if (cur != null) {
+        if (Array.isArray(cur)) {
+          cur.push(v);
+        } else {
+          params[k] = [cur, v];
+        }
+      } else {
+        params[k] = v;
+      }
+    });
 
-      for (const p of str.split(sep)) {
-        const [k = null, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
-        this._normalizeParams(params, k, v, 0);
-      }
-    } catch (e) {
-      if (e instanceof ArgumentError) {
-        throw new InvalidParameterError((e as Error).message);
-      }
-      throw e;
-    }
+    return Object.assign(Object.create(null), params);
+  }
+
+  parseQueryPairs(
+    qs: string | null | undefined,
+    separator: string | null = null,
+  ): [string, string | null][] {
+    const pairs: [string, string | null][] = [];
+
+    this.eachQueryPair(qs, separator, null, (k, v) => {
+      pairs.push([k, v]);
+    });
+
+    return pairs;
+  }
+
+  parseNestedQuery(
+    qs: string | null | undefined,
+    separator: string | null = null,
+  ): Record<string, any> {
+    const params = this.makeParams();
+
+    this.eachQueryPair(qs, separator, null, (k, v) => {
+      this._normalizeParams(params, k, v, 0);
+    });
 
     return Object.assign(Object.create(null), params);
   }
@@ -166,23 +167,53 @@ export class QueryParser {
     return new (this.constructor as typeof QueryParser)(this.paramsClass, paramDepthLimit);
   }
 
-  private checkQueryString(qs: string, sep: string | null | undefined): string {
-    const bytesize = new TextEncoder().encode(qs).length;
-    if (bytesize > this.bytesizeLimit) {
-      throw new QueryLimitError(
-        `total query size (${bytesize}) exceeds limit (${this.bytesizeLimit})`,
+  private eachQueryPair(
+    qs: string | null | undefined,
+    separator: string | null,
+    unescaper: ((s: string) => string) | null,
+    block: (k: string, v: string | null) => void,
+  ): void {
+    try {
+      if (qs == null || qs.length === 0) return;
+
+      if (new TextEncoder().encode(qs).length > this.bytesizeLimit) {
+        throw new QueryLimitError(`total query size exceeds limit (${this.bytesizeLimit})`);
+      }
+
+      const pairs = stringSplit(
+        qs,
+        separator ? (COMMON_SEP[separator] ?? escapedSepRe(separator)) : DEFAULT_SEP,
+        this.paramsLimit + 1,
       );
+
+      if (pairs.length > this.paramsLimit) {
+        const sepChars = separator || "&";
+        const paramCount =
+          pairs.length + [...pairs.at(-1)!].filter((c) => sepChars.includes(c)).length;
+        throw new QueryLimitError(
+          `total number of query parameters (${paramCount}) exceeds limit (${this.paramsLimit})`,
+        );
+      }
+
+      if (unescaper != null) {
+        for (const p of pairs) {
+          if (p.length === 0) continue;
+          const [k, v = null] = stringSplit(p, "=", 2).map(unescaper);
+          block(k, v);
+        }
+      } else {
+        for (const p of pairs) {
+          if (p.length === 0) continue;
+          const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
+          block(k, v);
+        }
+      }
+    } catch (e) {
+      if (e instanceof ArgumentError) {
+        throw new InvalidParameterError((e as Error).message);
+      }
+      throw e;
     }
-    const sepChars = sep || "&";
-    const sepRe = new RegExp(`[${sepChars.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}]`, "g");
-    let paramCount = 0;
-    while (sepRe.exec(qs) !== null) paramCount++;
-    if (paramCount >= this.paramsLimit) {
-      throw new QueryLimitError(
-        `total number of query parameters (${paramCount + 1}) exceeds limit (${this.paramsLimit})`,
-      );
-    }
-    return qs;
   }
 
   private _normalizeParams(params: any, name: string | null, v: unknown, depth: number): any {
