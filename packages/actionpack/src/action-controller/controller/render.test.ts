@@ -1110,15 +1110,15 @@ describe("HeadRenderTest", () => {
   });
 
   it("head with symbolic status", async () => {
-    await tc.get("headWithSymbolicStatus", { params: { status: "ok" } });
+    await tc.get("headWithSymbolicStatus", { params: { status: ":ok" } });
     expect(tc.response.status).toBe(200);
     assertResponse("ok");
 
-    await tc.get("headWithSymbolicStatus", { params: { status: "not_found" } });
+    await tc.get("headWithSymbolicStatus", { params: { status: ":not_found" } });
     expect(tc.response.status).toBe(404);
     assertResponse("not_found");
 
-    await tc.get("headWithSymbolicStatus", { params: { status: "no_content" } });
+    await tc.get("headWithSymbolicStatus", { params: { status: ":no_content" } });
     expect(tc.response.status).toBe(204);
     assertNotIncludes(tc.response.headers, "Content-Length");
     assertResponse("no_content");

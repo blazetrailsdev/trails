@@ -140,15 +140,15 @@ describe("PermissionsPolicyIntegrationTest", () => {
     }
 
     index(): void {
-      this.head("ok");
+      this.head(":ok");
     }
 
     sampleController(): void {
-      this.head("ok");
+      this.head(":ok");
     }
 
     multipleDirectives(): void {
-      this.head("ok");
+      this.head(":ok");
     }
   }
   constSetPath("PermissionsPolicyIntegrationTest::PolicyController", PolicyController);
@@ -251,7 +251,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     }
 
     index(): void {
-      this.head("ok");
+      this.head(":ok");
     }
   }
   type Helpers = { isPigsCanFly(): boolean; isSkyIsBlue(): boolean };

@@ -84,7 +84,7 @@ describe("ActionController::Cookies#cookies", () => {
   class CookiesController extends ApplicationController {
     async authenticate(): Promise<void> {
       this.cookies().set("user_name", "david");
-      this.head("ok");
+      this.head(":ok");
     }
   }
 
@@ -143,7 +143,7 @@ describe("ActionController::Base#respond_to?", () => {
     back = "";
     async show(): Promise<void> {
       this.back = this.viewContext().urlFor(":back");
-      this.head("ok");
+      this.head(":ok");
     }
   }
 
@@ -251,7 +251,7 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
       this.viewContext().formWith({ model: new Post(), url: "/posts" }, (f) => {
         this.builder = f;
       });
-      this.head("ok");
+      this.head(":ok");
     }
   }
 

@@ -742,15 +742,15 @@ ActionController.TestRequest = TestRequest;
 
 export class LiveTestResponse extends LiveResponse {
   get isSuccess(): boolean {
-    return this.successful;
+    return this.isSuccessful;
   }
 
   get isMissing(): boolean {
-    return this.notFound;
+    return this.isNotFound;
   }
 
   get isError(): boolean {
-    return this.serverError;
+    return this.isServerError;
   }
 }
 

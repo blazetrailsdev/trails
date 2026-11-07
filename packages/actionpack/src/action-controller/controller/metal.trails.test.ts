@@ -75,9 +75,9 @@ describe("Metal#response_body= / #status=", () => {
     const c = new klass() as Metal & Included<typeof Head>;
     c.setResponseBang(makeResponse());
     expect(() => {
-      c.status = "bogus";
+      c.status = ":bogus";
     }).toThrow("Unrecognized status code :bogus");
-    expect(() => c.head("bogus")).toThrow("Unrecognized status code :bogus");
+    expect(() => c.head(":bogus")).toThrow("Unrecognized status code :bogus");
   });
 });
 

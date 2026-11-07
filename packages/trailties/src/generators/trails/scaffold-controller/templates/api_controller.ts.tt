@@ -35,9 +35,9 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
     this.<%= singular %> = <%= this.ormClass().build(modelClassName, params) %>;
 
     if (await this.<%= this.ormInstance().save() %>) {
-      await this.render({ json: this.<%= singular %>, status: "created", location: this.<%= singular %> });
+      await this.render({ json: this.<%= singular %>, status: ":created", location: this.<%= singular %> });
     } else {
-      await this.render({ json: this.<%= this.ormInstance().errors() %>, status: "unprocessable_entity" });
+      await this.render({ json: this.<%= this.ormInstance().errors() %>, status: ":unprocessable_entity" });
     }
   }
 
@@ -46,7 +46,7 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
     if (await this.<%= this.ormInstance().update(params) %>) {
       await this.render({ json: this.<%= singular %> });
     } else {
-      await this.render({ json: this.<%= this.ormInstance().errors() %>, status: "unprocessable_entity" });
+      await this.render({ json: this.<%= this.ormInstance().errors() %>, status: ":unprocessable_entity" });
     }
   }
 

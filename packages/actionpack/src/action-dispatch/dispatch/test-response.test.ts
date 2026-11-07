@@ -6,7 +6,7 @@ import { TestResponse } from "../testing/test-response.js";
 describe("TestResponseTest", () => {
   function assertResponseCodeRange(
     range: Range<number> | number[],
-    predicate: "successful" | "notFound" | "isRedirection" | "serverError" | "clientError",
+    predicate: "isSuccessful" | "isNotFound" | "isRedirection" | "isServerError" | "isClientError",
   ): void {
     const response = new TestResponse();
     for (let status = 0; status <= 599; status++) {
@@ -18,11 +18,11 @@ describe("TestResponseTest", () => {
   }
 
   it("helpers", () => {
-    assertResponseCodeRange(new Range(200, 299), "successful");
-    assertResponseCodeRange([404], "notFound");
+    assertResponseCodeRange(new Range(200, 299), "isSuccessful");
+    assertResponseCodeRange([404], "isNotFound");
     assertResponseCodeRange(new Range(300, 399), "isRedirection");
-    assertResponseCodeRange(new Range(500, 599), "serverError");
-    assertResponseCodeRange(new Range(400, 499), "clientError");
+    assertResponseCodeRange(new Range(500, 599), "isServerError");
+    assertResponseCodeRange(new Range(400, 499), "isClientError");
   });
 
   it("response parsing", () => {

@@ -30,7 +30,7 @@ describe("ActiveStorage::SetBlob", () => {
     const head = vi.fn();
     const params = new Map([["signed_id", "invalid"]]);
     await SetBlob.setBlob.call({ params, head, blobScope: SetBlob.blobScope } as never);
-    expect(head).toHaveBeenCalledWith("not_found");
+    expect(head).toHaveBeenCalledWith(":not_found");
   });
 });
 

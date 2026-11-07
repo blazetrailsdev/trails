@@ -164,7 +164,7 @@ describe("ActionController rendering", () => {
     it("accepts symbol status", async () => {
       class C extends Base {
         async index() {
-          await this.render({ plain: "created", status: "created" });
+          await this.render({ plain: "created", status: ":created" });
         }
       }
       const c = new C();
@@ -175,7 +175,7 @@ describe("ActionController rendering", () => {
     it("accepts not_found status", async () => {
       class C extends Base {
         async index() {
-          await this.render({ plain: "nope", status: "not_found" });
+          await this.render({ plain: "nope", status: ":not_found" });
         }
       }
       const c = new C();
@@ -186,7 +186,7 @@ describe("ActionController rendering", () => {
     it("accepts unprocessable_entity status", async () => {
       class C extends Base {
         async index() {
-          await this.render({ json: { errors: [] }, status: "unprocessable_entity" });
+          await this.render({ json: { errors: [] }, status: ":unprocessable_entity" });
         }
       }
       const c = new C();
@@ -218,7 +218,7 @@ describe("ActionController rendering", () => {
     it("head with symbol status", async () => {
       class C extends HeadMetal {
         async index() {
-          this.head("not_found");
+          this.head(":not_found");
         }
       }
       const c = new C();
@@ -229,7 +229,7 @@ describe("ActionController rendering", () => {
     it("head with ok", async () => {
       class C extends HeadMetal {
         async index() {
-          this.head("ok");
+          this.head(":ok");
         }
       }
       const c = new C();
@@ -388,7 +388,7 @@ describe("ActionController rendering", () => {
     it("renders with status", async () => {
       class C extends API {
         async index() {
-          await this.render({ json: {}, status: "created" });
+          await this.render({ json: {}, status: ":created" });
         }
       }
       const c = new C();
@@ -552,7 +552,7 @@ describe("ActionController render edge cases", () => {
   it("render with status symbol", async () => {
     class C extends Base {
       async index() {
-        await this.render({ json: {}, status: "not_found" });
+        await this.render({ json: {}, status: ":not_found" });
       }
     }
     const c = new C();
@@ -574,7 +574,7 @@ describe("ActionController render edge cases", () => {
   it("head with status symbol", async () => {
     class C extends Base {
       async index() {
-        this.head("not_found");
+        this.head(":not_found");
       }
     }
     const c = new C();

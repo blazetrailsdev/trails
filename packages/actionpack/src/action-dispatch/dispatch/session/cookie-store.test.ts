@@ -54,7 +54,7 @@ const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as
 
 class TestController extends Base {
   noSessionAccess(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 
   async persistentSessionId(): Promise<void> {
@@ -83,17 +83,17 @@ class TestController extends Base {
 
   callSessionClear(): void {
     this.session.clear();
-    this.head("ok");
+    this.head(":ok");
   }
 
   callResetSession(): void {
     this.resetSession();
-    this.head("ok");
+    this.head(":ok");
   }
 
   raiseDataOverflow(): void {
     this.session.set("foo", "bye!".repeat(1024));
-    this.head("ok");
+    this.head(":ok");
   }
 
   async changeSessionId(): Promise<void> {
@@ -106,7 +106,7 @@ class TestController extends Base {
       "renew",
       true,
     );
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

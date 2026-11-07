@@ -5857,7 +5857,7 @@ describe("TestInternalRoutingParams", () => {
 
   class InternalController extends Base {
     internal(): void {
-      this.head("ok");
+      this.head(":ok");
     }
   }
   constSet(TopLevel, "InternalController", InternalController);

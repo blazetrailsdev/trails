@@ -175,7 +175,7 @@ describe("TestCase::Behavior", () => {
 describe("TestCase#wrap_execution", () => {
   class HeadController extends Base {
     async index() {
-      this.head("ok");
+      this.head(":ok");
     }
   }
 
@@ -330,7 +330,7 @@ describe("TestCase over a PostsController", () => {
     }
 
     async forbidden() {
-      this.head("forbidden");
+      this.head(":forbidden");
     }
   }
   class PostsControllerTest extends TestCase {}

@@ -14,7 +14,7 @@ export class ApplicationController extends ActionController.Base {
         html: htmlSafe(
           "<p>For security purposes, this information is only available to local requests.</p>",
         ),
-        status: "forbidden",
+        status: ":forbidden",
       });
     }
   }

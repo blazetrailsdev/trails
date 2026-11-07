@@ -10,7 +10,7 @@ declare module "@blazetrails/actionpack" {
 describe("Renderers.add render option types", () => {
   it("accepts a renderer key an app merges into RenderOptions", () => {
     const typed = (controller: ActionController.Base): void => {
-      controller.render({ csv: ["c", "s", "v"], status: "ok" });
+      controller.render({ csv: ["c", "s", "v"], status: ":ok" });
       controller.render("index", { csv: [] });
       // @ts-expect-error the merged key keeps its declared type
       controller.render({ csv: "c,s,v" });

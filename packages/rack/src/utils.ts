@@ -443,10 +443,7 @@ export function secureCompare(a: string | Uint8Array, b: string | Uint8Array): b
 }
 
 export function statusCode(status: number | string): number {
-  if (
-    typeof status === "string" &&
-    ((status.trim() !== "" && Number.isNaN(parseInt(status, 10))) || isSymbol(status))
-  ) {
+  if (isSymbol(status)) {
     const symbol = stringToSym(status);
     status = symbolToS(symbol);
     return fetch(

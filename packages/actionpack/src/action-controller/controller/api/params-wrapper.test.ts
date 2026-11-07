@@ -15,7 +15,7 @@ describe("ParamsWrapperForApiTest", () => {
 
     test() {
       this.lastParameters = this.params.except("controller", "action").toUnsafeH();
-      this.head("ok");
+      this.head(":ok");
     }
   }
   Object.defineProperty(UsersController, "name", {

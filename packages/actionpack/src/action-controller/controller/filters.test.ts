@@ -913,7 +913,7 @@ describe("FilterTest", () => {
       response = await testProcess(FT_RescuedController);
     });
 
-    assert(response!.successful);
+    assert(response!.isSuccessful);
     expect(response!.body).toBe(
       "I rescued this: #<FilterTest::ErrorToRescue: Something made the bad noise.>",
     );

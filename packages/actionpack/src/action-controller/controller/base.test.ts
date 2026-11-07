@@ -61,7 +61,7 @@ class EmptyController extends Base {}
 class SimpleController extends Base {
   // @ts-expect-error -- Ruby lets an action shadow an inherited method (base_test.rb:16-18)
   status(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 
   hello(): void {
@@ -73,7 +73,7 @@ class ChildController extends SimpleController {}
 
 class NonEmptyController extends Base {
   publicAction(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 
@@ -94,7 +94,7 @@ Object.defineProperty(DefaultUrlOptionsController.prototype, "defaultUrlOptions"
 
 class OptionalDefaultUrlOptionsController extends Base {
   show(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 Object.defineProperty(OptionalDefaultUrlOptionsController.prototype, "defaultUrlOptions", {

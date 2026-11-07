@@ -159,7 +159,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
 
   class PostsController extends Base {
     create(): void {
-      this.head("created");
+      this.head(":created");
     }
   }
   PostsController.protectFromForgery({ with: "exception" });
@@ -215,7 +215,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   it("reset_session delegates to the controller and drops the CSRF token", async ({ task }) => {
     class ResetController extends Base {
       create(): void {
-        this.head("created");
+        this.head(":created");
       }
     }
     ResetController.protectFromForgery({ with: "reset_session" });

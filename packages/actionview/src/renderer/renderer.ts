@@ -22,7 +22,7 @@ export class Renderer {
   render(
     context: ViewContext,
     options: RenderOptions,
-  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | Uint8Array | null> {
     const rendered = this.renderToObject(context, options);
     return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }
@@ -45,7 +45,7 @@ export class Renderer {
   async renderBody(
     context: ViewContext,
     options: RenderOptions,
-  ): Promise<Body | (string | SafeBuffer | null)[]> {
+  ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]> {
     if (Object.hasOwn(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
@@ -57,7 +57,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
     block?: (...args: unknown[]) => unknown,
-  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | Uint8Array | null> {
     const rendered = this.renderPartialToObject(context, options, block);
     return isThenable(rendered) ? rendered.then((r) => r.body) : rendered.body;
   }

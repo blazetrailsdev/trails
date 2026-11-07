@@ -14,7 +14,7 @@ class ApiRateLimitedController extends API {
   }
 
   limitedToTwo() {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

@@ -7,7 +7,7 @@ import "../../test-helpers/abstract-unit.js";
 
 class UsersController extends Base {
   create(): void {
-    this.head("ok");
+    this.head(":ok");
   }
 }
 

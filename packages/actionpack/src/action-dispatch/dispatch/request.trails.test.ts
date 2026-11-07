@@ -82,7 +82,7 @@ describe("Request", () => {
     req.requestMethod = "PATCH";
     expect(req.requestMethod).toBe("PATCH");
     expect(req.getHeader("REQUEST_METHOD")).toBe("PATCH");
-    expect(new Request({ REQUEST_METHOD: "POST" }).formData).toBe(false);
+    expect(new Request({ REQUEST_METHOD: "POST" }).isFormData).toBe(false);
   });
 
   it("port falls back to standard_port, and reads the forwarded host's port", () => {

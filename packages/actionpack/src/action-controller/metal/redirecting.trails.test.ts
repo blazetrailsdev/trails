@@ -28,7 +28,7 @@ describe("Redirecting#redirect_to types", () => {
       controller.redirectTo("/posts");
       controller.redirectTo(post, {
         notice: "Post was successfully updated.",
-        status: "see_other",
+        status: ":see_other",
       });
       controller.redirectTo({ action: "index", status: 303 });
       controller.redirectTo({ action: "show", id: 5, onlyPath: true, anchor: "comments" });
@@ -36,7 +36,7 @@ describe("Redirecting#redirect_to types", () => {
       controller.redirectTo({ action: "index", onlyPath: "yes" });
       controller.redirectTo(() => "/posts", { alert: "Watch it, mister!", status: ":found" });
       controller.redirectTo("/posts", { status: 301, flash: { updatedPostId: 1 } });
-      controller.redirectTo("/posts", { status: "unprocessable_entity" });
+      controller.redirectTo("/posts", { status: ":unprocessable_entity" });
       controller.redirectTo("https://rubyonrails.org", { allowOtherHost: true });
       controller.redirectTo<"warning">("/posts", { warning: "Careful" });
       // @ts-expect-error a misspelled response option

@@ -320,7 +320,7 @@ export class Base {
     options: RenderOptions | string | object = {},
     locals: Record<string, unknown> = {},
     block?: () => unknown,
-  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | Uint8Array | null> {
     if ((options as object | null)?.constructor === Object) {
       return this.inRenderingContext(options as RenderOptions, () => {
         if (block) {

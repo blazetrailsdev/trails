@@ -203,13 +203,15 @@ export interface RenderToBodyHost {
   /** @internal */
   _processRenderTemplateOptions(options: Record<string, unknown>): void;
   /** @internal */
-  _renderTemplate(options: Record<string, unknown>): Promise<string | SafeBuffer | null>;
+  _renderTemplate(
+    options: Record<string, unknown>,
+  ): Promise<string | SafeBuffer | Uint8Array | null>;
 }
 
 export async function renderToBody(
   this: RenderToBodyHost,
   options: Record<string, unknown> = {},
-): Promise<string | SafeBuffer | null> {
+): Promise<string | SafeBuffer | Uint8Array | null> {
   this._processOptions(options);
   this._processRenderTemplateOptions(options);
   return this._renderTemplate(options);
@@ -219,7 +221,7 @@ export async function renderToBody(
 export async function _renderTemplate(
   this: RenderToBodyHost,
   options: Record<string, unknown>,
-): Promise<string | SafeBuffer | null> {
+): Promise<string | SafeBuffer | Uint8Array | null> {
   const variant = options["variant"];
   delete options["variant"];
   const assigns = options["assigns"];

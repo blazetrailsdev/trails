@@ -593,7 +593,7 @@ it("return status code for string", () => {
 });
 
 it("return status code for symbol", () => {
-  expect(Utils.statusCode("ok" as any)).toBe(200);
+  expect(Utils.statusCode(":ok")).toBe(200);
 });
 
 it("return status code and give deprecation warning for obsolete symbols", () => {
@@ -605,12 +605,12 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
 
   captureWarnings((warnings) => {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
-      expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
+      expect(Utils.statusCode(`:${symbol}`)).toBe(valueHash.statusCode);
       assertEmpty(warnings);
     }
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
-      expect(Utils.statusCode(symbol)).toBe(code);
+      expect(Utils.statusCode(`:${symbol}`)).toBe(code);
       expect(warnings.pop()).toEqual([
         `Status code :${symbol} is deprecated and will be removed in a future version of Rack.`,
         { uplevel: 3 },
@@ -623,7 +623,7 @@ it("raise an error for an invalid symbol", () => {
   let error!: Error;
   expect(() => {
     try {
-      Utils.statusCode("foobar" as any);
+      Utils.statusCode(":foobar");
     } catch (e) {
       error = e as Error;
       throw e;

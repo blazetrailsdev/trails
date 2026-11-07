@@ -514,7 +514,7 @@ export class Request {
     return this.hasHeader(key);
   }
 
-  get formData(): boolean {
+  get isFormData(): boolean {
     const mt = this.mediaType;
     return mt != null && (FORM_DATA_MEDIA_TYPES as readonly string[]).includes(mt);
   }
@@ -805,7 +805,7 @@ export interface Request extends Omit<
   | "logger"
   | "GET"
   | "POST"
-  | "formData"
+  | "isFormData"
   | "defaultSession"
   | "serverName"
   | "acceptEncoding"

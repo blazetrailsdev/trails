@@ -16,20 +16,22 @@ export interface AssertionResponseHost {
 }
 
 export interface AssertionResponseLike {
-  status: number;
   responseCode: number;
   body?: string;
   location?: string;
-  isRedirection?: boolean;
+  isSuccessful: boolean;
+  isNotFound: boolean;
+  isRedirection: boolean;
+  isServerError: boolean;
   getHeader?: (key: string) => string | undefined;
 }
 
-const RESPONSE_PREDICATES: Record<string, (status: number) => boolean> = {
-  success: (s) => s >= 200 && s <= 299,
-  missing: (s) => s === 404,
-  redirect: (s) => s >= 300 && s <= 399,
-  error: (s) => s >= 500 && s <= 599,
-};
+const RESPONSE_PREDICATES = {
+  success: "isSuccessful",
+  missing: "isNotFound",
+  redirect: "isRedirection",
+  error: "isServerError",
+} as const;
 
 export function assertResponse(
   this: AssertionResponseHost,
@@ -39,7 +41,7 @@ export function assertResponse(
   message ??= generateResponseMessage.call(this, type);
 
   if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
-    assert(RESPONSE_PREDICATES[type](this.response.status), message);
+    assert(this.response[RESPONSE_PREDICATES[type as keyof typeof RESPONSE_PREDICATES]], message);
   } else {
     assertEqual(new AssertionResponse(type).code, this.response.responseCode, message);
   }
@@ -89,7 +91,7 @@ export function normalizeArgumentToRedirection(
 export function generateResponseMessage(
   this: AssertionResponseHost,
   expected: number | string,
-  actual: number = this.response.status,
+  actual: number = this.response.responseCode,
 ): () => string {
   return () =>
     `Expected response to be a <${codeWithName(expected)}>, but was a <${codeWithName(actual)}>`

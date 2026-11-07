@@ -39,11 +39,11 @@ export class DiskController extends BaseController {
           disposition: key.disposition,
         });
       } else {
-        this.head("not_found");
+        this.head(":not_found");
       }
     } catch (error) {
       if (!(error instanceof Errno.ENOENT)) throw error;
-      this.head("not_found");
+      this.head(":not_found");
     }
   }
 
@@ -55,16 +55,16 @@ export class DiskController extends BaseController {
           await this.namedDiskService(token.service_name).upload(token.key, this.request.body, {
             checksum: token.checksum,
           });
-          this.head("no_content");
+          this.head(":no_content");
         } else {
-          this.head("unprocessable_entity");
+          this.head(":unprocessable_entity");
         }
       } else {
-        this.head("not_found");
+        this.head(":not_found");
       }
     } catch (error) {
       if (!(error instanceof IntegrityError)) throw error;
-      this.head("unprocessable_entity");
+      this.head(":unprocessable_entity");
     }
   }
 

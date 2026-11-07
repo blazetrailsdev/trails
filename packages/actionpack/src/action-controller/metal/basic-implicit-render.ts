@@ -19,7 +19,7 @@ export async function sendAction(
 }
 
 export function defaultRender(this: BasicImplicitRenderHost): void {
-  this.head("no_content");
+  this.head(":no_content");
 }
 
 export const BasicImplicitRender = { sendAction, defaultRender };

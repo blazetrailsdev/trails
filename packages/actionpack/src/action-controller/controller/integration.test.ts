@@ -316,7 +316,7 @@ class IntegrationController extends Base {
 
   async setCookie(): Promise<void> {
     this.cookies().set("foo", "bar");
-    this.head("ok");
+    this.head(":ok");
   }
 
   async getCookie(): Promise<void> {
@@ -337,7 +337,7 @@ class IntegrationController extends Base {
 
   async removeHeader(): Promise<void> {
     this.response.headers.delete(this.params.get("header") as string);
-    this.head("ok", { c: "3" });
+    this.head(":ok", { c: "3" });
   }
 }
 
@@ -1177,7 +1177,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
     static {
       Object.defineProperty(this.prototype, "status", {
         async value(this: Base): Promise<void> {
-          this.head("ok");
+          this.head(":ok");
         },
         configurable: true,
         writable: true,

@@ -23,6 +23,10 @@ describe("Utils.statusCode", () => {
     expect(Utils.statusCode("")).toBe(0);
     expect(Utils.statusCode("  ")).toBe(0);
   });
+
+  it("converts a non-numeric String with to_i", () => {
+    expect(Utils.statusCode("abc")).toBe(0);
+  });
 });
 
 describe("Utils.setCookieHeader", () => {
