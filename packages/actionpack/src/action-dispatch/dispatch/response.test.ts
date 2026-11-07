@@ -290,11 +290,11 @@ describe("ResponseTest", () => {
     const response = newResponse();
     let eachCounter = 0;
     response.body = {
-      *[Symbol.iterator]() {
+      each(block: (chunk: string) => void) {
         eachCounter += 1;
-        yield "foo";
+        block("foo");
       },
-    } as unknown as string;
+    };
     response.setHeader("X-Foo", response.body);
 
     assertEqual(1, eachCounter, "#each was not called once");

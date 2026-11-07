@@ -14,6 +14,7 @@ import {
   SizedQueue,
   Thread,
   ThreadError,
+  each,
   excBacktrace,
   isSymbol,
   rbCallSuper,
@@ -202,9 +203,9 @@ export class Response extends DispatchResponse {
   }
 
   /** @internal */
-  buildBuffer(response: DispatchResponse, body: unknown[]): Buffer {
+  buildBuffer(response: DispatchResponse, body: unknown): Buffer {
     const buf = new Buffer(response);
-    for (const part of body) buf.write(String(part));
+    each(body as string[], (part) => buf.write(part));
     return buf;
   }
 }

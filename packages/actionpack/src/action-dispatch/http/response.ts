@@ -91,10 +91,10 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   get body(): string {
     if (this._strBody !== null) return this._strBody;
     let buf = "";
-    for (const chunk of this.each() as Iterable<unknown>) {
+    this.each((chunk) => {
       const str = rbObjAsString(chunk) as string | Uint8Array;
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
-    }
+    });
     this._strBody = buf;
     return this._strBody;
   }
@@ -290,20 +290,20 @@ export class Response {
   private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
-  stream: Buffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
+  stream!: Buffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
   constructor(
     status: number | string = 200,
     headers: Record<string, string> = {},
-    body: string[] = [],
+    body: unknown = [],
     block?: (response: Response) => void,
   ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
-    this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
+    this.body = body;
     this.status = status;
     this.prepareCacheControlBang();
 
@@ -323,22 +323,6 @@ export class Response {
 
   get message(): string {
     return HTTP_STATUS_CODES[this._status];
-  }
-
-  get successful(): boolean {
-    return this._status >= 200 && this._status < 300;
-  }
-  get isRedirection(): boolean {
-    return this._status >= 300 && this._status < 400;
-  }
-  get clientError(): boolean {
-    return this._status >= 400 && this._status < 500;
-  }
-  get serverError(): boolean {
-    return this._status >= 500 && this._status < 600;
-  }
-  get notFound(): boolean {
-    return this._status === 404;
   }
 
   get headers(): Headers {
@@ -395,8 +379,8 @@ export class Response {
     return (this.stream as { body: string }).body;
   }
 
-  set body(value: string | Uint8Array | { toPath(): string }) {
-    if (typeof (value as { toPath?: unknown }).toPath === "function") {
+  set body(value: unknown) {
+    if (rbObjRespondTo(value, "toPath")) {
       this.stream = value as { toPath(): string };
       return;
     }
@@ -548,14 +532,12 @@ export class Response {
   }
 
   commitBang(): void {
-    if (this._committed) return;
     this.beforeCommitted();
     this._committed = true;
     for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sendingBang(): void {
-    if (this._sending) return;
     this.beforeSending();
     this._sending = true;
     for (const broadcast of this.cv.splice(0)) broadcast();
@@ -643,22 +625,13 @@ export class Response {
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown[]): Buffer<{ push(obj: unknown): unknown }> {
-    return new Buffer(response as Response, body);
+  buildBuffer(response: unknown, body: unknown): Buffer<{ push(obj: unknown): unknown }> {
+    return new Buffer(response as Response, body as { push(obj: unknown): unknown });
   }
 
   /** @internal */
-  mungeBodyObject(body: unknown): unknown[] {
-    if (Array.isArray(body)) return body;
-    if (
-      body != null &&
-      typeof (body as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function" &&
-      typeof body !== "string" &&
-      !(body instanceof Uint8Array)
-    ) {
-      return Array.from(body as Iterable<unknown>);
-    }
-    return [body];
+  mungeBodyObject(body: unknown): unknown {
+    return rbObjRespondTo(body, "each") ? body : [body];
   }
 
   /** @internal */
@@ -713,11 +686,10 @@ export class Response {
     this: T,
     status = 200,
     headers: Record<string, string> = {},
-    body: string | string[] = [],
+    body: unknown = [],
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): InstanceType<T> {
     headers = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    body = Array.isArray(body) ? body : [body];
     return new this(status, headers, body) as InstanceType<T>;
   }
 }

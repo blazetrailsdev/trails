@@ -337,21 +337,21 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("server error response code", async () => {
     await tc.get("response500");
-    assert(tc.response.serverError);
+    assert(tc.response.isServerError);
     await tc.get("response599");
-    assert(tc.response.serverError);
+    assert(tc.response.isServerError);
     await tc.get("response404");
-    assertNot(tc.response.serverError);
+    assertNot(tc.response.isServerError);
   });
 
   it("missing response code", async () => {
     await tc.get("response404");
-    assert(tc.response.notFound);
+    assert(tc.response.isNotFound);
   });
 
   it("client error response code", async () => {
     await tc.get("response404");
-    assert(tc.response.clientError);
+    assert(tc.response.isClientError);
   });
 
   it("redirect url match", async () => {
@@ -372,7 +372,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("successful response code", async () => {
     await tc.get("nothing");
-    assert(tc.response.successful);
+    assert(tc.response.isSuccessful);
   });
 
   it("response object", async () => {
