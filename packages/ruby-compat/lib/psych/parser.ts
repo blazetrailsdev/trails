@@ -5,7 +5,7 @@ import { yaml as backend } from "../psych-adapter.js";
 import { Handler } from "./handler.js";
 import { SyntaxError } from "./syntax-error.js";
 
-const yaml = (): typeof Yaml => backend() as unknown as typeof Yaml;
+const yaml = backend as unknown as () => typeof Yaml;
 
 const SCALAR_STYLES: Record<string, number> = {
   PLAIN: 1,

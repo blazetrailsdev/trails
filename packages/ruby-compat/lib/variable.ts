@@ -88,7 +88,7 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
  * @noRailsEquivalent PERMANENT
  */
 export class Binding {
-  /** `Binding#receiver` (`vendor/ruby/v3.3.11/proc.c:636` `bind_receiver`). */
+  /** @noRailsEquivalent PERMANENT */
   readonly receiver: object;
 
   /** @noRailsEquivalent PERMANENT */
