@@ -28,7 +28,7 @@ function makeHost(
     opts.model ?? null,
   );
   const request: ParamsWrapperHost["request"] = {
-    hasContentType: () => true,
+    hasContentType: () => "application/json",
     contentMimeType: { ref: () => ":json" },
     requestParameters: {},
     filteredParameters: () => ({}),
@@ -103,7 +103,7 @@ describe("ParamsWrapper privates", () => {
   });
 
   it("_wrapperEnabled false when no content type", () => {
-    const host = makeHost({ name: "user", format: [":json"] }, { hasContentType: () => false });
+    const host = makeHost({ name: "user", format: [":json"] }, { hasContentType: () => null });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 

@@ -2,7 +2,7 @@ import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesuppo
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
-import { ArgumentError, classModule, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbEqual } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
@@ -11,9 +11,6 @@ const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
 export class InvalidType extends MimeType.InvalidMimeType {}
 
 export class MimeNegotiation {
-  /** @noRailsEquivalent PERMANENT */
-  static readonly [classModule] = true;
-
   declare protected getHeader: (key: string) => unknown;
   declare protected setHeader: (key: string, value: unknown) => unknown;
   declare protected fetchHeader: <T>(key: string, fallback: (key: string) => T) => unknown;
