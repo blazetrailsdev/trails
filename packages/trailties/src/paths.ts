@@ -1,4 +1,4 @@
-import { Dir, File, rbInspect } from "@blazetrails/ruby-compat";
+import { Dir, File, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];
@@ -228,7 +228,9 @@ export class Path {
       const doesExist = File.isExist(f);
 
       if (!doesExist && File.isSymlink(f)) {
-        throw new Error(`File ${rbInspect(f)} is a symlink that does not point to a valid file`);
+        throw new RuntimeError(
+          `File ${rbInspect(f)} is a symlink that does not point to a valid file`,
+        );
       }
       return doesExist;
     });
