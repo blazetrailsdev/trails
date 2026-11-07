@@ -23,6 +23,7 @@ describe("ActionMailer::Railtie class body", () => {
       "action_mailer.set_configs",
       "action_mailer.set_autoload_paths",
       "action_mailer.compile_config_methods",
+      "action_mailer.base",
     ]);
   });
 });
