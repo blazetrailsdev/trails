@@ -1,6 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { Task } from "@blazetrails/rake";
 import { STDIN, SystemExit, getProcessAdapter, setEnv } from "@blazetrails/ruby-compat";
+import { Relayer } from "../relayer.js";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("ActionMailbox ingress tasks", () => {
@@ -88,5 +89,40 @@ describe("ActionMailbox ingress tasks", () => {
     status = 500;
     expect(await run("exim")).toBe(75);
     expect(output).toBe("HTTP 500");
+  });
+
+  it("exim exits 69 on a permanent failure", async () => {
+    vi.spyOn(Relayer.prototype, "relay").mockResolvedValue(new Relayer.Result("5.0.0", "Rejected"));
+    expect(await run("exim")).toBe(69);
+    expect(output).toBe("Rejected");
+  });
+
+  it("postfix prints the status code on a transient failure", async () => {
+    status = 500;
+    expect(await run("postfix")).toBe(1);
+    expect(output).toBe("4.0.0 HTTP 500");
+  });
+
+  it("qmail exits 111 when URL is blank", async () => {
+    setEnv("URL", "");
+    expect(await run("qmail")).toBe(111);
+    expect(output).toBe("URL and INGRESS_PASSWORD are required");
+  });
+
+  it("qmail relays and exits 0", async () => {
+    expect(await run("qmail")).toBe(0);
+    expect(output).toBe("Successfully relayed message to ingress");
+  });
+
+  it("qmail exits 111 on a transient failure", async () => {
+    status = 500;
+    expect(await run("qmail")).toBe(111);
+    expect(output).toBe("HTTP 500");
+  });
+
+  it("qmail exits 100 on a permanent failure", async () => {
+    vi.spyOn(Relayer.prototype, "relay").mockResolvedValue(new Relayer.Result("5.0.0", "Rejected"));
+    expect(await run("qmail")).toBe(100);
+    expect(output).toBe("Rejected");
   });
 });
