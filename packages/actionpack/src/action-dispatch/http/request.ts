@@ -257,8 +257,9 @@ export class Request {
   }
 
   get originalFullpath(): string {
+    const originalFullpath = this.getHeader("ORIGINAL_FULLPATH") as string | null | false;
     return (this._originalFullpath ??=
-      (this.getHeader("ORIGINAL_FULLPATH") as string | null) ?? this.fullpath);
+      originalFullpath != null && originalFullpath !== false ? originalFullpath : this.fullpath);
   }
 
   get originalUrl(): string {
