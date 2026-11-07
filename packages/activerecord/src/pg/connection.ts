@@ -175,7 +175,7 @@ export class Connection {
           resolve();
         },
       };
-      void this.query(submittable);
+      this.query(submittable).catch(reject);
     });
   }
 
