@@ -138,7 +138,7 @@ export function qValues(qValueHeader: string): [string, number][] {
   });
 }
 
-const ALLOWED_FORWARDED_PARAMS: Record<string, string> = Object.freeze(
+export const ALLOWED_FORWARDED_PARAMS: Record<string, string> = Object.freeze(
   Object.fromEntries(["by", "for", "host", "proto"].map((name) => [name, name])),
 );
 

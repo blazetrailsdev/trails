@@ -1,6 +1,8 @@
 import {
   ArgumentError,
   Encoding,
+  block as rbBlock,
+  rbBlockGivenP,
   include,
   rbObjClassname,
   stringSplit,
@@ -113,18 +115,23 @@ export class QueryParser {
   ): Record<string, string | string[] | null> {
     const params = this.makeParams();
 
-    this.eachQueryPair(qs, separator, unescaper, (k, v) => {
-      const cur = params[k];
-      if (cur != null) {
-        if (Array.isArray(cur)) {
-          cur.push(v);
+    this.eachQueryPair(
+      qs,
+      separator,
+      unescaper,
+      rbBlock((k: string, v: string | null) => {
+        const cur = params[k];
+        if (cur != null) {
+          if (Array.isArray(cur)) {
+            cur.push(v);
+          } else {
+            params[k] = [cur, v];
+          }
         } else {
-          params[k] = [cur, v];
+          params[k] = v;
         }
-      } else {
-        params[k] = v;
-      }
-    });
+      }),
+    );
 
     return Object.assign(Object.create(null), params);
   }
@@ -135,9 +142,13 @@ export class QueryParser {
   ): [string, string | null][] {
     const pairs: [string, string | null][] = [];
 
-    this.eachQueryPair(qs, separator, (k, v) => {
-      pairs.push([k, v]);
-    });
+    this.eachQueryPair(
+      qs,
+      separator,
+      rbBlock((k: string, v: string | null) => {
+        pairs.push([k, v]);
+      }),
+    );
 
     return pairs;
   }
@@ -148,9 +159,13 @@ export class QueryParser {
   ): Record<string, any> {
     const params = this.makeParams();
 
-    this.eachQueryPair(qs, separator, (k, v) => {
-      this._normalizeParams(params, k, v, 0);
-    });
+    this.eachQueryPair(
+      qs,
+      separator,
+      rbBlock((k: string, v: string | null) => {
+        this._normalizeParams(params, k, v, 0);
+      }),
+    );
 
     return Object.assign(Object.create(null), params);
   }
@@ -170,13 +185,13 @@ export class QueryParser {
   private eachQueryPair(
     qs: string | null | undefined,
     separator: string | null,
-    ...args: [
-      ...([unescaper: ((s: string) => string) | null] | []),
-      block: (k: string, v: string | null) => void,
-    ]
+    unescaper: ((s: string) => string) | ((k: string, v: string | null) => void) | null = null,
+    block?: (k: string, v: string | null) => void,
   ): void {
-    const block = args.pop() as (k: string, v: string | null) => void;
-    const unescaper = (args[0] ?? null) as ((s: string) => string) | null;
+    if (rbBlockGivenP(unescaper)) {
+      block = unescaper as (k: string, v: string | null) => void;
+      unescaper = null;
+    }
     try {
       if (qs == null || qs.length === 0) return;
 
@@ -202,14 +217,14 @@ export class QueryParser {
       if (unescaper != null) {
         for (const p of pairs) {
           if (p.length === 0) continue;
-          const [k, v = null] = stringSplit(p, "=", 2).map(unescaper);
-          block(k, v);
+          const [k, v = null] = stringSplit(p, "=", 2).map(unescaper as (s: string) => string);
+          block!(k, v);
         }
       } else {
         for (const p of pairs) {
           if (p.length === 0) continue;
           const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
-          block(k, v);
+          block!(k, v);
         }
       }
     } catch (e) {
