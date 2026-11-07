@@ -230,14 +230,14 @@ export class Request {
   }
 
   get method(): string {
-    this._method ||= this.checkMethod(
+    this._method ??= this.checkMethod(
       this.getHeader("rack.methodoverride.original_method") ?? this.getHeader("REQUEST_METHOD"),
     );
     return this._method as string;
   }
 
   get requestMethod(): string {
-    this._requestMethod ||= this.checkMethod(this.rawRequestMethod);
+    this._requestMethod ??= this.checkMethod(this.rawRequestMethod);
     return this._requestMethod as string;
   }
 
@@ -253,13 +253,12 @@ export class Request {
   }
 
   get fullpath(): string {
-    return (this._fullpath ||=
-      this.queryString === "" ? this.path : `${this.path}?${this.queryString}`);
+    return (this._fullpath ??= this.rackRequest.fullpath);
   }
 
   get originalFullpath(): string {
-    return (this._originalFullpath ||=
-      (this.getHeader("ORIGINAL_FULLPATH") as string | null) || this.fullpath);
+    return (this._originalFullpath ??=
+      (this.getHeader("ORIGINAL_FULLPATH") as string | null) ?? this.fullpath);
   }
 
   get originalUrl(): string {
@@ -284,7 +283,7 @@ export class Request {
 
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
-  declare hasContentType: () => boolean;
+  declare hasContentType: () => unknown;
   declare negotiateMime: (order: (MimeType | undefined)[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
 
@@ -314,14 +313,13 @@ export class Request {
   }
 
   get ip(): string | null {
-    return (this._ip ||= this.rackRequest.ip);
+    return (this._ip ??= this.rackRequest.ip);
   }
 
   get remoteIp(): string | null {
-    return (this._remoteIp ||= (
-      (this.getHeader("action_dispatch.remote_ip") as string | GetIp | null) ??
-      this.ip ??
-      ""
+    const remoteIp = this.getHeader("action_dispatch.remote_ip") as string | GetIp | null | false;
+    return (this._remoteIp ??= (
+      (remoteIp != null && remoteIp !== false ? remoteIp : this.ip) ?? ""
     ).toString());
   }
 

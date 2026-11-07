@@ -42,8 +42,8 @@ export class MimeNegotiation {
   }
 
   /** @internal */
-  hasContentType(): boolean {
-    return this.getHeader("CONTENT_TYPE") != null;
+  hasContentType(): unknown {
+    return this.getHeader("CONTENT_TYPE");
   }
 
   get accepts(): MimeType[] {

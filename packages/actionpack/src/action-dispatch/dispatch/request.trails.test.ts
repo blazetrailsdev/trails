@@ -377,7 +377,7 @@ describe("RequestPermissionsPolicy", () => {
 
 describe("RequestMimeType", () => {
   it("has_content_type?", () => {
-    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe(true);
-    expect(new Request({}).hasContentType()).toBe(false);
+    expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe("text/html");
+    expect(new Request({}).hasContentType()).toBeUndefined();
   });
 });
