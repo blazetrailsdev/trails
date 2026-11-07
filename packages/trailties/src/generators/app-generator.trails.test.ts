@@ -121,35 +121,6 @@ describe("AppGenerator (trails-only)", () => {
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });
 
-  it("--edge points every @blazetrails package at the edge branch", async () => {
-    await new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, database: "sqlite", edge: true },
-      { destinationRoot: tmpDir },
-    ).invokeAll();
-
-    const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(
-      `github:blazetrailsdev/trails#${AppGenerator.edgeBranch()}&path:/packages/trailties`,
-    );
-  });
-
-  it("--main points every @blazetrails package at the main branch", async () => {
-    await new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, database: "sqlite", main: true },
-      { destinationRoot: tmpDir },
-    ).invokeAll();
-
-    const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(
-      "github:blazetrailsdev/trails#main&path:/packages/trailties",
-    );
-    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBe(
-      "github:blazetrailsdev/trails#main&path:/packages/trails-tsc",
-    );
-  });
-
   it("--dev points every @blazetrails package at the local checkout", async () => {
     await new AppGenerator(
       ["my-app"],

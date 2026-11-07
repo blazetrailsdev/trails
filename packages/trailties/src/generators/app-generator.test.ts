@@ -1,7 +1,7 @@
-import { Dir, File, FileUtils, Process, rbFBackquote } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, Gem, Process, rbFBackquote } from "@blazetrails/ruby-compat";
 import { assertNoChanges, assertNoMatch, capture } from "@blazetrails/activesupport";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppGenerator } from "./trails/app/app-generator.js";
 import { TestCase } from "./test-case.js";
 import { runAppUpdate } from "./generators-test-helper.js";
@@ -220,6 +220,48 @@ describe("AppGeneratorTest", () => {
         () => runAppUpdate.call(t),
       );
     });
+  });
+
+  it("edge option", async () => {
+    const stub = vi.spyOn(Trails, "gemVersion").mockReturnValue(new Gem.Version("2.1.0"));
+    try {
+      await t.runGenerator([t.destinationRoot, "--edge"]);
+    } finally {
+      stub.mockRestore();
+    }
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#2-1-stable[&"]/,
+    );
+  });
+
+  it("edge option during alpha", async () => {
+    const stub = vi.spyOn(Trails, "gemVersion").mockReturnValue(new Gem.Version("2.1.0.alpha"));
+    try {
+      await t.runGenerator([t.destinationRoot, "--edge"]);
+    } finally {
+      stub.mockRestore();
+    }
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+    );
+  });
+
+  it("main option", async () => {
+    await t.runGenerator([t.destinationRoot, "--main"]);
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+    );
+  });
+
+  it("master option", async () => {
+    await t.runGenerator([t.destinationRoot, "--master"]);
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+    );
   });
 
   it("skip git", async () => {
