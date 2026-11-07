@@ -194,3 +194,49 @@ export function methodMissingProxy<T extends object>(
     },
   });
 }
+
+/**
+ * Mirrors `BasicObject#method_missing` (`vendor/ruby/v3.3.11/vm_eval.c:2570`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function methodMissingPrototype<T extends object>(
+  klass: { prototype: T },
+  options: { delegate: (receiver: T) => unknown },
+): void {
+  const { delegate: readDelegate } = options;
+  const parent = Object.getPrototypeOf(klass.prototype) as object;
+  Object.setPrototypeOf(
+    klass.prototype,
+    new Proxy(Object.create(parent) as object, {
+      get(target, prop, receiver: T) {
+        if (
+          Reflect.has(target, prop) ||
+          Object.hasOwn(receiver, "constructor") ||
+          (typeof prop === "string" && prop.startsWith("_"))
+        ) {
+          return Reflect.get(target, prop, receiver);
+        }
+        const delegate = readDelegate(receiver);
+        if (respondsTo(delegate, prop)) {
+          const value = (delegate as Record<string | symbol, unknown>)[prop];
+          return typeof value === "function" && isMethod(delegate as object, prop)
+            ? value.bind(delegate)
+            : value;
+        }
+        if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) {
+          return undefined;
+        }
+        return (...args: unknown[]) => {
+          throw new NoMethodError(
+            `undefined method '${prop}' for an instance of ${receiver.constructor.name}`,
+            prop,
+            args,
+            false,
+            { receiver },
+          );
+        };
+      },
+    }),
+  );
+}

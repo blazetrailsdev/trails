@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DelegateClass } from "../lib/delegate.js";
+import { DelegateClass, SimpleDelegator } from "../lib/delegate.js";
+import { rbObjRespondTo } from "../lib/object.js";
 import { include, rbGetAllocFunc } from "../lib/include.js";
 
 describe("DelegateClass (trails)", () => {
@@ -54,5 +55,20 @@ describe("DelegateClass (trails)", () => {
     const mask = new Mask("[FILTERED]");
     expect(String(mask)).toBe("[FILTERED]");
     expect(`name: ${mask}`).toBe("name: [FILTERED]");
+  });
+
+  it("keeps a subclass's #private field reachable and delegates through the prototype chain", () => {
+    class Wrapper extends SimpleDelegator {
+      #secret = 7;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const wrapper = new Wrapper([1, 2]) as Wrapper & number[];
+    expect(wrapper.secret()).toBe(7);
+    expect(wrapper.at(1)).toBe(2);
+    expect(rbObjRespondTo(wrapper, "at")).toBe(true);
+    expect(wrapper instanceof Wrapper).toBe(true);
+    expect(Object.getPrototypeOf(wrapper)).toBe(Wrapper.prototype);
   });
 });

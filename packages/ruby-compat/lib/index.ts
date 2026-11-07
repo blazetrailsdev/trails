@@ -329,7 +329,12 @@ export {
 export { OptionParser } from "./optparse.js";
 export { IPAddr } from "./ipaddr.js";
 export { Resolv } from "./resolv.js";
-export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";
+export {
+  KERNEL_METHODS,
+  PROTOCOL_PROBES,
+  methodMissingPrototype,
+  methodMissingProxy,
+} from "./method-missing-proxy.js";
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
