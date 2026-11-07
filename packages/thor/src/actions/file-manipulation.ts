@@ -7,6 +7,7 @@ import {
   Hash,
   hashDelete,
   OpenURI,
+  type Binding,
   rbFBinding,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -122,7 +123,7 @@ export async function template(
     (args[0] as string | undefined) || source.replace(RegExp(`${TEMPLATE_EXTNAME}$`), "");
 
   source = File.expandPath(await this.findInSourcePaths(toS(source)));
-  const context = (hashDelete(config, "context") || rbFBinding(this)) as object;
+  const context = (hashDelete(config, "context") || rbFBinding(this)) as Binding;
 
   return this.createFile(destination, null, config, async () => {
     const capturableErb = new CapturableERB(strNew(Array.from(await getFs().readFile(source))), {

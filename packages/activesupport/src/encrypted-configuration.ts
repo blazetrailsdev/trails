@@ -58,7 +58,6 @@ export class EncryptedConfiguration extends EncryptedFile {
   private _config: Record<string, unknown> | null = null;
   private _options: OrderedOptions | null = null;
 
-  /** @missingRailsArgs delegate_missing_to — PERMANENT */
   constructor({
     configPath,
     keyPath,
@@ -71,7 +70,6 @@ export class EncryptedConfiguration extends EncryptedFile {
     raiseIfMissingKey: boolean;
   }) {
     super({ contentPath: configPath, keyPath, envKey, raiseIfMissingKey });
-    return delegateMissingTo.call(this, "options", { allowNil: true }) as EncryptedConfiguration;
   }
 
   override async read(): Promise<string> {
@@ -147,3 +145,5 @@ export class EncryptedConfiguration extends EncryptedFile {
     return (presence(config) as object | undefined) ?? {};
   }
 }
+
+delegateMissingTo.call(EncryptedConfiguration, "options", { allowNil: true });

@@ -44,6 +44,14 @@ describe("psych-adapter backend resolution", () => {
     expect(adapter.stringify(1)).toBe("dumped 1");
   });
 
+  it("resolves the yaml backend at the call, not at import", () => {
+    adapter.psychAdapterConfig.adapter = "late";
+    expect(() => adapter.yaml()).toThrow("cannot load such file -- late");
+    const backend = { parse: (src: string) => ({ late: src }), stringify: () => "" };
+    adapter.registerPsychAdapter("late", backend);
+    expect(adapter.yaml()).toBe(backend);
+  });
+
   it("loads yaml synchronously under Node", () => {
     expect(adapter.parse("a: 1")).toEqual({ a: 1 });
   });

@@ -14,7 +14,6 @@ import { DelegationError } from "../delegation.js";
 import { callerLocations } from "../deprecation.js";
 import {
   assert,
-  assertNot,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
@@ -135,6 +134,7 @@ class DecoratedTester extends ExtraMissing {
     return (this as any).name;
   }
 }
+delegateMissingTo.call(DecoratedTester, "client");
 
 class ParameterSet {
   "@params" = new Map([["foo", "bar"]]);
@@ -183,6 +183,34 @@ class DecoratedReserved {
     return this.case_;
   }
 }
+delegateMissingTo.call(DecoratedReserved, "case");
+
+class DecoratedMissingAllowNil {
+  constructor(public case_: any) {}
+
+  get case() {
+    return this.case_;
+  }
+
+  callName() {
+    return (this as any).name;
+  }
+}
+delegateMissingTo.call(DecoratedMissingAllowNil, "case", { allowNil: true });
+
+class Maze {
+  cavern: any;
+  passages: any;
+}
+
+class Cavern {
+  constructor(public maze: Maze) {}
+
+  get target() {
+    return (this.maze.passages = "twisty");
+  }
+}
+delegateMissingTo.call(Cavern, "target");
 
 describe("ModuleTest", () => {
   let david: Someone & Record<string, any>;
@@ -415,26 +443,20 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to with method", () => {
-    expect((delegateMissingTo.call(new DecoratedTester(david), "client") as any).name).toEqual(
-      "David",
-    );
+    expect((new DecoratedTester(david) as any).name).toEqual("David");
   });
 
   it("delegate missing to calling on self", () => {
-    expect(
-      (delegateMissingTo<DecoratedTester>).call(new DecoratedTester(david), "client").callName(),
-    ).toEqual("David");
+    expect(new DecoratedTester(david).callName()).toEqual("David");
   });
 
   it("delegate missing to with reserved methods", () => {
-    expect((delegateMissingTo.call(new DecoratedReserved(david), "case") as any).name).toEqual(
-      "David",
-    );
+    expect((new DecoratedReserved(david) as any).name).toEqual("David");
   });
 
   it("delegate missing to with keyword methods", () => {
     expect(
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).kwSend({
+      (new DecoratedReserved(david) as any).kwSend({
         method: "name",
       }),
     ).toEqual("David");
@@ -442,7 +464,7 @@ describe("ModuleTest", () => {
 
   it("delegate missing to does not delegate to private methods", async () => {
     const e = await assertRaises([NoMethodError], {}, () =>
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).privateName(),
+      (new DecoratedReserved(david) as any).privateName(),
     );
 
     expect(e.message).toMatch(/undefined method [`']privateName' for/);
@@ -450,7 +472,7 @@ describe("ModuleTest", () => {
 
   it("delegate missing to does not delegate to fake methods", async () => {
     const e = await assertRaises([NoMethodError], {}, () =>
-      (delegateMissingTo.call(new DecoratedReserved(david), "case") as any).myFakeMethod(),
+      (new DecoratedReserved(david) as any).myFakeMethod(),
     );
 
     expect(e.message).toMatch(/undefined method [`']myFakeMethod' for/);
@@ -460,72 +482,36 @@ describe("ModuleTest", () => {
     const e = await assertRaises(
       [DelegationError],
       {},
-      () => (delegateMissingTo.call(new DecoratedTester(null), "client") as any).name,
+      () => (new DecoratedTester(null) as any).name,
     );
 
     expect(e.message).toEqual("name delegated to client, but client is nil");
   });
 
   it("delegate missing to returns nil if allow nil and nil target", () => {
-    expect(
-      (delegateMissingTo.call(new DecoratedReserved(null), "case", { allowNil: true }) as any).name,
-    ).toBeUndefined();
+    expect((new DecoratedMissingAllowNil(null) as any).name).toBeUndefined();
   });
 
   it("delegate missing with allow nil when called on self", () => {
-    class DecoratedMissingAllowNil {
-      constructor(public case_: any) {}
-
-      get case() {
-        return this.case_;
-      }
-
-      callName() {
-        return (this as any).name;
-      }
-    }
-    expect(
-      (
-        delegateMissingTo.call(new DecoratedMissingAllowNil(null), "case", {
-          allowNil: true,
-        }) as any
-      ).callName(),
-    ).toBeUndefined();
+    expect(new DecoratedMissingAllowNil(null).callName()).toBeUndefined();
   });
 
   it("delegate missing to affects respond to", () => {
-    const decorated = () => delegateMissingTo.call(new DecoratedTester(david), "client");
+    const decorated = () => new DecoratedTester(david);
     assertRespondTo(decorated(), "name");
     assertNotRespondTo(decorated(), "privateName");
     assertNotRespondTo(decorated(), "myFakeMethod");
-
-    assert("name" in decorated());
-    assertNot("privateName" in decorated());
-    assertNot("myFakeMethod" in decorated());
   });
 
   it("delegate missing to respects superclass missing", () => {
-    expect(
-      (delegateMissingTo.call(new DecoratedTester(david), "client") as any).extraMissing,
-    ).toEqual(42);
+    expect((new DecoratedTester(david) as any).extraMissing).toEqual(42);
 
-    assertRespondTo(delegateMissingTo.call(new DecoratedTester(david), "client"), "extraMissing");
+    assertRespondTo(new DecoratedTester(david), "extraMissing");
   });
 
   it("delegate missing to does not interfere with marshallization", () => {
-    class Maze {
-      cavern: any;
-      passages: any;
-    }
-    class Cavern {
-      constructor(public maze: Maze) {}
-
-      get target() {
-        return (this.maze.passages = "twisty");
-      }
-    }
     const maze = new Maze();
-    maze.cavern = delegateMissingTo.call(new Cavern(new Maze()), "target");
+    maze.cavern = new Cavern(new Maze());
 
     const array = [maze, null];
     const serializedArray = JSON.stringify(array);

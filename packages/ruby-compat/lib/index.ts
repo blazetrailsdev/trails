@@ -418,6 +418,7 @@ export {
   rbConstWarnIfDeprecated,
   rbConstMissing,
   rbModConstMissing,
+  Binding,
   rbFBinding,
   rbModRemoveConst,
 } from "./variable.js";

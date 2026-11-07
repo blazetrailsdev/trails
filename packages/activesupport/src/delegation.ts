@@ -7,6 +7,7 @@ import {
   rbModName,
   rbModToS,
   rbObjClass,
+  rbObjRespondTo,
   nameErrMesgReceiver,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
@@ -258,52 +259,63 @@ export namespace Delegation {
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
    */
-  export function generateMethodMissing<T extends object>(
-    owner: T,
+  export function generateMethodMissing(
+    owner: { prototype: object },
     target: string,
     { allowNil }: { allowNil?: boolean } = {},
-  ): T {
+  ): void {
     if (RESERVED_METHOD_NAMES.has(target) || target === "__target") target = `self.${target}`;
 
     const targetName = target.startsWith("self.") ? target.slice("self.".length) : target;
+    const parent = Object.getPrototypeOf(owner.prototype) as object;
 
-    return new Proxy(owner, {
-      has(obj, prop) {
-        if (prop === "marshal_dump" || prop === "_dump") return false;
-        if (Reflect.has(obj, prop)) return true;
-        if (Object.hasOwn(obj, "constructor")) return false;
-        const __target = (obj as Record<string, unknown>)[targetName];
-        return __target != null && prop in Object(__target);
-      },
-      get(obj, prop, receiver) {
-        if (
-          prop in obj ||
-          typeof prop === "symbol" ||
-          prop.startsWith("_") ||
-          prop === "then" ||
-          KERNEL_METHODS.has(prop) ||
-          Object.hasOwn(receiver, "constructor")
-        ) {
-          return Reflect.get(obj, prop, receiver);
-        }
-        const __target = (receiver as Record<string, unknown>)[targetName];
-        if (__target == null) {
-          if (allowNil) return undefined;
-          throw DelegationError.nilTarget(globalThis.String(prop), target);
-        }
-        if (!(globalThis.String(prop) in Object(__target))) {
-          if (PROTOCOL_PROBES.has(globalThis.String(prop))) return undefined;
-          return () => {
-            throw new NoMethodError(
-              `undefined method '${globalThis.String(prop)}' for an instance of ${
-                (obj as object).constructor.name
-              }`,
-            );
-          };
-        }
-        const value = (__target as Record<string, unknown>)[globalThis.String(prop)];
-        return typeof value === "function" ? value.bind(__target) : value;
+    Object.defineProperty(owner.prototype, "respondToMissing", {
+      configurable: true,
+      writable: true,
+      value(this: Record<string, unknown>, name: string, includePrivate = false): boolean {
+        if (name === "marshal_dump" || name === "_dump") return false;
+        const __target = this[targetName];
+        if (__target != null && rbObjRespondTo(__target, name)) return true;
+        const sup = Reflect.get(parent, "respondToMissing", this) as
+          | ((name: string, includePrivate: boolean) => boolean)
+          | undefined;
+        return typeof sup === "function" ? sup.call(this, name, includePrivate) : false;
       },
     });
+
+    Object.setPrototypeOf(
+      owner.prototype,
+      new Proxy(Object.create(parent) as object, {
+        get(obj, prop, receiver) {
+          if (
+            prop in obj ||
+            typeof prop === "symbol" ||
+            prop.startsWith("_") ||
+            prop === "then" ||
+            KERNEL_METHODS.has(prop) ||
+            Object.hasOwn(receiver, "constructor")
+          ) {
+            return Reflect.get(obj, prop, receiver);
+          }
+          const __target = (receiver as Record<string, unknown>)[targetName];
+          if (__target == null) {
+            if (allowNil) return undefined;
+            throw DelegationError.nilTarget(prop, target);
+          }
+          if (!(prop in Object(__target))) {
+            if (PROTOCOL_PROBES.has(prop)) return undefined;
+            return () => {
+              throw new NoMethodError(
+                `undefined method '${prop}' for an instance of ${
+                  (receiver as object).constructor.name
+                }`,
+              );
+            };
+          }
+          const value = (__target as Record<string, unknown>)[prop];
+          return typeof value === "function" ? value.bind(__target) : value;
+        },
+      }),
+    );
   }
 }

@@ -1,25 +1,19 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { deepMerge, isPlainObject } from "./hash-utils.js";
+
+let contextOf: (merger: OptionMerger) => any;
 
 export class OptionMerger {
   static toString(): string {
     return "ActiveSupport::OptionMerger";
   }
 
-  private context: any;
-  private options: Record<string, unknown>;
+  #context: any;
+  #options: Record<string, unknown>;
 
   constructor(context: any, options: Record<string, unknown>) {
-    this.context = context;
-    this.options = options;
-
-    return new Proxy(context, {
-      getPrototypeOf: (): object => OptionMerger.prototype,
-      get: (target: object, property: string | symbol): unknown => {
-        const value = Reflect.get(target, property);
-        if (typeof value !== "function") return value;
-        return (...args: unknown[]) => this.methodMissing(property as string, ...args);
-      },
-    }) as unknown as OptionMerger;
+    this.#context = context;
+    this.#options = options;
   }
 
   private methodMissing(method: string, ...args: unknown[]): unknown {
@@ -29,16 +23,43 @@ export class OptionMerger {
 
     if (args.length === 1 && typeof args[0] === "function") {
       const proc = args.shift() as (...procArgs: unknown[]) => Record<string, unknown>;
-      args.push((...procArgs: unknown[]) => deepMerge(this.options, proc(...procArgs)));
+      args.push((...procArgs: unknown[]) => deepMerge(this.#options, proc(...procArgs)));
     } else if (isPlainObject(args[args.length - 1])) {
-      options = deepMerge(this.options, args.pop() as Record<string, unknown>);
+      options = deepMerge(this.#options, args.pop() as Record<string, unknown>);
     } else {
-      options = this.options;
+      options = this.#options;
     }
 
     if (options) args.push({ ...options });
     if (block) args.push(block);
 
-    return this.context[method](...args);
+    return this.#context[method](...args);
+  }
+
+  /** @internal */
+  private respondToMissing(name: string): boolean {
+    return rbObjRespondTo(this.#context, name);
+  }
+
+  static {
+    contextOf = (merger) => merger.#context;
   }
 }
+
+Object.setPrototypeOf(
+  OptionMerger.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(OptionMerger.prototype) as object) as object, {
+    get(target, property, receiver) {
+      if (typeof property === "symbol" || receiver === OptionMerger.prototype) {
+        return Reflect.get(target, property, receiver);
+      }
+      const value = Reflect.get(contextOf(receiver as OptionMerger), property);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) =>
+        (receiver as { methodMissing(...args: unknown[]): unknown }).methodMissing(
+          property,
+          ...args,
+        );
+    },
+  }),
+);

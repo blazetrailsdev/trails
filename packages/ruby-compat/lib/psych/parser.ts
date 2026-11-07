@@ -5,7 +5,7 @@ import { yaml as backend } from "../psych-adapter.js";
 import { Handler } from "./handler.js";
 import { SyntaxError } from "./syntax-error.js";
 
-const yaml = backend as unknown as typeof Yaml;
+const yaml = (): typeof Yaml => backend() as unknown as typeof Yaml;
 
 const SCALAR_STYLES: Record<string, number> = {
   PLAIN: 1,
@@ -71,8 +71,8 @@ export class Parser {
   ): this {
     if (yamlSource instanceof IO) yamlSource = yamlSource.read();
     if (yamlSource instanceof Uint8Array) yamlSource = new TextDecoder().decode(yamlSource);
-    const lineCounter = new yaml.LineCounter();
-    const parsed = yaml.parseAllDocuments(yamlSource, { lineCounter });
+    const lineCounter = new (yaml().LineCounter)();
+    const parsed = yaml().parseAllDocuments(yamlSource, { lineCounter });
     const docs = Array.isArray(parsed) ? parsed : [];
     const location = (start: number, end: number): void => {
       const s = lineCounter.linePos(start);
@@ -85,9 +85,9 @@ export class Parser {
       const root = doc.contents;
       const end = root?.range?.[1] ?? 0;
       const closed =
-        root != null && yaml.isCollection(root) && root.flow
+        root != null && yaml().isCollection(root) && root.flow
           ? "}]".includes(yamlSource[end - 1] ?? "")
-          : yaml.isScalar(root) && (root.type === "QUOTE_SINGLE" || root.type === "QUOTE_DOUBLE");
+          : yaml().isScalar(root) && (root.type === "QUOTE_SINGLE" || root.type === "QUOTE_DOUBLE");
       const errors = closed ? doc.errors.filter((e) => e.pos[0] < end) : doc.errors;
       if (errors.length > 0) {
         const [error] = errors;
@@ -126,9 +126,9 @@ export class Parser {
   ): void {
     const range = (node as { range?: [number, number, number] } | null)?.range;
     if (range) location(range[0], range[1]);
-    if (yaml.isAlias(node)) {
+    if (yaml().isAlias(node)) {
       handler.alias(node.source);
-    } else if (yaml.isScalar(node)) {
+    } else if (yaml().isScalar(node)) {
       const tag = node.tag ?? null;
       const style = SCALAR_STYLES[node.type ?? "PLAIN"];
       const value = String((node as { source?: unknown }).source ?? node.value ?? "");
@@ -140,17 +140,17 @@ export class Parser {
         !tag && style !== 1,
         style,
       );
-    } else if (yaml.isSeq(node)) {
+    } else if (yaml().isSeq(node)) {
       handler.startSequence(node.anchor ?? null, node.tag ?? null, !node.tag, node.flow ? 2 : 1);
       for (const item of node.items) this.emitNode(handler, item, location);
       location(range![1], range![1]);
       handler.endSequence();
-    } else if (yaml.isMap(node)) {
+    } else if (yaml().isMap(node)) {
       handler.startMapping(node.anchor ?? null, node.tag ?? null, !node.tag, node.flow ? 2 : 1);
       for (const pair of node.items) this.emitPair(handler, pair, location);
       location(range![1], range![1]);
       handler.endMapping();
-    } else if (yaml.isPair(node)) {
+    } else if (yaml().isPair(node)) {
       handler.startMapping(null, null, true, 2);
       this.emitPair(handler, node, location);
       handler.endMapping();

@@ -756,31 +756,26 @@ export class TagBuilder {
   [key: string]: unknown;
 }
 
-/** @internal */
-export function tagBuilder(this: TagHelperHost): TagBuilder {
-  return (this._tagBuilder ??= createTagBuilderProxy(this));
-}
-
-function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
-  const builder = new TagBuilder(viewContext);
-
-  return new Proxy(builder, {
+Object.setPrototypeOf(
+  TagBuilder.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(TagBuilder.prototype) as object) as object, {
     get(target, prop, receiver) {
-      if (typeof prop === "symbol" || prop in target) {
+      if (typeof prop === "symbol" || prop in target || receiver === TagBuilder.prototype) {
         return Reflect.get(target, prop, receiver);
       }
       if (prop === "then" || prop === "catch" || prop === "finally") return undefined;
 
-      const { methodMissing } = target as unknown as {
+      const { methodMissing } = receiver as {
         methodMissing(called: string, ...args: unknown[]): SafeBuffer;
       };
       return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
     },
+  }),
+);
 
-    has() {
-      return true;
-    },
-  });
+/** @internal */
+export function tagBuilder(this: TagHelperHost): TagBuilder {
+  return (this._tagBuilder ??= new TagBuilder(this));
 }
 
 export const TagHelper = defineModule(

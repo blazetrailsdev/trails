@@ -1,0 +1,27 @@
+import { describe, expect, it } from "vitest";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { OptionMerger } from "./option-merger.js";
+
+describe("OptionMerger in the prototype chain", () => {
+  it("is its own object and forwards through its prototype chain", () => {
+    class Merger extends OptionMerger {
+      #tag = "own";
+      tag() {
+        return this.#tag;
+      }
+    }
+    const context = {
+      greet(options: Record<string, unknown> = {}) {
+        return options;
+      },
+    };
+    const merger = new Merger(context, { a: 1 }) as Merger & { greet(o?: object): object };
+    expect(merger.tag()).toBe("own");
+    expect(merger).toBeInstanceOf(OptionMerger);
+    expect(Object.getPrototypeOf(merger)).toBe(Merger.prototype);
+    expect(Object.getPrototypeOf(new OptionMerger(context, {}))).toBe(OptionMerger.prototype);
+    expect(merger.greet({ b: 2 })).toEqual({ a: 1, b: 2 });
+    expect(rbObjRespondTo(merger, "greet")).toBe(true);
+    expect(rbObjRespondTo(merger, "missing")).toBe(false);
+  });
+});

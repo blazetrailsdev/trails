@@ -274,10 +274,7 @@ describe("delegate_missing_to and then", () => {
         return Promise.resolve("target");
       }
     }
-    Object.setPrototypeOf(
-      Holder.prototype,
-      Delegation.generateMethodMissing(Object.create(Object.prototype) as object, "target"),
-    );
+    Delegation.generateMethodMissing(Holder, "target");
     const holder = new Holder();
     expect(await holder).toBe(holder);
   });

@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  type Binding,
   capitalize,
   constGet,
   File,
@@ -16,7 +17,7 @@ import { Rack } from "./namespaces.js";
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
 
-export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Builder => rbFBinding(builder);
+export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Binding => rbFBinding(builder);
 
 export class Builder {
   private _use: Array<(app: RackApp) => RackApp> = [];
@@ -79,11 +80,14 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
-    const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Builder;
+    const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Binding;
     const source =
       `(function (builder, topLevel) { with (topLevel) { return (function () { "use strict"; ${builderScript}\n})(); } })` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(binding, TopLevel);
+    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(
+      binding.receiver as Builder,
+      TopLevel,
+    );
     return builder.toApp();
   }
 
