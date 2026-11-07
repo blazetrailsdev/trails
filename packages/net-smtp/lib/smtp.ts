@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+import { checkServerIdentity, type PeerCertificate } from "node:tls";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import {
   binaryBytes,
@@ -575,10 +577,16 @@ export class SMTP {
   /** @internal */
   private async tlsconnect(s: Connection, context: SslContext | null): Promise<void> {
     const { verifyMode, ...tls } = context ?? {};
+    const hostname = this.tlsHostname ?? this.address;
     s.options.tls = {
       ...tls,
       rejectUnauthorized: verifyMode !== "VERIFY_NONE",
-      servername: this.tlsHostname ?? this.address,
+      ...(isIP(hostname) === 0
+        ? { servername: hostname }
+        : {
+            checkServerIdentity: (_host: string, cert: PeerCertificate) =>
+              checkServerIdentity(hostname, cert),
+          }),
     };
     this.logging("TLS connection started");
     await new Promise<void>((resolve, reject) => {

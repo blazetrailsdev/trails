@@ -7,17 +7,17 @@ of the same name: `app/controllers/posts-controller.ts` is `posts_controller.rb`
 
 |                     |                                                                              |
 | ------------------- | ---------------------------------------------------------------------------- |
-| Language            | TypeScript, run by Node.js 24.21.0 (native type stripping)                   |
+| Language            | TypeScript, run by Node.js 26.13.0 (native type stripping)                   |
 | Framework           | trails (trailties application, Action Controller API, Active Record, router) |
 | Server              | `@blazetrails/rack`'s Node handler (`node:http`), via `trails server`        |
-| SQLite driver       | better-sqlite3 12                                                            |
+| SQLite driver       | better-sqlite3 13                                                            |
 | JWT                 | HS256 verifier on `node:crypto` (`lib/jwt.ts`)                               |
 | **Nginx or direct** | **Nginx**: behind `bench/nginx.conf`, the server on `127.0.0.1:3000`         |
 
 ## Running it
 
 ```bash
-sudo bash install.sh   # Node.js 24 into /opt/node
+sudo bash install.sh   # Node.js 26 + corepack into /opt/node (re-run on hosts set up for Node 24)
 bash build.sh          # pnpm install + build of the trails packages this app uses
 SQLITE_PATH=... JWT_SECRET=... HOST=127.0.0.1 PORT=3000 bash start.sh
 ```

@@ -102,7 +102,7 @@ export class DevcontainerGenerator extends GeneratorBase {
       dev,
       kamal,
       sqliteDriver: this.options.sqliteDriver ?? "better-sqlite3",
-      nodeVersion: this.options.nodeVersion ?? "24.16.0",
+      nodeVersion: this.options.nodeVersion ?? "26.13.0",
     };
     this.database = Database.build(database);
   }

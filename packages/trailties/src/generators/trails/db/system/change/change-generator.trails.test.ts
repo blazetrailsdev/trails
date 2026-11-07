@@ -22,7 +22,7 @@ beforeEach((context) => {
   t = context.testCase as TestCase;
   t.prepareDestination();
   write("tsconfig.json", "{}");
-  write("package.json", JSON.stringify({ dependencies: { "better-sqlite3": "^12.6.2" } }) + "\n");
+  write("package.json", JSON.stringify({ dependencies: { "better-sqlite3": "^13.0.3" } }) + "\n");
 });
 
 describe("ChangeGenerator", () => {
@@ -34,7 +34,7 @@ describe("ChangeGenerator", () => {
     write("package.json", JSON.stringify({ dependencies: { pg: "^8.19.0" } }) + "\n");
     await t.runGenerator(["--to", "sqlite3"]);
     const pkg = JSON.parse(File.read(File.join(t.destinationRoot, "package.json")));
-    expect(pkg.dependencies["better-sqlite3"]).toBe("^12.6.2");
+    expect(pkg.dependencies["better-sqlite3"]).toBe("^13.0.3");
     expect(pkg.dependencies.pg).toBeUndefined();
   });
 

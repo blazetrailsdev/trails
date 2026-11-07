@@ -175,10 +175,26 @@ export class Node {
           if (head.length > 0) socket.unshift(head);
         } else {
           if (length > MAX_BODY_SIZE) throw new Error("Request body too large");
+          const parsed: Uint8Array[] = [];
+          await new Promise<void>((resolve, reject) => {
+            const onData = (chunk: Uint8Array): void => {
+              parsed.push(chunk);
+            };
+            req.on("data", onData);
+            req.once("end", () => {
+              req.removeListener("data", onData);
+              resolve();
+            });
+            req.once("error", (error) => {
+              req.removeListener("data", onData);
+              reject(error);
+            });
+          });
+          const buffered = Buffer.concat([...parsed, head]);
           const bodyBytes = new Uint8Array(length);
-          let n = Math.min(length, head.length);
-          bodyBytes.set(head.subarray(0, n));
-          if (head.length > n) socket.unshift(head.subarray(n));
+          let n = Math.min(length, buffered.length);
+          bodyBytes.set(buffered.subarray(0, n));
+          if (buffered.length > n) socket.unshift(buffered.subarray(n));
           if (n < length) {
             await new Promise<void>((resolve, reject) => {
               const onEnd = (): void => {

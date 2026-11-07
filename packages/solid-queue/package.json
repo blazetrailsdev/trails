@@ -40,6 +40,6 @@
     "@blazetrails/trails-tsc": "workspace:*"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   }
 }
