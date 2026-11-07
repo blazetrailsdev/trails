@@ -106,7 +106,7 @@ export class Trailtie extends BaseTrailtie {
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
       Request.Utils.performDeepMunge = cfg.performDeepMunge;
       CacheRequest.strictFreshness = cfg.strictFreshness;
-      Response.defaultCharset = cfg.defaultCharset || app.config.encoding;
+      Response.defaultCharset = cfg.defaultCharset ?? app.config.encoding;
 
       Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
       Object.assign(ExceptionWrapper.rescueTemplates, cfg.rescueTemplates);

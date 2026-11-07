@@ -85,24 +85,20 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(Response.defaultCharset).toBe(charset);
   });
 
-  it(
-    "URL builder is configured to use HTTPS when force_ssl is on",
-    { timeout: 120_000 },
-    async () => {
-      await t.appFile(
-        "config/environments/development.ts",
-        `
+  it("URL builder is configured to use HTTPS when force_ssl is on", async () => {
+    await t.appFile(
+      "config/environments/development.ts",
+      `
         import { Trails } from "@blazetrails/trailties";
         Trails.application.configure(function () {
           this.config.forceSsl = true;
         });
 `,
-      );
+    );
 
-      await (t as unknown as Rack).app("development");
-      expect(URL.secureProtocol).toBe(true);
-    },
-  );
+    await (t as unknown as Rack).app("development");
+    expect(URL.secureProtocol).toBe(true);
+  });
 
   it("active_record extensions are applied to ActiveRecord", async () => {
     await t.addToConfig(`this.config.activeRecord.tableNamePrefix = "tbl_";`);
@@ -116,21 +112,17 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     await t.withUnhealthyDatabase(() => (t as unknown as Rack).app("development"));
   });
 
-  it(
-    "connections checked out during initialization are returned to the pool",
-    { timeout: 120_000 },
-    async () => {
-      await t.appFile(
-        "config/initializers/active-record.ts",
-        `
+  it("connections checked out during initialization are returned to the pool", async () => {
+    await t.appFile(
+      "config/initializers/active-record.ts",
+      `
         import { Base } from "@blazetrails/activerecord";
         await Base.leaseConnection();
 `,
-      );
-      await (t as unknown as Rack).app("development");
-      expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
-    },
-  );
+    );
+    await (t as unknown as Rack).app("development");
+    expect(Base.connectionPool().isActiveConnection()).toBeNull();
+  });
   it.skip("includes URL helpers as action methods", () => {
     // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
   });
