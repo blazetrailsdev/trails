@@ -4,8 +4,6 @@ import { AbstractController } from "@blazetrails/actionpack";
 import type { Base } from "@blazetrails/actionmailer";
 import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
 import { deprecator } from "@blazetrails/actionmailer/deprecator";
-import { TestHelper } from "@blazetrails/actionmailer/test-helper";
-import { ClearTestDeliveries } from "@blazetrails/actionmailer/test-case";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -104,11 +102,6 @@ export class Trailtie extends BaseTrailtie {
           rbFSend(this, `${k}=`, v);
         });
       });
-
-      onLoad("action_dispatch_integration_test", function (this: new () => object) {
-        include(this, TestHelper);
-        include(this, ClearTestDeliveries);
-      });
     });
 
     this.initializer(
@@ -129,8 +122,13 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_mailer.base", { after: "make_routes_lazy" }, async () => {
-      await import("@blazetrails/actionmailer");
+      const { TestHelper } = await import("@blazetrails/actionmailer/test-helper");
+      const { ClearTestDeliveries } = await import("@blazetrails/actionmailer/test-case");
       await import("../mailers-controller.js");
+      onLoad("action_dispatch_integration_test", function (this: new () => object) {
+        include(this, TestHelper);
+        include(this, ClearTestDeliveries);
+      });
     });
 
     this.config.afterInitialize((app) => {

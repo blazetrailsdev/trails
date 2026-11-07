@@ -14,6 +14,7 @@ import {
   rbObjIsProc,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { Mailer as ParameterizedMailer } from "./parameterized.js";
 

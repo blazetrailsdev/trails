@@ -14,6 +14,7 @@ import * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/a
 import { Encodings, Mail, type Message } from "@blazetrails/mail";
 import { File, IO, StandardError, TopLevel, include, rbModName } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import "./base.js";
 import { ActionMailer } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
 import "./constants.test-case.generated.js";
