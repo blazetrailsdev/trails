@@ -31,6 +31,26 @@ export class Configuration {
   /** @internal */
   static _appGenerators?: Generators;
 
+  constructor() {
+    return new Proxy(this, {
+      get(target, name, receiver) {
+        if (typeof name === "symbol" || name in target) return Reflect.get(target, name, receiver);
+        if (PROTOCOL_PROBES.has(name)) return undefined;
+        return target.methodMissing(name);
+      },
+      set(target, name, value, receiver) {
+        if (typeof name === "symbol" || Object.hasOwn(target, name) || hasWriter(target, name)) {
+          return Reflect.set(target, name, value, receiver);
+        }
+        target.methodMissing(`${name}=`, value);
+        return true;
+      },
+      has(target, name) {
+        return Reflect.has(target, name) || Object.hasOwn(Configuration._options, name);
+      },
+    });
+  }
+
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
   }
@@ -115,26 +135,3 @@ export class Configuration {
     }
   }
 }
-
-Object.setPrototypeOf(
-  Configuration.prototype,
-  new Proxy(Object.create(Object.getPrototypeOf(Configuration.prototype) as object) as object, {
-    get(target, name, receiver: Configuration) {
-      if (typeof name === "symbol" || name in target || receiver === Configuration.prototype) {
-        return Reflect.get(target, name, receiver);
-      }
-      if (PROTOCOL_PROBES.has(name)) return undefined;
-      return receiver.methodMissing(name);
-    },
-    set(target, name, value, receiver: Configuration) {
-      if (typeof name === "symbol" || hasWriter(receiver, name)) {
-        return Reflect.set(target, name, value, receiver);
-      }
-      receiver.methodMissing(`${name}=`, value);
-      return true;
-    },
-    has(target, name) {
-      return Reflect.has(target, name) || Object.hasOwn(Configuration._options, name);
-    },
-  }),
-);

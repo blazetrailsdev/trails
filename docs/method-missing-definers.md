@@ -33,7 +33,7 @@ Class-specific rules live in the owning package's `CLAUDE.md`, under
 | `action_mailer/base.rb`                               | Proxy (class chain)   |
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/engine/lazy_route_set.rb`                      | Proxy (module chain)  |
-| `rails/railtie/configuration.rb`                      | Proxy (proto chain)   |
+| `rails/railtie/configuration.rb`                      | Proxy                 |
 | `abstract_controller/collector.rb`                    | Proxy (proto chain)   |
 | `action_dispatch/system_test_case.rb`                 | named method, no trap |
 | `action_controller/metal/mime_responds.rb`            | Proxy (proto chain)   |

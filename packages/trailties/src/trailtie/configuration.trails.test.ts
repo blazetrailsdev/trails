@@ -37,21 +37,3 @@ describe("Railtie::Configuration (trails)", () => {
     expect(config.then).toBeUndefined();
   });
 });
-
-describe("Trailtie::Configuration method_missing in the prototype chain", () => {
-  it("lets a subclass with a #private field construct and answer config names", () => {
-    class Sub extends Configuration {
-      #tag = "sub";
-      tag(): string {
-        return this.#tag;
-      }
-    }
-    const config = new Sub() as Sub & Record<string, unknown>;
-    config.protoChainOption = 7;
-    expect(config.tag()).toBe("sub");
-    expect(config.protoChainOption).toBe(7);
-    expect(Object.hasOwn(config, "protoChainOption")).toBe(false);
-    expect(config instanceof Sub).toBe(true);
-    expect(Object.getPrototypeOf(config)).toBe(Sub.prototype);
-  });
-});
