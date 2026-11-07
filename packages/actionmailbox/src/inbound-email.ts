@@ -30,6 +30,7 @@ export class InboundEmail extends Record {
   declare isDelivered: () => boolean;
   declare isFailed: () => boolean;
   declare isBounced: () => boolean;
+  declare bouncedBang: () => Promise<unknown>;
 
   private _mail?: Message;
   private _source?: Uint8Array;
