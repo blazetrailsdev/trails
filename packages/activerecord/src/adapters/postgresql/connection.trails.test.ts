@@ -1,5 +1,6 @@
 import { it, expect, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import type { Connection } from "../../pg/connection.js";
 
 describeIfPg("PostgresqlConnectionTest (trails)", () => {
   it("non-default minMessages is applied to connection", async () => {
@@ -23,7 +24,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
       expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
     } finally {
-      await conn?.end().catch(() => {});
+      await conn?.close().catch(() => {});
     }
   });
 
@@ -31,9 +32,12 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
     const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
-    const endSpy = conn ? vi.spyOn(conn, "end") : null;
-    const socket = (conn as unknown as { connection?: { stream?: { destroy?: () => void } } })
-      ?.connection?.stream;
+    const endSpy = conn ? vi.spyOn(conn, "close") : null;
+    const socket = (
+      (conn as Connection | null)?.client as unknown as {
+        connection?: { stream?: { destroy?: () => void } };
+      }
+    )?.connection?.stream;
     try {
       expect(await a.active()).toBe(true);
       a.discardBang();

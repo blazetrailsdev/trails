@@ -1,7 +1,7 @@
 import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { IO } from "@blazetrails/ruby-compat";
-import { escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
+import { Connection, escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
 import { PG } from "./pg.js";
 import { cancelAnyRunningQuery } from "../connection-adapters/postgresql/database-statements.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -45,7 +45,7 @@ describe("pgConnection transaction_status and status", () => {
     expect(client.transactionStatus()).toBe(3);
     connection.emit("readyForQuery", { status: "I" });
     expect(client.transactionStatus()).toBe(0);
-    client._activeQuery = {};
+    client.client._activeQuery = {};
     expect(client.transactionStatus()).toBe(1);
   });
 
@@ -203,7 +203,7 @@ describe("PG::Error#result on every carrier path", () => {
     });
     const bare = Object.assign(new Error("socket"), { code: "08006" });
     const client = pgConnection({ query: (error: unknown) => Promise.reject(error) });
-    const query = client.query as unknown as (error: Error) => Promise<unknown>;
+    const query = client.query.bind(client) as unknown as (error: Error) => Promise<unknown>;
     const raised = (await query(server).catch((e: unknown) => e)) as PG.Error;
     expect(raised).toBeInstanceOf(PG.ServerError);
     expect(raised).not.toBeInstanceOf(PG.ConnectionBad);
@@ -235,7 +235,7 @@ describe("PG::Error#result on every carrier path", () => {
 
   it("rewraps an error raised by a member the client answers", async () => {
     const client = pgConnection({ end: () => Promise.reject(terminated()) });
-    await expect(client.end()).rejects.toBeInstanceOf(PG.UnableToSend);
+    await expect(client.close()).rejects.toBeInstanceOf(PG.UnableToSend);
   });
 });
 
@@ -309,9 +309,8 @@ describe("cancel_any_running_query", () => {
   }
 
   it("rescues PG::Error", async () => {
-    await expect(
-      cancelAnyRunningQuery.call(host(pgConnection({}).cancel)),
-    ).resolves.toBeUndefined();
+    const conn = pgConnection({});
+    await expect(cancelAnyRunningQuery.call(host(conn.cancel.bind(conn)))).resolves.toBeUndefined();
   });
 
   it("lets an error the driver did not raise propagate", async () => {
@@ -367,4 +366,54 @@ describe("PG::Connection#escape_string", () => {
       emit: (event: string, arg: unknown) => handlers[event]?.forEach((fn) => fn(arg)),
     };
   }
+});
+
+describe("pgConnection without a returned Proxy", () => {
+  it("returns the Connection itself, whose subclass private fields read", () => {
+    class Traced extends Connection {
+      #label = "traced";
+      label(): string {
+        return this.#label;
+      }
+    }
+    const conn = new Traced({});
+    expect(pgConnection(conn)).toBe(conn);
+    expect(pgConnection(conn).constructor).toBe(Traced);
+    expect(conn.label()).toBe("traced");
+    expect(pgConnection({})).toBeInstanceOf(Connection);
+  });
+
+  it("does not answer a member the client defines and Connection does not", () => {
+    const conn = pgConnection({ escapeLiteral: (s: string) => `'${s}'` });
+    expect("escapeLiteral" in conn).toBe(false);
+  });
+
+  it("close ends the client", async () => {
+    const end = vi.fn(() => Promise.resolve());
+    await pgConnection({ end }).close();
+    expect(end).toHaveBeenCalledTimes(1);
+  });
+
+  it("set_client_encoding sets the session's client_encoding", async () => {
+    const query = vi.fn(() => Promise.resolve({ rows: [] }));
+    await pgConnection({ query }).setClientEncoding("utf8");
+    expect(query).toHaveBeenCalledWith("SET client_encoding TO 'utf8'");
+  });
+
+  it("set_notice_receiver replaces the previous receiver", () => {
+    const listeners: Record<string, ((result: unknown) => void)[]> = {};
+    const client = {
+      on: (event: string, fn: (result: unknown) => void) => (listeners[event] ??= []).push(fn),
+      removeAllListeners: (event: string) => delete listeners[event],
+      emit: (event: string, result: unknown) => listeners[event]?.forEach((fn) => fn(result)),
+    };
+    const conn = pgConnection(client);
+    const first = vi.fn();
+    const second = vi.fn();
+    conn.setNoticeReceiver(first);
+    conn.setNoticeReceiver(second);
+    client.emit("notice", { message: "hi", code: "01000", severity: "WARNING" });
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledWith({ message: "hi", code: "01000", severity: "WARNING" });
+  });
 });

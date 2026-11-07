@@ -230,7 +230,7 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
-  static async newClient(connParams: Record<string, unknown>): Promise<pg.Client> {
+  static async newClient(connParams: Record<string, unknown>): Promise<PGConnection> {
     try {
       return await PG.connect(connParams);
     } catch (error) {
@@ -587,7 +587,7 @@ export class PostgreSQLAdapter
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
       try {
-        await this._rawConnection?.end();
+        await this._rawConnection?.close();
       } catch {}
       this._rawConnection = null;
     });
@@ -1193,9 +1193,9 @@ export class PostgreSQLAdapter
    */
   async connect(): Promise<void> {
     try {
-      this._rawConnection = (await (this.constructor as typeof PostgreSQLAdapter).newClient(
+      this._rawConnection = await (this.constructor as typeof PostgreSQLAdapter).newClient(
         this._connectionParameters,
-      )) as PGConnection;
+      );
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1219,9 +1219,7 @@ export class PostgreSQLAdapter
     await super.configureConnection();
 
     if (rtest(this._config.encoding)) {
-      await this._rawConnection!.query(
-        `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
-      );
+      await this._rawConnection!.setClientEncoding(String(this._config.encoding));
     }
 
     await this.setClientMinMessages(
@@ -1232,18 +1230,14 @@ export class PostgreSQLAdapter
     );
 
     if (dbWarningsAction() != null) {
-      this._rawConnection!.removeAllListeners("notice");
-      this._rawConnection!.on(
-        "notice",
-        (result: { severity?: string; message?: string; code?: string }) => {
-          const message = result.message;
-          const code = result.code ?? null;
-          const level = result.severity ?? null;
-          this._noticeReceiverSqlWarnings.push(
-            new SQLWarning(message, code, level, undefined, this.pool),
-          );
-        },
-      );
+      this._rawConnection!.setNoticeReceiver((result) => {
+        const message = result.message;
+        const code = result.code ?? null;
+        const level = result.severity ?? null;
+        this._noticeReceiverSqlWarnings.push(
+          new SQLWarning(message, code, level, undefined, this.pool),
+        );
+      });
     }
 
     await this.setStandardConformingStrings();
@@ -1618,7 +1612,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  _rawConnectionForTest(): pg.Client | null {
+  _rawConnectionForTest(): PGConnection | null {
     return this._rawConnection;
   }
 }
