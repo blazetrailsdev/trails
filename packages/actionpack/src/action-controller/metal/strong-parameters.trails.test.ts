@@ -46,6 +46,18 @@ describe("Parameters#expect types", () => {
     expect(values).toEqual(["1", "1"]);
   });
 
+  it("an array of keys is flattened as Rails' filters.flatten", () => {
+    expectTypeOf(params.expect(["id", "id"])).toEqualTypeOf<unknown[]>();
+    expectTypeOf(params.expect(["id"])).toBeUnknown();
+    expectTypeOf(params.expectBang(["id", "id"])).toEqualTypeOf<unknown[]>();
+    expect(params.expect(["id", "id"])).toEqual(["1", "1"]);
+    expect(params.expect(["id"])).toBe("1");
+    expect(params.expect({ post: ["title"] }, ["id"])).toHaveLength(2);
+    const permitted = params.permit("id", ["id", [{ post: ["title"] }]]);
+    expect(permitted.get("id")).toBe("1");
+    expect((permitted.get("post") as Parameters).get("title")).toBe("Hi");
+  });
+
   it("array and array-of-hashes filters fall through to the untyped overload", () => {
     const withTags = new Parameters({
       post: { title: "Hi" },

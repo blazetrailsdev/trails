@@ -260,10 +260,10 @@ describe("ParametersExpectTest", () => {
     const params = new Parameters({ a: 1 });
 
     await assertRaises([ParameterMissing], {}, () => {
-      params.expect(["a", "b"] as never);
+      params.expect(["a", "b"]);
     });
     await assertRaises([ExpectedParameterMissing], {}, () => {
-      params.expectBang(["a", "b"] as never);
+      params.expectBang(["a", "b"]);
     });
   });
 
@@ -271,10 +271,10 @@ describe("ParametersExpectTest", () => {
     const params = new Parameters({ a: 1, b: [] });
 
     await assertRaises([ParameterMissing], {}, () => {
-      params.expect(["a", "b"] as never);
+      params.expect(["a", "b"]);
     });
     await assertRaises([ExpectedParameterMissing], {}, () => {
-      params.expectBang(["a", "b"] as never);
+      params.expectBang(["a", "b"]);
     });
   });
 
