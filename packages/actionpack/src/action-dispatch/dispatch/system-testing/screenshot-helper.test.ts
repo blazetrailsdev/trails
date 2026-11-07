@@ -119,7 +119,7 @@ describe("ScreenshotHelperTest", () => {
     host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { screenshot: "artifact" }).then(() => {
       const out = msgs.join("\n");
-      expect(out).toMatch(/url=artifact:\/\//);
+      expect(out).toMatch(/url=artifact:\/\/.+?tmp\/screenshots\/1_x\.png/);
       consoleSpy.mockRestore();
     });
   });
@@ -139,7 +139,7 @@ describe("ScreenshotHelperTest", () => {
     return takeScreenshot.call(host, { html: true }).then(() => {
       const out = msgs.join("\n");
       assert(calledSaveHtml);
-      expect(out).toMatch(/\[Screenshot HTML\]/);
+      expect(out).toMatch(/\[Screenshot HTML\].+?tmp\/screenshots\/1_x\.html/);
       consoleSpy.mockRestore();
     });
   });
@@ -160,7 +160,7 @@ describe("ScreenshotHelperTest", () => {
     return takeScreenshot.call(host).then(() => {
       const out = msgs.join("\n");
       assert(calledSaveHtml);
-      expect(out).toMatch(/\[Screenshot HTML\]/);
+      expect(out).toMatch(/\[Screenshot HTML\].+?tmp\/screenshots\/1_x\.html/);
       consoleSpy.mockRestore();
     });
   });
@@ -175,7 +175,7 @@ describe("ScreenshotHelperTest", () => {
     };
     host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
-      expect(msgs.join("\n")).toMatch(/url=artifact:\/\//);
+      expect(msgs.join("\n")).toMatch(/url=artifact:\/\/.+?tmp\/screenshots\/1_x\.png/);
       consoleSpy.mockRestore();
     });
   });
@@ -195,7 +195,9 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("image path returns the absolute path from root", () => {
-    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
+    const parent = new Pathname(Dir.pwd()).join("..");
+    TopLevel.Trails = { root: () => parent } as unknown as typeof TopLevel.Trails;
+    assertEqual(parent.join("tmp/screenshots/0_x.png").toString(), imagePath.call(host));
   });
 
   it("screenshotsDir defaults to tmp/screenshots", () => {

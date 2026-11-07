@@ -90,6 +90,7 @@ export {
   rbObjIvarDefined,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbObjRemoveInstanceVariable,
   classpaths,
   rbCClass,
   rbClassSuperclass,
