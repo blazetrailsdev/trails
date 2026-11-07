@@ -8,6 +8,10 @@ export class PwaController extends ApplicationController {
     return "trails/pwa";
   }
 
+  static {
+    this.skipForgeryProtection();
+  }
+
   async serviceWorker(): Promise<void> {
     await this.render({ template: "pwa/service-worker", layout: false } as PWARenderOptions);
   }
@@ -16,5 +20,3 @@ export class PwaController extends ApplicationController {
     await this.render({ template: "pwa/manifest", layout: false } as PWARenderOptions);
   }
 }
-
-PwaController.skipBeforeAction(":verifyAuthenticityToken", { raise: false });

@@ -87,9 +87,6 @@ export class RoutesProxy implements UrlForHost {
   get _routes(): UrlForRoutes {
     return this.routes;
   }
-  set _routes(value: UrlForRoutes | null) {
-    if (value != null) this.routes = value;
-  }
 
   urlOptions(): Record<string, unknown> {
     return _withRoutes.call<
@@ -111,7 +108,7 @@ export class RoutesProxy implements UrlForHost {
       options = { ...this.urlOptions(), ...(options ?? {}) };
 
       if (this._scriptNamer) {
-        options["scriptName"] = mergeScriptNames(
+        options["scriptName"] = this.mergeScriptNames(
           options["scriptName"] as string | null | undefined,
           this._scriptNamer(options),
         );
@@ -128,6 +125,20 @@ export class RoutesProxy implements UrlForHost {
         { receiver: this },
       );
     }
+  }
+
+  /** @internal */
+  private mergeScriptNames(
+    previousScriptName: string | null | undefined,
+    newScriptName: string,
+  ): string {
+    if (previousScriptName == null) return newScriptName;
+
+    const resolvedParts = newScriptName.split("/").length - 1;
+    const previousParts = previousScriptName.split("/").length - 1;
+    const contextParts = previousParts - resolvedParts + 1;
+
+    return previousScriptName.split("/").slice(0, contextParts).join("/") + newScriptName;
   }
 }
 
@@ -156,26 +167,5 @@ Object.setPrototypeOf(
 );
 
 Routing.RoutesProxy = RoutesProxy;
-
-/** @internal */
-export function mergeScriptNames(
-  previousScriptName: string | null | undefined,
-  newScriptName: string,
-): string {
-  if (previousScriptName == null) return newScriptName;
-
-  const resolvedParts = countSlashes(newScriptName);
-  const previousParts = countSlashes(previousScriptName);
-  const contextParts = previousParts - resolvedParts + 1;
-
-  return previousScriptName.split("/").slice(0, contextParts).join("/") + newScriptName;
-}
-
-/** @internal */
-function countSlashes(s: string): number {
-  let n = 0;
-  for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 47) n++;
-  return n;
-}
 
 include(RoutesProxy, UrlFor);

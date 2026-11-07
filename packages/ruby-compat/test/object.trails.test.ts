@@ -52,6 +52,7 @@ import {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbObjRemoveInstanceVariable,
   rbModName,
   rbModToS,
   rbObjClassname,
@@ -1120,6 +1121,20 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
     rbObjIvarSet(o, "@_cache_key", 3);
     expect(Object.hasOwn(o, "_cacheKey")).toBe(true);
     expect(rbObjInstanceVariables(o)).toContain("@_cache_key");
+  });
+
+  it("removes a declared field and answers its value", () => {
+    const o = new SubHolder();
+    rbObjIvarSet(o, "@items", [3]);
+    expect(rbObjRemoveInstanceVariable(o, "@items")).toEqual([3]);
+    expect(Object.hasOwn(o, "_items")).toBe(false);
+    expect(() => rbObjRemoveInstanceVariable(o, "@items")).toThrow(
+      "instance variable @items not defined",
+    );
+    expect(() => rbObjRemoveInstanceVariable(o, "items")).toThrow(NameError);
+    expect(() => rbObjRemoveInstanceVariable(Object.freeze(new SubHolder()), "@foo_bar")).toThrow(
+      FrozenError,
+    );
   });
 
   it("reports each field under a name that reads the same field back", () => {
