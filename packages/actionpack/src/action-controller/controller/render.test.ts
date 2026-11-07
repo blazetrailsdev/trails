@@ -543,8 +543,7 @@ describe("ExpiresInRenderTest", () => {
     ).rejects.toThrow(MissingTemplate);
   });
 
-  // BLOCKED: render-permitted-parameters-are-not-read-as-the-options-hash
-  it.skip("permitted dynamic render file hash", async () => {
+  it("permitted dynamic render file hash", async () => {
     expect(
       await File.isExistAsync(
         File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),

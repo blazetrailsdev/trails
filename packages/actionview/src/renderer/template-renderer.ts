@@ -1,6 +1,6 @@
 import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 
-import { ArgumentError, File, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, hasKey, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import type { LookupContext } from "../lookup-context.js";
 import { MissingTemplate } from "../template/error.js";
@@ -31,32 +31,35 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
   }
 
   /** @internal */
-  private determineTemplate(options: RenderOptions): RenderableTemplate {
+  private determineTemplate(
+    options: RenderOptions & { isKey?(key: string): boolean },
+  ): RenderableTemplate {
     const keys = options.locals ? Object.keys(options.locals) : [];
 
-    if (Object.hasOwn(options, "body")) {
+    if (hasKey(options, "body")) {
       return new Text(options.body);
     }
-    if (Object.hasOwn(options, "plain")) {
+    if (hasKey(options, "plain")) {
       return new Text(options.plain);
     }
-    if (Object.hasOwn(options, "html")) {
+    if (hasKey(options, "html")) {
       return new HTML(options.html, this.formats[0]);
     }
-    if (Object.hasOwn(options, "file")) {
-      if (File.isExist(options.file!)) {
-        return new RawFile(options.file);
+    if (hasKey(options, "file")) {
+      const file = hashAref(options, "file") as string;
+      if (File.isExist(file)) {
+        return new RawFile(file);
       } else {
-        if (File.isAbsolutePath(options.file!)) {
-          throw new ArgumentError(`File ${options.file} does not exist`);
+        if (File.isAbsolutePath(file)) {
+          throw new ArgumentError(`File ${file} does not exist`);
         } else {
           throw new ArgumentError(
-            `\`render file:\` should be given the absolute path to a file. '${options.file}' was given instead`,
+            `\`render file:\` should be given the absolute path to a file. '${file}' was given instead`,
           );
         }
       }
     }
-    if (Object.hasOwn(options, "inline")) {
+    if (hasKey(options, "inline")) {
       const handler = Template.handlerForExtension(options.type ?? "tse");
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
@@ -66,10 +69,10 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         format,
       });
     }
-    if (Object.hasOwn(options, "renderable")) {
+    if (hasKey(options, "renderable")) {
       return new Renderable(options.renderable);
     }
-    if (Object.hasOwn(options, "template")) {
+    if (hasKey(options, "template")) {
       if (rbObjRespondTo(options.template, "render")) {
         return options.template as RenderableTemplate;
       }
