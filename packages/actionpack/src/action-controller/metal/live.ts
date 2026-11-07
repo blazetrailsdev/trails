@@ -203,9 +203,9 @@ export class Response extends DispatchResponse {
   }
 
   /** @internal */
-  buildBuffer(response: DispatchResponse, body: unknown): Buffer {
+  buildBuffer(response: DispatchResponse, body: Iterable<string>): Buffer {
     const buf = new Buffer(response);
-    each(body as Iterable<string>, (part) => buf.write(part));
+    each(body, (part) => buf.write(part));
     return buf;
   }
 }
