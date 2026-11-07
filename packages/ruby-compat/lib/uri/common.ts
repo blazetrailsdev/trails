@@ -273,6 +273,9 @@ export class URI {
 
   /**
    * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`).
+   * `enc` is accepted for Ruby's signature; the result is always the UTF-8 arm,
+   * since a JS string has no encoding tag (CLAUDE.md, "A String has no encoding
+   * tag either").
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
    * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370`).

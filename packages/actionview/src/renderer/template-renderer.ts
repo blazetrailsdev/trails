@@ -27,7 +27,12 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     this.details = this.extractDetails(options as Record<string, unknown>);
     const template = this.determineTemplate(options);
     this.prependFormats(template.format);
-    return this.renderTemplate(context, template, options.layout, options.locals ?? {});
+    return this.renderTemplate(
+      context,
+      template,
+      hashAref(options, "layout") as RenderOptions["layout"],
+      (hashAref(options, "locals") as Record<string, unknown> | null) ?? {},
+    );
   }
 
   /** @internal */
