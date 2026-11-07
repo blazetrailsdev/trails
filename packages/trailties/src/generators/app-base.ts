@@ -512,13 +512,15 @@ ${requireStatements.join("\n")}`;
    * @missingRailsCall rails_version_specifier — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
    */
   trailsGemfileEntry(name: string, packageManager: string): string {
+    const subdirectory =
+      packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : "";
     if (this.options.dev) {
       const path = this.trailsDevPackages()[name];
       return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
     } else if (this.options.edge) {
-      return `github:blazetrailsdev/trails#${this.edgeBranch()}${packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : ""}`;
+      return `github:blazetrailsdev/trails#${this.edgeBranch()}${subdirectory}`;
     } else if (this.options.main) {
-      return `github:blazetrailsdev/trails#main${packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : ""}`;
+      return `github:blazetrailsdev/trails#main${subdirectory}`;
     } else {
       return "*";
     }

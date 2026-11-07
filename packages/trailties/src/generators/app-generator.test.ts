@@ -231,7 +231,7 @@ describe("AppGeneratorTest", () => {
     }
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#2-1-stable[&"]/,
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#2-1-stable&path:\/packages\/trailties"/,
     );
   });
 
@@ -244,7 +244,7 @@ describe("AppGeneratorTest", () => {
     }
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
     );
   });
 
@@ -252,7 +252,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--main"]);
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
     );
   });
 
@@ -260,7 +260,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--master"]);
     await t.assertFile(
       "package.json",
-      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main[&"]/,
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
     );
   });
 
