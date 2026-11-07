@@ -157,7 +157,7 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/src/test-helpers/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
-      "packages/mini-magick/src/test-helpers/fixtures/**",
+      "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
       "packages/activestorage/src/test-helpers/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
@@ -409,14 +409,14 @@ export default defineConfig(
   // catch it behind an `as any`, which is how six association call sites drifted
   // (four dead `typeof … === "function"` gates, two raising `?.()`).
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
     },
   },
 
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     ignores: ["**/*.test.ts", "**/*.test-d.ts"],
     rules: {
       "blazetrails/no-q-suffix-predicate": "error",
@@ -429,7 +429,7 @@ export default defineConfig(
   // `AsyncFunction` tag. A non-`async` promise-returning `isEmpty` carries no
   // such tag, so its query would be issued before anything could see it.
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/async-querying-empty": "error",
     },
@@ -584,7 +584,7 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/inlined-from-placement": "error",
       "blazetrails/perf-tag-placement": "error",
@@ -778,7 +778,7 @@ export default defineConfig(
   //    origin/main by `pnpm parity:lint:counts`, so only NEW standalone usages
   //    fail. See eslint/no-standalone-associations.mjs. ──
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-standalone-associations": "warn",
     },
@@ -932,7 +932,7 @@ export default defineConfig(
 
   // ── ruby-compat-native-required: the native form where it is the same operation (RFC 0194) ──
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/ruby-compat-native-required": "error",
     },
@@ -1076,7 +1076,7 @@ export default defineConfig(
   // ── no conditionals in tests (all packages except activerecord) ──
   {
     files: [
-      "packages/*/src/**/*.test.ts",
+      "packages/*/{src,lib,test}/**/*.test.ts",
       "packages/*/dx-tests/**/*.test.ts",
       "packages/*/virtualized-dx-tests/**/*.test.ts",
     ],

@@ -3,15 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../chronic" },
     { "path": "../date" },
     { "path": "../ruby-compat" },
     { "path": "../tzinfo" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  ]
 }

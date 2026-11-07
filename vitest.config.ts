@@ -333,12 +333,12 @@ const alias = {
   "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/src/index.ts"),
   "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
   "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
-  "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/src") + "/",
-  "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/src/index.ts"),
+  "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/lib") + "/",
+  "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/lib/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
   "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
-  "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),
+  "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/lib/index.ts"),
   "@blazetrails/actionpack/system-testing": path.resolve(
     __dirname,
     "packages/actionpack/src/system-testing.ts",
@@ -356,8 +356,8 @@ const alias = {
   "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/src/index.ts"),
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
-  "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/src") + "/",
-  "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/src/index.ts"),
+  "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
+  "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
   "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/src") + "/",
   "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/src/index.ts"),
   "@blazetrails/actionmailbox/": path.resolve(__dirname, "packages/actionmailbox/src") + "/",
@@ -379,9 +379,9 @@ const alias = {
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
   "@blazetrails/vitest-matchers/setup": path.resolve(
     __dirname,
-    "packages/vitest-matchers/src/setup.ts",
+    "packages/vitest-matchers/lib/setup.ts",
   ),
-  "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/src/index.ts"),
+  "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/lib/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/src") + "/",
@@ -389,21 +389,21 @@ const alias = {
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
-  "@blazetrails/builder": path.resolve(__dirname, "packages/builder/src/builder.ts"),
+  "@blazetrails/builder": path.resolve(__dirname, "packages/builder/lib/builder.ts"),
   "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/src/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/src/marcel.ts"),
-  "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/src/mini-mime.ts"),
-  "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/src/smtp.ts"),
+  "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/lib/mini-mime.ts"),
+  "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/lib/smtp.ts"),
   "@blazetrails/rake": path.resolve(__dirname, "packages/rake/src/rake.ts"),
-  "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/src") + "/",
-  "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/src") + "/",
+  "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/lib") + "/",
+  "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/lib") + "/",
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/src/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
-  "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/src/et-orbi.ts"),
+  "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
-  "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/src/fugit.ts"),
-  "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
+  "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
+  "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };
 
@@ -477,11 +477,11 @@ const COVERAGE_EXCLUDE = [
 const aliasEntries = [
   {
     find: /^@blazetrails\/image-processing$/,
-    replacement: path.resolve(__dirname, "packages/image-processing/src/image-processing.ts"),
+    replacement: path.resolve(__dirname, "packages/image-processing/lib/image-processing.ts"),
   },
   {
     find: /^@blazetrails\/mini-magick$/,
-    replacement: path.resolve(__dirname, "packages/mini-magick/src/mini-magick.ts"),
+    replacement: path.resolve(__dirname, "packages/mini-magick/lib/mini-magick.ts"),
   },
   {
     find: /^@blazetrails\/thor$/,
@@ -513,7 +513,7 @@ const otherResolve = {
 // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
 // (it runs under activerecord, where the engine is ActiveRecord::Base).
 const otherSetupFiles = [
-  "./packages/vitest-matchers/src/setup.ts",
+  "./packages/vitest-matchers/lib/setup.ts",
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
@@ -577,7 +577,7 @@ export default defineConfig({
             "packages/activerecord/src/**/*.test.ts",
             "packages/activerecord/scripts/**/*.test.ts",
             "packages/solid-queue/src/**/*.test.ts",
-            "packages/solid-cable/src/**/*.test.ts",
+            "packages/solid-cable/test/**/*.test.ts",
             "packages/activestorage/src/**/*.test.ts",
             "packages/actionmailbox/src/**/*.test.ts",
           ],
@@ -585,7 +585,7 @@ export default defineConfig({
             ...SHARED_EXCLUDE,
             ...ADAPTER_SPECIFIC_EXCLUDE,
             ...SQLITE_DRIVER_TESTS,
-            "packages/solid-cable/src/generators/**",
+            "packages/solid-cable/test/generators/**",
             "packages/solid-queue/src/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
@@ -594,7 +594,7 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
-            "./packages/vitest-matchers/src/setup.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",
@@ -715,14 +715,14 @@ export default defineConfig({
           globals: true,
           include: [
             "packages/trailties/src/**/*.test.ts",
-            "packages/solid-cable/src/generators/**/*.test.ts",
+            "packages/solid-cable/test/generators/**/*.test.ts",
             "packages/solid-queue/src/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
             "./packages/trailties/src/test-helpers/build-templates.ts",
             "./packages/trailties/src/test-helpers/isolation/global-setup.ts",
-            "./packages/solid-cable/src/test-helpers/build-templates.ts",
+            "./packages/solid-cable/test/support/build-templates.ts",
             "./packages/solid-queue/src/test-helpers/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
@@ -744,10 +744,10 @@ export default defineConfig({
         test: {
           name: "et-orbi",
           globals: true,
-          include: ["packages/et-orbi/src/**/*.test.ts"],
+          include: ["packages/et-orbi/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: [
-            "./packages/vitest-matchers/src/setup.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
           ],
         },
@@ -777,10 +777,10 @@ export default defineConfig({
         test: {
           name: "fugit",
           globals: true,
-          include: ["packages/fugit/src/**/*.test.ts"],
+          include: ["packages/fugit/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: [
-            "./packages/vitest-matchers/src/setup.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
           ],
         },

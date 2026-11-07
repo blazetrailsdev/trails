@@ -13,7 +13,7 @@ import {
   singularize,
   underscore,
 } from "../../packages/activesupport/src/index.js";
-import { parse as tseParse } from "../../packages/tse-compiler/src/index.js";
+import { parse as tseParse } from "../../packages/tse-compiler/lib/index.js";
 import {
   ARUNIT2_SCHEMA,
   POSTGRESQL_SPECIFIC_SCHEMA,

@@ -13,7 +13,22 @@
  */
 
 /** Packages already moved to `lib/` + `test/`. Only-grow. */
-export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>(["ruby-compat", "tzinfo"]);
+export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
+  "ruby-compat",
+  "tzinfo",
+  "mini-mime",
+  "net-smtp",
+  "et-orbi",
+  "vitest-matchers",
+  "fugit",
+  "rackup",
+  "solid-cable",
+  "nokogiri",
+  "mini-magick",
+  "image-processing",
+  "builder",
+  "tse-compiler",
+]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */
 export function libRoot(pkg: string): "lib" | "src" {

@@ -18,7 +18,7 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "`Handlers::ERB::Erubi` (erubi.rb:9-83) is the Erubi step, and root CLAUDE.md " +
       '§ "Templates are precompiled" rules that `compileJs` in `@blazetrails/tse-compiler` ' +
-      "is that step. Its members answer them in `tse-compiler/src/emit-js.ts`: `initialize`'s " +
+      "is that step. Its members answer them in `tse-compiler/lib/emit-js.ts`: `initialize`'s " +
       "`bufvar` / `preamble` / `postamble` / `escapefunc` are `EmitJsOptions` read by `emit`; " +
       "`add_text` is `emitNode`'s `text` arm (`safeAppend`); `add_expression` is its `expr` / " +
       "`rawExpr` arms and `emit`'s `blockExpr` arm (`BLOCK_EXPR`); `add_code` is the `code` " +

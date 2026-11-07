@@ -3,9 +3,9 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../actioncable" },
     { "path": "../activejob" },
@@ -15,6 +15,5 @@
     { "path": "../date" },
     { "path": "../ruby-compat" },
     { "path": "../trailties" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  ]
 }
