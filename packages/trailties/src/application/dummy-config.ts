@@ -1,5 +1,6 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
+/** @noRailsEquivalent CONVERGEABLE class-path-walk-pairs-top-level-ruby-constants */
 export class DummyConfig {
   #config: object;
   #self: DummyConfig;
