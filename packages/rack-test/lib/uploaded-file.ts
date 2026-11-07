@@ -8,7 +8,8 @@ import {
   RuntimeError,
   StringIO,
   Tempfile,
-  methodMissingProxy,
+  methodMissingPrototype,
+  rbFSend,
   rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -59,8 +60,10 @@ export class UploadedFile {
     }
 
     if (binary) this.tempfile.binmode();
+  }
 
-    return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile.tempfile });
+  methodMissing(methodName: string, ...args: unknown[]): unknown {
+    return rbFSend(this.tempfile, methodName, ...args);
   }
 
   respondToMissing(methodName: string, _includePrivate: boolean = false): boolean {
@@ -119,5 +122,9 @@ export class UploadedFile {
     this.tempfile.setEncoding(Encoding.BINARY);
 
     FileUtils.copyFile(path, this.tempfile.path()!);
+  }
+
+  static {
+    methodMissingPrototype(this, { delegate: (uploadedFile) => uploadedFile.tempfile });
   }
 }

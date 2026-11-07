@@ -564,7 +564,6 @@ export {
 export type { Included, Extended, ModuleVisibility } from "@blazetrails/ruby-compat/include";
 export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
-export { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 export { prepend } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 

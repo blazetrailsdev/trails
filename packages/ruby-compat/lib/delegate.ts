@@ -65,7 +65,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * `Object.prototype.toString` is always found first here, so `toString`
  * forwards explicitly. Ruby takes public and protected
  * but never private, and a `_`-prefixed name is how trails spells private —
- * the same reading `methodMissingProxy` takes of `respond_to?`. A TS
+ * the same reading `methodMissingPrototype` takes of `respond_to?`. A TS
  * `protected` member carries no prefix and is an ordinary prototype property,
  * so it is walked and forwarded, as Ruby's protected set is.
  *

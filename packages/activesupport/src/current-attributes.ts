@@ -1,4 +1,9 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  methodMissingPrototype,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
@@ -180,6 +185,23 @@ export abstract class CurrentAttributes {
       (this as CurrentAttributesClass)._currentInstancesKey = this.name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
+  }
+
+  /** @internal */
+  private static methodMissing(name: string, ...args: unknown[]): unknown {
+    return rbFSend(this.instance(), name, ...args);
+  }
+
+  /** @internal */
+  private static respondToMissing(name: string, _includePrivate: boolean): boolean {
+    return rbObjRespondTo(this.instance(), name);
+  }
+
+  static {
+    methodMissingPrototype(
+      { prototype: this as unknown as { methodMissing(m: string, ...args: unknown[]): unknown } },
+      { delegate: (klass) => (klass as unknown as typeof CurrentAttributes).instance() },
+    );
   }
 
   /** @missingRailsCall with — PERMANENT */
