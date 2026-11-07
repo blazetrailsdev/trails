@@ -84,7 +84,7 @@ describe("Object#presence on a thenable with an async blank?", () => {
     const present = await presence(lazy);
     expect(present).toBeInstanceOf(Lazy);
     expect(lazy.evaluated).toBe(0);
-    expect("then" in present!).toBe(false);
+    expect(present).toBe(lazy);
   });
 
   it("answers nil when blank", async () => {

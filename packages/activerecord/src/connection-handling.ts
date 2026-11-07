@@ -1,3 +1,4 @@
+import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -336,23 +337,34 @@ export function withRoleAndShard<T>(
   fn: () => T,
 ): T {
   let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
-  return rbEnsure(
+  const result = rbEnsure(
     () => {
       if (role === readingRole()) preventWrites = true;
 
       appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
       const load = (returnValue: unknown) => {
-        if (returnValue instanceof ActiveRecord.Relation) return returnValue.load();
-        return returnValue;
+        if (returnValue instanceof ActiveRecord.Relation) {
+          return returnValue.load().then(() => ({ returnValue }));
+        }
+        return { returnValue };
       };
       const returnValue = fn();
-      return (returnValue instanceof Promise ? returnValue.then(load) : load(returnValue)) as T;
+      if (returnValue instanceof Promise) return returnValue.then(load);
+      const loaded = load(returnValue);
+      return loaded instanceof Promise ? loaded : returnValue;
     },
     () => {
       const stack = connectedToStack();
       stack.splice(stack.lastIndexOf(entry as never), 1);
     },
   );
+  return (
+    result instanceof Promise
+      ? result.then(({ returnValue }: { returnValue: unknown }) =>
+          returnValue instanceof ActiveRecord.Relation ? stripThenable(returnValue) : returnValue,
+        )
+      : result
+  ) as T;
 }
 
 /** @internal */

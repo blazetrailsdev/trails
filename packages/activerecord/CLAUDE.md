@@ -25,7 +25,7 @@ counterpart for:
   relation, so `Relation.prototype` carries `then` / `catch` / `finally`
   forwarding to `toArray()`. JS unwraps a thenable _returned_ from an `async`
   body, so a builder returning a relation would evaluate it; `stripThenable` is
-  the `then`-hiding Proxy view that lets a relation be returned unevaluated
+  an own `then` shadow, removed by its first read, that lets a relation be returned unevaluated
   (and lets `Object#presence` answer one).
 - **`DeferredIdsIn` / `DeferredIdsNotIn`**
   (`relation/predicate-builder/deferred-distinct-pk-in.ts`). `RelationHandler#call`

@@ -251,7 +251,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     this.resetScope();
   }
 
-  async concat(...records: T[]): Promise<Omit<this, "then"> | false> {
+  concat(...records: T[]): Promise<Omit<this, "then"> | false> {
     return this.push(...records);
   }
 
