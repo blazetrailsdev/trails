@@ -239,7 +239,11 @@ export class Delegator {
     this.__setobj__(obj);
   }
 
-  /** `Delegator#method_missing` (`vendor/ruby/v3.3.11/lib/delegate.rb:82-93`). */
+  /**
+   * `Delegator#method_missing` (`vendor/ruby/v3.3.11/lib/delegate.rb:82-93`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   methodMissing(m: string, ...args: unknown[]): unknown {
     let r = true;
     const target = this.__getobj__(() => {
@@ -257,7 +261,11 @@ export class Delegator {
     );
   }
 
-  /** `Delegator#respond_to_missing?` (`vendor/ruby/v3.3.11/lib/delegate.rb:99-108`). */
+  /**
+   * `Delegator#respond_to_missing?` (`vendor/ruby/v3.3.11/lib/delegate.rb:99-108`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   respondToMissing(m: string): boolean {
     let r = true;
     const target = this.__getobj__(() => {
