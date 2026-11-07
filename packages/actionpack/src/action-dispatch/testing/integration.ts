@@ -721,7 +721,7 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   declare _htmlDocument?: XmlDocument | null;
 
-  static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
+  declare static withRouting: typeof routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
 
   /** @internal */
   _originalRoutes?: RouteSet;
@@ -770,11 +770,6 @@ export class IntegrationTest extends TestCase {
     return `#<${this.constructor.name} ${url}>`;
   }
 
-  declare withRouting: typeof routingAssertions.WithIntegrationRouting.withRouting;
-  /** @internal */
-  declare createRoutes: typeof routingAssertions.WithIntegrationRouting.createRoutes;
-  /** @internal */
-  declare resetRoutes: typeof routingAssertions.WithIntegrationRouting.resetRoutes;
   declare urlFor: typeof urlForMod.urlFor;
   declare fullUrlFor: typeof urlForMod.fullUrlFor;
   declare routeFor: typeof urlForMod.routeFor;
@@ -850,17 +845,16 @@ export interface IntegrationTest
   extends
     SessionMethodMissing,
     Included<typeof FixtureFile>,
-    Omit<Assertions, "withRouting" | "createRoutes" | "resetRoutes">,
+    Omit<Assertions, keyof routingAssertions.WithIntegrationRouting>,
+    routingAssertions.WithIntegrationRouting,
     Runner {}
 
 include(IntegrationTest, FixtureFile);
 include(IntegrationTest, Assertions);
+include(IntegrationTest, routingAssertions.WithIntegrationRouting);
 include(IntegrationTest, Runner);
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
-proto.withRouting = routingAssertions.WithIntegrationRouting.withRouting;
-proto.createRoutes = routingAssertions.WithIntegrationRouting.createRoutes;
-proto.resetRoutes = routingAssertions.WithIntegrationRouting.resetRoutes;
 proto.urlFor = urlForMod.urlFor;
 proto.fullUrlFor = urlForMod.fullUrlFor;
 proto.routeFor = urlForMod.routeFor;

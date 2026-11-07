@@ -122,6 +122,15 @@ export const WithIntegrationRouting = {
     this.routes = oldRoutes;
   },
 };
+extend(WithIntegrationRouting, Concern);
+
+export type WithIntegrationRouting = {
+  withRouting: (typeof WithIntegrationRouting)["withRouting"];
+  /** @internal */
+  createRoutes: (typeof WithIntegrationRouting)["createRoutes"];
+  /** @internal */
+  resetRoutes: (typeof WithIntegrationRouting)["resetRoutes"];
+};
 
 // eslint-disable-next-line @typescript-eslint/no-namespace -- `RoutingAssertions::ClassMethods` (`routing.rb:79`), whose `with_routing` shares its name with the instance method.
 export namespace ClassMethods {

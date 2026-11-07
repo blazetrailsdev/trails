@@ -13212,13 +13212,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "create_routes",
-    "digest": "f79725148a856dc9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "create_session",
     "digest": "fb9a68f78eea649c",
     "ref": "v8.0.2"
@@ -13438,13 +13431,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "reset!",
     "digest": "63a2777433b509fd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "reset_routes",
-    "digest": "3f75514427f48b75",
     "ref": "v8.0.2"
   },
   {
