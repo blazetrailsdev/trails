@@ -12,7 +12,6 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
-  stringSplit,
   fetch,
   warn,
   Process,
@@ -139,26 +138,75 @@ export function qValues(qValueHeader: string): [string, number][] {
   });
 }
 
+const ALLOWED_FORWARDED_PARAMS: Record<string, string> = Object.freeze(
+  Object.fromEntries(["by", "for", "host", "proto"].map((name) => [name, name])),
+);
+
 export function forwardedValues(
   forwardedHeader: string | null | undefined,
 ): Record<string, string[]> | null {
-  if (!forwardedHeader) return null;
-  forwardedHeader = forwardedHeader.replace(/\n/g, ";");
-  const result: Record<string, string[]> = {};
+  if (forwardedHeader == null) return null;
+  let header = String(forwardedHeader).replaceAll("\n", ";");
+  header = header.replace(/^[\s;,]+/, "");
+  let numParams = 0,
+    numEscapes = 0;
+  const maxParams = 1024,
+    maxEscapes = 1024;
+  const params: Record<string, string[]> = {};
 
-  for (const field of stringSplit(forwardedHeader, ";")) {
-    for (let pair of stringSplit(field, ",")) {
-      pair = stringSplit(pair, "=")
-        .map((s) => s.trim())
-        .join("=");
-      const match = pair.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
-      if (!match) return null;
-      const key = match[1].toLowerCase();
-      if (!result[key]) result[key] = [];
-      result[key].push(match[2]);
+  let i: number;
+  while ((i = header.indexOf("=")) !== -1) {
+    numParams += 1;
+    if (numParams > maxParams) return null;
+
+    let param: string | undefined = header.slice(0, i + 1);
+    header = header.slice(i + 1);
+
+    param = param.slice(0, -1).trim().toLowerCase();
+    if ((param = ALLOWED_FORWARDED_PARAMS[param]) == null) return null;
+
+    let value: string;
+    if (header[0] === '"') {
+      header = header.slice(1);
+      value = "";
+
+      let m: RegExpExecArray | null;
+      while ((m = /["\\]/.exec(header)) !== null) {
+        const c = m[0];
+
+        value += header.slice(0, m.index);
+        header = header.slice(m.index);
+
+        header = header.slice(1);
+
+        if (c === '"') break;
+
+        numEscapes += 1;
+        if (numEscapes > maxEscapes) return null;
+        const escapedChar = header.slice(0, 1);
+        header = header.slice(1);
+        value += escapedChar;
+      }
+    } else {
+      const m = /[;,]/.exec(header);
+      if (m !== null) {
+        value = header.slice(0, m.index);
+        header = header.slice(m.index);
+        value = value.replace(/[\s;,]+$/, "");
+      } else {
+        header = header.trim();
+        value = header;
+        header = "";
+      }
+      value = value.trimStart();
     }
+
+    (params[param] ??= []).push(value);
+
+    if (header.length !== 0) header = header.replace(/^[\s;,]+/, "");
   }
-  return result;
+
+  return params;
 }
 
 export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
@@ -196,16 +244,21 @@ export function selectBestEncoding(
   availableEncodings: string[],
   acceptEncoding: [string, number][],
 ): string | null {
+  acceptEncoding = acceptEncoding.slice(0, 16);
   const expanded: [string, number, number][] = [];
+  let wildcardSeen = false;
 
   for (const [m, q] of acceptEncoding) {
     const preference = availableEncodings.indexOf(m);
     const pref = preference === -1 ? availableEncodings.length : preference;
 
     if (m === "*") {
-      const acceptNames = acceptEncoding.map((a) => a[0]);
-      for (const m2 of availableEncodings.filter((a) => !acceptNames.includes(a))) {
-        expanded.push([m2, q, pref]);
+      if (!wildcardSeen) {
+        const acceptNames = acceptEncoding.map((a) => a[0]);
+        for (const m2 of availableEncodings.filter((a) => !acceptNames.includes(a))) {
+          expanded.push([m2, q, pref]);
+        }
+        wildcardSeen = true;
       }
     } else {
       expanded.push([m, q, pref]);
@@ -260,17 +313,6 @@ export function parseCookies(env: Record<string, any>): Record<string, string | 
 
 const VALID_COOKIE_KEY = /^[!#$%&'*+\-.^_`|~0-9a-zA-Z]+$/;
 
-function escapeCookieKey(key: string): string {
-  if (VALID_COOKIE_KEY.test(key)) {
-    return key;
-  } else {
-    console.warn(
-      `Cookie key ${rbInspect(key)} is not valid according to RFC2616; it will be escaped. This behaviour is deprecated and will be removed in a future version of Rack.`,
-    );
-    return escape(key);
-  }
-}
-
 export function setCookieHeader(
   key: string,
   value: string | string[] | Record<string, any>,
@@ -284,8 +326,11 @@ export function setCookieHeader(
     sameSite = "",
     partitioned = "";
 
+  if (!VALID_COOKIE_KEY.test(key)) {
+    throw new ArgumentError(`invalid cookie key: ${rbInspect(key)}`);
+  }
+
   if (typeof value === "object" && !Array.isArray(value)) {
-    if (value.escapeKey !== false) key = escapeCookieKey(key);
     if (value.domain != null && value.domain !== false) domain = `; domain=${value.domain}`;
     if (value.path != null && value.path !== false) path = `; path=${value.path}`;
     if (value.maxAge != null && value.maxAge !== false) maxAge = `; max-age=${value.maxAge}`;
@@ -304,8 +349,6 @@ export function setCookieHeader(
     }
     if (value.partitioned != null && value.partitioned !== false) partitioned = "; partitioned";
     value = value.value;
-  } else {
-    key = escapeCookieKey(key);
   }
 
   if (!Array.isArray(value)) value = [value as string];
@@ -386,21 +429,28 @@ export function rfc2822(time: Date): string {
   return `${d}, ${day} ${mon} ${year} ${h}:${m}:${s} -0000`;
 }
 
-export function byteRanges(env: Record<string, any>, size: number): Range<number>[] | null {
-  return getByteRanges(env["HTTP_RANGE"], size);
+export function byteRanges(
+  env: Record<string, any>,
+  size: number,
+  { maxRanges = 100 }: { maxRanges?: number } = {},
+): Range<number>[] | null {
+  return getByteRanges(env["HTTP_RANGE"], size, { maxRanges });
 }
 
 export function getByteRanges(
   httpRange: string | null | undefined,
   size: number,
+  { maxRanges = 100 }: { maxRanges?: number } = {},
 ): Range<number>[] | null {
   if (size === 0) return null;
   if (!httpRange) return null;
   const match = httpRange.match(/bytes=([^;]+)/);
   if (!match) return null;
+  const byteRange = match[1];
+  if (byteRange.split(",").length - 1 >= maxRanges) return null;
   const ranges: Range<number>[] = [];
 
-  for (const spec of match[1].split(/,[ \t]*/)) {
+  for (const spec of byteRange.split(/,[ \t]*/)) {
     if (!spec.includes("-")) return null;
     const parts = spec.split("-");
     const r0s = parts[0],
@@ -457,11 +507,12 @@ export function statusCode(status: number | string): number {
             throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
           }),
         ) as number;
-        const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
+        let message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
         const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[status];
-        if (canonicalSymbol == null) {
-          warn(message, { uplevel: 3 });
+        if (canonicalSymbol != null) {
+          message = `${message} Please use ${rbInspect(stringToSym(canonicalSymbol))} instead.`;
         }
+        warn(message, { uplevel: 3 });
         return fallbackCode;
       }),
     );

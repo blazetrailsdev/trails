@@ -461,7 +461,7 @@ it("parses RFC 7239 Forwarded header", () => {
     for: ["3.4.5.6"],
     proto: ["https"],
   });
-  expect(Utils.forwardedValues("for=3.4.5.6; proto=http, proto=https")).toEqual({
+  expect(Utils.forwardedValues("for=3.4.5.6\nproto=http, proto=https")).toEqual({
     for: ["3.4.5.6"],
     proto: ["http", "https"],
   });
@@ -469,7 +469,39 @@ it("parses RFC 7239 Forwarded header", () => {
     for: ["3.4.5.6", "1.2.3.4"],
     proto: ["http", "https"],
   });
+  expect(
+    Utils.forwardedValues('for="3.4.5.6;host=evil.com"; proto=http, proto=https; for=1.2.3.4'),
+  ).toEqual({
+    for: ["3.4.5.6;host=evil.com", "1.2.3.4"],
+    proto: ["http", "https"],
+  });
+  expect(
+    Utils.forwardedValues('for=" 3.4.5.6\\"; ";; proto=http, proto=https; for=1.2.3.4'),
+  ).toEqual({
+    for: [' 3.4.5.6"; ', "1.2.3.4"],
+    proto: ["http", "https"],
+  });
+  expect(
+    Utils.forwardedValues('proto=http, proto=https; for=1.2.3.4; for=" 3.4.5.6\\"; "'),
+  ).toEqual({
+    for: ["1.2.3.4", ' 3.4.5.6"; '],
+    proto: ["http", "https"],
+  });
+  expect(
+    Utils.forwardedValues('proto=http, proto=https; for=1.2.3.4; for=" 3.4.5.6\\"; "; '),
+  ).toEqual({
+    for: ["1.2.3.4", ' 3.4.5.6"; '],
+    proto: ["http", "https"],
+  });
   expect(Utils.forwardedValues("for=3.4.5.6; foo=bar")).toBeNull();
+
+  expect(Utils.forwardedValues("for=a;".repeat(1024))).toEqual({ for: Array(1024).fill("a") });
+  expect(Utils.forwardedValues('for="a' + "\\\\".repeat(1024) + 'b"')).toEqual({
+    for: ["a" + "\\".repeat(1024) + "b"],
+  });
+
+  expect(Utils.forwardedValues("for=a;".repeat(1025))).toBeNull();
+  expect(Utils.forwardedValues('for="a' + "\\\\".repeat(1025) + 'b"')).toBeNull();
 });
 
 it("select best quality match", () => {
@@ -576,6 +608,35 @@ it("figure out which encodings are acceptable", () => {
       ],
     ),
   ).toBe("identity");
+  expect(
+    Utils.selectBestEncoding(
+      ["foo", "bar", "baz", "identity"],
+      [
+        ["*", 0.1],
+        ["identity", 0.2],
+      ],
+    ),
+  ).toBe("identity");
+  expect(
+    Utils.selectBestEncoding(
+      ["foo", "bar", "baz", "identity"],
+      [
+        ["*", 0.1],
+        ["identity", 0.2],
+        ["*", 0.3],
+      ],
+    ),
+  ).toBe("identity");
+  expect(
+    Utils.selectBestEncoding(
+      ["foo", "bar", "baz", "identity"],
+      [
+        ["*", 0.3],
+        ["identity", 0.2],
+        ["*", 0.1],
+      ],
+    ),
+  ).toBe("foo");
 });
 
 it("should perform constant time string comparison", () => {
@@ -606,7 +667,10 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
   captureWarnings((warnings) => {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
       expect(Utils.statusCode(`:${symbol}`)).toBe(valueHash.statusCode);
-      assertEmpty(warnings);
+      expect(warnings.pop()).toEqual([
+        `Status code :${symbol} is deprecated and will be removed in a future version of Rack. Please use :${valueHash.standardSymbol} instead.`,
+        { uplevel: 3 },
+      ]);
     }
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
@@ -701,18 +765,10 @@ describe("cookies", () => {
     expect(headers["set-cookie"]).toEqual(["name=value", "name2=value2", "name2=value3"]);
   });
 
-  it("encodes cookie key values by default", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      expect(Utils.setCookieHeader("na e", "value")).toBe("na+e=value");
-      expect(warn.mock.calls.pop()![0]).toMatch(/Cookie key "na e" is not valid/);
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  it("does not encode cookie key values if :escape_key is false", () => {
-    expect(Utils.setCookieHeader("na e", { value: "value", escapeKey: false })).toBe("na e=value");
+  it("raises an error if the cookie key is invalid", () => {
+    expect(() => {
+      Utils.setCookieHeader("na e", "value");
+    }).toThrowError(/invalid cookie key/);
   });
 
   it("sets partitioned cookie attribute", () => {
@@ -762,6 +818,20 @@ describe("cookies", () => {
 describe("get_byte_ranges", () => {
   it("returns an empty list if the sum of the ranges is too large", () => {
     expect(Utils.byteRanges({ HTTP_RANGE: "bytes=0-20,0-500" }, 500)).toEqual([]);
+  });
+
+  it("returns an empty list if the number of ranges exceeds what is allowed", () => {
+    const range = `bytes=${Array.from({ length: 101 }, (_, i) => `${i}=${i}`).join(",")}`;
+    expect(Utils.byteRanges({ HTTP_RANGE: range }, 500)).toBeNull();
+    expect(Utils.getByteRanges(range, 500)).toBeNull();
+
+    expect(Utils.byteRanges({ HTTP_RANGE: "bytes=0-0,1-1" }, 500, { maxRanges: 1 })).toBeNull();
+    expect(Utils.getByteRanges("bytes=0-0,1-1", 500, { maxRanges: 1 })).toBeNull();
+
+    expect(Utils.byteRanges({ HTTP_RANGE: "bytes=0-0" }, 500, { maxRanges: 1 })).toEqual([
+      new Range(0, 0),
+    ]);
+    expect(Utils.getByteRanges("bytes=0-0", 500, { maxRanges: 1 })).toEqual([new Range(0, 0)]);
   });
 
   it("parse simple byte ranges from env", () => {
