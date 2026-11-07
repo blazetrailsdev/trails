@@ -1,14 +1,28 @@
-import { afterEach, beforeEach, describe, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { ApplicationController } from "./application-controller.js";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
 import { Annotation } from "./source-annotation-extractor.js";
 import { Trails } from "./trails.js";
 
 class InfoControllerNotesTestApp extends Application {}
+
+describe("Trails::InfoController", () => {
+  it("derives from Trails::ApplicationController under the trails/info path", () => {
+    expect(Object.getPrototypeOf(InfoController)).toBe(ApplicationController);
+    expect(InfoController.controllerPath()).toBe("trails/info");
+  });
+
+  it("drops the layout for an xhr request and uses application otherwise", () => {
+    const layout = InfoController._layout as (this: unknown) => string | false;
+    expect(layout.call({ request: { isXhr: () => true } })).toBe(false);
+    expect(layout.call({ request: { isXhr: () => false } })).toBe("application");
+  });
+});
 
 describe("Trails::InfoController#notes", () => {
   let dir: string;
