@@ -31,7 +31,6 @@ export { Endpoint } from "./endpoint.js";
 export { type DispatchableControllerClass } from "./dispatcher.js";
 export {
   RoutesProxy,
-  mergeScriptNames,
   type RoutesProxyHelpers,
   type RoutesProxyInstance,
   type ScriptNamer,

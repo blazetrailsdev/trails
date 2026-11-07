@@ -2,7 +2,7 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { RouteSet } from "./route-set.js";
-import { RoutesProxy, mergeScriptNames, type RoutesProxyInstance } from "./routes-proxy.js";
+import { RoutesProxy, type RoutesProxyInstance } from "./routes-proxy.js";
 import { _routesIvar, urlOptions, type UrlForHost, type UrlForRoutes } from "./url-for.js";
 
 function makeRoutes(label = "R1"): UrlForRoutes {
@@ -145,6 +145,12 @@ describe("RoutesProxy", () => {
 });
 
 describe("mergeScriptNames", () => {
+  const mergeScriptNames = (prev: string | null | undefined, next: string): string =>
+    (
+      RoutesProxy.prototype as unknown as {
+        mergeScriptNames(p: string | null | undefined, n: string): string;
+      }
+    ).mergeScriptNames(prev, next);
   it("returns newScriptName when previous is null", () => {
     expect(mergeScriptNames(null, "/foo")).toBe("/foo");
     expect(mergeScriptNames(undefined, "/foo")).toBe("/foo");

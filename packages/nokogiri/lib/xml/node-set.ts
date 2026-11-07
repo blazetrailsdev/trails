@@ -42,6 +42,19 @@ export class NodeSet implements Iterable<Node> {
     );
   }
 
+  xpath(...args: unknown[]): NodeSet {
+    const self = this as unknown as SearchableHost;
+    const [paths, handler, ns, binds] = self.extractParams(args);
+
+    return this._list.reduce(
+      (set, node) =>
+        set.plus(
+          self.xpathInternal(node as unknown as SearchableHost, paths, handler, ns, binds ?? null),
+        ),
+      new NodeSet(this.document),
+    );
+  }
+
   plus(nodeSet: NodeSet): NodeSet {
     const list = [...this._list];
     for (const n2 of nodeSet) {

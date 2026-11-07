@@ -10,7 +10,10 @@ export class Middleware {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
+    const input = env[RACK_INPUT];
+    if (input != null && input !== false) {
+      env[RACK_INPUT] = new RewindableInput(input);
+    }
     return this.app.call(env);
   }
 }

@@ -1,7 +1,6 @@
 import type { TCPSocket } from "@blazetrails/ruby-compat";
 
-export { RELEASE, release } from "./version.js";
-export { RELEASE as VERSION } from "./version.js";
+export { VERSION, RELEASE, release } from "./version.js";
 
 export type RackEnv = Record<string, unknown>;
 

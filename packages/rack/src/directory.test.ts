@@ -49,7 +49,7 @@ it("serve root directory index", async () => {
   const res = await new MockRequest(new Lint(app)).get("/");
   expect(res.isOk).toBeTruthy();
   expect(res.body).toContain("<html><head>");
-  expect(res.body).toContain("href='cgi");
+  expect(res.body).toContain("href='./cgi");
 });
 
 it("serve directory indices", async () => {
@@ -118,6 +118,21 @@ it("not allow directory traversal", async () => {
   expect(res.isForbidden).toBeTruthy();
   res = await new MockRequest(new Lint(app)).get("/cgi/%2E%2E/%2E%2E/lib");
   expect(res.isForbidden).toBeTruthy();
+});
+
+it("not allow directory traversal via root prefix bypass", async () => {
+  await withTmpdir(async (dir) => {
+    const root = File.join(dir, "root");
+    const outside = `${root}_test`;
+    FileUtils.mkdirP(root);
+    FileUtils.mkdirP(outside);
+    FileUtils.touch(File.join(outside, "test.txt"));
+
+    const app = new Directory(root);
+    const res = await new MockRequest(app).get(`/../${File.basename(outside)}/`);
+
+    expect(res.isForbidden).toBeTruthy();
+  });
 });
 
 it("not allow dir globs", async () => {
@@ -197,4 +212,22 @@ it("return error when file not found for head request", async () => {
   const res = await new MockRequest(new Lint(app)).head("/cgi/missing");
   expect(res.isNotFound).toBeTruthy();
   expect(res.body.length === 0).toBeTruthy();
+});
+
+it("handles root paths containing regex metacharacters", async () => {
+  await withTmpdir(async (tmpdir) => {
+    const root = File.join(tmpdir, "plus+root");
+    Dir.mkdir(root);
+
+    File.write(File.join(root, "file.txt"), "test");
+
+    const app = new Lint(new Directory(root));
+    const res = await new MockRequest(app).get("/");
+    expect(res.isOk).toBeTruthy();
+
+    expect(res.body).not.toContain(root);
+    expect(res.body).not.toContain(escapeHtml(tmpdir));
+
+    expect(res.body).toContain("file.txt");
+  });
 });

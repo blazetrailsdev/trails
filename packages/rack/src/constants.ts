@@ -47,6 +47,7 @@ export const RACK_RECURSIVE_INCLUDE = "rack.recursive.include";
 export const RACK_MULTIPART_BUFFER_SIZE = "rack.multipart.buffer_size";
 export const RACK_MULTIPART_TEMPFILE_FACTORY = "rack.multipart.tempfile_factory";
 export const RACK_RESPONSE_FINISHED = "rack.response_finished";
+export const RACK_PROTOCOL = "rack.protocol";
 export const RACK_REQUEST_FORM_INPUT = "rack.request.form_input";
 export const RACK_REQUEST_FORM_HASH = "rack.request.form_hash";
 export const RACK_REQUEST_FORM_PAIRS = "rack.request.form_pairs";

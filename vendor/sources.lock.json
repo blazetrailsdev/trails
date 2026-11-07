@@ -101,8 +101,8 @@
       "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
     },
     "rack": {
-      "ref": "v3.1.14",
-      "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
+      "ref": "v3.2.8",
+      "sha": "5f511d7d3d9d62becddcbd403dde813a67e10c81"
     },
     "rack-session": {
       "ref": "v2.1.0",

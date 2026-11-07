@@ -139,7 +139,7 @@ export class Metal extends AbstractControllerBase {
   get params(): Parameters | Record<string, unknown> {
     return (this._params ??= this.request.parameters);
   }
-  set params(value: Parameters | Record<string, unknown>) {
+  set params(value: Parameters | Record<string, unknown> | null) {
     this._params = value;
   }
 

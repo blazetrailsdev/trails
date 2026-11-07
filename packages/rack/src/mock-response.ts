@@ -6,14 +6,70 @@
  */
 
 import { Time } from "@blazetrails/date";
-import { CGI, fetch, rbFArray, rbObjRespondTo, rbStrToI } from "@blazetrails/ruby-compat";
+import {
+  StringIO,
+  rbFSend,
+  fetch,
+  rbFArray,
+  rbObjRespondTo,
+  rbProcCall,
+  rbStrToI,
+} from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 import { Rack } from "./namespaces.js";
 
-type Cookie = InstanceType<typeof CGI.Cookie>;
+export class Cookie {
+  readonly name: string;
+  readonly value: string[];
+  readonly path: string | null;
+  readonly domain: string | null;
+  readonly expires: unknown;
+  readonly secure: boolean;
+
+  constructor(args: Record<string, any>) {
+    this.name = args["name"];
+    this.value = args["value"];
+    this.path = args["path"];
+    this.domain = args["domain"];
+    this.expires = args["expires"];
+    this.secure = args["secure"];
+  }
+
+  methodMissing(methodName: string, ...args: unknown[]): any {
+    return rbObjRespondTo(this.value, methodName)
+      ? rbFSend(this.value, methodName, ...args)
+      : Reflect.get(this.value, methodName);
+  }
+
+  respondToMissing(methodName: string, _includeAll = false): boolean {
+    return rbObjRespondTo(this.value, methodName) || methodName in this.value;
+  }
+}
+
+Object.setPrototypeOf(
+  Cookie.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Cookie.prototype) as object) as object, {
+    get: (target, prop, receiver: Cookie) => {
+      if (
+        Reflect.has(target, prop) ||
+        typeof prop !== "string" ||
+        receiver === Cookie.prototype ||
+        !receiver.respondToMissing(prop)
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      const member = (receiver.value as any)[prop];
+      return typeof member === "function"
+        ? (...args: unknown[]) => receiver.methodMissing(prop, ...args)
+        : receiver.methodMissing(prop);
+    },
+  }),
+);
 
 export class MockResponse extends Response {
+  static Cookie = Cookie;
+
   originalHeaders: Record<string, any>;
   cookies: Record<string, Cookie>;
   private _errors: any;
@@ -47,11 +103,21 @@ export class MockResponse extends Response {
 
     let buffer = (this._bufferedBody = "");
 
-    for (const chunk of this._body) {
-      buffer +=
-        chunk instanceof Uint8Array
-          ? Array.from(chunk, (byte) => String.fromCharCode(byte)).join("")
-          : String(chunk);
+    try {
+      if (rbObjRespondTo(this._body, "each")) {
+        for (const chunk of this._body) {
+          buffer +=
+            chunk instanceof Uint8Array
+              ? Array.from(chunk, (byte) => String.fromCharCode(byte)).join("")
+              : String(chunk);
+        }
+      } else {
+        const stream = new StringIO(buffer);
+        rbProcCall(this._body, stream);
+        buffer = stream.string();
+      }
+    } finally {
+      if (rbObjRespondTo(this._body, "close")) this._body.close();
     }
     this._bufferedBody = buffer;
 
@@ -84,7 +150,7 @@ export class MockResponse extends Response {
         const [cookieName, cookieFilling] =
           i === -1 ? [cookie, undefined] : [cookie.slice(0, i), cookie.slice(i + 1)];
         const cookieAttributes = this.identifyCookieAttributes(cookieFilling!);
-        const parsedCookie = new CGI.Cookie({
+        const parsedCookie = new Cookie({
           name: cookieName.trim(),
           value: fetch(cookieAttributes, "value"),
           path: Object.hasOwn(cookieAttributes, "path") ? cookieAttributes.path : null,
@@ -102,7 +168,7 @@ export class MockResponse extends Response {
   private identifyCookieAttributes(cookieFilling: string): Record<string, any> {
     const cookieBits = cookieFilling.split(";");
     const cookieAttributes: Record<string, any> = {};
-    cookieAttributes["value"] = cookieBits[0].trim();
+    cookieAttributes["value"] = rbFArray(cookieBits[0].trim());
     for (const bit of cookieBits.slice(1)) {
       if (bit.includes("=")) {
         const index = bit.indexOf("=");

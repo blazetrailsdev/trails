@@ -2,7 +2,7 @@ import { NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat
 import { Rack } from "./namespaces.js";
 
 export class BodyProxy {
-  private body: any;
+  protected body: any;
   private block: () => void;
   private _closed = false;
 

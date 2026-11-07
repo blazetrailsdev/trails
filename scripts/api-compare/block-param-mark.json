@@ -87,13 +87,11 @@
     "byFile": {}
   },
   "rack": {
-    "total": 5,
+    "total": 3,
     "byFile": {
       "builder.rb": 1,
       "headers.rb": 1,
-      "query_parser.rb": 1,
-      "response.rb": 1,
-      "utils.rb": 1
+      "response.rb": 1
     }
   },
   "rails-dom-testing": {

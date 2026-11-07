@@ -14,6 +14,7 @@ import {
   isPlainObject,
   runLoadHooks,
   TopLevel,
+  toParam,
   toQuery,
   toXml,
   fromXml,
@@ -637,15 +638,21 @@ export class TestRequest extends AbstractTestRequest {
     queryStringKeys: string[],
   ): void {
     const nonPathParameters: Record<string, unknown> = {};
-    const pathParameters: Record<string, string | string[]> = {};
+    type ParamValue = ReturnType<typeof toParam>;
+    const pathParameters: Record<string, ParamValue | ParamValue[]> = {};
 
-    for (const [key, value] of Object.entries(parameters)) {
+    for (const [key, entry] of Object.entries(parameters)) {
+      let value = entry;
       if (queryStringKeys.includes(key)) {
         nonPathParameters[key] = value;
-      } else if (Array.isArray(value)) {
-        pathParameters[key] = value.map((v) => String(v ?? ""));
       } else {
-        pathParameters[key] = String(value ?? "");
+        if (Array.isArray(value)) {
+          value = value.map((v) => toParam(v));
+        } else {
+          value = toParam(value);
+        }
+
+        pathParameters[key] = value as ParamValue | ParamValue[];
       }
     }
 

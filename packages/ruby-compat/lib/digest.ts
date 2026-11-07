@@ -68,7 +68,7 @@ export class DigestClass {
 
 /**
  * The running digest `Digest::Class.new` answers, which
- * `Rack::ETag#digest_body` feeds part by part (`vendor/rack/v3.1.14/lib/rack/etag.rb:65`).
+ * `Rack::ETag#digest_body` feeds part by part (`vendor/rack/v3.2.8/lib/rack/etag.rb:65`).
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest::Instance`
  * (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:60`), which Rack calls without

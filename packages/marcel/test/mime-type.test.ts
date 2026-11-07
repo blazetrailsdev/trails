@@ -53,6 +53,6 @@ describe("Marcel::MimeTypeTest", () => {
     expect(contentType).toEqual("image/gif");
   });
 
-  // PERMANENT-SKIP: Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.1.14, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.1.14/lib/rack/lint.rb:44, :445)
+  // PERMANENT-SKIP: Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.2.8, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.2.8/lib/rack/lint.rb:71, :495)
   it.skip("gets content type from sources that conform to Rack::Lint::InputWrapper", () => {});
 });

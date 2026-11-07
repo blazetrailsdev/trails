@@ -41,7 +41,6 @@ it("close the body when it is removed", async () => {
   expect(resp[0]).toBe(200);
   expect(resp[1]).toEqual({ "content-type": "test/plain", "content-length": "3" });
   expect(await toEnum(resp[2]).toA()).toEqual([]);
-  expect(body.isClosed()).toBeFalsy();
   await resp[2].close();
   expect(body.isClosed()).toBeTruthy();
 });
