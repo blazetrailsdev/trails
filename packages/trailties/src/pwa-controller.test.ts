@@ -28,3 +28,16 @@ describe("PWAController", () => {
     expect(render).toHaveBeenCalledWith({ template: "pwa/manifest", layout: false });
   });
 });
+
+describe("PWAController forgery protection", () => {
+  it("skips verifyAuthenticityToken like skip_forgery_protection", () => {
+    const names = (
+      PwaController as unknown as {
+        _processActionCallbacks: { entries: { kind: string; filter: unknown }[] };
+      }
+    )._processActionCallbacks.entries
+      .filter((c) => c.kind === "before")
+      .map((c) => c.filter);
+    expect(names).not.toContain(":verifyAuthenticityToken");
+  });
+});
