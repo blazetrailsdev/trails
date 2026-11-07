@@ -338,7 +338,7 @@ describe("Rack::Test::Session#request", () => {
   it("sends XMLHttpRequest for the X-Requested-With header if :xhr option is given", async () => {
     await request("/", { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    mustBe(lastRequest(), "xhr");
+    mustBe(lastRequest(), "isXhr");
   });
 });
 
@@ -613,7 +613,7 @@ function verbExamples(verb: Verb): void {
   it("sends XMLHttpRequest for the X-Requested-With header", async () => {
     await session[verb]("/", {}, { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    mustBe(lastRequest(), "xhr");
+    mustBe(lastRequest(), "isXhr");
   });
 }
 
@@ -821,7 +821,7 @@ describe("Rack::Test::Session#custom_request", () => {
   it("sends XMLHttpRequest for the X-Requested-With header for an XHR", async () => {
     await session.customRequest("link", "/", {}, { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
-    mustBe(lastRequest(), "xhr");
+    mustBe(lastRequest(), "isXhr");
   });
 });
 
