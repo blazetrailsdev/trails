@@ -1,6 +1,6 @@
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { Dir, File, getFs, rbFBinding, rbStrToI, strNew, TSE } from "@blazetrails/ruby-compat";
+import { Dir, File, rbFBinding, rbStrToI, strNew, TSE } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
@@ -84,7 +84,7 @@ export const Migration = {
 
   async migrationTemplate(
     this: MigrationTemplateHost,
-    source: unknown,
+    source: string,
     destination: string,
     config: CreateMigrationConfig = {},
   ): Promise<string | undefined> {
@@ -96,11 +96,11 @@ export const Migration = {
     const numberedDestination = File.join(dir, ["%migration_number%", base].join("_"));
 
     const file = await this.createMigration(numberedDestination, null, config, async () => {
-      const erb = new TSE(strNew(Array.from(await getFs().readFile(source as string))), {
+      const erb = new TSE(strNew(Array.from((await File.binreadAsync(source))!)), {
         trimMode: "-",
         eoutvar: "@output_buffer",
       });
-      erb.filename = source as string;
+      erb.filename = source;
       return erb.result(rbFBinding(this));
     });
     return Generators.addGeneratedFile(file!);
