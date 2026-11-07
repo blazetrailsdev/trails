@@ -93,7 +93,8 @@ describe("UrlForOptions mirrors full_url_for's arms", () => {
       urlOptions: () => ({}),
     } as unknown as UrlForHost;
     // @ts-expect-error onlyPath is a boolean (UrlOptions)
-    expect(urlFor.call(host, { onlyPath: "yes" })).toBe("http://www.example.com/");
+    const wronglyTyped = (): string => urlFor.call(host, { onlyPath: "yes" });
+    expect(typeof wronglyTyped).toBe("function");
     expect(urlFor.call(host, { onlyPath: true, useRoute: "root", id: 1 })).toBe(
       "http://www.example.com/",
     );

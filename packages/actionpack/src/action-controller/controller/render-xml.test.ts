@@ -1,7 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual, Logger } from "@blazetrails/activesupport";
 import "../../test-helpers/abstract-unit.js";
-import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import { Customer } from "../../test-helpers/lib/controller/fake-models.js";
 import { deprecator as actionDispatchDeprecator } from "../../action-dispatch/deprecator.js";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
@@ -36,7 +35,7 @@ describe("RenderXmlTest", () => {
       const customer = new Customer("Some guy", 1);
       await this.render({
         xml: "<customer/>",
-        location: customer as unknown as ToModel,
+        location: customer,
         status: ":created",
       });
     }

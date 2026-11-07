@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ModelName } from "@blazetrails/activemodel";
 
 import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
 
@@ -106,22 +107,18 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   it("class options delegate to HelperMethodBuilder.url().handleClassCall", () => {
     const usersUrl = vi.fn(() => "/users");
     class User {
-      static modelName = {
-        name: "User",
-        singularRouteKey: "user",
-        routeKey: "users",
-      };
+      static modelName = new ModelName(this, null, "User");
     }
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["usersUrl"] = usersUrl;
-    const result = fullUrlFor.call(host, User as unknown as UrlForOptions);
+    const result = fullUrlFor.call(host, User);
     expect(result).toBe("/users");
     expect(usersUrl).toHaveBeenCalledOnce();
   });
 
   it("model instance options delegate to HelperMethodBuilder.url().handleModelCall", () => {
     const userUrl = vi.fn(() => "/users/1");
-    const modelName = { name: "User", singularRouteKey: "user", routeKey: "users" };
+    const modelName = new ModelName(class User {}, null, "User");
     class UserRecord {
       toModel() {
         return { modelName, isPersisted: () => true };
@@ -130,7 +127,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const user = new UserRecord();
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
-    const result = fullUrlFor.call(host, user as unknown as UrlForOptions);
+    const result = fullUrlFor.call(host, user);
     expect(result).toBe("/users/1");
     expect(userUrl).toHaveBeenCalledOnce();
   });
