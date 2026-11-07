@@ -129,7 +129,7 @@ describe("TestHelperMailerTest", () => {
 
   it("read fixture", async ({ testCase }: TestContext) => {
     const previous = TopLevel.Trails;
-    const root = File.expandPath("test-helpers", import.meta.dirname);
+    const root = File.expandPath("..", import.meta.dirname);
     TopLevel.Trails = { root: () => root } as unknown as typeof TopLevel.Trails;
     try {
       expect(await (testCase as T).readFixture("welcome")).toEqual(["Welcome!"]);

@@ -121,9 +121,8 @@ export function collectLibTests(content: string, file: string, namespace: string
  * Only-grow, like its twin.
  */
 export const REQUIRED_TEST_MODULES: Record<string, string> = {
-  commonSubscriptionAdapterTest:
-    "packages/actioncable/src/test-helpers/subscription-adapter/common.ts",
-  channelPrefixTest: "packages/actioncable/src/test-helpers/subscription-adapter/channel-prefix.ts",
+  commonSubscriptionAdapterTest: "packages/actioncable/test/support/subscription-adapter/common.ts",
+  channelPrefixTest: "packages/actioncable/test/support/subscription-adapter/channel-prefix.ts",
 };
 
 /** The top-level function `name` declared in a required test-module file. */

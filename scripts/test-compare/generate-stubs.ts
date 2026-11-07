@@ -44,7 +44,7 @@ const PKG_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
-  actioncable: "packages/actioncable/src/",
+  actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/src/",
   thor: "packages/thor/src/",
 };

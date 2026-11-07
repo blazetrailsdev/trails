@@ -4,7 +4,7 @@
     "outDir": "dist-test",
     "rootDir": ".",
     "paths": {
-      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/src/test-helpers/*.ts"]
+      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/test/support/*.ts"]
     }
   },
   "include": ["test"],

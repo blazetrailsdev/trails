@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "dist-test",
     "paths": {
-      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/src/test-helpers/*.ts"]
+      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/test/support/*.ts"]
     }
   },
   "exclude": [],

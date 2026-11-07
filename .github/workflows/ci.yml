@@ -1193,7 +1193,7 @@ jobs:
       - if: needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
-          $(git ls-files 'packages/actioncable/src/*.ts')
+          $(git ls-files 'packages/actioncable/lib/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
         run: pnpm vitest run packages/thor
       - if: needs.changes.outputs.thor_only == 'true'
@@ -1740,7 +1740,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/redis.test.ts
+      - run: pnpm vitest run packages/actioncable/test/subscription-adapter/redis.test.ts
         env:
           REDIS_URL: redis://localhost:6379/1
 
@@ -1781,7 +1781,7 @@ jobs:
         run: |
           psql -h localhost -U postgres -d activerecord_unittest \
             -v ON_ERROR_STOP=1 -f scripts/db-init/postgres/01-rails-role.sql
-      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/postgresql.test.ts
+      - run: pnpm vitest run packages/actioncable/test/subscription-adapter/postgresql.test.ts
         env:
           ARCONN: postgresql
           PGHOST: localhost

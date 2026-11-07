@@ -39,7 +39,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/globalid/wire", "../globalid/src/wire.ts"],
   ["@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"],
   ["@blazetrails/globalid", "../globalid/src/index.ts"],
-  ["@blazetrails/actioncable", "../actioncable/src/index.ts"],
+  ["@blazetrails/actioncable", "../actioncable/lib/index.ts"],
   ["@blazetrails/solid-queue", "../solid-queue/src/index.ts"],
   ["@blazetrails/solid-cable", "../solid-cable/lib/index.ts"],
   ["@blazetrails/actionmailbox", "../actionmailbox/src/index.ts"],
