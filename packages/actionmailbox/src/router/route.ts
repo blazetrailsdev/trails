@@ -27,10 +27,9 @@ export class Route {
         .recipients()
         .some((recipient) => address.toLowerCase() === String(recipient).toLowerCase());
     } else if (address instanceof RegExp) {
-      return (await inboundEmail.mail()).recipients().some((recipient) => {
-        address.lastIndex = 0;
-        return address.test(String(recipient));
-      });
+      return (await inboundEmail.mail())
+        .recipients()
+        .some((recipient) => address.test(String(recipient)));
     } else if (typeof address === "function") {
       return await address(inboundEmail);
     } else {
