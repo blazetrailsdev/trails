@@ -57,7 +57,7 @@ jobs:
   # `packages/website/` and affects the site build.
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
@@ -365,7 +365,7 @@ jobs:
           AR_SCOPE: ${{ steps.filter.outputs.ar_scope }}
           UNIT_PACKAGES: ${{ steps.filter.outputs.unit_packages }}
         run: |
-          hosted='"ubuntu-latest"'
+          hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
           sqlite_shards='[1, 2]'
@@ -405,7 +405,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
-  # `ubuntu-latest`). GitHub treats `runs-on:` as one literal label when given
+  # `ubuntu-24.04`). GitHub treats `runs-on:` as one literal label when given
   # a string, so a comma-separated value like `self-hosted,Linux,X64` will
   # NOT match any runner. If a multi-label selector is ever needed, switch
   # this expression to `fromJSON(vars.RUNNER)` and store the variable as a
@@ -414,7 +414,7 @@ jobs:
     name: Build & Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -427,7 +427,7 @@ jobs:
     name: Lint (${{ matrix.shard }})
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -501,7 +501,7 @@ jobs:
     if: github.event.schedule != '0 7 * * *'
     # Needs the PR body for the attribution step; the diff-based steps need
     # full history (fetch-depth: 0) to diff against the PR base SHA.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       # contents: read for the two checkout-based steps (prettier reads the
@@ -885,7 +885,7 @@ jobs:
       needs.changes.outputs.guides_affected == 'true' &&
       (github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'run-guides'))
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -905,7 +905,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -919,7 +919,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1088,7 +1088,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'))
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1130,7 +1130,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actionpack_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1149,7 +1149,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.actionpack_affected == 'true' ||
       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1181,7 +1181,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.actioncable_only == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1208,7 +1208,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1235,7 +1235,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
@@ -1384,7 +1384,7 @@ jobs:
       (github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -1420,7 +1420,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
@@ -1465,7 +1465,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # TRAILS_TEST_FORKS=1 serializes the cli suite onto one worker (see below),
     # and its trails-tsc E2E tests run heavy tsc compiles under v8 coverage on a
     # 2-vCPU runner, so allow more wall time than the multi-fork trails-tsc job.
@@ -1513,7 +1513,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1539,7 +1539,7 @@ jobs:
     # `needs`, so a skip here never trips the all-jobs gate.
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1589,7 +1589,7 @@ jobs:
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # 3-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
     # the CI critical path; vitest --shard splits the file set across three free
@@ -1724,7 +1724,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actioncable_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
       redis:
@@ -1755,7 +1755,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actioncable_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
       postgres:
@@ -1801,7 +1801,7 @@ jobs:
       false &&
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       mysql:
@@ -1881,7 +1881,7 @@ jobs:
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job above for the rationale. Each matrix leg gets its own
@@ -1963,7 +1963,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       mariadb:
@@ -2018,7 +2018,7 @@ jobs:
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2047,7 +2047,7 @@ jobs:
       needs.changes.outputs.comparison_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -2498,7 +2498,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
       (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
@@ -2535,7 +2535,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2574,7 +2574,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2601,7 +2601,7 @@ jobs:
       needs.changes.outputs.parity_sqlite == 'true' &&
       needs.schema-parity-rails.result == 'success' &&
       needs.schema-parity-trails.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2624,7 +2624,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       # Minted once per workflow run and consumed by both dump jobs so they
@@ -2646,7 +2646,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -2682,7 +2682,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -2711,7 +2711,7 @@ jobs:
       needs.changes.outputs.parity_sqlite == 'true' &&
       needs.query-parity-rails.result == 'success' &&
       needs.query-parity-trails.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2764,7 +2764,7 @@ jobs:
       - query-parity-rails
       - query-parity-trails
       - query-parity-diff
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       issues: write
