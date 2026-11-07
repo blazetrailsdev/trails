@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { MockRequest } from "@blazetrails/rack";
 import { File, getFs, include } from "@blazetrails/ruby-compat";
 import type { Generation, Rack } from "../test-helpers/isolation/abstract-unit.js";
@@ -8,6 +9,7 @@ import "../test-helpers/isolation/abstract-unit.js";
 
 class MailerPreviewsTest extends TestCase {}
 include(MailerPreviewsTest, Isolation);
+registerSpecType(/^MailerPreviewsTest$/, MailerPreviewsTest);
 
 type Host = Generation & Rack & MailerPreviewsTest;
 

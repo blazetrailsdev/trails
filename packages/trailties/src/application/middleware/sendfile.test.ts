@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { ActionController } from "@blazetrails/actionpack";
 import { File, FileUtils, TopLevel, constSet, getFs, include } from "@blazetrails/ruby-compat";
 import { Application } from "../../application.js";
@@ -21,6 +22,7 @@ class SendfileTest extends TestCase {
   }
 }
 include(SendfileTest, Isolation);
+registerSpecType(/^SendfileTest$/, SendfileTest);
 
 type Host = Omit<Generation, "simpleController"> &
   Omit<Rack, "get"> &

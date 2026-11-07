@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { FileUtils, include } from "@blazetrails/ruby-compat";
 import { EnvHelpers } from "../../test-helpers/env-helpers.js";
 import type { Generation, Rack } from "../../test-helpers/isolation/abstract-unit.js";
@@ -11,6 +12,7 @@ interface FrameworksTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class FrameworksTest extends TestCase {}
 include(FrameworksTest, Isolation);
+registerSpecType(/^FrameworksTest$/, FrameworksTest);
 include(FrameworksTest, EnvHelpers);
 
 describe("FrameworksTest", () => {

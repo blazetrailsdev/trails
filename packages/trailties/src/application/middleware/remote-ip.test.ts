@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { ActionDispatch } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
@@ -40,6 +41,7 @@ class RemoteIpTest extends TestCase {
   }
 }
 include(RemoteIpTest, Isolation);
+registerSpecType(/^RemoteIpTest$/, RemoteIpTest);
 
 describe("RemoteIpTest", () => {
   let t: RemoteIpTest;

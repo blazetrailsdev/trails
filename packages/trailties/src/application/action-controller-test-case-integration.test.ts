@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { TopLevel, include } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
@@ -132,6 +133,9 @@ class WithoutExecutorIntegrationTest extends ActionControllerTestCaseIntegration
     this.executorAroundEachRequest = false;
   }
 }
+
+registerSpecType(/^WithExecutorIntegrationTest$/, WithExecutorIntegrationTest);
+registerSpecType(/^WithoutExecutorIntegrationTest$/, WithoutExecutorIntegrationTest);
 
 describe("WithExecutorIntegrationTest", () => {
   let t: WithExecutorIntegrationTest;

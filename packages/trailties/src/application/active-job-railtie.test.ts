@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { include } from "@blazetrails/ruby-compat";
 import type { Generation } from "../test-helpers/isolation/abstract-unit.js";
 import "../test-helpers/isolation/abstract-unit.js";
@@ -10,6 +11,7 @@ interface ActiveJobTrailtieTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ActiveJobTrailtieTest extends TestCase {}
 include(ActiveJobTrailtieTest, Isolation);
+registerSpecType(/^ActiveJobRailtieTest$/, ActiveJobTrailtieTest);
 
 describe("ActiveJobRailtieTest", () => {
   let t: ActiveJobTrailtieTest;
