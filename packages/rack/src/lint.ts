@@ -323,7 +323,7 @@ export class Wrapper {
     this.assertRequired(QUERY_STRING);
 
     const serverName = this.assertRequired(SERVER_NAME);
-    if (!SERVER_NAME_PATTERN.test(serverName)) {
+    if (!Lint.SERVER_NAME_PATTERN.test(serverName)) {
       throw new LintError("env[SERVER_NAME] must be a valid host");
     }
 
@@ -348,7 +348,7 @@ export class Wrapper {
 
     const httpHost = env[HTTP_HOST];
     if (httpHost != null) {
-      if (!HTTP_HOST_PATTERN.test(httpHost)) {
+      if (!Lint.HTTP_HOST_PATTERN.test(httpHost)) {
         throw new LintError("env[HTTP_HOST] must be a valid authority");
       }
     }
@@ -804,15 +804,17 @@ const _IPV6_ADDRESS = [
   `(?:(?:${_H}{1,4}:){0,5}${_H}{1,4})?::${_H}{1,4}`,
   `(?:(?:${_H}{1,4}:){0,6}${_H}{1,4})?::`,
 ].join("|");
-const HOST_PATTERN =
+const _HOST_PATTERN =
   `(?:\\[(?:(?:${_IPV6_ADDRESS})|(?:v${_H}+\\.[!$&-.0-9:;=A-Z_a-z~]+))\\]` +
   `|${_IPV4_ADDRESS}` +
   `|(?:%${_H}${_H}|[!$&-.0-9;=A-Z_a-z~])*)`;
-const SERVER_NAME_PATTERN = new RegExp(`^${HOST_PATTERN}$`);
-const HTTP_HOST_PATTERN = new RegExp(`^${HOST_PATTERN}(:\\d*)?$`);
 
 export class Lint {
   static readonly ALLOWED_SCHEMES = ["https", "http", "wss", "ws"];
+
+  static readonly HOST_PATTERN = _HOST_PATTERN;
+  static readonly SERVER_NAME_PATTERN = new RegExp(`^${_HOST_PATTERN}$`);
+  static readonly HTTP_HOST_PATTERN = new RegExp(`^${_HOST_PATTERN}(:\\d*)?$`);
 
   static readonly REQUEST_PATH_ORIGIN_FORM = /^\/[^#]*$/;
   /** @missingRailsCall make_regexp — CONVERGEABLE uri-rfc2396-parser-make-regexp-unported */

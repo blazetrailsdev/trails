@@ -289,20 +289,19 @@ include(Collector, Enumerable);
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
 const CONTENT_DISPOSITION_MAX_PARAMS = 16;
 const CONTENT_DISPOSITION_MAX_BYTES = 1536;
-const OBS_UNFOLD = /\r\n([ \t])/g;
-
-const BOUNDARY_START_LIMIT = 16 * 1024;
-const MIME_HEADER_BYTESIZE_LIMIT = 64 * 1024;
-const BUFFERED_UPLOAD_BYTESIZE_LIMIT = 16 * 1024 * 1024;
 const _bytesizeLimit = 10 * 1024 * 1024 * 1024;
-const PARSER_BYTESIZE_LIMIT = _bytesizeLimit > 0 ? _bytesizeLimit : null;
-const CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT = 8 * 1024;
 
-const _bytesize = (content: string | Uint8Array): number =>
+const _byteLength = (content: string | Uint8Array): number =>
   content instanceof Uint8Array ? content.length : new TextEncoder().encode(content).length;
 
 export class Parser {
   static readonly BUFSIZE = 1_048_576;
+  static readonly BOUNDARY_START_LIMIT = 16 * 1024;
+  static readonly MIME_HEADER_BYTESIZE_LIMIT = 64 * 1024;
+  static readonly BUFFERED_UPLOAD_BYTESIZE_LIMIT = 16 * 1024 * 1024;
+  static readonly PARSER_BYTESIZE_LIMIT: number | null = _bytesizeLimit > 0 ? _bytesizeLimit : null;
+  static readonly CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT = 8 * 1024;
+  static readonly OBS_UNFOLD = /\r\n([ \t])/g;
   static readonly TEXT_PLAIN = "text/plain";
   static readonly TEMPFILE_FACTORY = (filename: string, _contentType: string): Tempfile => {
     const extension = File.extname(filename.replace(/\0/g, "%00")).slice(0, 129);
@@ -356,12 +355,12 @@ export class Parser {
     if (!boundary) return EMPTY;
 
     if (
-      PARSER_BYTESIZE_LIMIT != null &&
+      Parser.PARSER_BYTESIZE_LIMIT != null &&
       contentLength != null &&
-      contentLength > PARSER_BYTESIZE_LIMIT
+      contentLength > Parser.PARSER_BYTESIZE_LIMIT
     ) {
       throw new BoundaryTooLongError(
-        `multipart Content-Length ${contentLength} exceeds limit of ${PARSER_BYTESIZE_LIMIT} bytes`,
+        `multipart Content-Length ${contentLength} exceeds limit of ${Parser.PARSER_BYTESIZE_LIMIT} bytes`,
       );
     }
 
@@ -387,7 +386,7 @@ export class Parser {
     this.bufsize = bufsize;
     this.bodyRetained = null;
     this.retainedSize = 0;
-    this.totalBytesRead = PARSER_BYTESIZE_LIMIT != null ? 0 : null;
+    this.totalBytesRead = Parser.PARSER_BYTESIZE_LIMIT != null ? 0 : null;
     this.contentDispositionQuotedEscapes = 0;
     this.collector = new Collector(tempfile);
     this.sbuf = new SBuf(rbObjDup(""));
@@ -436,10 +435,10 @@ export class Parser {
     const content = io.read(this.bufsize, outbuf);
     this.handleEmptyContentBang(content);
     if (this.totalBytesRead != null) {
-      this.totalBytesRead += _bytesize(content!);
-      if (this.totalBytesRead > PARSER_BYTESIZE_LIMIT!) {
+      this.totalBytesRead += _byteLength(content!);
+      if (this.totalBytesRead > Parser.PARSER_BYTESIZE_LIMIT!) {
         throw new BoundaryTooLongError(
-          `multipart upload exceeds limit of ${PARSER_BYTESIZE_LIMIT} bytes`,
+          `multipart upload exceeds limit of ${Parser.PARSER_BYTESIZE_LIMIT} bytes`,
         );
       }
     }
@@ -461,7 +460,7 @@ export class Parser {
           return;
         }
       } else {
-        if (this.sbuf.string.length > BOUNDARY_START_LIMIT) {
+        if (this.sbuf.string.length > Parser.BOUNDARY_START_LIMIT) {
           throw new BoundaryTooLongError("multipart boundary not found within limit");
         }
 
@@ -479,12 +478,12 @@ export class Parser {
     if (this.sbuf.scanUntil(this.headRegex)) {
       const head = this.sbuf.cap(1);
       let contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
-      if (contentType != null) contentType = contentType.replace(OBS_UNFOLD, "$1");
+      if (contentType != null) contentType = contentType.replace(Parser.OBS_UNFOLD, "$1");
 
       let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
       let disposition = MULTIPART_CONTENT_DISPOSITION.exec(head)?.[1];
       if (disposition != null && Buffer.byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
-        disposition = disposition.replace(OBS_UNFOLD, "$1");
+        disposition = disposition.replace(Parser.OBS_UNFOLD, "$1");
 
         let i = disposition.indexOf(";");
         if (i === -1) throw new NoMethodError("undefined method `+' for nil");
@@ -519,7 +518,10 @@ export class Parser {
               if (c === '"') break;
 
               this.contentDispositionQuotedEscapes += 1;
-              if (this.contentDispositionQuotedEscapes > CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT) {
+              if (
+                this.contentDispositionQuotedEscapes >
+                Parser.CONTENT_DISPOSITION_QUOTED_ESCAPES_LIMIT
+              ) {
                 throw new BoundaryTooLongError(
                   "number of quoted escapes during content disposition parsing exceeds limit",
                 );
@@ -579,14 +581,14 @@ export class Parser {
         name = filename ?? `${contentType ?? Parser.TEXT_PLAIN}[]`;
       }
 
-      this.updateRetainedSize(_bytesize(head));
+      this.updateRetainedSize(_byteLength(head));
 
       this.bodyRetained = filename == null;
 
       this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
       this.state = "MIME_BODY";
     } else {
-      if (_bytesize(this.sbuf.rest) > MIME_HEADER_BYTESIZE_LIMIT) {
+      if (_byteLength(this.sbuf.rest) > Parser.MIME_HEADER_BYTESIZE_LIMIT) {
         throw new BoundaryTooLongError("multipart mime part header too large");
       }
 
@@ -599,7 +601,7 @@ export class Parser {
     const bodyWithBoundary = this.sbuf.checkUntil(this.bodyRegex);
     if (bodyWithBoundary != null) {
       const body = bodyWithBoundary.replace(this.bodyRegexAtEnd, "");
-      if (this.bodyRetained) this.updateRetainedSize(_bytesize(body));
+      if (this.bodyRetained) this.updateRetainedSize(_byteLength(body));
       this.collector.onMimeBody(this.mimeIndex, body);
       this.sbuf.pos += body.length + 2;
       this.state = "CONSUME_TOKEN";
@@ -608,7 +610,7 @@ export class Parser {
       if (this.rxMaxSize < this.sbuf.restSize) {
         const delta = this.sbuf.restSize - this.rxMaxSize;
         const body = this.sbuf.peek(delta);
-        if (this.bodyRetained) this.updateRetainedSize(_bytesize(body));
+        if (this.bodyRetained) this.updateRetainedSize(_byteLength(body));
         this.collector.onMimeBody(this.mimeIndex, body);
         this.sbuf.pos += delta;
       }
@@ -619,7 +621,7 @@ export class Parser {
 
   /** @internal */ private updateRetainedSize(size: number) {
     this.retainedSize += size;
-    if (this.retainedSize > BUFFERED_UPLOAD_BYTESIZE_LIMIT) {
+    if (this.retainedSize > Parser.BUFFERED_UPLOAD_BYTESIZE_LIMIT) {
       throw new BoundaryTooLongError("multipart data over retained size limit");
     }
   }
