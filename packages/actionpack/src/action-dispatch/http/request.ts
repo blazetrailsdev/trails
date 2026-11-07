@@ -868,7 +868,6 @@ export interface Request {
   set pathParameters(parameters: Record<string, unknown>);
 }
 
-
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- `ActiveSupport.on_load(:action_dispatch_request) { include RequestCookieMethods }` (`action_dispatch/middleware/cookies.rb:93-95`). */
 export interface Request extends Included<typeof RequestCookieMethods> {}
 
