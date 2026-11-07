@@ -41,6 +41,21 @@ import { MimeType } from "../action-dispatch/http/mime-type.js";
 import "../test-helpers/abstract-unit.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
+  it("converts a path parameter with to_param", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "GET");
+    const record = { toParam: () => "42" };
+    req.assignParameters(
+      null,
+      "posts",
+      "show",
+      { id: record, flag: true, gone: null },
+      "/posts/42",
+      [],
+    );
+    expect(req.pathParameters).toMatchObject({ id: "42", flag: true, gone: null });
+  });
+
   it("raises on a Content-Type no Mime::Type is registered for", () => {
     const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");

@@ -11,6 +11,8 @@ import { XPathVisitor } from "../css/xpath-visitor.js";
 export class XmlDocument {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => XmlNode | undefined;
+  declare xpath: (...args: unknown[]) => NodeSet;
+  declare atXpath: (...args: unknown[]) => XmlNode | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
