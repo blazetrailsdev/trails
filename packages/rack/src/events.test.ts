@@ -171,6 +171,6 @@ describe("TestEvents", () => {
     const app: RackApp = async (_env) => [200, {}, ((stream: StringIO) => stream.close()) as any];
     const e = new Events(app, []);
     const triple = await e.call({});
-    expect(rbObjRespondTo(triple[2], "each")).toBe(false);
+    expect(rbObjRespondTo(triple[2], "each")).toBeFalsy();
   });
 });
