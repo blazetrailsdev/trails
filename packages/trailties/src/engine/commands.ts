@@ -7,4 +7,4 @@ if (APP_PATH == null) {
   }
 }
 
-await import("../bin.js");
+await import("../commands.js");

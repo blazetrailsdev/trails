@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
 import { APP_PATH, setAppPath, setEngineRoot } from "../app-path.js";
 
-vi.mock("../bin.js", () => ({}));
+vi.mock("../commands.js", () => ({}));
 
 describe("engine/commands", () => {
   const load = () => rbFLoad(File.join(import.meta.dirname, "commands.ts"));

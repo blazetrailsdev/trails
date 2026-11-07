@@ -37,8 +37,8 @@
       "default": "./dist/app-path.js"
     },
     "./commands": {
-      "types": "./dist/bin.d.ts",
-      "default": "./dist/bin.js"
+      "types": "./dist/commands.d.ts",
+      "default": "./dist/commands.js"
     },
     "./generators": "./dist/generators/index.js",
     "./generators/test-case": {

@@ -13,7 +13,9 @@ async function reachesTrails(entry: string): Promise<boolean> {
     if (seen.has(file) || !file.endsWith(".ts") || !(await getFs().exists(file))) continue;
     seen.add(file);
     const source = await getFs().readFile(file, "utf-8");
-    for (const [, spec] of source.matchAll(/^(?:import|export) (?!type)[^;]*?"(\.[^"]+)"/gm)) {
+    for (const [, spec] of source.matchAll(
+      /^(?:(?:import|export) (?!type)[^;]*?|await import\()"(\.[^"]+)"/gm,
+    )) {
       queue.push(File.expandPath(spec.replace(/\.js$/, ".ts"), File.dirname(file)));
     }
   }

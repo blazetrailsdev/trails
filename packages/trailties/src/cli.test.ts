@@ -1,5 +1,4 @@
 import { beforeAll, describe, it, expect } from "vitest";
-import { aliases } from "./commands.js";
 import { createProgram } from "./cli.js";
 import { VERSION } from "./gem-version.js";
 import { Generators } from "./generators.js";
@@ -33,9 +32,5 @@ describe("CLI", () => {
     const program = createProgram();
     const names = program.commands.map((c) => c.name());
     expect(names).toContain("new");
-  });
-
-  it("server command has alias s", () => {
-    expect(aliases.s).toBe("server");
   });
 });

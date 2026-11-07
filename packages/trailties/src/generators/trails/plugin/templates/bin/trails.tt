@@ -4,10 +4,13 @@ import { File } from "@blazetrails/ruby-compat";
 import { setAppPath, setEnginePath, setEngineRoot } from "@blazetrails/trailties/app-path";
 
 const __dir__ = import.meta.dirname;
-setEngineRoot(File.expandPath("..", __dir__));
-setEnginePath(File.expandPath("../lib/<%= this.namespacedName() %>/engine.ts", __dir__));
+const ENGINE_ROOT = File.expandPath("..", __dir__);
+const ENGINE_PATH = File.expandPath("../lib/<%= this.namespacedName() %>/engine.ts", __dir__);
+setEngineRoot(ENGINE_ROOT);
+setEnginePath(ENGINE_PATH);
 <% if (this.isWithDummyApp()) { -%>
-setAppPath(File.expandPath("../<%= this.dummyPath() %>/config/application.ts", __dir__));
+const APP_PATH = File.expandPath("../<%= this.dummyPath() %>/config/application.ts", __dir__);
+setAppPath(APP_PATH);
 <% } -%>
 
 await import("@blazetrails/trailties/engine/commands");
