@@ -101,11 +101,12 @@ export class Trailtie extends BaseTrailtie {
     this.initializer("action_dispatch.configure", (app) => {
       const cfg = this.config.actionDispatch;
 
+      HttpURL.secureProtocol = app.config.forceSsl;
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
       Request.Utils.performDeepMunge = cfg.performDeepMunge;
       CacheRequest.strictFreshness = cfg.strictFreshness;
-      Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
+      Response.defaultCharset = cfg.defaultCharset || app.config.encoding;
 
       Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
       Object.assign(ExceptionWrapper.rescueTemplates, cfg.rescueTemplates);
