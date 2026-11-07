@@ -19,11 +19,13 @@ import {
   toH,
 } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
+import type { UrlOptions } from "../http/url.js";
 import {
   HelperMethodBuilder,
   isModelClass,
   type PolymorphicHost,
   type PolymorphicMappingEntry,
+  type ModelClass,
   type ToModel,
 } from "./polymorphic-routes.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -68,7 +70,19 @@ export function urlFor(this: UrlForHost, options?: UrlForOptions): string {
   return fullUrlFor.call(this, options);
 }
 
-export type UrlForOptions = null | undefined | string | object;
+export type UrlForHashOptions = UrlOptions & { useRoute?: string } & Record<string, unknown>;
+
+export type UrlForOptions =
+  | null
+  | undefined
+  | UrlForHashOptions
+  | Hash<string, unknown>
+  | Parameters
+  | string
+  | `:${string}`
+  | unknown[]
+  | ModelClass
+  | ToModel;
 
 /** @internal */
 export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
@@ -101,10 +115,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (isModelClass(options)) {
     return HelperMethodBuilder.url().handleClassCall(this as unknown as PolymorphicHost, options);
   }
-  return HelperMethodBuilder.url().handleModelCall(
-    this as unknown as PolymorphicHost,
-    options as ToModel,
-  );
+  return HelperMethodBuilder.url().handleModelCall(this as unknown as PolymorphicHost, options);
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {

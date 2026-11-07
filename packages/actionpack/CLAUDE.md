@@ -38,6 +38,17 @@ repo owner set this (reversing trails#8573, which had made `action_name` the
 Rails spelling): an application names its own methods, and two spellings for
 one action with a conversion between them was rejected in favour of one rule.
 
+**A non-action helper is `_`-prefixed or `#private`.** Rails' `action_methods`
+is `public_instance_methods(true) - internal_methods`
+(`actionpack/lib/abstract_controller/base.rb:77-107`), so a `private def` helper
+is never an action. TypeScript's `private` keyword leaves nothing at run time
+(CLAUDE.md, "Method visibility is compile-time only"), so a `private` method is
+listed by `actionMethods()` and dispatchable through a dynamic `:action`
+segment. A controller's helper is written `_setPost()`, which a callback can
+still name (`beforeAction(":_setPost")`), or as an ES `#setPost()` method, which
+is not on the prototype at all; `actionMethods()` and `isAvailableAction()` skip
+both (`abstract-controller/base.trails.test.ts`).
+
 **What lives in a file is kebab-case.** A template's file name and a
 lazy-lookup locale key are the action's name in kebab-case: the action
 `nextBundle` renders `next-bundle.html.tse` and scopes `t(".title")` by

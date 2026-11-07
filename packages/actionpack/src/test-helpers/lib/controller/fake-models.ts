@@ -1,10 +1,12 @@
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { extend, include, isPresent } from "@blazetrails/activesupport";
 import { rbInspect, Struct } from "@blazetrails/ruby-compat";
+import type { ToModel } from "../../../action-dispatch/routing/polymorphic-routes.js";
 
 export class Customer extends Struct.new("name", "id") {
   declare name: string;
   declare id: number | null;
+  declare toModel: ToModel["toModel"];
 
   static {
     extend(this, Naming);
