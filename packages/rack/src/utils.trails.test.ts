@@ -36,6 +36,14 @@ describe("Utils.setCookieHeader", () => {
       "foo=bar; samesite=lax",
     );
   });
+
+  it("guards each attribute with Ruby truthiness", () => {
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: null })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: false })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", domain: "", path: "" })).toBe(
+      "foo=bar; domain=; path=",
+    );
+  });
 });
 
 describe("Utils.unescapePath", () => {
