@@ -52,6 +52,7 @@ export class Trails {
   declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
   declare static Generators?: typeof Generators;
+  declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   /** @noRailsEquivalent PERMANENT */
   declare static TrailsTsc?: typeof TrailsTsc;
 

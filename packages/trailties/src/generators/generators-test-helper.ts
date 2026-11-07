@@ -1,11 +1,18 @@
-import { Dir, File, FileUtils, JSON, TSE, rbFBinding, type Hash } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  JSON,
+  TSE,
+  rbFBinding,
+  rbFSystem,
+  type Hash,
+} from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "./testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import type { TestCase } from "./test-case.js";
-import { Trails } from "../trails.js";
-import { invoke } from "../command.js";
 
 export async function copyRoutes(this: TestCase): Promise<void> {
   const routes = await evaluateTemplate(
@@ -105,14 +112,22 @@ export async function evaluateTemplate(
   return erb.result(rbFBinding(locals));
 }
 
-/** @missingRailsCall system — PERMANENT */
 export async function runAppUpdate(
   this: TestCase,
   appRoot: string = this.destinationRoot,
   { flags = "--force" }: { flags?: string } = {},
 ): Promise<void> {
   await Dir.chdir(appRoot, async () => {
-    Trails.application!.config.setRoot(appRoot);
-    await invoke("app:update", flags.split(" "));
+    const frameworkRoot = File.expandPath("../..", import.meta.dirname);
+    await FileUtils.mkdirPAsync("node_modules/@blazetrails");
+    await FileUtils.lnSfAsync(
+      [
+        frameworkRoot,
+        ...(await Dir.globAsync(File.join(frameworkRoot, "node_modules/@blazetrails/*"))),
+      ],
+      "node_modules/@blazetrails",
+    );
+
+    await rbFSystem(`bin/trails app:update ${flags}`, { exception: true });
   });
 }

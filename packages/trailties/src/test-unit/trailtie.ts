@@ -2,6 +2,7 @@ import { onLoad } from "@blazetrails/activesupport";
 import type { TestCase } from "@blazetrails/activesupport/test-case";
 import { File, extend, rbFLoad } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
+import { Trails } from "../trails.js";
 import { LineFiltering } from "./line-filtering.js";
 
 type GeneratorsDsl = Record<string, (namespace: string, configuration?: object) => void>;
@@ -31,3 +32,4 @@ export class TestUnitRailtie extends Trailtie {
 }
 
 Object.defineProperty(TestUnitRailtie, "name", { value: "Trails::TestUnitRailtie" });
+Trails.TestUnitRailtie = TestUnitRailtie;
