@@ -6,12 +6,13 @@ import {
   TSE,
   rbFBinding,
   rbFSystem,
+  stdout,
   type Hash,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "./testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
-import { OrderedOptions } from "@blazetrails/activesupport";
+import { OrderedOptions, silenceStream } from "@blazetrails/activesupport";
 import type { TestCase } from "./test-case.js";
 
 export async function copyRoutes(this: TestCase): Promise<void> {
@@ -128,6 +129,8 @@ export async function runAppUpdate(
       "node_modules/@blazetrails",
     );
 
-    await rbFSystem(`bin/trails app:update ${flags}`, { exception: true });
+    await silenceStream(stdout, () =>
+      rbFSystem(`bin/trails app:update ${flags}`, { exception: true }),
+    );
   });
 }
