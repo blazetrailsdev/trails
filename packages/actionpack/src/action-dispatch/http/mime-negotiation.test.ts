@@ -14,7 +14,7 @@ function makeHost(parameters: () => unknown): MimeNegotiationHost {
       return parameters() as Record<string, unknown>;
     },
     accept: "",
-    xhr: false,
+    isXhr: () => false,
   } as MimeNegotiationHost;
 }
 
@@ -82,7 +82,7 @@ describe("MimeNegotiation writers", () => {
 
   it("format= forces the format regardless of the path extension", () => {
     const req = new Request({ PATH_INFO: "/posts/5.html" });
-    req.setFormat("xml");
+    req.format = "xml";
     expect(req.format().toString()).toBe("application/xml");
     expect(req.params["format"]).toBe("xml");
   });

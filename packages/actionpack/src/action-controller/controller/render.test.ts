@@ -455,7 +455,7 @@ class TestController extends Base {
       case "layoutOverridingLayout":
         return "layouts/talk_from_action";
       case "renderImplicitHtmlTemplateFromXhrRequest":
-        return this.request.xhr ? "layouts/xhr" : "layouts/standard";
+        return this.request.isXhr() ? "layouts/xhr" : "layouts/standard";
     }
   }
 }

@@ -16,7 +16,7 @@ export class InfoController extends ApplicationController {
 
   static {
     this.layout(function (this: InfoController) {
-      return this.request.xhr ? false : "application";
+      return this.request.isXhr() ? false : "application";
     });
   }
 

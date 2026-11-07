@@ -51,13 +51,11 @@ import {
 import {
   accepts as _accepts,
   contentMimeType as _contentMimeType,
-  format as _format,
   formatFromPathExtension as _formatFromPathExtension,
   hasContentType as _hasContentType,
   MimeNegotiation as _MimeNegotiation,
   negotiateMime as _negotiateMime,
   isParamsReadable as _isParamsReadable,
-  setFormat as _setFormat,
   shouldApplyVaryHeader as _shouldApplyVaryHeader,
   useAcceptHeader as _useAcceptHeader,
   validAcceptHeader as _validAcceptHeader,
@@ -280,8 +278,6 @@ export class Request {
   declare hasContentType: () => boolean;
   declare negotiateMime: (order: (MimeType | undefined)[]) => MimeType | NullType | null;
   declare shouldApplyVaryHeader: () => boolean;
-  declare format: (_viewPath?: unknown) => MimeType | NullType;
-  declare setFormat: (extension: unknown) => void;
 
   declare static ignoreAcceptHeader: boolean;
   declare ignoreAcceptHeader: boolean;
@@ -304,7 +300,7 @@ export class Request {
     );
   }
 
-  get xhr(): boolean {
+  isXhr(): boolean {
     return this.isXmlHttpRequest;
   }
 
@@ -800,7 +796,7 @@ export interface Request extends Omit<
   | "fullpath"
   | "mediaType"
   | "contentLength"
-  | "xhr"
+  | "isXhr"
   | "ip"
   | "params"
   | "session"
@@ -862,6 +858,8 @@ include(Request, RequestEnv);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {
+  get format(): (_viewPath?: unknown) => MimeType | NullType;
+  set format(extension: unknown);
   get formats(): MimeType[];
   set formats(extensions: unknown[]);
   get variant(): ArrayInquirer<string> & Record<string, () => boolean>;
@@ -935,8 +933,6 @@ Request.prototype.useAcceptHeader = function (this: Request) {
 Request.prototype.formatFromPathExtension = function (this: Request) {
   return _formatFromPathExtension.call(this);
 };
-Request.prototype.format = _format;
-Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 
 ActionDispatch.Request = Request;
