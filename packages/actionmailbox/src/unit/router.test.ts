@@ -44,7 +44,7 @@ class FirstMailboxAddress {
 
 class RouterTest extends TestCase {}
 
-describe("ActionMailbox::RouterTest", () => {
+describe("RouterTest", () => {
   let router: Router;
   const test = new RouterTest("router");
   const createInboundEmailFromMail = async (options: Record<string, unknown>) =>
@@ -212,17 +212,19 @@ describe("ActionMailbox::RouterTest", () => {
       subject: "This is a reply",
     });
     await expect(router.route(inboundEmail)).rejects.toThrow(ActionMailbox.Router.RoutingError);
-    expect(inboundEmail.isBounced()).toBe(true);
+    expect(inboundEmail.isBounced()).toBeTruthy();
   });
 
   it("invalid address", () => {
     let error: unknown;
-    try {
-      router.addRoute([] as never, { to: "first" });
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(ArgumentError);
+    expect(() => {
+      try {
+        router.addRoute([] as never, { to: "first" });
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
     expect((error as Error).message).toBe(
       "Expected a Symbol, String, Regexp, Proc, or matchable, got []",
     );
