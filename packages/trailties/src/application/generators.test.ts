@@ -14,6 +14,7 @@ import type { Generators } from "../configuration.js";
 import { Generators as TrailsGenerators } from "../generators.js";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
+import { Color } from "@blazetrails/thor/shell/color";
 
 type ConfiguredGenerators = Generators & Record<string, unknown>;
 
@@ -75,6 +76,7 @@ describe("GeneratorsTest", () => {
 
   it("generators no color on initialization", () => {
     const shell = ThorBase.shell;
+    ThorBase.shell = Color;
     try {
       withBareConfig((c) => {
         c.generators().colorizeLogging = false;
