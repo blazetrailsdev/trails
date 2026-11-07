@@ -18,7 +18,7 @@ export function clearInstanceVariablesBetweenRequests(this: Metal): void {
   rbObjIvarSet(this, "@_ivars", rbObjInstanceVariables(this));
 }
 
-export function recycleBang(this: Metal & { formats: unknown }): void {
+export function recycleBang(this: Metal): void {
   rbObjIvarSet(this, "@_url_options", null);
   this.formats = null;
   this.params = null;
