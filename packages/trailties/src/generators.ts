@@ -2,6 +2,7 @@ import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import type { GeneratorBase, GeneratorConfig } from "./generators/base.js";
+import { noColorBang } from "./command/behavior.js";
 import { Trails } from "./trails.js";
 import type {
   AfterGenerateCallback,
@@ -88,6 +89,8 @@ export class Generators {
   }
 
   static configureBang(config: GeneratorsConfiguration): void {
+    if (config.apiOnly) Generators.apiOnlyBang();
+    if (!config.colorizeLogging) noColorBang();
     deepMergeBang(Generators.aliases(), config.aliases as never);
     deepMergeBang(Generators.options(), config.options as never);
     Object.assign(Generators.fallbacks(), config.fallbacks);
@@ -233,6 +236,20 @@ export class Generators {
   static async publicNamespaces(): Promise<string[]> {
     await Generators.lookupBang();
     return Generators.subclasses().map((k) => k.namespace());
+  }
+
+  static apiOnlyBang(): void {
+    Generators.hideNamespaces("assets", "helper", "css", "js");
+
+    Object.assign(Generators.options().trails, {
+      api: true,
+      assets: false,
+      helper: false,
+      templateEngine: null,
+    });
+
+    Generators.options().mailer ??= {};
+    Generators.options().mailer.templateEngine ??= "tse";
   }
 
   static hiddenNamespaces(): string[] {

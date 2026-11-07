@@ -537,6 +537,8 @@ export class Configuration extends EngineConfiguration {
   }
   set apiOnly(value: boolean) {
     this._apiOnly = value;
+    this.generators().apiOnly = value;
+
     this._debugExceptionResponseFormat ??= "api";
   }
 
