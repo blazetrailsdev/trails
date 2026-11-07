@@ -86,7 +86,7 @@ export function fetch<T>(
 /**
  * The block arm: on a miss `rb_hash_fetch_m` yields the key and returns what
  * the block returns, which is what `Rack::Request::Env#fetch_header`
- * (`vendor/rack/v3.2.8/lib/rack/request.rb:106-108`) installs a default through.
+ * (`vendor/rack/v3.2.8/lib/rack/request.rb:111-113`) installs a default through.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
 export function fetch<T>(

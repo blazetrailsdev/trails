@@ -125,7 +125,7 @@ const DUMMY_NAMES = new Set([
  *
  * The registry is Ruby's, not WHATWG's, because that is the accept/reject
  * criterion every caller is porting: `Rack::Multipart::Parser#find_encoding`
- * (`vendor/rack/v3.2.8/lib/rack/multipart/parser.rb:489-493`) treats an unknown
+ * (`vendor/rack/v3.2.8/lib/rack/multipart/parser.rb:594-598`) treats an unknown
  * charset as binary, and which charsets are unknown is what the two registries
  * disagree about. `TextDecoder` rejects `ASCII-8BIT`, `BINARY`, `CP932`,
  * `CP949` and `646`, all of which Ruby resolves, and accepts WHATWG-only
@@ -148,7 +148,7 @@ const DUMMY_NAMES = new Set([
  * `null` row still
  * resolves, because the accept/reject criterion is the registry's and not the
  * decoder's — `Rack::Multipart::Parser#find_encoding`
- * (`vendor/rack/v3.2.8/lib/rack/multipart/parser.rb:489-493`) asks the registry, and
+ * (`vendor/rack/v3.2.8/lib/rack/multipart/parser.rb:594-598`) asks the registry, and
  * a name Ruby registers must not fall to `BINARY` here. MRI has no such field
  * because its decoder IS the registry entry (`rb_encoding *`), and JS keeps
  * the two apart.
