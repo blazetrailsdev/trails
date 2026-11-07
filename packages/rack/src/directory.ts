@@ -1,4 +1,11 @@
-import { Dir, File, rbObjMethod, sprintf, stringSplit } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  rbObjMethod,
+  regexpEscape,
+  sprintf,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import type { FsStatResult } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constants.js";
 import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
@@ -8,7 +15,7 @@ import { Head } from "./head.js";
 import { Rack } from "./namespaces.js";
 
 const DIR_FILE =
-  "<tr><td class='name'><a href='%s'>%s</a></td><td class='size'>%s</td><td class='type'>%s</td><td class='mtime'>%s</td></tr>\n";
+  "<tr><td class='name'><a href='./%s'>%s</a></td><td class='size'>%s</td><td class='type'>%s</td><td class='mtime'>%s</td></tr>\n";
 const DIR_PAGE_FOOTER = `</table>
 <hr />
 </body></html>
@@ -60,7 +67,7 @@ export class DirectoryBody {
 
   /** @missingRailsName sub — PERMANENT */
   each(cb: (chunk: string) => void): void {
-    const showPath = escapeHtml(this.path.replace(new RegExp(`^${this.root}`), ""));
+    const showPath = escapeHtml(this.path.replace(new RegExp(`^${regexpEscape(this.root)}`), ""));
     cb(sprintf(DIR_PAGE_HEADER, showPath, showPath));
 
     if (this.path.replace(/\/$/, "") !== this.root) {
@@ -85,12 +92,16 @@ export class DirectoryBody {
 
 export class Directory {
   root: string;
+  private rootWithSeparator: string;
   private app: any;
   private head: Head;
 
   /** @missingRailsName method — PERMANENT */
   constructor(root: string, app?: any) {
     this.root = File.expandPath(root);
+    this.rootWithSeparator = this.root.endsWith(File.SEPARATOR)
+      ? this.root
+      : `${this.root}${File.SEPARATOR}`;
     this.app = app || new Files(this.root);
     this.head = new Head(rbObjMethod(this, ":get"));
   }
@@ -129,7 +140,9 @@ export class Directory {
 
   checkForbidden(pathInfo: string): [number, Record<string, any>, any] | null {
     if (!pathInfo.includes("..")) return null;
-    if (File.expandPath(File.join(this.root, pathInfo)).startsWith(this.root)) return null;
+
+    const expandedPath = File.expandPath(File.join(this.root, pathInfo));
+    if (expandedPath === this.root || expandedPath.startsWith(this.rootWithSeparator)) return null;
 
     const body = "Forbidden\n";
     return [

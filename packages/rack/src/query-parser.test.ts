@@ -6,6 +6,9 @@ it("can normalize values with missing values", () => {
   expect(queryParser.parseNestedQuery("a=a")).toEqual({ a: "a" });
   expect(queryParser.parseNestedQuery("a=")).toEqual({ a: "" });
   expect(queryParser.parseNestedQuery("a")).toEqual({ a: null });
+  expect(queryParser.parseQueryPairs("a=a")).toEqual([["a", "a"]]);
+  expect(queryParser.parseQueryPairs("a=")).toEqual([["a", ""]]);
+  expect(queryParser.parseQueryPairs("a")).toEqual([["a", null]]);
 });
 
 it("accepts bytesize_limit to specify maximum size of query string to parse", () => {
@@ -13,9 +16,11 @@ it("accepts bytesize_limit to specify maximum size of query string to parse", ()
   expect(queryParser.parseQuery("a=a")).toEqual({ a: "a" });
   expect(queryParser.parseNestedQuery("a=a")).toEqual({ a: "a" });
   expect(queryParser.parseNestedQuery("a=a", "&")).toEqual({ a: "a" });
+  expect(queryParser.parseQueryPairs("a=a")).toEqual([["a", "a"]]);
   expect(() => queryParser.parseQuery("a=aa")).toThrowError(QueryLimitError);
   expect(() => queryParser.parseNestedQuery("a=aa")).toThrowError(QueryLimitError);
   expect(() => queryParser.parseNestedQuery("a=aa", "&")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseQueryPairs("a=aa")).toThrowError(QueryLimitError);
 });
 
 it("accepts params_limit to specify maximum number of query parameters to parse", () => {
@@ -23,7 +28,16 @@ it("accepts params_limit to specify maximum number of query parameters to parse"
   expect(queryParser.parseQuery("a=a&b=b")).toEqual({ a: "a", b: "b" });
   expect(queryParser.parseNestedQuery("a=a&b=b")).toEqual({ a: "a", b: "b" });
   expect(queryParser.parseNestedQuery("a=a&b=b", "&")).toEqual({ a: "a", b: "b" });
+  expect(queryParser.parseQueryPairs("a=a&b=b")).toEqual([
+    ["a", "a"],
+    ["b", "b"],
+  ]);
+  expect(queryParser.parseQueryPairs("a=1&a=2")).toEqual([
+    ["a", "1"],
+    ["a", "2"],
+  ]);
   expect(() => queryParser.parseQuery("a=a&b=b&c=c")).toThrowError(QueryLimitError);
   expect(() => queryParser.parseNestedQuery("a=a&b=b&c=c", "&")).toThrowError(QueryLimitError);
   expect(() => queryParser.parseQuery("b[]=a&b[]=b&b[]=c")).toThrowError(QueryLimitError);
+  expect(() => queryParser.parseQueryPairs("a=a&b=b&c=c")).toThrowError(QueryLimitError);
 });

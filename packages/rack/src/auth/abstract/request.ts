@@ -1,3 +1,4 @@
+import { warn } from "@blazetrails/ruby-compat";
 import { Request } from "../../request.js";
 
 const AUTHORIZATION_KEYS = ["HTTP_AUTHORIZATION", "X-HTTP_AUTHORIZATION", "X_HTTP_AUTHORIZATION"];
@@ -15,6 +16,10 @@ export class AbstractRequest {
   }
 
   get request(): Request {
+    warn(
+      "Rack::Auth::AbstractRequest#request is deprecated and will be removed in a future version of rack.",
+      { uplevel: 1 },
+    );
     this._request ??= new Request(this.env);
     return this._request;
   }

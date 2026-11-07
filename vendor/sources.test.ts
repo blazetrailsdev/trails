@@ -53,13 +53,13 @@ describe("vendor/sources.ts", () => {
   it("declares the rack source (wave 2)", () => {
     const rack = SOURCES.find((s) => s.name === "rack");
     expect(rack).toBeDefined();
-    expect(rack!.origin.ref).toBe("v3.1.14");
+    expect(rack!.origin.ref).toBe("v3.2.8");
     expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib/rack", testPath: "test" }]);
   });
 
   it("declares the rack-session source, enrolled in both compares", () => {
     // Rack 3 moved Rack::Session out of rack into its own gem, so vendor/rack
-    // (v3.1.14) has no lib/rack/session/. v2.1.0 is what
+    // (v3.2.8) has no lib/rack/session/. v2.1.0 is what
     // vendor/rails/Gemfile.lock:440 resolves.
     const rackSession = SOURCES.find((s) => s.name === "rack-session");
     expect(rackSession).toBeDefined();
@@ -450,7 +450,7 @@ describe("vendor/sources.ts", () => {
     expect(
       m["abstractcontroller"].endsWith("vendor/rails/v8.0.2/actionpack/lib/abstract_controller"),
     ).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/v3.1.14/lib/rack")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.2.8/lib/rack")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/lib/global_id")).toBe(true);
   });
 
@@ -502,7 +502,7 @@ describe("vendor/sources.ts", () => {
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/v3.1.14/test")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
   });
 

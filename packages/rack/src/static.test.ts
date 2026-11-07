@@ -1,5 +1,5 @@
 import { it, expect, beforeEach } from "vitest";
-import { Dir, File, getZlib } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, getZlib } from "@blazetrails/ruby-compat";
 import { Static, type StaticOptions } from "./static.js";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
@@ -254,6 +254,53 @@ it("prioritizes header rules over fixed cache-control setting (legacy option)", 
   expect(res.headers["cache-control"]).toBe("public, max-age=42");
 });
 
+it("applies :fonts header rules to URL-encoded paths", async () => {
+  const res = await headerRequest.get("/cgi/assets/fonts/font%2Eeot");
+  expect(res.isOk).toBeTruthy();
+  expect(res.headers["cache-control"]).toBe("public, max-age=200");
+});
+
+it("applies Array header rules to URL-encoded paths", async () => {
+  const res = await headerRequest.get("/cgi/assets/images/image%2Epng");
+  expect(res.isOk).toBeTruthy();
+  expect(res.headers["cache-control"]).toBe("public, max-age=300");
+});
+
+it("applies Regexp header rules to URL-encoded paths", async () => {
+  const res = await headerRequest.get("/cgi/assets/stylesheets/app%2Ecss");
+  expect(res.isOk).toBeTruthy();
+  expect(res.headers["cache-control"]).toBe("public, max-age=600");
+});
+
+it("escapes Array rule entries when building regexp", async () => {
+  const opts: StaticOptions = {
+    ...OPTIONS,
+    headerRules: [[["p.g"], { "cache-control": "public, max-age=999" }]],
+  };
+  const request = new MockRequest(_static(new DummyApp(), opts));
+  const res = await request.get("/cgi/assets/images/image.png");
+  expect(res.isOk).toBeTruthy();
+  expect(res.headers["cache-control"]).toBeUndefined();
+});
+
+it("not allow directory traversal via root prefix bypass", async () => {
+  const dir = Dir.mktmpdir();
+  try {
+    const root = File.join(dir, "root");
+    const outside = `${root}_test`;
+    FileUtils.mkdirP(root);
+    FileUtils.mkdirP(outside);
+    FileUtils.touch(File.join(outside, "test.txt"));
+
+    const app = new Static({ call: () => [403, {}, ""] } as any, { root: dir, urls: ["/root"] });
+    const res = await new MockRequest(app).get("/root_test/test.txt");
+
+    expect(res.isForbidden).toBeTruthy();
+  } finally {
+    FileUtils.rmRf(dir);
+  }
+});
+
 it("expands the root path upon the middleware initialization", async () => {
   const relativePath = STATIC_OPTIONS.root!.replace(`${Dir.pwd()}/`, "");
   const opts: StaticOptions = { urls: [""], root: relativePath, index: "index.html" };
@@ -263,4 +310,11 @@ it("expands the root path upon the middleware initialization", async () => {
     expect(res.isOk).toBeTruthy();
     expect(res.body).toMatch(/index!/);
   });
+});
+
+it("supports urls ending in /", async () => {
+  const request = new MockRequest(_static(new DummyApp(), { ...OPTIONS, urls: ["/cgi/"] }));
+  const res = await request.get("/cgi/test");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(/ruby/);
 });

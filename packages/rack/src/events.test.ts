@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Events, BufferedResponse, type EventHandler } from "./events.js";
 import { Request } from "./request.js";
 import type { RackApp, RackBody } from "./index.js";
-import { groupBy } from "@blazetrails/ruby-compat";
+import { StringIO, groupBy, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 function makeHandler(events: [any, string][]): EventHandler & { self: object } {
   const handler = {
@@ -87,6 +87,20 @@ describe("TestEvents", () => {
     expect(events.map(([_, m]) => m)).toEqual(["on_start", "call", "on_commit", "on_send"]);
   });
 
+  it("send is called on call", async () => {
+    const events: [any, string][] = [];
+    const ret: any = [200, {}, (stream: StringIO) => stream.close()];
+    const app: RackApp = async (_env) => {
+      events.push([null, "call"]);
+      return ret;
+    };
+    const se = makeHandler(events);
+    const e = new Events(app, [se]);
+    const triple = await e.call({});
+    (triple[2] as any).call(new StringIO());
+    expect(events.map(([_, m]) => m)).toEqual(["on_start", "call", "on_commit", "on_send"]);
+  });
+
   it("finish is called on close", async () => {
     const events: [any, string][] = [];
     const app: RackApp = async (_env) => {
@@ -151,5 +165,12 @@ describe("TestEvents", () => {
     await expect(e.call({})).rejects.toThrow("boom");
 
     expect(events.map(([_, m]) => m)).toEqual(["on_start", "on_error", "on_finish"]);
+  });
+
+  it("evented body proxy respond to each matches body", async () => {
+    const app: RackApp = async (_env) => [200, {}, ((stream: StringIO) => stream.close()) as any];
+    const e = new Events(app, []);
+    const triple = await e.call({});
+    expect(rbObjRespondTo(triple[2], "each")).toBeFalsy();
   });
 });
