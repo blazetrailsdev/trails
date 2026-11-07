@@ -48,4 +48,8 @@ describe("stripThenable", () => {
   it("raises on a non-extensible object", () => {
     expect(() => stripThenable(Object.freeze(new Lazy()))).toThrow(TypeError);
   });
+
+  it("raises on an object with its own then", () => {
+    expect(() => stripThenable({ then: () => undefined })).toThrow(TypeError);
+  });
 });

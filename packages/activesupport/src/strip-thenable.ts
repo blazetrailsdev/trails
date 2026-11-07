@@ -10,7 +10,11 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   if (!Object.isExtensible(obj)) {
     throw new TypeError("stripThenable: cannot hide `then` on a non-extensible object");
   }
-  if (!Object.hasOwn(obj, "then")) {
+  const own = Object.getOwnPropertyDescriptor(obj, "then");
+  if (own && own.get !== hiddenThen) {
+    throw new TypeError("stripThenable: cannot hide an own `then`");
+  }
+  if (!own) {
     Object.defineProperty(obj, "then", { configurable: true, enumerable: false, get: hiddenThen });
   }
   return obj;
