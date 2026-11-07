@@ -33,7 +33,11 @@ describe("RenderXmlTest", () => {
 
     async renderWithObjectLocation() {
       const customer = new Customer("Some guy", 1);
-      await this.render({ xml: "<customer/>", location: customer, status: ":created" });
+      await this.render({
+        xml: "<customer/>",
+        location: customer,
+        status: ":created",
+      });
     }
 
     async renderWithToXml() {

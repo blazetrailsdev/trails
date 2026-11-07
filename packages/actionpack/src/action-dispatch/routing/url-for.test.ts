@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ModelName } from "@blazetrails/activemodel";
 
 import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
 
@@ -15,6 +16,7 @@ import {
   urlFor,
   urlOptions,
   type UrlForHost,
+  type UrlForOptions,
   type UrlForRoutes,
 } from "./url-for.js";
 import { RouteSet } from "./route-set.js";
@@ -105,11 +107,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   it("class options delegate to HelperMethodBuilder.url().handleClassCall", () => {
     const usersUrl = vi.fn(() => "/users");
     class User {
-      static modelName = {
-        name: "User",
-        singularRouteKey: "user",
-        routeKey: "users",
-      };
+      static modelName = new ModelName(this, null, "User");
     }
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["usersUrl"] = usersUrl;
@@ -120,7 +118,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
 
   it("model instance options delegate to HelperMethodBuilder.url().handleModelCall", () => {
     const userUrl = vi.fn(() => "/users/1");
-    const modelName = { name: "User", singularRouteKey: "user", routeKey: "users" };
+    const modelName = new ModelName(class User {}, null, "User");
     class UserRecord {
       toModel() {
         return { modelName, isPersisted: () => true };
@@ -193,14 +191,18 @@ describe("ActionDispatch::Routing::UrlFor", () => {
         return { id: 1 };
       }
     }
-    expect(() => fullUrlFor.call(makeHost(), new FakeParams())).toThrow(TypeError);
+    expect(() => fullUrlFor.call(makeHost(), new FakeParams() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
   });
 
   it("class-instance options fall through to HelperMethodBuilder dispatch", () => {
     class Post {
       id = 1;
     }
-    expect(() => fullUrlFor.call(makeHost(), new Post())).toThrow(TypeError);
+    expect(() => fullUrlFor.call(makeHost(), new Post() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
   });
 
   it("optimizeRoutesGeneration requires empty defaultUrlOptions", () => {
