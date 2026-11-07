@@ -66,7 +66,8 @@ function setupFiberedBase() {
   const bufferedRender = async (options: Record<string, unknown>): Promise<string> => {
     const body = await renderBody(options);
     let string = "";
-    const each = (piece: string | SafeBuffer | null) => void (string += String(piece ?? ""));
+    const each = (piece: string | SafeBuffer | Uint8Array | null) =>
+      void (string += String(piece ?? ""));
     if (Array.isArray(body)) body.forEach(each);
     else await body.each(each);
     return string;

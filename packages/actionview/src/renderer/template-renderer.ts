@@ -105,7 +105,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     locals: Record<string, unknown>,
   ): Rendered {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
-      Notifications.instrument<Promise<string | SafeBuffer>>(
+      Notifications.instrument<Promise<string | SafeBuffer | Uint8Array>>(
         "render_template.action_view",
         {
           identifier: template.identifier,
@@ -115,7 +115,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         () =>
           template.render(view, locals, null, {}, (...name) =>
             view._layoutFor!(...name),
-          ) as Promise<string | SafeBuffer>,
+          ) as Promise<string | SafeBuffer | Uint8Array>,
       ),
     ) as unknown as Rendered;
   }
@@ -126,23 +126,23 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
-    block: (layout: RenderableTemplate | null) => Promise<string | SafeBuffer>,
+    block: (layout: RenderableTemplate | null) => Promise<string | SafeBuffer | Uint8Array>,
   ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
         ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
         : null;
 
-    let body: string | SafeBuffer;
+    let body: string | SafeBuffer | Uint8Array;
     if (layout) {
-      body = await Notifications.instrument<Promise<string | SafeBuffer>>(
+      body = await Notifications.instrument<Promise<string | SafeBuffer | Uint8Array>>(
         "render_layout.action_view",
         { identifier: layout.identifier },
         async () => {
           view.viewFlow?.set("layout", await block(layout));
           return (await layout.render(view, locals, null, {}, (...name) =>
             view._layoutFor!(...name),
-          )) as string | SafeBuffer;
+          )) as string | SafeBuffer | Uint8Array;
         },
       );
     } else {
