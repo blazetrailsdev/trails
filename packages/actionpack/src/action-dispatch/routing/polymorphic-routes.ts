@@ -46,8 +46,9 @@ export type PolymorphicArg =
   | ToModel
   | ModelClass
   | string
-  | ReadonlyArray<ToModel | ModelClass | string | RoutesProxy | null | undefined>
-  | Record<string, unknown>;
+  | ReadonlyArray<ToModel | ModelClass | string | RoutesProxy | object | null | undefined>
+  | Record<string, unknown>
+  | object;
 
 export interface PolymorphicOptions {
   action?: "edit" | "new" | (string & {});
@@ -244,14 +245,14 @@ export class HelperMethodBuilder {
     let args: unknown[];
     let target: PolymorphicHost = recipient;
     if (Array.isArray(recordOrHashOrArray)) {
-      recordOrHashOrArray = recordOrHashOrArray.filter((x) => x != null);
-      if (recordOrHashOrArray.length === 0) {
+      recordOrHashOrArray = (recordOrHashOrArray as readonly unknown[]).filter((x) => x != null);
+      if ((recordOrHashOrArray as unknown[]).length === 0) {
         throw new ArgumentError("Nil location provided. Can't build URI.");
       }
-      if (recordOrHashOrArray[0] instanceof Routing.RoutesProxy) {
+      if ((recordOrHashOrArray as unknown[])[0] instanceof Routing.RoutesProxy) {
         target = (recordOrHashOrArray as unknown[]).shift() as PolymorphicHost;
       }
-      [method, args] = builder.handleList(recordOrHashOrArray);
+      [method, args] = builder.handleList(recordOrHashOrArray as unknown[]);
     } else if (typeof recordOrHashOrArray === "string") {
       [method, args] = builder.handleString(recordOrHashOrArray);
     } else if (isModelClass(recordOrHashOrArray)) {
@@ -304,10 +305,10 @@ export class HelperMethodBuilder {
     return [namedRoute, args];
   }
 
-  handleModelCall(target: PolymorphicHost, record: ToModel): string {
+  handleModelCall(target: PolymorphicHost, record: ToModel | object): string {
     const mapping = polymorphicMapping(target, record);
     if (mapping) return mapping.call(target, [record], this.suffix === "path");
-    const [method, args] = this.handleModel(record);
+    const [method, args] = this.handleModel(record as ToModel);
     return rbFSend(target, method, ...args) as string;
   }
 

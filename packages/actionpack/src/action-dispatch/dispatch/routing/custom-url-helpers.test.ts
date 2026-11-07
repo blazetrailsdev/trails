@@ -6,11 +6,7 @@ import {
   Parameters,
   UnfilteredParameters,
 } from "../../../action-controller/metal/strong-parameters.js";
-import {
-  HelperMethodBuilder,
-  type PolymorphicHost,
-  type ToModel,
-} from "../../routing/polymorphic-routes.js";
+import { HelperMethodBuilder, type PolymorphicHost } from "../../routing/polymorphic-routes.js";
 import { RouteSet, type UrlHelpersModule } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import "../../../test-helpers/abstract-unit.js";
@@ -167,14 +163,14 @@ class TestCustomUrlHelpers extends IntegrationTest {
   category!: Category;
   collection!: Collection;
   product!: Product;
-  manufacturer!: ToModel;
+  manufacturer!: Manufacturer;
   basket!: Basket;
   user!: User;
   video!: Video;
-  article!: ToModel;
-  page!: ToModel;
-  categoryPage!: ToModel;
-  productPage!: ToModel;
+  article!: Article;
+  page!: Page;
+  categoryPage!: CategoryPage;
+  productPage!: ProductPage;
   pathParams!: Record<string, string>;
   unsafeParams!: Parameters;
   safeParams!: Parameters;
@@ -184,14 +180,14 @@ class TestCustomUrlHelpers extends IntegrationTest {
       this.category = new Category("1");
       this.collection = new Collection("2");
       this.product = new Product("3");
-      this.manufacturer = new Manufacturer("apple") as unknown as ToModel;
+      this.manufacturer = new Manufacturer("apple");
       this.basket = new Basket();
       this.user = new User();
       this.video = new Video("4");
-      this.article = new Article("5") as unknown as ToModel;
-      this.page = new Page("6") as unknown as ToModel;
-      this.categoryPage = new CategoryPage("7") as unknown as ToModel;
-      this.productPage = new ProductPage("8") as unknown as ToModel;
+      this.article = new Article("5");
+      this.page = new Page("6");
+      this.categoryPage = new CategoryPage("7");
+      this.productPage = new ProductPage("8");
       this.pathParams = { controller: "pages", action: "index" };
       this.unsafeParams = new Parameters(this.pathParams);
       this.safeParams = new Parameters(this.pathParams).permit("controller", "action");

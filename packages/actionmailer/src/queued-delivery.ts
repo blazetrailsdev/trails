@@ -12,6 +12,14 @@ Concern.included.call(QueuedDelivery as never, null, function (this: object) {
   Object.defineProperty(this, "deliveryJob", {
     ...deliveryJob,
     /** @inventedArm registerSubclass — PERMANENT */
+    get(this: typeof host) {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
+      for (let klass = this; klass !== host; klass = rbClassSuperclass(klass)!) {
+        DescendantsTracker.registerSubclass(rbClassSuperclass(klass)!, klass);
+      }
+      return deliveryJob.get!.call(this);
+    },
+    /** @inventedArm registerSubclass — PERMANENT */
     set(this: typeof host, value: unknown) {
       deliveryJob.set!.call(this, value);
       // eslint-disable-next-line @typescript-eslint/no-this-alias

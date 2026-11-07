@@ -8,6 +8,7 @@ import {
   titleize,
   underscore,
 } from "@blazetrails/activesupport";
+import type { ActionController } from "@blazetrails/actionpack";
 import type { Message } from "@blazetrails/mail";
 import {
   Dir,
@@ -77,9 +78,9 @@ Concern.included.call(Previews as never, null, function (this: PreviewsClass) {
 export class Preview {
   declare static readonly descendants: (typeof Preview)[];
 
-  readonly params: Record<string, unknown>;
+  readonly params: Record<string, unknown> | ActionController.Parameters;
 
-  constructor(params: Record<string, unknown> = {}) {
+  constructor(params: Record<string, unknown> | ActionController.Parameters = {}) {
     this.params = params;
   }
 
@@ -92,7 +93,10 @@ export class Preview {
   }
 
   /** @inventedArm if — PERMANENT */
-  static async call(email: string, params: Record<string, unknown> = {}): Promise<Message> {
+  static async call(
+    email: string,
+    params: Record<string, unknown> | ActionController.Parameters = {},
+  ): Promise<Message> {
     const preview = new this(params);
     const message = rbFSend(preview, email) as Message;
     if (message instanceof MessageDelivery) await message.message();
