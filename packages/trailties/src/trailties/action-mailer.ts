@@ -25,10 +25,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-type AppRoutes = Parameters<typeof AbstractController.Trailties.RoutesHelpers.with>[0] & {
-  mountedHelpers(): object;
-};
-
 type MailerClass = typeof Base & {
   logger?: unknown;
 };
@@ -71,7 +67,7 @@ export class Trailtie extends BaseTrailtie {
       options.relativeUrlRoot ??= app.config.relativeUrlRoot;
 
       onLoad("action_mailer", function (this: MailerClass) {
-        const routes = app.routes() as AppRoutes;
+        const routes = app.routes();
         include(this as never, AbstractController.UrlFor as never);
         AbstractController.Trailties.RoutesHelpers.with(routes, false)(this as never);
         include(this as never, routes.mountedHelpers() as never);

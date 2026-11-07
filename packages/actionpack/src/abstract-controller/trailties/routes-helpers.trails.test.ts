@@ -4,6 +4,10 @@ import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutesHelpers, type RoutesHelpersControllerClass } from "./routes-helpers.js";
 
 describe("RoutesHelpers.with (trails)", () => {
+  it("accepts a real RouteSet with no cast", () => {
+    expect(typeof RoutesHelpers.with(new RouteSet())).toBe("function");
+  });
+
   it("a later include outranks an earlier one", () => {
     const cls = class {};
     const wired = cls as unknown as RoutesHelpersControllerClass;
