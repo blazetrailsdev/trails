@@ -9,7 +9,6 @@ import { Trails } from "./trails.js";
 
 const { TestCase } = ActionController;
 const SOURCE_FILE = import.meta.filename;
-const SOURCE_LINE = 105;
 
 function exactResults(tc: InstanceType<typeof TestCase>): string[] {
   return (JSON.parse(tc.response.body) as { exact: string[] }).exact;
@@ -100,8 +99,10 @@ describe("InfoControllerTest", () => {
     Mapper.routeSourceLocations = true;
     try {
       const routes = Trails.application!.routes() as unknown as RouteSet;
+      let sourceLine = 0;
       routes.draw(function () {
         this.namespace("test", () => {
+          sourceLine = Number(/:(\d+):\d+\)?$/.exec(new Error().stack!.split("\n")[1])![1]) + 1;
           this.get("nested_route", { to: "test#show" });
         });
         this.get("/trails/info/routes", { to: "trails/info#routes" });
@@ -114,7 +115,7 @@ describe("InfoControllerTest", () => {
         block(() => {
           tc.assertSelect("td", { text: "test_nested_route_path" });
           tc.assertSelect("td", { text: "test/test#show" });
-          tc.assertSelect("td", { text: `${SOURCE_FILE}:${SOURCE_LINE}` });
+          tc.assertSelect("td", { text: `${SOURCE_FILE}:${sourceLine}` });
         }),
       );
     } finally {
