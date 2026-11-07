@@ -1,8 +1,8 @@
-import "../../constants.plugin-plugin-command.generated.js";
+import "../constants.plugin.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
-import { Base } from "../../command/base.js";
-import { PluginGenerator } from "../../generators/trails/plugin/plugin-generator.js";
+import { Base } from "../command/base.js";
+import { PluginGenerator } from "../generators/trails/plugin/plugin-generator.js";
 
 export class PluginCommand extends Base {
   static {

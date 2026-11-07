@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
 import { Dir, File } from "@blazetrails/ruby-compat";
-import { invoke } from "../../command.js";
+import { invoke } from "../command.js";
 
 describe("Trails::Command::PluginCommand", () => {
   it("invoke plugin without new prints the plugin generator's help", async () => {

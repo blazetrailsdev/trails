@@ -25,7 +25,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> 
   build: async () => (await import("../commands/build.js"), null),
   rake: async () => (await import("../commands/rake.js"), null),
   application: async () => (await import("../commands/application.js"), null),
-  "plugin/plugin": async () => (await import("../commands/plugin/plugin-command.js"), null),
+  plugin: async () => (await import("../commands/plugin.js"), null),
   "app/update": async () => (await import("../commands/app/update-command.js"), null),
   "db/system/change/change": async () => (
     await import("../commands/db/system/change/change-command.js"),
