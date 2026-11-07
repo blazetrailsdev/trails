@@ -4,7 +4,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { include, isModuleIncluded, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "./route-set.js";
-import { UrlFor } from "./url-for.js";
+import { UrlFor, urlFor, type UrlForHost } from "./url-for.js";
 import { Base as ViewBase } from "@blazetrails/actionview";
 
 describe("ActionDispatch::Routing::UrlFor included", () => {
@@ -82,5 +82,20 @@ describe("ActionView::Base with Routing::UrlFor included", () => {
     expect(isModuleIncluded(View, UrlFor)).toBe(true);
     expect(isModuleIncluded(ViewBase, UrlFor)).toBe(false);
     expect((View.empty() as unknown as { _routes: unknown })._routes).toBe(routes);
+  });
+});
+
+describe("UrlForOptions mirrors full_url_for's arms", () => {
+  it("rejects a known url option of the wrong type at compile time", () => {
+    const host = {
+      _routes: { urlFor: () => "http://www.example.com/" },
+      defaultUrlOptions: {},
+      urlOptions: () => ({}),
+    } as unknown as UrlForHost;
+    // @ts-expect-error onlyPath is a boolean (UrlOptions)
+    expect(urlFor.call(host, { onlyPath: "yes" })).toBe("http://www.example.com/");
+    expect(urlFor.call(host, { onlyPath: true, useRoute: "root", id: 1 })).toBe(
+      "http://www.example.com/",
+    );
   });
 });

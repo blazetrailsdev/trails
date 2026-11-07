@@ -2,7 +2,7 @@ import { ActionController } from "../../namespaces.js";
 import { hashDelete } from "@blazetrails/ruby-compat";
 import { statusCode, type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
-import type { UrlOptions } from "../../action-dispatch/http/url.js";
+import type { UrlForHashOptions } from "../../action-dispatch/routing/url-for.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
 import type { Parameters } from "./strong-parameters.js";
@@ -41,7 +41,7 @@ export type RedirectToOptions =
   | string
   | ToModel
   | unknown[]
-  | (UrlOptions & Record<string, unknown>)
+  | UrlForHashOptions
   | Parameters
   | ((this: never) => RedirectToOptions)
   | null;

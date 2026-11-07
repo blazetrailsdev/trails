@@ -15,6 +15,7 @@ import {
   urlFor,
   urlOptions,
   type UrlForHost,
+  type UrlForOptions,
   type UrlForRoutes,
 } from "./url-for.js";
 import { RouteSet } from "./route-set.js";
@@ -113,7 +114,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     }
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["usersUrl"] = usersUrl;
-    const result = fullUrlFor.call(host, User);
+    const result = fullUrlFor.call(host, User as unknown as UrlForOptions);
     expect(result).toBe("/users");
     expect(usersUrl).toHaveBeenCalledOnce();
   });
@@ -129,7 +130,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const user = new UserRecord();
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
-    const result = fullUrlFor.call(host, user);
+    const result = fullUrlFor.call(host, user as unknown as UrlForOptions);
     expect(result).toBe("/users/1");
     expect(userUrl).toHaveBeenCalledOnce();
   });
@@ -193,14 +194,18 @@ describe("ActionDispatch::Routing::UrlFor", () => {
         return { id: 1 };
       }
     }
-    expect(() => fullUrlFor.call(makeHost(), new FakeParams())).toThrow(TypeError);
+    expect(() => fullUrlFor.call(makeHost(), new FakeParams() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
   });
 
   it("class-instance options fall through to HelperMethodBuilder dispatch", () => {
     class Post {
       id = 1;
     }
-    expect(() => fullUrlFor.call(makeHost(), new Post())).toThrow(TypeError);
+    expect(() => fullUrlFor.call(makeHost(), new Post() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
   });
 
   it("optimizeRoutesGeneration requires empty defaultUrlOptions", () => {
