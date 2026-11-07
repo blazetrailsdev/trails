@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertEqual, assertNotEqual } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNotEqual } from "@blazetrails/activesupport";
 import type { RackEnv } from "@blazetrails/rack";
 import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "../../middleware/session/abstract-store.js";
@@ -47,7 +47,7 @@ class MemoryStore extends AbstractSecureStore {
   }
 }
 
-describe("ActionDispatch::Session::AbstractSecureStoreTest", () => {
+describe("AbstractSecureStoreTest", () => {
   let env: RackEnv | null = null;
   function app() {
     env = null;
@@ -62,8 +62,8 @@ describe("ActionDispatch::Session::AbstractSecureStoreTest", () => {
     const as = new MemoryStore(app());
     await as.call(e);
 
-    assertEqual(true, env != null);
-    assertEqual(true, Session.find(new Request(env!)) != null);
+    assert(env);
+    assert(Session.find(new Request(env!)));
   });
 
   it("new session object is merged with old", async () => {
@@ -71,7 +71,7 @@ describe("ActionDispatch::Session::AbstractSecureStoreTest", () => {
     const as = new MemoryStore(app());
     await as.call(e);
 
-    assertEqual(true, env != null);
+    assert(env);
     const session = Session.find(new Request(env!))!;
     session.set("foo", "bar");
 
