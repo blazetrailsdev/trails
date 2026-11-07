@@ -41,7 +41,7 @@ export class Cookie {
   }
 
   respondToMissing(methodName: string, _includeAll = false): boolean {
-    return methodName in this.value;
+    return rbObjRespondTo(this.value, methodName) || methodName in this.value;
   }
 }
 

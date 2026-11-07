@@ -482,7 +482,7 @@ export class Parser {
 
       let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
       let disposition = MULTIPART_CONTENT_DISPOSITION.exec(head)?.[1];
-      if (disposition != null && Buffer.byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
+      if (disposition != null && _byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
         disposition = disposition.replace(Parser.OBS_UNFOLD, "$1");
 
         let i = disposition.indexOf(";");
