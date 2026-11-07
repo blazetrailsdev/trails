@@ -4,7 +4,6 @@ export class DummyConfig {
   #config: object;
   #self: DummyConfig;
 
-  /** @inventedArm if — PERMANENT */
   constructor(config: object) {
     this.#config = config;
     return (this.#self = new Proxy(this, {
