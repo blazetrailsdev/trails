@@ -10,6 +10,5 @@
     { "path": "../activesupport" },
     { "path": "../date" },
     { "path": "../ruby-compat" }
-  ],
-  "exclude": ["lib/**/*.test.ts"]
+  ]
 }

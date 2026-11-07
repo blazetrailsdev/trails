@@ -10,6 +10,5 @@
     { "path": "../date" },
     { "path": "../ruby-compat" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["lib/**/*.test.ts"]
+  ]
 }

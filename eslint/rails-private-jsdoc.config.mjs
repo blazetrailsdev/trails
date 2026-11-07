@@ -20,7 +20,7 @@ import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 export default [
   {
     ignores: [
-      "packages/marcel/lib/test-helpers/fixtures/**",
+      "packages/marcel/test/fixtures/**",
       "packages/mini-magick/test/fixtures/**",
       "packages/activestorage/src/test-helpers/fixtures/files/**",
       "packages/rack/test/cgi/assets/**",

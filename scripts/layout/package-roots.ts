@@ -28,6 +28,16 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "image-processing",
   "builder",
   "tse-compiler",
+  "bcrypt",
+  "did-you-mean",
+  "marcel",
+  "trails-tsc",
+  "rack-session",
+  "rack-test",
+  "date",
+  "html-sanitizer",
+  "msgpack",
+  "chronic",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

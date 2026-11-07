@@ -155,7 +155,7 @@ export default defineConfig(
       "packages/actionpack/src/test-helpers/fixtures/public/**",
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
-      "packages/marcel/lib/test-helpers/fixtures/**",
+      "packages/marcel/test/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
@@ -1090,13 +1090,13 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/marcel/lib/extension.test.ts"],
+    files: ["packages/marcel/test/extension.test.ts"],
     rules: {
       "vitest/no-conditional-tests": "off",
     },
   },
   {
-    files: ["packages/marcel/lib/test-helpers/test-helper.ts"],
+    files: ["packages/marcel/test/support/test-helper.ts"],
     rules: {
       "no-useless-assignment": "off",
       "prefer-const": ["error", { destructuring: "all" }],

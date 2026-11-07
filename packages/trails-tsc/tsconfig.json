@@ -13,6 +13,5 @@
     { "path": "../tse-compiler" },
     { "path": "../zeitwerk" },
     { "path": "../actionview" }
-  ],
-  "exclude": ["lib/**/*.test.ts"]
+  ]
 }
