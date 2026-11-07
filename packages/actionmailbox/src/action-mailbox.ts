@@ -13,6 +13,7 @@ import type { InboundEmail } from "./inbound-email.js";
 import type { Record as ActionMailboxRecord } from "./record.js";
 import type { Relayer } from "./relayer.js";
 import type { RoutingJob } from "./routing-job.js";
+import type { TestCase } from "./test-case.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -25,7 +26,7 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
   Relayer: typeof Relayer;
   Router: unknown;
   RoutingJob: typeof RoutingJob;
-  TestCase: unknown;
+  TestCase: typeof TestCase;
   deprecator(): Deprecation;
   ingress: string | null;
   logger: Logger | null;
