@@ -234,8 +234,8 @@ describe("CodeStatisticsTest", () => {
       CodeStatistics.registerDirectory("My Directory", "path/to/dir");
       expect(
         CodeStatistics.directories.some(([l, p]) => l === "My Directory" && p === "path/to/dir"),
-      ).toBe(true);
-      expect(CodeStatistics.testTypes.includes("My Directory")).toBe(false);
+      ).toBeTruthy();
+      expect(CodeStatistics.testTypes.includes("My Directory")).toBeFalsy();
     } finally {
       const index = CodeStatistics.directories.findIndex(
         ([l, p]) => l === "My Directory" && p === "path/to/dir",
@@ -247,7 +247,7 @@ describe("CodeStatisticsTest", () => {
   it("register test directories", () => {
     try {
       CodeStatistics.registerDirectory("Model specs", "spec/models", { testDirectory: true });
-      expect(CodeStatistics.testTypes.includes("Model specs")).toBe(true);
+      expect(CodeStatistics.testTypes.includes("Model specs")).toBeTruthy();
     } finally {
       const index = CodeStatistics.testTypes.indexOf("Model specs");
       if (index !== -1) CodeStatistics.testTypes.splice(index, 1);
@@ -255,7 +255,7 @@ describe("CodeStatisticsTest", () => {
   });
 
   it("ignores directories that happen to have source files extensions", async () => {
-    await expect(CodeStatistics.create(["tmp dir", tmpPath])).resolves.toBeDefined();
+    await expect(CodeStatistics.create(["tmp dir", tmpPath])).resolves.not.toThrow();
   });
 
   it("renders a Rails-shaped table with totals and Code-to-Test ratio", async () => {
@@ -286,6 +286,6 @@ describe("CodeStatisticsTest", () => {
       path.join(tmpPath, ".example.rb"),
       "      def foo\n        puts 'foo'\n      end\n",
     );
-    await expect(CodeStatistics.create(["hidden file", tmpPath])).resolves.toBeDefined();
+    await expect(CodeStatistics.create(["hidden file", tmpPath])).resolves.not.toThrow();
   });
 });

@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ActionController, type RouteSet } from "@blazetrails/actionpack";
+import { ActionController, Mapper, type RouteSet } from "@blazetrails/actionpack";
 import { assert, assertNil, include } from "@blazetrails/activesupport";
+import { block } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { InfoController } from "./info-controller.js";
 import { Info, PropertyList } from "./info.js";
 import { Trails } from "./trails.js";
 
 const { TestCase } = ActionController;
+const SOURCE_FILE = import.meta.filename;
 
 function exactResults(tc: InstanceType<typeof TestCase>): string[] {
   return (JSON.parse(tc.response.body) as { exact: string[] }).exact;
@@ -90,6 +92,35 @@ describe("InfoControllerTest", () => {
   test("info controller renders with routes", async () => {
     await tc.get("routes");
     tc.assertResponse("success");
+  });
+
+  test("info controller routes shows source location", async () => {
+    const was = Mapper.routeSourceLocations;
+    Mapper.routeSourceLocations = true;
+    try {
+      const routes = Trails.application!.routes() as unknown as RouteSet;
+      let sourceLine = 0;
+      routes.draw(function () {
+        this.namespace("test", () => {
+          sourceLine = Number(/:(\d+):\d+\)?$/.exec(new Error().stack!.split("\n")[1])![1]) + 1;
+          this.get("nested_route", { to: "test#show" });
+        });
+        this.get("/trails/info/routes", { to: "trails/info#routes" });
+      });
+
+      await tc.get("routes");
+
+      tc.assertSelect(
+        "table tr",
+        block(() => {
+          tc.assertSelect("td", { text: "test_nested_route_path" });
+          tc.assertSelect("td", { text: "test/test#show" });
+          tc.assertSelect("td", { text: `${SOURCE_FILE}:${sourceLine}` });
+        }),
+      );
+    } finally {
+      Mapper.routeSourceLocations = was;
+    }
   });
 
   test("info controller search returns exact matches for route names", async () => {

@@ -1,8 +1,9 @@
-import { htmlSafe, isBlank } from "@blazetrails/activesupport";
-import { DebugView, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
+import { isBlank } from "@blazetrails/activesupport";
+import { DebugView, RoutesInspector, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
 import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
 import { Info } from "./info.js";
+import { Annotation, SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 
 export interface RouteSearchResult {
   exact: string[];
@@ -10,6 +11,11 @@ export interface RouteSearchResult {
 }
 
 export class InfoController extends ApplicationController {
+  info?: string;
+  pageTitle?: string;
+  routesInspector?: RoutesInspector;
+  annotations?: Map<string, Annotation[]>;
+
   static override controllerPath(): string {
     return "trails/info";
   }
@@ -21,11 +27,12 @@ export class InfoController extends ApplicationController {
   }
 
   index(): void {
-    this.redirectTo("/trails/info/routes");
+    this.redirectTo({ action: "routes" });
   }
 
-  async properties(): Promise<void> {
-    await this.render({ html: htmlSafe(Info.toHtml()) });
+  properties(): void {
+    this.info = Info.toHtml();
+    this.pageTitle = "Properties";
   }
 
   async routes(): Promise<void> {
@@ -39,12 +46,17 @@ export class InfoController extends ApplicationController {
         },
       });
     } else {
-      await this.render({ json: { exact: [], fuzzy: [] } });
+      this.routesInspector = new RoutesInspector(
+        (this as unknown as { _routes: RouteSet })._routes.routes(),
+      );
+      this.pageTitle = "Routes";
     }
   }
 
-  async notes(): Promise<void> {
-    await this.render({ json: [] });
+  notes(): void {
+    this.annotations = new SourceAnnotationExtractor(Annotation.tags.join("|")).find(
+      Annotation.directories,
+    );
   }
 
   private matchingRoutes({ query, exactMatch }: { query: string; exactMatch: boolean }): string[] {

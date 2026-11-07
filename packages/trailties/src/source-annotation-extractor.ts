@@ -183,14 +183,20 @@ export function resetAnnotationRegistry(): void {
 }
 
 function registerDefaults(): void {
-  const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
+  const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`, "m");
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", (tag) =>
     tokenizer
-      ? new ParserExtractor(new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`))
+      ? new ParserExtractor(
+          new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`, "m"),
+        )
       : slash(tag),
   );
   Annotation.registerExtensions("css", "scss", "sass", "less", slash);
-  Annotation.registerExtensions("yml", "yaml", (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
+  Annotation.registerExtensions(
+    "yml",
+    "yaml",
+    (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`, "m"),
+  );
   Annotation.registerExtensions(
     "ejs",
     "tse",
