@@ -316,7 +316,6 @@ const isSource = (n: string) =>
   n.endsWith(".ts") && !n.endsWith(".test.ts") && !n.endsWith(".d.ts");
 const isTest = (n: string) => n.endsWith(".test.ts");
 
-/** The `vendor/sources.ts` entries whose port lives in `packages/<dir>`. */
 function entriesOf(dir: string) {
   return SOURCES.flatMap((s) => s.packages.map((p) => ({ source: s.name, p }))).filter(
     (e) => (e.p.portedBy ?? packageDirOf(e.p.name)) === dir,
@@ -346,7 +345,6 @@ export function compareKeysOf(dir: string): string[] {
   return keys.length > 0 ? keys : [dir];
 }
 
-/** A package's description, with the reason api-compare skips it appended. */
 function withExclusion(description: string | null, excluded: string | null): string | null {
   if (excluded === null) return description;
   return `${description ?? ""}${description ? " " : ""}(Not in api:compare: ${excluded})`;

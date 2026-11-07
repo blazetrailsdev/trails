@@ -871,7 +871,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/tzinfo/tzinfo.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:642.
       ref: "v2.0.6",
     },
     packages: [
