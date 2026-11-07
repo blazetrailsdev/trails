@@ -41,6 +41,7 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
+import type { Enumerator } from "@blazetrails/ruby-compat";
 import {
   block as rbBlock,
   fetch,
@@ -48,6 +49,7 @@ import {
   hashReplace,
   include,
   rbObjDup,
+  toEnum,
   warn,
   strNew,
 } from "@blazetrails/ruby-compat";
@@ -134,7 +136,7 @@ export abstract class Env {
   }
 
   getHeader(name: string): any {
-    return this.env[name];
+    return this.env[name] ?? null;
   }
 
   fetchHeader(name: string): any;
@@ -143,8 +145,14 @@ export abstract class Env {
     return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
   }
 
-  eachHeader(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) callback(k, v);
+  eachHeader(): Enumerator<[string, any]>;
+  eachHeader(block: (key: string, value: any) => void): Record<string, any>;
+  eachHeader(
+    block?: (key: string, value: any) => void,
+  ): Record<string, any> | Enumerator<[string, any]> {
+    if (block === undefined) return toEnum(this, "eachHeader");
+    for (const [k, v] of Object.entries(this.env)) block(k, v);
+    return this.env;
   }
 
   setHeader(name: string, v: any): any {
@@ -181,7 +189,7 @@ export interface Helpers {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
   get body(): any {
-    return this.getHeader(RACK_INPUT) ?? null;
+    return this.getHeader(RACK_INPUT);
   }
 
   get scriptName(): string {
@@ -207,19 +215,19 @@ export abstract class Helpers {
   }
 
   get contentLength(): string | null {
-    return this.getHeader("CONTENT_LENGTH") ?? null;
+    return this.getHeader("CONTENT_LENGTH");
   }
 
   get logger(): any {
-    return this.getHeader(RACK_LOGGER) ?? null;
+    return this.getHeader(RACK_LOGGER);
   }
 
   get userAgent(): string | null {
-    return this.getHeader("HTTP_USER_AGENT") || null;
+    return this.getHeader("HTTP_USER_AGENT");
   }
 
   get referer(): string | null {
-    return this.getHeader("HTTP_REFERER") ?? null;
+    return this.getHeader("HTTP_REFERER");
   }
 
   get referrer(): string | null {
@@ -307,11 +315,11 @@ export abstract class Helpers {
   }
 
   get serverName(): string | null {
-    return this.getHeader(SERVER_NAME) ?? null;
+    return this.getHeader(SERVER_NAME);
   }
 
   get serverPort(): string | null {
-    return this.getHeader(SERVER_PORT) ?? null;
+    return this.getHeader(SERVER_PORT);
   }
 
   get cookies(): Record<string, string> | Map<string, string> {
@@ -340,7 +348,7 @@ export abstract class Helpers {
   }
 
   get hostAuthority(): string | null {
-    return this.getHeader(HTTP_HOST) ?? null;
+    return this.getHeader(HTTP_HOST);
   }
 
   hostWithPort(authority: string | null = this.authority): string | null {
