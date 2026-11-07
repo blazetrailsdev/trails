@@ -2,6 +2,7 @@ import { it, expect } from "vitest";
 import {
   b,
   Encoding,
+  File,
   forceEncoding,
   rbObjRespondTo,
   Hash,
@@ -33,7 +34,7 @@ it("pass valid request", async () => {
 });
 
 it("notice fatal errors", async () => {
-  const p = new Lint(null!).call();
+  const p = new Lint(validApp).call();
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/No env given/);
 });
@@ -42,55 +43,59 @@ it("notice environment errors", async () => {
   let p: Promise<any>;
   let e: Record<string, any>;
 
-  p = new Lint(null!).call(5 as any);
+  p = new Lint(validApp).call(5 as any);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/not a Hash/);
 
-  p = new Lint(null!).call(Object.freeze({}));
+  p = new Lint(validApp).call(Object.freeze({}));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/env should not be frozen, but is/);
 
+  p = new Lint(validApp).call({ [Symbol("a")]: 1 } as any);
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe("env contains non-string keys: [Symbol(a)]");
+
   e = env();
   delete e["REQUEST_METHOD"];
-  p = new Lint(null!).call(e);
+  p = new Lint(validApp).call(e);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/missing required key REQUEST_METHOD/);
 
   e = env();
   delete e["SERVER_NAME"];
-  p = new Lint(null!).call(e);
+  p = new Lint(validApp).call(e);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/missing required key SERVER_NAME/);
 
   e = env();
   delete e["SERVER_PROTOCOL"];
-  p = new Lint(null!).call(e);
+  p = new Lint(validApp).call(e);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/missing required key SERVER_PROTOCOL/);
 
   e = env();
   e["SERVER_PROTOCOL"] = "Foo";
-  p = new Lint(null!).call(e);
+  p = new Lint(validApp).call(e);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/env\[SERVER_PROTOCOL\] does not match HTTP/);
 
-  p = new Lint(null!).call(env({ HTTP_CONTENT_TYPE: "text/plain" }));
+  p = new Lint(validApp).call(env({ HTTP_CONTENT_TYPE: "text/plain" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/contains HTTP_CONTENT_TYPE/);
 
-  p = new Lint(null!).call(env({ HTTP_CONTENT_LENGTH: "42" }));
+  p = new Lint(validApp).call(env({ HTTP_CONTENT_LENGTH: "42" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/contains HTTP_CONTENT_LENGTH/);
 
-  p = new Lint(null!).call(env({ FOO: new (class Object {})() }));
+  p = new Lint(validApp).call(env({ FOO: new (class Object {})() }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/non-string value/);
 
-  p = new Lint(null!).call(env({ "rack.url_scheme": "gopher" }));
+  p = new Lint(validApp).call(env({ "rack.url_scheme": "gopher" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/url_scheme unknown/);
 
-  p = new Lint(null!).call(env({ "rack.session": [] }));
+  p = new Lint(validApp).call(env({ "rack.session": [] }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("session [] must respond to store and []=");
 
@@ -98,34 +103,34 @@ it("notice environment errors", async () => {
 
   const obj: any = new (class Object {})();
   obj.inspect = () => "[]";
-  p = new Lint(null!).call(env({ "rack.logger": obj }));
+  p = new Lint(validApp).call(env({ "rack.logger": obj }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("logger [] must respond to info");
 
   obj.info = () => {};
-  p = new Lint(null!).call(env({ "rack.logger": obj }));
+  p = new Lint(validApp).call(env({ "rack.logger": obj }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("logger [] must respond to debug");
 
   obj.debug = () => {};
-  p = new Lint(null!).call(env({ "rack.logger": obj }));
+  p = new Lint(validApp).call(env({ "rack.logger": obj }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("logger [] must respond to warn");
 
   obj.warn = () => {};
-  p = new Lint(null!).call(env({ "rack.logger": obj }));
+  p = new Lint(validApp).call(env({ "rack.logger": obj }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("logger [] must respond to error");
 
   obj.error = () => {};
-  p = new Lint(null!).call(env({ "rack.logger": obj }));
+  p = new Lint(validApp).call(env({ "rack.logger": obj }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("logger [] must respond to fatal");
 
   obj.fatal = () => {};
   expect((await new Lint(validApp).call(env({ "rack.logger": obj })))[0]).toBe(200);
 
-  p = new Lint(null!).call(env({ "rack.multipart.buffer_size": 0 }));
+  p = new Lint(validApp).call(env({ "rack.multipart.buffer_size": 0 }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe(
     "rack.multipart.buffer_size must be an Integer > 0 if specified",
@@ -133,7 +138,7 @@ it("notice environment errors", async () => {
 
   expect((await new Lint(validApp).call(env({ "rack.multipart.buffer_size": 1 })))[0]).toBe(200);
 
-  p = new Lint(null!).call(env({ "rack.multipart.tempfile_factory": Tempfile }));
+  p = new Lint(validApp).call(env({ "rack.multipart.tempfile_factory": Tempfile }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe(
     "rack.multipart.tempfile_factory must respond to #call",
@@ -163,41 +168,41 @@ it("notice environment errors", async () => {
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("response array has 0 elements instead of 3");
 
-  p = new Lint(null!).call(env({ SERVER_PORT: "howdy" }));
+  p = new Lint(validApp).call(env({ SERVER_PORT: "howdy" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("env[SERVER_PORT] is not an Integer");
 
-  p = new Lint(null!).call(env({ SERVER_NAME: "\u1234" }));
+  p = new Lint(validApp).call(env({ SERVER_NAME: "A Host" }));
   await expect(p).rejects.toThrow(LintError);
-  expect((await p.catch((e) => e)).message).toBe("\u1234 must be a valid authority");
+  expect((await p.catch((e) => e)).message).toBe("env[SERVER_NAME] must be a valid host");
 
-  p = new Lint(null!).call(env({ HTTP_HOST: "\u1234" }));
+  p = new Lint(validApp).call(env({ HTTP_HOST: "A Host" }));
   await expect(p).rejects.toThrow(LintError);
-  expect((await p.catch((e) => e)).message).toBe("\u1234 must be a valid authority");
+  expect((await p.catch((e) => e)).message).toBe("env[HTTP_HOST] must be a valid authority");
 
-  p = new Lint(null!).call(env({ REQUEST_METHOD: "FUCKUP?" }));
+  p = new Lint(validApp).call(env({ REQUEST_METHOD: "FUCKUP?" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/REQUEST_METHOD/);
 
-  p = new Lint(null!).call(env({ REQUEST_METHOD: "OOPS?\b!" }));
+  p = new Lint(validApp).call(env({ REQUEST_METHOD: "OOPS?\b!" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/OOPS\?\\/);
 
-  p = new Lint(null!).call(env({ SCRIPT_NAME: "howdy" }));
+  p = new Lint(validApp).call(env({ SCRIPT_NAME: "howdy" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/must start with/);
 
-  p = new Lint(null!).call(env({ CONTENT_LENGTH: "xcii" }));
+  p = new Lint(validApp).call(env({ CONTENT_LENGTH: "xcii" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/Invalid CONTENT_LENGTH/);
 
-  p = new Lint(null!).call(env({ QUERY_STRING: null }));
+  p = new Lint(validApp).call(env({ QUERY_STRING: null }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toContain(
     "env variable QUERY_STRING has non-string value nil",
   );
 
-  p = new Lint(null!).call(env({ QUERY_STRING: "\u1234" }));
+  p = new Lint(validApp).call(env({ QUERY_STRING: "\u1234" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toContain(
     "env variable QUERY_STRING has value containing non-ASCII characters and has non-ASCII-8BIT encoding",
@@ -210,21 +215,37 @@ it("notice environment errors", async () => {
   e = env();
   delete e["PATH_INFO"];
   delete e["SCRIPT_NAME"];
-  p = new Lint(null!).call(e);
+  p = new Lint(validApp).call(e);
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/One of .* must be set/);
 
-  p = new Lint(null!).call(env({ SCRIPT_NAME: "/" }));
+  p = new Lint(validApp).call(env({ PATH_INFO: "", SCRIPT_NAME: "" }));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toMatch(/One of .* must be set/);
+
+  e = env({ PATH_INFO: "" });
+  delete e["SCRIPT_NAME"];
+  p = new Lint(validApp).call(e);
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toMatch(/One of .* must be set/);
+
+  e = env({ SCRIPT_NAME: "" });
+  delete e["PATH_INFO"];
+  p = new Lint(validApp).call(e);
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toMatch(/One of .* must be set/);
+
+  p = new Lint(validApp).call(env({ SCRIPT_NAME: "/" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/cannot be .* make it ''/);
 
-  p = new Lint(null!).call(env({ "rack.response_finished": "not a callable" }));
+  p = new Lint(validApp).call(env({ "rack.response_finished": "not a callable" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /rack.response_finished must be an array of callable objects/,
   );
 
-  p = new Lint(null!).call(
+  p = new Lint(validApp).call(
     env({ "rack.response_finished": [(_env: unknown) => {}, "not a callable"] }),
   );
   await expect(p).rejects.toThrow(LintError);
@@ -234,13 +255,13 @@ it("notice environment errors", async () => {
 });
 
 it("notice input errors", async () => {
-  let p = new Lint(null!).call(env({ "rack.input": "" }));
+  let p = new Lint(validApp).call(env({ "rack.input": "" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/does not respond to #gets/);
 
   let input: any = new (class Object {})();
   input.isBinmode = () => false;
-  p = new Lint(null!).call(env({ "rack.input": input }));
+  p = new Lint(validApp).call(env({ "rack.input": input }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/is not opened in binary mode/);
 
@@ -250,7 +271,7 @@ it("notice input errors", async () => {
     result.name = () => "US-ASCII";
     return result;
   };
-  p = new Lint(null!).call(env({ "rack.input": input }));
+  p = new Lint(validApp).call(env({ "rack.input": input }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /does not have ASCII-8BIT as its external encoding/,
@@ -260,13 +281,17 @@ it("notice input errors", async () => {
 it("notice error errors", async () => {
   const io = new StringIO();
   io.binmode();
-  const p = new Lint(null!).call(env({ "rack.errors": "", "rack.input": io }));
+  const p = new Lint(validApp).call(env({ "rack.errors": "", "rack.input": io }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/does not respond to #puts/);
 });
 
 it("notice response errors", async () => {
-  let p = new Lint(async () => "" as any).call(env({}));
+  let p = new Lint(async () => Object.freeze([200, {}, []]) as any).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toContain("response is frozen");
+
+  p = new Lint(async () => "" as any).call(env({}));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toContain("response is not an Array, but String");
 
@@ -276,7 +301,7 @@ it("notice response errors", async () => {
 });
 
 it("accepts empty PATH_INFO", async () => {
-  expect((await new Lint(validApp).call(env({ PATH_INFO: "" })))[0]).toBe(200);
+  expect((await new Lint(validApp).call(env({ PATH_INFO: "", SCRIPT_NAME: "/foo" })))[0]).toBe(200);
 });
 
 it("notices request-target asterisk form errors", async () => {
@@ -284,7 +309,7 @@ it("notices request-target asterisk form errors", async () => {
     (await new Lint(validApp).call(env({ REQUEST_METHOD: "OPTIONS", PATH_INFO: "*" })))[0],
   ).toBe(200);
 
-  const p = new Lint(null!).call(env({ PATH_INFO: "*" }));
+  const p = new Lint(validApp).call(env({ PATH_INFO: "*" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /Only OPTIONS requests may have PATH_INFO set to '\*'/,
@@ -298,14 +323,14 @@ it("notices request-target authority form errors", async () => {
     )[0],
   ).toBe(200);
 
-  const p = new Lint(null!).call(env({ PATH_INFO: "example.com:80" }));
+  const p = new Lint(validApp).call(env({ PATH_INFO: "example.com:80" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /Only CONNECT requests may have PATH_INFO set to an authority/,
   );
 
   void (async () => {
-    expect((await new Lint(null!).call(env({ PATH_INFO: "/:80" })))[0]).toBe(200);
+    expect((await new Lint(validApp).call(env({ PATH_INFO: "/:80" })))[0]).toBe(200);
   });
 });
 
@@ -314,13 +339,13 @@ it("notices request-target absolute-form errors", async () => {
     (await new Lint(validApp).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "http://foo/bar" })))[0],
   ).toBe(200);
 
-  let p = new Lint(null!).call(env({ REQUEST_METHOD: "CONNECT", PATH_INFO: "http://foo/bar" }));
+  let p = new Lint(validApp).call(env({ REQUEST_METHOD: "CONNECT", PATH_INFO: "http://foo/bar" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /CONNECT and OPTIONS requests must not have PATH_INFO set to a URI/,
   );
 
-  p = new Lint(null!).call(env({ REQUEST_METHOD: "OPTIONS", PATH_INFO: "http://foo/bar" }));
+  p = new Lint(validApp).call(env({ REQUEST_METHOD: "OPTIONS", PATH_INFO: "http://foo/bar" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(
     /CONNECT and OPTIONS requests must not have PATH_INFO set to a URI/,
@@ -332,15 +357,15 @@ it("notices request-target origin-form errors", async () => {
     (await new Lint(validApp).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar" })))[0],
   ).toBe(200);
 
-  let p = new Lint(null!).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "../etc/passwd" }));
+  let p = new Lint(validApp).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "../etc/passwd" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/PATH_INFO must start with a '\/'/);
 
-  p = new Lint(null!).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar#qux" }));
+  p = new Lint(validApp).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar#qux" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/PATH_INFO.*must not include a fragment/);
 
-  p = new Lint(null!).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar?baz#qux" }));
+  p = new Lint(validApp).call(env({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar?baz#qux" }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toMatch(/PATH_INFO.*must not include a fragment/);
 });
@@ -438,16 +463,20 @@ it("notice header errors", async () => {
 });
 
 it("notice rack.early_hints errors", async () => {
-  const app = (value: unknown) => {
+  const app = (value: unknown, extraEnv: Record<string, any> = {}) => {
     const app = new Lint(async (env) => {
       env["rack.early_hints"](value);
       return [200, {}, []];
     });
-    return () => app.call(env({ "rack.early_hints": () => {} }));
+    return () => app.call(env({ "rack.early_hints": () => {}, ...extraEnv }));
   };
   const message = async (p: Promise<unknown>) => ((await p.catch((e) => e)) as Error).message;
 
-  let p = app(new (class Object {})())();
+  let p = app({}, { "rack.early_hints": new (class Object {})() })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("rack.early_hints must respond to call");
+
+  p = app(new (class Object {})())();
   await expect(p).rejects.toThrow(LintError);
   expect(await message(p)).toBe(
     "headers object should be a hash, but isn't (got Object as headers)",
@@ -554,6 +583,20 @@ it("responds to to_path", async () => {
   expect(lintBody.toPath()).toBe(import.meta.url);
 });
 
+it("handles body.to_path returning nil", async () => {
+  let body: any = {
+    each() {},
+    toPath() {
+      return null;
+    },
+  };
+  const app: RackApp = async () => [200, {}, body];
+
+  body = (await new Lint(app).call(env({})))[2];
+  expect(body).toRespondTo("toPath");
+  expect(body.toPath()).toBeNull();
+});
+
 it("notice body errors", async () => {
   const bodyOf = async (body: unknown, contentLength: string) =>
     (
@@ -587,7 +630,15 @@ it("notice body errors", async () => {
     body.each((_part: string) => {});
   })();
   await expect(p).rejects.toThrow(LintError);
-  expect(await message(p)).toBe("Response body must only be invoked once (each)");
+  expect(await message(p)).toBe("Response body must only be called once (each)");
+
+  p = (async () => {
+    const body = await bodyOf([], "0");
+    body.close();
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Response body is already closed");
 
   const stackedLint = (app: RackApp, block: (body: any) => any) =>
     new Lint(async (env) => {
@@ -702,7 +753,20 @@ it("notice body errors", async () => {
     body.each((_part: string) => {});
   })();
   await expect(p).rejects.toThrow(LintError);
-  expect(await message(p)).toBe("The file identified by body.to_path does not exist");
+  expect(await message(p)).toBe("body.to_path must be nil or a path to an existing file");
+
+  p = (async () => {
+    const toPath = {
+      each() {},
+      toPath() {
+        return false;
+      },
+    };
+    const body = await bodyOf(toPath, "0");
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("body.to_path must be nil or a path to an existing file");
 
   p = (async () => {
     const body = await bodyOf(new (class Object {})(), "0");
@@ -717,7 +781,15 @@ it("notice body errors", async () => {
     body.call(null);
   })();
   await expect(p).rejects.toThrow(LintError);
-  expect(await message(p)).toBe("Response body must only be invoked once (call)");
+  expect(await message(p)).toBe("Response body must only be called once (call)");
+
+  p = (async () => {
+    const body = await bodyOf(() => {}, "0");
+    body.close();
+    body.call(new StringIO());
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Response body is already closed");
 
   p = (async () => {
     const body = await bodyOf({ call() {} }, "0");
@@ -913,6 +985,81 @@ it("notices when request env doesn't have a valid rack.hijack callback", async (
   expect((await p.catch((e) => e)).message).toMatch(/rack.hijack must respond to call/);
 });
 
+it("handles valid rack.hijack env", async () => {
+  let s: File | null = null;
+  try {
+    let hijackCalled = false;
+    s = File.open(import.meta.filename, "rb");
+    const e = env({
+      "rack.hijack": () => {
+        hijackCalled = true;
+        return s;
+      },
+    });
+    await new Lint(async () => [
+      201,
+      { "content-type": "text/plain", "content-length": "0" },
+      [],
+    ]).call(e);
+    expect(hijackCalled).toBe(false);
+    expect(e["rack.hijack"]()).toBe(s);
+    expect(hijackCalled).toBe(true);
+  } finally {
+    s?.close();
+  }
+});
+
+it("notices when rack.hijack env entry does not respond to #call", async () => {
+  const p = new Lint(async () => [
+    201,
+    { "content-type": "text/plain", "content-length": "0" },
+    [],
+  ]).call(env({ "rack.hijack": new (class Object {})() }));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe("rack.hijack must respond to call");
+});
+
+it("notices when rack.hijack env entry does not return an IO", async () => {
+  const e = env({ "rack.hijack": () => new (class Object {})() });
+  await new Lint(async () => [
+    201,
+    { "content-type": "text/plain", "content-length": "0" },
+    [],
+  ]).call(e);
+  expect(() => e["rack.hijack"]()).toThrowError(LintError);
+  expect(() => e["rack.hijack"]()).toThrowError("rack.hijack must return an IO instance");
+});
+
+it("handles valid rack.hijack response header", async () => {
+  let hijackCalled = false;
+  const res = await new Lint(async () => [
+    201,
+    {
+      "content-type": "text/plain",
+      "content-length": "0",
+      "rack.hijack": (io: any) => {
+        hijackCalled = true;
+        io.write("1");
+      },
+    },
+    [],
+  ]).call(env({ "rack.hijack?": true }));
+  expect(hijackCalled).toBe(false);
+  const s = new StringIO();
+  res[1]["rack.hijack"](s);
+  s.rewind();
+  expect(s.read()).toBe("1");
+  expect(hijackCalled).toBe(true);
+});
+
+it("allows non-hijack responses when server supports hijacking", async () => {
+  await new Lint(async () => [
+    201,
+    { "content-type": "text/plain", "content-length": "0" },
+    [],
+  ]).call(env({ "rack.hijack?": true }));
+});
+
 it("notices when the response headers don't have a valid rack.hijack callback", async () => {
   const p = new Lint(async () => [
     201,
@@ -925,6 +1072,22 @@ it("notices when the response headers don't have a valid rack.hijack callback", 
   ]).call(env({ "rack.hijack?": true }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("rack.hijack header must respond to #call");
+});
+
+it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
+  const p = new Lint(async () => [
+    201,
+    {
+      "content-type": "text/plain",
+      "content-length": "0",
+      "rack.hijack": new (class Object {})() as any,
+    },
+    [],
+  ]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe(
+    "rack.hijack header must not be present if server does not support hijacking",
+  );
 });
 
 it("pass valid rack.response_finished", async () => {
@@ -942,6 +1105,14 @@ it("pass valid rack.response_finished", async () => {
       )
     )[0],
   ).toBe(200);
+});
+
+it("notices when the response protocol is not an array of strings", async () => {
+  const app = new Lint(async () => [101, { "rack.protocol": "websocket" }, ["foo"]]);
+
+  const p = app.call(env({ "rack.protocol": "websocket" }));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe("rack.protocol must be an Array of Strings");
 });
 
 it("notices when the response protocol is specified in the response but not in the request", async () => {
