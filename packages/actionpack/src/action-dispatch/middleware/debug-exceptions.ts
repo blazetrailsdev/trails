@@ -248,7 +248,7 @@ export class DebugExceptions {
 
     let body: string;
     let format: string;
-    if (request.xhr) {
+    if (request.isXhr()) {
       body = String(await template.render({ template: file, layout: false, formats: [":text"] }));
       format = "text/plain";
     } else {

@@ -455,7 +455,7 @@ class TestController extends Base {
       case "layoutOverridingLayout":
         return "layouts/talk_from_action";
       case "renderImplicitHtmlTemplateFromXhrRequest":
-        return this.request.xhr ? "layouts/xhr" : "layouts/standard";
+        return this.request.isXhr() ? "layouts/xhr" : "layouts/standard";
     }
   }
 }
@@ -543,8 +543,7 @@ describe("ExpiresInRenderTest", () => {
     ).rejects.toThrow(MissingTemplate);
   });
 
-  // BLOCKED: render-permitted-parameters-are-not-read-as-the-options-hash
-  it.skip("permitted dynamic render file hash", async () => {
+  it("permitted dynamic render file hash", async () => {
     expect(
       await File.isExistAsync(
         File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),

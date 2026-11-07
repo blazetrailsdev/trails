@@ -899,10 +899,10 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
 
   it("figure out if called via XHR", () => {
     let req = makeRequest(MockRequest.envFor(""));
-    expect(req.xhr).toBeFalsy();
+    expect(req.isXhr()).toBeFalsy();
 
     req = makeRequest(MockRequest.envFor("", { HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }));
-    expect(req.xhr).toBeTruthy();
+    expect(req.isXhr()).toBeTruthy();
   });
 
   it("ssl detection", () => {

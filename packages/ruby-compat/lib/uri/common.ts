@@ -2,7 +2,7 @@ import { TopLevel } from "../object.js";
 import { ArgumentError } from "../argument-error.js";
 import { Encoding } from "../encoding.js";
 import { rbObjClone, constSet } from "../include.js";
-import { bytes } from "../string/bytes.js";
+import { bytes, strNew } from "../string/bytes.js";
 import { encode } from "../string/encode.js";
 import { forceEncoding, rbObjEncoding } from "../string/force-encoding.js";
 
@@ -269,6 +269,33 @@ export class URI {
       b += String.fromCharCode(byte);
     }
     return b.replace(regexp, (c) => table[c]);
+  }
+
+  /**
+   * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`).
+   * `enc` is accepted for Ruby's signature; the result is always the UTF-8 arm,
+   * since a JS string has no encoding tag (CLAUDE.md, "A String has no encoding
+   * tag either").
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
+   * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370`).
+   */
+  static decodeWwwFormComponent(str: string, enc: Encoding = Encoding.UTF_8): string {
+    return URI._decodeUriComponent(/\+|%[0-9a-fA-F]{2}/g, str, enc);
+  }
+
+  /**
+   * `URI._decode_uri_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:399-402`),
+   * private in MRI. `str.b` is the String's bytes one character per byte; the
+   * `force_encoding` is its UTF-8 arm (CLAUDE.md, "A String has no encoding tag
+   * either"), so a byte that is not well-formed UTF-8 is carried, not raised on.
+   */
+  private static _decodeUriComponent(regexp: RegExp, str: string, _enc: Encoding): string {
+    if (/%(?![0-9a-fA-F]{2})/.test(str)) throw new ArgumentError(`invalid %-encoding (${str})`);
+    let b = "";
+    for (const byte of bytes(str)) b += String.fromCharCode(byte);
+    const decoded = b.replace(regexp, (c) => TBLDECWWWCOMP_[c]);
+    return strNew(Array.from(decoded, (c) => c.charCodeAt(0)));
   }
 
   /**

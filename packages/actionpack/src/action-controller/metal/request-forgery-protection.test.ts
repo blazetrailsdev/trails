@@ -43,6 +43,7 @@ const methods = requestForgeryProtection as unknown as Omit<CsrfController, "req
 
 const verbs = {
   path: "/",
+  isXhr: () => false,
   requestMethod: "POST",
   isGet(this: { method: string }): boolean {
     return this.method === "GET";
@@ -190,7 +191,7 @@ describe("isNonXhrJavascriptResponse", () => {
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
-            xhr: true,
+            isXhr: () => true,
           },
         }),
       ),

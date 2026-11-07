@@ -894,7 +894,7 @@ describe("RequestFormat", () => {
       QUERY_STRING: "",
     });
 
-    assertPredicate(request, (r) => r.xhr);
+    assertPredicate(request, (r) => r.isXhr());
     assertEqual(Mime.get(":js")!, request.format());
   });
 
@@ -1052,15 +1052,15 @@ describe("RequestProtocol", () => {
     let request = await stubRequest();
 
     assertNotPredicate(request, (r) => r.isXmlHttpRequest);
-    assertNotPredicate(request, (r) => r.xhr);
+    assertNotPredicate(request, (r) => r.isXhr());
 
     request = await stubRequest({ HTTP_X_REQUESTED_WITH: "DefinitelyNotAjax1.0" });
     assertNotPredicate(request, (r) => r.isXmlHttpRequest);
-    assertNotPredicate(request, (r) => r.xhr);
+    assertNotPredicate(request, (r) => r.isXhr());
 
     request = await stubRequest({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" });
     assertPredicate(request, (r) => r.isXmlHttpRequest);
-    assertPredicate(request, (r) => r.xhr);
+    assertPredicate(request, (r) => r.isXhr());
   });
 });
 

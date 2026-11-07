@@ -48,7 +48,7 @@ class PostController extends AbstractPostController {
   }
 
   private async withIphone(block: () => Promise<void>): Promise<void> {
-    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.format = "iphone";
     await block();
   }
 }

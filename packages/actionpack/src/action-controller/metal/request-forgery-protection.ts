@@ -339,7 +339,7 @@ export interface CsrfRequest {
   path: string;
   requestMethod: string;
   mediaType?: string | null;
-  xhr?: boolean;
+  isXhr(): boolean;
   xCsrfToken?: string | null;
   env?: Record<string, unknown>;
   session?: {
@@ -452,7 +452,7 @@ export function isMarkedForSameOriginVerification(this: CsrfController): boolean
 
 /** @internal */
 export function isNonXhrJavascriptResponse(this: CsrfController): boolean {
-  return /^(?:text|application)\/javascript/.test(this.mediaType ?? "") && !this.request.xhr;
+  return /^(?:text|application)\/javascript/.test(this.mediaType ?? "") && !this.request.isXhr();
 }
 
 /** @internal */

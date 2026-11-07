@@ -66,7 +66,7 @@ class RespondToController extends Base {
   }
 
   async forcedXml(): Promise<void> {
-    this.request.setFormat("xml");
+    this.request.format = "xml";
 
     await this.respondTo((type) => {
       type.html(() => this.render({ body: "HTML" }));
@@ -195,7 +195,7 @@ class RespondToController extends Base {
   }
 
   async iphoneWithHtmlResponseType(): Promise<void> {
-    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.format = "iphone";
 
     await this.respondTo((type) => {
       type.html(() => {
@@ -208,7 +208,7 @@ class RespondToController extends Base {
   }
 
   async iphoneWithHtmlResponseTypeWithoutLayout(): Promise<void> {
-    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.format = "iphone";
 
     await this.respondTo((type) => {
       type.html(() => {

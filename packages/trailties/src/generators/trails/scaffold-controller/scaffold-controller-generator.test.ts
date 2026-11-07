@@ -383,13 +383,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
       assertMatch(/it\("should get index"/, content);
       assertMatch(
         new RegExp(
-          `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: "json" \\}\\)`,
+          `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: ":json" \\}\\)`,
         ),
         content,
       );
       assertMatch(
         new RegExp(
-          `t\\.patch\\(t\\.userUrl\\(t\\["@user"\\]\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: "json" \\}\\)`,
+          `t\\.patch\\(t\\.userUrl\\(t\\["@user"\\]\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: ":json" \\}\\)`,
         ),
         content,
       );

@@ -1,4 +1,4 @@
-import { block, deleteIf, fetch, hashReplace, KeyError } from "@blazetrails/ruby-compat";
+import { block, deleteIf, fetch, hashReplace, KeyError, rbModName } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 /** @noRailsEquivalent PERMANENT */
@@ -282,9 +282,9 @@ export class Session {
 
   inspect(): string {
     if (this.isLoaded()) {
-      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
+      return `#<${rbModName(this.constructor)}:0x${objectIdHex(this)}>`;
     } else {
-      return `#<${this.constructor.name}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rbModName(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 

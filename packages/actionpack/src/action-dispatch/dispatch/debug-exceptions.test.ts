@@ -340,38 +340,38 @@ describe("DebugExceptionsTest", () => {
     t.app = ApiApp;
     const headers = { "action_dispatch.show_exceptions": "all" };
 
-    await t.get("/", { headers, as: "json" });
+    await t.get("/", { headers, as: ":json" });
     t.assertResponse(500);
     assertNoMatch(/<header>/, body());
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
     assertMatch(/RuntimeError: puke/, body());
 
-    await t.get("/not_found", { headers, as: "json" });
+    await t.get("/not_found", { headers, as: ":json" });
     t.assertResponse(404);
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
     assertMatch(new RegExp(ActionNotFound.name), body());
 
-    await t.get("/method_not_allowed", { headers, as: "json" });
+    await t.get("/method_not_allowed", { headers, as: ":json" });
     t.assertResponse(405);
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
     assertMatch(/ActionController::MethodNotAllowed/, body());
 
-    await t.get("/unknown_http_method", { headers, as: "json" });
+    await t.get("/unknown_http_method", { headers, as: ":json" });
     t.assertResponse(405);
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
     assertMatch(/ActionController::UnknownHttpMethod/, body());
 
-    await t.get("/bad_request", { headers, as: "json" });
+    await t.get("/bad_request", { headers, as: ":json" });
     t.assertResponse(400);
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
     assertMatch(/ActionController::BadRequest/, body());
 
-    await t.get("/parameter_missing", { headers, as: "json" });
+    await t.get("/parameter_missing", { headers, as: ":json" });
     t.assertResponse(400);
     assertNoMatch(/<body>/, body());
     assertEqual("application/json", t.response.mediaType);
@@ -379,7 +379,7 @@ describe("DebugExceptionsTest", () => {
 
     await t.get("/invalid_mimetype", {
       headers: { Accept: "text/html,*", "action_dispatch.show_exceptions": "all" },
-      as: "json",
+      as: ":json",
     });
     t.assertResponse(406);
     assertNoMatch(/<body>/, body());
@@ -427,7 +427,7 @@ describe("DebugExceptionsTest", () => {
     try {
       MimeType.register("text/wibble", ":wibble");
 
-      IntegrationTest.registerEncoder("wibble", {
+      IntegrationTest.registerEncoder(":wibble", {
         paramEncoder: (params: unknown) => params,
       });
 
@@ -435,7 +435,7 @@ describe("DebugExceptionsTest", () => {
 
       await t.get("/index", {
         headers: { "action_dispatch.show_exceptions": "all" },
-        as: "wibble",
+        as: ":wibble",
       });
       t.assertResponse(500);
       assertEqual("application/json", t.response.mediaType);

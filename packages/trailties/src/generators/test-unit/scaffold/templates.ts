@@ -87,31 +87,31 @@ const apiFunctionalTest: Template = function () {
   return `${preamble}
 describe("${testPath}", () => {
   it("should get index", async ({ testCase: t }) => {
-    await t.get(t.${this.indexHelper()}Url(), { as: "json" });
+    await t.get(t.${this.indexHelper()}Url(), { as: ":json" });
     t.assertResponse("success");
   });
 
   it("should create ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), async () => {
-      await t.post(t.${this.indexHelper()}Url(), { params: { ${singular}: ${this.attributesString()} }, as: "json" });
+      await t.post(t.${this.indexHelper()}Url(), { params: { ${singular}: ${this.attributesString()} }, as: ":json" });
     });
 
     t.assertResponse("created");
   });
 
   it("should show ${singular}", async ({ testCase: t }) => {
-    await t.get(t.${this.showHelper(record)}, { as: "json" });
+    await t.get(t.${this.showHelper(record)}, { as: ":json" });
     t.assertResponse("success");
   });
 
   it("should update ${singular}", async ({ testCase: t }) => {
-    await t.patch(t.${this.showHelper(record)}, { params: { ${singular}: ${this.attributesString()} }, as: "json" });
+    await t.patch(t.${this.showHelper(record)}, { params: { ${singular}: ${this.attributesString()} }, as: ":json" });
     t.assertResponse("success");
   });
 
   it("should destroy ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), -1, async () => {
-      await t.delete(t.${this.showHelper(record)}, { as: "json" });
+      await t.delete(t.${this.showHelper(record)}, { as: ":json" });
     });
 
     t.assertResponse("no_content");

@@ -172,7 +172,7 @@ export class DefaultResponseApp {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const request = new Request(env);
-    const format = request.xhr ? "text/plain" : "text/html";
+    const format = request.isXhr() ? "text/plain" : "text/html";
     this.logError(request);
     return this.response(format, String(await this.responseBody(request)));
   }

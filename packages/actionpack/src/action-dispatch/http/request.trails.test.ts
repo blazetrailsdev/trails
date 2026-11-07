@@ -49,8 +49,7 @@ describe("Request ENV_METHODS readers", () => {
 describe("Request include MimeNegotiation", () => {
   it("keeps its own format / formats / variant readers beside the module's writers", () => {
     expect(typeof Request.prototype.format).toBe("function");
-    expect(typeof Request.prototype.setFormat).toBe("function");
-    for (const name of ["formats", "variant"]) {
+    for (const name of ["format", "formats", "variant"]) {
       const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
       expect(typeof descriptor?.get).toBe("function");
       expect(typeof descriptor?.set).toBe("function");
@@ -119,5 +118,16 @@ describe("Cache::Request.strict_freshness", () => {
     } finally {
       CacheRequest.strictFreshness = old;
     }
+  });
+});
+
+describe("Request#inspect", () => {
+  it("renders the receiver's own class name", () => {
+    class CustomRequest extends Request {}
+    const req = new CustomRequest({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
+    expect(req.inspect()).toMatch(/^#<CustomRequest GET /);
+    expect(new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/" }).inspect()).toMatch(
+      /^#<ActionDispatch::Request GET /,
+    );
   });
 });

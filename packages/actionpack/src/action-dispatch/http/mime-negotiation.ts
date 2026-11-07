@@ -16,7 +16,7 @@ export interface MimeNegotiationHost {
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   parameters: Record<string, unknown>;
   accept: string | undefined;
-  xhr: boolean;
+  isXhr(): boolean;
 }
 
 export class MimeNegotiation {
@@ -40,6 +40,17 @@ export class MimeNegotiation {
     }
     this._variant = new ArrayInquirer<string>(...arr) as ArrayInquirer<string> &
       Record<string, () => boolean>;
+  }
+
+  get format(): (_viewPath?: unknown) => MimeType | NullType {
+    return format;
+  }
+
+  set format(extension: unknown) {
+    this.parameters["format"] = extension == null ? "" : String(extension);
+    this.setHeader("action_dispatch.request.formats", [
+      MimeType.lookupByExtension(this.parameters["format"] as string),
+    ]);
   }
 
   get formats(): MimeType[] {
@@ -90,13 +101,6 @@ export function accepts(this: MimeNegotiationHost): MimeType[] {
   }) as MimeType[];
 }
 
-export function setFormat(this: MimeNegotiationHost, extension: unknown): void {
-  this.parameters["format"] = extension == null ? "" : String(extension);
-  this.setHeader("action_dispatch.request.formats", [
-    MimeType.lookupByExtension(this.parameters["format"] as string),
-  ]);
-}
-
 export function format(this: MimeNegotiationHost, _viewPath?: unknown): MimeType | NullType {
   return formats.call(this)[0] ?? NullType.instance;
 }
@@ -113,7 +117,7 @@ export function formats(this: MimeNegotiationHost): MimeType[] {
       v = [...accepts.call(this)];
     } else if ((extType = formatFromPathExtension.call(this))) {
       v = [extType];
-    } else if (this.xhr) {
+    } else if (this.isXhr()) {
       const js = MimeType.lookupByExtension("js");
       v = js ? [js] : [];
     } else {
@@ -171,7 +175,7 @@ export function validAcceptHeader(this: MimeNegotiationHost): boolean {
   const a = this.accept;
   const present = a != null && a !== "";
   return (
-    (this.xhr && (present || contentMimeType.call(this) != null)) ||
+    (this.isXhr() && (present || contentMimeType.call(this) != null)) ||
     (present && !BROWSER_LIKE_ACCEPTS.test(a))
   );
 }

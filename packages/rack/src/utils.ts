@@ -18,6 +18,7 @@ import {
   Process,
   RFC2396_PARSER,
   URI,
+  Encoding,
   isSymbol,
   rbInspect,
   stringToSym,
@@ -85,8 +86,8 @@ export function unescapePath(s: string): string {
   return URI_PARSER.unescape(s);
 }
 
-export function unescape(s: string): string {
-  return decodeURIComponent(s.replace(/\+/g, " "));
+export function unescape(s: string, encoding: Encoding = Encoding.UTF_8): string {
+  return URI.decodeWwwFormComponent(s, encoding);
 }
 
 export function parseQuery(qs: string, d?: string): Record<string, string | string[] | null> {
@@ -285,12 +286,14 @@ export function setCookieHeader(
 
   if (typeof value === "object" && !Array.isArray(value)) {
     if (value.escapeKey !== false) key = escapeCookieKey(key);
-    if (value.domain) domain = `; domain=${value.domain}`;
-    if (value.path) path = `; path=${value.path}`;
-    if (value.maxAge !== undefined) maxAge = `; max-age=${value.maxAge}`;
-    if (value.expires) expires = `; expires=${httpDate(value.expires)}`;
-    if (value.secure) secure = "; secure";
-    if ("httponly" in value ? value.httponly : value.httpOnly) httponly = "; httponly";
+    if (value.domain != null && value.domain !== false) domain = `; domain=${value.domain}`;
+    if (value.path != null && value.path !== false) path = `; path=${value.path}`;
+    if (value.maxAge != null && value.maxAge !== false) maxAge = `; max-age=${value.maxAge}`;
+    if (value.expires != null && value.expires !== false)
+      expires = `; expires=${httpDate(value.expires)}`;
+    if (value.secure != null && value.secure !== false) secure = "; secure";
+    const httponlyValue = "httponly" in value ? value.httponly : value.httpOnly;
+    if (httponlyValue != null && httponlyValue !== false) httponly = "; httponly";
     if (value.sameSite !== undefined && value.sameSite !== false && value.sameSite !== null) {
       const ss = value.sameSite;
       if (ss === ":none" || ss === "None" || ss === ":None") sameSite = "; samesite=none";
@@ -299,7 +302,7 @@ export function setCookieHeader(
         sameSite = "; samesite=strict";
       else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
-    if (value.partitioned) partitioned = "; partitioned";
+    if (value.partitioned != null && value.partitioned !== false) partitioned = "; partitioned";
     value = value.value;
   } else {
     key = escapeCookieKey(key);

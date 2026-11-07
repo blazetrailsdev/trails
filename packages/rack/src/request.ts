@@ -335,7 +335,7 @@ export abstract class Helpers {
     return contentType == null || contentType === "" ? null : contentType;
   }
 
-  get xhr(): boolean {
+  isXhr(): boolean {
     return (this.getHeader("HTTP_X_REQUESTED_WITH") || "").toLowerCase() === "xmlhttprequest";
   }
 
