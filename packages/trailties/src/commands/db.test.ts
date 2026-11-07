@@ -2786,6 +2786,42 @@ export class CreateOwners extends Migration.Current {
     },
   );
 
+  it.skipIf(!pgLane)(
+    "db migrate creates an absent Postgres database and runs its migrations",
+    async () => {
+      const dbName = `trails_db_absent_${process.pid}`;
+      fs.writeFileSync(
+        path.join(tmpDir, "config", "database.ts"),
+        `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb())} },
+    hub: { url: ${JSON.stringify(pgUrl(dbName))}, migrationsPaths: "db/migrate_hub" },
+  },
+};`,
+      );
+      fs.mkdirSync(path.join(tmpDir, "db", "migrate_hub"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "db", "migrate_hub", "20260101000003_create_hub_owners.ts"),
+        `import { Migration } from "@blazetrails/activerecord";
+export class CreateHubOwners extends Migration.Current {
+  async up() { await this.createTable("hub_owners", (t) => { t.string("login"); }); }
+  async down() { await this.dropTable("hub_owners"); }
+}`,
+      );
+      await runTask("db:drop");
+      stdout = "";
+      logs.length = 0;
+
+      await runTask("db:migrate");
+
+      expect(stdout).toMatch(/== 20260101000003 CreateHubOwners: migrated/);
+      expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
+      expect(`${stdout}${logs.join("\n")}`).not.toContain("Loaded schema from");
+      await runTask("db:drop");
+      expect(process.exitCode ?? 0).toBe(0);
+    },
+  );
+
   it("db drop drops a SQLite database, which has no maintenance connection", async () => {
     writeTwoDatabaseConfig();
     writeMigrations();
