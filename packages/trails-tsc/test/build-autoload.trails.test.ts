@@ -1,6 +1,6 @@
 import { Dir, File, FileUtils, TopLevel } from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildAutoload } from "../lib/build-autoload.js";
 
 describe("buildAutoload", () => {
@@ -72,7 +72,10 @@ describe("buildAutoload", () => {
       FileUtils.mkdirP("app");
       FileUtils.mkdirP("config");
       File.write("app/widget.ts", 'throw new Error("imported at build time");');
-      File.write("config/application.ts", "export {};\n");
+      File.write(
+        "config/application.ts",
+        "await new Promise((resolve) => setTimeout(resolve));\nglobalThis.__applicationLoaded = true;\nexport {};\n",
+      );
       File.write("config/environment.ts", "export default null;\n");
       const main = new Loader();
       main.tag = "trails.main";
@@ -111,6 +114,29 @@ describe("buildAutoload", () => {
       );
       expect(install).toContain('"trails.main": imports0,');
       expect(install).toContain("loader.imports = byTag[loader.tag]");
+
+      let sawApplication: unknown;
+      vi.doMock("@blazetrails/trailties", () => ({
+        Trails: {
+          autoloaders: {
+            each: (block: (loader: Loader) => void) => {
+              sawApplication = (globalThis as Record<string, unknown>).__applicationLoaded;
+              block(main);
+            },
+          },
+        },
+      }));
+      const globals = globalThis as Record<string, unknown>;
+      delete globals.__applicationLoaded;
+      vi.resetModules();
+      try {
+        await import(File.expandPath(".trails/autoload/install.generated.js"));
+        expect(sawApplication).toBe(true);
+        expect(Object.keys(main.imports!)).toEqual(["Widget"]);
+      } finally {
+        vi.doUnmock("@blazetrails/trailties");
+        delete globals.__applicationLoaded;
+      }
     } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);

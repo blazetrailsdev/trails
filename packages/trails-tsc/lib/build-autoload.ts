@@ -22,7 +22,7 @@ interface BootApplication {
 export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}): Promise<string[]> {
   let applicationFile: string | undefined;
   for (const ext of ["ts", "js"]) {
-    const application = File.join(cwd, `config/application.${ext}`);
+    const application = File.expandPath(`config/application.${ext}`, cwd);
     if (await File.isExistAsync(application)) {
       applicationFile = application;
       await import(getPath().pathToFileURL!(application).href);
@@ -32,8 +32,9 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
 
   const trails = (TopLevel as { Trails?: { application?: BootApplication | null } }).Trails;
   const application = trails?.application;
+  let loaders: BootLoader[] = [];
   if (application != null) {
-    const loaders = [application.autoloaders?.once, application.autoloaders?.main].filter(
+    loaders = [application.autoloaders?.once, application.autoloaders?.main].filter(
       (loader): loader is BootLoader => loader != null,
     );
     const own = loaders.map((loader) => Object.getOwnPropertyDescriptors(loader));
@@ -61,24 +62,30 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     loader.manifestRoot ??= root;
     const dir = await writeArtifacts(loader);
     dirs.push(dir);
-    tagged.push([loader.tag, dir]);
+    if (loaders.includes(loader)) tagged.push([loader.tag, dir]);
   }
   if (application != null && applicationFile !== undefined) {
-    await writeEntry(File.expandPath(".trails", root), applicationFile, tagged);
+    const environmentFile = File.join(
+      File.dirname(applicationFile),
+      `environment${File.extname(applicationFile)}`,
+    );
+    if (await File.isExistAsync(environmentFile)) {
+      await writeEntry(File.expandPath(".trails", root), applicationFile, environmentFile, tagged);
+    }
   }
   return dirs;
-}
-
-function specifier(from: string, to: string): string {
-  const relative = getPath().relative!(from, to);
-  return relative.startsWith(".") ? relative : `./${relative}`;
 }
 
 async function writeEntry(
   trailsDir: string,
   applicationFile: string,
+  environmentFile: string,
   tagged: [string, string][],
 ): Promise<void> {
+  const specifier = (from: string, to: string) => {
+    const relative = getPath().relative!(from, to);
+    return relative.startsWith(".") ? relative : `./${relative}`;
+  };
   const autoloadDir = File.join(trailsDir, "autoload");
   const imports = tagged.map(
     ([, dir], i) =>
@@ -97,10 +104,6 @@ async function writeEntry(
     "});",
     "",
   ].join("\n");
-  const environmentFile = File.join(
-    File.dirname(applicationFile),
-    `environment${File.extname(applicationFile)}`,
-  );
   const entry = [
     'import "./autoload/install.generated.js";',
     `export { default } from ${JSON.stringify(specifier(trailsDir, environmentFile))};`,
