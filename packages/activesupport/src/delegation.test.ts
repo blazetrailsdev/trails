@@ -279,4 +279,38 @@ describe("Delegation.generateMethodMissing", () => {
     expect(obj.name).toBe("David");
     expect(rbObjRespondTo(obj, "name")).toBe(true);
   });
+
+  it("answers super's respond_to_missing? without reading through a parent layer", () => {
+    class Outer {
+      get outer() {
+        return { fromOuter: () => 1 };
+      }
+    }
+    Delegation.generateMethodMissing(Outer, "outer");
+    class Inner extends Outer {
+      get inner() {
+        return { fromInner: () => 2 };
+      }
+    }
+    Delegation.generateMethodMissing(Inner, "inner");
+    const inner = new Inner() as any;
+    expect(rbObjRespondTo(inner, "fromInner")).toBe(true);
+    expect(rbObjRespondTo(inner, "fromOuter")).toBe(true);
+    expect(rbObjRespondTo(inner, "neither")).toBe(false);
+    expect(inner.fromOuter()).toBe(1);
+  });
+
+  it("replaces the layer when delegate_missing_to is called again", () => {
+    const obj = host({ first: { a: () => "first" }, second: { a: () => "second" } } as never);
+    Delegation.generateMethodMissing(obj.constructor, "second");
+    expect(obj.a()).toBe("second");
+    expect(rbObjRespondTo(obj, "a")).toBe(true);
+    const layer = Object.getPrototypeOf(Object.getPrototypeOf(obj));
+    expect(Object.getPrototypeOf(layer)).toBe(Object.prototype);
+  });
+
+  it("forwards a method nil answers to nil", () => {
+    const obj = host({ delegate: null });
+    expect(rbObjRespondTo(obj, "inspect")).toBe(rbObjRespondTo(null, "inspect"));
+  });
 });
