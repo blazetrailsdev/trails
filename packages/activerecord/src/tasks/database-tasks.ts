@@ -791,8 +791,10 @@ export class DatabaseTasks {
     return hash.digest("hex");
   }
 
-  static setupInitialDatabaseYaml(): RawConfigurations {
-    return {};
+  static async setupInitialDatabaseYaml(): Promise<RawConfigurations> {
+    if (TopLevel.Trails === undefined) return {};
+
+    return (await TopLevel.Trails.application!.config.loadDatabaseYaml()) as RawConfigurations;
   }
 
   static forEach(databases: RawConfigurations | HashConfig[], fn: (name: string) => void): void {

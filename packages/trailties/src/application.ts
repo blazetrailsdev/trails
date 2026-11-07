@@ -156,6 +156,9 @@ export class Application extends Engine {
     this._config = newCfg;
     return newCfg;
   }
+  set config(configuration: Configuration) {
+    this._config = configuration;
+  }
 
   get deprecators(): Deprecators {
     if (!this._deprecators) {

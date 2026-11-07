@@ -23,6 +23,7 @@ import { EngineConfiguration } from "../engine/configuration.js";
 import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
+import { DummyConfig } from "./dummy-config.js";
 
 export interface PublicFileServer {
   enabled: boolean;
@@ -558,6 +559,7 @@ export class Configuration extends EngineConfiguration {
 
   override paths(): Root {
     const paths = super.paths();
+    if (!paths.get("config/database")) paths.add("config/database", { with: "config/database.ts" });
     if (!paths.get("config/environment"))
       paths.add("config/environment", { with: "config/environment.ts" });
     if (!paths.get("lib/templates")) paths.add("lib/templates");
@@ -566,6 +568,28 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("public/javascripts")) paths.add("public/javascripts");
     if (!paths.get("public/stylesheets")) paths.add("public/stylesheets");
     return paths;
+  }
+
+  /** @missingRailsCall parse — PERMANENT */
+  async loadDatabaseYaml(): Promise<Record<string, unknown>> {
+    let path: string | undefined;
+    if ((path = (await this.paths().get("config/database")!.existent())[0]) !== undefined) {
+      const originalRailsConfig = Trails.application!.config;
+
+      try {
+        Trails.application!.config = new DummyConfig(
+          originalRailsConfig,
+        ) as unknown as Configuration;
+        const mod = (await import(
+          `${getPath().pathToFileURL!(path).href}?loadDatabaseYaml=${Date.now()}`
+        )) as { default?: unknown };
+        return (mod.default ?? mod) as Record<string, unknown>;
+      } finally {
+        Trails.application!.config = originalRailsConfig;
+      }
+    } else {
+      return {};
+    }
   }
 
   async defaultLogFile(): Promise<File> {

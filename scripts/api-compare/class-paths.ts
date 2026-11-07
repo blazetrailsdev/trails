@@ -660,6 +660,27 @@ function renamedKey(key: string): string {
 }
 
 /**
+ * The Ruby classes defined at top level (`class DummyConfig`,
+ * `railties/lib/rails/application/dummy_config.rb:3`). A TS class of the same
+ * name needs no table row, since its JS name is already its Ruby path, so its
+ * exclusion is not new surface.
+ */
+async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
+  const ruby = await readJson<Manifest>("rails-api.json").catch(() => null);
+  const out = new Set<string>();
+  for (const [pkg, rubyPkg] of Object.entries(ruby?.packages ?? {})) {
+    if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;
+    const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
+    const subDir = path.relative(srcRoot, packageSrcDir(pkg));
+    for (const [fqn, info] of Object.entries(rubyPkg.classes ?? {})) {
+      if (fqn.includes("::") || !info.file) continue;
+      out.add(`${path.join(subDir, rubyFileToTs(info.file, pkg))}::${fqn}`);
+    }
+  }
+  return out;
+}
+
+/**
  * The keys `record` adds to `excluded` over `base` with no receipt. A
  * package new to the record starts from an empty list.
  */
@@ -669,10 +690,12 @@ export async function unreceiptedExclusions(
   base: Record<string, ConstantResidue>,
 ): Promise<string[]> {
   const before = new Set((base[dir]?.excluded ?? []).map(renamedKey));
+  const topLevel = await topLevelRubyConstants(dir);
   const out: string[] = [];
   for (const key of record.excluded) {
     if (before.has(key)) continue;
     const [file, tsName] = splitKey(key);
+    if (topLevel.has(key)) continue;
     const source = await fs.readFile(
       path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
       "utf8",
