@@ -127,8 +127,6 @@ export namespace JSON {
    * `generate_json_object` / `generate_json_array` and `json_object_i`
    * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:837-950`), with the pretty
    * state's defaults (`common.rb:352-355`).
-   *
-   * @noRailsEquivalent PERMANENT
    */
   export function prettyGenerate(
     obj: unknown,
