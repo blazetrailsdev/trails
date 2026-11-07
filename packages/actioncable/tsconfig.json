@@ -7,13 +7,26 @@
   },
   "include": ["lib"],
   "references": [
-    { "path": "../actionpack" },
-    { "path": "../activerecord" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../rack" },
-    { "path": "../rackup" },
-    { "path": "../ruby-compat" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
+    {
+      "path": "../actionpack"
+    },
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../rack"
+    },
+    {
+      "path": "../rackup"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }
