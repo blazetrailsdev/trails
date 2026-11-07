@@ -84,6 +84,7 @@ it("provides access to the HTTP headers", async () => {
 it("provides access to session cookies", async () => {
   const res = await new MockRequest(app).get("");
   const sessionCookie = res.cookie("session_test")!;
+  expect((sessionCookie as any)[0]).toBe("session_test");
   expect(sessionCookie.value[0]).toBe("session_test");
   expect(sessionCookie.domain).toBe("test.com");
   expect(sessionCookie.path).toBe("/");
@@ -223,6 +224,42 @@ it("does not calculate content length for streaming body", () => {
   const res = new MockResponse(200, { "transfer-encoding": "chunked" }, body).toA();
   const headers = res[1];
   expect(Object.hasOwn(headers, "content-length")).toBeFalsy();
+});
+
+it("handles Proc bodies", () => {
+  const headers = { "content-type": "text/event-stream" };
+
+  const body = (stream: StringIO) => {
+    stream.write("Hello, ");
+    stream.write("world!");
+  };
+
+  const response = new MockResponse(200, headers, body);
+
+  expect(response.status).toBe(200);
+  expect(response.headers).toEqual(headers);
+  expect(response.body).toBe("Hello, world!");
+});
+
+it("closes streaming bodies that respond to close", () => {
+  const body = Object.assign(
+    (stream: StringIO) => {
+      stream.write("content");
+    },
+    {
+      _closed: false,
+      close() {
+        this._closed = true;
+      },
+      isClosed() {
+        return this._closed;
+      },
+    },
+  );
+
+  const response = new MockResponse(200, {}, body);
+  expect(response.body).toBe("content");
+  expect(body.isClosed()).toBe(true);
 });
 
 describe("headers", () => {
