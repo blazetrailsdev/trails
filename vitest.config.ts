@@ -746,8 +746,6 @@ export default defineConfig({
           globals: true,
           include: ["packages/et-orbi/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          // determine_local_tzone walks every TZInfo zone cold (~4s locally),
-          // which a loaded CI runner pushes past the 5s default.
           testTimeout: 30_000,
           setupFiles: [
             "./packages/vitest-matchers/lib/setup.ts",
