@@ -8,5 +8,9 @@
   },
   "exclude": [],
   "include": ["src/**/*.test.ts", "src/test-helpers/**/*", "src/**/__fixtures__"],
-  "references": [{ "path": "./tsconfig.json" }, { "path": "../actioncable/tsconfig.test.json" }]
+  "references": [
+    { "path": "./tsconfig.json" },
+    { "path": "../actionmailbox" },
+    { "path": "../actioncable/tsconfig.test.json" }
+  ]
 }

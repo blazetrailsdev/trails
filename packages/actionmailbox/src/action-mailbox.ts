@@ -32,7 +32,7 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
   logger: Logger | null;
   incinerate: boolean;
   incinerateAfter: Duration;
-  queues: Record<string, unknown>;
+  queues: { incineration?: unknown; routing?: unknown };
   storageService: string | null;
 };
 extend(ActionMailbox, Autoload);
