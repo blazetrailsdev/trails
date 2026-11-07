@@ -2351,13 +2351,31 @@ conditions are required:
 Imported function + `.call` works. Alias + direct call works. Only the
 combination fails.
 
-Root cause: `exported_func_has_rest` in `run_pipeline.rs` is keyed off
-function DECLARATIONS (lines 1883, 1964) and off re-export chains (~2580). An
-`export const alias = someFn` is none of those, so the alias name is never
-recorded, `imported_func_has_rest` misses it, and the cross-module `.call`
-site in `extern_func.rs` (`has_rest` at line 1475) does not bundle. The direct
-call path resolves the alias by another route, which is why only `.call` shows
-it.
+**Fixed in perry `c336c1aeb`** (fork branch `wall29-const-alias-rest`, off
+`ladder/perry-native`), with `test-files/test_gap_const_alias_rest_call.ts`.
+
+Root cause: the alias-wrapper fact table in `perry-codegen`'s
+`codegen/artifacts.rs`. HIR records `export const alias = fn` as
+`Export::Named { local: alias, exported: alias }` plus an `exported_functions`
+entry, and `export_value_wrappers.rs` emits a forwarding
+`__perry_wrap_<src>__alias` for every `exported_functions` entry. But the loop
+that gives an alias wrapper its rest / synthetic-`arguments` facts (the
+#5134-followup) only walked RENAMED `Export::Named` entries (`local !=
+exported`). The const alias's wrapper therefore carried no rest index, and a
+consumer that took the alias as a VALUE (`.call`, `.apply`) dispatched
+positionally. A direct call never touches the wrapper, which is why it worked.
+`.apply` was broken identically; the probe never tried it.
+
+The first diagnosis, recorded here and in RECOMMENDED-WORK.md, blamed
+`exported_func_has_rest` in `run_pipeline.rs`. That was wrong: line 1908
+already copies `has_rest` to the alias through `exported_functions`. What
+settled it was `--print-hir` on the 2-module probe, which showed I2 and I4 with
+the IDENTICAL `PropertyGet { ExternFuncRef, "call" }` shape, so the difference
+had to be in what the alias NAME resolves to as a value, not in the call site.
+
+Verified: the 2-module probe matches tsx; `perry-codegen` 2720 passed / 0
+failed / 1 ignored (the baseline); `cattr-mechanism.ts` (385 modules) reads
+`["installed"]` with `M4 true`; `08-serve` compiles in 2103s and serves.
 
 ### Three hypotheses this cost, all killed at 1 module
 
@@ -2381,3 +2399,64 @@ the oracle and the compiler can read different files, which makes a tsx
 comparison meaningless without anything looking wrong. Check the `exports` map
 before trusting a subpath comparison, and rebuild the dist or instrument the
 file the oracle actually loads.
+
+## Wall 30 — `/up` is 404: path-loaded application files are never compiled
+
+With wall 29 fixed, `08-serve` serves:
+
+    [08] env=production port=3178 status=404 len=795
+
+against `status=200 len=73` under `tsx`. `log/production.log` says
+`ActionController::RoutingError (No route matches [GET] "/up")`. The binary has
+no routes at all.
+
+`RoutesReloader#loadPaths` loads `config/routes.ts` with
+`import(pathToFileURL(path).href + "?load=N")`. Perry cannot resolve a runtime
+URL, so it compiles that site to a deferred runtime error, and
+`config/routes.ts` is not among the 1962 modules. The error is reached at boot
+and surfaces nowhere — boot completes and serves an empty route table. That
+silence is a defect of its own, separate from the missing file.
+
+### It is a class, not a routes bug
+
+The compile log lists every deferred site. Of the fifteen, these load the
+APPLICATION's own files by path and are reached by a production boot or
+request:
+
+| Site                                                  | Loads                          |
+| ----------------------------------------------------- | ------------------------------ |
+| `trailties` `application/routes-reloader` `loadPaths` | `config/routes.ts`             |
+| `trailties` `engine` `load_environment_config`        | `config/environments/<env>.ts` |
+| `trailties` `engine` `loadConfigInitializer`          | `config/initializers/*.ts`     |
+| `trailties` `application` `configFor`                 | `config/<name>.ts`             |
+| `trailties` `database`                                | `config/database.ts`           |
+| `trailties` `trailties/action-controller`             | `app/helpers/*`                |
+| `actionpack` `routing/mapper` `drawRoutes`            | `config/routes/<name>.ts`      |
+| `actionview` `template`                               | compiled `.trails/views/*.js`  |
+| `zeitwerk` `core-ext/kernel` `require`                | every autoloaded `app/` file   |
+
+So rung 07's "initializers, autoloading, routes" was never true under perry:
+the environment file, the initializers and every autoloaded constant are
+missing the same way. Nothing failed because each miss is silent.
+
+### Trails already has the mechanism, twice, and wires neither
+
+- `X.loadPath["key"]` registries of literal `() => import("./file")` thunks —
+  `ConnectionAdapters`, `Transformers`, `GlobalID`, `ActiveSupport`,
+  `Handler`. Statically resolvable, which is why none of them shows up above.
+- `trails build` writes `.trails/autoload/<tag>/imports.generated.js`, the same
+  thunk map for every autoloadable constant, and zeitwerk's `require` prefers
+  `loader.imports[cpath]` over `import(url)`. But nothing assigns
+  `loader.imports` — on this branch or on trails `main` (`a7270c9593`) — so the
+  manifest is written and never read.
+
+The fix belongs in trails: one boot manifest that `trails build` emits for an
+application's path-loaded files, keyed by absolute path, imported statically by
+the AOT entry, and consulted by each site above before it falls back to
+`import(url)`. Patching the rung to import `config/routes.ts` statically would
+reach `status=200` and leave every other row broken and still silent.
+
+Probes: `serve-handler.ts` (217 modules, rackup alone) and `serve-booted.ts`
+(1962) both serve under perry, which is what cleared the server, the event loop
+and `fetch`. An early read of a filtered strace blamed an early exit; the
+`[08]` line was there all along, written before the buffered `INIT:` flush.
