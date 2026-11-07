@@ -73,7 +73,7 @@ export class Engine extends TrailsEngine {
         ActionMailbox.incinerate =
           app.config.actionMailbox.incinerate == null ? true : app.config.actionMailbox.incinerate;
         ActionMailbox.incinerateAfter = app.config.actionMailbox.incinerateAfter || days(30);
-        ActionMailbox.queues = (app.config.actionMailbox.queues || {}) as Record<string, unknown>;
+        ActionMailbox.queues = app.config.actionMailbox.queues || {};
         ActionMailbox.ingress = app.config.actionMailbox.ingress ?? null;
         ActionMailbox.storageService = app.config.actionMailbox.storageService ?? null;
       });
