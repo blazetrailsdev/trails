@@ -1,5 +1,14 @@
 import type { ThorClass } from "@blazetrails/thor";
-import { File, included, rbRegSUnion } from "@blazetrails/ruby-compat";
+import {
+  File,
+  STDOUT,
+  env,
+  exit,
+  included,
+  rbRegSUnion,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
+import { presence } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
@@ -796,5 +805,91 @@ export class AppGenerator extends AppBase {
   /** @internal */
   protected getBuilderClass(): new (generator: never) => object {
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
+  }
+}
+
+export class ARGVScrubber {
+  /** @internal */
+  private argv: string[];
+
+  constructor(argv: string[]) {
+    this.argv = argv;
+  }
+
+  async prepareBang(): Promise<string[]> {
+    this.handleVersionRequestBang(this.argv[0]);
+    return this.handleInvalidCommandBang(this.argv[0], this.argv, () =>
+      this.handleRailsRcBang(this.argv.slice(1)),
+    );
+  }
+
+  static async defaultRcFile(): Promise<string> {
+    const xdgConfigHome = presence(env.XDG_CONFIG_HOME) ?? "~/.config";
+    const xdgRailsrc = File.expandPath("trails/railsrc", xdgConfigHome);
+    if (await File.isExistAsync(xdgRailsrc)) {
+      return xdgRailsrc;
+    } else {
+      return File.expandPath("~/.trailsrc");
+    }
+  }
+
+  /** @internal */
+  private handleVersionRequestBang(argument: string | undefined): void {
+    if (["--version", "-v"].includes(argument!)) {
+      STDOUT.puts(`Trails ${VERSION.STRING}`);
+      exit(0);
+    }
+  }
+
+  /** @internal */
+  private async handleInvalidCommandBang(
+    argument: string | undefined,
+    argv: string[],
+    block: () => Promise<string[]>,
+  ): Promise<string[]> {
+    if (argument === "new") {
+      return block();
+    } else {
+      return ["--help", ...argv.slice(1)];
+    }
+  }
+
+  /** @internal */
+  private async handleRailsRcBang(argv: string[]): Promise<string[]> {
+    if (argv.find((arg) => arg === "--no-rc") !== undefined) {
+      return argv.filter((arg) => arg !== "--no-rc");
+    } else {
+      return this.railsrc(argv, (rcArgv, rc) => this.insertRailsrcIntoArgvBang(rcArgv, rc));
+    }
+  }
+
+  /** @internal */
+  private async railsrc(
+    argv: string[],
+    block: (argv: string[], rc: string) => Promise<string[]>,
+  ): Promise<string[]> {
+    const customrc = argv.findIndex((x) => x.includes("--rc="));
+    if (customrc !== -1) {
+      const fname = File.expandPath(argv[customrc].replace(/--rc=/g, ""));
+      return block([...argv.slice(0, customrc), ...argv.slice(customrc + 1)], fname);
+    } else {
+      return block(argv, await (this.constructor as typeof ARGVScrubber).defaultRcFile());
+    }
+  }
+
+  /** @internal */
+  private async readRcFile(railsrc: string): Promise<string[]> {
+    const extraArgs = (await File.readlinesAsync(railsrc)).flatMap((line) =>
+      stringSplit(stringSplit(line, "#", 2)[0]),
+    );
+    STDOUT.puts(`Using ${extraArgs.join(" ")} from ${railsrc}`);
+    return extraArgs;
+  }
+
+  /** @internal */
+  private async insertRailsrcIntoArgvBang(argv: string[], railsrc: string): Promise<string[]> {
+    if (!(await File.isExistAsync(railsrc))) return argv;
+    const extraArgs = await this.readRcFile(railsrc);
+    return [...argv.slice(0, 1), ...extraArgs, ...argv.slice(1)];
   }
 }
