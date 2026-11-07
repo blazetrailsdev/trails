@@ -242,3 +242,21 @@ describe("TZInfo periods read base offsets from tzdata", () => {
     expect(before.equals(after)).toBe(false);
   });
 });
+
+describe("TimeWithZone method_missing in the prototype chain", () => {
+  it("lets a subclass with a #private field construct and forward", () => {
+    class Sub extends TimeWithZone {
+      #tag = "sub";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const twz = new Sub(Temporal.Instant.from("2000-01-01T00:00:00Z"), TimeZone.find("UTC")!);
+    expect(twz.tag()).toBe("sub");
+    expect(twz instanceof Sub).toBe(true);
+    expect(Object.getPrototypeOf(twz)).toBe(Sub.prototype);
+    expect(() => (twz as unknown as { noSuchThing(): unknown }).noSuchThing()).toThrow(
+      /undefined method/,
+    );
+  });
+});

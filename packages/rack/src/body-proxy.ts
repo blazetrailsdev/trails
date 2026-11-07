@@ -9,20 +9,6 @@ export class BodyProxy {
   constructor(body: any, block: () => void) {
     this.body = body;
     this.block = block;
-    return new Proxy(this, {
-      has: (target, prop) =>
-        Reflect.has(target, prop) || (typeof prop === "string" && target.respondToMissing(prop)),
-      get: (target, prop, receiver) => {
-        if (
-          Reflect.has(target, prop) ||
-          typeof prop !== "string" ||
-          !target.respondToMissing(prop)
-        ) {
-          return Reflect.get(target, prop, receiver);
-        }
-        return (...args: unknown[]) => target.methodMissing(prop, ...args);
-      },
-    });
   }
 
   close(): void {
@@ -117,3 +103,20 @@ export class BodyProxy {
 }
 
 Rack.BodyProxy = BodyProxy;
+
+Object.setPrototypeOf(
+  BodyProxy.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(BodyProxy.prototype) as object) as object, {
+    get: (target, prop, receiver: BodyProxy) => {
+      if (
+        Reflect.has(target, prop) ||
+        typeof prop !== "string" ||
+        receiver === BodyProxy.prototype ||
+        !receiver.respondToMissing(prop)
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+    },
+  }),
+);

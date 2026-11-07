@@ -24,19 +24,6 @@ export class TaskArguments {
       if (values[i] == null || values[i] === "") return;
       this._hash[String(name)] = values[i];
     });
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (
-          typeof prop === "symbol" ||
-          prop in target ||
-          PROTOCOL_PROBES.has(prop) ||
-          KERNEL_METHODS.has(prop)
-        ) {
-          return Reflect.get(target, prop, receiver);
-        }
-        return target.methodMissing(prop);
-      },
-    });
   }
 
   toA(): unknown[] {
@@ -118,3 +105,21 @@ export class TaskArguments {
 include(TaskArguments, Enumerable);
 
 export const EMPTY_TASK_ARGS = new TaskArguments([], []);
+
+Object.setPrototypeOf(
+  TaskArguments.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(TaskArguments.prototype) as object) as object, {
+    get(target, prop, receiver: TaskArguments) {
+      if (
+        typeof prop === "symbol" ||
+        prop in target ||
+        PROTOCOL_PROBES.has(prop) ||
+        KERNEL_METHODS.has(prop) ||
+        receiver === TaskArguments.prototype
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      return receiver.methodMissing(prop);
+    },
+  }),
+);

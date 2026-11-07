@@ -130,7 +130,6 @@ export class VariantCollector {
 
   constructor(variant: readonly string[] | null = null) {
     this._variant = variant;
-    return new Proxy(this, VARIANT_COLLECTOR_HANDLER) as this;
   }
 
   any(...args: (string | FormatHandler)[]): void {
@@ -169,12 +168,17 @@ export class VariantCollector {
 
 const RESERVED_KEYS = new Set<string | symbol>(["then", "catch", "finally", "toJSON", "inspect"]);
 
-const VARIANT_COLLECTOR_HANDLER: ProxyHandler<VariantCollector> = {
-  get(target, prop, receiver) {
-    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
-    if (RESERVED_KEYS.has(prop) || typeof prop !== "string") return undefined;
-    return (block?: FormatHandler): void => target.methodMissing(prop, block);
-  },
-};
+Object.setPrototypeOf(
+  VariantCollector.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(VariantCollector.prototype) as object) as object, {
+    get(target, prop, receiver: VariantCollector) {
+      if (Reflect.has(target, prop) || receiver === VariantCollector.prototype) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (RESERVED_KEYS.has(prop) || typeof prop !== "string") return undefined;
+      return (block?: FormatHandler): void => receiver.methodMissing(prop, block);
+    },
+  }),
+);
 
 ActionController.MimeResponds = MimeResponds;

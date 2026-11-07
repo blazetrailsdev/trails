@@ -73,23 +73,6 @@ export class NullPool implements AbstractPool {
 
   declare readonly withConnection: never;
 
-  constructor() {
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (
-          typeof prop === "symbol" ||
-          prop in target ||
-          (KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop))
-        ) {
-          return Reflect.get(target, prop, receiver);
-        }
-        throw new NoMethodError(
-          `undefined method '${prop}' for an instance of ActiveRecord::ConnectionAdapters::NullPool`,
-        );
-      },
-    });
-  }
-
   serverVersion(connection: DatabaseAdapter): unknown {
     if (this._serverVersion != null) return this._serverVersion;
     if (this._serverVersionFetcher !== null && isMonOwned.call(this._serverVersionFetcher.lock)) {
@@ -137,6 +120,25 @@ export class NullPool implements AbstractPool {
     return true;
   }
 }
+
+Object.setPrototypeOf(
+  NullPool.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(NullPool.prototype) as object) as object, {
+    get(target, prop, receiver) {
+      if (
+        typeof prop === "symbol" ||
+        prop in target ||
+        receiver === NullPool.prototype ||
+        (KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop))
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      throw new NoMethodError(
+        `undefined method '${prop}' for an instance of ActiveRecord::ConnectionAdapters::NullPool`,
+      );
+    },
+  }),
+);
 
 export class WeakThreadKeyMap<V> {
   private _map = new Map<Thread | Fiber, V>();

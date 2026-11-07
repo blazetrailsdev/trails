@@ -1,5 +1,5 @@
 import type { RackApp } from "@blazetrails/rack";
-import { hashDelete, Mutex } from "@blazetrails/ruby-compat";
+import { hashAref, hashDelete, Mutex } from "@blazetrails/ruby-compat";
 
 import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,
@@ -68,7 +68,7 @@ export class Pool extends PersistedSecure {
   ): Promise<SessionId | null> {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
-    if (!isTruthy(options["drop"])) return this.generateSid({ useMutex: false });
+    if (!isTruthy(hashAref(options, "drop"))) return this.generateSid({ useMutex: false });
     return null;
   }
 

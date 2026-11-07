@@ -1218,3 +1218,19 @@ describe("execution context at Rails thread-spawn sites", () => {
     expect(a1).not.toBe(b1);
   });
 });
+
+describe("NullPool method_missing in the prototype chain", () => {
+  it("lets a subclass with a #private field construct and still raises on unknown names", () => {
+    class Sub extends NullPool {
+      #tag = "sub";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const pool = new Sub();
+    expect(pool.tag()).toBe("sub");
+    expect(() => (pool as unknown as { anything: unknown }).anything).toThrow(/undefined method/);
+    expect(pool instanceof Sub).toBe(true);
+    expect(Object.getPrototypeOf(pool)).toBe(Sub.prototype);
+  });
+});

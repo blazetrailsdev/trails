@@ -467,7 +467,7 @@ export class Persisted {
     session: PersistedSession,
     options: Record<string, unknown>,
   ): boolean {
-    if (isTruthy(options["skip"])) return false;
+    if (isTruthy(hashAref(options, "skip"))) return false;
     const hasSession =
       this.isLoadedSession(session) || this.isForcedSessionUpdate(session, options);
     return hasSession && this.isSecurityMatches(req, options);
@@ -486,13 +486,13 @@ export class Persisted {
   /** @internal */
   isForceOptions(options: Record<string, unknown>): boolean {
     return ["maxAge", "renew", "drop", "defer", "expireAfter"]
-      .map((key) => options[key])
+      .map((key) => hashAref(options, key))
       .some(isTruthy);
   }
 
   /** @internal */
   isSecurityMatches(request: PersistedRequest, options: Record<string, unknown>): boolean {
-    if (!isTruthy(options["secure"])) return true;
+    if (!isTruthy(hashAref(options, "secure"))) return true;
     return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
@@ -501,7 +501,7 @@ export class Persisted {
     const options: Record<string, unknown> = session.options();
 
     let sessionId: unknown;
-    if (isTruthy(options["drop"]) || isTruthy(options["renew"])) {
+    if (isTruthy(hashAref(options, "drop")) || isTruthy(hashAref(options, "renew"))) {
       const currentId = session.id();
       sessionId = await this.deleteSession(
         req,
@@ -525,7 +525,7 @@ export class Persisted {
       (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
         `Warning! ${this.constructor.name} failed to save session. Content dropped.`,
       );
-    } else if (isTruthy(options["defer"]) && !isTruthy(options["renew"])) {
+    } else if (isTruthy(hashAref(options, "defer")) && !isTruthy(hashAref(options, "renew"))) {
       if (isTruthy(verbose())) {
         (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
           `Deferring cookie for ${String(sessionId)}`,
@@ -534,12 +534,12 @@ export class Persisted {
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
-      const expireAfter = options["expireAfter"];
+      const expireAfter = hashAref(options, "expireAfter");
       if (isTruthy(expireAfter)) {
         // boundary: `Time.now + options[:expire_after]` is an ABSOLUTE expiry
         cookie["expires"] = new Date(Date.now() + (expireAfter as number) * 1000);
       }
-      const maxAge = options["maxAge"];
+      const maxAge = hashAref(options, "maxAge");
       if (isTruthy(maxAge)) {
         // boundary: as above (`abstract/id.rb:404`).
         cookie["expires"] = new Date(Date.now() + (maxAge as number) * 1000);

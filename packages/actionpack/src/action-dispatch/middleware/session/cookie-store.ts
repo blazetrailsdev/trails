@@ -78,7 +78,7 @@ export class CookieStore extends AbstractSecureStore {
     _sessionId: unknown,
     options: Record<string, unknown>,
   ): Promise<RackSessionId | null> {
-    const newSid = options["drop"] ? null : this.generateSid();
+    const newSid = hashAref(options, "drop") ? null : this.generateSid();
     req.setHeader(
       "action_dispatch.request.unsigned_session_cookie",
       newSid ? { session_id: newSid.publicId } : {},

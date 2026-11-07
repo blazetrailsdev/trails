@@ -27,8 +27,6 @@ export class DisabledSessionError extends Error {
 }
 
 export class Options {
-  [key: string]: unknown;
-
   private by: SessionStore | null;
   private delegate: Record<string, unknown>;
 
@@ -43,18 +41,6 @@ export class Options {
   constructor(by: SessionStore | null, defaultOptions: Record<string, unknown>) {
     this.by = by;
     this.delegate = { ...defaultOptions };
-    return new Proxy(this, {
-      get: (target, key, receiver) =>
-        Reflect.has(target, key)
-          ? Reflect.get(target, key, receiver)
-          : target.delegate[key as string],
-      has: (target, key) => Reflect.has(target, key) || key in target.delegate,
-      ownKeys: (target) => Reflect.ownKeys(target.delegate).filter((k) => !Reflect.has(target, k)),
-      getOwnPropertyDescriptor: (target, key) =>
-        Reflect.has(target, key)
-          ? undefined
-          : Object.getOwnPropertyDescriptor(target.delegate, key),
-    });
   }
 
   get(key: string): unknown {

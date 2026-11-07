@@ -261,7 +261,7 @@ export class Cookie extends PersistedSecure {
     _sessionId: unknown,
     options: Record<string, unknown>,
   ): Promise<unknown> {
-    if (!isTruthy(options["drop"])) return this.generateSid();
+    if (!isTruthy(hashAref(options, "drop"))) return this.generateSid();
     return null;
   }
 

@@ -82,19 +82,6 @@ export class RoutesProxy implements UrlForHost {
     this.scope = scope;
     this._helpers = helpers;
     this._scriptNamer = scriptNamer;
-
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === "string" && !(prop in target) && target.respondToMissing(prop, false)) {
-          return (...args: unknown[]) => target.methodMissing(prop, ...args);
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      has(target, prop) {
-        if (typeof prop === "string" && target.respondToMissing(prop, false)) return true;
-        return Reflect.has(target, prop);
-      },
-    }) as RoutesProxy;
   }
 
   get _routes(): UrlForRoutes {
@@ -143,6 +130,30 @@ export class RoutesProxy implements UrlForHost {
     }
   }
 }
+
+Object.setPrototypeOf(
+  RoutesProxy.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(RoutesProxy.prototype) as object) as object, {
+    get(
+      target,
+      prop,
+      receiver: {
+        respondToMissing(method: string, _: boolean): boolean;
+        methodMissing(method: string, ...args: unknown[]): unknown;
+      },
+    ) {
+      if (
+        typeof prop === "string" &&
+        !(prop in target) &&
+        (receiver as object) !== RoutesProxy.prototype &&
+        receiver.respondToMissing(prop, false)
+      ) {
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  }),
+);
 
 Routing.RoutesProxy = RoutesProxy;
 
