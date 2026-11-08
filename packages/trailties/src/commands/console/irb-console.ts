@@ -1,19 +1,9 @@
 import "../../constants.console-irb-console.generated.js";
 import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
-import {
-  Dir,
-  STDERR,
-  STDOUT,
-  TopLevel,
-  constGet,
-  extend,
-  getFs,
-  getPath,
-  getReplAsync,
-} from "@blazetrails/ruby-compat";
+import { IRB, STDOUT, TopLevel, constGet, env as ENV, extend } from "@blazetrails/ruby-compat";
 import { Trails } from "../../trails.js";
 
-export class RailsHelperBase {}
+export class RailsHelperBase extends IRB.HelperMethod.Base {}
 
 export class ControllerHelper extends RailsHelperBase {
   execute(): unknown {
@@ -63,14 +53,11 @@ export class ReloadHelper extends RailsHelperBase {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-const HELPER_METHODS: Record<string, RailsHelperBase & { execute(...args: unknown[]): unknown }> = {
-  helper: new ControllerHelper(),
-  controller: new ControllerInstance(),
-  newSession: new NewSession(),
-  app: new AppInstance(),
-  reloadBang: new ReloadHelper(),
-};
+IRB.HelperMethod.register("helper", ControllerHelper);
+IRB.HelperMethod.register("controller", ControllerInstance);
+IRB.HelperMethod.register("newSession", NewSession);
+IRB.HelperMethod.register("app", AppInstance);
+IRB.HelperMethod.register("reloadBang", ReloadHelper);
 
 const BLUE = "\u001b[34m";
 const RED = "\u001b[31m";
@@ -88,28 +75,40 @@ export class IRBConsole {
     return "IRB";
   }
 
-  /**
-   * @missingRailsCall key? — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
-   * @missingRailsCall filter — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
-   * @missingRailsCall run — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
-   * @inventedArm loadModels — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
-   * @inventedArm clearAllConnectionsBang — CONVERGEABLE port-irb-setup-conf-and-run-for-irb-console
-   */
   async start(): Promise<void> {
-    const { Base: ActiveRecordBase, Migration } = await import("@blazetrails/activerecord");
-    const env = this.colorizedEnv();
-    const promptPrefix = `${this.app.name()}(${env})`;
+    IRB.setup(null);
 
-    const context = await this.loadModels({ Base: ActiveRecordBase, Migration });
-    const repl = await getReplAsync();
-    const server = repl.start({ prompt: `${promptPrefix}> `, useGlobal: true });
-    Object.assign(server.context, context);
-    for (const [name, helper] of Object.entries(HELPER_METHODS)) {
-      server.context[name] = (...args: unknown[]) => helper.execute(...args);
+    if (!Trails.env["local?"]() && !Object.hasOwn(ENV, "IRB_USE_AUTOCOMPLETE")) {
+      IRB.conf.USE_AUTOCOMPLETE = false;
     }
 
-    await new Promise<void>((resolve) => server.on("exit", () => resolve()));
-    await ActiveRecordBase.connectionHandler.clearAllConnectionsBang();
+    const env = this.colorizedEnv();
+    const promptPrefix = `%N(${env})`;
+    IRB.conf.IRB_NAME = this.app.name();
+
+    (IRB.conf.PROMPT as Record<string, unknown>).RAILS_PROMPT = {
+      PROMPT_I: `${promptPrefix}> `,
+      PROMPT_S: `${promptPrefix}%l `,
+      PROMPT_C: `${promptPrefix}* `,
+      RETURN: "=> %s\n",
+    };
+
+    const currentFilter = IRB.conf.BACKTRACE_FILTER as
+      | ((backtrace: string[]) => string[])
+      | undefined;
+    if (currentFilter != null) {
+      IRB.conf.BACKTRACE_FILTER = (backtrace: string[]) => {
+        backtrace = currentFilter(backtrace);
+        return Trails.backtraceCleaner.filter(backtrace);
+      };
+    } else {
+      IRB.conf.BACKTRACE_FILTER = (backtrace: string[]) => {
+        return Trails.backtraceCleaner.filter(backtrace);
+      };
+    }
+
+    if (IRB.conf.PROMPT_MODE === "DEFAULT") IRB.conf.PROMPT_MODE = "RAILS_PROMPT";
+    await new IRB.Irb().run(IRB.conf);
   }
 
   colorizedEnv(): string {
@@ -123,28 +122,5 @@ export class IRBConsole {
       default:
         return String(Trails.env);
     }
-  }
-
-  /** @internal */
-  private async loadModels(context: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const fs = getFs();
-    const path = getPath();
-    const modelsDir = path.join(Dir.pwd(), "app", "models");
-    if (await fs.exists(modelsDir)) {
-      for (const file of await fs.readdir!(modelsDir)) {
-        if (!/(?<!\.d|\.test)\.[tj]s$/.test(file)) continue;
-        try {
-          const mod = (await import(
-            path.pathToFileURL!(path.join(modelsDir, file)).href
-          )) as Record<string, unknown>;
-          for (const [name, value] of Object.entries(mod)) {
-            if (typeof value === "function") context[name] = value;
-          }
-        } catch (error) {
-          STDERR.puts(`Could not load ${file}: ${(error as Error).message}`);
-        }
-      }
-    }
-    return context;
   }
 }
