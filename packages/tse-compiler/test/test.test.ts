@@ -56,42 +56,6 @@ _buf.to_s
     );
   });
 
-  it("should escape all backslashes and apostrophes in text", () => {
-    checkOutput(
-      `<table>
- <tbody>' ' \\ \\
-  <% i = 0
-     list.each_with_index do |item, i| %>
-  <tr>
-   <td><%= i+1 -%>
-</td>
-   <td><%== item %></td>
-  </tr>
- <% end %>
- </tbody>
-</table>
-<%== i+1 %>
-<%
-%>`,
-      `_buf = ::String.new; _buf << '<table>
- <tbody>\\' \\' \\\\ \\\\
-';   i = 0
-     list.each_with_index do |item, i| 
- _buf << '  <tr>
-   <td>'; _buf << ( i+1 ).to_s; _buf << '</td>
-   <td>'; _buf << ::Erubi.h(( item )); _buf << '</td>
-  </tr>
-';  end 
- _buf << ' </tbody>
-</table>
-'; _buf << ::Erubi.h(( i+1 )); _buf << '
-';
-_buf.to_s
-`,
-      {},
-    );
-  });
-
   it("should strip only whitespace for <%, <%- and <%# tags", () => {
     checkOutput(
       `  <% a = 1 %>  

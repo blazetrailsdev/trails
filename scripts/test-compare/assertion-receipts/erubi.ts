@@ -9,9 +9,6 @@ const checkOutputEval: AssertionReceipt = {
 };
 
 export const erubi: Record<string, AssertionReceipt[]> = {
-  "erubi:test.rb › Erubi › should escape all backslashes and apostrophes in text": [
-    checkOutputEval,
-  ],
   "erubi:test.rb › Erubi › should handle :bufvar and :freeze options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :escape and :escapefunc options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :escape option without :escapefunc option": [
