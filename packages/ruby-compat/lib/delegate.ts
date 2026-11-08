@@ -287,6 +287,17 @@ export class Delegator {
   }
 
   /**
+   * `to_s`, undefined on `Delegator` (`vendor/ruby/v3.3.11/lib/delegate.rb:47-49`) so
+   * it reaches the delegate through `method_missing`; `Object.prototype.toString`
+   * is always found first here, so it forwards explicitly, as `DelegateClass` does.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toString(): string {
+    return String(this.__getobj__());
+  }
+
+  /**
    * `Delegator#marshal_dump` (`vendor/ruby/v3.3.11/lib/delegate.rb:203-210`). `@delegate_dc_obj`
    * and `@delegate_sd_obj` are spelled `@delegateDcObj` and `@delegateSdObj`.
    *

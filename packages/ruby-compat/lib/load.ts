@@ -37,14 +37,16 @@ export const LOADED_FEATURES: string[] = [];
 /**
  * `Kernel#require` of a file (`require_internal`,
  * `vendor/ruby/v3.3.11/load.c:1236`): searches `$LOAD_PATH` for
- * `feature.js` and loads it once. A miss raises `LoadError`.
+ * `feature.js` and loads it once. A feature that already ends in a source
+ * extension is searched as given (`search_required`'s `IS_RBEXT` arm,
+ * `vendor/ruby/v3.3.11/load.c:1058-1072`). A miss raises `LoadError`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFRequireFile(feature: string): Promise<boolean> {
   const explicit = /^(\/|\.\.?\/|~)/.test(feature);
   for (const path of explicit ? [Dir.pwd()] : LOAD_PATH) {
-    const full = File.expandPath(`${feature}.js`, path);
+    const full = File.expandPath(/\.[jt]s$/.test(feature) ? feature : `${feature}.js`, path);
     if (!(await File.isExistAsync(full))) continue;
     if (LOADED_FEATURES.includes(full)) return false;
     await rbFLoad(full);

@@ -145,6 +145,7 @@
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/mail": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"

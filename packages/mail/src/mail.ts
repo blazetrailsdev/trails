@@ -59,6 +59,7 @@ export interface MailConstants {
   UnstructuredField: typeof import("./fields/unstructured-field.js").UnstructuredField;
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
+  readFromString(mailAsString: string): Message;
   defaults(block: (this: Configuration) => unknown): unknown;
   deliveryMethod(): unknown;
   RANDOM_TAG: string;
@@ -136,6 +137,10 @@ export const Mail: MailConstants = {
 
   async read(filename: string): Promise<Message> {
     return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
+  },
+
+  readFromString(mailAsString: string): Message {
+    return Mail.new(mailAsString);
   },
 
   randomTag(): string {

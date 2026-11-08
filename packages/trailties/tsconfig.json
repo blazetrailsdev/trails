@@ -30,6 +30,7 @@
     { "path": "../did-you-mean" },
     { "path": "../thor" },
     { "path": "../et-orbi" },
+    { "path": "../mail" },
     { "path": "../vitest-matchers" }
   ],
   "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/**/__fixtures__"]

@@ -563,5 +563,7 @@ export {
 
 import { Kernel } from "./include.js";
 import { kernelRand } from "./kernel-rand.js";
+import { rbFRequireFile } from "./load.js";
 import "./constants.generated.js";
 Kernel.rand = kernelRand;
+Kernel.require = rbFRequireFile;
