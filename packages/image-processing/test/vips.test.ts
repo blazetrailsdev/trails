@@ -1,4 +1,5 @@
 import { File, Pathname, Tempfile } from "@blazetrails/ruby-compat";
+import { assertIncludes, assertMatch, assertRaises } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Error as ImageProcessingError } from "../lib/image-processing.js";
 import {
@@ -20,6 +21,7 @@ const Vips = ImageProcessingVips as unknown as Pipeline & {
   Processor: { SHARPEN_MASK: VipsImage };
 };
 const SHARPEN_MASK = Vips.Processor.SHARPEN_MASK;
+const VipsError = WebAssembly.Exception as unknown as typeof Error;
 const BLOB_TYPE = vips.Utils.typeFromName("VipsBlob");
 
 function fields(image: VipsImage): string[] {
@@ -118,13 +120,17 @@ describe("ImageProcessing::Vips", () => {
   });
 
   it("raises correct Vips::Error on unknown loader", async () => {
-    await expect(Vips.convert("jpg").call(Tempfile.new(""))).rejects.toThrow(
-      /not a known file format/,
+    const error = await assertRaises([VipsError], {}, () =>
+      Vips.convert("jpg").call(Tempfile.new("")),
     );
+    assertIncludes(error.message, "not a known file format");
   });
 
   it("accepts :loader", async () => {
-    await expect(Vips.loader({ loader: "tiff" }).call(portrait)).rejects.toThrow(/Not a TIFF/);
+    const error = await assertRaises([VipsError], {}, () =>
+      Vips.loader({ loader: "tiff" }).call(portrait),
+    );
+    assertMatch("Not a TIFF", error.message);
   });
 
   it("applies saver options", async () => {
@@ -135,7 +141,7 @@ describe("ImageProcessing::Vips", () => {
   it("converts :quality saver option to :Q", async () => {
     const result1 = await Vips.saver({ quality: 50 }).call(portrait);
     const result2 = await Vips.saver({ quality: 100 }).call(portrait);
-    expect(result1.size() < result2.size()).toBe(true);
+    expect(result1.size() < result2.size()).toBeTruthy();
   });
 
   it("ignores saver options that are not defined", async () => {
@@ -143,9 +149,8 @@ describe("ImageProcessing::Vips", () => {
   });
 
   it("raises correct Vips::Error on unknown saver", async () => {
-    await expect(Vips.convert("foo").call(portrait)).rejects.toThrow(
-      /is not a known file format|No known saver for/,
-    );
+    const error = await assertRaises([VipsError], {}, () => Vips.convert("foo").call(portrait));
+    assertMatch(/is not a known file format|No known saver for/, error.message);
   });
 
   it("accepts :saver", async () => {
@@ -156,13 +161,13 @@ describe("ImageProcessing::Vips", () => {
 
   describe(".valid_image?", () => {
     it("returns true for correct images", () => {
-      expect(Vips.isValidImage(portrait)).toBe(true);
-      expect(Vips.isValidImage(copyToTempfile(portrait))).toBe(true);
+      expect(Vips.isValidImage(portrait)).toBeTruthy();
+      expect(Vips.isValidImage(copyToTempfile(portrait))).toBeTruthy();
     });
 
     it("returns false for incorrect images", () => {
-      expect(Vips.isValidImage(fixtureImage("invalid.jpg"))).toBe(false);
-      expect(Vips.isValidImage(copyToTempfile(fixtureImage("invalid.jpg")))).toBe(false);
+      expect(Vips.isValidImage(fixtureImage("invalid.jpg"))).toBeFalsy();
+      expect(Vips.isValidImage(copyToTempfile(fixtureImage("invalid.jpg")))).toBeFalsy();
     });
   });
 
@@ -211,7 +216,7 @@ describe("ImageProcessing::Vips", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     it("sharpening uses integer precision", async () => {
@@ -267,7 +272,7 @@ describe("ImageProcessing::Vips", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     it("sharpening uses integer precision", async () => {
@@ -310,7 +315,7 @@ describe("ImageProcessing::Vips", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     it("sharpening uses integer precision", async () => {
@@ -374,7 +379,7 @@ describe("ImageProcessing::Vips", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     it("sharpening uses integer precision", async () => {
@@ -453,7 +458,7 @@ describe("ImageProcessing::Vips", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
 
     it("sharpening uses integer precision", async () => {
@@ -590,7 +595,8 @@ describe("ImageProcessing::Vips", () => {
         .loader({ fail: true })
         .resizeToFit(400, 400);
 
-      await expect(pipeline.call()).rejects.toThrow(/Corrupt JPEG data/);
+      const error = await assertRaises([VipsError], {}, () => pipeline.call());
+      assertMatch("Corrupt JPEG data", error.message);
     });
   });
 });

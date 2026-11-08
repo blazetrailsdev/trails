@@ -1754,6 +1754,8 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/test/action-controller/",
   abstractcontroller: "packages/actionpack/test/abstract-controller/",
   actionview: "packages/actionview/src/",
+  "rails-dom-testing": "packages/actionview/src/rails-dom-testing/assertions/",
+  "image-processing": "packages/image-processing/test/",
   actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/src/",
   actionmailer: "packages/actionmailer/test/",

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from "vitest";
-import { assertEqual, assertNot } from "@blazetrails/activesupport";
+import { assertEqual, assertMatch, assertNot } from "@blazetrails/activesupport";
 import { block, ArgumentError, Range } from "@blazetrails/ruby-compat";
 import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
 import { Testing } from "../testing.js";
@@ -357,7 +357,17 @@ describe("AssertSelectTest", () => {
   it("nested assert select with match failure shows nice regex", () => {
     renderHtml('<div id="1">foo</div>');
 
-    expect(() => assertSelect("div:match('id', ?)", /wups/)).toThrow("div:match('id', /wups/)");
+    let error!: Error;
+    expect(() => {
+      try {
+        assertSelect("div:match('id', ?)", /wups/);
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow();
+
+    assertMatch("div:match('id', /wups/)", error.message);
   });
 
   it("body not present in empty document", () => {

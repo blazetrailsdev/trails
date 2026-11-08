@@ -58,6 +58,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "ruby-compat",
     "thor",
     "mini-magick",
+    "image-processing",
     "mail",
     "mini-mime",
     "net-smtp",
@@ -101,6 +102,10 @@ export function getPackageTestFiles(): Record<string, string[]> {
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
+  result["rails-dom-testing"] = globInTestRoots(
+    "actionview",
+    "rails-dom-testing/**/*.test.ts",
+  ).sort();
 
   // Aliased packages (erubi → tse-compiler, the html-sanitizer gems, ...)
   for (const [alias, [dir, pattern, ignore]] of Object.entries(packageAliases)) {

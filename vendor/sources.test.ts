@@ -485,6 +485,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "loofah",
+        "image-processing",
         "mail",
         "marcel",
         "mini-magick",
@@ -499,6 +500,7 @@ describe("vendor/sources.ts", () => {
         "rack-test",
         "rackup",
         "rails-html-sanitizer",
+        "rails-dom-testing",
         "rake",
         "ruby-compat",
         "solid-cable",
@@ -513,6 +515,8 @@ describe("vendor/sources.ts", () => {
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
+    expect(m["image-processing"].endsWith("vendor/image_processing/v1.14.0/test")).toBe(true);
+    expect(m["rails-dom-testing"].endsWith("vendor/rails-dom-testing/v2.2.0/test")).toBe(true);
   });
 
   it("validateSources rejects missing libPath", () => {

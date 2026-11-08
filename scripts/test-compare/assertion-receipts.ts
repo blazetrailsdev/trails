@@ -16,9 +16,11 @@ import { activemodel } from "./assertion-receipts/activemodel.js";
 import { activerecord } from "./assertion-receipts/activerecord.js";
 import { activestorage } from "./assertion-receipts/activestorage.js";
 import { activesupport } from "./assertion-receipts/activesupport.js";
+import { imageProcessing } from "./assertion-receipts/image-processing.js";
 import { mail } from "./assertion-receipts/mail.js";
 import { msgpack } from "./assertion-receipts/msgpack.js";
 import { rack } from "./assertion-receipts/rack.js";
+import { railsDomTesting } from "./assertion-receipts/rails-dom-testing.js";
 import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
@@ -56,9 +58,11 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   activerecord,
   activestorage,
   activesupport,
+  "image-processing": imageProcessing,
   mail,
   msgpack,
   rack,
+  "rails-dom-testing": railsDomTesting,
   rake,
   "ruby-compat": rubyCompat,
   "solid-queue": solidQueue,
