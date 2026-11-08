@@ -67,7 +67,9 @@ describe("Mail::Message binary raw source", () => {
   });
 
   it("compares binary-source messages by their encoded bytes", () => {
-    const raw = new TextEncoder().encode("Message-ID: <a@b>\r\nSubject: hi\r\n\r\nabc");
+    const raw = new TextEncoder().encode(
+      "Date: Mon, 01 Jan 2024 00:00:00 +0000\r\nMessage-ID: <a@b>\r\nSubject: hi\r\n\r\nabc",
+    );
     expect(new Mail.Message(raw).equals(new Mail.Message(raw))).toBe(true);
   });
 
