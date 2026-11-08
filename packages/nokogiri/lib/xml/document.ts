@@ -24,7 +24,6 @@ export class XmlDocument {
   private _doc: LibXmlDocument | null = null;
   private _root: XmlNode | null = null;
 
-  /** @missingRailsCall expand_path — CONVERGEABLE nokogiri-xml-document-parse-pathname-arm */
   static parse(
     stringOrIo: string | Readable | null,
     url: string | null = null,
