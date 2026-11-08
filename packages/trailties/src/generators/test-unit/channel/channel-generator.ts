@@ -12,7 +12,6 @@ export class ChannelGenerator extends Base {
     this.methodAdded("createTestFiles");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
     await this.template(
       "channel_test.ts",
