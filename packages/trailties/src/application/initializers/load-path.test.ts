@@ -37,6 +37,25 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
     expect(LOAD_PATH).not.toContain(`${await t.appPath()}/app/models`);
   });
 
+  // BLOCKED: trailties-load-path-require-in-application-class-body
+  it.skip("initializing an application allows to load code on lib path inside application class definition", async () => {
+    await t.appFile(
+      "lib/foo.ts",
+      `
+        export const Foo = {};
+`,
+    );
+
+    await t.addToConfig(`
+        await rbFRequire("foo");
+        if (!("Foo" in TopLevel)) throw new Error("Expected Foo to be defined");
+`);
+
+    await import(`${await t.appPath()}/config/environment.ts`);
+
+    expect(LOAD_PATH).toContain(`${await t.appPath()}/lib`);
+  });
+
   it("initializing an application eager load any path under app", async () => {
     await t.appFile(
       "app/anything/foo.ts",
@@ -51,6 +70,34 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
 
     await import(`${await t.appPath()}/config/environment.ts`);
     expect(constants.Foo).toBeTruthy();
+  });
+
+  // BLOCKED: zeitwerk-namespace-body-autoloads-own-children
+  it.skip("eager loading loads parent classes before children", async () => {
+    await t.appFile(
+      "lib/zoo.ts",
+      `
+        import { include } from "@blazetrails/ruby-compat";
+        export class Zoo {
+          static { include(this, (Zoo as any).ReptileHouse); }
+        }
+`,
+    );
+
+    await t.appFile(
+      "lib/zoo/reptile-house.ts",
+      `
+        export const ReptileHouse = {};
+`,
+    );
+
+    await t.addToConfig(`
+        this.config.setRoot("${await t.appPath()}");
+        this.config.eagerLoadPaths.push("${await t.appPath()}/lib");
+`);
+
+    await import(`${await t.appPath()}/config/environment.ts`);
+    expect(constants.Zoo).toBeTruthy();
   });
 
   it("eager loading accepts Pathnames", async () => {
