@@ -854,8 +854,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/jeremyevans/erubi.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:201; actionview's ERB handler
-      // subclasses ::Erubi::Engine (action_view/template/handlers/erb/erubi.rb).
       ref: "1.13.1",
     },
     packages: [
