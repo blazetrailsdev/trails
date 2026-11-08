@@ -27,3 +27,4 @@ export type { DatabaseName, PkgDependency, DockerService } from "./database.js";
 export * from "./migration.js";
 export * from "./model-helpers.js";
 export * from "./resource-helpers.js";
+export * as ActiveRecordMigration from "./active-record/migration.js";

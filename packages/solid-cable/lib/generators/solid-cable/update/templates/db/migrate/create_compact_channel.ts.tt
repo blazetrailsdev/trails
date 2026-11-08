@@ -1,0 +1,21 @@
+import { Migration } from "@blazetrails/activerecord";
+import { Message } from "@blazetrails/solid-cable";
+
+export class CreateCompactChannel extends Migration.get(7.2) {
+  async up(): Promise<void> {
+    await this.changeColumn("solid_cable_messages", "channel", "binary", { limit: 1024, null: false });
+    await this.addColumn("solid_cable_messages", "channel_hash", "integer", { limit: 8, ifNotExists: true });
+    await this.addIndex("solid_cable_messages", "channel_hash", { ifNotExists: true });
+    await this.changeColumn("solid_cable_messages", "payload", "binary", { limit: 536_870_912, null: false });
+
+    for await (const msg of Message.findEach()) {
+      await msg.update({ channel_hash: Message.channelHashFor(msg.channel) });
+    }
+  }
+
+  async down(): Promise<void> {
+    await this.changeColumn("solid_cable_messages", "channel", "text");
+    await this.removeColumn("solid_cable_messages", "channel_hash", { ifExists: true });
+    await this.changeColumn("solid_cable_messages", "payload", "text");
+  }
+}
