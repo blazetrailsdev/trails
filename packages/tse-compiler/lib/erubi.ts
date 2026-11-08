@@ -54,6 +54,7 @@ export class Engine {
   protected bufferOnStack: boolean;
   protected escapefunc: string;
 
+  /** @inventedArm if — PERMANENT */
   constructor(input: string, properties: EngineProperties = {}) {
     const escape = (this.escape = Object.hasOwn(properties, "escape")
       ? properties.escape!
@@ -62,13 +63,13 @@ export class Engine {
         : false);
     const trim = properties.trim !== false;
     this.filename = properties.filename ?? null;
-    const bufvar = (this.bufvar = properties.bufvar || properties.outvar || "_buf");
-    const bufval = properties.bufval || "::String.new";
-    const regexp = properties.regexp || Engine.DEFAULT_REGEXP;
-    const literalPrefix = properties.literalPrefix || "<%";
-    const literalPostfix = properties.literalPostfix || "%>";
-    const preamble = properties.preamble || `${bufvar} = ${bufval};`;
-    const postamble = properties.postamble || `${bufvar}.to_s\n`;
+    const bufvar = (this.bufvar = properties.bufvar ?? properties.outvar ?? "_buf");
+    const bufval = properties.bufval ?? "::String.new";
+    const regexp = properties.regexp ?? Engine.DEFAULT_REGEXP;
+    const literalPrefix = properties.literalPrefix ?? "<%";
+    const literalPostfix = properties.literalPostfix ?? "%>";
+    const preamble = properties.preamble ?? `${bufvar} = ${bufval};`;
+    const postamble = properties.postamble ?? `${bufvar}.to_s\n`;
     this.chainAppends = properties.chainAppends ?? null;
     this.textEnd = (
       Object.hasOwn(properties, "freezeTemplateLiterals")
@@ -79,7 +80,7 @@ export class Engine {
       : "'";
 
     this.bufferOnStack = false;
-    this.src = properties.src || "";
+    this.src = properties.src ?? "";
     if (properties.freeze) this.src += "# frozen_string_literal: true\n";
     if (properties.ensure) {
       this.src += `begin; __original_outvar = ${bufvar}`;
@@ -90,7 +91,7 @@ export class Engine {
       }
     }
 
-    if (!(this.escapefunc = properties.escapefunc!)) {
+    if ((this.escapefunc = properties.escapefunc!) == null) {
       if (escape) {
         this.escapefunc = "__erubi.h";
         this.src += "__erubi = ::Erubi; ";
@@ -182,7 +183,7 @@ export class Engine {
     if (this.src.at(RANGE_LAST) !== "\n") this.src += "\n";
     this.addPostamble(postamble);
     if (properties.ensure) this.src += "; ensure\n  " + bufvar + " = __original_outvar\nend\n";
-    Object.freeze(this);
+    if (new.target === Engine) Object.freeze(this);
   }
 
   /** @internal */
