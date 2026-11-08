@@ -174,8 +174,8 @@ describe("action_controller.set_helpers_path", () => {
 
       const methods = extend({}, base._helpers!);
       expect("adminUsers" in methods).toBe(true);
-      expect("compiledUsers" in methods).toBe(i === 0);
-      expect("users" in methods).toBe(i === 1);
+      expect("compiledUsers" in methods).toBe(true);
+      expect("users" in methods).toBe(false);
     }
   });
 

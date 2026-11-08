@@ -1410,10 +1410,8 @@ export class Mapper {
     }
 
     const routePath = `${path}/${name}.ts`;
-    const mod = (await loadIseqEval(routePath)) as {
-      drawRoutes?: DrawCallback;
-    };
-    mod.drawRoutes?.call(this);
+    const { drawRoutes } = await loadIseqEval(routePath, true);
+    (drawRoutes as DrawCallback | undefined)?.call(this);
   }
 
   /** @internal */
