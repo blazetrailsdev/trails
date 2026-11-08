@@ -309,6 +309,34 @@ it("withConnection waits using pool default timeout without explicit checkoutTim
   expect(pool.stat().busy).toBe(0);
 });
 
+it("withConnectionSync on a saturated pool borrows a busy connection instead of timing out", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).toBe(held);
+  expect(pool.stat().busy).toBe(1);
+  expect(pool.connectionLease().connection).toBeFalsy();
+});
+
+it("withConnectionSync raises when a borrowed connection's block goes async", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+
+  expect(() => pool.withConnectionSync(async () => 1)).toThrow(RuntimeError);
+  expect(pool.stat().busy).toBe(1);
+});
+
+it("withConnectionSync checks out an idle connection rather than borrowing", async () => {
+  const pool = makePool(2);
+  const held = await pool.checkout();
+  pool.checkin(held);
+  const other = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).not.toBe(other);
+});
+
 it("full pool async checkout timeout", async () => {
   const pool = makePool(1);
   await pool.checkout();

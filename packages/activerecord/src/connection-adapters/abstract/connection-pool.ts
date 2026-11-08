@@ -720,6 +720,17 @@ export class ConnectionPool implements ReapablePool {
         if (pinned && this._connections && !this._connections.includes(pinned)) {
           this._connections.push(pinned);
         }
+        const borrowed = pinned ? null : this.borrowForSyncBlock();
+        if (borrowed) {
+          const value = fn(borrowed);
+          if (value instanceof Promise) {
+            value.catch(() => {});
+            throw new RuntimeError(
+              "withConnectionSync borrowed a busy connection; its block must not go async",
+            );
+          }
+          return value;
+        }
         result = fn(
           (lease.connection = pinned ?? this.acquireConnectionSync(this.checkoutTimeout)),
         );
@@ -729,6 +740,16 @@ export class ConnectionPool implements ReapablePool {
       throw error;
     }
     return ensure(release, result);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  borrowForSyncBlock(): DatabaseAdapter | null {
+    if (this._available?.any) return null;
+    if (this._connections!.length + this._nowConnecting < this.size) return null;
+    return this._connections!.find((c) => c.isInUse()) ?? null;
   }
 
   /**
