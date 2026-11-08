@@ -1,3 +1,4 @@
+import { ImageProcessing } from "./namespaces.js";
 import { File, rbGetKwargs, rbObjRespondTo, Tempfile } from "@blazetrails/ruby-compat";
 import type { Operation, Options } from "./chainable.js";
 import { Error } from "./image-processing.js";
@@ -139,3 +140,5 @@ export class Pipeline {
     return extension.length > 1 ? extension.slice(1) : null;
   }
 }
+
+ImageProcessing.Pipeline = Pipeline;

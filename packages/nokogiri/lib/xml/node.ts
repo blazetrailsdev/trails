@@ -5,12 +5,13 @@ import {
   XmlText as LibXmlText,
   XmlTreeNode,
 } from "libxml2-wasm";
-import { include, constSet } from "@blazetrails/ruby-compat";
+import { xmlAddChild, xmlUnlinkNode } from "libxml2-wasm/lib/libxml2.mjs";
+import { ArgumentError, include, constSet, rbObjClassname } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
-import type { NodeSet } from "./node-set.js";
-import "./node-set.js";
+import type { Node } from "../html5/node.js";
+import { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
 
 export interface AttrNode {
@@ -77,7 +78,6 @@ export class XmlNode {
     return this._node.content ?? "";
   }
 
-  /** @missingRailsCall coerce — CONVERGEABLE nokogiri-xml-node-children-writer */
   get children(): XmlNode[] {
     if (!(this._node instanceof LibXmlElement)) return [];
     const result: XmlNode[] = [];
@@ -89,12 +89,63 @@ export class XmlNode {
     return result;
   }
 
+  set children(nodeOrTags: XmlNode | NodeSet | string) {
+    const coerced = this.coerce(nodeOrTags);
+    new NodeSet(this.document, this.children as unknown as Node[]).unlink();
+    if (coerced instanceof NodeSet) {
+      coerced.each((n) => this.addChildNodeAndReparentAttrs(n as unknown as XmlNode));
+    } else {
+      this.addChildNodeAndReparentAttrs(coerced);
+    }
+  }
+
+  unlink(): this {
+    xmlUnlinkNode(this.pointerId);
+    return this;
+  }
+
+  set(name: string, value: string): void {
+    if (this._node instanceof LibXmlElement) this._node.setAttr(name, value);
+  }
+
   get attributeNodes(): AttrNode[] {
     if (!(this._node instanceof LibXmlElement)) return [];
     return this._node.attrs.map((a: LibXmlAttribute) => ({
       nodeName: a.name,
       value: a.value,
     }));
+  }
+
+  /** @internal */
+  protected coerce(data: unknown): XmlNode | NodeSet {
+    if (data instanceof NodeSet) {
+      return data;
+    } else if (typeof data === "string") {
+      return XML.Document.parse(`<root>${data}</root>`).xpath("/root/node()");
+    } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
+      return data;
+    }
+
+    throw new ArgumentError(
+      `Requires a Node, NodeSet or String argument, and cannot accept a ${rbObjClassname(data)}.\n(You probably want to select a node from the Document with at() or search(), or create a new Node via Node.new().)\n`,
+    );
+  }
+
+  /** @internal */
+  private addChildNode(node: XmlNode): void {
+    xmlUnlinkNode(node.pointerId);
+    xmlAddChild(this.pointerId, node.pointerId);
+  }
+
+  /** @internal */
+  private addChildNodeAndReparentAttrs(node: XmlNode): void {
+    this.addChildNode(node);
+    if (!(node._node instanceof LibXmlElement)) return;
+    for (const attrNode of node._node.attrs.filter((a) => a.name.includes(":"))) {
+      const { name, value } = attrNode;
+      attrNode.remove();
+      node.set(name, value);
+    }
   }
 }
 

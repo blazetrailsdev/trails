@@ -1,3 +1,4 @@
+import { constSet } from "@blazetrails/ruby-compat";
 import {
   XmlDocument as LibXmlDocument,
   XmlElement,
@@ -7,7 +8,8 @@ import {
   XmlParseError,
 } from "libxml2-wasm";
 import { SaxDocument } from "./document.js";
-import { type Readable, readSource } from "../readable.js";
+import { SAX } from "../../namespaces.js";
+import { type Readable, readSource } from "../../readable.js";
 
 export class SaxParser {
   constructor(private readonly handler: SaxDocument) {}
@@ -53,3 +55,5 @@ export class SaxParser {
     }
   }
 }
+
+constSet(SAX, "Parser", SaxParser);

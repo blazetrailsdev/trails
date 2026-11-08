@@ -190,9 +190,13 @@ export class Node {
     return coerced;
   }
 
-  remove(): this {
+  unlink(): this {
     defaultTreeAdapter.detachNode(this._node);
     return this;
+  }
+
+  remove(): this {
+    return this.unlink();
   }
 
   toString(): string {

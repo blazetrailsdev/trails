@@ -182,3 +182,5 @@ export function chainableProxy(host: object): void {
     }),
   );
 }
+
+ImageProcessing.Chainable = Chainable;

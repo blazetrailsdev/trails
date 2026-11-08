@@ -1,5 +1,6 @@
+import { CSS } from "../namespaces.js";
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { constSet, rbFSend } from "@blazetrails/ruby-compat";
 
 import type { XPathVisitor } from "./xpath-visitor.js";
 
@@ -55,3 +56,5 @@ export class Node {
     return [this.type, ...this.value.map((n) => (n instanceof Node ? n.toA() : [n]))];
   }
 }
+
+constSet(CSS, "Node", Node);

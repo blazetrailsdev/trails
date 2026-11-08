@@ -1,5 +1,6 @@
+import { CSS } from "../namespaces.js";
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { constSet, rbObjAsString } from "@blazetrails/ruby-compat";
 
 import { Parser as RaccParser, ParseError } from "../racc/parser.js";
 import { Node } from "./node.js";
@@ -467,3 +468,5 @@ export class Parser extends RaccParser {
     return val[0];
   }
 }
+
+constSet(CSS, "Parser", Parser);

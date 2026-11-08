@@ -78,6 +78,11 @@ export class NodeSet implements Iterable<Node> {
     return this;
   }
 
+  unlink(): this {
+    for (const node of this._list) node.unlink();
+    return this;
+  }
+
   get length(): number {
     return this._list.length;
   }

@@ -1,6 +1,7 @@
 const HEADONLY = new WeakMap<RegExp, RegExp>();
 const SEARCH = new WeakMap<RegExp, RegExp>();
 const REGS = new WeakMap<StringScanner, RegExpExecArray | null>();
+const PREV = new WeakMap<StringScanner, number>();
 
 /**
  * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1667` `rb_define_class("StringScanner", rb_cObject)`.
@@ -79,8 +80,34 @@ export class StringScanner {
     const m = re.exec(this.#str.slice(this.#curr));
     REGS.set(this, m);
     if (m === null) return null;
+    PREV.set(this, this.#curr);
     this.#curr += m[0].length;
     return m[0];
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:884` `strscan_getch`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  getch(): string | null {
+    if (this.isEos()) {
+      REGS.set(this, null);
+      return null;
+    }
+    return this.scan(/[\s\S]/u);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1000` `strscan_unscan`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  unscan(): this {
+    if (!REGS.get(this)) throw new Error("unscan failed: previous match record not exist");
+    this.#curr = PREV.get(this)!;
+    REGS.set(this, null);
+    return this;
   }
 
   /**
@@ -103,6 +130,7 @@ export class StringScanner {
     REGS.set(this, m);
     if (m === null) return null;
     const prev = this.#curr;
+    PREV.set(this, prev);
     this.#curr += m.index + m[0].length;
     return this.#str.slice(prev, this.#curr);
   }

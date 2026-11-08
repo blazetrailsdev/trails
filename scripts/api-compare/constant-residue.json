@@ -983,6 +983,19 @@
     "unwalked": ["handlers.ts::Handlers"],
     "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
   },
+  "date": {
+    "rows": 1,
+    "excluded": [
+      "date.ts::Date",
+      "date.ts::DateTime",
+      "date.ts::ERANGE",
+      "date.ts::SubMinuteOffsetZonedDateTime",
+      "time.ts::Time",
+      "time.ts::Timezone"
+    ],
+    "unwalked": [],
+    "residue": { "date.ts::DateInfinity": "Date::Infinity" }
+  },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
@@ -1007,6 +1020,17 @@
       "uri/gid.ts::MissingModelIdError": "URI::GID::MissingModelIdError"
     }
   },
+  "html-sanitizer": {
+    "rows": 4,
+    "excluded": [
+      "full-sanitizer.ts::FullSanitizer",
+      "link-sanitizer.ts::LinkSanitizer",
+      "safe-list-sanitizer.ts::SafeListSanitizer",
+      "sanitizer.ts::Sanitizer"
+    ],
+    "unwalked": [],
+    "residue": {}
+  },
   "i18n": {
     "rows": 27,
     "excluded": [],
@@ -1017,6 +1041,17 @@
       "backend/transliterator.ts::ProcTransliterator": "I18n::Backend::Transliterator::ProcTransliterator",
       "exceptions.ts::Base": "I18n::MissingTranslation::Base",
       "locale/tag/rfc4646.ts::Parser": "I18n::Locale::Tag::Rfc4646::Parser"
+    }
+  },
+  "image-processing": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "builder.ts::Builder": "ImageProcessing::Builder",
+      "chainable.ts::Chainable": "ImageProcessing::Chainable",
+      "pipeline.ts::Pipeline": "ImageProcessing::Pipeline",
+      "processor.ts::Processor": "ImageProcessing::Processor"
     }
   },
   "mail": {
@@ -1112,6 +1147,37 @@
       "smtp.ts::SMTPSyntaxError": "Net::SMTPSyntaxError",
       "smtp.ts::SMTPUnknownError": "Net::SMTPUnknownError",
       "smtp.ts::SMTPUnsupportedCommand": "Net::SMTPUnsupportedCommand"
+    }
+  },
+  "nokogiri": {
+    "rows": 25,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "css/node.ts::Node": "Nokogiri::CSS::Node",
+      "css/parser.ts::Parser": "Nokogiri::CSS::Parser",
+      "css/selector-cache.ts::SelectorCache": "Nokogiri::CSS::SelectorCache",
+      "css/syntax-error.ts::SyntaxError": "Nokogiri::CSS::SyntaxError",
+      "css/tokenizer.ts::ScanError": "Nokogiri::CSS::Tokenizer::ScanError",
+      "css/tokenizer.ts::Tokenizer": "Nokogiri::CSS::Tokenizer",
+      "css/xpath-visitor.ts::BuiltinsConfig": "Nokogiri::CSS::XPathVisitor::BuiltinsConfig",
+      "css/xpath-visitor.ts::DoctypeConfig": "Nokogiri::CSS::XPathVisitor::DoctypeConfig",
+      "css/xpath-visitor.ts::XPathVisitor": "Nokogiri::CSS::XPathVisitor",
+      "html5/document-fragment.ts::DocumentFragment": "Nokogiri::HTML5::DocumentFragment",
+      "html5/document.ts::Document": "Nokogiri::HTML5::Document",
+      "html5/node.ts::Node": "Nokogiri::HTML5::Node",
+      "racc/parser.ts::ParseError": "Racc::ParseError",
+      "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
+      "xml/document.ts::XmlDocument": "Nokogiri::XML::Document",
+      "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",
+      "xml/node-set.ts::NodeSet": "Nokogiri::XML::NodeSet",
+      "xml/node.ts::XmlNode": "Nokogiri::XML::Node",
+      "xml/parse-options.ts::ParseOptions": "Nokogiri::XML::ParseOptions",
+      "xml/sax/document.ts::SaxDocument": "Nokogiri::XML::SAX::Document",
+      "xml/sax/parser.ts::SaxParser": "Nokogiri::XML::SAX::Parser",
+      "xml/syntax-error.ts::SyntaxError": "Nokogiri::XML::SyntaxError",
+      "xml/xpath-context.ts::XPathContext": "Nokogiri::XML::XPathContext",
+      "xml/xpath/syntax-error.ts::SyntaxError": "Nokogiri::XML::XPath::SyntaxError"
     }
   },
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },

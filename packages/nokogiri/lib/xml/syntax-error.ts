@@ -1,9 +1,11 @@
+import { constSet } from "@blazetrails/ruby-compat";
+import { XML } from "../namespaces.js";
 export class SyntaxError extends Error {
   readonly level: number;
   readonly line?: number;
   readonly column?: number;
 
-  constructor(message: string, level: number, line?: number, column?: number) {
+  constructor(message: string, level = 0, line?: number, column?: number) {
     super(message);
     this.name = "Nokogiri::XML::SyntaxError";
     this.level = level;
@@ -27,3 +29,5 @@ export class SyntaxError extends Error {
     return this.level === 3;
   }
 }
+
+constSet(XML, "SyntaxError", SyntaxError);

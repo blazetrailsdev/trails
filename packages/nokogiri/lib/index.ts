@@ -2,8 +2,8 @@ import { XmlDocument } from "./xml/document.js";
 import { XmlNode } from "./xml/node.js";
 import { parseXml } from "./xml/parse.js";
 import { SyntaxError } from "./xml/syntax-error.js";
-import { SaxDocument } from "./sax/document.js";
-import { SaxParser } from "./sax/parser.js";
+import { SaxDocument } from "./xml/sax/document.js";
+import { SaxParser } from "./xml/sax/parser.js";
 
 export const XML = { Document: XmlDocument, Node: XmlNode, NodeSet, SyntaxError };
 export const SAX = { Document: SaxDocument, Parser: SaxParser };
@@ -24,6 +24,7 @@ import { Tokenizer as CssTokenizer } from "./css/tokenizer.js";
 import { XPathVisitor } from "./css/xpath-visitor.js";
 export { usesLibxml } from "./version/info.js";
 import { xpathFor } from "./css.js";
+import "./constants.generated.js";
 export const HTML5 = { Document: Html5Document, DocumentFragment: Html5DocumentFragment };
 export type { Html5Document, Html5DocumentFragment, Html5Node };
 export type { NodeSet };
