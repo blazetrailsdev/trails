@@ -46,7 +46,10 @@ export const LOADED_FEATURES: string[] = [];
 export async function rbFRequireFile(feature: string): Promise<boolean> {
   const explicit = /^(\/|\.\.?\/|~)/.test(feature);
   for (const path of explicit ? [Dir.pwd()] : LOAD_PATH) {
-    const full = File.expandPath(/\.[jt]s$/.test(feature) ? feature : `${feature}.js`, path);
+    const full = File.expandPath(
+      feature.endsWith(".js") || feature.endsWith(".ts") ? feature : `${feature}.js`,
+      path,
+    );
     if (!(await File.isExistAsync(full))) continue;
     if (LOADED_FEATURES.includes(full)) return false;
     await rbFLoad(full);
