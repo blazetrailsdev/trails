@@ -394,9 +394,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // from config.ts — porting it to config.ts would CREATE an import cycle.
   "activerecord-test-support:config.rb": "connection.ts",
   "actionview:dependency_tracker/ruby_tracker.rb": "dependency-tracker/tse-tracker.ts",
-  // Generators another gem ships under `lib/rails/generators/` sit beside
-  // railties' own `rails/<name>/` generators in trails, so the same short name
-  // in the `Rails::` and `TestUnit::` namespaces pairs by file, not by name.
   "trailties:generators/channel/channel_generator.rb":
     "generators/trails/channel/channel-generator.ts",
   "trailties:generators/job/job_generator.rb": "generators/trails/job/job-generator.ts",
