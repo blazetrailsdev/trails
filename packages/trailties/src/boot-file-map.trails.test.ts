@@ -8,7 +8,6 @@ describe("trails build's boot file map", () => {
     const here = decodeURIComponent(
       new URL("./__fixtures__/boot-file-map", import.meta.url).pathname,
     );
-    FileUtils.mkdirP(here);
     const base = File.realpath(Dir.mktmpdir("build", here));
     const root = `${base}/app`;
     const engineRoot = `${base}/blog`;

@@ -2,21 +2,12 @@ import { describe, expect, it } from "vitest";
 import { HTML5 } from "@blazetrails/nokogiri";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Testing } from "./testing.js";
+import { withDefaultHtmlVersion } from "../test-helpers/dom-testing-helpers.js";
 
-function withDefaultHtmlVersion(version: string, block: () => void): void {
-  const oldVersion = Testing.defaultHtmlVersion;
-  try {
-    Testing.defaultHtmlVersion = version;
-    block();
-  } finally {
-    Testing.defaultHtmlVersion = oldVersion;
-  }
-}
-
-/* eslint-disable vitest/no-conditional-expect -- Rails branches on `html5_support?` (parser_selection_test.rb:16-22) */
 describe("DomTestingParserSelectionTest", () => {
   it("with default html4", () => {
     withDefaultHtmlVersion(":html4", () => {
+      /* eslint-disable vitest/no-conditional-expect -- parser_selection_test.rb:16-22 branches on `html5_support?` */
       if (Testing.isHtml5Support()) {
         expect(Testing.htmlDocument({ htmlVersion: ":html5" })).toBe(HTML5.Document);
         expect(Testing.htmlDocumentFragment({ htmlVersion: ":html5" })).toBe(
@@ -28,6 +19,7 @@ describe("DomTestingParserSelectionTest", () => {
           NotImplementedError,
         );
       }
+      /* eslint-enable vitest/no-conditional-expect */
 
       expect(() => Testing.htmlDocument({ htmlVersion: ":html9" })).toThrow(ArgumentError);
       expect(() => Testing.htmlDocumentFragment({ htmlVersion: ":html9" })).toThrow(ArgumentError);
@@ -36,6 +28,7 @@ describe("DomTestingParserSelectionTest", () => {
 
   it("with default html5", () => {
     withDefaultHtmlVersion(":html5", () => {
+      /* eslint-disable vitest/no-conditional-expect -- parser_selection_test.rb:16-22 branches on `html5_support?` */
       if (Testing.isHtml5Support()) {
         expect(Testing.htmlDocument()).toBe(HTML5.Document);
         expect(Testing.htmlDocumentFragment()).toBe(HTML5.DocumentFragment);
@@ -43,7 +36,9 @@ describe("DomTestingParserSelectionTest", () => {
         expect(() => Testing.htmlDocument()).toThrow(NotImplementedError);
         expect(() => Testing.htmlDocumentFragment()).toThrow(NotImplementedError);
       }
+      /* eslint-enable vitest/no-conditional-expect */
 
+      /* eslint-disable vitest/no-conditional-expect -- parser_selection_test.rb:16-22 branches on `html5_support?` */
       if (Testing.isHtml5Support()) {
         expect(Testing.htmlDocument({ htmlVersion: ":html5" })).toBe(HTML5.Document);
         expect(Testing.htmlDocumentFragment({ htmlVersion: ":html5" })).toBe(
@@ -55,6 +50,7 @@ describe("DomTestingParserSelectionTest", () => {
           NotImplementedError,
         );
       }
+      /* eslint-enable vitest/no-conditional-expect */
 
       expect(() => Testing.htmlDocument({ htmlVersion: ":html9" })).toThrow(ArgumentError);
       expect(() => Testing.htmlDocumentFragment({ htmlVersion: ":html9" })).toThrow(ArgumentError);
@@ -66,6 +62,7 @@ describe("DomTestingParserSelectionTest", () => {
       expect(() => Testing.htmlDocument()).toThrow(ArgumentError);
       expect(() => Testing.htmlDocumentFragment()).toThrow(ArgumentError);
 
+      /* eslint-disable vitest/no-conditional-expect -- parser_selection_test.rb:16-22 branches on `html5_support?` */
       if (Testing.isHtml5Support()) {
         expect(Testing.htmlDocument({ htmlVersion: ":html5" })).toBe(HTML5.Document);
         expect(Testing.htmlDocumentFragment({ htmlVersion: ":html5" })).toBe(
@@ -77,10 +74,10 @@ describe("DomTestingParserSelectionTest", () => {
           NotImplementedError,
         );
       }
+      /* eslint-enable vitest/no-conditional-expect */
 
       expect(() => Testing.htmlDocument({ htmlVersion: ":html9" })).toThrow(ArgumentError);
       expect(() => Testing.htmlDocumentFragment({ htmlVersion: ":html9" })).toThrow(ArgumentError);
     });
   });
 });
-/* eslint-enable vitest/no-conditional-expect */

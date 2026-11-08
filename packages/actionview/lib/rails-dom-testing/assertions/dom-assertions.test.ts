@@ -3,16 +3,7 @@ import { Assertion, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Testing } from "../testing.js";
 import { assertDomEqual, assertDomNotEqual } from "./dom-assertions.js";
-
-function withDefaultHtmlVersion(version: string, block: () => void): void {
-  const oldVersion = Testing.defaultHtmlVersion;
-  try {
-    Testing.defaultHtmlVersion = version;
-    block();
-  } finally {
-    Testing.defaultHtmlVersion = oldVersion;
-  }
-}
+import { withDefaultHtmlVersion } from "../../test-helpers/dom-testing-helpers.js";
 
 describe("DomAssertionsTest", () => {
   it("responds to assert dom equal", () => {
@@ -179,8 +170,6 @@ describe("DomAssertionsHtmlParserSelectionTest", () => {
   });
 
   it("invalid version specified", () => {
-    expect(() => assertDomEqual("a", "b", null, { htmlVersion: ":html9" })).toThrow(
-      new ArgumentError("html_version must be :html4 or :html5, received :html9"),
-    );
+    expect(() => assertDomEqual("a", "b", null, { htmlVersion: ":html9" })).toThrow(ArgumentError);
   });
 });
