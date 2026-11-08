@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
+import { _virtualAttributePrototypeCache } from "./persistence.js";
 
 describe("select alias dynamic reader (trails)", () => {
   fixtures(["posts", "comments"]);
@@ -32,6 +33,65 @@ describe("select alias dynamic reader (trails)", () => {
     });
     expect(record.bumped_id).toEqual(record.readAttribute("bumped_id"));
     expect(record.bumped_id).not.toBeUndefined();
+  });
+
+  it("records loaded with the same alias share one reader instead of a singleton each", async () => {
+    const [a, b] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    const [c] = await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    expect(Object.getPrototypeOf(a)).toBe(Object.getPrototypeOf(b));
+    expect(Object.getPrototypeOf(a)).toBe(Object.getPrototypeOf(c));
+    expect(Object.getPrototypeOf(Object.getPrototypeOf(a))).toBe(Comment.prototype);
+    expect(a).toBeInstanceOf(Comment);
+    expect(a.bumped_id).not.toEqual(b.bumped_id);
+  });
+
+  it("does not leak an alias reader onto records loaded without it", async () => {
+    await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    const [plain] = (await Comment.order("id")) as (Comment & { bumped_id: unknown })[];
+    const [other] = (await Comment.select("comments.*, (id + 2000) AS other_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown; other_id: unknown })[];
+    expect(Object.getPrototypeOf(plain)).toBe(Comment.prototype);
+    expect(plain.bumped_id).toBeUndefined();
+    expect(other.bumped_id).toBeUndefined();
+    expect(other.other_id).toEqual(other.readAttribute("other_id"));
+  });
+
+  it("a clone of a record carrying the shared alias reader keeps it", async () => {
+    const [record] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    const copy = record.clone() as Comment & { bumped_id: unknown };
+    expect(copy.bumped_id).toEqual(record.bumped_id);
+    expect(copy).toBeInstanceOf(Comment);
+  });
+
+  it("rebuilds the shared alias reader after the class undefines its attribute methods", async () => {
+    const [a] = await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    Comment.undefineAttributeMethods();
+    const [b] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    expect(Object.getPrototypeOf(b) === Object.getPrototypeOf(a)).toBe(false);
+    expect(b.bumped_id).toEqual(b.readAttribute("bumped_id"));
+  });
+
+  it("caches at most 64 alias sets and 64 alias readers per class", async () => {
+    Comment.undefineAttributeMethods();
+    for (let i = 0; i < 65; i++) {
+      const [record] = (await Comment.select(`comments.*, (id + ${i}) AS alias_${i}`).order(
+        "id",
+      )) as (Comment & Record<string, unknown>)[];
+      expect(record[`alias_${i}`]).toEqual(record.readAttribute(`alias_${i}`));
+    }
+    const cache = _virtualAttributePrototypeCache.get(Comment)!;
+    expect(cache.prototypes.size).toBe(64);
+    expect(cache.methods.size).toBe(64);
+    const [first] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
+    const [second] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
+    expect(Object.getPrototypeOf(first) === Object.getPrototypeOf(second)).toBe(false);
   });
 
   it("loads a record without materializing its attribute set", async () => {

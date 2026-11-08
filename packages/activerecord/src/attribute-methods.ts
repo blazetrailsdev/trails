@@ -31,6 +31,7 @@ import {
 import { DangerousAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
+import { _virtualAttributePrototypeCache } from "./persistence.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   type InspectionMask,
@@ -384,6 +385,7 @@ export function undefineAttributeMethods(this: AttributeMethodsHost): void {
     }
     this._attributeMethodsGenerated = false;
     this._aliasAttributesMassGenerated = false;
+    _virtualAttributePrototypeCache.delete(this);
   });
 }
 
