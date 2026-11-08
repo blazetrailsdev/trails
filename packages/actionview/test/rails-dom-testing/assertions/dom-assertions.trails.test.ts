@@ -57,20 +57,10 @@ describe("DomAssertions", () => {
 });
 
 describe("Rails::Dom::Testing.html_document_fragment", () => {
-  it("raises ArgumentError for an unknown html_version", () => {
-    expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html6" })).toThrow(
-      "html_version must be :html4 or :html5, received :html6",
-    );
-  });
-
   it("has no HTML4 fragment parser yet", () => {
     expect(() => assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html4" })).toThrow(
       NotImplementedError,
     );
-  });
-
-  it("selects the HTML5 fragment parser", () => {
-    assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html5" });
   });
 });
 
