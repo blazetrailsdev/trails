@@ -65,7 +65,14 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "solid-queue",
     "solid-cable",
   ];
-  const packageAliases: Record<string, string> = { erubi: "tse-compiler" };
+  const packageAliases: Record<string, [dir: string, pattern: string]> = {
+    erubi: ["tse-compiler", "**/*.test.ts"],
+    nokogiri: ["nokogiri", "!(racc)/**/*.test.ts"],
+    racc: ["nokogiri", "racc/**/*.test.ts"],
+    "rails-html-sanitizer": ["html-sanitizer", "*.test.ts"],
+    loofah: ["html-sanitizer", "loofah/**/*.test.ts"],
+    crass: ["html-sanitizer", "crass/**/*.test.ts"],
+  };
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
@@ -95,9 +102,9 @@ export function getPackageTestFiles(): Record<string, string[]> {
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
 
-  // Aliased packages (erubi → tse-compiler)
-  for (const [alias, dir] of Object.entries(packageAliases)) {
-    const files = globInTestRoots(dir, "**/*.test.ts").sort();
+  // Aliased packages (erubi → tse-compiler, the html-sanitizer gems, ...)
+  for (const [alias, [dir, pattern]] of Object.entries(packageAliases)) {
+    const files = globInTestRoots(dir, pattern).sort();
     result[alias] = files;
   }
 
