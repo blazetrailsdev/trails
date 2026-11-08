@@ -12,7 +12,7 @@ describe("SolidCableTest", () => {
 
   it("autotrimming when nothing is set", async () => {
     expect(
-      Object.hasOwn(await TopLevel.Trails!.application!.configFor("cable"), "autotrim"),
+      Object.hasOwn((await TopLevel.Trails!.application!.configFor("cable")) as object, "autotrim"),
     ).toBeFalsy();
     expect(SolidCable.isAutotrim()).toBeTruthy();
   });

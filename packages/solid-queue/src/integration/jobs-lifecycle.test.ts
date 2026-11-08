@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import "../test-helpers/dummy-application.js";
 import {
   permanentConnectionCheckout,
@@ -109,7 +110,7 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
     const message = "raised ExpectedTestError for the 1st time";
     expect(JobBuffer.values.sort()).toEqual([`A: ${message}`, `B: ${message}`]);
 
-    expect(await Job.finished().toArray()).toEqual([]);
+    expect(await Job.finished().toArray()).toBeEmpty();
   });
 
   it("enqueue and run jobs that fail and succeed after retrying", async () => {

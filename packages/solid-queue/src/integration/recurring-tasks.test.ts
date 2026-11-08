@@ -73,13 +73,13 @@ describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
     await run.terminate();
 
     await Record.uncached(async () => {
-      expect(await Job.count()).toBeGreaterThanOrEqual(2);
+      expect((await Job.count()) >= 2).toBeTruthy();
       for (const job of await Job.all().toArray()) {
         expect((await job.recurringExecution)!.task_key).toBe("periodic_store_result");
         expect(job.class_name).toBe("StoreResultJob");
       }
 
-      expect(await JobResult.count()).toBeGreaterThanOrEqual(2);
+      expect((await JobResult.count()) >= 2).toBeTruthy();
       for (const result of await JobResult.all().toArray()) {
         expect(result.status).toBe("custom_status");
         expect(result.value).toBe("42");
