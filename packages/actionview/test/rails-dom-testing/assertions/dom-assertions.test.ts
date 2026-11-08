@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assertion, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
-import { Testing } from "../testing.js";
-import { assertDomEqual, assertDomNotEqual } from "./dom-assertions.js";
-import { withDefaultHtmlVersion } from "../../test-helpers/dom-testing-helpers.js";
+import { Testing } from "../../../lib/rails-dom-testing/testing.js";
+import {
+  assertDomEqual,
+  assertDomNotEqual,
+} from "../../../lib/rails-dom-testing/assertions/dom-assertions.js";
+import { withDefaultHtmlVersion } from "../../support/dom-testing-helpers.js";
 
 describe("DomAssertionsTest", () => {
   it("responds to assert dom equal", () => {

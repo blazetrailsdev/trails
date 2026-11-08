@@ -1,4 +1,4 @@
-import { Testing } from "../rails-dom-testing/testing.js";
+import { Testing } from "../../lib/rails-dom-testing/testing.js";
 
 export function withDefaultHtmlVersion(version: string, block: () => void): void {
   const oldVersion = Testing.defaultHtmlVersion;

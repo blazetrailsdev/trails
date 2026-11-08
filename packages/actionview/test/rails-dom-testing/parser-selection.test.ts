@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { HTML5 } from "@blazetrails/nokogiri";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
-import { Testing } from "./testing.js";
-import { withDefaultHtmlVersion } from "../test-helpers/dom-testing-helpers.js";
+import { Testing } from "../../lib/rails-dom-testing/testing.js";
+import { withDefaultHtmlVersion } from "../support/dom-testing-helpers.js";
 
 describe("DomTestingParserSelectionTest", () => {
   it("with default html4", () => {
