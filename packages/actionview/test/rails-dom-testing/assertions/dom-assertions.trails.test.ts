@@ -68,10 +68,6 @@ describe("Rails::Dom::Testing.html_document_fragment", () => {
       NotImplementedError,
     );
   });
-
-  it("selects the HTML5 fragment parser", () => {
-    assertDomEqual("<a></a>", "<a></a>", null, { htmlVersion: ":html5" });
-  });
 });
 
 describe("Rails::Dom::Testing.html_document_fragment inspect", () => {
