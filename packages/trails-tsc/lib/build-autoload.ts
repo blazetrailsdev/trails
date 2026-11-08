@@ -12,8 +12,21 @@ interface BootLoader {
   eagerLoad?(): Promise<void>;
 }
 
-interface BootApplication {
+interface BootPaths {
+  get(
+    path: string,
+  ):
+    | { toAry(): string[]; extensions(): string[] | undefined; existent(): Promise<string[]> }
+    | undefined;
+}
+
+interface BootEngine {
   config: { root: string | null };
+  paths?(): BootPaths;
+}
+
+interface BootApplication extends BootEngine {
+  railties?(): Iterable<object>;
   initializers: { tsort(): BootInitializer[] };
   autoloaders?: Partial<Record<"main" | "once", BootLoader>>;
 }
@@ -70,10 +83,66 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
       `environment${File.extname(applicationFile)}`,
     );
     if (await File.isExistAsync(environmentFile)) {
-      await writeEntry(File.expandPath(".trails", root), applicationFile, environmentFile, tagged);
+      const trailsDir = File.expandPath(".trails", root);
+      await writeBoot(trailsDir, root, application);
+      await writeEntry(trailsDir, applicationFile, environmentFile, tagged);
     }
   }
   return dirs;
+}
+
+const BOOT_PATHS = [
+  "config/routes.ts",
+  "config/routes",
+  "config/environments",
+  "config/initializers",
+  "db/seeds.ts",
+];
+
+async function writeBoot(
+  trailsDir: string,
+  root: string,
+  application: BootApplication,
+): Promise<void> {
+  const path = getPath();
+  const engines = [application, ...(application.railties?.() ?? [])].filter(
+    (engine): engine is BootEngine => typeof (engine as BootEngine).paths === "function",
+  );
+  const files = new Set<string>();
+  for (const engine of engines) {
+    const engineRoot = engine.config.root ?? root;
+    for (const key of BOOT_PATHS) {
+      const node = engine.paths!().get(key);
+      if (node === undefined) continue;
+      if (key !== "config/environments") {
+        for (const file of await node.existent()) files.add(file);
+        continue;
+      }
+      const glob = `*.{${(node.extensions() ?? ["ts", "js"]).join(",")}}`;
+      for (const raw of node.toAry()) {
+        const dir = File.expandPath(raw, engineRoot);
+        if (!(await File.isDirectoryAsync(dir))) continue;
+        for (const file of (await Dir.globAsync(glob, 0, { base: dir })).sort()) {
+          if (!File.basename(file, File.extname(file)).includes("."))
+            files.add(File.join(dir, file));
+        }
+      }
+    }
+  }
+  const entries = [...files].map((file) => {
+    const specifier = path.relative!(trailsDir, file);
+    return `  ${JSON.stringify(path.relative!(root, file))}: () => import(${JSON.stringify(specifier.startsWith(".") ? specifier : `./${specifier}`)}),`;
+  });
+  const boot = [
+    'import { getPath, registerCompiledFiles } from "@blazetrails/ruby-compat";',
+    "",
+    'registerCompiledFiles(getPath().fileURLToPath(new URL("..", import.meta.url)), {',
+    ...entries,
+    "});",
+    "",
+  ].join("\n");
+  await getFs().mkdir!(trailsDir, { recursive: true });
+  await getFs().writeFile!(File.join(trailsDir, "boot.generated.js"), boot);
 }
 
 async function writeEntry(
@@ -93,6 +162,7 @@ async function writeEntry(
   );
   const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: imports${i},`);
   const install = [
+    'import "../boot.generated.js";',
     'import { Trails } from "@blazetrails/trailties";',
     `import ${JSON.stringify(specifier(autoloadDir, applicationFile))};`,
     ...imports,

@@ -1,4 +1,11 @@
-import { Dir, File, FileUtils, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  TopLevel,
+  rbFLoad,
+  registerCompiledFiles,
+} from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildAutoload } from "../lib/build-autoload.js";
@@ -196,6 +203,109 @@ describe("buildAutoload", () => {
       expect(manifest.shadowed).toEqual([]);
       expect(Object.hasOwn(once, "eagerLoad")).toBe(false);
     } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("writes a boot file that registers the routes, environments, initializers and seeds", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      for (const dir of [
+        "config/environments",
+        "config/initializers/deep",
+        "config/routes",
+        "db",
+      ]) {
+        FileUtils.mkdirP(dir);
+      }
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      File.write(
+        "config/routes.ts",
+        "globalThis.__routesEvaluated = (globalThis.__routesEvaluated ?? 0) + 1;\nexport const Drawn = {};\n",
+      );
+      File.write("config/routes/admin.ts", "export {};\n");
+      File.write("config/environments/test.ts", "export {};\n");
+      File.write("config/environments/production.ts", "export {};\n");
+      File.write("config/environments/production.d.ts", "export {};\n");
+      File.write("config/initializers/deep/inflections.ts", "export {};\n");
+      File.write("db/seeds.ts", "export {};\n");
+      const root = Dir.pwd();
+      const globs: Record<string, string> = {
+        "config/routes": "**/*.{ts,js}",
+        "config/environments": "test.{ts,js}",
+        "config/initializers": "**/*.{ts,js}",
+      };
+      const paths = (engineRoot: string) => () => ({
+        get: (key: string) => ({
+          toAry: () => [key],
+          extensions: () => globs[key]?.match(/\{(\S+)\}/)?.[1].split(","),
+          existent: async () => {
+            const full = File.expandPath(key, engineRoot);
+            if (globs[key] === undefined) return File.isExist(full) ? [full] : [];
+            if (!File.isDirectory(full)) return [];
+            const found = await Dir.globAsync(globs[key], 0, { base: full });
+            return found.sort().map((file) => File.join(full, file));
+          },
+        }),
+      });
+      const engineRoot = File.expandPath("vendor/blog");
+      FileUtils.mkdirP(`${engineRoot}/config/initializers`);
+      File.write(`${engineRoot}/config/routes.ts`, "export {};\n");
+      File.write(`${engineRoot}/config/initializers/blog.ts`, "export {};\n");
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: paths(root),
+          railties: () => [{ config: { root: engineRoot }, paths: paths(engineRoot) }, {}],
+          initializers: { tsort: () => [] },
+        },
+      };
+
+      await buildAutoload();
+
+      const boot = File.read(".trails/boot.generated.js");
+      for (const rel of [
+        "config/routes.ts",
+        "config/routes/admin.ts",
+        "config/environments/production.ts",
+        "config/environments/test.ts",
+        "config/initializers/deep/inflections.ts",
+        "db/seeds.ts",
+        "vendor/blog/config/routes.ts",
+        "vendor/blog/config/initializers/blog.ts",
+      ]) {
+        expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
+      }
+      expect(boot).not.toContain("production.d.ts");
+      expect(File.read(".trails/autoload/install.generated.js")).toContain(
+        'import "../boot.generated.js";',
+      );
+
+      const registered: [string, Record<string, () => Promise<unknown>>][] = [];
+      vi.doMock("@blazetrails/ruby-compat", async (original) => ({
+        ...(await original<object>()),
+        registerCompiledFiles: (r: string, files: Record<string, () => Promise<unknown>>) => {
+          registered.push([r, files]);
+          registerCompiledFiles(r, files);
+        },
+      }));
+      vi.resetModules();
+      try {
+        await import(File.expandPath(".trails/boot.generated.js"));
+      } finally {
+        vi.doUnmock("@blazetrails/ruby-compat");
+      }
+      expect(registered.map(([r]) => File.expandPath(r))).toEqual([root]);
+      const drawn = await import(File.expandPath("config/routes.ts"));
+      await rbFLoad(File.expandPath("config/routes.ts"));
+      expect((globalThis as Record<string, unknown>).__routesEvaluated).toBe(1);
+      expect(seats.Drawn).toBe(drawn.Drawn);
+    } finally {
+      delete seats.Drawn;
+      delete (globalThis as Record<string, unknown>).__routesEvaluated;
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
     }
