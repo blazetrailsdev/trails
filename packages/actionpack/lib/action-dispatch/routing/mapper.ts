@@ -30,7 +30,7 @@ import {
   Enumerable,
   extend,
   getFs,
-  getPath,
+  loadIseqEval,
   hashAref,
   hashAset,
   include,
@@ -1393,7 +1393,6 @@ export class Mapper {
    */
   async draw(name: string): Promise<void> {
     const fs = getFs();
-    const p = getPath();
     let path: string | undefined;
     for (const _path of this._drawPaths) {
       if (await fs.exists(`${_path}/${name}.ts`)) {
@@ -1411,10 +1410,8 @@ export class Mapper {
     }
 
     const routePath = `${path}/${name}.ts`;
-    const mod = (await import(p.pathToFileURL!(routePath).href)) as {
-      drawRoutes?: DrawCallback;
-    };
-    mod.drawRoutes?.call(this);
+    const { drawRoutes } = await loadIseqEval(routePath, true);
+    (drawRoutes as DrawCallback | undefined)?.call(this);
   }
 
   /** @internal */

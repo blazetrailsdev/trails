@@ -4,6 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { registerCompiledFiles } from "@blazetrails/ruby-compat";
 import { Mapper } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 
@@ -131,6 +132,33 @@ describe("Mapper public DSL additions", () => {
     await m.draw("external");
 
     expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/external(.:format)");
+  });
+
+  it("draws a sub-routes file through its registered compiled thunk", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "trails-draw-compiled-"));
+    await writeFile(
+      join(dir, "compiled.ts"),
+      'export function drawRoutes() { this.get("/disk", { to: "disk#index" }); }\n',
+    );
+    registerCompiledFiles(dir, {
+      "compiled.ts": async () => ({
+        drawRoutes(this: Mapper) {
+          this.get("/compiled", { to: "compiled#index" });
+        },
+      }),
+    });
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    m._drawPaths.push(dir);
+
+    await m.draw("compiled");
+
+    const specs = () => set.routes().routes.map((r) => r.path.spec.toString());
+    expect(specs()).toContain("/compiled(.:format)");
+    expect(specs()).not.toContain("/disk(.:format)");
+
+    await m.draw("compiled");
+    expect(specs()).toContain("/disk(.:format)");
   });
 
   it("root routes through match_root_route and keeps the bare slash", () => {
