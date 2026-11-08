@@ -101,6 +101,7 @@ describe("JobsLifecycleTest", { timeout: 15_000 }, () => {
   it("enqueue and run jobs that fail without retries", async () => {
     await RaisingJob.performLater(ExpectedTestError, "A");
     await RaisingJob.performLater(ExpectedTestError, "B");
+    const _jobs = await Job.last(2);
 
     await dispatcher.start();
     await worker.start();
