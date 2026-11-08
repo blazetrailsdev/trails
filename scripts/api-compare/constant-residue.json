@@ -1192,7 +1192,7 @@
     "residue": {}
   },
   "solid-queue": {
-    "rows": 60,
+    "rows": 61,
     "excluded": [
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",

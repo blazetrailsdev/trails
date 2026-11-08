@@ -4,15 +4,17 @@ import { Struct, constSet, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution, UndiscardableError } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
 
-export class ClaimedExecution extends Execution {
-  static Result = class Result extends Struct.new("success", "error") {
-    declare success: boolean;
-    declare error: Error | null;
+export class Result extends Struct.new("success", "error") {
+  declare success: boolean;
+  declare error: Error | null;
 
-    isSuccess(): boolean {
-      return this.success;
-    }
-  };
+  isSuccess(): boolean {
+    return this.success;
+  }
+}
+
+export class ClaimedExecution extends Execution {
+  declare static Result: typeof Result;
 
   declare static orphaned: () => Relation<ClaimedExecution>;
   declare process_id: unknown;
@@ -20,6 +22,7 @@ export class ClaimedExecution extends Execution {
 
   static {
     constSet(SolidQueue, "ClaimedExecution", this);
+    constSet(this, "Result", Result);
 
     this.belongsTo("process");
 
@@ -123,7 +126,7 @@ export class ClaimedExecution extends Execution {
   }
 
   /** @internal */
-  private async execute(): Promise<InstanceType<typeof ClaimedExecution.Result>> {
+  private async execute(): Promise<Result> {
     try {
       await ActiveJobBase.execute(
         (await this.job).arguments as unknown as Parameters<typeof ActiveJobBase.execute>[0],

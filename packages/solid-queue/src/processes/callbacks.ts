@@ -12,10 +12,10 @@ export class Callbacks {
 }
 
 export declare class ClassMethods {
-  beforeBoot: (...args: unknown[]) => void;
-  aroundBoot: (...args: unknown[]) => void;
-  afterBoot: (...args: unknown[]) => void;
-  beforeShutdown: (...args: unknown[]) => void;
-  aroundShutdown: (...args: unknown[]) => void;
-  afterShutdown: (...args: unknown[]) => void;
+  beforeBoot: (...callbacks: unknown[]) => void;
+  aroundBoot: (...callbacks: unknown[]) => void;
+  afterBoot: (...callbacks: unknown[]) => void;
+  beforeShutdown: (...callbacks: unknown[]) => void;
+  aroundShutdown: (...callbacks: unknown[]) => void;
+  afterShutdown: (...callbacks: unknown[]) => void;
 }

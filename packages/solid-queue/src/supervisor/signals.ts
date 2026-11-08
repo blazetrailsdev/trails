@@ -1,6 +1,7 @@
 import { Concern, extend } from "@blazetrails/activesupport";
 import { classModule, onSignal } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
+import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
 type Signal = "QUIT" | "INT" | "TERM";
 
@@ -95,10 +96,7 @@ export class Signals {
 extend(Signals, Concern);
 (
   Signals as unknown as {
-    included(
-      base: null,
-      block: (this: { beforeBoot(name: string): void; afterShutdown(name: string): void }) => void,
-    ): void;
+    included(base: null, block: (this: CallbacksClassMethods) => void): void;
   }
 ).included(null, function () {
   this.beforeBoot(":registerSignalHandlers");

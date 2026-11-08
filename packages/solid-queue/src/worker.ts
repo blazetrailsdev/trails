@@ -26,8 +26,8 @@ export class Worker extends Poller {
   static {
     include(this, LifecycleHooks);
 
-    (this as unknown as { afterBoot(name: string): void }).afterBoot(":runStartHooks");
-    (this as unknown as { beforeShutdown(name: string): void }).beforeShutdown(":runStopHooks");
+    this.afterBoot(":runStartHooks");
+    this.beforeShutdown(":runStopHooks");
   }
 
   queues: string[];

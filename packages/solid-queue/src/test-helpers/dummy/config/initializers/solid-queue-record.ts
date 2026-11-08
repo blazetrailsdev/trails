@@ -1,11 +1,13 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { Record } from "../../../../record.js";
+import { app } from "../application.js";
 
-export const x = { solidQueueRecordHookRan: false };
+app.config.x.solidQueueRecordHookRan = false;
 
 onLoad("solid_queue_record", function (this: unknown) {
-  if (this !== Record)
+  if (this !== Record) {
     throw new RuntimeError(`Expected to run on SolidQueue::Record, got ${rbInspect(this)}`);
-  x.solidQueueRecordHookRan = true;
+  }
+  app.config.x.solidQueueRecordHookRan = true;
 });

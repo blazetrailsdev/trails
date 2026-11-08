@@ -2,6 +2,7 @@ import { Concern, extend } from "@blazetrails/activesupport";
 import { classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import { Pidfile } from "./pidfile.js";
+import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
 interface PidfiledHost {
   _pidfile?: Pidfile;
@@ -28,10 +29,7 @@ export class Pidfiled {
 extend(Pidfiled, Concern);
 (
   Pidfiled as unknown as {
-    included(
-      base: null,
-      block: (this: { beforeBoot(name: string): void; afterShutdown(name: string): void }) => void,
-    ): void;
+    included(base: null, block: (this: CallbacksClassMethods) => void): void;
   }
 ).included(null, function () {
   this.beforeBoot(":setupPidfile");

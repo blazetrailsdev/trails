@@ -747,6 +747,7 @@ export function extractFromProgram(
     // Renamed-import aliases for this file, consumed by extractCalls below.
     currentImportAliases = collectImportAliases(sourceFile);
     const sectionVisibility = collectModuleSectionVisibility(sourceFile);
+    let attributeReceivers: Set<string | undefined> | undefined;
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -1025,10 +1026,10 @@ export function extractFromProgram(
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
           if (!decl.initializer) continue;
-          const declName = decl.name.text;
-          const literal = collectClassAttributeCalls(sourceFile).some(
-            (call) => call.receiver === declName,
-          )
+          attributeReceivers ??= new Set(
+            collectClassAttributeCalls(sourceFile).map((call) => call.receiver),
+          );
+          const literal = attributeReceivers.has(decl.name.text)
             ? unwrapAssertions(decl.initializer)
             : decl.initializer;
           const objectLiteral = ts.isObjectLiteralExpression(literal);
