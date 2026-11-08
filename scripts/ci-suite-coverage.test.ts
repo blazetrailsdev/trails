@@ -827,7 +827,7 @@ describe("CI runs every tooling test suite", () => {
   ].join("\n");
   const VITEST_BEFORE = [
     "const alias = {",
-    '  "@blazetrails/rack": "packages/rack/src/index.ts",',
+    '  "@blazetrails/rack": "packages/rack/lib/index.ts",',
     "};",
     "",
   ].join("\n");
@@ -956,7 +956,7 @@ describe("CI runs every tooling test suite", () => {
       "packages/activerecord/src/relation.test.ts",
       "packages/activerecord/src/test-helpers/models/topic.ts",
       "packages/activerecord/src/test-helpers/fixtures/topics.yml",
-      "packages/arel/src/__snapshots__/visitors.test.ts.snap",
+      "packages/arel/test/__snapshots__/visitors.test.ts.snap",
       "packages/activerecord/src/test-fixtures.ts",
       "packages/activerecord/src/test-fixtures/fixture-connection.ts",
     ];
@@ -991,8 +991,8 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
         "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
         "packages/activerecord/src/connection-adapters/sql-classification.ts",
-        "packages/arel/src/visitors/postgresql.ts",
-        "packages/arel/src/visitors/mysql.ts",
+        "packages/arel/lib/visitors/postgresql.ts",
+        "packages/arel/lib/visitors/mysql.ts",
         "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
       ];
       const skips = [
@@ -1001,7 +1001,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord/src/base.test.ts",
         "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
         "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
-        "packages/arel/src/visitors/to-sql.ts",
+        "packages/arel/lib/visitors/to-sql.ts",
       ];
       const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
       const outcome = Object.fromEntries(

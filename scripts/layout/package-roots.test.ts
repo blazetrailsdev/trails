@@ -18,16 +18,16 @@ describe("package-roots", () => {
   });
 
   it("answers src for an unmoved package", () => {
-    expect(libRoot("arel")).toBe("src");
-    expect(testRoots("arel")).toEqual(["src"]);
-    expect(sourceRoots("arel")).toEqual(["src"]);
+    expect(libRoot("activerecord")).toBe("src");
+    expect(testRoots("activerecord")).toEqual(["src"]);
+    expect(sourceRoots("activerecord")).toEqual(["src"]);
   });
 
   it("matches a package's src segment and nothing longer", () => {
-    const re = new RegExp(srcReferencePattern("rack"));
-    expect(re.test("see packages/rack/src/index.ts")).toBe(true);
-    expect(re.test('"packages/rack/src"')).toBe(true);
-    expect(re.test("packages/rack-test/lib/x.ts")).toBe(false);
-    expect(re.test("packages/rack/srcs")).toBe(false);
+    const re = new RegExp(srcReferencePattern("activemodel"));
+    expect(re.test("see packages/activemodel/src/index.ts")).toBe(true);
+    expect(re.test('"packages/activemodel/src"')).toBe(true);
+    expect(re.test("packages/activemodel-x/lib/x.ts")).toBe(false);
+    expect(re.test("packages/activemodel/srcs")).toBe(false);
   });
 });

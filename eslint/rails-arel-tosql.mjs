@@ -75,7 +75,7 @@ function loadAllow() {
 /** Repo-relative path (POSIX) for the in-scope packages; null if out of scope. */
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/(activerecord|activemodel|arel)\/src\/.+\.ts)$/);
+  const m = norm.match(/(?:^|\/)(packages\/(activerecord|activemodel|arel)\/(?:src|lib)\/.+\.ts)$/);
   return m ? { rel: m[1], pkg: m[2] } : null;
 }
 

@@ -2424,7 +2424,7 @@ export function skeletonsOfOwner(
  *
  * `parity:api` credits a Ruby method against a TS name wherever that name is
  * declared, and an `interface`/`type` signature is a declaration. So
- * `packages/arel/src/crud.ts` — four bare signatures mirroring `crud.rb`'s four
+ * `packages/arel/lib/crud.ts` — four bare signatures mirroring `crud.rb`'s four
  * module bodies — scored 4/4, and a Rails developer opening the two files side
  * by side found nothing to compare. A signature is a shape claim, not a port,
  * so it earns no matched credit.

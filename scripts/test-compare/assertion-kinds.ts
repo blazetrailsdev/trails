@@ -306,7 +306,7 @@ const AREL_HELPER_ALIAS: Record<string, string> = {
  * The Ruby `must_be_like` above IS an assertion — it squeezes whitespace and
  * then delegates to `must_equal` (helper.rb:10-13), which is why it aliases to
  * `assert_equal` in AREL_HELPER_ALIAS. The trails port splits those two halves:
- * `packages/arel/src/test-helpers/must-be-like.ts` keeps only the squeezing,
+ * `packages/arel/test/support/must-be-like.ts` keeps only the squeezing,
  * and a native `expect(mustBeLike(a)).toBe(mustBeLike(b))` does the asserting.
  * The terminal `toBe` is therefore the whole assertion, and counting the two
  * normalizer calls beside it scores one Rails assertion as three.

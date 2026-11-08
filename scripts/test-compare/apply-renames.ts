@@ -16,206 +16,206 @@ const RENAMES: [string, string, string][] = [
   // ==========================================================================
   // Table
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "manufactures an Attribute via get()",
     "manufactures an attribute if the symbol names an attribute within the relation",
   ],
-  ["packages/arel/src/arel.test.ts", "project returns a SelectManager", "returns a tree manager"],
+  ["packages/arel/test/arel.test.ts", "project returns a SelectManager", "returns a tree manager"],
 
   // Attribute predicates
-  ["packages/arel/src/arel.test.ts", "eq generates =", "should return an equality node"],
-  ["packages/arel/src/arel.test.ts", "eq(null) generates IS NULL", "should handle nil"],
-  ["packages/arel/src/arel.test.ts", "notEq generates !=", "should create a NotEqual node"],
-  ["packages/arel/src/arel.test.ts", "gt generates >", "should create a GreaterThan node"],
-  ["packages/arel/src/arel.test.ts", "lt generates <", "should create a LessThan node"],
-  ["packages/arel/src/arel.test.ts", "matches generates LIKE", "should create a Matches node"],
+  ["packages/arel/test/arel.test.ts", "eq generates =", "should return an equality node"],
+  ["packages/arel/test/arel.test.ts", "eq(null) generates IS NULL", "should handle nil"],
+  ["packages/arel/test/arel.test.ts", "notEq generates !=", "should create a NotEqual node"],
+  ["packages/arel/test/arel.test.ts", "gt generates >", "should create a GreaterThan node"],
+  ["packages/arel/test/arel.test.ts", "lt generates <", "should create a LessThan node"],
+  ["packages/arel/test/arel.test.ts", "matches generates LIKE", "should create a Matches node"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "doesNotMatch generates NOT LIKE",
     "should create a DoesNotMatch node",
   ],
-  ["packages/arel/src/arel.test.ts", "notIn generates NOT IN", "should generate NOT IN in sql"],
+  ["packages/arel/test/arel.test.ts", "notIn generates NOT IN", "should generate NOT IN in sql"],
 
   // Ordering
-  ["packages/arel/src/arel.test.ts", "asc generates ASC", "should create an Ascending node"],
-  ["packages/arel/src/arel.test.ts", "desc generates DESC", "should create a Descending node"],
+  ["packages/arel/test/arel.test.ts", "asc generates ASC", "should create an Ascending node"],
+  ["packages/arel/test/arel.test.ts", "desc generates DESC", "should create a Descending node"],
 
   // Math operations
-  ["packages/arel/src/arel.test.ts", "add generates +", "should handle Addition"],
-  ["packages/arel/src/arel.test.ts", "subtract generates -", "should handle Subtraction"],
-  ["packages/arel/src/arel.test.ts", "multiply generates *", "should handle Multiplication"],
-  ["packages/arel/src/arel.test.ts", "divide generates /", "should handle Division"],
+  ["packages/arel/test/arel.test.ts", "add generates +", "should handle Addition"],
+  ["packages/arel/test/arel.test.ts", "subtract generates -", "should handle Subtraction"],
+  ["packages/arel/test/arel.test.ts", "multiply generates *", "should handle Multiplication"],
+  ["packages/arel/test/arel.test.ts", "divide generates /", "should handle Division"],
 
   // SelectManager
-  ["packages/arel/src/arel.test.ts", "lock generates FOR UPDATE", "adds a lock node"],
-  ["packages/arel/src/arel.test.ts", "inner join", "returns inner join sql"],
-  ["packages/arel/src/arel.test.ts", "left outer join", "returns outer join sql"],
+  ["packages/arel/test/arel.test.ts", "lock generates FOR UPDATE", "adds a lock node"],
+  ["packages/arel/test/arel.test.ts", "inner join", "returns inner join sql"],
+  ["packages/arel/test/arel.test.ts", "left outer join", "returns outer join sql"],
 
   // InsertManager
-  ["packages/arel/src/arel.test.ts", "handles null values", "inserts null"],
-  ["packages/arel/src/arel.test.ts", "handles boolean false", "inserts false"],
+  ["packages/arel/test/arel.test.ts", "handles null values", "inserts null"],
+  ["packages/arel/test/arel.test.ts", "handles boolean false", "inserts false"],
 
   // UpdateManager
-  ["packages/arel/src/arel.test.ts", "generates UPDATE with WHERE", "generates a where clause"],
-  ["packages/arel/src/arel.test.ts", "handles null set value", "updates with null"],
+  ["packages/arel/test/arel.test.ts", "generates UPDATE with WHERE", "generates a where clause"],
+  ["packages/arel/test/arel.test.ts", "handles null set value", "updates with null"],
 
   // DeleteManager
-  ["packages/arel/src/arel.test.ts", "generates DELETE with WHERE", "uses where values"],
+  ["packages/arel/test/arel.test.ts", "generates DELETE with WHERE", "uses where values"],
 
   // Advanced
-  ["packages/arel/src/arel.test.ts", "UNION", "should union two managers"],
-  ["packages/arel/src/arel.test.ts", "UNION ALL", "should union all"],
-  ["packages/arel/src/arel.test.ts", "INTERSECT", "should intersect two managers"],
-  ["packages/arel/src/arel.test.ts", "EXCEPT", "should except two managers"],
-  ["packages/arel/src/arel.test.ts", "EXISTS wraps subquery", "should create an exists clause"],
-  ["packages/arel/src/arel.test.ts", "WITH clause", "should support basic WITH"],
-  ["packages/arel/src/arel.test.ts", "WITH RECURSIVE", "should support WITH RECURSIVE"],
+  ["packages/arel/test/arel.test.ts", "UNION", "should union two managers"],
+  ["packages/arel/test/arel.test.ts", "UNION ALL", "should union all"],
+  ["packages/arel/test/arel.test.ts", "INTERSECT", "should intersect two managers"],
+  ["packages/arel/test/arel.test.ts", "EXCEPT", "should except two managers"],
+  ["packages/arel/test/arel.test.ts", "EXISTS wraps subquery", "should create an exists clause"],
+  ["packages/arel/test/arel.test.ts", "WITH clause", "should support basic WITH"],
+  ["packages/arel/test/arel.test.ts", "WITH RECURSIVE", "should support WITH RECURSIVE"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "attribute.count(true) generates COUNT(DISTINCT ...)",
     "should take a distinct param",
   ],
-  ["packages/arel/src/arel.test.ts", "attribute.count()", "should return a count node"],
-  ["packages/arel/src/arel.test.ts", "attribute.sum()", "should create a SUM node"],
-  ["packages/arel/src/arel.test.ts", "attribute.maximum()", "should create a MAX node"],
-  ["packages/arel/src/arel.test.ts", "attribute.minimum()", "should create a Min node"],
-  ["packages/arel/src/arel.test.ts", "attribute.average()", "should create a AVG node"],
-  ["packages/arel/src/arel.test.ts", "NamedFunction: COUNT(*)", "should visit named functions"],
-  ["packages/arel/src/arel.test.ts", "NamedFunction: SUM with alias", "construct with alias"],
+  ["packages/arel/test/arel.test.ts", "attribute.count()", "should return a count node"],
+  ["packages/arel/test/arel.test.ts", "attribute.sum()", "should create a SUM node"],
+  ["packages/arel/test/arel.test.ts", "attribute.maximum()", "should create a MAX node"],
+  ["packages/arel/test/arel.test.ts", "attribute.minimum()", "should create a Min node"],
+  ["packages/arel/test/arel.test.ts", "attribute.average()", "should create a AVG node"],
+  ["packages/arel/test/arel.test.ts", "NamedFunction: COUNT(*)", "should visit named functions"],
+  ["packages/arel/test/arel.test.ts", "NamedFunction: SUM with alias", "construct with alias"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "attribute compared to subquery",
     "should handle comparing with a subquery",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "OVER with PARTITION BY and ORDER BY",
     "takes a partition and an order",
   ],
-  ["packages/arel/src/arel.test.ts", "OVER with empty window", "should use empty definition"],
+  ["packages/arel/test/arel.test.ts", "OVER with empty window", "should use empty definition"],
 
   // Window framing
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "ROWS UNBOUNDED PRECEDING",
     "takes a rows frame, unbounded preceding",
   ],
 
   // Join types
-  ["packages/arel/src/arel.test.ts", "StringJoin (raw SQL join)", "returns string join sql"],
+  ["packages/arel/test/arel.test.ts", "StringJoin (raw SQL join)", "returns string join sql"],
 
   // Case node
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "generates simple CASE WHEN THEN END",
     "supports simple case expressions",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "generates CASE with operand",
     "supports extended case expressions",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "generates CASE with multiple conditions and else",
     "allows chaining multiple conditions",
   ],
 
   // Extract node
-  ["packages/arel/src/arel.test.ts", "generates EXTRACT(field FROM expr)", "should extract field"],
-  ["packages/arel/src/arel.test.ts", "supports .as() aliasing", "should alias the extract"],
+  ["packages/arel/test/arel.test.ts", "generates EXTRACT(field FROM expr)", "should extract field"],
+  ["packages/arel/test/arel.test.ts", "supports .as() aliasing", "should alias the extract"],
 
   // InfixOperation
-  ["packages/arel/src/arel.test.ts", "generates custom infix operation", "construct"],
+  ["packages/arel/test/arel.test.ts", "generates custom infix operation", "construct"],
 
   // Comment node
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "generates SQL comment",
     "appends a comment to the generated query",
   ],
 
   // SelectManager introspection
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "projections getter returns current projections",
     "reads projections",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "projections setter replaces all projections",
     "overwrites projections",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "constraints returns where conditions",
     "gives me back the where sql",
   ],
-  ["packages/arel/src/arel.test.ts", "source returns the FROM source", "should hand back froms"],
+  ["packages/arel/test/arel.test.ts", "source returns the FROM source", "should hand back froms"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "orders getter returns ORDER BY expressions",
     "returns order clauses",
   ],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "as() returns a TableAlias for subquery aliasing",
     "can be aliased",
   ],
 
   // Table factory methods
-  ["packages/arel/src/arel.test.ts", "alias() creates a TableAlias", "create table alias"],
-  ["packages/arel/src/arel.test.ts", "createJoin() creates an InnerJoin node", "create join"],
+  ["packages/arel/test/arel.test.ts", "alias() creates a TableAlias", "create table alias"],
+  ["packages/arel/test/arel.test.ts", "createJoin() creates an InnerJoin node", "create join"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "createStringJoin() creates a StringJoin node",
     "create string join",
   ],
-  ["packages/arel/src/arel.test.ts", "createOn() creates an On node", "create on"],
+  ["packages/arel/test/arel.test.ts", "createOn() creates an On node", "create on"],
 
   // InsertManager columns getter
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "returns columns after insert()",
     "combines columns and values list in order",
   ],
 
   // UpdateManager introspection
-  ["packages/arel/src/arel.test.ts", "key() sets primary key condition", "can be set"],
+  ["packages/arel/test/arel.test.ts", "key() sets primary key condition", "can be set"],
 
   // Collectors
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "Bind collector accumulates binds",
     "compile gathers all bind params",
   ],
 
   // DeleteManager advanced
-  ["packages/arel/src/arel.test.ts", "DELETE with ORDER BY and LIMIT", "handles limit properly"],
+  ["packages/arel/test/arel.test.ts", "DELETE with ORDER BY and LIMIT", "handles limit properly"],
 
   // InsertManager advanced
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "multi-row INSERT with ValuesList",
     "can create a ValuesList node",
   ],
 
   // Attribute string/null functions
-  ["packages/arel/src/arel.test.ts", "lower() generates LOWER function", "lower"],
-  ["packages/arel/src/arel.test.ts", "coalesce() generates COALESCE function", "coalesce"],
+  ["packages/arel/test/arel.test.ts", "lower() generates LOWER function", "lower"],
+  ["packages/arel/test/arel.test.ts", "coalesce() generates COALESCE function", "coalesce"],
 
   // ToSql Visitor
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "Grouping produces single layer of parens",
     "wraps nested groupings in brackets only once",
   ],
-  ["packages/arel/src/arel.test.ts", "Not applies to expression", "should visit_Not"],
-  ["packages/arel/src/arel.test.ts", "SqlLiteral is not quoted", "should not quote sql literals"],
-  ["packages/arel/src/arel.test.ts", "handles boolean false", "should handle false"],
-  ["packages/arel/src/arel.test.ts", "handles boolean true", "should handle true"],
+  ["packages/arel/test/arel.test.ts", "Not applies to expression", "should visit_Not"],
+  ["packages/arel/test/arel.test.ts", "SqlLiteral is not quoted", "should not quote sql literals"],
+  ["packages/arel/test/arel.test.ts", "handles boolean false", "should handle false"],
+  ["packages/arel/test/arel.test.ts", "handles boolean true", "should handle true"],
   [
-    "packages/arel/src/arel.test.ts",
+    "packages/arel/test/arel.test.ts",
     "handles string escaping (single quotes)",
     "should escape strings",
   ],

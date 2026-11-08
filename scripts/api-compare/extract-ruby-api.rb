@@ -5419,7 +5419,7 @@ def run
     end
 
     # A gem's `libEntryFile` is walked as an ordinary file, relative to its own
-    # directory, so it records as `arel.rb` — the path `packages/arel/src/arel.ts`
+    # directory, so it records as `arel.rb` — the path `packages/arel/lib/arel.ts`
     # maps onto. Otherwise the top-level umbrella file (`<libPath>.rb`, one level
     # above the package's libPath and outside the glob above) is scanned for its
     # declarations. See ApiExtractor#scan_umbrella_file.

@@ -253,14 +253,14 @@ on both sides.
   (2) fetch-rails-tests.sh, (3) `ruby extract-ruby-api.rb`,
   (4) `ruby extract-ruby-tests.rb`, (5) `tsx extract-ts-api.ts && tsx
   compare.ts`, (6) `tsx compare.ts --privates`, (7) `tsx lint-deps.ts`,
-  (8) `tsx build-rails-privates-manifest.ts && eslint packages/arel/src`,
+  (8) `tsx build-rails-privates-manifest.ts && eslint packages/arel/lib`,
   (9) test-compare. The Rails-derived ESLint gate is step 8; steps 5–7
   validate parity:api itself. The structure rule plugs in with two new steps
   inserted after `extract-ruby-api.rb`: (1) `ruby
 extract-rails-structure.rb` → `output/rails-structure.json`, (2) `tsx
 build-rails-structure-manifest.ts` → `eslint/rails-file-structure.cache.json`.
   The existing line-409 `eslint` invocation expands to cover all
-  Rails-mirroring packages (not just `packages/arel/src`), picking up the
+  Rails-mirroring packages (not just `packages/arel/lib`), picking up the
   new manifest. The structure rule's real gate is the `rails-comparison`
   job; this asymmetry with the default `lint` job is explicit and matches
   the existing precedent for `rails-private-jsdoc`.

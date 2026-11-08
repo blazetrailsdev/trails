@@ -278,7 +278,7 @@ export class TaskManager {
     const locations = rbFCaller();
     let i = 0;
     while (locations[i] != null) {
-      if (/rake\/(?:src|dist)\/dsl-definition\./.test(locations[i])) {
+      if (/rake\/(?:lib|dist)\/dsl-definition\./.test(locations[i])) {
         return locations[i + 1] ?? null;
       }
       i += 1;

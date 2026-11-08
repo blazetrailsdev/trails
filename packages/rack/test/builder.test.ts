@@ -316,9 +316,7 @@ describe("Rack::Builder", () => {
     });
 
     it("requires an_underscore_app not ending in .ru", async () => {
-      const app = await Builder.parseFile(
-        File.join(__dirname, "__fixtures__", "an_underscore_app.ts"),
-      );
+      const app = await Builder.parseFile(File.join(__dirname, "fixtures", "an_underscore_app.ts"));
       expect((await new MockRequest(app).get("/")).body.toString()).toEqual("OK");
     });
 

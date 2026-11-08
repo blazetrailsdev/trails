@@ -10,7 +10,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { captureOutput, useApplicationTestCase } from "./support/application.js";
 
-const load = () => rbFLoad(new URL("./rake-test-loader.ts", import.meta.url).pathname);
+const load = () => rbFLoad(new URL("../lib/rake-test-loader.ts", import.meta.url).pathname);
 const argvReplace = (...argv: string[]) => rbArgv().splice(0, rbArgv().length, ...argv);
 
 describe("TestRakeRakeTestLoader", () => {

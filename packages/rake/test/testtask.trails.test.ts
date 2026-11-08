@@ -25,7 +25,7 @@ describe("TestTask", () => {
     const existing = [...LOAD_PATH];
     LOAD_PATH.push("/existing");
     try {
-      await rbFLoad(new URL("./rake-test-loader.ts", import.meta.url).pathname);
+      await rbFLoad(new URL("../lib/rake-test-loader.ts", import.meta.url).pathname);
       expect(LOAD_PATH.slice(0, 2)).toEqual([
         File.expandPath("lib", Dir.pwd()),
         File.expandPath("test", Dir.pwd()),

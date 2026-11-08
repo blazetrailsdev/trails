@@ -1536,7 +1536,7 @@ function getArgTemplateSkeleton(node: ts.CallExpression, index: number): string 
 
 export function pkgFromPath(relPath: string): string {
   const parts = relPath.split(path.sep);
-  // packages/arel/src/... -> arel
+  // packages/arel/lib/... -> arel
   if (parts[0] === "packages" && parts[1]) {
     if (parts[1] === "actionpack" && parts[3]) {
       return parts[3]; // actiondispatch, actioncontroller, actionview

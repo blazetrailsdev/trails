@@ -248,7 +248,7 @@ Rails' `RackBody#each` and `Response#each`
 (`action_dispatch/http/response.rb:77-82`, `:526-528`) are synchronous, because
 a Ruby server iterates the body on the thread that waits for `Live::Buffer`'s
 queue. A Node handler cannot block its thread, so trails' Rack handlers write a
-body with `for await` (`packages/rack/src/handler/node.ts`), and a streamed
+body with `for await` (`packages/rack/lib/handler/node.ts`), and a streamed
 body yields chunks as a `Live::Buffer` receives them. **`each` stays ported at
 its Rails name, and a body also answers `Symbol.asyncIterator`** (and
 `Symbol.iterator` where Rails' `each` is reached by a sync caller). Those

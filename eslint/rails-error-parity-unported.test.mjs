@@ -25,6 +25,7 @@ import { PKG_NS, rubyToSrcRel } from "./rails-error-parity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
+const libRoot = (pkg) => (pkg === "arel" ? "lib" : "src");
 
 function entryKey(e) {
   return `${e.package}::${e.rubyFile}::${e.name}`;
@@ -55,7 +56,7 @@ async function findUnported(manifest, exists) {
     if (!ns) continue;
     for (const e of classes) {
       if (!e.rubyFile.startsWith(ns)) continue;
-      const rel = `packages/${pkg}/src/${rubyToSrcRel(e.rubyFile)}`;
+      const rel = `packages/${pkg}/${libRoot(pkg)}/${rubyToSrcRel(e.rubyFile)}`;
       if (await exists(rel)) continue;
       out.push({ package: pkg, name: e.name, rubyFile: e.rubyFile });
     }
@@ -96,7 +97,7 @@ describe("rails-error-parity unported allowlist", () => {
       // whose rubyFile doesn't live under its package namespace is treated as
       // malformed (caught below) rather than silently path-mapped.
       const inNs = ns && e.rubyFile.startsWith(ns);
-      const rel = `packages/${e.package}/src/${rubyToSrcRel(e.rubyFile)}`;
+      const rel = `packages/${e.package}/${libRoot(e.package)}/${rubyToSrcRel(e.rubyFile)}`;
       const ported = inNs && (await fileExists(path.join(ROOT, rel)));
       if (ported) stale.push(entryKey(e));
     }

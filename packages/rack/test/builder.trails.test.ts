@@ -13,7 +13,7 @@ it("handles builder with no middleware and just run", async () => {
 
 it("parse_file raises NameError when a .ts config defines no constant named after its file", async () => {
   await expect(
-    Builder.parseFile(File.join(__dirname, "__fixtures__", "no_constant_app.ts")),
+    Builder.parseFile(File.join(__dirname, "fixtures", "no_constant_app.ts")),
   ).rejects.toThrow(NameError);
 });
 

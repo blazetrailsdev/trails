@@ -1730,11 +1730,11 @@ function formatGate(g?: TestGate): string {
  */
 /** Each compare package's TS source root, repo-relative with a trailing slash. */
 export const PKG_SRC_DIRS: Record<string, string> = {
-  arel: "packages/arel/src/",
+  arel: "packages/arel/test/",
   activemodel: "packages/activemodel/src/",
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/src/",
-  rack: "packages/rack/src/",
+  rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",
   rackup: "packages/rackup/test/",
@@ -1743,11 +1743,11 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   marcel: "packages/marcel/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",
-  rake: "packages/rake/src/",
+  rake: "packages/rake/test/",
   chronic: "packages/chronic/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
-  raabro: "packages/raabro/src/",
+  raabro: "packages/raabro/test/",
   fugit: "packages/fugit/test/",
   zeitwerk: "packages/zeitwerk/src/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",

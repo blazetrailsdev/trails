@@ -29,7 +29,7 @@ const ROOT = path.resolve(__dirname, "..");
 // rule's enrollment globs in eslint.config.mjs.
 const PACKAGE_DIRS: Record<string, string> = {
   actionview: "packages/actionview/test",
-  arel: "packages/arel/src",
+  arel: "packages/arel/test",
   date: "packages/date/test",
   "did-you-mean": "packages/did-you-mean/test",
   globalid: "packages/globalid/src",

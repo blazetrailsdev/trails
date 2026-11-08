@@ -13,7 +13,7 @@ import {
   useRakeTestCase,
 } from "./support/file-creation.js";
 
-const PHONY = new URL("./phony.ts", import.meta.url).pathname;
+const PHONY = new URL("../lib/phony.ts", import.meta.url).pathname;
 
 describe("TestRakeFileTask", () => {
   const rake = useRakeTestCase();
