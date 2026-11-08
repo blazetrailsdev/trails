@@ -1,0 +1,31 @@
+import { describe, it, expect } from "vitest";
+import { fakeRecordConnection } from "../support/connection.js";
+import { Nodes, Visitors } from "../../lib/index.js";
+import type { Node } from "../../lib/nodes/node.js";
+import { uniq } from "../support/uniq.js";
+
+describe("GroupingTest", () => {
+  describe("equality", () => {
+    it("is equal with equal ivars", () => {
+      const array = [
+        new Nodes.Grouping("foo" as unknown as Node),
+        new Nodes.Grouping("foo" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(1);
+    });
+
+    it("is not equal with different ivars", () => {
+      const array = [
+        new Nodes.Grouping("foo" as unknown as Node),
+        new Nodes.Grouping("bar" as unknown as Node),
+      ];
+      expect(uniq(array).length).toBe(2);
+    });
+  });
+
+  it("should create Equality nodes", () => {
+    const grouping = new Nodes.Grouping(Nodes.buildQuoted("foo"));
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(grouping.eq("foo"));
+    expect(sql).toBe("('foo') = 'foo'");
+  });
+});

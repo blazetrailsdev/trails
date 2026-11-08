@@ -43,6 +43,10 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "chronic",
   "actionview",
   "activejob",
+  "arel",
+  "raabro",
+  "rack",
+  "rake",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

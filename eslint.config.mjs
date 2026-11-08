@@ -656,7 +656,7 @@ export default defineConfig(
         {
           files: [
             "packages/actionview/{lib,test}/**/*.test.ts",
-            "packages/arel/lib/**/*.test.ts",
+            "packages/arel/{lib,test}/**/*.test.ts",
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
@@ -916,7 +916,7 @@ export default defineConfig(
   // Applies to both app code and test files across the ported packages.
   {
     files: [
-      "packages/arel/lib/**/*.ts",
+      "packages/arel/{lib,test}/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
@@ -982,7 +982,7 @@ export default defineConfig(
   //    inline `eslint-disable`. Disabling the rule must itself be an error —
   //    fix the `any`. No allowlist; applies to src and tests. ──
   {
-    files: ["packages/activerecord/src/**/*.ts", "packages/arel/lib/**/*.ts"],
+    files: ["packages/activerecord/src/**/*.ts", "packages/arel/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
     },
@@ -1139,7 +1139,7 @@ export default defineConfig(
 
   // ── rack ──
   {
-    files: ["packages/rack/lib/**/*.ts"],
+    files: ["packages/rack/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
