@@ -15,14 +15,11 @@ import { format, File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface ScaffoldGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
 
     this.methodAdded("createRootFolder");

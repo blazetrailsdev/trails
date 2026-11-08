@@ -16,8 +16,6 @@ import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import type { GeneratorClass } from "../../../generators.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface ScaffoldControllerGeneratorOptions extends GeneratorOptions, ModelHelpersOptions {
   api?: boolean;
   skipRoutes?: boolean;
@@ -110,7 +108,6 @@ export class ScaffoldControllerGenerator extends NamedBase {
 Object.defineProperty(ScaffoldControllerGenerator, "name", {
   value: "Trails::Generators::ScaffoldControllerGenerator",
 });
-void ScaffoldControllerGenerator.sourceRoot(File.expandPath("templates", __dir__));
 include(ScaffoldControllerGenerator, ResourceHelpers);
 ScaffoldControllerGenerator.checkClassCollision({ suffix: "Controller" });
 ScaffoldControllerGenerator.classOption("helper", { type: "boolean" });

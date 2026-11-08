@@ -18,7 +18,6 @@ export class ChannelGenerator extends NamedBase {
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "method method" });
     this.classOption("assets", { type: "boolean" });
     this.checkClassCollision({ suffix: "Channel" });

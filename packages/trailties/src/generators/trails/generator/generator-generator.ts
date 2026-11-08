@@ -3,8 +3,6 @@ import type { GeneratorOptions } from "../../base.js";
 import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface GeneratorGeneratorOptions extends GeneratorOptions {
   namespace?: boolean;
 }
@@ -13,7 +11,6 @@ export class GeneratorGenerator extends NamedBase {
   declare options: GeneratorGeneratorOptions;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "Generator" });
 
     this.classOption("namespace", {

@@ -3,8 +3,6 @@ import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface JobGeneratorOptions extends GeneratorOptions {
   queue?: string;
   parent?: string;
@@ -14,7 +12,6 @@ export class JobGenerator extends NamedBase {
   declare options: JobGeneratorOptions;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.classOption("queue", {
       type: "string",
       default: "default",
