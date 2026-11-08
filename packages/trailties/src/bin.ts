@@ -2,6 +2,7 @@
 import "@blazetrails/activesupport/node";
 import { SystemExit, exit, rbArgv, setExitCode, STDOUT, trap } from "@blazetrails/ruby-compat";
 import { AppLoader } from "./app-loader.js";
+import { HELP_MAPPINGS, invoke } from "./command.js";
 
 AppLoader.execApp();
 
@@ -10,7 +11,6 @@ trap("INT", () => {
   exit(1);
 });
 
-const { HELP_MAPPINGS, invoke } = await import("./command.js");
 try {
   const first = rbArgv()[0];
   if (first == null || first === "help" || HELP_MAPPINGS.has(first)) {
