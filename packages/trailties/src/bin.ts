@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 import "@blazetrails/activesupport/node";
-import { SystemExit, rbArgv, setExitCode } from "@blazetrails/ruby-compat";
+import { SystemExit, exit, rbArgv, setExitCode, STDOUT, trap } from "@blazetrails/ruby-compat";
 import { AppLoader } from "./app-loader.js";
 
 AppLoader.execApp();
+
+trap("INT", () => {
+  STDOUT.puts();
+  exit(1);
+});
 
 const { HELP_MAPPINGS, invoke } = await import("./command.js");
 try {
