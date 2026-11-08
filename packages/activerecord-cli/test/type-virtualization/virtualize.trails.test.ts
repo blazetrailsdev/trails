@@ -1,0 +1,1360 @@
+import { describe, expect, test } from "vitest";
+import * as ts from "typescript/unstable/ast";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  virtualize,
+  remapLine,
+  missingTables,
+  type ModelTable,
+} from "../../lib/type-virtualization/virtualize.js";
+import { tsApi } from "../../lib/type-virtualization/ts-api.js";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = path.join(HERE, "fixtures");
+
+function fixtureDirs(): string[] {
+  return fs
+    .readdirSync(FIXTURES_DIR, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
+}
+
+describe("virtualize — fixture pairs", () => {
+  for (const name of fixtureDirs()) {
+    const dir = path.join(FIXTURES_DIR, name);
+    const inputPath = path.join(dir, "input.ts");
+    const expectedPath = path.join(dir, "expected.ts");
+    test(name, () => {
+      const input = fs.readFileSync(inputPath, "utf8");
+      const expected = fs.readFileSync(expectedPath, "utf8");
+      const { text } = virtualize(input, inputPath);
+      expect(text).toBe(expected);
+    });
+  }
+});
+
+describe("virtualize — deltas", () => {
+  test("records one delta per injected block", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("title", "string");\n' +
+      '    this.attribute("body", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { deltas } = virtualize(src, "post.ts");
+    expect(deltas).toHaveLength(1);
+    expect(deltas[0].lineCount).toBe(37);
+  });
+
+  test("no deltas when no class matches Base", () => {
+    const { deltas, text } = virtualize("export class NotAModel {}\n", "nope.ts");
+    expect(deltas).toHaveLength(0);
+    expect(text).toBe("export class NotAModel {}\n");
+  });
+
+  test("schemaColumnsByTable injects declares for columns without attribute()", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static override tableName = "posts";\n' +
+      "  static {\n" +
+      '    this.attribute("title", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { title: "string", body: "text", published_at: "datetime", views: "integer" },
+      },
+    });
+    expect(text).toMatch(/get title\(\): string;/);
+    expect(text.match(/get title\(\): string;/g)?.length).toBe(1);
+    expect(text).toMatch(/get body\(\): string;/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*date"\)\.Time/);
+    expect(text).toMatch(/get views\(\): number;/);
+  });
+
+  test("timeZoneAwareAttributes types a datetime column as the one type it holds", () => {
+    const src = "export class Post extends Base {}\n";
+    const columns = { posts: { created_at: { type: "datetime", null: false } } };
+    const aware = virtualize(src, "post.ts", {
+      schemaColumnsByTable: columns,
+      timeZoneAwareAttributes: true,
+    });
+    expect(aware.text).toMatch(
+      /get created_at\(\): import\("@blazetrails\/activesupport"\)\.TimeWithZone;/,
+    );
+    const naive = virtualize(src, "post.ts", {
+      schemaColumnsByTable: columns,
+      timeZoneAwareAttributes: false,
+    });
+    expect(naive.text).toMatch(/get created_at\(\): import\("@blazetrails\/date"\)\.Time;/);
+  });
+
+  test("schemaColumnsByTable skips user-authored declares", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static override tableName = "posts";\n' +
+      "  declare body: string;\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { body: "text" } },
+    });
+    expect(text.match(/declare body:/g)?.length).toBe(1);
+    expect(text).not.toMatch(/get body\(\):/);
+  });
+
+  test("schemaColumnsByTable skips `id`", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { id: "integer", name: "string" } },
+    });
+    expect(text).not.toMatch(/get id\(\):/);
+    expect(text).toMatch(/get name\(\): string;/);
+  });
+
+  test("schemaColumnsByTable types `id` from an integer primary key", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { id: { type: "bigint", null: false, primaryKey: 0 } } },
+    });
+    expect(text).toMatch(/declare id: number;/);
+  });
+
+  test("schemaColumnsByTable types `id` from a uuid primary key", () => {
+    const src = "export class Token extends Base {}\n";
+    const { text } = virtualize(src, "token.ts", {
+      schemaColumnsByTable: { tokens: { id: { type: "uuid", null: false, primaryKey: 0 } } },
+    });
+    expect(text).toMatch(/declare id: string;/);
+  });
+
+  test("schemaColumnsByTable types `id` as a tuple for a composite primary key", () => {
+    const src = "export class Tagging extends Base {}\n";
+    const { text } = virtualize(src, "tagging.ts", {
+      schemaColumnsByTable: {
+        taggings: {
+          taggable_type: "string",
+          name: { type: "string", null: false, primaryKey: 1 },
+          tag_id: { type: "integer", null: false, primaryKey: 0 },
+        },
+      },
+    });
+    expect(text).toMatch(/declare id: \[number, string\];/);
+  });
+
+  test("schemaColumnsByTable quotes non-identifier and reserved-word column names", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          "strange-col": "string",
+          "2bad": "string",
+          class: "string",
+          static: "string",
+          interface: "string",
+          private: "string",
+          safe: "string",
+        },
+      },
+    });
+    expect(text).toMatch(/get safe\(\): string;/);
+    expect(text).toMatch(/get "strange-col"\(\): string;/);
+    expect(text).toMatch(/get "2bad"\(\): string;/);
+    expect(text).toMatch(/get "class"\(\): string;/);
+    expect(text).toMatch(/get "static"\(\): string;/);
+    expect(text).toMatch(/get "interface"\(\): string;/);
+    expect(text).toMatch(/get "private"\(\): string;/);
+    expect(text).not.toMatch(/get class\(\): string;/);
+    expect(text).not.toMatch(/get static\(\): string;/);
+  });
+
+  test("schemaColumnsByTable de-dupes against user-authored quoted members", () => {
+    const src = "export class Post extends Base {\n" + '  declare "strange-col": string;\n' + "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { "strange-col": "string", safe: "string" },
+      },
+    });
+    expect(text.match(/declare "strange-col":/g)?.length).toBe(1);
+    expect(text).not.toMatch(/get "strange-col"\(\):/);
+    expect(text).toMatch(/get safe\(\): string;/);
+  });
+
+  test("isKnownTarget: unknown plain association target falls back to Base", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      '    this.hasMany("gadgets");\n' +
+      '    this.belongsTo("owner");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "thing.ts", {
+      isKnownTarget: (name) => name === "Base" || name === "Owner",
+    });
+    expect(text).toMatch(/get otherThing\(\): Base \| null \| Promise<Base \| null>;/);
+    expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
+    expect(text).toMatch(/get owner\(\): Owner \| null \| Promise<Owner \| null>;/);
+    expect(text).not.toMatch(/OtherThing/);
+    expect(text).not.toMatch(/Gadget/);
+  });
+
+  test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
+    const src =
+      "export class A extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n" +
+      "export class B extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "ab.ts", {
+      isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
+    });
+    expect(text).toMatch(
+      /interface A \{\s*get widget\(\): Widget \| null \| Promise<Widget \| null>;/,
+    );
+    expect(text).toMatch(/interface B \{\s*get widget\(\): Base \| null \| Promise<Base \| null>;/);
+  });
+
+  test("integer FK attribute() declare widens to PrimaryKeyValue", () => {
+    const src =
+      "export class Membership extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("club_id", "integer");\n' +
+      '    this.attribute("rank", "integer");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "membership.ts", { attributesNullable: true });
+    expect(text).toMatch(
+      /get club_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(/get rank\(\): number \| null;/);
+  });
+
+  test("isKnownTarget omitted: every target is trusted verbatim", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "thing.ts");
+    expect(text).toMatch(/get otherThing\(\): OtherThing \| null \| Promise<OtherThing \| null>;/);
+  });
+
+  test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      "  static {\n" +
+      '    this.hasMany("comments");\n' +
+      '    this.belongsTo("author");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { comments: "string", author: "string", body: "string" },
+      },
+    });
+    expect(text.match(/declare comments:/g)?.length).toBe(1);
+    expect(text.match(/get author\(\):/g)?.length).toBe(1);
+    expect(text).toMatch(/get body\(\): string;/);
+  });
+
+  test("runtime-macro declares quote reserved / non-identifier names", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("class", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    expect(text).toMatch(/get "class"\(\): string;/);
+    expect(text).not.toMatch(/get class\(\): string;/);
+  });
+
+  test("schemaColumnsByTable accepts the rich shape (null: true, arrayElementType)", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          title: { type: "string", null: false },
+          bio: { type: "string", null: true },
+          tags: { type: "array", null: true, arrayElementType: "integer" },
+          strict_tags: { type: "array", null: false, arrayElementType: "string" },
+        },
+      },
+    });
+    expect(text).toMatch(/get title\(\): string;/);
+    expect(text).toMatch(/get bio\(\): string \| null;/);
+    expect(text).toMatch(/get tags\(\): number\[\] \| null;/);
+    expect(text).toMatch(/get strict_tags\(\): string\[\];/);
+  });
+
+  test("schemaColumnsByTable emits Temporal types for timestamp/timestamptz/date/time columns", () => {
+    const src = "export class Event extends Base {}\n";
+    const { text } = virtualize(src, "event.ts", {
+      schemaColumnsByTable: {
+        events: {
+          created_at: { type: "timestamptz", null: false },
+          updated_at: { type: "timestamp", null: false },
+          starts_on: { type: "date", null: true },
+          duration: { type: "time", null: false },
+          scheduled_at: { type: "datetime", null: true },
+        },
+      },
+    });
+    expect(text).toMatch(/get created_at\(\):.*Temporal\.Instant;/);
+    expect(text).toMatch(/get updated_at\(\):.*Temporal\.PlainDateTime;/);
+    expect(text).toMatch(/get starts_on\(\):.*Temporal\.PlainDate.*\| null/);
+    expect(text).toMatch(/get duration\(\):.*TimeWithZone.*date"\)\.Time;/);
+    expect(text).toMatch(/get scheduled_at\(\): \(.*TimeWithZone.*date"\)\.Time\) \| null/);
+  });
+
+  test("schemaColumnsByTable emits bigint for big_integer schema columns", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          score: { type: "big_integer", null: false },
+          score_nullable: { type: "big_integer", null: true },
+        },
+      },
+    });
+    expect(text).toMatch(/get score\(\): bigint;/);
+    expect(text).toMatch(/get score_nullable\(\): bigint \| null;/);
+  });
+
+  test("schemaColumnsByTable widens integer FK columns to PrimaryKeyValue", () => {
+    const src = "export class Membership extends Base {}\n";
+    const { text } = virtualize(src, "membership.ts", {
+      schemaColumnsByTable: {
+        memberships: {
+          club_id: { type: "integer", null: true },
+          member_id: { type: "big_integer", null: false },
+          favorite_things_id: "integer",
+          rank: { type: "integer", null: true },
+        },
+      },
+    });
+    expect(text).toMatch(
+      /get club_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /get member_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /get favorite_things_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(/get rank\(\): number \| null;/);
+  });
+
+  test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: {
+          legacy: "string",
+          modern: { type: "integer", null: false },
+        },
+      },
+    });
+    expect(text).toMatch(/get legacy\(\): string;/);
+    expect(text).toMatch(/get modern\(\): number;/);
+  });
+
+  test("schemaColumnsByTable emits columns in stable (sorted) order", () => {
+    const src = "export class Post extends Base {}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: {
+        posts: { zulu: "string", alpha: "string", mike: "string" },
+      },
+    });
+    const alphaIdx = text.indexOf("get alpha():");
+    const mikeIdx = text.indexOf("get mike():");
+    const zuluIdx = text.indexOf("get zulu():");
+    expect(alphaIdx).toBeGreaterThan(-1);
+    expect(mikeIdx).toBeGreaterThan(alphaIdx);
+    expect(zuluIdx).toBeGreaterThan(mikeIdx);
+  });
+
+  test("schemaColumnsByTable infers table name from class name when absent", () => {
+    const src = "export class BlogPost extends Base {}\n";
+    const { text } = virtualize(src, "blog-post.ts", {
+      schemaColumnsByTable: { blog_posts: { slug: "string" } },
+    });
+    expect(text).toMatch(/get slug\(\): string;/);
+  });
+
+  test("skip marker yields no deltas", () => {
+    const src =
+      "/** @trails-typegen skip */\n" +
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("t", "string"); }\n' +
+      "}\n";
+    const { deltas } = virtualize(src, "skip.ts");
+    expect(deltas).toHaveLength(0);
+  });
+});
+
+describe("remapLine", () => {
+  test("lines above injection are unchanged", () => {
+    const deltas = [{ insertedAtLine: 5, lineCount: 3 }];
+    expect(remapLine(2, deltas)).toBe(2);
+    expect(remapLine(5, deltas)).toBe(5);
+  });
+
+  test("lines below injection subtract the inserted line count", () => {
+    const deltas = [{ insertedAtLine: 5, lineCount: 3 }];
+    expect(remapLine(10, deltas)).toBe(7);
+  });
+
+  test("lines inside the injected range return null", () => {
+    const deltas = [{ insertedAtLine: 5, lineCount: 3 }];
+    expect(remapLine(6, deltas)).toBeNull();
+    expect(remapLine(7, deltas)).toBeNull();
+    expect(remapLine(8, deltas)).toBeNull();
+  });
+
+  test("multiple deltas compose correctly", () => {
+    const deltas = [
+      { insertedAtLine: 5, lineCount: 2 },
+      { insertedAtLine: 15, lineCount: 3 },
+    ];
+    expect(remapLine(10, deltas)).toBe(8);
+    expect(remapLine(25, deltas)).toBe(20);
+    expect(remapLine(3, deltas)).toBe(3);
+  });
+
+  test("empty delta list is identity", () => {
+    expect(remapLine(42, [])).toBe(42);
+  });
+});
+
+describe("virtualize — prependImports", () => {
+  test("prepends import type lines at the top of the file", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      prependImports: ['import type { Author } from "./author.js";'],
+    });
+    expect(text.startsWith('import type { Author } from "./author.js";')).toBe(true);
+  });
+
+  test("inserts after leading directives (shebang, triple-slash, @ts-nocheck)", () => {
+    const src =
+      "#!/usr/bin/env node\n" +
+      "// @ts-nocheck\n" +
+      "/// <reference types='node' />\n" +
+      "\n" +
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      prependImports: ['import type { Author } from "./author.js";'],
+    });
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("#!/usr/bin/env node");
+    expect(lines[1]).toBe("// @ts-nocheck");
+    expect(lines[2]).toBe("/// <reference types='node' />");
+    expect(lines[3]).toBe("");
+    expect(lines[4]).toBe('import type { Author } from "./author.js";');
+  });
+
+  test("remapLine accounts for prepended lines", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { deltas } = virtualize(src, "post.ts", {
+      prependImports: ['import type { A } from "./a.js";', 'import type { B } from "./b.js";'],
+    });
+    expect(remapLine(0, deltas)).toBeNull();
+    expect(remapLine(1, deltas)).toBeNull();
+    expect(remapLine(2, deltas)).toBe(0);
+  });
+
+  test("remapLine preserves leading-directive lines when imports are inserted after them", () => {
+    const src =
+      "#!/usr/bin/env node\n" +
+      "// @ts-nocheck\n" +
+      "\n" +
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { deltas } = virtualize(src, "post.ts", {
+      prependImports: ['import type { Author } from "./author.js";'],
+    });
+    expect(remapLine(0, deltas)).toBe(0);
+    expect(remapLine(1, deltas)).toBe(1);
+    expect(remapLine(2, deltas)).toBe(2);
+    expect(remapLine(3, deltas)).toBeNull();
+    expect(remapLine(4, deltas)).toBe(3);
+  });
+});
+
+describe("virtualize — multiple classes", () => {
+  test("remapLine is correct for lines after the second injected block", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n" +
+      "\n" +
+      "export class Comment extends Base {\n" +
+      '  static { this.attribute("body", "string"); }\n' +
+      "}\n";
+    const { text, deltas } = virtualize(src, "file.ts");
+    expect(deltas).toHaveLength(2);
+
+    const vLines = text.split("\n");
+    const commentBraceVLine = vLines.findIndex((l) => l.startsWith("export class Comment"));
+    expect(commentBraceVLine).toBeGreaterThan(4);
+    expect(remapLine(commentBraceVLine, deltas)).toBe(4);
+
+    const commentBodyVLine = vLines.findIndex((l) => l.includes('this.attribute("body"'));
+    expect(remapLine(commentBodyVLine, deltas)).toBe(5);
+
+    expect(remapLine(deltas[0].insertedAtLine + 1, deltas)).toBeNull();
+    expect(remapLine(deltas[1].insertedAtLine + 1, deltas)).toBeNull();
+  });
+
+  test("injects declares into model classes nested inside function bodies", () => {
+    const src =
+      'describe("nested", () => {\n' +
+      "  function makeModels() {\n" +
+      "    class Widget extends Base {\n" +
+      "      static {\n" +
+      '        this.attribute("title", "string");\n' +
+      '        this.hasMany("gadgets", { className: "Gadget" });\n' +
+      "      }\n" +
+      "    }\n" +
+      "    return Widget;\n" +
+      "  }\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("get title(): string;");
+    expect(text).toContain("declare gadgets:");
+  });
+
+  test("materializes standalone Model.enum(...) nested in a function body", () => {
+    const src =
+      'describe("nested enum", () => {\n' +
+      '  it("works", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("status", "integer"); }\n' +
+      "    }\n" +
+      '    Post.enum("status", { draft: 0, published: 1 });\n' +
+      "  });\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("isDraft");
+    expect(text).toContain("isPublished");
+  });
+
+  test("an enum label that is not an identifier surfaces under its method-friendly alias", () => {
+    const src =
+      "class Story extends Base {\n" +
+      "  static {\n" +
+      '    this.enum("status", { ready: "ready", "in-progress": "in-progress" });\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).toContain("declare isInProgress: () => boolean;");
+    expect(text).toContain("declare inProgressBang:");
+    expect(text).toContain("declare static inProgress:");
+    expect(text).toContain("declare static notInProgress:");
+    expect(text).toContain('declare "isIn-progress": () => boolean;');
+    expect(text).toContain('declare static "in-progress":');
+    expect(text).not.toMatch(/declare (static )?\w*[Ii]n-progress/);
+  });
+
+  test("an enum alias another label already defines is declared once", () => {
+    const src =
+      "class Story extends Base {\n" +
+      "  static {\n" +
+      '    this.enum("status", { in_progress: 0, "in-progress": 1, a$b: 2 });\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text.match(/declare isInProgress:/g)?.length).toBe(1);
+    expect(text).toContain("declare isA$b: () => boolean;");
+    expect(text).toContain("declare isAB: () => boolean;");
+  });
+
+  test("nested defineEnum binds to the same-scope class, not a sibling-scope namesake", () => {
+    const src =
+      'describe("d", () => {\n' +
+      '  it("a", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("status", "integer"); }\n' +
+      "    }\n" +
+      '    Post.enum("status", { draft: 0 });\n' +
+      "  });\n" +
+      '  it("b", () => {\n' +
+      "    class Post extends Base {\n" +
+      '      static { this.attribute("title", "string"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      "});\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text.match(/isDraft/g)?.length).toBe(1);
+  });
+
+  test("isModelClass predicate overrides name-based baseNames matching", () => {
+    const src =
+      'describe("d", () => {\n' +
+      '  it("a", () => {\n' +
+      "    class Company extends Base {}\n" +
+      "    class Client extends Company {\n" +
+      '      static { this.attribute("rating", "integer"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      '  it("b", () => {\n' +
+      "    class Company {}\n" +
+      "    class Client extends Company {\n" +
+      '      static { this.attribute("rating", "integer"); }\n' +
+      "    }\n" +
+      "  });\n" +
+      "});\n";
+    const sf = tsApi().createSourceFile("file.ts", src);
+    const baseRooted = new Set<string>();
+    const visit = (node: ts.Node): void => {
+      if (ts.isClassDeclaration(node) && node.name?.text === "Client" && baseRooted.size === 0) {
+        baseRooted.add(`${node.pos}:${node.end}`);
+      }
+      node.forEachChild(visit);
+    };
+    visit(sf);
+    const { text } = virtualize(src, "file.ts", {
+      isModelClass: (cls) => baseRooted.has(`${cls.pos}:${cls.end}`),
+    });
+    expect(text.match(/get rating\(\): number;/g)?.length).toBe(1);
+  });
+});
+
+describe("virtualize — materializing-generator gaps", () => {
+  test('skips `declare id` for an explicit this.attribute("id", ...)', () => {
+    const src =
+      "class Reply extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("id", "integer");\n' +
+      '    this.attribute("content", "string");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "file.ts");
+    expect(text).not.toMatch(/get id\(\):/);
+    expect(text).toContain("get content(): string;");
+  });
+
+  test("attributesNullable renders attribute declares as `T | null`", () => {
+    const src =
+      "class Reply extends Base {\n" +
+      '  static { this.attribute("content", "string"); }\n' +
+      "}\n";
+    expect(virtualize(src, "file.ts").text).toContain("get content(): string;");
+    expect(virtualize(src, "file.ts", { attributesNullable: true }).text).toContain(
+      "get content(): string | null;",
+    );
+  });
+
+  test("classNameAliases resolves association targets registered under an alias", () => {
+    const src =
+      "class Virus extends Base {\n" +
+      '  static { this.belongsTo("octopus", { className: "EsOctopus" }); }\n' +
+      "}\n";
+    const aliases = new Map([["EsOctopus", "Octopus"]]);
+    const { text } = virtualize(src, "file.ts", { classNameAliases: aliases });
+    expect(text).toContain("get octopus(): Octopus | null | Promise<Octopus | null>;");
+    expect(text).not.toMatch(/declare octopus: EsOctopus/);
+  });
+
+  test("associationTargets overrides the through-association element type", () => {
+    const src =
+      "class Author extends Base {\n" +
+      '  static { this.hasMany("commentsWithOrder", { through: "posts", source: "comments" }); }\n' +
+      "}\n";
+    const targets = new Map([["Author#commentsWithOrder", "Comment"]]);
+    const { text } = virtualize(src, "file.ts", { associationTargets: targets });
+    expect(text).toContain(
+      'declare commentsWithOrder: import("@blazetrails/activerecord").AssociationProxy<Comment>;',
+    );
+    expect(text).not.toMatch(/CommentsWithOrder/);
+  });
+
+  test("cross-file subtype: narrowed declare is kept when superclass chain lives in another file", () => {
+    const src =
+      "class Comment extends Base {\n" +
+      '  static { this.belongsTo("post"); }\n' +
+      "}\n" +
+      "class SpecialComment extends Comment {\n" +
+      '  static { this.belongsTo("post", { className: "SpecialPost" }); }\n' +
+      "}\n";
+    const globalSuperNameOf = new Map([["SpecialPost", "Post"]]);
+    const { text } = virtualize(src, "comment.ts", {
+      isModelClass: () => true,
+      globalSuperNameOf,
+    });
+    expect(text.slice(text.indexOf("class SpecialComment"))).toContain(
+      "get post(): SpecialPost | null | Promise<SpecialPost | null>;",
+    );
+  });
+
+  test("subclass association overrides across a 3-level chain (suppress, keep subtype, effective target)", () => {
+    const src =
+      "class Post extends Base {}\n" +
+      "class SpecialPost extends Post {}\n" +
+      "class Sibling extends Base {}\n" +
+      "class Root extends Base {\n" +
+      '  static { this.belongsTo("post"); }\n' +
+      "}\n" +
+      "class Mid extends Root {\n" +
+      '  static { this.belongsTo("post", { className: "Sibling" }); }\n' +
+      "}\n" +
+      "class Leaf extends Mid {\n" +
+      '  static { this.belongsTo("post", { className: "SpecialPost" }); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "file.ts", { isModelClass: () => true });
+    const midBody = text.slice(text.indexOf("class Mid"), text.indexOf("class Leaf"));
+    expect(midBody).not.toMatch(/declare post:/);
+    expect(text.slice(text.indexOf("class Leaf"))).toContain(
+      "get post(): SpecialPost | null | Promise<SpecialPost | null>;",
+    );
+  });
+});
+
+function indexOfNthNewline(text: string, n: number): number {
+  let idx = 0;
+  for (let i = 0; i < n; i++) {
+    const next = text.indexOf("\n", idx);
+    if (next === -1) return text.length;
+    idx = next + 1;
+  }
+  return idx;
+}
+
+describe("virtualize — include() interface bridge", () => {
+  test("emits interface-merge for include() of a local class", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QueryMethods } from "./query-methods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QueryMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(
+      /import type \{ Included as __TrailsIncluded \} from "@blazetrails\/activesupport";/,
+    );
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QueryMethods> \{\}/);
+  });
+
+  test("groups multiple include() calls on the same class into one heritage list", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { A, B } from "./mods.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, A);\n" +
+      "include(Relation, B);\n";
+    const { text } = virtualize(src, "relation.ts");
+    const m = text.match(/interface Relation extends ([^{]+) \{\}/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toContain("__TrailsIncluded<typeof A>");
+    expect(m![1]).toContain("__TrailsIncluded<typeof B>");
+    expect(text.match(/interface Relation extends/g)?.length).toBe(1);
+  });
+
+  test("ignores include() when not imported from activesupport", () => {
+    const src =
+      'import { include } from "./local-helper.js";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+
+  test("ignores include() when target class is not declared in this file", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { External } from "./external.js";\n' +
+      "include(External, Mod);\n";
+    const { text } = virtualize(src, "x.ts");
+    expect(text).not.toMatch(/interface External/);
+  });
+
+  test("preserves export modifier and generic type params on the merged interface", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation<T extends Base> {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(
+      /export interface Relation<T extends Base> extends __TrailsIncluded<typeof QM> \{\}/,
+    );
+  });
+
+  test("skips include() with non-typeof-queryable module expressions (object literals)", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, { bar() {} });\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+  });
+
+  test("accepts property-access module expressions (typeof Mod.InstanceMethods)", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import * as Persistence from "./persistence.js";\n' +
+      "export class Foo {}\n" +
+      "include(Foo, Persistence.InstanceMethods);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).toMatch(
+      /interface Foo extends __TrailsIncluded<typeof Persistence\.InstanceMethods> \{\}/,
+    );
+  });
+
+  test("aliased include import (`include as inc`) is not picked up", () => {
+    const src =
+      'import { include as inc } from "@blazetrails/activesupport";\n' +
+      "function include(c: any, m: any) {}\n" +
+      "export class Foo {}\n" +
+      "include(Foo, Bar);\n";
+    const { text } = virtualize(src, "foo.ts");
+    expect(text).not.toMatch(/interface Foo extends/);
+    expect(text).not.toMatch(/__TrailsIncluded/);
+  });
+
+  test("multi-line module expression — delta math survives embedded newlines", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import * as Persistence from "./persistence.js";\n' +
+      "export class Foo {}\n" +
+      "include(\n  Foo,\n  Persistence\n    .InstanceMethods,\n);\n" +
+      "const target = 42;\n";
+    const { text, deltas } = virtualize(src, "foo.ts");
+    expect(text).toMatch(/__TrailsIncluded<typeof Persistence[\s\S]*\.InstanceMethods>/);
+    const headDelta = deltas[0];
+    const headLines = text
+      .slice(0, indexOfNthNewline(text, headDelta.insertedAtLine + headDelta.lineCount + 1))
+      .split(/\r?\n/);
+    expect(headLines[headDelta.insertedAtLine + 1]).toMatch(/import type \{ Included as/);
+  });
+
+  test("reuses existing `Included as __TrailsIncluded` import — emits interfaces but not a duplicate import", () => {
+    const src =
+      "import type { Included as __TrailsIncluded } from '@blazetrails/activesupport'\n" +
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QM>/);
+  });
+
+  test("bails entirely when __TrailsIncluded is bound by something else", () => {
+    const src =
+      'import { __TrailsIncluded } from "./local.js";\n' +
+      'import { include } from "@blazetrails/activesupport";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).not.toMatch(/import type \{ Included as __TrailsIncluded \}/);
+    expect(text).not.toMatch(/interface Relation extends/);
+  });
+
+  test("skips auto-bridge for classes the user hand-declares an interface for", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { FinderMethods } from "./finder-methods.js";\n' +
+      "export class Relation<T> {}\n" +
+      "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
+      "include(Relation, FinderMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).not.toMatch(/interface Relation<T> extends __TrailsIncluded/);
+  });
+
+  test("bails when __TrailsIncluded is bound by an enum or namespace", () => {
+    for (const decl of [
+      "enum __TrailsIncluded { A }",
+      "namespace __TrailsIncluded { export const x = 1; }",
+    ]) {
+      const src =
+        decl +
+        "\n" +
+        'import { include } from "@blazetrails/activesupport";\n' +
+        "export class Relation {}\n" +
+        "include(Relation, QM);\n";
+      const { text } = virtualize(src, "relation.ts");
+      expect(text).not.toMatch(/import type \{ Included as __TrailsIncluded \}/);
+      expect(text).not.toMatch(/interface Relation extends __TrailsIncluded/);
+    }
+  });
+
+  test("does not inject the __TrailsIncluded import when every target has a user interface", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { FinderMethods } from "./finder-methods.js";\n' +
+      "export class Relation<T> {}\n" +
+      "export interface Relation<T> { find(...args: unknown[]): Promise<T>; }\n" +
+      "include(Relation, FinderMethods);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).not.toMatch(/__TrailsIncluded/);
+  });
+
+  test("accepts `include as include` (local binding still `include`)", () => {
+    const src =
+      'import { include as include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const { text } = virtualize(src, "relation.ts");
+    expect(text).toMatch(/interface Relation extends __TrailsIncluded<typeof QM>/);
+  });
+
+  test("re-virtualizing already-virtualized output does not re-inject", () => {
+    const src =
+      'import { include } from "@blazetrails/activesupport";\n' +
+      'import { QM } from "./qm.js";\n' +
+      "export class Relation {}\n" +
+      "include(Relation, QM);\n";
+    const once = virtualize(src, "relation.ts").text;
+    const twice = virtualize(once, "relation.ts").text;
+    expect(twice).toBe(once);
+    expect(once.match(/__TrailsIncluded/g)?.length).toBeGreaterThan(0);
+    expect(twice.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
+    expect(twice.match(/interface Relation extends __TrailsIncluded<typeof QM>/g)?.length).toBe(1);
+  });
+});
+
+describe("virtualize — attribute accessor pairs", () => {
+  test("an attribute member is a get/set pair whose writer takes what the type casts", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("published_at", "datetime"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    expect(text).toMatch(/export interface Post \{/);
+    expect(text).toMatch(/get published_at\(\):.*TimeWithZone.*date"\)\.Time;/);
+    expect(text).toMatch(/set published_at\(value: .*date"\)\.Time \| string\);/);
+  });
+
+  test("an integer column's writer takes a number, a string or a bigint", () => {
+    const { text } = virtualize("export class Post extends Base {}\n", "post.ts", {
+      schemaColumnsByTable: { posts: { views: { type: "integer", null: false } } },
+    });
+    expect(text).toMatch(/set views\(value: number \| string \| bigint\);/);
+  });
+
+  test("a nullable column's writer takes null", () => {
+    const { text } = virtualize("export class Post extends Base {}\n", "post.ts", {
+      schemaColumnsByTable: { posts: { archived: { type: "boolean", null: true } } },
+    });
+    expect(text).toMatch(/set archived\(value: boolean \| null \| string \| number\);/);
+  });
+
+  test("an enum attribute's writer takes its labels and mapped values", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static {\n    this.enum("status", { draft: 0, archived: 1 });\n  }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts", {
+      schemaColumnsByTable: { posts: { status: { type: "integer", null: true } } },
+    });
+    expect(text).toMatch(/get status\(\): "draft" \| "archived" \| null;/);
+    expect(text).toMatch(/set status\(value: "draft" \| "archived" \| 0 \| 1 \| null\);/);
+  });
+
+  test("a type the registry does not know keeps an unknown writer", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("money", "money"); }\n' +
+      "}\n";
+    expect(virtualize(src, "post.ts").text).toMatch(/set money\(value: unknown\);/);
+  });
+
+  test("a serialized column is typed unknown, not as its storage column", () => {
+    const src =
+      "export class Rfc extends Base {\n" +
+      '  static { this.serialize("tags", { coder: JsonArray }); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "rfc.ts", {
+      schemaColumnsByTable: { rfcs: { tags: { type: "text", null: true } } },
+    });
+    expect(text).toMatch(/get tags\(\): unknown;/);
+    expect(text).toMatch(/set tags\(value: unknown\);/);
+  });
+
+  test("a named primary key with the default type is a PrimaryKeyValue", () => {
+    const { text } = virtualize("export class Region extends Base {}\n", "region.ts", {
+      schemaColumnsByTable: { regions: { code: { type: "bigint", null: false, primaryKey: 0 } } },
+    });
+    expect(text).toMatch(/get code\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/);
+  });
+});
+
+describe("virtualize — dirty attribute methods", () => {
+  const run = (body: string, extra = ""): string =>
+    virtualize(
+      `export class Story extends Base {\n${extra}  static {\n${body}  }\n}\n`,
+      "story.ts",
+      { schemaColumnsByTable: { stories: { title: { type: "string", null: false } } } },
+    ).text;
+
+  test("a column gets the dirty and query methods ActiveModel::Dirty defines", () => {
+    const text = run("");
+    expect(text).toMatch(/titleWas\(\): string;/);
+    expect(text).toMatch(/titleChanged\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/titleChange\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/titleWillChange\(\): unknown;/);
+    expect(text).toMatch(/titlePreviouslyWas\(\): string;/);
+    expect(text).toMatch(/restoreTitle\(\): void;/);
+    expect(text).toMatch(/clearTitleChange\(\): void;/);
+  });
+
+  test("a column gets the methods ActiveRecord::AttributeMethods::Dirty defines", () => {
+    const text = run("");
+    expect(text).toMatch(/titleBeforeLastSave\(\): string;/);
+    expect(text).toMatch(/savedChangeToTitle\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/isSavedChangeToTitle\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/isWillSaveChangeToTitle\(options\?: .*\): boolean \| undefined;/);
+    expect(text).toMatch(/titleChangeToBeSaved\(\): \[string, string\] \| null;/);
+    expect(text).toMatch(/titleInDatabase\(\): string;/);
+  });
+
+  test("an alias gets the family under its own name", () => {
+    const text = run('    this.aliasAttribute("heading", "title");\n');
+    expect(text).toMatch(/headingWas\(\): string;/);
+    expect(text).toMatch(/savedChangeToHeading\(\): \[string, string\] \| null;/);
+  });
+
+  test("an enum-narrowed attribute's methods use the narrowed type", () => {
+    const text = run(
+      '    this.attribute("status", "string");\n    this.enum("status", ["open", "closed"]);\n',
+    );
+    expect(text).toMatch(/statusWas\(\): "open" \| "closed";/);
+  });
+
+  test("a member the class declares wins", () => {
+    const text = run("", "  declare titleWas: () => number;\n");
+    expect(text).not.toMatch(/titleWas\(\)/);
+    expect(text).toMatch(/titleChanged\(/);
+  });
+
+  test("a serialized column has its attribute methods typed unknown", () => {
+    const text = run('    this.serialize("title", { coder: JsonArray });\n');
+    expect(text).toMatch(/get title\(\): unknown;/);
+    expect(text).toMatch(/titleWas\(\): unknown;/);
+  });
+
+  test("an enum over a serialized column reads as its labels", () => {
+    const text = run(
+      '    this.serialize("title", { coder: JsonArray });\n    this.enum("title", ["a", "b"]);\n',
+    );
+    expect(text).toMatch(/get title\(\): "a" \| "b";/);
+  });
+
+  test("a negative mapped enum value is a writer input", () => {
+    const text = run('    this.enum("title", { hidden: -1, shown: 1 });\n');
+    expect(text).toMatch(/set title\(value: "hidden" \| "shown" \| -1 \| 1\);/);
+  });
+
+  test("an association gets no dirty methods", () => {
+    expect(run('    this.belongsTo("author");\n')).not.toMatch(/authorWas/);
+  });
+
+  test("a default-exported class keeps the plain declare form", () => {
+    const src =
+      "export default class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    expect(text).toContain("declare title: string;");
+    expect(text).not.toMatch(/interface Post/);
+  });
+});
+
+describe("virtualize — idempotence", () => {
+  test("re-virtualizing the output skips members already declared", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const once = virtualize(src, "post.ts").text;
+    const twice = virtualize(once, "post.ts").text;
+    expect(twice).toBe(once);
+  });
+});
+
+describe("virtualize — missingTables", () => {
+  const schema = { posts: { title: "string" } };
+  const missing = (...files: string[]): string[] => {
+    const models: ModelTable[] = [];
+    files.forEach((src, i) =>
+      virtualize(src, i === 0 ? "m.ts" : `m${i}.ts`, {
+        baseNames: ["Base", "ApplicationRecord", "Article", "Post"],
+        schemaColumnsByTable: schema,
+        onModel: (m) => models.push(m),
+      }),
+    );
+    return missingTables(models, schema).map((m) => `${m.className}:${m.tableName}:${m.fileName}`);
+  };
+
+  test("warns for a model whose table is in no schema", () => {
+    expect(missing("export class PullRequest extends Base {}\n")).toEqual([
+      "PullRequest:pull_requests:m.ts",
+    ]);
+  });
+
+  test("does not warn for a model marked no-schema or skip", () => {
+    expect(
+      missing("/** @trails-typegen no-schema */\nexport class PullRequest extends Base {}\n"),
+    ).toEqual([]);
+    expect(
+      missing("/** @trails-typegen skip */\nexport class PullRequest extends Base {}\n"),
+    ).toEqual([]);
+  });
+
+  test("does not warn for an abstract class", () => {
+    expect(
+      missing(
+        "export class Hub extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n",
+      ),
+    ).toEqual([]);
+  });
+
+  test("reads tableName assigned in a static block", () => {
+    const src =
+      "export class Article extends Base {\n" +
+      '  static {\n    this.tableName = "posts";\n  }\n' +
+      "}\n";
+    expect(missing(src)).toEqual([]);
+    const { text } = virtualize(src, "m.ts", { schemaColumnsByTable: schema });
+    expect(text).toMatch(/get title\(\): string;/);
+  });
+
+  test("does not warn for a model whose tableName is not a literal", () => {
+    expect(
+      missing(
+        'export class Stat extends Base {\n  static {\n    this.tableName = prefix + "stats";\n  }\n}\n',
+      ),
+    ).toEqual([]);
+  });
+
+  test("ignores Object.prototype keys when looking up a table", () => {
+    expect(
+      missing('export class Constructor extends Base {\n  static tableName = "constructor";\n}\n'),
+    ).toEqual(["Constructor:constructor:m.ts"]);
+  });
+
+  test("does not warn for an STI subclass of a model whose table is known", () => {
+    expect(
+      missing("export class Post extends Base {}\nexport class Draft extends Post {}\n"),
+    ).toEqual([]);
+  });
+
+  test("resolves an STI subclass's table through a base class in another file", () => {
+    const base = 'export class Article extends Base {\n  static tableName = "posts";\n}\n';
+    const sub = "export class Draft extends Article {}\n";
+    expect(missing(sub, base)).toEqual([]);
+  });
+
+  test("does not warn when the base class is in no processed file", () => {
+    expect(missing("export class Draft extends Article {}\n")).toEqual([]);
+  });
+
+  test("resolves the table below an abstract class in another file", () => {
+    const abstract =
+      "export class ApplicationRecord extends Base {\n  static {\n    this.abstractClass = true;\n  }\n}\n";
+    expect(missing("export class Post extends ApplicationRecord {}\n", abstract)).toEqual([]);
+    expect(missing("export class Comment extends ApplicationRecord {}\n", abstract)).toEqual([
+      "Comment:comments:m.ts",
+    ]);
+  });
+
+  test("resolves the table below a primaryAbstractClass() class", () => {
+    const abstract =
+      "export class ApplicationRecord extends Base {\n  static {\n    this.primaryAbstractClass();\n  }\n}\n";
+    expect(missing(abstract)).toEqual([]);
+    expect(missing("export class Post extends ApplicationRecord {}\n", abstract)).toEqual([]);
+  });
+
+  test("a no-schema model keeps its synthesized associations", () => {
+    const src =
+      "/** @trails-typegen no-schema */\n" +
+      'export class PullRequest extends Base {\n  static { this.hasMany("posts"); }\n}\n';
+    expect(virtualize(src, "m.ts").text).toContain("declare posts:");
+  });
+});
+
+describe("virtualize — aliasAttribute", () => {
+  const run = (body: string, extra = ""): string =>
+    virtualize(
+      `export class Story extends Base {\n${extra}  static {\n${body}  }\n}\n`,
+      "story.ts",
+      { schemaColumnsByTable: { stories: { pr_number: "integer" } } },
+    ).text;
+
+  test("aliases a schema column", () => {
+    const text = run('    this.aliasAttribute("prNumber", "pr_number");\n');
+    expect(text).toMatch(/get prNumber\(\): number;/);
+    expect(text).toMatch(/set prNumber\(value: number \| string \| bigint\);/);
+  });
+
+  test("aliases an attribute() call", () => {
+    const text = run(
+      '    this.attribute("title", "string");\n    this.aliasAttribute("heading", "title");\n',
+    );
+    expect(text).toMatch(/get heading\(\): string;/);
+  });
+
+  test("aliases a hand-declared member", () => {
+    const text = run('    this.aliasAttribute("label", "name");\n', "  declare name: string;\n");
+    expect(text).toMatch(/get label\(\): string;/);
+  });
+
+  test("an enum-narrowed attribute keeps its narrowed type under the alias", () => {
+    const text = run(
+      '    this.attribute("status", "string");\n' +
+        '    this.enum("status", { open: 0, closed: 1 });\n' +
+        '    this.aliasAttribute("state", "status");\n',
+    );
+    expect(text).toMatch(/get state\(\): "open" \| "closed";/);
+  });
+
+  test("an alias of an unknown attribute synthesizes nothing", () => {
+    expect(run('    this.aliasAttribute("ghost", "missing");\n')).not.toMatch(/get ghost/);
+  });
+
+  test("an alias of an alias resolves regardless of source order", () => {
+    const text = run(
+      '    this.aliasAttribute("prNo", "prNumber");\n' +
+        '    this.aliasAttribute("prNumber", "pr_number");\n',
+    );
+    expect(text).toMatch(/get prNo\(\): number;/);
+  });
+
+  test("an existing member wins over the alias", () => {
+    const text = run(
+      '    this.aliasAttribute("prNumber", "pr_number");\n',
+      "  declare prNumber: string;\n",
+    );
+    expect(text).not.toMatch(/get prNumber/);
+  });
+});
+
+describe("schema scopes and non-model bases", () => {
+  const scoped = new Map([["StatsSyncRecord", { pull_requests: { title: "string" } }]]);
+
+  test("does not treat a class extending ActiveJob's Base as a model", () => {
+    const source = `import { Base } from "@blazetrails/activejob";\nexport class ApplicationJob extends Base {}\n`;
+    const seen: string[] = [];
+    virtualize(source, "app/jobs/application-job.ts", {
+      schemaColumnsByTable: { users: { name: "string" } },
+      onModel: (m) => seen.push(m.className),
+    });
+    expect(seen).toEqual([]);
+  });
+
+  test("applies a scoped schema to a descendant of its base, across files", () => {
+    const source = `export class PullRequest extends StatsSyncRecord {}\n`;
+    const { text } = virtualize(source, "app/models/stats-sync/pull-request.ts", {
+      baseNames: ["Base", "StatsSyncRecord"],
+      schemaColumnsByTable: { pull_requests: { other: "string" } },
+      schemaScopes: scoped,
+      modelSuperKeys: new Map([
+        [
+          "app/models/stats-sync/pull-request.ts#PullRequest",
+          "app/models/stats-sync-record.ts#StatsSyncRecord",
+        ],
+        [
+          "app/models/stats-sync-record.ts#StatsSyncRecord",
+          "app/models/application-record.ts#ApplicationRecord",
+        ],
+      ]),
+    });
+    expect(text).toContain("title");
+    expect(text).not.toContain("other");
+  });
+
+  test("keeps a scoped schema from a model outside its base", () => {
+    const source = `export class PullRequest extends Stats {}\n`;
+    const { text } = virtualize(source, "app/models/pull-request.ts", {
+      baseNames: ["Base", "Stats"],
+      schemaScopes: scoped,
+    });
+    expect(text).not.toContain("title");
+  });
+
+  test("reports a missing table against the model's scoped schema only", () => {
+    const model = (className: string, superName: string, abstract = false) => ({
+      className,
+      superName,
+      dynamicTableName: false,
+      abstract,
+      optedOut: false,
+      fileName: `${className}.ts`,
+    });
+    const models = [
+      model("StatsSyncRecord", "Base", true),
+      model("PullRequest", "StatsSyncRecord"),
+      model("WorkflowRun", "StatsSyncRecord"),
+    ];
+    expect(
+      missingTables(models, { workflow_runs: {} }, undefined, scoped).map((m) => m.className),
+    ).toEqual(["WorkflowRun"]);
+  });
+});
+
+test("scopes each of two same-named models by its own superclass", () => {
+  const model = (superName: string, fileName: string) => ({
+    className: "PullRequest",
+    superName,
+    dynamicTableName: false,
+    abstract: false,
+    optedOut: false,
+    fileName,
+  });
+  const models = [model("Stats", "a.ts"), model("StatsSyncRecord", "b.ts")];
+  const scopes = new Map([["StatsSyncRecord", { pull_requests: {} }]]);
+  expect(
+    missingTables(models, {}, new Set(["Base", "Stats"]), scopes).map((m) => m.fileName),
+  ).toEqual(["a.ts"]);
+});
+
+test("resolves same-named intermediates to their own parents by class identity", () => {
+  const model = (
+    className: string,
+    fileName: string,
+    superName: string,
+    superKey: string,
+    abstract = false,
+  ) => ({
+    className,
+    superName,
+    superKey,
+    dynamicTableName: false,
+    abstract,
+    optedOut: false,
+    fileName,
+  });
+  const models = [
+    model("Record", "hub/record.ts", "Hub", "base.ts#Hub", true),
+    model("Record", "stats/record.ts", "StatsSyncRecord", "base.ts#StatsSyncRecord", true),
+    model("PullRequest", "hub/pull-request.ts", "Record", "hub/record.ts#Record"),
+    model("PullRequest", "stats/pull-request.ts", "Record", "stats/record.ts#Record"),
+  ];
+  const scopes = new Map([["StatsSyncRecord", { pull_requests: {} }]]);
+  expect(
+    missingTables(models, {}, new Set(["Base", "Hub", "StatsSyncRecord"]), scopes).map(
+      (m) => m.fileName,
+    ),
+  ).toEqual(["hub/pull-request.ts"]);
+});

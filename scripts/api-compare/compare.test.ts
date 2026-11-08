@@ -2559,7 +2559,7 @@ describe("buildEntitiesByName", () => {
 
   it("includes entities from @blazetrails/* dep packages when package.json lists them", () => {
     // activerecord depends on activemodel; Model lives in activemodel.
-    const model = cls("packages/activemodel/src/model.ts", "Model");
+    const model = cls("packages/activemodel/lib/model.ts", "Model");
     model.instanceMethods = [method("attributes")];
 
     const base = cls("packages/activerecord/src/base.ts", "Base");
@@ -2581,7 +2581,7 @@ describe("buildEntitiesByName", () => {
     const concern = cls("packages/activesupport/lib/concern.ts", "Concern");
     const ts = makeManifest({
       activesupport: { classes: { Concern: concern } },
-      activemodel: { classes: { Model: cls("packages/activemodel/src/model.ts", "Model") } },
+      activemodel: { classes: { Model: cls("packages/activemodel/lib/model.ts", "Model") } },
     });
 
     const map = buildEntitiesByName("activesupport", ts);
@@ -2610,7 +2610,7 @@ describe("buildEntitiesByName", () => {
 
   it("current-package entities appear before dep-package entities (same name)", () => {
     const localModel = cls("packages/activerecord/src/model.ts", "Model");
-    const depModel = cls("packages/activemodel/src/model.ts", "Model");
+    const depModel = cls("packages/activemodel/lib/model.ts", "Model");
     const ts = makeManifest({
       activerecord: { classes: { LocalModel: localModel } },
       activemodel: { classes: { Model: depModel } },

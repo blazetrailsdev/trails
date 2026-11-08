@@ -156,7 +156,7 @@ place of the primitive. It was rejected:
   for equal content, `typeof` is `"object"`, a `Map` / `Set` / object key no
   longer finds the entry stored under the primitive, and every bind, quote and
   serialize arm that turns on `typeof x === "string"` (197 sites in
-  `activemodel/src` and `activerecord/src`, tests excluded) falls through to
+  `activemodel/lib` and `activerecord/src`, tests excluded) falls through to
   its non-string branch. The same holds for every line of user code that reads
   an attribute, where trails cannot sweep.
 - **It still would not be a String.** `title.length`, `title.startsWith(…)`,
@@ -424,7 +424,7 @@ primitive, so a thenable translation breaks `` `Name ${error.message}` `` and
 
 What made the sync answer cheap is that trails had already put the asynchrony
 at the load: `setLoadPath`, `reloadBang` and `eagerLoadBang` are async
-(`packages/i18n/src/i18n.ts:127`, `:139`, `:144`), converged there by
+(`packages/i18n/lib/i18n.ts:127`, `:139`, `:144`), converged there by
 `i18n-async-reload-chain` and `i18n-backend-async-read-path` under RFC 0074,
 against Ruby's lazy `init_translations unless initialized?` inside
 `Backend::Simple#lookup`

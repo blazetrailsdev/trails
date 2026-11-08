@@ -33,7 +33,7 @@ const ENROLLED = [
   "packages/date/test/**/*.test.ts",
   "packages/did-you-mean/test/**/*.test.ts",
   "packages/globalid/src/**/*.test.ts",
-  "packages/i18n/src/**/*.test.ts",
+  "packages/i18n/test/**/*.test.ts",
 ];
 
 async function currentMarks(): Promise<Record<string, number>> {

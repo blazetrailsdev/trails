@@ -15,14 +15,14 @@ const FIXTURE = {
     // lookup.
     "packages/activerecord/src/inheritance.ts": ["computeType"],
     "packages/activerecord/src/base.ts": ["computeType"],
-    "packages/activemodel/src/attributes.ts": [],
+    "packages/activemodel/lib/attributes.ts": [],
     "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   // `attribute` folds out of the file-wide union: private on the instance half
   // (activemodel/lib/active_model/attributes.rb:161), public on
   // `Attributes::ClassMethods` (attributes.rb:59).
   instanceFiles: {
-    "packages/activemodel/src/attributes.ts": ["attribute"],
+    "packages/activemodel/lib/attributes.ts": ["attribute"],
     "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   // `loadRecords` folds out of both file-wide unions: private on the nested
@@ -37,7 +37,7 @@ const FIXTURE = {
 setManifestForTests(FIXTURE);
 const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
-const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
+const attributesFile = path.join(REPO_ROOT, "packages/activemodel/lib/attributes.ts");
 const preloaderAssociationFile = path.join(
   REPO_ROOT,
   "packages/activerecord/src/associations/preloader/association.ts",

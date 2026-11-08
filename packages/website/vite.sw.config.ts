@@ -38,7 +38,7 @@ export default defineConfig({
       },
       pkgAlias("@blazetrails/activesupport", "../activesupport/lib/index.ts"),
       pkgAlias("@blazetrails/arel", "../arel/lib/index.ts"),
-      pkgAlias("@blazetrails/activemodel", "../activemodel/src/index.ts"),
+      pkgAlias("@blazetrails/activemodel", "../activemodel/lib/index.ts"),
       pkgAlias("@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"),
       {
         find: /^@blazetrails\/activerecord\/(.+)$/,
@@ -56,7 +56,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/bcrypt", "../bcrypt/lib/index.ts"),
       pkgAlias("@blazetrails/date", "../date/lib/index.ts"),
       pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/lib/index.ts"),
-      pkgAlias("@blazetrails/i18n", "../i18n/src/index.ts"),
+      pkgAlias("@blazetrails/i18n", "../i18n/lib/index.ts"),
       pkgAlias("@blazetrails/builder", "../builder/lib/builder.ts"),
       pkgAlias("@blazetrails/marcel", "../marcel/lib/marcel.ts"),
       pkgAlias("@blazetrails/chronic", "../chronic/lib/chronic.ts"),

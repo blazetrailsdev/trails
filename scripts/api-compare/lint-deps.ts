@@ -576,7 +576,7 @@ export function methodUsesDepImport(
  * `ActiveModel::Type.default_value`
  * (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref
  * `Type`. The port is a top-level function of the file mirroring that module
- * (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so
+ * (activemodel/lib/type.ts's `defaultValue`), imported by its bare name, so
  * its module is the declaring file's basename. With `depRoot`, a function
  * declared outside that package directory has no module there and answers null.
  */

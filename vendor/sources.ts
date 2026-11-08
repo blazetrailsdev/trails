@@ -562,7 +562,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // The date port (packages/i18n/src/date.ts today) cites
+        // The date port (packages/i18n/lib/date.ts today) cites
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface

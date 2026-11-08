@@ -1,0 +1,361 @@
+import { Notifications, type Extended } from "@blazetrails/activesupport";
+import { UploadedFile } from "@blazetrails/rack-test";
+import { ActionController } from "@blazetrails/actionpack";
+import { Image } from "@blazetrails/mini-magick/image";
+import {
+  File,
+  OpenSSL,
+  StringIO,
+  type Pathname,
+  constSet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
+import { ActiveStorage } from "../../lib/active-storage.js";
+import type { ClassMethods } from "../../lib/attached/model.js";
+import type { Attachment } from "../../lib/attachment.js";
+import type { Many } from "../../lib/attached/many.js";
+import type { One } from "../../lib/attached/one.js";
+import { Blob } from "../../lib/blob.js";
+import { FixtureSet } from "../../lib/fixture-set.js";
+import { Service } from "../../lib/service.js";
+import type { DiskService } from "../../lib/service/disk-service.js";
+import { Base } from "@blazetrails/activerecord";
+import type { AssociationProxy } from "@blazetrails/activerecord/associations/collection-proxy";
+
+export class User extends Base {
+  declare name: string | null;
+  declare private _recordCallbacks: boolean | undefined;
+  declare callbackCounter: number | undefined;
+  notificationSent: boolean | undefined;
+
+  declare avatar: One & Pick<Attachment, "signedId">;
+  declare coverPhoto: One;
+  declare avatarAttachment: Attachment | null | Promise<Attachment | null>;
+  declare avatarBlob: Blob | null | Promise<Blob | null>;
+  declare avatarWithVariants: One;
+  declare avatarWithPreprocessed: One;
+  declare avatarWithConditionalPreprocessed: One;
+  declare introVideo: One;
+  declare namePronunciationAudio: One;
+  declare resume: One;
+  declare resumeWithPreprocessing: One;
+  declare highlightsWithVariants: Many;
+  declare highlightsWithPreprocessed: Many;
+  declare highlightsWithConditionalPreprocessed: Many;
+  declare setAvatar: (attachable: unknown) => Promise<void>;
+  declare setCoverPhoto: (attachable: unknown) => Promise<void>;
+  declare highlights: Many & Pick<AssociationProxy<Attachment>, "findBy">;
+  declare vlogs: Many;
+  declare highlightsAttachments: Attachment[] | Promise<Attachment[]>;
+  declare highlightsBlobs: { count(): Promise<number> };
+  declare setHighlights: (attachables: unknown) => Promise<void>;
+  declare setVlogs: (attachables: unknown) => Promise<void>;
+  declare attachmentChanges: { [k: string]: unknown };
+
+  static {
+    this.validates("name", { presence: true });
+
+    const attached = this as unknown as Extended<typeof ClassMethods>;
+    attached.hasOneAttached("avatar");
+    attached.hasOneAttached("coverPhoto", { dependent: false, service: "local" });
+    attached.hasOneAttached("avatarWithVariants", {}, (attachable) => {
+      attachable.variant("thumb", { resizeToLimit: [100, 100] });
+    });
+    attached.hasOneAttached("avatarWithPreprocessed", {}, (attachable) => {
+      attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
+    });
+    attached.hasOneAttached("avatarWithConditionalPreprocessed", {}, (attachable) => {
+      attachable.variant("proc", {
+        resizeToLimit: [2, 2],
+        preprocessed: (user: User) => user.name === "transform via proc",
+      });
+      attachable.variant("method", {
+        resizeToLimit: [3, 3],
+        preprocessed: ":isShouldPreprocessed",
+      });
+    });
+    attached.hasOneAttached("introVideo");
+    attached.hasOneAttached("namePronunciationAudio");
+
+    attached.hasManyAttached("highlights");
+    attached.hasManyAttached("vlogs", { dependent: false, service: "local" });
+    attached.hasManyAttached("highlightsWithVariants", {}, (attachable) => {
+      attachable.variant("thumb", { resizeToLimit: [100, 100] });
+    });
+    attached.hasManyAttached("highlightsWithPreprocessed", {}, (attachable) => {
+      attachable.variant("bool", { resizeToLimit: [1, 1], preprocessed: true });
+    });
+    attached.hasManyAttached("highlightsWithConditionalPreprocessed", {}, (attachable) => {
+      attachable.variant("proc", {
+        resizeToLimit: [2, 2],
+        preprocessed: (user: User) => user.name === "transform via proc",
+      });
+      attachable.variant("method", {
+        resizeToLimit: [3, 3],
+        preprocessed: ":isShouldPreprocessed",
+      });
+    });
+    attached.hasOneAttached("resume", {}, (attachable) => {
+      attachable.variant("preview", { resizeToFill: [400, 400] });
+    });
+    attached.hasOneAttached("resumeWithPreprocessing", {}, (attachable) => {
+      attachable.variant("preview", { resizeToFill: [400, 400], preprocessed: true });
+    });
+
+    this.afterCommit((user: User) => user.incrementCallbackCounter());
+    this.afterUpdateCommit((user: User) => user.notify());
+
+    this.acceptsNestedAttributesFor("highlightsAttachments", { allowDestroy: true });
+  }
+
+  get recordCallbacks(): boolean | undefined {
+    return this._recordCallbacks;
+  }
+
+  set recordCallbacks(value: boolean | undefined) {
+    this._recordCallbacks = value;
+  }
+
+  isShouldPreprocessed(): boolean {
+    return this.name === "transform via method";
+  }
+
+  incrementCallbackCounter(): void {
+    if (this.recordCallbacks) {
+      this.callbackCounter ??= 0;
+      this.callbackCounter += 1;
+    }
+  }
+
+  async notify(): Promise<void> {
+    if ((await this.highlightsAttachments).some((a) => a.isPreviouslyNewRecord())) {
+      this.notificationSent = true;
+    }
+  }
+}
+constSet(TopLevel, "User", User);
+
+export class Group extends Base {
+  declare avatar: One;
+  declare users: AssociationProxy<User>;
+
+  static {
+    (this as unknown as Extended<typeof ClassMethods>).hasOneAttached("avatar");
+    this.hasMany("users", { autosave: true });
+
+    this.acceptsNestedAttributesFor("users");
+  }
+}
+constSet(TopLevel, "Group", Group);
+
+FixtureSet.fileFixturePath = File.expandPath("../fixtures/files", import.meta.dirname);
+
+export const SERVICE_CONFIGURATIONS = {
+  local: { service: "Disk", root: File.join(import.meta.dirname, "../../tmp/storage") },
+};
+
+export function fileFixture(fixtureName: string): Pathname {
+  return new FixtureSet().fileFixture(fixtureName);
+}
+
+export async function createBlob({
+  key = null,
+  data = "Hello world!",
+  filename = "hello.txt",
+  contentType = "text/plain",
+  identify = true,
+  serviceName = null,
+  record = null,
+}: {
+  key?: string | null;
+  data?: string;
+  filename?: string;
+  contentType?: string | null;
+  identify?: boolean;
+  serviceName?: string | null;
+  record?: unknown;
+} = {}): Promise<Blob> {
+  return await Blob.createAndUploadBang({
+    key: key,
+    io: new StringIO(data),
+    filename: filename,
+    contentType: contentType,
+    identify: identify,
+    serviceName: serviceName,
+    record: record,
+  });
+}
+
+export function buildBlobAfterUnfurling({
+  key = null,
+  data = "Hello world!",
+  filename = "hello.txt",
+  contentType = "text/plain",
+  identify = true,
+  record = null,
+}: {
+  key?: string | null;
+  data?: string;
+  filename?: string;
+  contentType?: string | null;
+  identify?: boolean;
+  record?: unknown;
+} = {}): Blob {
+  return Blob.buildAfterUnfurling({
+    key: key,
+    io: new StringIO(data),
+    filename: filename,
+    contentType: contentType,
+    identify: identify,
+    record: record,
+  });
+}
+
+export async function createFileBlob({
+  filename = "racecar.jpg",
+  fixture = filename,
+  contentType = "image/jpeg",
+  identify = true,
+  metadata = null,
+  serviceName = null,
+  record = null,
+}: {
+  key?: string | null;
+  filename?: string;
+  fixture?: string;
+  contentType?: string | null;
+  identify?: boolean;
+  metadata?: { [k: string]: unknown } | null;
+  serviceName?: string | null;
+  record?: unknown;
+} = {}): Promise<Blob> {
+  return await Blob.createAndUploadBang({
+    io: fileFixture(fixture).open(),
+    filename: filename,
+    contentType: contentType,
+    identify: identify,
+    metadata: metadata,
+    serviceName: serviceName,
+    record: record,
+  });
+}
+
+export async function createBlobBeforeDirectUpload({
+  key = null,
+  filename = "hello.txt",
+  byteSize,
+  checksum,
+  contentType = "text/plain",
+  record = null,
+}: {
+  key?: string | null;
+  filename?: string;
+  byteSize: number;
+  checksum: string;
+  contentType?: string | null;
+  record?: unknown;
+}): Promise<Blob> {
+  return await Blob.createBeforeDirectUploadBang({
+    key: key,
+    filename: filename,
+    byteSize: byteSize,
+    checksum: checksum,
+    contentType: contentType,
+    record: record,
+  });
+}
+
+export async function directlyUploadFileBlob({
+  filename = "racecar.jpg",
+  contentType = "image/jpeg",
+  record = null,
+}: { filename?: string; contentType?: string | null; record?: unknown } = {}): Promise<Blob> {
+  const file = fileFixture(filename);
+  const byteSize = file.size();
+  const checksum = (await OpenSSL.Digest.MD5.file(file)).base64digest();
+
+  const blob = await createBlobBeforeDirectUpload({
+    filename: filename,
+    byteSize: byteSize,
+    checksum: checksum,
+    contentType: contentType,
+    record: record,
+  });
+  const service = (Blob.service as (Service & { primary?: Service }) | null)!;
+  await (service.primary ?? service).upload(blob.key, file.open());
+  return blob;
+}
+
+export async function readImage(blobOrVariant: {
+  service: Service;
+  key: string | Promise<string | null>;
+}) {
+  return await Image.open(
+    (blobOrVariant.service as DiskService).pathFor((await blobOrVariant.key)!),
+  );
+}
+
+export async function extractMetadataFrom(blob: Blob) {
+  await blob.analyze();
+  return blob.metadata;
+}
+
+export function fixtureFileUpload(filename: string): UploadedFile {
+  return new UploadedFile(fileFixture(filename));
+}
+
+export async function withService<T>(
+  serviceName: string | null,
+  block: () => T | Promise<T>,
+): Promise<T> {
+  const previousService = Blob.service;
+  try {
+    Blob.service = serviceName ? Blob.services.fetch(serviceName) : null;
+
+    return await block();
+  } finally {
+    Blob.service = previousService;
+  }
+}
+
+export async function withStrictLoadingByDefault<T>(block: () => T | Promise<T>): Promise<T> {
+  const strictLoadingWas = Base.strictLoadingByDefault;
+  try {
+    Base.strictLoadingByDefault = true;
+    return await block();
+  } finally {
+    Base.strictLoadingByDefault = strictLoadingWas;
+  }
+}
+
+export async function withoutVariantTracking<T>(block: () => T | Promise<T>): Promise<T> {
+  const variantTrackingWas = ActiveStorage.trackVariants;
+  try {
+    ActiveStorage.trackVariants = false;
+    return await block();
+  } finally {
+    ActiveStorage.trackVariants = variantTrackingWas;
+  }
+}
+
+export async function withRaiseOnOpenRedirects<T>(
+  service: string,
+  block: () => T | Promise<T>,
+): Promise<T> {
+  const oldRaiseOnOpenRedirects = ActionController.Base.raiseOnOpenRedirects;
+  const oldService = Blob.service;
+  try {
+    ActionController.Base.raiseOnOpenRedirects = true;
+    Blob.service = Service.configure(service, SERVICE_CONFIGURATIONS);
+    return await block();
+  } finally {
+    ActionController.Base.raiseOnOpenRedirects = oldRaiseOnOpenRedirects;
+    Blob.service = oldService;
+  }
+}
+
+export function subscribeEventsFrom(name: string): unknown[] {
+  const events: unknown[] = [];
+  Notifications.subscribe(name, (event: unknown) => events.push(event));
+  return events;
+}

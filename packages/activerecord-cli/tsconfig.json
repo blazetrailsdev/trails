@@ -3,20 +3,24 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/**/__fixtures__",
-    "src/tsc-wrapper/__fixtures__",
-    "src/type-virtualization/fixtures"
-  ],
+  "include": ["lib"],
   "references": [
-    { "path": "../activerecord" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../ruby-compat" },
-    { "path": "../trails-tsc" }
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trails-tsc"
+    }
   ]
 }

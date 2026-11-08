@@ -1424,7 +1424,7 @@ export const RUBY_ONLY_CLASSES: RubyOnlyClass[] = [
       "to `JSON = ActiveSupport::JSON`. It is a library-selection shim, not " +
       "behavior: JavaScript has `JSON` in the language, and its " +
       "`stringify`/`parse` are that `encode`/`decode`, which is what " +
-      "`KeyValue` calls directly (`packages/i18n/src/backend/key-value.ts`). " +
+      "`KeyValue` calls directly (`packages/i18n/lib/backend/key-value.ts`). " +
       "Mirroring it would mean adding a trails class whose whole body " +
       "forwards to a global the language already provides.",
   },

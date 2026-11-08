@@ -48,6 +48,10 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "raabro",
   "rack",
   "rake",
+  "activemodel",
+  "activerecord-cli",
+  "activestorage",
+  "i18n",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

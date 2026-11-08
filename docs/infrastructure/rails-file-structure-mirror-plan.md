@@ -83,7 +83,7 @@ off-by-one counts due to trailing-newline handling):
 | `activerecord/src/base.ts`                                   | 3464 |
 | `activerecord/src/migration.ts`                              | 2976 |
 | `activerecord/src/connection-adapters/sqlite3-adapter.ts`    | 2330 |
-| `activemodel/src/model.ts`                                   | 2316 |
+| `activemodel/lib/model.ts`                                   | 2316 |
 | `activerecord/src/relation/query-methods.ts`                 | 2292 |
 | `activerecord/src/associations.ts`                           | 2256 |
 | `activerecord/src/associations/collection-proxy.ts`          | 2243 |

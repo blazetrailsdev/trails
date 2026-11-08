@@ -60,7 +60,7 @@ describeManifest("rails-private-methods manifest", () => {
       "packages/actionpack/lib/action-controller/metal/content-security-policy.ts",
       "contentSecurityPolicy",
     ],
-    ["packages/activemodel/src/attributes.ts", "attribute"],
+    ["packages/activemodel/lib/attributes.ts", "attribute"],
   ])("does not claim %s's %s is Rails-private on a `?` sibling's candidate", (file, name) => {
     expect(manifest.files[file] ?? []).not.toContain(name);
   });

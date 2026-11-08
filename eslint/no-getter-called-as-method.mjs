@@ -3,7 +3,7 @@
  *
  * Some Rails predicates port onto TypeScript *getters* rather than methods —
  * `ActiveModel::Dirty#has_changes_to_save?` becomes
- * `get hasChangesToSave(): boolean` (activemodel/src/model.ts). Those getters
+ * `get hasChangesToSave(): boolean` (activemodel/lib/model.ts). Those getters
  * are deliberately never wired through `include()`, because `include()`
  * replaces the getter descriptor with a data property (see the Category A note
  * in activerecord/src/base.ts).

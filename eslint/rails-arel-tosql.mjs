@@ -9,7 +9,7 @@
  * that should instead route through Arel — this rule catches that drift.
  *
  * Scoped (via eslint.config.mjs) to
- * `packages/{activerecord,activemodel,arel}/src/**\/*.ts` excluding
+ * `packages/{activerecord,activemodel,arel}/{src,lib}/**\/*.ts` excluding
  * `*.test.ts`. The allow-set is DRIVEN BY THE RAILS API MANIFEST
  * (api-compare output), not a hand-maintained list — Arel itself legitimately
  * defines `toSql`, so it must come from the manifest. Getter / regular method

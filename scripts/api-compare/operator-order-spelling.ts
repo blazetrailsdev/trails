@@ -247,7 +247,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // encryption/message.ts `equals`.
   "ActiveRecord::Encryption::Message": { "==": ["equals"] },
   // active_model/type/binary.rb:56 `def ==(other)` →
-  // activemodel/src/type/binary.ts `Data#equals`.
+  // activemodel/lib/type/binary.ts `Data#equals`.
   "ActiveModel::Type::Binary::Data": { "==": ["equals"] },
   // connection_adapters/postgresql/utils.rb:30 `def ==(o)` →
   // connection-adapters/postgresql/utils.ts `Name#equals`.

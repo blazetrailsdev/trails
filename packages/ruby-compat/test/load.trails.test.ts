@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { rbFLoad, rbFRequireFile, registerCompiledFiles } from "../lib/load.js";
+import { isCompiledFile, rbFLoad, rbFRequireFile, registerCompiledFiles } from "../lib/load.js";
 import { TopLevel } from "../lib/object.js";
 import { constGet, rbModRemoveConst } from "../lib/variable.js";
 
@@ -75,5 +75,20 @@ describe("registerCompiledFiles", () => {
     });
     expect(await rbFLoad("/nonexistent-trails-root/sub/../dotted.js")).toBe(true);
     expect(calls).toBe(1);
+  });
+
+  it("loads a registered path with no source through its thunk on every load", async () => {
+    let calls = 0;
+    registerCompiledFiles("/nonexistent-trails-root", {
+      "repeat.js": async () => {
+        calls += 1;
+        return {};
+      },
+    });
+    expect(isCompiledFile("/nonexistent-trails-root/repeat.js")).toBe(true);
+    expect(isCompiledFile("/nonexistent-trails-root/unregistered.js")).toBe(false);
+    await rbFLoad("/nonexistent-trails-root/repeat.js");
+    await rbFLoad("/nonexistent-trails-root/repeat.js");
+    expect(calls).toBe(2);
   });
 });

@@ -33,12 +33,12 @@ where Rails returns a String, and an async `translate` makes it return a
 `Promise`:
 
 - `ActiveModel::Error#message` and `#full_message`
-  (`packages/activemodel/src/error.ts:235`, `:258`), which are **getters**,
+  (`packages/activemodel/lib/error.ts:235`, `:258`), which are **getters**,
   over the statics they call (`:87`, `:148`). `Errors#full_messages`
   (`errors.ts:233`), `#messages_for` (`:241`) and `#to_hash` (`:296`) read
   them, and `as_json` reads `to_hash`.
 - `ActiveModel::Translation#human_attribute_name`
-  (`packages/activemodel/src/translation.ts:60`) and `Name#human`
+  (`packages/activemodel/lib/translation.ts:60`) and `Name#human`
   (`naming.ts:220`), which name a model and its attributes everywhere one is
   rendered.
 - `Inflector#ordinal` / `#ordinalize`
@@ -93,7 +93,7 @@ As a consequence:
   empty rather than Rails', because that body names two things the port does
   not define: `I18n::Backend::Cache`, which this section leaves unported, and
   the `I18n.cache_store` accessor it is configured through (`cache.rb:44-74`,
-  with no counterpart in `packages/i18n/src/i18n.ts`). Its
+  with no counterpart in `packages/i18n/lib/i18n.ts`). Its
   `ActiveSupport::Cache.lookup_store(:memory_store)` call does resolve
   (`packages/activesupport/lib/cache.ts:16`), so the two i18n names are the
   whole blocker. The receipt carries the citation instead.
@@ -101,7 +101,7 @@ As a consequence:
   synchronous store there: Ruby's store answers `[]`, `[]=` and `keys`
   (`vendor/i18n/v1.14.8/lib/i18n/backend/key_value.rb:26-30`), and the ported
   `Store` interface is those three methods, synchronous
-  (`packages/i18n/src/backend/key-value.ts:17-21`). A store whose reads are
+  (`packages/i18n/lib/backend/key-value.ts:17-21`). A store whose reads are
   async does not satisfy that interface, in Ruby or here. How such a store
   would be adapted is not decided by this section.
 
