@@ -162,7 +162,7 @@ describe("InstrumentationTest", () => {
       await worker.stop();
     });
 
-    expect(events.length >= 1).toBe(true);
+    expect(events.length >= 1).toBeTruthy();
     for (const e of events) assertEvent(e, "polling");
   });
 
@@ -315,7 +315,7 @@ describe("InstrumentationTest", () => {
 
   it("errors when deregistering processes are included in deregister_process events", async () => {
     const error = new ExpectedTestError("everything is broken");
-    vi.spyOn(Process.prototype, "destroyBang").mockRejectedValue(error);
+    const destroyBang = vi.spyOn(Process.prototype, "destroyBang").mockRejectedValue(error);
 
     const events = await subscribed("deregister_process.solid_queue", async () => {
       await expect(
@@ -332,6 +332,7 @@ describe("InstrumentationTest", () => {
 
     expect(events.length).toEqual(1);
     assertEvent(events[0], "deregister_process", { error: error });
+    expect(destroyBang).toHaveBeenCalled();
   });
 
   it("retrying failed job emits retry event", async () => {
@@ -476,14 +477,14 @@ describe("InstrumentationTest", () => {
       await scheduler.stop();
     });
 
-    expect(events.length >= 1).toBe(true);
+    expect(events.length >= 1).toBeTruthy();
     const event = events.at(-1)!;
 
     assertEvent(event, "enqueue_recurring_task", {
       task: "example_task",
       active_job_id: (await Job.last())!.active_job_id,
     });
-    expect(isPresent(event[4].at)).toBe(true);
+    expect(isPresent(event[4].at)).toBeTruthy();
     expect(event[4].other_adapter).toBeUndefined();
   });
 
@@ -499,7 +500,7 @@ describe("InstrumentationTest", () => {
       for (const scheduler of schedulers) await scheduler.stop();
     });
 
-    expect(events.length >= 2).toBe(true);
+    expect(events.length >= 2).toBeTruthy();
     for (const event of events) {
       assertEvent(event, "enqueue_recurring_task", { task: "example_task" });
     }
@@ -510,10 +511,10 @@ describe("InstrumentationTest", () => {
       NotificationArgs[]
     >;
     for (const eventsByTime of [...byTime.values()].filter((group) => group.length > 1)) {
-      expect(eventsByTime.some((e) => e[4].active_job_id == null)).toBe(true);
-      expect(eventsByTime.some((e) => activeJobIds.includes(e[4].active_job_id as string))).toBe(
-        true,
-      );
+      expect(eventsByTime.some((e) => e[4].active_job_id == null)).toBeTruthy();
+      expect(
+        eventsByTime.some((e) => activeJobIds.includes(e[4].active_job_id as string)),
+      ).toBeTruthy();
     }
   });
 
@@ -531,14 +532,14 @@ describe("InstrumentationTest", () => {
       await scheduler.stop();
     });
 
-    expect(events.length >= 1).toBe(true);
+    expect(events.length >= 1).toBeTruthy();
     const event = events.at(-1)!;
 
     assertEvent(event, "enqueue_recurring_task", {
       task: "example_task",
       enqueue_error: "ActiveRecord::Deadlocked: ActiveRecord::Deadlocked",
     });
-    expect(isPresent(event[4].at)).toBe(true);
+    expect(isPresent(event[4].at)).toBeTruthy();
     expect(event[4].other_adapter).toBeUndefined();
   });
 
@@ -561,14 +562,14 @@ describe("InstrumentationTest", () => {
         await scheduler.stop();
       });
 
-      expect(events.length >= 1).toBe(true);
+      expect(events.length >= 1).toBeTruthy();
       const event = events.at(-1)!;
 
       assertEvent(event, "enqueue_recurring_task", {
         task: "example_task",
         enqueue_error: "All is broken",
       });
-      expect(isPresent(event[4].at)).toBe(true);
+      expect(isPresent(event[4].at)).toBeTruthy();
       expect(event[4].other_adapter).toBeTruthy();
     } finally {
       AddToBufferJob.setQueueAdapter("solid_queue");
@@ -578,11 +579,10 @@ describe("InstrumentationTest", () => {
   it("thread errors emit thread_error events", async () => {
     const error = new ExpectedTestError("everything is broken");
     const Result = ClaimedExecution.Result;
-    ClaimedExecution.Result = class {
-      constructor() {
-        throw error;
-      }
-    } as unknown as typeof Result;
+    const resultNew = vi.fn(function () {
+      throw error;
+    });
+    ClaimedExecution.Result = resultNew as unknown as typeof Result;
 
     try {
       await AddToBufferJob.performLater("hey!");
@@ -595,6 +595,7 @@ describe("InstrumentationTest", () => {
 
       expect(events.length).toEqual(1);
       assertEvent(events[0], "thread_error", { error: error });
+      expect(resultNew).toHaveBeenCalled();
     } finally {
       ClaimedExecution.Result = Result;
     }
