@@ -1,7 +1,7 @@
 /**
  * Transliterates mail's Ragel-generated parsers
  * (`vendor/mail/2.8.1/lib/mail/parsers/*_parser.rb`) into
- * `packages/mail/src/parsers/*.ts` (RFC 0204, "The Ragel parsers are
+ * `packages/mail/lib/parsers/*.ts` (RFC 0204, "The Ragel parsers are
  * transliterated from their generated Ruby"). Ragel 6 has no JavaScript
  * target, so the generated Ruby is the source: its tables are copied, and its
  * driver loop and action bodies are rewritten line by line by the rules below.

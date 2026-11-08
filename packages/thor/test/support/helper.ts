@@ -48,11 +48,11 @@ export async function capture(stream: string, block: () => unknown): Promise<str
 }
 
 export function sourceRoot(): string {
-  return File.join(File.dirname(__FILE__), "fixtures");
+  return File.join(File.dirname(File.dirname(__FILE__)), "fixtures");
 }
 
 export function destinationRoot(): string {
-  return File.join(File.dirname(__FILE__), "sandbox");
+  return File.join(File.dirname(File.dirname(__FILE__)), "sandbox");
 }
 
 export function silenceWarnings<T>(block: () => T): T {

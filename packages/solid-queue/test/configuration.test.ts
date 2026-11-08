@@ -5,7 +5,7 @@ import { Configuration, RecurringTask, type Scheduler } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./support/job-result.js";
 
-const dummyRoot = `${import.meta.dirname}/test-helpers/dummy`;
+const dummyRoot = `${import.meta.dirname}/support/dummy`;
 
 function configFilePath(name: string): string {
   return `${dummyRoot}/config/${name}.yml`;

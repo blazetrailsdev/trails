@@ -120,9 +120,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
     const failedExecution = (await job.failedExecution) as FailedExecution;
     expect(failedExecution.exceptionClass()).toBe("RuntimeError");
     expect(failedExecution.message()).toBe("This is a RuntimeError exception");
-    expect((failedExecution.backtrace() as string[])[0]).toMatch(
-      /\/test-helpers\/raising-job\.ts:\d+/,
-    );
+    expect((failedExecution.backtrace() as string[])[0]).toMatch(/\/support\/raising-job\.ts:\d+/);
 
     expect((await claimedExecution.process)?.id).toEqual(process.id);
   });

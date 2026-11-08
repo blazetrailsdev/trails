@@ -38,7 +38,7 @@ const PKG_DIRS: Record<string, string> = {
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
   raabro: "packages/raabro/src/",
-  zeitwerk: "packages/zeitwerk/src/",
+  zeitwerk: "packages/zeitwerk/test/",
   fugit: "packages/fugit/test/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",
   actioncontroller: "packages/actionpack/test/action-controller/",
@@ -46,7 +46,7 @@ const PKG_DIRS: Record<string, string> = {
   actionview: "packages/actionview/test/",
   actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/test/",
-  thor: "packages/thor/src/",
+  thor: "packages/thor/test/",
 };
 
 interface ConventionFile {

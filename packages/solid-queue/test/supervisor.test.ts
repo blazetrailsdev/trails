@@ -34,7 +34,7 @@ import {
   waitForRegisteredProcesses,
 } from "./support/processes-test-helper.js";
 
-const dummyRoot = `${import.meta.dirname}/test-helpers/dummy`;
+const dummyRoot = `${import.meta.dirname}/support/dummy`;
 
 function configFilePath(name: string): string {
   return `${dummyRoot}/config/${name}.yml`;
@@ -77,7 +77,7 @@ describe("SupervisorTest", () => {
 
   beforeEach(() => {
     previousPidfile = SolidQueue.supervisorPidfile;
-    pidfile = `${import.meta.dirname}/test-helpers/dummy/tmp/pids/pidfile_${SecureRandom.hex()}.pid`;
+    pidfile = `${import.meta.dirname}/support/dummy/tmp/pids/pidfile_${SecureRandom.hex()}.pid`;
     SolidQueue.supervisorPidfile = pidfile;
   });
 

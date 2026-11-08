@@ -81,7 +81,7 @@ describe("TestCpathExpectedAtNil", () => {
   it("returns nil if the argument does not belong to the autoload paths", async () => {
     await withSetup(s.loader, [], { dirs: ["."] }, async () => {
       expect(await s.loader.cpathExpectedAt(import.meta.dirname)).toBeNull();
-      expect(await s.loader.cpathExpectedAt(File.join(import.meta.dirname, "cref.ts"))).toBeNull();
+      expect(await s.loader.cpathExpectedAt(import.meta.filename)).toBeNull();
     });
   });
 

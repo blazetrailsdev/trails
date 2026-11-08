@@ -137,7 +137,7 @@ describe("Thor::Command", () => {
   });
 
   it("drops Thor's own frames and the caller's from a backtrace", () => {
-    const thor = new URL(".", import.meta.url).pathname;
+    const thor = new URL("../lib/", import.meta.url).pathname;
     const own = [
       `at async Command.run (file://${thor}command.js:27:3)`,
       `at ${thor}command.ts:1:1`,

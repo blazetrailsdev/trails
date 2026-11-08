@@ -50,12 +50,12 @@ export default [
       "packages/activejob/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/globalid/src/**/*.ts",
+      "packages/globalid/lib/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/thor/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     languageOptions: {
@@ -76,10 +76,10 @@ export default [
   {
     files: [
       "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/thor/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
-      "packages/globalid/src/**/*.ts",
+      "packages/globalid/lib/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",

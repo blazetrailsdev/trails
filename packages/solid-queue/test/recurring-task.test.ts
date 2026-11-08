@@ -309,7 +309,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
   it("task configured with a command", async () => {
     const task = recurringTaskWith({
-      command: `${import.meta.dirname}/test-helpers/dummy/lib/from-a-command.ts`,
+      command: `${import.meta.dirname}/support/dummy/lib/from-a-command.ts`,
     });
     await enqueueAndAssertPerformedWithResult(task, "from_a_command");
 

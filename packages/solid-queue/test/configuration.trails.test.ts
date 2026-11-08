@@ -20,7 +20,7 @@ describe("Configuration", () => {
       return fromConfiguration(key, options);
     });
 
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/test-helpers/dummy`);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/support/dummy`);
     const configuration = new Configuration({ dispatchers: [] });
     const processes = await configuration.configuredProcesses();
 

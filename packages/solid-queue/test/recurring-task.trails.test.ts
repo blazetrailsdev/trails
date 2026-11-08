@@ -14,7 +14,7 @@ describe("RecurringTask (trails)", () => {
   });
 
   it("RecurringJob runs its command on every perform", async () => {
-    const command = `${import.meta.dirname}/test-helpers/dummy/lib/from-a-command.ts`;
+    const command = `${import.meta.dirname}/support/dummy/lib/from-a-command.ts`;
     const size = JobBuffer.values.length;
     await RecurringJob.performNow(command);
     await RecurringJob.performNow(command);
