@@ -125,7 +125,7 @@ export const HelpersContainer = Object.defineProperty({}, "installHelperMethods"
  *
  * @noRailsEquivalent PERMANENT
  */
-export class Irb {
+export class Tsrepl {
   /** @noRailsEquivalent PERMANENT */
   context: { irbName: string; main: string };
   /** @noRailsEquivalent PERMANENT */
@@ -135,7 +135,7 @@ export class Irb {
 
   /** @noRailsEquivalent PERMANENT */
   constructor() {
-    this.context = { irbName: IRB.conf.IRB_NAME as string, main: "main" };
+    this.context = { irbName: TSREPL.conf.TSREPL_NAME as string, main: "main" };
     this.lineNo = 1;
   }
 
@@ -145,8 +145,8 @@ export class Irb {
    *
    * @noRailsEquivalent PERMANENT
    */
-  async run(conf: Record<string, unknown> = IRB.conf): Promise<void> {
-    if (conf.IRB_RC != null) (conf.IRB_RC as (context: unknown) => void)(this.context);
+  async run(conf: Record<string, unknown> = TSREPL.conf): Promise<void> {
+    if (conf.TSREPL_RC != null) (conf.TSREPL_RC as (context: unknown) => void)(this.context);
     const prevContext = conf.MAIN_CONTEXT;
     conf.MAIN_CONTEXT = this.context;
 
@@ -154,7 +154,7 @@ export class Irb {
     try {
       forcedExit = await this.evalInput();
     } finally {
-      if (prevContext != null) IRB.conf.MAIN_CONTEXT = prevContext;
+      if (prevContext != null) TSREPL.conf.MAIN_CONTEXT = prevContext;
       for (const hook of conf.AT_EXIT as Array<() => void>) hook();
       if (forcedExit) exit();
     }
@@ -168,7 +168,9 @@ export class Irb {
    * @noRailsEquivalent PERMANENT
    */
   async evalInput(): Promise<boolean> {
-    const pconf = (IRB.conf.PROMPT as Record<string, PromptConf>)[IRB.conf.PROMPT_MODE as string];
+    const pconf = (TSREPL.conf.PROMPT as Record<string, PromptConf>)[
+      TSREPL.conf.PROMPT_MODE as string
+    ];
     const prompt = this.formatPrompt((pconf.PROMPT_I as string | null) ?? "", null, 0, this.lineNo);
     const repl = await getReplAsync();
     const server = repl.start({ prompt, useGlobal: true });
@@ -274,10 +276,10 @@ export class Irb {
  *
  * @noRailsEquivalent PERMANENT
  */
-export const IRB = {
+export const TSREPL = {
   conf: {} as Record<string, unknown>,
   INITIALIZED: false,
-  Irb,
+  Tsrepl,
   HelperMethod,
 
   /**
@@ -288,13 +290,13 @@ export const IRB = {
    * @noRailsEquivalent PERMANENT
    */
   setup(apPath: string | null): void {
-    IRB.initConfig(apPath);
+    TSREPL.initConfig(apPath);
 
-    const conf = IRB.conf as { PROMPT: Record<string, unknown>; PROMPT_MODE: string };
+    const conf = TSREPL.conf as { PROMPT: Record<string, unknown>; PROMPT_MODE: string };
     if (conf.PROMPT[conf.PROMPT_MODE] == null) {
       throw new UndefinedPromptMode(conf.PROMPT_MODE);
     }
-    IRB.INITIALIZED = true;
+    TSREPL.INITIALIZED = true;
   },
 
   /**
@@ -306,18 +308,19 @@ export const IRB = {
    * @noRailsEquivalent PERMANENT
    */
   initConfig(_apPath: string | null): void {
-    const conf = IRB.conf;
-    conf.IRB_NAME = "irb";
+    const conf = TSREPL.conf;
+    conf.TSREPL_NAME = "tsrepl";
 
     conf.RC = true;
     conf.LOAD_MODULES = [];
-    conf.IRB_RC = null;
+    conf.TSREPL_RC = null;
 
     const nc = env.NO_COLOR;
     conf.USE_COLORIZE = nc == null || nc === "";
     conf.USE_AUTOCOMPLETE =
-      (Object.hasOwn(env, "IRB_USE_AUTOCOMPLETE") ? env.IRB_USE_AUTOCOMPLETE : "true") !== "false";
-    conf.COMPLETOR = Object.hasOwn(env, "IRB_COMPLETOR") ? env.IRB_COMPLETOR : "regexp";
+      (Object.hasOwn(env, "TSREPL_USE_AUTOCOMPLETE") ? env.TSREPL_USE_AUTOCOMPLETE : "true") !==
+      "false";
+    conf.COMPLETOR = Object.hasOwn(env, "TSREPL_COMPLETOR") ? env.TSREPL_COMPLETOR : "regexp";
     conf.INSPECT_MODE = true;
     conf.USE_TRACER = false;
     conf.USE_LOADER = false;

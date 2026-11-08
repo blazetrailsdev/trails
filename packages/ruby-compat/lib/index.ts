@@ -262,7 +262,7 @@ export {
   ARRAY_METHOD_TABLE,
 } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
-export { IRB } from "./repl-adapter.js";
+export { TSREPL } from "./repl-adapter.js";
 export { registerReplAdapter, getReplAsync, replAdapterConfig } from "./repl-adapter.js";
 export type { ReplAdapter, ReplServerLike } from "./repl-adapter.js";
 export { FrozenError } from "./frozen-error.js";

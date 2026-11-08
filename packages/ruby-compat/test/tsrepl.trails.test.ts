@@ -5,7 +5,7 @@ import { Kernel } from "../lib/include.js";
 import { autoloadDelete, rbAutoloadLoad, rbAutoloadStr } from "../lib/variable.js";
 import { LoadError } from "../lib/load-error.js";
 import {
-  IRB,
+  TSREPL,
   registerReplAdapter,
   replAdapterConfig,
   type ReplServerLike,
@@ -40,7 +40,7 @@ function fakeRepl() {
   return started;
 }
 
-describe("IRB", () => {
+describe("TSREPL", () => {
   let exit: MockInstance<(code?: number) => never>;
 
   beforeEach(() => {
@@ -48,54 +48,54 @@ describe("IRB", () => {
   });
 
   afterEach(() => {
-    for (const key of Object.keys(IRB.conf)) delete IRB.conf[key];
+    for (const key of Object.keys(TSREPL.conf)) delete TSREPL.conf[key];
     replAdapterConfig.adapter = "node";
     exit.mockRestore();
   });
 
-  it("setup seeds the default prompts and IRB_NAME, which format_prompt expands", () => {
-    IRB.setup(null);
-    expect(IRB.conf.IRB_NAME).toBe("irb");
-    expect(Object.keys(IRB.conf.PROMPT as object)).toContain("DEFAULT");
-    expect(["DEFAULT", "NULL"]).toContain(IRB.conf.PROMPT_MODE);
-    expect(IRB.INITIALIZED).toBe(true);
-    IRB.conf.IRB_NAME = "app";
-    expect(new IRB.Irb().formatPrompt("%N(%m):%03n%l ", '"', 0, 7)).toBe('app(main):007" ');
+  it("setup seeds the default prompts and TSREPL_NAME, which format_prompt expands", () => {
+    TSREPL.setup(null);
+    expect(TSREPL.conf.TSREPL_NAME).toBe("tsrepl");
+    expect(Object.keys(TSREPL.conf.PROMPT as object)).toContain("DEFAULT");
+    expect(["DEFAULT", "NULL"]).toContain(TSREPL.conf.PROMPT_MODE);
+    expect(TSREPL.INITIALIZED).toBe(true);
+    TSREPL.conf.TSREPL_NAME = "app";
+    expect(new TSREPL.Tsrepl().formatPrompt("%N(%m):%03n%l ", '"', 0, 7)).toBe('app(main):007" ');
   });
 
   it("setup raises UndefinedPromptMode for an unknown prompt mode", () => {
-    const initConfig = IRB.initConfig;
-    IRB.initConfig = (apPath) => {
+    const initConfig = TSREPL.initConfig;
+    TSREPL.initConfig = (apPath) => {
       initConfig(apPath);
-      IRB.conf.PROMPT_MODE = "NOPE";
+      TSREPL.conf.PROMPT_MODE = "NOPE";
     };
     try {
-      expect(() => IRB.setup(null)).toThrow("Undefined prompt mode(NOPE).");
+      expect(() => TSREPL.setup(null)).toThrow("Undefined prompt mode(NOPE).");
     } finally {
-      IRB.initConfig = initConfig;
+      TSREPL.initConfig = initConfig;
     }
   });
 
   it("run puts helpers and TopLevel constants on main, runs AT_EXIT, then exits", async () => {
     const started = fakeRepl();
-    class Greet extends IRB.HelperMethod.Base {
+    class Greet extends TSREPL.HelperMethod.Base {
       execute(): string {
         return "hello";
       }
     }
-    IRB.HelperMethod.register("greet", Greet);
-    IRB.setup(null);
-    IRB.conf.PROMPT_MODE = "DEFAULT";
+    TSREPL.HelperMethod.register("greet", Greet);
+    TSREPL.setup(null);
+    TSREPL.conf.PROMPT_MODE = "DEFAULT";
     const order: string[] = [];
-    (IRB.conf.AT_EXIT as Array<() => void>).push(() => order.push("at_exit"));
+    (TSREPL.conf.AT_EXIT as Array<() => void>).push(() => order.push("at_exit"));
     exit.mockImplementation((() => order.push("exit")) as never);
     const prev = { name: "outer" };
-    IRB.conf.MAIN_CONTEXT = prev;
+    TSREPL.conf.MAIN_CONTEXT = prev;
 
-    await new IRB.Irb().run(IRB.conf);
+    await new TSREPL.Tsrepl().run(TSREPL.conf);
 
     const { prompt, server } = started[0];
-    expect(prompt).toBe("irb(main):001> ");
+    expect(prompt).toBe("tsrepl(main):001> ");
     expect((server.context.greet as () => string)()).toBe("hello");
     expect(Greet.instance()).toBe(Greet.instance());
     const singleton = Object.getPrototypeOf(server.context) as object;
@@ -109,12 +109,12 @@ describe("IRB", () => {
       delete (TopLevel as Record<string, unknown>).IrbSeatedLater;
     }
     expect(order).toEqual(["at_exit", "exit"]);
-    expect(IRB.conf.MAIN_CONTEXT).toBe(prev);
+    expect(TSREPL.conf.MAIN_CONTEXT).toBe(prev);
   });
 
   it("evaluate loads a pending top-level autoload before the REPL evaluates", async () => {
     const started = fakeRepl();
-    IRB.setup(null);
+    TSREPL.setup(null);
     const required: string[] = [];
     const prevRequire = Kernel.require;
     Kernel.require = async (feature) => {
@@ -126,7 +126,7 @@ describe("IRB", () => {
     rbAutoloadStr(Object, "IrbLazy", "/app/models/irb_lazy.ts");
     rbAutoloadStr(Object, "IrbOther", "/app/models/irb_other.ts");
     try {
-      await new IRB.Irb().run(IRB.conf);
+      await new TSREPL.Tsrepl().run(TSREPL.conf);
       const { server } = started[0];
       const result = await new Promise((resolve, reject) =>
         server.eval("IrbLazy + 1", server.context, "repl", (e, r) => (e ? reject(e) : resolve(r))),
