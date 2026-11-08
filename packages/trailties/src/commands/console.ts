@@ -7,7 +7,7 @@ import { environment } from "../command.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
 import { Trails } from "../trails.js";
-import { IRBConsole } from "./console/irb-console.js";
+import { TSREPLConsole } from "./console/tsrepl-console.js";
 
 interface ConsoleOptions {
   sandbox?: boolean | null;
@@ -59,7 +59,7 @@ export class Console {
     this._loadConsole = Promise.resolve(app.loadConsole());
     this._loadConsole.catch(() => {});
 
-    this.console = app.config.console || new IRBConsole(app);
+    this.console = app.config.console || new TSREPLConsole(app);
   }
 
   isSandbox(): boolean | undefined {

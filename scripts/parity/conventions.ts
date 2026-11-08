@@ -59,6 +59,12 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rb: "js",
   ERB: "TSE",
   Erb: "Tse",
+  // irb is Interactive Ruby; the trails console evaluates TypeScript, so
+  // `IRBConsole` (railties/lib/rails/commands/console/irb_console.rb) and the
+  // irb port it drives are spelled TSREPL.
+  irb: "tsrepl",
+  IRB: "TSREPL",
+  Irb: "Tsrepl",
   // trails lints with ESLint, never RuboCop: `apply_rubocop_autocorrect_after_generate!`
   // (railties/lib/rails/configuration.rb:134-139), `skip_rubocop?`
   // (generators/app_base.rb:392-393) and `create_rubocop_file`

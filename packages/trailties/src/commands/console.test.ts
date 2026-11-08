@@ -3,7 +3,7 @@ import { capture } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 import { Console, ConsoleCommand } from "./console.js";
-import { IRBConsole } from "./console/irb-console.js";
+import { TSREPLConsole } from "./console/tsrepl-console.js";
 
 class FakeConsole {
   static _started = false;
@@ -94,27 +94,27 @@ describe("Trails::ConsoleTest", () => {
     expect(output).toMatch(/\sproduction\s/);
   });
 
-  it("console defaults to IRB", () => {
-    expect((new Console(buildApp(null)).console as IRBConsole).name()).toBe("IRB");
+  it("console defaults to TSREPL", () => {
+    expect((new Console(buildApp(null)).console as TSREPLConsole).name()).toBe("TSREPL");
   });
 
   it("prompt env colorization", () => {
-    const irbConsole = new Console(buildApp(null)).console as IRBConsole;
+    const tsreplConsole = new Console(buildApp(null)).console as TSREPLConsole;
     const red = "\u001b[31m";
     const blue = "\u001b[34m";
     const clear = "\u001b[0m";
 
     Trails.env = "development";
-    expect(irbConsole.colorizedEnv()).toBe(`${blue}dev${clear}`);
+    expect(tsreplConsole.colorizedEnv()).toBe(`${blue}dev${clear}`);
 
     Trails.env = "test";
-    expect(irbConsole.colorizedEnv()).toBe(`${blue}test${clear}`);
+    expect(tsreplConsole.colorizedEnv()).toBe(`${blue}test${clear}`);
 
     Trails.env = "production";
-    expect(irbConsole.colorizedEnv()).toBe(`${red}prod${clear}`);
+    expect(tsreplConsole.colorizedEnv()).toBe(`${red}prod${clear}`);
 
     Trails.env = "custom_env";
-    expect(irbConsole.colorizedEnv()).toBe("custom_env");
+    expect(tsreplConsole.colorizedEnv()).toBe("custom_env");
   });
 
   it("default environment with no trails env", async () => {
