@@ -161,6 +161,26 @@ describe("Mapper public DSL additions", () => {
     expect(specs()).toContain("/disk(.:format)");
   });
 
+  it("draw finds a registered compiled routes file with no source on disk", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "trails-draw-sourceless-"));
+    registerCompiledFiles(dir, {
+      "sourceless.ts": async () => ({
+        drawRoutes(this: Mapper) {
+          this.get("/sourceless", { to: "sourceless#index" });
+        },
+      }),
+    });
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    m._drawPaths.push(dir);
+
+    await m.draw("sourceless");
+    await m.draw("sourceless");
+
+    const specs = set.routes().routes.map((r) => r.path.spec.toString());
+    expect(specs.filter((s) => s === "/sourceless(.:format)")).toHaveLength(2);
+  });
+
   it("root routes through match_root_route and keeps the bare slash", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
