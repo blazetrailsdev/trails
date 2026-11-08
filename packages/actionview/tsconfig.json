@@ -3,15 +3,15 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "exclude": [
-    "src/**/*.test.ts",
-    "src/test-helpers",
-    "src/test",
-    "src/test-case.ts",
-    "src/constants.excluded.generated.ts"
+    "lib/**/*.test.ts",
+    "lib/test-helpers",
+    "lib/test",
+    "lib/test-case.ts",
+    "lib/constants.excluded.generated.ts"
   ],
   "references": [
     { "path": "../builder" },

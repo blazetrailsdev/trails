@@ -244,7 +244,7 @@ export default defineConfig(
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     ignores: [
@@ -357,7 +357,7 @@ export default defineConfig(
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
@@ -383,7 +383,7 @@ export default defineConfig(
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/website/src/**/*.ts",
@@ -442,9 +442,9 @@ export default defineConfig(
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
-      "packages/activejob/src/**/*.ts",
+      "packages/activejob/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
@@ -530,11 +530,11 @@ export default defineConfig(
   {
     files: [
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
-      "packages/activejob/src/**/*.ts",
+      "packages/activejob/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/date/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
@@ -599,7 +599,7 @@ export default defineConfig(
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -637,7 +637,7 @@ export default defineConfig(
           },
         },
         {
-          files: ["packages/activejob/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
+          files: ["packages/activejob/lib/**/*.ts", "packages/activesupport/src/**/*.ts"],
           ignores: ["**/*.test.ts", "**/test-helpers/**"],
           rules: {
             "blazetrails/class-to-string-seat": "error",
@@ -655,7 +655,7 @@ export default defineConfig(
     ? [
         {
           files: [
-            "packages/actionview/src/**/*.test.ts",
+            "packages/actionview/{lib,test}/**/*.test.ts",
             "packages/arel/src/**/*.test.ts",
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
@@ -676,7 +676,7 @@ export default defineConfig(
     files: [
       "packages/activerecord/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/arel/src/**/*.ts",
