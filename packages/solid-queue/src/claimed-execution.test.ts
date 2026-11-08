@@ -133,16 +133,19 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
     const reloaderHook = block((_: unknown, inner: () => unknown) => Executor.wrap(() => inner()));
     executeCallbacks.setCallback("execute", "around", { prepend: true }, reloaderHook);
 
-    await expect(
-      withErrorSubscriber(subscriber, async () => {
-        const claimedExecution = await prepareAndClaimJob(
-          await RaisingJob.performLater(RuntimeError, "B"),
-        );
+    try {
+      await expect(
+        withErrorSubscriber(subscriber, async () => {
+          const claimedExecution = await prepareAndClaimJob(
+            await RaisingJob.performLater(RuntimeError, "B"),
+          );
 
-        await claimedExecution.perform();
-      }),
-    ).rejects.toThrow(RuntimeError);
-    executeCallbacks.skipCallback("execute", "around", reloaderHook);
+          await claimedExecution.perform();
+        }),
+      ).rejects.toThrow(RuntimeError);
+    } finally {
+      executeCallbacks.skipCallback("execute", "around", reloaderHook);
+    }
 
     expect(subscriber.errors.length).toBe(1);
     expect(subscriber.messages()[0]).toBe("This is a RuntimeError exception");

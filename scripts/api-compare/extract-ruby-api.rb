@@ -2117,8 +2117,6 @@ class ApiExtractor
     }
   end
 
-  # `scope :name, ->(a) { … }` defines `name(a)`: the generated class method
-  # takes the lambda's parameters (`vendor/rails/v8.0.2/activerecord/lib/active_record/scoping/named.rb:154-189`).
   def scope_lambda_params(args)
     list = positional_arg_list(args)
     return [] unless list.is_a?(Array)
