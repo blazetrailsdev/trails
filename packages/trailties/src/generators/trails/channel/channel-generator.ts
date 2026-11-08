@@ -145,6 +145,7 @@ pin_all_from "app/javascript/channels", under: "channels"
   /** @internal */
   private __fileName?: string;
 
+  /** @internal */
   override get fileName(): string {
     return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
   }
