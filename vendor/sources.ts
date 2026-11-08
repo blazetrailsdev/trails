@@ -602,7 +602,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/minitest/minitest.git",
       // The version scripts/parity/pipeline/schema/ruby/Gemfile.lock:32 pins.
       // Move this ref when that pin moves, so the `gem/path.rb:LINE` citations
-      // in activesupport/src/testing/assertions.ts stay checkable.
+      // in activesupport/lib/testing/assertions.ts stay checkable.
       ref: "v5.27.0",
     },
     packages: [
