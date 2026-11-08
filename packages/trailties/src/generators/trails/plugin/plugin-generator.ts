@@ -1,3 +1,4 @@
+import "../../../constants.trails-plugin-plugin-generator.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
 import { File, chomp, constDefined, rbFBackquote } from "@blazetrails/ruby-compat";
 import {

@@ -1,3 +1,4 @@
+import "../constants.generated-attribute.generated.js";
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";

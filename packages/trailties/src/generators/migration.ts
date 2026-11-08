@@ -1,3 +1,4 @@
+import "../constants.migration.generated.js";
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import { Dir, File, rbFBinding, rbStrToI, strNew, TSE } from "@blazetrails/ruby-compat";

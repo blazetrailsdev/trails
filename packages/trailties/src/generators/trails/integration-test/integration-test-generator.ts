@@ -1,3 +1,4 @@
+import "../../../constants.trails-integration-test-integration-test-generator.generated.js";
 import { NamedBase } from "../../named-base.js";
 
 export class IntegrationTestGenerator extends NamedBase {}

@@ -1,3 +1,4 @@
+import "../../../constants.tse-authentication-authentication-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 

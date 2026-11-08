@@ -1,3 +1,4 @@
+import "../../../constants.trails-credentials-credentials-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedConfiguration } from "@blazetrails/activesupport";
 import { SecureRandom } from "@blazetrails/ruby-compat";

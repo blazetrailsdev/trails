@@ -1,3 +1,4 @@
+import "../../../constants.trails-scaffold-controller-scaffold-controller-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
   include,

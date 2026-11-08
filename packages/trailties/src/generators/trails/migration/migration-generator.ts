@@ -1,3 +1,4 @@
+import "../../../constants.trails-migration-migration-generator.generated.js";
 import { NamedBase } from "../../named-base.js";
 
 export class MigrationGenerator extends NamedBase {

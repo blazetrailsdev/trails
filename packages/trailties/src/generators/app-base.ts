@@ -1,3 +1,4 @@
+import "../constants.app-base.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
 import {
   Dir,

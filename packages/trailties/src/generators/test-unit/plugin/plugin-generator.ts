@@ -1,3 +1,4 @@
+import "../../../constants.test-unit-plugin-plugin-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../test-unit.js";
 

@@ -1,3 +1,4 @@
+import "../../../constants.trails-channel-channel-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
 import { dasherize, type GeneratorOptions } from "../../base.js";

@@ -1,3 +1,4 @@
+import "../../../constants.trails-system-test-system-test-generator.generated.js";
 import { NamedBase } from "../../named-base.js";
 
 export class SystemTestGenerator extends NamedBase {}

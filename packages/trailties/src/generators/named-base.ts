@@ -1,3 +1,4 @@
+import "../constants.named-base.generated.js";
 import {
   underscore,
   camelize,

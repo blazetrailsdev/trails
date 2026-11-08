@@ -1,3 +1,4 @@
+import "../../../constants.trails-resource-resource-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`resource_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import { include, type Included, pluralize } from "@blazetrails/activesupport";
 import { ModelGenerator, type ModelGeneratorOptions } from "../model/model-generator.js";

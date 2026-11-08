@@ -1,3 +1,4 @@
+import "../constants.resource-helpers.generated.js";
 import { NameError, camelize, constantize, underscore } from "@blazetrails/activesupport";
 import { include, included } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";

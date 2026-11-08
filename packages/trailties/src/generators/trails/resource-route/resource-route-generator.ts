@@ -1,3 +1,4 @@
+import "../../../constants.trails-resource-route-resource-route-generator.generated.js";
 import { isPresent, pluralize } from "@blazetrails/activesupport";
 import { NamedBase } from "../../named-base.js";
 

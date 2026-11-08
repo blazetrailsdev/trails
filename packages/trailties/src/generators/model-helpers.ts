@@ -1,3 +1,4 @@
+import "../constants.model-helpers.generated.js";
 import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";

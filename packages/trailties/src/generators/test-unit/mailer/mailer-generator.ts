@@ -1,3 +1,4 @@
+import "../../../constants.test-unit-mailer-mailer-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";

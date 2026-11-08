@@ -1,3 +1,4 @@
+import "../../../constants.active-record-multi-db-multi-db-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 

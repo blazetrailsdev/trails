@@ -1,3 +1,4 @@
+import "../../../constants.trails-benchmark-benchmark-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
 

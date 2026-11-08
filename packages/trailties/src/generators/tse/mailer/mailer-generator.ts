@@ -1,3 +1,4 @@
+import "../../../constants.tse-mailer-mailer-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
 import { dasherize } from "../../base.js";

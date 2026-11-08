@@ -1,3 +1,4 @@
+import "../../../constants.active-record-migration-migration-generator.generated.js";
 import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";

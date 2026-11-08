@@ -1,3 +1,4 @@
+import "../../../constants.trails-master-key-master-key-generator.generated.js";
 import { Pathname } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { Base } from "../../base.js";

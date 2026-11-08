@@ -1,3 +1,4 @@
+import "../../../constants.trails-job-job-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";

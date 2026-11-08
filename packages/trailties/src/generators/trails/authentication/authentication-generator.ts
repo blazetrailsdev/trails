@@ -1,3 +1,4 @@
+import "../../../constants.trails-authentication-authentication-generator.generated.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { getPackageManager } from "../../../package-manager.js";
