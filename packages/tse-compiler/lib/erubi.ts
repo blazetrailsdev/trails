@@ -48,14 +48,14 @@ export class Engine {
   readonly filename: string | null;
   readonly bufvar: string;
 
-  protected _escape: boolean;
-  protected _chainAppends: boolean | null;
-  protected _textEnd: string;
-  protected _bufferOnStack: boolean;
-  protected _escapefunc: string;
+  protected escape: boolean;
+  protected chainAppends: boolean | null;
+  protected textEnd: string;
+  protected bufferOnStack: boolean;
+  protected escapefunc: string;
 
   constructor(input: string, properties: EngineProperties = {}) {
-    const escape = (this._escape = Object.hasOwn(properties, "escape")
+    const escape = (this.escape = Object.hasOwn(properties, "escape")
       ? properties.escape!
       : Object.hasOwn(properties, "escapeHtml")
         ? properties.escapeHtml!
@@ -69,8 +69,8 @@ export class Engine {
     const literalPostfix = properties.literalPostfix || "%>";
     const preamble = properties.preamble || `${bufvar} = ${bufval};`;
     const postamble = properties.postamble || `${bufvar}.to_s\n`;
-    this._chainAppends = properties.chainAppends ?? null;
-    this._textEnd = (
+    this.chainAppends = properties.chainAppends ?? null;
+    this.textEnd = (
       Object.hasOwn(properties, "freezeTemplateLiterals")
         ? properties.freezeTemplateLiterals
         : FREEZE_TEMPLATE_LITERALS
@@ -78,7 +78,7 @@ export class Engine {
       ? "'.freeze"
       : "'";
 
-    this._bufferOnStack = false;
+    this.bufferOnStack = false;
     this.src = properties.src || "";
     if (properties.freeze) this.src += "# frozen_string_literal: true\n";
     if (properties.ensure) {
@@ -90,12 +90,12 @@ export class Engine {
       }
     }
 
-    if (!(this._escapefunc = properties.escapefunc!)) {
+    if (!(this.escapefunc = properties.escapefunc!)) {
       if (escape) {
-        this._escapefunc = "__erubi.h";
+        this.escapefunc = "__erubi.h";
         this.src += "__erubi = ::Erubi; ";
       } else {
-        this._escapefunc = "::Erubi.h";
+        this.escapefunc = "::Erubi.h";
       }
     }
 
@@ -186,13 +186,19 @@ export class Engine {
   }
 
   /** @internal */
+  protected _dupStringIfFrozen(string: string): string {
+    return string;
+  }
+
+  /** @internal */
   protected addText(text: string): void {
     if (text === "") return;
 
+    text = this._dupStringIfFrozen(text);
     text = text.replace(/['\\]/g, "\\$&");
 
     this.withBuffer(() => {
-      this.src += " << '" + text + this._textEnd;
+      this.src += " << '" + text + this.textEnd;
     });
   }
 
@@ -201,12 +207,12 @@ export class Engine {
     this.terminateExpression();
     this.src += code;
     if (code.at(RANGE_LAST) !== "\n") this.src += ";";
-    this._bufferOnStack = false;
+    this.bufferOnStack = false;
   }
 
   /** @internal */
   protected addExpression(indicator: string, code: string): void {
-    if ((indicator === "=") !== this._escape) {
+    if ((indicator === "=") !== this.escape) {
       this.addExpressionResult(code);
     } else {
       this.addExpressionResultEscaped(code);
@@ -223,7 +229,7 @@ export class Engine {
   /** @internal */
   protected addExpressionResultEscaped(code: string): void {
     this.withBuffer(() => {
-      this.src += " << " + this._escapefunc + "((" + code + "))";
+      this.src += " << " + this.escapefunc + "((" + code + "))";
     });
   }
 
@@ -246,12 +252,12 @@ export class Engine {
 
   /** @internal */
   protected withBuffer(block: () => void): void {
-    if (this._chainAppends) {
-      if (!this._bufferOnStack) {
+    if (this.chainAppends) {
+      if (!this.bufferOnStack) {
         this.src += "; " + this.bufvar;
       }
       block();
-      this._bufferOnStack = true;
+      this.bufferOnStack = true;
     } else {
       this.src += " " + this.bufvar;
       block();
@@ -261,6 +267,6 @@ export class Engine {
 
   /** @internal */
   protected terminateExpression(): void {
-    if (this._chainAppends) this.src += "; ";
+    if (this.chainAppends) this.src += "; ";
   }
 }
