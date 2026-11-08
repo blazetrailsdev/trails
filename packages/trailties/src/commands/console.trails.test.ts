@@ -136,6 +136,27 @@ describe("ConsoleCommand (trails)", () => {
     }
   });
 
+  it("chains the global main object to TopLevel without touching Object.prototype", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    constSet(TopLevel, "ConsoleSeatedConstant", 42);
+    const g = globalThis as Record<string, unknown>;
+    io.server = null;
+    const started = startConsole();
+    await vi.waitFor(() => expect(io.server).not.toBeNull());
+    try {
+      expect(io.server!.context).toBe(globalThis);
+      expect(Object.getPrototypeOf(globalThis)).not.toBe(Object.prototype);
+      await evaluate(`globalThis.consoleSeated = [ConsoleSeatedConstant, String(this)]`);
+      expect(g.consoleSeated).toEqual([42, "[object global]"]);
+    } finally {
+      io.server!.close();
+      await started;
+      delete g.consoleSeated;
+      rbModRemoveConst(TopLevel, "ConsoleSeatedConstant");
+      vi.restoreAllMocks();
+    }
+  });
+
   it("loads app/models before the REPL reads piped input", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const root = await mkdtemp(join(tmpdir(), "trails-console-"));

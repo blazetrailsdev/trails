@@ -451,5 +451,5 @@ export function rbAutoloadP(mod: object, id: string): string | null {
 export async function rbAutoloadLoad(module: object, name: string): Promise<boolean> {
   const feature = rbAutoloadP(module, name);
   if (feature == null) return false;
-  return Kernel.require!(feature);
+  return Kernel.require(feature);
 }

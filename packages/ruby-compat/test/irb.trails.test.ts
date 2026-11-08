@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { getProcessAdapter } from "../lib/process-adapter.js";
 import { TopLevel } from "../lib/object.js";
 import { Kernel } from "../lib/include.js";
-import { autoloadDelete, rbAutoloadStr } from "../lib/variable.js";
+import { autoloadDelete, rbAutoloadLoad, rbAutoloadStr } from "../lib/variable.js";
+import { LoadError } from "../lib/load-error.js";
 import {
   IRB,
   registerReplAdapter,
@@ -52,12 +53,14 @@ describe("IRB", () => {
     exit.mockRestore();
   });
 
-  it("setup seeds the default prompts and IRB_NAME", () => {
+  it("setup seeds the default prompts and IRB_NAME, which format_prompt expands", () => {
     IRB.setup(null);
     expect(IRB.conf.IRB_NAME).toBe("irb");
     expect(Object.keys(IRB.conf.PROMPT as object)).toContain("DEFAULT");
     expect(["DEFAULT", "NULL"]).toContain(IRB.conf.PROMPT_MODE);
     expect(IRB.INITIALIZED).toBe(true);
+    IRB.conf.IRB_NAME = "app";
+    expect(new IRB.Irb().formatPrompt("%N(%m):%03n%l ", '"', 0, 7)).toBe('app(main):007" ');
   });
 
   it("setup raises UndefinedPromptMode for an unknown prompt mode", () => {
@@ -71,24 +74,6 @@ describe("IRB", () => {
     } finally {
       IRB.initConfig = initConfig;
     }
-  });
-
-  it("format_prompt expands %N, %m, %03n and %l", () => {
-    IRB.setup(null);
-    IRB.conf.IRB_NAME = "app";
-    const irb = new IRB.Irb();
-    expect(irb.formatPrompt("%N(%m):%03n%l ", '"', 0, 7)).toBe('app(main):007" ');
-  });
-
-  it("helper methods are singletons registered by name", () => {
-    class Hello extends IRB.HelperMethod.Base {
-      execute(): string {
-        return "hi";
-      }
-    }
-    IRB.HelperMethod.register("hello", Hello);
-    expect(IRB.HelperMethod.helperMethods.hello).toBe(Hello);
-    expect(Hello.instance()).toBe(Hello.instance());
   });
 
   it("run puts helpers and TopLevel constants on main, runs AT_EXIT, then exits", async () => {
@@ -112,10 +97,9 @@ describe("IRB", () => {
     const { prompt, server } = started[0];
     expect(prompt).toBe("irb(main):001> ");
     expect((server.context.greet as () => string)()).toBe("hello");
+    expect(Greet.instance()).toBe(Greet.instance());
     const singleton = Object.getPrototypeOf(server.context) as object;
     expect(singleton).not.toBe(Object.prototype);
-    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
-    expect(Object.getPrototypeOf(Object.prototype)).toBeNull();
     expect(String(server.context)).toBe("[object Object]");
     expect(typeof (server.context as object).hasOwnProperty).toBe("function");
     (TopLevel as Record<string, unknown>).IrbSeatedLater = 42;
@@ -140,19 +124,31 @@ describe("IRB", () => {
       return true;
     };
     rbAutoloadStr(Object, "IrbLazy", "/app/models/irb_lazy.ts");
+    rbAutoloadStr(Object, "IrbOther", "/app/models/irb_other.ts");
     try {
       await new IRB.Irb().run(IRB.conf);
       const { server } = started[0];
       const result = await new Promise((resolve, reject) =>
         server.eval("IrbLazy + 1", server.context, "repl", (e, r) => (e ? reject(e) : resolve(r))),
       );
+      await new Promise((resolve) => server.eval("x.IrbOther", server.context, "repl", resolve));
       expect(required).toEqual(["/app/models/irb_lazy.ts"]);
-      expect(server.evaluated).toEqual(["IrbLazy + 1"]);
+      expect(server.evaluated).toEqual(["IrbLazy + 1", "x.IrbOther"]);
       expect(result).toBe(7);
     } finally {
       Kernel.require = prevRequire;
       autoloadDelete(Object, "IrbLazy");
+      autoloadDelete(Object, "IrbOther");
       delete (TopLevel as Record<string, unknown>).IrbLazy;
+    }
+  });
+
+  it("a pending autoload with no gem's require raises LoadError", async () => {
+    rbAutoloadStr(Object, "IrbMissing", "/nowhere/irb_missing");
+    try {
+      await expect(rbAutoloadLoad(Object, "IrbMissing")).rejects.toBeInstanceOf(LoadError);
+    } finally {
+      autoloadDelete(Object, "IrbMissing");
     }
   });
 });

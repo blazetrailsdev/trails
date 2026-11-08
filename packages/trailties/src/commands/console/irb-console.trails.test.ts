@@ -30,7 +30,7 @@ describe("IRBConsole#start", () => {
     });
   }
 
-  it("names the session after the app and swaps DEFAULT for RAILS_PROMPT", async () => {
+  it("names the session after the app and swaps only DEFAULT for RAILS_PROMPT", async () => {
     Trails.env = "custom_env";
     setupWith((conf) => {
       conf.PROMPT_MODE = "DEFAULT";
@@ -39,6 +39,11 @@ describe("IRBConsole#start", () => {
     expect(ran).toBe(IRB.conf);
     expect(IRB.conf.IRB_NAME).toBe("Blog");
     expect(IRB.conf.PROMPT_MODE).toBe("RAILS_PROMPT");
+    setupWith((conf) => {
+      conf.PROMPT_MODE = "SIMPLE";
+    });
+    await new IRBConsole(app).start();
+    expect(IRB.conf.PROMPT_MODE).toBe("SIMPLE");
     expect((IRB.conf.PROMPT as Record<string, unknown>).RAILS_PROMPT).toEqual({
       PROMPT_I: "%N(custom_env)> ",
       PROMPT_S: "%N(custom_env)%l ",
@@ -47,37 +52,16 @@ describe("IRBConsole#start", () => {
     });
   });
 
-  it("respects a prompt mode other than DEFAULT", async () => {
-    setupWith((conf) => {
-      conf.PROMPT_MODE = "SIMPLE";
-    });
-    await new IRBConsole(app).start();
-    expect(IRB.conf.PROMPT_MODE).toBe("SIMPLE");
-  });
-
-  it("turns autocomplete off outside a local environment", async () => {
+  it("turns autocomplete off outside a local environment only", async () => {
     Trails.env = "production";
     await new IRBConsole(app).start();
     expect(IRB.conf.USE_AUTOCOMPLETE).toBe(false);
-  });
-
-  it("keeps autocomplete in a local environment", async () => {
     Trails.env = "development";
     await new IRBConsole(app).start();
     expect(IRB.conf.USE_AUTOCOMPLETE).toBe(true);
   });
 
-  it("filters the backtrace through the backtrace cleaner", async () => {
-    const filter = vi
-      .spyOn(Trails.backtraceCleaner, "filter")
-      .mockImplementation((bt) => bt.map((l) => `clean ${String(l)}`));
-    await new IRBConsole(app).start();
-    const backtraceFilter = IRB.conf.BACKTRACE_FILTER as (bt: string[]) => string[];
-    expect(backtraceFilter(["a"])).toEqual(["clean a"]);
-    expect(filter).toHaveBeenCalledWith(["a"]);
-  });
-
-  it("runs an existing BACKTRACE_FILTER before the backtrace cleaner", async () => {
+  it("wraps the backtrace cleaner around any existing BACKTRACE_FILTER", async () => {
     vi.spyOn(Trails.backtraceCleaner, "filter").mockImplementation((bt) =>
       bt.map((l) => `clean ${String(l)}`),
     );
@@ -87,5 +71,10 @@ describe("IRBConsole#start", () => {
     await new IRBConsole(app).start();
     const backtraceFilter = IRB.conf.BACKTRACE_FILTER as (bt: string[]) => string[];
     expect(backtraceFilter(["a"])).toEqual(["clean user a"]);
+    setupWith((conf) => {
+      delete conf.BACKTRACE_FILTER;
+    });
+    await new IRBConsole(app).start();
+    expect((IRB.conf.BACKTRACE_FILTER as (bt: string[]) => string[])(["a"])).toEqual(["clean a"]);
   });
 });

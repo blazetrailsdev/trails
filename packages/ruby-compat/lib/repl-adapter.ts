@@ -107,16 +107,15 @@ export const HelperMethod = {
  *
  * @noRailsEquivalent PERMANENT
  */
-export const HelpersContainer: Record<string, unknown> & { installHelperMethods(): void } =
-  Object.defineProperty({} as Record<string, unknown>, "installHelperMethods", {
-    value(): void {
-      for (const [name, helperMethodClass] of Object.entries(HelperMethod.helperMethods)) {
-        if (Object.hasOwn(HelpersContainer, name)) continue;
-        HelpersContainer[name] = (...args: unknown[]) =>
-          helperMethodClass.instance().execute(...args);
-      }
-    },
-  }) as Record<string, unknown> & { installHelperMethods(): void };
+export const HelpersContainer = Object.defineProperty({}, "installHelperMethods", {
+  value(): void {
+    for (const [name, helperMethodClass] of Object.entries(HelperMethod.helperMethods)) {
+      if (Object.hasOwn(HelpersContainer, name)) continue;
+      HelpersContainer[name] = (...args: unknown[]) =>
+        helperMethodClass.instance().execute(...args);
+    }
+  },
+}) as Record<string, unknown> & { installHelperMethods(): void };
 
 /**
  * `IRB::Irb` (`vendor/ruby/v3.3.11/lib/irb.rb:920`), over the REPL adapter.
@@ -131,6 +130,8 @@ export class Irb {
   context: { irbName: string; main: string };
   /** @noRailsEquivalent PERMANENT */
   lineNo: number;
+  /** @noRailsEquivalent PERMANENT */
+  binding: ((statements: string, file: string) => Promise<unknown>) | null = null;
 
   /** @noRailsEquivalent PERMANENT */
   constructor() {
@@ -173,17 +174,17 @@ export class Irb {
     const server = repl.start({ prompt, useGlobal: true });
     this.loadHelperMethodsToMain(server);
     const evalDefault = server.eval;
+    this.binding = (statements, file) =>
+      new Promise((resolve, reject) =>
+        evalDefault.call(server, statements, server.context, file, (err, result) =>
+          err ? reject(err) : resolve(result),
+        ),
+      );
     let previous: Promise<void> = Promise.resolve();
-    server.eval = (statements, context, file, callback) => {
+    server.eval = (statements, _context, file, callback) => {
       previous = previous.then(() =>
-        this.evaluate(statements).then(
-          () =>
-            new Promise<void>((resolve) =>
-              evalDefault.call(server, statements, context, file, (err, result) => {
-                callback(err, result);
-                resolve();
-              }),
-            ),
+        this.evaluate(statements, file).then(
+          (result) => callback(null, result),
           (error: unknown) => callback(error as Error),
         ),
       );
@@ -221,18 +222,22 @@ export class Irb {
   }
 
   /**
-   * `IRB::WorkSpace#evaluate` (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:120-122`).
-   * Ruby's `eval` loads a pending autoload when it looks the constant up
-   * (`rb_autoload_load`, `vendor/ruby/v3.3.11/variable.c:3045`). That load is
-   * awaited, so every top-level constant the statements name is loaded before
-   * the REPL evaluates them.
+   * `IRB::WorkSpace#evaluate` (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:120-122`):
+   * `eval(statements, @binding, file)`, with the REPL's own evaluator as the
+   * binding. Ruby's `eval` loads a pending autoload when it looks the constant
+   * up (`rb_autoload_load`, `vendor/ruby/v3.3.11/variable.c:3045`). That load
+   * is awaited, so first each capitalized name the statements contain that is
+   * not a property read (`x.Name`) and is still pending under `Object` is
+   * loaded. The scan reads text, so a name inside a string or comment loads
+   * too; for `A.B` only `A` loads here, and `B` loads with `A`'s namespace.
    *
    * @noRailsEquivalent PERMANENT
    */
-  async evaluate(statements: string): Promise<void> {
-    for (const [name] of statements.matchAll(/\b[A-Z]\w*/g)) {
+  async evaluate(statements: string, file: string): Promise<unknown> {
+    for (const [name] of statements.matchAll(/(?<![.\w$])[A-Z][\w$]*/g)) {
       if (!Object.hasOwn(TopLevel, name)) await rbAutoloadLoad(Object, name);
     }
+    return this.binding!(statements, file);
   }
 
   /**
@@ -274,7 +279,6 @@ export const IRB = {
   INITIALIZED: false,
   Irb,
   HelperMethod,
-  UndefinedPromptMode,
 
   /**
    * `IRB.setup` (`vendor/ruby/v3.3.11/lib/irb/init.rb:50-61`).
