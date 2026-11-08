@@ -51,7 +51,7 @@ export function isManifestAvailable() {
 /** Repo-relative POSIX path of a package test file; null when out of scope. */
 export function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/[^/]+\/src\/.+\.test\.ts)$/);
+  const m = norm.match(/(?:^|\/)(packages\/[^/]+\/(?:src|test)\/.+\.test\.ts)$/);
   return m ? m[1] : null;
 }
 
