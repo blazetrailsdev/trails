@@ -137,7 +137,10 @@ export class OptionParser {
     this.summaryIndent = indent;
   }
 
-  /** @missingRailsCall visit — CONVERGEABLE ruby-compat-optparse-visit-add-banner */
+  /**
+   * @noRailsEquivalent PERMANENT
+   * @missingRailsCall visit — CONVERGEABLE ruby-compat-optparse-visit-add-banner
+   */
   get banner(): string {
     if (this._banner == null) {
       this._banner = `Usage: ${this.programName} [options]`;
@@ -149,6 +152,7 @@ export class OptionParser {
     this._banner = banner;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get programName(): string {
     return this._programName ?? File.basename(rbProgname(), ".*");
   }
