@@ -4,7 +4,14 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { rbInspect, rbModName, rbObjClass, round, slice } from "@blazetrails/ruby-compat";
+import {
+  rbInspect,
+  rbModName,
+  rbObjAsString,
+  rbObjClass,
+  round,
+  slice,
+} from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 import { VERSION } from "./version.js";
 
@@ -316,7 +323,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     event: Event,
     { action, ...attributes }: { action: string } & Attributes,
   ): string {
-    return `SolidQueue-${VERSION} ${action} (${round(event.duration, 1)}ms)  ${this.formattedAttributes(attributes)}`;
+    return `SolidQueue-${VERSION} ${action} (${rbObjAsString(new Number(round(event.duration, 1)))}ms)  ${this.formattedAttributes(attributes)}`;
   }
 
   /** @internal */
