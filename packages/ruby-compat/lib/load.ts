@@ -112,7 +112,7 @@ export async function rbFRequireFile(feature: string): Promise<boolean> {
       feature.endsWith(".js") || feature.endsWith(".ts") ? feature : `${feature}.js`,
       path,
     );
-    if (!compiledFiles.has(full) && !(await File.isExistAsync(full))) continue;
+    if (!isCompiledFile(full) && !(await File.isExistAsync(full))) continue;
     if (LOADED_FEATURES.includes(full)) return false;
     await rbFLoad(full);
     LOADED_FEATURES.push(full);
