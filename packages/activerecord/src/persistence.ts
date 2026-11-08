@@ -632,7 +632,7 @@ export async function reload<T extends ReloadRecord>(
   this._associationCache = freshObject._associationCache;
   for (const association of this._associationCache.values()) association.owner = this;
   this._attributes = freshObject._attributes;
-  if (virtualAttributePrototypes.has(Object.getPrototypeOf(this))) {
+  if (_virtualAttributePrototypes.has(Object.getPrototypeOf(this))) {
     Object.setPrototypeOf(this, this.constructor.prototype);
   }
   if (Object.getPrototypeOf(this) !== this.constructor.prototype) {
@@ -954,12 +954,9 @@ export function _raiseRecordNotTouchedError(): never {
 
 /**
  * @internal
- * @inventedArm loop — PERMANENT
  * @inventedArm if — PERMANENT
  * @inventedArm keys — PERMANENT
  * @inventedArm basicObjRespondTo — PERMANENT
- * @inventedArm rbObjSingletonClass — PERMANENT
- * @inventedArm defineAttributeMethod — PERMANENT
  */
 export function instantiateInstanceOf(
   this: PersistenceHost,
@@ -973,39 +970,36 @@ export function instantiateInstanceOf(
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
   const virtual = names.filter((name) => !basicObjRespondTo(record, name));
-  if (virtual.length > 0) Object.setPrototypeOf(record, virtualAttributePrototype(klass, virtual));
+  if (virtual.length > 0) Object.setPrototypeOf(record, _virtualAttributePrototype(klass, virtual));
   return record.initWithAttributes(attributes, false, block);
 }
 
-const virtualAttributePrototypeCache = new WeakMap<object, Map<string, object>>();
-const virtualAttributePrototypes = new WeakSet<object>();
+/** @perf 1.8x — PERMANENT */
+const _virtualAttributePrototypeCache = new WeakMap<object, Map<string, object>>();
+/** @perf 1.8x — PERMANENT */
+const _virtualAttributePrototypes = new WeakSet<object>();
 
-/**
- * @internal
- * @inventedArm defineAttributeMethod — PERMANENT
- */
-function virtualAttributePrototype(klass: typeof Base, names: string[]): object {
-  let byKey = virtualAttributePrototypeCache.get(klass);
-  if (!byKey) virtualAttributePrototypeCache.set(klass, (byKey = new Map()));
+/** @perf 1.8x — PERMANENT */
+function _virtualAttributePrototype(klass: typeof Base, names: string[]): object {
+  let byKey = _virtualAttributePrototypeCache.get(klass);
+  if (!byKey) _virtualAttributePrototypeCache.set(klass, (byKey = new Map()));
   const key = names.join("\0");
   let proto = byKey.get(key);
   if (proto) return proto;
   proto = Object.create(klass.prototype) as object;
-  for (const name of names) Object.defineProperties(proto, virtualAttributeMethods(klass, name));
+  for (const name of names) Object.defineProperties(proto, _virtualAttributeMethods(klass, name));
   byKey.set(key, proto);
-  virtualAttributePrototypes.add(proto);
+  _virtualAttributePrototypes.add(proto);
   return proto;
 }
 
-const virtualAttributeMethodCache = new WeakMap<object, Map<string, PropertyDescriptorMap>>();
+/** @perf 1.8x — PERMANENT */
+const _virtualAttributeMethodCache = new WeakMap<object, Map<string, PropertyDescriptorMap>>();
 
-/**
- * @internal
- * @inventedArm defineAttributeMethod — PERMANENT
- */
-function virtualAttributeMethods(klass: typeof Base, name: string): PropertyDescriptorMap {
-  let byName = virtualAttributeMethodCache.get(klass);
-  if (!byName) virtualAttributeMethodCache.set(klass, (byName = new Map()));
+/** @perf 1.8x — PERMANENT */
+function _virtualAttributeMethods(klass: typeof Base, name: string): PropertyDescriptorMap {
+  let byName = _virtualAttributeMethodCache.get(klass);
+  if (!byName) _virtualAttributeMethodCache.set(klass, (byName = new Map()));
   let descriptors = byName.get(name);
   if (descriptors) return descriptors;
 
