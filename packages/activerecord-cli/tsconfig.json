@@ -3,14 +3,14 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "exclude": [
-    "src/**/*.test.ts",
-    "src/**/__fixtures__",
-    "src/tsc-wrapper/__fixtures__",
-    "src/type-virtualization/fixtures"
+    "lib/**/*.test.ts",
+    "lib/**/__fixtures__",
+    "lib/tsc-wrapper/__fixtures__",
+    "lib/type-virtualization/fixtures"
   ],
   "references": [
     { "path": "../activerecord" },

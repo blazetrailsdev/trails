@@ -4,9 +4,9 @@
     "composite": true,
     "outDir": "dist",
     "declarationDir": "dist/types",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../rake" },
     { "path": "../actionpack" },
@@ -22,5 +22,5 @@
     { "path": "../trailties" },
     { "path": "../vitest-matchers" }
   ],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["lib/**/*.test.ts"]
 }

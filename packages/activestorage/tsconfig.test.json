@@ -5,6 +5,6 @@
     "declarationDir": "dist-test/types"
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts"],
+  "include": ["lib/**/*.test.ts"],
   "references": [{ "path": "./tsconfig.json" }, { "path": "../activerecord/tsconfig.test.json" }]
 }
