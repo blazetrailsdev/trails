@@ -2460,3 +2460,54 @@ Probes: `serve-handler.ts` (217 modules, rackup alone) and `serve-booted.ts`
 (1962) both serve under perry, which is what cleared the server, the event loop
 and `fetch`. An early read of a filtered strace blamed an early exit; the
 `[08]` line was there all along, written before the buffered `INIT:` flush.
+
+### Wall 30 is fixed by the boot file map (r64)
+
+RFC 0224 landed on trails `main` (#9871: `trails build` writes
+`.trails/boot.generated.js`, and `.trails/entry.generated.js` imports it before
+`config/environment.ts`). Rungs 07 and 08 now import the generated entry, and
+`run-ladder.sh` runs `trails build` first. Under `tsx`, rung 08 still answers
+`[08] env=production port=3178 status=200 len=73`.
+
+Under perry, r64 (compiler `84bc3026b`, trails `38657dc16b`) compiles 2151
+modules in 2125s to a 215 MB binary. Boot now gets past the generated entry —
+`INIT: examples_perry_native__trails_boot_generated_js` is reached — and stops
+at wall 31, so the 200 is not confirmed natively yet.
+
+Two notes from the merge that brought #9871 in:
+
+- `config/storage.ts` is required now, as `config/storage.yml` is in Rails
+  (`activestorage/lib/active_storage/engine.rb`, `active_storage.services`).
+  The file added is the `trails new` template.
+- The merge added the symlink cycle `trailties -> actionmailbox`.
+  `perry-ladder-keep/cut-symlinks.txt` now cuts it, along with the two edges it
+  already listed. `all.ts` loads both engines through computed specifiers, so
+  perry logs `Could not resolve import` for them, and `rbFRequire` treats that
+  as a `LoadError`.
+
+## Wall 31 — a Proxy in the prototype chain is never consulted
+
+    RangeError: Maximum call stack size exceeded
+        at get (<anonymous>)
+        at Configuration.appGenerators (<anonymous>)
+        at trails/test_unit/railtie (<anonymous>)
+
+#9791 (RFC 0221) moved `method_missing` traps off returned Proxies and into the
+prototype chain. `Generators.prototype`'s parent is now a `Proxy`, so
+`TestUnitRailtie`'s `c.testFramework(...)` resolves through that Proxy's `get`
+trap.
+
+`perry/probes/proxy-in-proto-chain.ts` is a 1-module repro of that shape:
+
+| runtime | output                                     |
+| ------- | ------------------------------------------ |
+| `tsx`   | `own=true traps=1 r=["testFramework",1,0]` |
+| perry   | `own=true traps=0 r={}`                    |
+
+Perry never calls the trap for a name the instance does not have, and calling
+the result returns `{}`. This is perry-specific. The returned-Proxy shape
+`Configuration` still uses (`perry/probes/proxy-reflect-receiver.ts`) behaves
+the same under both runtimes. The probe does not yet show how the miss becomes
+recursion in the real `Generators`. That is the next step, and the fix belongs
+in perry: a `Proxy` in the prototype chain gets `[[Get]]` / `[[Set]]` like any
+other prototype.
