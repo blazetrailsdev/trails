@@ -2,7 +2,7 @@
  * ESLint rule: rails-error-parity. Error classes are observable API, so our
  * hierarchy must mirror Rails and Rails-mirroring source must throw ported
  * error classes. Scoped (via eslint.config.mjs) to
- * `packages/{activerecord,activemodel,activesupport,arel}/src/**\/*.ts` excluding
+ * `packages/{activerecord,activemodel,activesupport,arel}/{src,lib}/**\/*.ts` excluding
  * `*.test.ts`:
  *
  *   1. On any in-scope file: every manifest error class whose Rails source
@@ -88,7 +88,7 @@ function loadManifest() {
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
   const m = norm.match(
-    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel|actionpack|actionview|rack|trailties|activejob|bcrypt|date|did-you-mean|globalid|i18n|msgpack|rack-session|rack-test)\/src\/.+\.ts)$/,
+    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel|actionpack|actionview|rack|trailties|activejob|bcrypt|date|did-you-mean|globalid|i18n|msgpack|rack-session|rack-test)\/(?:src|lib)\/.+\.ts)$/,
   );
   return m ? { rel: m[1], pkg: m[2] } : null;
 }
@@ -169,7 +169,7 @@ function checkParity(context, exportedClasses, rubyCompatImports) {
   const ns = PKG_NS[pkg];
   if (!ns) return;
 
-  const srcRel = scope.rel.replace(/^packages\/[^/]+\/src\//, ""); // e.g. `errors.ts`
+  const srcRel = scope.rel.replace(/^packages\/[^/]+\/(?:src|lib)\//, ""); // e.g. `errors.ts`
   const manifest = loadManifest();
   const classes = manifest.packages?.[pkg] ?? [];
 
@@ -236,7 +236,9 @@ const rule = {
     const scope = repoRel(filename);
     if (!scope) return {};
     const bareRaises =
-      loadManifest().bareRaises?.[scope.pkg]?.[scope.rel.replace(/^packages\/[^/]+\/src\//, "")];
+      loadManifest().bareRaises?.[scope.pkg]?.[
+        scope.rel.replace(/^packages\/[^/]+\/(?:src|lib)\//, "")
+      ];
     const errinfo = loadManifest().errinfo?.[scope.pkg] ?? [];
     const inventedMessage = {
       ThrowStatement(node) {

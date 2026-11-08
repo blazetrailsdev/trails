@@ -7,7 +7,7 @@
  *
  * trails does: `Relation#isEmpty`, `CollectionAssociation#isEmpty`,
  * `Preloader#isEmpty` and `Querying#isEmpty` all run a query. `isBlank`
- * (`activesupport/src/core-ext/object/blank.ts`) invokes a method-shaped
+ * (`activesupport/lib/core-ext/object/blank.ts`) invokes a method-shaped
  * `isEmpty`/`empty` exactly as blank.rb:19 invokes `empty?`, and holds out the
  * querying ones by reading the function object's `AsyncFunction` tag BEFORE the
  * call — the only point at which exclusion is worth anything, since invoking to

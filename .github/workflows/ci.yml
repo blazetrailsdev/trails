@@ -2403,7 +2403,7 @@ jobs:
         # `pnpm rails-privates:manifest` and commit the result.
         run: |
           set -euo pipefail
-          artifact=packages/activesupport/src/support/rails-private-methods.generated.ts
+          artifact=packages/activesupport/test/support/rails-private-methods.generated.ts
           if git diff --quiet -- "$artifact"; then
             echo "$artifact is in sync with a fresh regeneration."
             exit 0

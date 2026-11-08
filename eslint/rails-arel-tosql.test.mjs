@@ -83,7 +83,7 @@ tester.run("rails-arel-tosql", rule, {
     { filename: builderFile, code: `export const o = { toSql() { return "x"; } };\n` },
     // Out-of-scope file is ignored entirely.
     {
-      filename: path.join(REPO_ROOT, "packages/activesupport/src/x.ts"),
+      filename: path.join(REPO_ROOT, "packages/activesupport/lib/x.ts"),
       code: `export class Foo { toSql() { return ""; } }\n`,
     },
   ],

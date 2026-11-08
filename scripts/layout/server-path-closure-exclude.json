@@ -60,14 +60,6 @@
     "packages/activesupport/dist/testing/time-helpers.js"
   ],
   "server-path-activesupport-test-case-and-behaviors": [
-    "packages/activesupport/dist/cache/behaviors/cache-delete-matched-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-increment-decrement-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-instrumentation-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-store-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-store-coder-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-store-compression-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/cache-store-serializer-behavior.js",
-    "packages/activesupport/dist/cache/behaviors/local-cache-behavior.js",
     "packages/activesupport/dist/executor/test-helper.js",
     "packages/activesupport/dist/test-case.js",
     "packages/activesupport/dist/testing/file-fixtures.js"

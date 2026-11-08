@@ -116,123 +116,123 @@ const alias = {
   ),
   "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/numeric/bytes.ts",
+    "packages/activesupport/lib/core-ext/numeric/bytes.ts",
   ),
   "@blazetrails/activesupport/testing/isolation": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/isolation.ts",
+    "packages/activesupport/lib/testing/isolation.ts",
   ),
   "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/file-fixtures.ts",
+    "packages/activesupport/lib/testing/file-fixtures.ts",
   ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-verifier.ts",
+    "packages/activesupport/lib/message-verifier.ts",
   ),
   "@blazetrails/activesupport/messages/codec": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/codec.ts",
+    "packages/activesupport/lib/messages/codec.ts",
   ),
   "@blazetrails/activesupport/messages/rotation-configuration": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/rotation-configuration.ts",
+    "packages/activesupport/lib/messages/rotation-configuration.ts",
   ),
   "@blazetrails/activesupport/messages/serializer-with-fallback": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/serializer-with-fallback.ts",
+    "packages/activesupport/lib/messages/serializer-with-fallback.ts",
   ),
   "@blazetrails/activesupport/message-encryptor": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-encryptor.ts",
+    "packages/activesupport/lib/message-encryptor.ts",
   ),
   "@blazetrails/activesupport/core-ext/kernel/reporting": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/kernel/reporting.ts",
+    "packages/activesupport/lib/core-ext/kernel/reporting.ts",
   ),
   "@blazetrails/activesupport/core-ext/date/calculations": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date/calculations.ts",
+    "packages/activesupport/lib/core-ext/date/calculations.ts",
   ),
   "@blazetrails/activesupport/core-ext/date/conversions": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date/conversions.ts",
+    "packages/activesupport/lib/core-ext/date/conversions.ts",
   ),
   "@blazetrails/activesupport/core-ext/string/inflections": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/string/inflections.ts",
+    "packages/activesupport/lib/core-ext/string/inflections.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-time/calculations": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-time/calculations.ts",
+    "packages/activesupport/lib/core-ext/date-time/calculations.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-time/conversions": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-time/conversions.ts",
+    "packages/activesupport/lib/core-ext/date-time/conversions.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-and-time/zones": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-and-time/zones.ts",
+    "packages/activesupport/lib/core-ext/date-and-time/zones.ts",
   ),
   "@blazetrails/activesupport/core-ext/hash/slice": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/hash/slice.ts",
+    "packages/activesupport/lib/core-ext/hash/slice.ts",
   ),
   "@blazetrails/activesupport/core-ext/string/inflections": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/string/inflections.ts",
+    "packages/activesupport/lib/core-ext/string/inflections.ts",
   ),
   "@blazetrails/activesupport/temporal": path.resolve(
     __dirname,
-    "packages/activesupport/src/temporal.ts",
+    "packages/activesupport/lib/temporal.ts",
   ),
   "@blazetrails/activesupport/key-generator": path.resolve(
     __dirname,
-    "packages/activesupport/src/key-generator.ts",
+    "packages/activesupport/lib/key-generator.ts",
   ),
   "@blazetrails/activesupport/digest": path.resolve(
     __dirname,
-    "packages/activesupport/src/digest.ts",
+    "packages/activesupport/lib/digest.ts",
   ),
   // Above the bare entry: Vite's object alias is a prefix match, so "…/cache"
   // alone would also swallow "…/cache/*".
   "@blazetrails/activesupport/cache/":
-    path.resolve(__dirname, "packages/activesupport/src/cache/") + "/",
+    path.resolve(__dirname, "packages/activesupport/lib/cache/") + "/",
   "@blazetrails/activesupport/cache": path.resolve(
     __dirname,
-    "packages/activesupport/src/cache.ts",
+    "packages/activesupport/lib/cache.ts",
   ),
   "@blazetrails/activesupport/configuration-file": path.resolve(
     __dirname,
-    "packages/activesupport/src/configuration-file.ts",
+    "packages/activesupport/lib/configuration-file.ts",
   ),
-  "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
+  "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/lib/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-pack.ts",
+    "packages/activesupport/lib/message-pack.ts",
   ),
   "@blazetrails/activesupport/test-case": path.resolve(
     __dirname,
-    "packages/activesupport/src/test-case.ts",
+    "packages/activesupport/lib/test-case.ts",
   ),
   "@blazetrails/activesupport/log-subscriber/test-helper": path.resolve(
     __dirname,
-    "packages/activesupport/src/log-subscriber/test-helper.ts",
+    "packages/activesupport/lib/log-subscriber/test-helper.ts",
   ),
   "@blazetrails/activesupport/testing/autorun": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/autorun.ts",
+    "packages/activesupport/lib/testing/autorun.ts",
   ),
-  "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
+  "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/lib/gzip.ts"),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
-    "packages/activesupport/src/encrypted-file.ts",
+    "packages/activesupport/lib/encrypted-file.ts",
   ),
   "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/temporal-helpers.ts",
+    "packages/activesupport/lib/testing/temporal-helpers.ts",
   ),
-  "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
+  "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/lib/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
@@ -516,8 +516,8 @@ const otherResolve = {
 // (it runs under activerecord, where the engine is ActiveRecord::Base).
 const otherSetupFiles = [
   "./packages/vitest-matchers/lib/setup.ts",
-  "./packages/activesupport/src/testing/autorun.ts",
-  "./packages/activesupport/src/test-setup-abstract-unit.ts",
+  "./packages/activesupport/lib/testing/autorun.ts",
+  "./packages/activesupport/test/support/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
   "./packages/actionview/test/support/setup-compile-template.ts",
   "./packages/ruby-compat/test-setup/class-paths.ts",
@@ -599,7 +599,7 @@ export default defineConfig({
             "./packages/vitest-matchers/lib/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
-            "./packages/activesupport/src/testing/autorun.ts",
+            "./packages/activesupport/lib/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
             "./packages/actionview/test/support/setup-compile-template.ts",

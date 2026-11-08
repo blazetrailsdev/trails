@@ -289,7 +289,7 @@ the precedent for gating one stratum and leaving the rest report-only.
 The eight artefacts were two named classes and nothing else:
 
 - **`throw(:abort)` / `throw(:exception, …)` ported through the settled halt
-  helper** — `throwAbort()` (`activesupport/src/callbacks.ts:10`) and
+  helper** — `throwAbort()` (`activesupport/lib/callbacks.ts:10`) and
   `throwException(…)` (`i18n/src/throw-catch.ts`), against
   `has_many_association.rb:22`, `has_one_association.rb:18,35`,
   `autosave_association.rb:213` and `i18n/backend/base.rb:47,54`. Suppressed at

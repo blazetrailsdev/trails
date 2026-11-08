@@ -4260,7 +4260,7 @@ export interface SeenRubyMethod {
  * would — and then the bucket's methods are compared against whichever
  * same-named symbol the barrel happens to re-export, which is unrelated to the
  * port (PR #6225: `core_ext/object/acts_like.rb` landed on
- * `activesupport/src/index.ts`, so Ruby `Object#as_json` was compared against
+ * `activesupport/lib/index.ts`, so Ruby `Object#as_json` was compared against
  * `TimeWithZone#asJson`). A barrel is a re-export site, never a port location;
  * a bucket that genuinely lives there is spelled out in
  * `RUBY_FILE_TS_OVERRIDES`, which is the direct-match path and does not come

@@ -1,0 +1,140 @@
+import { describe, it, expect } from "vitest";
+import { TypeError } from "@blazetrails/ruby-compat";
+import { classAttribute } from "../lib/class-attribute.js";
+
+describe("classAttribute", () => {
+  it("answers the predicate with Ruby's !!, so only nil and false are falsy", () => {
+    class Model {
+      declare static isPrefix: boolean;
+      declare static isCount: boolean;
+      declare static isFlag: boolean;
+      declare static isMissing: boolean;
+    }
+    classAttribute.call(Model, "prefix", { default: "" });
+    classAttribute.call(Model, "count", { default: 0 });
+    classAttribute.call(Model, "flag", { default: false });
+    classAttribute.call(Model, "missing");
+
+    expect(Model.isPrefix).toBe(true);
+    expect(Model.isCount).toBe(true);
+    expect(Model.isFlag).toBe(false);
+    expect(Model.isMissing).toBe(false);
+  });
+
+  it("defines a class-level attribute with default", () => {
+    class Model {}
+    classAttribute.call(Model, "tableName", { default: "models" });
+
+    expect((Model as any).tableName).toBe("models");
+  });
+
+  it("allows overriding the class-level value", () => {
+    class Model {}
+    classAttribute.call(Model, "tableName", { default: "models" });
+    (Model as any).tableName = "users";
+
+    expect((Model as any).tableName).toBe("users");
+  });
+
+  it("instance reads fall back to class value", () => {
+    class Model {}
+    classAttribute.call(Model, "tableName", { default: "models" });
+
+    const instance = new Model() as any;
+    expect(instance.tableName).toBe("models");
+  });
+
+  it("instance can override the value locally", () => {
+    class Model {}
+    classAttribute.call(Model, "tableName", { default: "models" });
+
+    const a = new Model() as any;
+    const b = new Model() as any;
+    a.tableName = "custom";
+
+    expect(a.tableName).toBe("custom");
+    expect(b.tableName).toBe("models");
+  });
+
+  it("subclass inherits from parent", () => {
+    class Base {}
+    classAttribute.call(Base, "color", { default: "red" });
+
+    class Child extends Base {}
+    expect((Child as any).color).toBe("red");
+  });
+
+  it("subclass can override without affecting parent", () => {
+    class Base {}
+    classAttribute.call(Base, "color", { default: "red" });
+
+    class Child extends Base {}
+    (Child as any).color = "blue";
+
+    expect((Base as any).color).toBe("red");
+    expect((Child as any).color).toBe("blue");
+  });
+
+  it("instanceWriter: false prevents instance writes", () => {
+    class Model {}
+    classAttribute.call(Model, "locked", { default: true, instanceWriter: false });
+
+    const instance = new Model() as any;
+    expect(instance.locked).toBe(true);
+
+    expect(() => {
+      instance.locked = false;
+    }).toThrow();
+  });
+
+  it("instanceReader: false prevents instance reads", () => {
+    class Model {}
+    classAttribute.call(Model, "secret", {
+      default: "hidden",
+      instanceReader: false,
+    });
+
+    const instance = new Model() as any;
+    expect(instance.secret).toBeUndefined();
+    expect((Model as any).secret).toBe("hidden");
+  });
+
+  it("instancePredicate creates isName getter", () => {
+    class Model {}
+    classAttribute.call(Model, "active", {
+      default: true,
+      instancePredicate: true,
+    });
+
+    const instance = new Model() as any;
+    expect(instance.isActive).toBe(true);
+  });
+
+  it("defines several attributes at once", () => {
+    class Model {}
+    classAttribute.call(Model, "one", "two", { default: 1 });
+
+    expect((Model as any).one).toBe(1);
+    expect((Model as any).two).toBe(1);
+  });
+
+  it("raises a TypeError on a name that is neither a symbol nor a string", () => {
+    expect(() => classAttribute.call(class {}, 1 as unknown as string)).toThrow(
+      new TypeError("1 is not a symbol nor a string"),
+    );
+  });
+
+  it("predicate reflects current value", () => {
+    class Model {}
+    classAttribute.call(Model, "active", {
+      default: false,
+      instancePredicate: true,
+    });
+
+    const instance = new Model() as any;
+    expect(instance.isActive).toBe(false);
+
+    instance.active = 1;
+    expect(instance.isActive).toBe(true);
+  });
+});

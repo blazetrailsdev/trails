@@ -106,7 +106,7 @@ const DEPRECATED_OUT = path.join(ROOT, "eslint/rails-deprecated-methods.json");
 // wrong for a `.ts` target; hence the direct spawn below.
 const RUNTIME_MODULE_PATH = path.join(
   ROOT,
-  "packages/activesupport/src/support/rails-private-methods.generated.ts",
+  "packages/activesupport/test/support/rails-private-methods.generated.ts",
 );
 
 function emitRuntimePrivateMethods(files: Record<string, string[]>): void {

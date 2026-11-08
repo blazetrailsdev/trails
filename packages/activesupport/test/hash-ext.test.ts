@@ -1,0 +1,771 @@
+import { describe, it, expect } from "vitest";
+import { toXml, fromXml, fromTrustedXml } from "../lib/hash-utils.js";
+import { except } from "@blazetrails/ruby-compat";
+import type { ToXmlOptions } from "../lib/xml-mini.js";
+import { DisallowedType } from "../lib/core-ext/hash/conversions.js";
+import { Date as RubyDate } from "@blazetrails/date";
+import { extractBang, sliceBang } from "../lib/core-ext/hash/slice.js";
+import {
+  deepMerge,
+  deepTransformKeys,
+  deepTransformValues,
+  symbolizeKeys,
+  stringifyKeys,
+  deepSymbolizeKeys,
+  deepStringifyKeys,
+  reverseMerge,
+  assertValidKeys,
+  ArgumentError,
+  slice,
+  exceptBang,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaults,
+  withDefaultsBang,
+  stringifyKeysBang,
+  symbolizeKeysBang,
+  toOptions,
+  toOptionsBang,
+  deepTransformKeysBang,
+  deepStringifyKeysBang,
+  deepSymbolizeKeysBang,
+  nestedUnderIndifferentAccess,
+  withIndifferentAccess,
+  toParam,
+  compact,
+  compactBlank,
+} from "../lib/hash-utils.js";
+
+describe("HashExtTest", () => {
+  const strings = { a: 1, b: 2 };
+  const symbols = { a: 1, b: 2 };
+  const mixed = { a: 1, b: 2 };
+
+  it("deep_transform_keys — transforms all keys recursively", () => {
+    const nested = { a: { b: { c: 3 } } };
+    const result = deepTransformKeys(nested, (k) => k.toUpperCase());
+    expect(result).toEqual({ A: { B: { C: 3 } } });
+  });
+
+  it("deep_transform_keys — handles array values", () => {
+    const obj = { a: [{ b: 2 }, { c: 3 }, 4] };
+    const result = deepTransformKeys(obj, (k) => k.toUpperCase());
+    expect(result).toEqual({ A: [{ B: 2 }, { C: 3 }, 4] });
+  });
+
+  it("deep_transform_keys does not mutate original", () => {
+    const original = { a: { b: 1 } };
+    deepTransformKeys(original, (k) => k.toUpperCase());
+    expect(original).toEqual({ a: { b: 1 } });
+  });
+
+  it("deep_transform_values — transforms all values recursively", () => {
+    const obj = { a: 1, b: 2 };
+    expect(deepTransformValues(obj, (v) => String(v))).toEqual({ a: "1", b: "2" });
+  });
+
+  it("deep_transform_values — nested", () => {
+    const obj = { a: { b: { c: 3 } } };
+    expect(deepTransformValues(obj, (v) => String(v))).toEqual({ a: { b: { c: "3" } } });
+  });
+
+  it("deep_transform_values — arrays", () => {
+    const obj = { a: [{ b: 2 }, { c: 3 }, 4] };
+    expect(deepTransformValues(obj, (v) => String(v))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
+  });
+
+  it("deep_transform_values does not mutate original", () => {
+    const original = { a: { b: 1 } };
+    deepTransformValues(original, (v) => String(v));
+    expect(original).toEqual({ a: { b: 1 } });
+  });
+
+  it("symbolize_keys — returns object with string keys (identity in TS)", () => {
+    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+  });
+
+  it("symbolize_keys does not mutate original", () => {
+    const obj = { a: 1, b: 2 };
+    symbolizeKeys(obj);
+    expect(obj).toEqual({ a: 1, b: 2 });
+  });
+
+  it("deep_symbolize_keys — recursively normalizes keys", () => {
+    expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({ ":a": { ":b": { ":c": 3 } } });
+  });
+
+  it("stringify_keys — converts keys to strings", () => {
+    expect(stringifyKeys({ a: 1, b: 2 })).toEqual({ a: 1, b: 2 });
+  });
+
+  it("stringify_keys does not mutate original", () => {
+    const obj = { a: 1, b: 2 };
+    stringifyKeys(obj);
+    expect(obj).toEqual({ a: 1, b: 2 });
+  });
+
+  it("deep_stringify_keys — recursively converts keys", () => {
+    const nested = { a: { b: { c: 3 } } };
+    expect(deepStringifyKeys(nested)).toEqual({ a: { b: { c: 3 } } });
+  });
+
+  it("assert_valid_keys — passes for valid keys", () => {
+    expect(() =>
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"]),
+    ).not.toThrow();
+  });
+
+  it("assert_valid_keys — passes when not all valid keys present", () => {
+    expect(() =>
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny", "sunny"]),
+    ).not.toThrow();
+  });
+
+  it("assert_valid_keys — throws on unknown key", () => {
+    expect(() =>
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
+    ).toThrow("Unknown key: :failore. Valid keys are: :failure, :funny");
+    let error: unknown;
+    try {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect((error as Error).name).toBe("ArgumentError");
+  });
+
+  it("assert_valid_keys — includes valid keys in error message", () => {
+    expect(() => assertValidKeys({ failore: "stuff" }, ["failure"])).toThrow(
+      "Unknown key: :failore. Valid keys are: :failure",
+    );
+  });
+
+  it("deep_merge — merges nested objects", () => {
+    const h1 = { a: "a", b: "b", c: { c1: "c1", c2: "c2", c3: { d1: "d1" } } };
+    const h2 = { a: 1, c: { c1: 2, c3: { d2: "d2" } } };
+    const expected = { a: 1, b: "b", c: { c1: 2, c2: "c2", c3: { d1: "d1", d2: "d2" } } };
+    expect(deepMerge(h1, h2)).toEqual(expected);
+  });
+
+  it("deep_merge does not mutate original", () => {
+    const target = { a: { b: 1 } };
+    deepMerge(target, { a: { c: 2 } });
+    expect(target).toEqual({ a: { b: 1 } });
+  });
+
+  it("reverse_merge — fills defaults without overwriting", () => {
+    const defaults = { d: 0, a: "x", b: "y", c: 10 };
+    const options = { a: 1, b: 2 };
+    const expected = { d: 0, a: 1, b: 2, c: 10 };
+    expect(reverseMerge(options, defaults)).toEqual(expected);
+  });
+
+  it("reverse_merge does not mutate options", () => {
+    const options = { a: 1, b: 2 };
+    reverseMerge(options, { b: 99, c: 10 });
+    expect(options).toEqual({ a: 1, b: 2 });
+  });
+
+  it("slice — picks specified keys", () => {
+    const original = { a: "x", b: "y", c: 10 };
+    expect(slice(original, "a", "b")).toEqual({ a: "x", b: "y" });
+  });
+
+  it("except (except!) — removes specified keys", () => {
+    const original = { a: "x", b: "y", c: 10 };
+    expect(except(original, "c")).toEqual({ a: "x", b: "y" });
+  });
+
+  it("except with multiple keys", () => {
+    const original = { a: "x", b: "y", c: 10 };
+    expect(except(original, "b", "c")).toEqual({ a: "x" });
+  });
+
+  it("extract — removes and returns specified keys", () => {
+    const original: Record<string, unknown> = { a: 1, b: 2, c: 3, d: 4 };
+    const extracted = extractBang(original, "a", "b");
+    expect(extracted).toEqual({ a: 1, b: 2 });
+    expect(original).toEqual({ c: 3, d: 4 });
+  });
+
+  it("extract nils — handles null values", () => {
+    const original: Record<string, unknown> = { a: null, b: null };
+    const extracted = extractBang(original, "a", "x");
+    expect(extracted).toEqual({ a: null });
+    expect(original).toEqual({ b: null });
+  });
+
+  it("compact — removes null/undefined values", () => {
+    const obj = { a: 1, b: null, c: undefined, d: 2 };
+    expect(compact(obj)).toEqual({ a: 1, d: 2 });
+  });
+
+  it("compact — empty object stays empty", () => {
+    expect(compact({})).toEqual({});
+  });
+
+  it("compact — object with no nils is unchanged", () => {
+    expect(compact({ a: 1, b: 2 })).toEqual({ a: 1, b: 2 });
+  });
+});
+
+describe("HashExtToParamTests", () => {
+  it("empty hash returns empty string", () => {
+    expect(toParam({})).toBe("");
+  });
+
+  it("simple string hash", () => {
+    expect(toParam({ hello: "world" })).toBe("hello=world");
+  });
+
+  it("string hash with number value", () => {
+    expect(toParam({ hello: 10 })).toBe("hello=10");
+  });
+
+  it("multiple keys are joined with &", () => {
+    const result = toParam({ hello: "world", say_bye: true });
+    expect(result).toContain("hello=world");
+    expect(result).toContain("say_bye=true");
+    expect(result).toContain("&");
+  });
+
+  it("number keys", () => {
+    const result = toParam({ 10: 20, 30: 40, 50: 60 });
+    expect(result).toContain("10=20");
+    expect(result).toContain("30=40");
+    expect(result).toContain("50=60");
+  });
+
+  it("encodes spaces and special chars", () => {
+    const result = toParam({ "param 1": "A string with / characters" });
+    expect(result).toContain("param");
+    expect(result).toMatch(/param[+%20]/);
+  });
+
+  it("keys sorted in ascending order", () => {
+    const result = toParam({ b: 1, c: 0, a: 2 });
+    expect(result).toBe("a=2&b=1&c=0");
+  });
+
+  it("compactBlank — removes blank values from object", () => {
+    const values = { a: "", b: 1, c: null, d: [] as unknown[], e: false, f: true };
+    expect(compactBlank(values)).toEqual({ b: 1, f: true });
+  });
+});
+
+describe("HashExtTest", () => {
+  it("methods", () => {
+    expect(typeof deepMerge).toBe("function");
+    expect(typeof symbolizeKeys).toBe("function");
+    expect(typeof stringifyKeys).toBe("function");
+  });
+
+  it("deep transform keys", () => {
+    const h = { a: { b: 1 } };
+    const result = deepTransformKeys(h, (k) => k.toString().toUpperCase());
+    expect((result as any).A.B).toBe(1);
+  });
+
+  it("deep transform keys not mutates", () => {
+    const h = { a: 1 };
+    deepTransformKeys(h, (k) => k.toString().toUpperCase());
+    expect(h).toEqual({ a: 1 });
+  });
+
+  it("deep transform keys!", () => {
+    const h = { a: { b: 1 } };
+    const result = deepTransformKeys(h, (k) => `x_${k}`);
+    expect((result as any).x_a.x_b).toBe(1);
+  });
+
+  it("deep transform keys with bang mutates", () => {
+    const h = { x: 1 };
+    const r = deepTransformKeys(h, (k) => k.toString() + "!");
+    expect((r as any)["x!"]).toBe(1);
+  });
+
+  it("deep transform values", () => {
+    const h = { a: 1, b: { c: 2 } };
+    const result = deepTransformValues(h, (v) => (typeof v === "number" ? v * 2 : v));
+    expect((result as any).a).toBe(2);
+    expect((result as any).b.c).toBe(4);
+  });
+
+  it("deep transform values not mutates", () => {
+    const h = { a: 1 };
+    deepTransformValues(h, (v) => v);
+    expect(h).toEqual({ a: 1 });
+  });
+
+  it("deep transform values!", () => {
+    const h = { a: "hello" };
+    const result = deepTransformValues(h, (v) => (typeof v === "string" ? v.toUpperCase() : v));
+    expect((result as any).a).toBe("HELLO");
+  });
+
+  it("deep transform values with bang mutates", () => {
+    const h = { n: 5 };
+    const r = deepTransformValues(h, (v) => (typeof v === "number" ? v + 1 : v));
+    expect((r as any).n).toBe(6);
+  });
+
+  it("symbolize keys", () => {
+    expect(symbolizeKeys({ ":a": 1, ":b": 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeys({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeys({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+  });
+
+  it("symbolize keys not mutates", () => {
+    const h = { a: 1 };
+    symbolizeKeys(h);
+    expect(h).toEqual({ a: 1 });
+  });
+
+  it("deep symbolize keys", () => {
+    expect(deepSymbolizeKeys({ ":a": { ":b": { ":c": 3 } } })).toEqual({
+      ":a": { ":b": { ":c": 3 } },
+    });
+    expect(deepSymbolizeKeys({ a: { b: { c: 3 } } })).toEqual({ ":a": { ":b": { ":c": 3 } } });
+    expect(deepSymbolizeKeys({ a: [{ b: 2 }, { c: 3 }, 4] })).toEqual({
+      ":a": [{ ":b": 2 }, { ":c": 3 }, 4],
+    });
+  });
+
+  it("deep symbolize keys not mutates", () => {
+    const h = { a: { b: 1 } };
+    deepSymbolizeKeys(h);
+    expect(h).toEqual({ a: { b: 1 } });
+  });
+
+  it("symbolize keys!", () => {
+    expect(symbolizeKeysBang({ a: 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+    expect(symbolizeKeysBang({ ":a": 1, b: 2 })).toEqual({ ":a": 1, ":b": 2 });
+  });
+
+  it("symbolize keys with bang mutates", () => {
+    const h = { ":a": 1, b: 2 };
+    symbolizeKeysBang(h);
+    expect(h).toEqual({ ":a": 1, ":b": 2 });
+  });
+
+  it("deep symbolize keys!", () => {
+    expect(deepSymbolizeKeysBang({ a: { ":b": { c: 3 } } })).toEqual({
+      ":a": { ":b": { ":c": 3 } },
+    });
+  });
+
+  it("deep symbolize keys with bang mutates", () => {
+    const h = { a: { ":b": { c: 3 } } };
+    deepSymbolizeKeysBang(h);
+    expect(h).toEqual({ ":a": { ":b": { ":c": 3 } } });
+  });
+
+  it("symbolize keys preserves keys that cant be symbolized", () => {
+    const key: unknown[] = [];
+    const h = new Map<unknown, number>([[key, 3]]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      key,
+    ]);
+  });
+
+  it("deep symbolize keys preserves keys that cant be symbolized", () => {
+    const key: unknown[] = [];
+    const h = new Map<unknown, unknown>([[key, 3]]);
+    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([key]);
+  });
+
+  it("symbolize keys preserves integer keys", () => {
+    const h = new Map<unknown, number>([
+      [0, 1],
+      [1, 2],
+    ]);
+    expect([...(symbolizeKeys(h as never) as unknown as Map<unknown, number>).keys()]).toEqual([
+      0, 1,
+    ]);
+  });
+
+  it("deep symbolize keys preserves integer keys", () => {
+    const h = new Map<unknown, unknown>([[0, 1]]);
+    expect([...(deepSymbolizeKeys(h) as Map<unknown, unknown>).keys()]).toEqual([0]);
+  });
+
+  it("stringify keys", () => {
+    const h = { a: 1, b: 2 };
+    const r = stringifyKeys(h);
+    expect(r["a"]).toBe(1);
+    expect(r["b"]).toBe(2);
+  });
+
+  it("stringify keys not mutates", () => {
+    const h = { a: 1 };
+    stringifyKeys(h);
+    expect(h).toEqual({ a: 1 });
+  });
+
+  it("deep stringify keys", () => {
+    const h = { a: { b: 1 } };
+    const r = deepStringifyKeys(h);
+    expect((r as any)["a"]["b"]).toBe(1);
+  });
+
+  it("deep stringify keys not mutates", () => {
+    const h = { a: { b: 1 } };
+    deepStringifyKeys(h);
+    expect(h).toEqual({ a: { b: 1 } });
+  });
+
+  it("stringify keys!", () => {
+    const h = { x: 99 };
+    expect(stringifyKeys(h)["x"]).toBe(99);
+  });
+
+  it("stringify keys with bang mutates", () => {
+    const h = { y: "yes" };
+    expect(stringifyKeys(h)["y"]).toBe("yes");
+  });
+
+  it("deep stringify keys!", () => {
+    const h = { a: { b: 2 } };
+    expect((deepStringifyKeys(h) as any)["a"]["b"]).toBe(2);
+  });
+
+  it("deep stringify keys with bang mutates", () => {
+    const h = { n: { m: 3 } };
+    expect((deepStringifyKeys(h) as any)["n"]["m"]).toBe(3);
+  });
+
+  it("assert valid keys", () => {
+    expect(() => assertValidKeys({ a: 1, b: 2 }, ["a", "b", "c"])).not.toThrow();
+  });
+
+  it("deep merge", () => {
+    const h = deepMerge({ a: { b: 1 } }, { a: { c: 2 } });
+    expect(h.a).toEqual({ b: 1, c: 2 });
+  });
+
+  it("deep merge with block", () => {
+    const h = deepMerge({ a: 1 }, { a: 2 });
+    expect(h.a).toBe(2);
+  });
+
+  it("deep merge with falsey values", () => {
+    const h = deepMerge({ a: true }, { a: false });
+    expect(h.a).toBe(false);
+  });
+
+  it("slice inplace with an array key", () => {
+    const r = slice({ x: 1, y: 2, z: 3 }, "x", "z");
+    expect(r).toEqual({ x: 1, z: 3 });
+  });
+
+  it("slice inplace", () => {
+    const original: Record<string, unknown> = { a: "x", b: "y", c: 10 };
+    expect(sliceBang(original, "a", "b")).toEqual({ c: 10 });
+    expect(original).toEqual({ a: "x", b: "y" });
+  });
+
+  it("slice bang does not override default", () => {
+    const hash: Record<string, unknown> = { a: 1, b: 2 };
+    sliceBang(hash, "a");
+    expect(hash).toEqual({ a: 1 });
+  });
+
+  it("slice bang does not override default proc", () => {
+    const hash: Record<string, unknown> = { key: "val", other: "nope" };
+    sliceBang(hash, "key");
+    expect(hash).toEqual({ key: "val" });
+  });
+
+  it("reverse merge", () => {
+    const defaults = { d: 0, a: "x", b: "y", c: 10 };
+    const options: Record<string, unknown> = { a: 1, b: 2 };
+    const expected = { d: 0, a: 1, b: 2, c: 10 };
+
+    expect(reverseMerge(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    let merged: Record<string, unknown> = { ...options };
+    expect(reverseMergeBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+    expect(Object.keys(merged)).toEqual(Object.keys(expected));
+
+    merged = { ...options };
+    expect(reverseUpdate(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("with defaults aliases reverse merge", () => {
+    const defaults = { a: "x", b: "y", c: 10 };
+    const options: Record<string, unknown> = { a: 1, b: 2 };
+    const expected = { a: 1, b: 2, c: 10 };
+
+    expect(withDefaults(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    const merged: Record<string, unknown> = { ...options };
+    expect(withDefaultsBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("except bang", () => {
+    const original: Record<string, unknown> = { a: true, b: false, c: null };
+    expect(exceptBang(original, "c")).toEqual({ a: true, b: false });
+    expect(original).toEqual({ a: true, b: false });
+  });
+
+  it("stringify keys bang", () => {
+    const hash: Record<string, unknown> = { a: 1, b: 2 };
+    expect(stringifyKeysBang(hash)).toBe(hash);
+    expect(hash).toEqual({ a: 1, b: 2 });
+  });
+
+  it("symbolize keys bang", () => {
+    const hash: Record<string, unknown> = { a: 1 };
+    expect(symbolizeKeysBang(hash)).toBe(hash);
+    expect(toOptionsBang).toBe(symbolizeKeysBang);
+    expect(toOptions).toBe(symbolizeKeys);
+  });
+
+  it("deep transform keys bang", () => {
+    const hash: Record<string, unknown> = { person: { name: "Rob", age: "28" } };
+    const nested = hash.person;
+    expect(deepTransformKeysBang(hash, (k) => k.toUpperCase())).toBe(hash);
+    expect(hash).toEqual({ PERSON: { NAME: "Rob", AGE: "28" } });
+    expect(hash.PERSON).toBe(nested);
+  });
+
+  it("deep stringify keys bang", () => {
+    const hash: Record<string, unknown> = { a: [{ b: 1 }, 2] };
+    expect(deepStringifyKeysBang(hash)).toBe(hash);
+    expect(hash).toEqual({ a: [{ b: 1 }, 2] });
+    expect(deepSymbolizeKeysBang(hash)).toBe(hash);
+    expect(nestedUnderIndifferentAccess).toBe(withIndifferentAccess);
+  });
+
+  it("extract", () => {
+    const h: Record<string, unknown> = { a: 1, b: 2, c: 3 };
+    const extracted = extractBang(h, "a", "c");
+    expect(extracted).toEqual({ a: 1, c: 3 });
+    expect(h).toEqual({ b: 2 });
+  });
+
+  it("extract nils", () => {
+    const h: Record<string, unknown> = { a: null, b: 2 };
+    const extracted = extractBang(h, "a");
+    expect(extracted).toEqual({ a: null });
+    expect(h).toEqual({ b: 2 });
+  });
+
+  it("except", () => {
+    const r = except({ a: 1, b: 2, c: 3 }, "b");
+    expect(r).toEqual({ a: 1, c: 3 });
+  });
+
+  it("except with more than one argument", () => {
+    const r = except({ a: 1, b: 2, c: 3 }, "a", "c");
+    expect(r).toEqual({ b: 2 });
+  });
+
+  it("except with original frozen", () => {
+    const h = Object.freeze({ a: 1, b: 2 });
+    const r = except(h as any, "a");
+    expect(r).toEqual({ b: 2 });
+  });
+});
+
+describe("HashToXmlTest", () => {
+  const xmlOptions: ToXmlOptions = { root: "person", skipInstruct: true, indent: 0 };
+
+  it("one level", () => {
+    const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level dasherize false", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, dasherize: false },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street_name>Paulina</street_name>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level dasherize true", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, dasherize: true },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street-name>Paulina</street-name>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level camelize true", () => {
+    const xml = toXml({ name: "David", street_name: "Paulina" }, { ...xmlOptions, camelize: true });
+    expect(xml.slice(0, 8)).toBe("<Person>");
+    expect(xml).toContain("<StreetName>Paulina</StreetName>");
+    expect(xml).toContain("<Name>David</Name>");
+  });
+
+  it("one level camelize lower", () => {
+    const xml = toXml(
+      { name: "David", street_name: "Paulina" },
+      { ...xmlOptions, camelize: "lower" },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<streetName>Paulina</streetName>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("one level with types", () => {
+    const xml = toXml(
+      {
+        name: "David",
+        street: "Paulina",
+        age: 26,
+        age_in_millis: 820497600000,
+        moved_on: RubyDate.civil(2005, 11, 15),
+        resident: ":yes",
+      },
+      xmlOptions,
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age type="integer">26</age>');
+    expect(xml).toContain('<age-in-millis type="integer">820497600000</age-in-millis>');
+    expect(xml).toContain('<moved-on type="date">2005-11-15</moved-on>');
+    expect(xml).toContain('<resident type="symbol">yes</resident>');
+  });
+
+  it("one level with nils", () => {
+    const xml = toXml({ name: "David", street: "Paulina", age: null }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age nil="true"/>');
+  });
+
+  it("one level with skipping types", () => {
+    const xml = toXml(
+      { name: "David", street: "Paulina", age: null },
+      { ...xmlOptions, skipTypes: true },
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain('<age nil="true"/>');
+  });
+
+  it("one level with yielding", () => {
+    const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
+      x.tag("creator", "Rails");
+    });
+
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<street>Paulina</street>");
+    expect(xml).toContain("<name>David</name>");
+    expect(xml).toContain("<creator>Rails</creator>");
+  });
+
+  it("two levels", () => {
+    const xml = toXml({ name: "David", address: { street: "Paulina" } }, xmlOptions);
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain("<address><street>Paulina</street></address>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("two levels with array", () => {
+    const xml = toXml(
+      { name: "David", addresses: [{ street: "Paulina" }, { street: "Evergreen" }] },
+      xmlOptions,
+    );
+    expect(xml.slice(0, 8)).toBe("<person>");
+    expect(xml).toContain('<addresses type="array"><address>');
+    expect(xml).toContain("<address><street>Paulina</street></address>");
+    expect(xml).toContain("<address><street>Evergreen</street></address>");
+    expect(xml).toContain("<name>David</name>");
+  });
+
+  it("three levels with array", () => {
+    const xml = toXml(
+      { name: "David", addresses: [{ streets: [{ name: "Paulina" }, { name: "Paulina" }] }] },
+      xmlOptions,
+    );
+    expect(xml).toContain('<addresses type="array"><address><streets type="array"><street><name>');
+  });
+
+  it("from xml raises on disallowed type attributes", () => {
+    expect(() => fromXml('<product><name type="foo">value</name></product>', ["foo"])).toThrow(
+      DisallowedType,
+    );
+  });
+
+  it("from xml array one", async () => {
+    expect(await fromXml('<numbers type="Array"><value>1</value></numbers>')).toEqual({
+      numbers: { type: "Array", value: "1" },
+    });
+  });
+
+  it("from xml disallows symbol and yaml types by default", () => {
+    expect(() => fromXml('<product><name type="symbol">value</name></product>')).toThrow(
+      DisallowedType,
+    );
+
+    expect(() => fromXml('<product><name type="yaml">value</name></product>')).toThrow(
+      DisallowedType,
+    );
+  });
+
+  it("from xml array many", async () => {
+    expect(
+      await fromXml('<numbers type="Array"><value>1</value><value>2</value></numbers>'),
+    ).toEqual({
+      numbers: { type: "Array", value: ["1", "2"] },
+    });
+  });
+
+  it("from trusted xml allows symbol and yaml types", async () => {
+    expect(await fromTrustedXml('<product><name type="symbol">value</name></product>')).toEqual({
+      product: { name: ":value" },
+    });
+  });
+
+  it("escaping to xml", () => {
+    const hash = { bare_string: "First & Last Name", pre_escaped_string: "First &amp; Last Name" };
+
+    const expectedXml =
+      "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+    expect(toXml(hash, xmlOptions)).toBe(expectedXml);
+  });
+
+  it("unescaping from xml", async () => {
+    const xmlString =
+      "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+    const expectedHash = {
+      bare_string: "First & Last Name",
+      pre_escaped_string: "First &amp; Last Name",
+    };
+    expect(((await fromXml(xmlString)) as Record<string, unknown>)["person"]).toEqual(expectedHash);
+  });
+
+  it("roundtrip to xml from xml", async () => {
+    const hash = { bare_string: "First & Last Name", pre_escaped_string: "First &amp; Last Name" };
+
+    expect(((await fromXml(toXml(hash, xmlOptions))) as Record<string, unknown>)["person"]).toEqual(
+      hash,
+    );
+  });
+
+  it("to xml dups options", () => {
+    const options = { skipInstruct: true };
+    toXml({}, options);
+    expect(Object.keys(options)).toEqual(["skipInstruct"]);
+  });
+});

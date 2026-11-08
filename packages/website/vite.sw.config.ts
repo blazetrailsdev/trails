@@ -34,9 +34,9 @@ export default defineConfig({
       // matches the specifier, so no special case is needed.
       {
         find: /^@blazetrails\/activesupport\/(.+)$/,
-        replacement: path.resolve(__dirname, "../activesupport/src/$1.ts"),
+        replacement: path.resolve(__dirname, "../activesupport/lib/$1.ts"),
       },
-      pkgAlias("@blazetrails/activesupport", "../activesupport/src/index.ts"),
+      pkgAlias("@blazetrails/activesupport", "../activesupport/lib/index.ts"),
       pkgAlias("@blazetrails/arel", "../arel/src/index.ts"),
       pkgAlias("@blazetrails/activemodel", "../activemodel/src/index.ts"),
       pkgAlias("@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"),

@@ -3574,7 +3574,7 @@ function collectDefineColumnMethodsMembers(
 
 /**
  * A `classAttribute.call(Host, "name", { … })` site — the trails port of Ruby's
- * `class_attribute` macro (activesupport/src/class-attribute.ts), which is how
+ * `class_attribute` macro (activesupport/lib/class-attribute.ts), which is how
  * an `included do class_attribute :foo end` block is spelled here (CLAUDE.md,
  * _Module mixins_). Ruby's macro defines `foo`, `foo?` and `foo=`, and
  * extract-ruby-api.rb#process_mattr credits all three; ours installs the same
