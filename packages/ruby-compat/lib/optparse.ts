@@ -138,8 +138,8 @@ export class OptionParser {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @missingRailsCall visit — CONVERGEABLE ruby-compat-optparse-visit-add-banner
+   * @noRailsEquivalent PERMANENT
    */
   get banner(): string {
     if (this._banner == null) {
