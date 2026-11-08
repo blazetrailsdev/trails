@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { getProcessAdapter } from "../lib/process-adapter.js";
 import { TopLevel } from "../lib/object.js";
+import { Kernel } from "../lib/include.js";
+import { autoloadDelete, rbAutoloadStr } from "../lib/variable.js";
 import {
   IRB,
   registerReplAdapter,
@@ -9,7 +11,10 @@ import {
 } from "../lib/repl-adapter.js";
 
 function fakeRepl() {
-  const started: Array<{ prompt: string; server: ReplServerLike & { close(): void } }> = [];
+  const started: Array<{
+    prompt: string;
+    server: ReplServerLike & { close(): void; evaluated: string[] };
+  }> = [];
   registerReplAdapter("fake", {
     start({ prompt }) {
       let onExit = () => {};
@@ -19,6 +24,11 @@ function fakeRepl() {
           onExit = listener;
         },
         close: () => onExit(),
+        evaluated: [] as string[],
+        eval(cmd: string, _ctx: object, _file: string, cb: (e: Error | null, r?: unknown) => void) {
+          server.evaluated.push(cmd);
+          cb(null, (TopLevel as Record<string, unknown>).IrbLazy);
+        },
       };
       started.push({ prompt, server });
       queueMicrotask(() => server.close());
@@ -116,5 +126,33 @@ describe("IRB", () => {
     }
     expect(order).toEqual(["at_exit", "exit"]);
     expect(IRB.conf.MAIN_CONTEXT).toBe(prev);
+  });
+
+  it("evaluate loads a pending top-level autoload before the REPL evaluates", async () => {
+    const started = fakeRepl();
+    IRB.setup(null);
+    const required: string[] = [];
+    const prevRequire = Kernel.require;
+    Kernel.require = async (feature) => {
+      required.push(feature);
+      autoloadDelete(Object, "IrbLazy");
+      (TopLevel as Record<string, unknown>).IrbLazy = 7;
+      return true;
+    };
+    rbAutoloadStr(Object, "IrbLazy", "/app/models/irb_lazy.ts");
+    try {
+      await new IRB.Irb().run(IRB.conf);
+      const { server } = started[0];
+      const result = await new Promise((resolve, reject) =>
+        server.eval("IrbLazy + 1", server.context, "repl", (e, r) => (e ? reject(e) : resolve(r))),
+      );
+      expect(required).toEqual(["/app/models/irb_lazy.ts"]);
+      expect(server.evaluated).toEqual(["IrbLazy + 1"]);
+      expect(result).toBe(7);
+    } finally {
+      Kernel.require = prevRequire;
+      autoloadDelete(Object, "IrbLazy");
+      delete (TopLevel as Record<string, unknown>).IrbLazy;
+    }
   });
 });

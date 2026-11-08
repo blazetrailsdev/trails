@@ -6,9 +6,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { capture, isPlainObject } from "@blazetrails/activesupport";
 import {
-  Dir,
+  Kernel,
   TopLevel,
+  autoloadDelete,
   constSet,
+  getProcessAdapter,
+  rbAutoloadStr,
   rbArgv,
   rbModRemoveConst,
   registerReplAdapter,
@@ -36,10 +39,11 @@ replAdapterConfig.adapter = "test";
 async function evaluate(line: string): Promise<void> {
   const before = io.output.length;
   io.server!.input.emit("data", `${line}\n`);
-  await vi.waitFor(() => expect(io.output.slice(before)).toContain("> "));
+  await vi.waitFor(() => expect(io.output.length).toBeGreaterThan(before));
 }
 
 function startConsole(): Promise<void> {
+  vi.spyOn(getProcessAdapter(), "exit").mockImplementation((() => undefined) as never);
   const app = { sandbox: null, config: {}, name: () => "app", loadConsole() {} };
   return Console.start(app);
 }
@@ -140,7 +144,14 @@ describe("ConsoleCommand (trails)", () => {
       join(root, "app", "models", "console_piped_post.js"),
       `export class ConsolePipedPost { static first() { return Promise.resolve({ title: "Hello" }); } }\n`,
     );
-    vi.spyOn(Dir, "pwd").mockReturnValue(root);
+    const prevRequire = Kernel.require;
+    Kernel.require = async (feature) => {
+      autoloadDelete(Object, "ConsolePipedPost");
+      const mod = (await import(feature)) as Record<string, unknown>;
+      constSet(TopLevel, "ConsolePipedPost", mod.ConsolePipedPost);
+      return true;
+    };
+    rbAutoloadStr(Object, "ConsolePipedPost", join(root, "app", "models", "console_piped_post.js"));
     io.piped = "globalThis.consolePipedTitle = ConsolePipedPost.first().then((p) => p.title)\n";
     const g = globalThis as Record<string, unknown>;
     io.server = null;
@@ -154,7 +165,9 @@ describe("ConsoleCommand (trails)", () => {
       io.server!.close();
       await started;
       delete g.consolePipedTitle;
-      delete g.ConsolePipedPost;
+      Kernel.require = prevRequire;
+      autoloadDelete(Object, "ConsolePipedPost");
+      rbModRemoveConst(TopLevel, "ConsolePipedPost");
       vi.restoreAllMocks();
       await rm(root, { recursive: true, force: true });
     }

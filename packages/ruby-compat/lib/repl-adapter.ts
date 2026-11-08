@@ -1,6 +1,7 @@
 import { STDIN } from "./io.js";
 import { format } from "./kernel-format.js";
 import { TopLevel } from "./object.js";
+import { rbAutoloadLoad } from "./variable.js";
 import { env, exit } from "./process-adapter.js";
 import { extend } from "./include.js";
 import { StandardError } from "./standard-error.js";
@@ -9,6 +10,12 @@ import { LoadError } from "./load-error.js";
 export interface ReplServerLike {
   context: Record<string, unknown>;
   on(event: "exit", listener: () => void): unknown;
+  eval: (
+    cmd: string,
+    context: object,
+    file: string,
+    callback: (err: Error | null, result?: unknown) => void,
+  ) => void;
 }
 
 export interface ReplAdapter {
@@ -163,8 +170,24 @@ export class Irb {
     const pconf = (IRB.conf.PROMPT as Record<string, PromptConf>)[IRB.conf.PROMPT_MODE as string];
     const prompt = this.formatPrompt((pconf.PROMPT_I as string | null) ?? "", null, 0, this.lineNo);
     const repl = await getReplAsync();
-    const server = repl.start({ prompt, useGlobal: false });
+    const server = repl.start({ prompt, useGlobal: true });
     this.loadHelperMethodsToMain(server);
+    const evalDefault = server.eval;
+    let previous: Promise<void> = Promise.resolve();
+    server.eval = (statements, context, file, callback) => {
+      previous = previous.then(() =>
+        this.evaluate(statements).then(
+          () =>
+            new Promise<void>((resolve) =>
+              evalDefault.call(server, statements, context, file, (err, result) => {
+                callback(err, result);
+                resolve();
+              }),
+            ),
+          (error: unknown) => callback(error as Error),
+        ),
+      );
+    };
     await new Promise<void>((resolve) => server.on("exit", () => resolve()));
     return true;
   }
@@ -195,6 +218,21 @@ export class Irb {
           (typeof key === "string" && Object.hasOwn(top, key)) || Reflect.has(target, key),
       }),
     );
+  }
+
+  /**
+   * `IRB::WorkSpace#evaluate` (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:120-122`).
+   * Ruby's `eval` loads a pending autoload when it looks the constant up
+   * (`rb_autoload_load`, `vendor/ruby/v3.3.11/variable.c:3045`). That load is
+   * awaited, so every top-level constant the statements name is loaded before
+   * the REPL evaluates them.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async evaluate(statements: string): Promise<void> {
+    for (const [name] of statements.matchAll(/\b[A-Z]\w*/g)) {
+      if (!Object.hasOwn(TopLevel, name)) await rbAutoloadLoad(Object, name);
+    }
   }
 
   /**

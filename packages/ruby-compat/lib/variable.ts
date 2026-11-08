@@ -22,7 +22,7 @@ import { StandardError } from "./standard-error.js";
 import { Hash } from "./hash.js";
 import { warn } from "./kernel-warn.js";
 import { verbose } from "./verbose.js";
-import { rbModAncestors } from "./include.js";
+import { Kernel, rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { TopLevel, classpaths, rbCBasicObject, rbCSymbol, rbModName, rbModToS } from "./object.js";
 import { Range } from "./range.js";
@@ -404,4 +404,52 @@ for (const [name, value] of Object.entries(_coreConstants)) {
   if (classpaths.get(value as object)?.permanent !== true) {
     classpaths.set(value as object, { path: name, permanent: true });
   }
+}
+
+const autoloadTbl = new WeakMap<object, Map<string, string>>();
+
+/**
+ * `Module#autoload`'s table entry (`rb_autoload_str`,
+ * `vendor/ruby/v3.3.11/variable.c:2711`): `feature` is required the first
+ * time `name` is looked up under `module`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAutoloadStr(module: object, name: string, feature: string): void {
+  let tbl = autoloadTbl.get(module);
+  if (tbl === undefined) autoloadTbl.set(module, (tbl = new Map()));
+  tbl.set(name, feature);
+}
+
+/**
+ * `autoload_delete` (`vendor/ruby/v3.3.11/variable.c:2736`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function autoloadDelete(module: object, name: string): void {
+  autoloadTbl.get(module)?.delete(name);
+}
+
+/**
+ * `Module#autoload?` (`rb_autoload_p`, `vendor/ruby/v3.3.11/variable.c:3083`)
+ * with `recur` false: the feature still pending for `name`, or `null`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAutoloadP(mod: object, id: string): string | null {
+  return autoloadTbl.get(mod)?.get(id) ?? null;
+}
+
+/**
+ * `rb_autoload_load` (`vendor/ruby/v3.3.11/variable.c:3045`), which
+ * `autoload_try_load` ends in a `Kernel#require` of the feature. ESM has no
+ * synchronous load, so this is an awaited step (CLAUDE.md § "An adapter file
+ * is loaded by an awaited step").
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function rbAutoloadLoad(module: object, name: string): Promise<boolean> {
+  const feature = rbAutoloadP(module, name);
+  if (feature == null) return false;
+  return Kernel.require!(feature);
 }

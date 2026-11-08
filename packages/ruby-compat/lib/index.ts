@@ -413,6 +413,10 @@ export { rbHash, rbObjHash } from "./rb-hash.js";
 export {
   resetConstants,
   rbConstGet,
+  rbAutoloadStr,
+  rbAutoloadP,
+  rbAutoloadLoad,
+  autoloadDelete,
   rbGvGet,
   rbGvSet,
   constGet,
