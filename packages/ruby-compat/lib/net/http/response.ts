@@ -52,6 +52,10 @@ export class HTTPResponse {
   readonly message: string;
   /** @noRailsEquivalent PERMANENT */
   decodeContent = false;
+  /** @noRailsEquivalent PERMANENT */
+  bodyEncoding: string | false = false;
+  /** @noRailsEquivalent PERMANENT */
+  ignoreEof = true;
   private _uri: URIHTTP | null = null;
   private readonly _header: Record<string, string[]> = {};
   private _body: Uint8Array | null = null;

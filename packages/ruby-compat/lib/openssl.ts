@@ -17,16 +17,19 @@ export class CipherError extends StandardError {}
 /**
  * `OpenSSL::SSL::SSLError` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616`). A
  * TLS failure reaches JS as the host's own error with an `ERR_SSL_` or
- * `ERR_TLS_` code, which is this class to `rescue OpenSSL::SSL::SSLError`.
+ * `ERR_TLS_` code, or an OpenSSL certificate-verify code, which is this class to `rescue OpenSSL::SSL::SSLError`.
  *
  * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616
  */
+const SSL_ERROR_CODE =
+  /^(?:ERR_SSL_|ERR_TLS_|CERT_|UNABLE_TO_|DEPTH_ZERO_SELF_SIGNED_CERT$|SELF_SIGNED_CERT_IN_CHAIN$|HOSTNAME_MISMATCH$)/;
+
 class SSLError extends StandardError {
   static [Symbol.hasInstance](error: unknown): boolean {
     const code = (error as { code?: unknown } | null | undefined)?.code;
     return (
       Function.prototype[Symbol.hasInstance].call(this, error) ||
-      (typeof code === "string" && (code.startsWith("ERR_SSL_") || code.startsWith("ERR_TLS_")))
+      (typeof code === "string" && SSL_ERROR_CODE.test(code))
     );
   }
 }

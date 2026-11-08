@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SystemCallError } from "../../lib/errno.js";
 import { OpenSSL } from "../../lib/openssl.js";
 import { SocketError } from "../../lib/socket.js";
-import { URI } from "../../lib/uri.js";
+import { HTTPS, URI } from "../../lib/uri.js";
 import { Net } from "../../lib/net/protocol.js";
 import "../../lib/net/http.js";
 
@@ -82,6 +82,59 @@ describe("Net::HTTP", () => {
     expect(response.get("content-length")).toBe("5");
     expect(response.uri!.toString()).toBe(`http://127.0.0.1:${port}/x`);
     expect(response.uri).not.toBe(uri);
+  });
+
+  it("reads past a 1xx response to the final one", async () => {
+    const port = await listen(
+      createServer((_req, res) => {
+        res.writeEarlyHints({ link: "</a.css>; rel=preload" });
+        res.writeHead(201);
+        res.end("made");
+      }),
+    );
+    const response = await new Net.HTTP("127.0.0.1", port).post("/", "");
+    expect(response).toBeInstanceOf(Net.HTTPCreated);
+  });
+
+  it("closes a keep-alive connection when the response says close", async () => {
+    const port = await listen(
+      createServer((_req, res) => {
+        res.writeHead(200, { connection: "close" });
+        res.end("x");
+      }),
+    );
+    const http = new Net.HTTP("127.0.0.1", port);
+    await http.start();
+    const response = await http.post("/", "");
+    expect(response.isConnectionClose()).toBe(true);
+    expect(http.isKeepAlive(new Net.HTTP.Post("/"), response)).toBe(false);
+    http.doFinish();
+  });
+
+  it("sends accept-encoding and decodes only when the caller set neither it nor range", () => {
+    const req = new Net.HTTP.Post("/");
+    expect(req.get("accept-encoding")).toBe("gzip;q=1.0,deflate;q=0.6,identity;q=0.3");
+    expect(req.decodeContent).toBe(true);
+    const ranged = new Net.HTTP.Post("/", { Range: "bytes=0-1" });
+    expect(ranged.get("accept-encoding")).toBeNull();
+    expect(ranged.decodeContent).toBe(false);
+    expect(new Net.HTTP.Post("/", { "Accept-Encoding": "br" }).decodeContent).toBe(false);
+  });
+
+  it("update_uri strips the host port and converts the URI class for ssl", () => {
+    const req = new Net.HTTP.Post(URI.parse("http://example.com:8080/p?q=1") as never);
+    req.updateUri("example.com", 443, true);
+    expect(req.uri).toBeInstanceOf(HTTPS);
+    expect(req.uri!.toString()).toBe("https://example.com/p?q=1");
+  });
+
+  it("max_retries truncates and rejects a negative count", () => {
+    const http = new Net.HTTP("127.0.0.1", 1);
+    http.maxRetries = 2.7;
+    expect(http.maxRetries).toBe(2);
+    expect(() => (http.maxRetries = -1)).toThrow(
+      "max_retries should be non-negative integer number",
+    );
   });
 
   it("raises Errno::ECONNREFUSED when nothing listens", async () => {

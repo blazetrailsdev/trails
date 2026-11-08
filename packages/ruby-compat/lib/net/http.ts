@@ -58,9 +58,15 @@ export class HTTP {
   private _readTimeout: number | null = 60;
   private _maxRetries = 1;
   private _currHttpVersion = HTTP.HTTPVersion;
-  private _keepAliveTimeout = 2;
+  /** @noRailsEquivalent PERMANENT */
+  keepAliveTimeout = 2;
   private _lastCommunicated: number | null = null;
-  private _closeOnEmptyResponse = false;
+  /** @noRailsEquivalent PERMANENT */
+  closeOnEmptyResponse = false;
+  /** @noRailsEquivalent PERMANENT */
+  responseBodyEncoding: string | false = false;
+  /** @noRailsEquivalent PERMANENT */
+  ignoreEof = true;
   private _useSsl = false;
   private _started = false;
   private _socket: HttpClientConnection | null = null;
@@ -88,7 +94,8 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT */
   set maxRetries(retries: number) {
-    if (!(Number.isInteger(retries) && retries >= 0)) {
+    retries = Math.trunc(retries);
+    if (retries < 0) {
       throw new ArgumentError("max_retries should be non-negative integer number");
     }
     this._maxRetries = retries;
@@ -234,6 +241,8 @@ export class HTTP {
             });
             res = HTTPResponse.readNew(sock);
             res.decodeContent = req.decodeContent;
+            res.bodyEncoding = this.responseBodyEncoding;
+            res.ignoreEof = this.ignoreEof;
           } while (res instanceof HTTPInformation);
 
           res.uri = req.uri;
@@ -277,7 +286,7 @@ export class HTTP {
     if (this._socket!.isClosed()) {
       await this.connect();
     } else if (this._lastCommunicated != null) {
-      if (this._lastCommunicated + this._keepAliveTimeout < performance.now() / 1000) {
+      if (this._lastCommunicated + this.keepAliveTimeout < performance.now() / 1000) {
         this._socket!.close();
         await this.connect();
       } else if (this._socket!.isEof()) {
@@ -286,7 +295,7 @@ export class HTTP {
       }
     }
 
-    if (!req.isResponseBodyPermitted() && this._closeOnEmptyResponse) {
+    if (!req.isResponseBodyPermitted() && this.closeOnEmptyResponse) {
       if (req.get("connection") == null) req.set("connection", "close");
     }
 
@@ -300,7 +309,7 @@ export class HTTP {
     this._lastCommunicated = null;
     if (this._socket!.isClosed()) {
       return;
-    } else if (res.body == null && this._closeOnEmptyResponse) {
+    } else if (res.body == null && this.closeOnEmptyResponse) {
       this._socket!.close();
     } else if (this.isKeepAlive(req, res)) {
       this._lastCommunicated = performance.now() / 1000;
