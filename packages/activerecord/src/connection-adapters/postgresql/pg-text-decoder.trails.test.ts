@@ -3,6 +3,7 @@ import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { PGTextDecoder, PGTypeMapByOid } from "./pg-text-decoder.js";
 import { pgConnection } from "../../pg/connection.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 const OID_DATE = 1082;
 const OID_TIMESTAMP = 1114;
@@ -145,4 +146,76 @@ describe("global pg type registry is unaffected", () => {
     const result = (globalParser as (v: string) => unknown)("2026-04-26 14:23:55+00");
     expect(result).not.toBeInstanceOf(Temporal.Instant);
   });
+});
+
+describe("PGTextDecoder — timestamps match Time.new", () => {
+  const RE =
+    /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
+
+  function viaTimeNew(value: string, dbLocal: boolean, appLocal: boolean): RubyTime {
+    const m = RE.exec(value)!;
+    let year = Number(m[1]);
+    if (m[12]) year = -year + 1;
+    const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
+    const sec = nsec
+      ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
+      : Number(m[6]);
+    const args = [year, +m[2], +m[3], +m[4], +m[5], sec] as const;
+    if (m[8]) {
+      let offset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
+      if (m[8] === "-") offset = -offset;
+      return RubyTime.new(...args, offset);
+    }
+    const res = RubyTime.new(...args, dbLocal ? null : 0);
+    if (dbLocal && appLocal) return res;
+    return appLocal ? res.getlocal() : res.utc();
+  }
+
+  const fingerprint = (t: RubyTime) =>
+    [t.utcOffset, t.isUtc(), t.zone, t.nsec, t.toR().toString(), t.yday, t.wday]
+      .concat(t.strftime("%FT%T.%N %z %Z"))
+      .join("|");
+
+  const values = [
+    "2026-11-06 19:33:14.918",
+    "2026-11-06 19:33:14",
+    "2026-11-06 19:33:14.123456789",
+    "2000-02-29 00:00:00.5",
+    "1969-12-31 23:59:59.999999",
+    "1970-01-01 00:00:00",
+    "0099-01-01 00:00:00",
+    "0001-01-01 00:00:00",
+    "0044-03-15 12:00:00 BC",
+    "9999-12-31 23:59:59.999999",
+    "2026-11-06 19:33:14.918+05:30",
+    "2026-11-06 19:33:14-08",
+    "1900-01-01 00:00:00+00:19:32",
+    "2026-03-08 02:30:00",
+    "275760-01-01 00:00:00",
+  ];
+
+  const coders = [
+    [new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" }), false, false],
+    [
+      new PGTextDecoder.TimestampWithTimeZone({ oid: OID_TIMESTAMPTZ, name: "timestamptz" }),
+      false,
+      false,
+    ],
+    [
+      new PGTextDecoder.TimestampWithoutTimeZone({ oid: OID_TIMESTAMP, name: "timestamp" }),
+      true,
+      true,
+    ],
+  ] as const;
+
+  for (const [coder, dbLocal, appLocal] of coders) {
+    it(`${coder.constructor.name} decodes like Time.new`, () => {
+      for (const value of values) {
+        expect([value, fingerprint(coder.decode(value) as RubyTime)]).toEqual([
+          value,
+          fingerprint(viaTimeNew(value, dbLocal, appLocal)),
+        ]);
+      }
+    });
+  }
 });

@@ -615,6 +615,17 @@ export class Time extends rbCTime {
     );
   }
 
+  /**
+   * `rb_time_timespec_new` (`vendor/ruby/v3.3.11/time.c:2783-2804`).
+   *
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static timespecNew(epochNs: bigint, offset: number | "utc" | "local"): Time {
+    if (offset === "utc") return Time.#atInstant(epochNs, "UTC", true);
+    return Time.#atInstant(epochNs, offset === "local" ? null : offset);
+  }
+
   static #atInstant(
     at: Temporal.Instant | bigint,
     zone: string | number | object | null = null,
