@@ -142,6 +142,12 @@ describe("unreceiptedExclusions", () => {
     );
   });
 
+  it("credits a package's MRI core class without a receipt", async () => {
+    expect(
+      await unreceiptedExclusions("date", { ...empty, excluded: ["time.ts::Time"] }, {}),
+    ).toEqual([]);
+  });
+
   it("exempts no key when the base record has none", async () => {
     expect(await unreceiptedExclusions("globalid", record, {})).toEqual([
       "locator.ts::BaseLocator",
