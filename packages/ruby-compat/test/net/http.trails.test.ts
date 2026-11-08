@@ -1,5 +1,6 @@
 import { createServer, type Server } from "node:http";
 import { createServer as createNetServer, type Socket as NetSocket } from "node:net";
+import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
 import { SystemCallError } from "../../lib/errno.js";
 import { OpenSSL } from "../../lib/openssl.js";
@@ -60,6 +61,27 @@ describe("Net::HTTP", () => {
     const denied = await new Net.HTTP("127.0.0.1", port).post("/denied", "");
     expect(denied).toBeInstanceOf(Net.HTTPUnauthorized);
     expect(denied).not.toBeInstanceOf(Net.HTTPSuccess);
+  });
+
+  it("decodes a gzip response body and sets the response uri", async () => {
+    let acceptEncoding: string | undefined;
+    const port = await listen(
+      createServer((req, res) => {
+        acceptEncoding = req.headers["accept-encoding"];
+        const body = gzipSync("hello");
+        res.writeHead(200, { "content-encoding": "gzip", "content-length": body.length });
+        res.end(body);
+      }),
+    );
+    const uri = URI.parse(`http://127.0.0.1:${port}/x`);
+    const response = await new Net.HTTP("127.0.0.1", port).post(uri as never, "");
+    expect(acceptEncoding).toBe("gzip;q=1.0,deflate;q=0.6,identity;q=0.3");
+    expect(response).toBeInstanceOf(Net.HTTPOK);
+    expect(new TextDecoder().decode(response.body!)).toBe("hello");
+    expect(response.get("content-encoding")).toBeNull();
+    expect(response.get("content-length")).toBe("5");
+    expect(response.uri!.toString()).toBe(`http://127.0.0.1:${port}/x`);
+    expect(response.uri).not.toBe(uri);
   });
 
   it("raises Errno::ECONNREFUSED when nothing listens", async () => {

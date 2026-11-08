@@ -15,6 +15,23 @@ const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
 export class CipherError extends StandardError {}
 
 /**
+ * `OpenSSL::SSL::SSLError` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616`). A
+ * TLS failure reaches JS as the host's own error with an `ERR_SSL_` or
+ * `ERR_TLS_` code, which is this class to `rescue OpenSSL::SSL::SSLError`.
+ *
+ * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616
+ */
+export class SSLError extends StandardError {
+  static [Symbol.hasInstance](error: unknown): boolean {
+    const code = (error as { code?: unknown } | null | undefined)?.code;
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, error) ||
+      (typeof code === "string" && (code.startsWith("ERR_SSL_") || code.startsWith("ERR_TLS_")))
+    );
+  }
+}
+
+/**
  * `OpenSSL::Cipher` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/cipher.rb:16`), the
  * sliver Rails drives (`message_encryptor.rb:276-290`).
  *
@@ -225,7 +242,7 @@ export const Random = {
 export const OpenSSL = {
   Cipher,
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2999-3000 */
-  SSL: { VERIFY_NONE: 0, VERIFY_PEER: 1 },
+  SSL: { VERIFY_NONE: 0, VERIFY_PEER: 1, SSLError },
   HMAC,
   Random,
   Digest: {

@@ -1,6 +1,8 @@
 import { ArgumentError } from "../../argument-error.js";
 import { Generic } from "../../uri/generic.js";
+import { HTTPS as URIHTTPS } from "../../uri/https.js";
 import { HTTP as URIHTTP } from "../../uri/http.js";
+import { rbObjDup } from "../../include.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -23,45 +25,58 @@ export class HTTPRequest {
   /** @noRailsEquivalent PERMANENT */
   readonly path: string;
   /** @noRailsEquivalent PERMANENT */
-  readonly uri: URIHTTP | null = null;
+  uri: URIHTTP | null;
+  /** @noRailsEquivalent PERMANENT */
+  readonly decodeContent: boolean;
   /** @noRailsEquivalent PERMANENT */
   body: string | Uint8Array | null = null;
   private readonly _header: Record<string, string> = {};
   private readonly _responseHasBody: boolean;
 
-  /**
-   * @missingRailsCall dup — CONVERGEABLE ruby-compat-net-http-full-transport
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   constructor(path: string | Generic, initheader: Record<string, string> | null = null) {
     const klass = this.constructor as typeof HTTPRequest;
     this.method = klass.METHOD;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
-    if (path instanceof URIHTTP) {
+
+    let host: string | null;
+    if (path instanceof Generic) {
+      if (!(path instanceof URIHTTP)) throw new ArgumentError("not an HTTP URI");
       const hostname = path.hostname;
       if (!(hostname != null && hostname.length > 0)) {
         throw new ArgumentError("no host component for URI");
       }
-      this.uri = path;
+      const uri = rbObjDup(path);
+      this.uri = uri;
+      host = uri.hostname!;
+      if (uri.port !== uri.defaultPort) host += `:${uri.port}`;
       const requestUri = path.requestUri();
       if (requestUri == null) throw new ArgumentError("no HTTP request path given");
       this.path = requestUri;
-    } else if (path instanceof Generic) {
-      throw new ArgumentError("not an HTTP URI");
     } else {
+      this.uri = null;
+      host = null;
       if (path == null) throw new ArgumentError("no HTTP request path given");
       if (path.length === 0) throw new ArgumentError("HTTP request path is empty");
       this.path = path;
     }
-    if (initheader != null) {
-      for (const [key, value] of Object.entries(initheader)) this.set(key, value);
+
+    let decodeContent = false;
+
+    if (
+      initheader == null ||
+      !Object.keys(initheader).some((k) => ["accept-encoding", "range"].includes(k.toLowerCase()))
+    ) {
+      if (this._responseHasBody) decodeContent = true;
+      initheader = initheader != null ? { ...initheader } : {};
+      initheader["accept-encoding"] = "gzip;q=1.0,deflate;q=0.6,identity;q=0.3";
     }
+    this.decodeContent = decodeContent;
+
+    for (const [key, value] of Object.entries(initheader)) this.set(key, value);
     if (this.get("Accept") == null) this.set("Accept", "*/*");
     if (this.get("User-Agent") == null) this.set("User-Agent", "Ruby");
-    if (this.uri != null && this.get("host") == null) {
-      const host = this.uri.hostname!;
-      this.set("host", this.uri.port === this.uri.defaultPort ? host : `${host}:${this.uri.port}`);
-    }
+    if (host != null && this.get("Host") == null) this.set("Host", host);
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#[]` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:224-227`). */
@@ -92,6 +107,47 @@ export class HTTPRequest {
     if (str != null) this.body = str;
     if (this.body == null && (this.constructor as typeof HTTPRequest).REQUEST_HAS_BODY) {
       this.body = "";
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#connection_close?` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:966-971`). */
+  isConnectionClose(): boolean {
+    const token = /(?:^|,)\s*close\s*(?:$|,)/i;
+    if (this._header["connection"] != null && token.test(this._header["connection"])) return true;
+    if (this._header["proxy-connection"] != null && token.test(this._header["proxy-connection"])) {
+      return true;
+    }
+    return false;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:210-237`. */
+  updateUri(addr: string, port: number, ssl: boolean): void {
+    if (this.uri == null) return;
+
+    let scheme: string;
+    let klass: typeof URIHTTP;
+    if (ssl) {
+      scheme = "https";
+      klass = URIHTTPS;
+    } else {
+      scheme = "http";
+      klass = URIHTTP;
+    }
+
+    let host = this.get("host");
+    if (host != null) {
+      host = host.replace(/:[\s\S]*/, "");
+    } else if (this.uri.host != null) {
+      host = this.uri.host;
+    } else {
+      host = addr;
+    }
+    const uri: Generic = this.uri;
+    if (uri instanceof klass) {
+      uri.host = host;
+      uri.port = port;
+    } else {
+      this.uri = new klass(scheme, uri.userinfo, host, port, null, uri.path, null, uri.query, null);
     }
   }
 }
