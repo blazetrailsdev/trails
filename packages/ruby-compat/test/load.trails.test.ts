@@ -64,4 +64,16 @@ describe("registerCompiledFiles", () => {
     expect(await rbFRequireFile("/nonexistent-trails-root/absent.js")).toBe(true);
     expect(calls).toBe(1);
   });
+
+  it("finds a registered path named through a relative segment", async () => {
+    let calls = 0;
+    registerCompiledFiles("/nonexistent-trails-root", {
+      "dotted.js": async () => {
+        calls += 1;
+        return {};
+      },
+    });
+    expect(await rbFLoad("/nonexistent-trails-root/sub/../dotted.js")).toBe(true);
+    expect(calls).toBe(1);
+  });
 });

@@ -14,7 +14,8 @@ const loadedFiles = new Set<string>();
  * through `import(url)`, in place of the read `load_iseq_eval`
  * (`vendor/ruby/v3.3.11/load.c:744`) makes: each key is resolved against `root`, and the first
  * {@link rbFLoad} of that path imports through its thunk (RFC 0224; CLAUDE.md
- * § "Constant lookup is an import or a registry").
+ * § "Constant lookup is an import or a registry"). Registration lasts for the
+ * process, as `$LOADED_FEATURES` does; nothing unregisters a file.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -38,7 +39,8 @@ export function registerCompiledFiles(
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFLoad(fname: string): Promise<true> {
-  const compiled = loadedFiles.has(fname) ? undefined : compiledFiles.get(fname);
+  const full = File.expandPath(fname);
+  const compiled = loadedFiles.has(full) ? undefined : compiledFiles.get(full);
   let exports: Record<string, unknown>;
   if (compiled !== undefined) {
     exports = (await compiled()) as Record<string, unknown>;
@@ -49,7 +51,7 @@ export async function rbFLoad(fname: string): Promise<true> {
     path.search = `?${(loads += 1)}`;
     exports = (await import(path.href)) as Record<string, unknown>;
   }
-  loadedFiles.add(fname);
+  loadedFiles.add(full);
   for (const [id, val] of Object.entries(exports)) {
     if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
   }
