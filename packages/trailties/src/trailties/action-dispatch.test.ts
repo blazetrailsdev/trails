@@ -1,3 +1,4 @@
+import { Configuration } from "../application/configuration.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Deprecators } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
@@ -22,7 +23,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
   let savedDefaultCharset: string | null;
-  let app: { deprecators: Deprecators };
+  let app: { deprecators: Deprecators; config: Configuration };
 
   beforeEach(() => {
     savedConfig = { ...cfg() };
@@ -31,7 +32,7 @@ describe("ActionDispatch::Trailtie", () => {
     savedPerformDeepMunge = Request.Utils.performDeepMunge;
     savedStrictFreshness = CacheRequest.strictFreshness;
     savedDefaultCharset = Response.defaultCharset;
-    app = { deprecators: new Deprecators() };
+    app = { deprecators: new Deprecators(), config: new Configuration("/app") };
   });
 
   afterEach(() => {

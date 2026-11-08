@@ -11,6 +11,7 @@ import { Codec } from "@blazetrails/activesupport/messages/codec";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import { LoadError, verbose } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Configuration } from "./application/configuration.js";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./application/bootstrap.js";
 import { Trails } from "./trails.js";
 import { runTrailtieInitializers } from "./support/trailtie-initializers.js";
@@ -73,7 +74,7 @@ describe("active_support/message_pack is awaited at boot", () => {
   });
 
   const app = () => ({
-    config: ActiveSupportTrailtie.config,
+    config: new Configuration("/app"),
     deprecators: new Map(),
     executor: class extends Executor {},
     reloader: class extends Reloader {},
