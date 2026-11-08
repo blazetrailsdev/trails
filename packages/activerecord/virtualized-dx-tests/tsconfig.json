@@ -7,7 +7,7 @@
       "@blazetrails/activerecord/fixtures.js": ["../src/fixtures.ts"],
       "@blazetrails/activerecord": ["../src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
-      "@blazetrails/arel": ["../../arel/src/index.ts"],
+      "@blazetrails/arel": ["../../arel/lib/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
       "@blazetrails/i18n": ["../../i18n/src/index.ts"],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/lib/include.ts"],

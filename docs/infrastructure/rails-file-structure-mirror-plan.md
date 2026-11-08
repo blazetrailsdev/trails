@@ -87,7 +87,7 @@ off-by-one counts due to trailing-newline handling):
 | `activerecord/src/relation/query-methods.ts`                 | 2292 |
 | `activerecord/src/associations.ts`                           | 2256 |
 | `activerecord/src/associations/collection-proxy.ts`          | 2243 |
-| `arel/src/visitors/to-sql.ts`                                | 1902 |
+| `arel/lib/visitors/to-sql.ts`                                | 1902 |
 
 Eyeball survey — judgments below come from a quick read of `persistence.ts`
 and `callbacks.ts` against their Rails counterparts plus pattern-inference

@@ -8,14 +8,8 @@
   },
   "include": ["lib"],
   "references": [
-    {
-      "path": "../date"
-    },
-    {
-      "path": "../ruby-compat"
-    },
-    {
-      "path": "../vitest-matchers"
-    }
+    { "path": "../date" },
+    { "path": "../ruby-compat" },
+    { "path": "../vitest-matchers" }
   ]
 }

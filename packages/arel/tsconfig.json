@@ -7,14 +7,8 @@
   },
   "include": ["lib"],
   "references": [
-    {
-      "path": "../activesupport"
-    },
-    {
-      "path": "../activemodel"
-    },
-    {
-      "path": "../ruby-compat"
-    }
+    { "path": "../activesupport" },
+    { "path": "../activemodel" },
+    { "path": "../ruby-compat" }
   ]
 }
