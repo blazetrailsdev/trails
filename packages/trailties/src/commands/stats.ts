@@ -13,7 +13,7 @@ export class StatsCommand extends Base {
 
   /**
    * @missingRailsCall new — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
-   * @missingRailsArgs join — CONVERGEABLE trails-cli-outside-app-dispatch-mirrors-cli-rb
+   * @missingRailsArgs join — CONVERGEABLE stats-command-joins-application-root
    * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
    */
   async perform(): Promise<void> {
