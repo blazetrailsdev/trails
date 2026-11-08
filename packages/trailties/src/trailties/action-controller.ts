@@ -15,6 +15,7 @@ import {
   except,
   File,
   getPath,
+  loadIseqEval,
   Module,
   rbFSend,
   rbObjIsKindOf,
@@ -174,7 +175,7 @@ async function helperConstants(
         .replace(/[-_]helper$/, "")
         .replaceAll("-", "_");
       const name = `${camelize([...namespace, stem].join("/"))}Helper`;
-      const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
+      const mod = await loadIseqEval(full);
 
       const exported = mod[demodulize(name)];
       if (rbObjIsKindOf(exported, Module)) {

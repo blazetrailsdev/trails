@@ -39,6 +39,24 @@ export function registerCompiledFiles(
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFLoad(fname: string): Promise<true> {
+  const exports = await loadIseqEval(fname);
+  for (const [id, val] of Object.entries(exports)) {
+    if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
+  }
+  return true;
+}
+
+/**
+ * `load_iseq_eval` (`vendor/ruby/v3.3.11/load.c:744`): evaluates `fname` and
+ * answers the module's exports, through its {@link registerCompiledFiles}
+ * thunk on the first evaluation of that path and under a fresh URL after.
+ * A caller that reads one file's own export rather than the constants
+ * {@link rbFLoad} seats (`Mapper#draw`'s routes file, a helper file whose
+ * short name another namespace shares) reads it here.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function loadIseqEval(fname: string): Promise<Record<string, unknown>> {
   const full = File.expandPath(fname);
   const compiled = loadedFiles.has(full) ? undefined : compiledFiles.get(full);
   let exports: Record<string, unknown>;
@@ -52,10 +70,7 @@ export async function rbFLoad(fname: string): Promise<true> {
     exports = (await import(path.href)) as Record<string, unknown>;
   }
   loadedFiles.add(full);
-  for (const [id, val] of Object.entries(exports)) {
-    if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
-  }
-  return true;
+  return exports;
 }
 
 /** @noRailsEquivalent PERMANENT — `$LOAD_PATH`, `vendor/ruby/v3.3.11/load.c:1593`. */

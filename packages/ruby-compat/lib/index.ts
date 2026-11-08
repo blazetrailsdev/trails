@@ -324,6 +324,7 @@ export {
   LOADED_FEATURES,
   LOAD_PATH,
   rbFLoad,
+  loadIseqEval,
   rbFRequire,
   rbFRequireFile,
   registerCompiledFiles,
