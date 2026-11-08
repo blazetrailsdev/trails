@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { rbFLoad } from "../lib/load.js";
+import { rbFLoad, rbFRequireFile, registerCompiledFiles } from "../lib/load.js";
 import { TopLevel } from "../lib/object.js";
 import { constGet, rbModRemoveConst } from "../lib/variable.js";
 
@@ -24,5 +24,44 @@ describe("rbFLoad", () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("registerCompiledFiles", () => {
+  it("loads a registered path through its thunk on the first load only", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-rb-f-compiled-"));
+    const fname = join(root, "compiled.js");
+    try {
+      await writeFile(fname, `export const RbFCompiledProbe = "disk";\n`);
+      let calls = 0;
+      registerCompiledFiles(root, {
+        "compiled.js": async () => {
+          calls += 1;
+          return { RbFCompiledProbe: "thunk" };
+        },
+      });
+      expect(await rbFRequireFile(fname)).toBe(true);
+      expect(calls).toBe(1);
+      expect(constGet(Object, "RbFCompiledProbe")).toBe("thunk");
+      expect(await rbFRequireFile(fname)).toBe(false);
+
+      await rbFLoad(fname);
+      expect(calls).toBe(1);
+      expect(rbModRemoveConst(Object, "RbFCompiledProbe")).toBe("disk");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("finds a registered path that is not on disk", async () => {
+    let calls = 0;
+    registerCompiledFiles("/nonexistent-trails-root", {
+      "absent.js": async () => {
+        calls += 1;
+        return {};
+      },
+    });
+    expect(await rbFRequireFile("/nonexistent-trails-root/absent.js")).toBe(true);
+    expect(calls).toBe(1);
   });
 });
