@@ -702,7 +702,7 @@ export default defineConfig({
         test: {
           name: "system",
           globals: true,
-          include: ["packages/*/src/**/*.system.test.ts"],
+          include: ["packages/*/{src,test}/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
           setupFiles: otherSetupFiles,
           pool: "forks",
