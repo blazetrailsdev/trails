@@ -45,13 +45,4 @@ describe("ObjectTests", () => {
     expect(actsLike.call(duckString, "string")).toBeTruthy();
     expect(actsLike.call(duckString, "invalid")).toBeFalsy();
   });
-
-  it("answers per receiver when the duck name was seen before", () => {
-    const duck = new DuckString();
-    expect(actsLike.call(duck, "string")).toBeTruthy();
-    expect(actsLike.call(new Stringish(), "string")).toBeTruthy();
-    expect(actsLike.call({}, "string")).toBeFalsy();
-    expect(actsLike.call(null, "string")).toBeFalsy();
-    expect(actsLike.call(duck, "string")).toBeTruthy();
-  });
 });

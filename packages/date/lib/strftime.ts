@@ -89,6 +89,8 @@ const ampm = ["AM", "PM"];
 /**
  * `rb_strftime_with_timespec` (`vendor/ruby/v3.3.11/strftime.c:233-917`), on its
  * `timev` arm: `ts` is always `NULL`, as `rb_strftime` passes it.
+ *
+ * @perf 1000ns — PERMANENT
  */
 function rbStrftimeWithTimespec(
   ftime: { s: string; capacity: number },
