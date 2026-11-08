@@ -56,7 +56,7 @@ class collapses into `Driver`.
 ## File layout (6 files, matching Rails)
 
 ```
-packages/actionpack/src/action-dispatch/
+packages/actionpack/lib/action-dispatch/
   system-test-case.ts           — SystemTestCase class + drivenBy/servedBy
   system-testing/
     driver.ts                   — Driver (wraps Playwright browser launch)
@@ -64,7 +64,7 @@ packages/actionpack/src/action-dispatch/
     test-helpers/
       screenshot-helper.ts      — takeScreenshot / takeFailedScreenshot
       setup-and-teardown.ts     — beforeAll/afterEach lifecycle mixin
-packages/actionpack/src/action-dispatch/
+packages/actionpack/lib/action-dispatch/
   testing/test-helpers/
     page-dump-helper.ts         — saveAndOpenPage / savePage
 ```

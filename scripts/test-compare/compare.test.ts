@@ -411,17 +411,17 @@ describe("misplacedLocation", () => {
 describe("sharingPackages", () => {
   it("counts actiondispatch's Rails names when actioncontroller reads its TS files", () => {
     const file = (f: string) => ({ file: f, testCases: [] });
-    const dispatch = file("packages/actionpack/src/action-dispatch/uploaded-file.test.ts");
+    const dispatch = file("packages/actionpack/test/action-dispatch/uploaded-file.test.ts");
     const ts = {
       source: "typescript",
       generatedAt: "",
       packages: {
         actiondispatch: { files: [dispatch] },
         actioncontroller: {
-          files: [file("packages/actionpack/src/action-controller/test-case.test.ts"), dispatch],
+          files: [file("packages/actionpack/test/action-controller/test-case.test.ts"), dispatch],
         },
         abstractcontroller: {
-          files: [file("packages/actionpack/src/abstract-controller/callbacks.test.ts")],
+          files: [file("packages/actionpack/test/abstract-controller/callbacks.test.ts")],
         },
       },
     } as unknown as Parameters<typeof sharingPackages>[1];

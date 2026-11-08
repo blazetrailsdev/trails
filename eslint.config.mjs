@@ -150,10 +150,10 @@ export default defineConfig(
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
-      "packages/actionpack/src/action-dispatch/journey/visualizer/**",
+      "packages/actionpack/lib/action-dispatch/journey/visualizer/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
-      "packages/actionpack/src/test-helpers/fixtures/public/**",
-      "packages/actionpack/src/test-helpers/fixtures/公共/**",
+      "packages/actionpack/test/fixtures/public/**",
+      "packages/actionpack/test/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/test/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
@@ -243,7 +243,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
@@ -356,7 +356,7 @@ export default defineConfig(
     files: [
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -382,7 +382,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
@@ -441,7 +441,7 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       "packages/activejob/src/**/*.ts",
@@ -529,7 +529,7 @@ export default defineConfig(
 
   {
     files: [
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
@@ -598,7 +598,7 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
     ],
@@ -675,7 +675,7 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
@@ -1154,7 +1154,7 @@ export default defineConfig(
   // ── actionpack + trailties ──
   {
     files: [
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/{lib,test}/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],

@@ -33,7 +33,7 @@ describe("TS extractor assertion-count collection", () => {
         expect(name).toBe("David");
       });
     `;
-    const info = extractTestsFromSource(src, "packages/actionpack/src/x.test.ts");
+    const info = extractTestsFromSource(src, "packages/actionpack/test/x.test.ts");
     expect(info.testCases[0].assertionCount).toBe(3);
     expect(info.testCases[0].assertionKinds).toEqual(["expect", "assertEqual", "toBe"]);
   });

@@ -341,9 +341,9 @@ const alias = {
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/lib/index.ts"),
   "@blazetrails/actionpack/system-testing": path.resolve(
     __dirname,
-    "packages/actionpack/src/system-testing.ts",
+    "packages/actionpack/lib/system-testing.ts",
   ),
-  "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),
+  "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/lib/index.ts"),
   "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/src/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
     __dirname,
@@ -702,7 +702,7 @@ export default defineConfig({
         test: {
           name: "system",
           globals: true,
-          include: ["packages/*/src/**/*.system.test.ts"],
+          include: ["packages/*/{src,test}/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
           setupFiles: otherSetupFiles,
           pool: "forks",

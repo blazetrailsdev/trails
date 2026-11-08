@@ -1,0 +1,84 @@
+import { describe, expect, it } from "vitest";
+import { SessionId } from "@blazetrails/rack-session";
+import { assertEqual, assertInstanceOf } from "@blazetrails/activesupport";
+import { rbCString } from "@blazetrails/ruby-compat";
+import { TestSession } from "../../../../lib/action-controller/test-case.js";
+
+describe("ActionController::TestSessionTest", () => {
+  it("initialize with values", () => {
+    const session = new TestSession({ one: "one", two: "two" });
+    expect(session.get("one")).toBe("one");
+    expect(session.get("two")).toBe("two");
+  });
+
+  it("setting session item sets item", () => {
+    const session = new TestSession();
+    session.set("key", "value");
+    expect(session.get("key")).toBe("value");
+  });
+
+  it("calling delete removes item and returns its value", () => {
+    const session = new TestSession();
+    session.set("key", "value");
+    expect(session.get("key")).toBe("value");
+    expect(session.delete("key")).toBe("value");
+    expect(session.get("key")).toBeUndefined();
+  });
+
+  it("calling update with params passes to attributes", () => {
+    const session = new TestSession();
+    session.update({ key: "value" });
+    expect(session.get("key")).toBe("value");
+  });
+
+  it("clear empties session", () => {
+    const session = new TestSession({ one: "one", two: "two" });
+    session.clear();
+    expect(session.get("one")).toBeUndefined();
+    expect(session.get("two")).toBeUndefined();
+  });
+
+  it("keys and values", () => {
+    const session = new TestSession({ one: "1", two: "2" });
+    expect(session.keys()).toEqual(["one", "two"]);
+    expect(session.values()).toEqual(["1", "2"]);
+  });
+
+  it("dig", () => {
+    const session = new TestSession({ one: { two: { three: "3" } } });
+    expect(session.dig("one", "two", "three")).toBe("3");
+    expect(session.dig("ruby", "on", "rails")).toBeUndefined();
+  });
+
+  it("fetch returns default", () => {
+    const session = new TestSession({ one: "1" });
+    expect(session.fetch("two", "2")).toBe("2");
+  });
+
+  it("fetch on symbol returns value", () => {
+    const session = new TestSession({ one: "1" });
+    expect(session.fetch("one")).toBe("1");
+  });
+
+  it("fetch on string returns value", () => {
+    const session = new TestSession({ one: "1" });
+    expect(session.fetch("one")).toBe("1");
+  });
+
+  it("fetch returns block value", () => {
+    const session = new TestSession({ one: "1" });
+    expect(session.fetch("2", undefined, (key: string) => parseInt(key, 10))).toBe(2);
+  });
+
+  it("session id", () => {
+    const session = new TestSession();
+    assertInstanceOf(rbCString, (session.id() as SessionId).publicId);
+    assertEqual((session.id() as SessionId).publicId, session.get("session_id"));
+  });
+
+  it("merge!", () => {
+    const session = new TestSession();
+    session.mergeBang({ key: "value" });
+    expect(session.get("key")).toBe("value");
+  });
+});

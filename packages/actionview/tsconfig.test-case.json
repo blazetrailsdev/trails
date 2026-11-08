@@ -5,7 +5,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
-      "@blazetrails/actionpack": ["../actionpack/src/index.ts"]
+      "@blazetrails/actionpack": ["../actionpack/lib/index.ts"]
     }
   },
   "include": ["src/test-case.ts", "src/constants.excluded.generated.ts"],

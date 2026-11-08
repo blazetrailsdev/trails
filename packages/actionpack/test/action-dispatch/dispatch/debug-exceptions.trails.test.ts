@@ -1,0 +1,147 @@
+import { describe, it, expect } from "vitest";
+import { DebugExceptions } from "../../../lib/action-dispatch/middleware/debug-exceptions.js";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { NotImplemented } from "../../../lib/action-controller/metal/exceptions.js";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
+import { MimeType } from "../../../lib/action-dispatch/http/mime-type.js";
+import { Logger, TaggedLogging } from "@blazetrails/activesupport";
+import { Hash as RubyHash, rbModDefineMethod, rbModUndefMethod } from "@blazetrails/ruby-compat";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+
+const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
+  throw new Error("Something went wrong");
+};
+
+const BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+
+async function contentTypeFor(
+  accept: string,
+  responseFormat: "default" | "api" = "default",
+): Promise<string> {
+  const [, headers] = await new DebugExceptions(errorApp, null, responseFormat).call({
+    REQUEST_METHOD: "GET",
+    PATH_INFO: "/test",
+    "action_dispatch.show_detailed_exceptions": true,
+    HTTP_ACCEPT: accept,
+  });
+  return String(headers["content-type"]);
+}
+
+describe("DebugExceptions format negotiation", () => {
+  it("renders HTML for a browser Accept header that also lists application/xml", async () => {
+    expect(await contentTypeFor(BROWSER_ACCEPT)).toContain("text/html");
+    expect(await contentTypeFor(BROWSER_ACCEPT, "api")).toContain("text/html");
+  });
+
+  it("renders the browser page for application/json outside the api response format", async () => {
+    expect(await contentTypeFor("application/json")).toContain("text/html");
+  });
+
+  it("renders JSON for application/json in the api response format", async () => {
+    expect(await contentTypeFor("application/json", "api")).toContain("application/json");
+  });
+
+  it("renders XML for an explicit application/xml in the api response format", async () => {
+    expect(await contentTypeFor("application/xml", "api")).toContain("application/xml");
+  });
+
+  it("falls back to HTML for a browser-like Accept listing */*, as request.formats does", async () => {
+    expect(await contentTypeFor("application/json,*/*", "api")).toContain("text/html");
+  });
+
+  it("decides api_request? from the highest-q format, not the first substring", async () => {
+    expect(await contentTypeFor("text/html;q=0.5,application/json", "api")).toContain(
+      "application/json",
+    );
+  });
+});
+
+describe("DebugExceptions browser render", () => {
+  it("renders HTML, not text, for a non-XHR request with a text/plain body", async () => {
+    const [, headers] = await new DebugExceptions(errorApp).call({
+      REQUEST_METHOD: "POST",
+      PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
+      CONTENT_TYPE: "text/plain",
+    });
+    expect(String(headers["content-type"])).toContain("text/html");
+  });
+});
+
+describe("DebugExceptions interceptors", () => {
+  it("receives the ActionDispatch::Request call built, not the Rack env", async () => {
+    let received: unknown;
+    await new DebugExceptions(errorApp, null, "default", [(request) => (received = request)]).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
+    });
+    expect(received).toBeInstanceOf(Request);
+  });
+});
+
+describe("DebugExceptions API body conversions", () => {
+  it("selects a Hash conversion activesupport adds by the matching Mime symbol", async () => {
+    MimeType.register("text/wibble", ":wibble");
+    rbModDefineMethod(RubyHash, "toWibble", function (this: { status: unknown }) {
+      return `wibble:${String(this.status)}`;
+    });
+    try {
+      const [, headers, body] = await new DebugExceptions(errorApp, null, "api").call({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/test",
+        "action_dispatch.show_detailed_exceptions": true,
+        HTTP_ACCEPT: "text/wibble",
+      });
+      expect(String(headers["content-type"])).toContain("text/wibble");
+      expect([...(body as Iterable<string>)].join("")).toBe("wibble:500");
+    } finally {
+      rbModUndefMethod(RubyHash, "toWibble");
+      MimeType.unregister(":wibble");
+    }
+  });
+});
+
+describe("DebugExceptions#log_error rescue_response? gate", () => {
+  async function logged(app: (env: RackEnv) => Promise<RackResponse>): Promise<string[]> {
+    const output = new StringIO();
+    await new DebugExceptions(app).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
+      "action_dispatch.logger": new Logger(output),
+      "action_dispatch.log_rescued_responses": false,
+    });
+    output.rewind();
+    return output
+      .read()
+      .split(/(?<=\n)/)
+      .filter((line) => line !== "");
+  }
+
+  it("skips a 5xx rescue response when log_rescued_responses is false", async () => {
+    const notImplementedApp = async (): Promise<RackResponse> => {
+      throw new NotImplemented();
+    };
+    expect(await logged(notImplementedApp)).toEqual([]);
+  });
+
+  it("logs an exception with no rescue response when log_rescued_responses is false", async () => {
+    expect((await logged(errorApp)).length).toBeGreaterThan(0);
+  });
+});
+
+describe("DebugExceptions#log_array", () => {
+  it("joins lines with the formatter's tags_text when it answers one (debug_exceptions.rb:177-178)", async () => {
+    const output = new StringIO();
+    const logger = TaggedLogging.new(new Logger(output)).tagged("BCX");
+    await new DebugExceptions(errorApp).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+      "action_dispatch.show_detailed_exceptions": true,
+      "action_dispatch.logger": logger,
+    });
+    output.rewind();
+    expect(output.read()).toContain("\n[BCX] Error (Something went wrong):\n[BCX]   ");
+  });
+});

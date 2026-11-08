@@ -1,0 +1,57 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { assertNotDeprecated } from "@blazetrails/activesupport";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import { deprecator } from "../../../lib/action-controller/deprecator.js";
+import { Base } from "../../../lib/action-controller/base.js";
+import { TestCase } from "../../../lib/action-controller/test-case.js";
+import "../../support/abstract-unit.js";
+
+class IntegrationController extends Base {
+  async yamlParams(): Promise<void> {
+    await this.render({ plain: YAML.dump(this.params) });
+  }
+
+  async permitParams(): Promise<void> {
+    this.params.permit({ key1: {} });
+
+    await this.render({ plain: "Home" });
+  }
+}
+
+describe("ActionControllerParametersIntegrationTest", () => {
+  let tc: TestCase;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new IntegrationController();
+    await tc.beforeSetup();
+  });
+
+  it("parameters can be serialized as YAML", async () => {
+    await tc.post("yamlParams", { params: { person: { name: "Mjallo!" } } });
+    const expected = `--- !ruby/object:ActionController::Parameters
+parameters: !ruby/hash:ActiveSupport::HashWithIndifferentAccess
+  person: !ruby/hash:ActiveSupport::HashWithIndifferentAccess
+    name: Mjallo!
+  controller: integration
+  action: yamlParams
+permitted: false
+`;
+    expect(tc.response.body).toBe(expected);
+  });
+
+  it("identical arrays can be permitted", async () => {
+    const params = {
+      key1: {
+        a: [{ same_key: { c: 1 } }],
+        b: [{ same_key: { c: 1 } }],
+      },
+    };
+
+    await assertNotDeprecated(deprecator(), async () => {
+      await tc.post("permitParams", { params });
+    });
+    assertResponse("ok");
+  });
+});
