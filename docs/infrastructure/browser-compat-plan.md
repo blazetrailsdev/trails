@@ -32,7 +32,7 @@ New packages must declare their status before merging.
 
 ### activesupport adapter pattern
 
-`packages/activesupport/src` already ships `fsAdapter`, `pathAdapter`,
+`packages/activesupport/lib` already ships `fsAdapter`, `pathAdapter`,
 `cryptoAdapter` (and others — see [activesupport.md](../activesupport.md) §Adapters).
 Twenty files across activerecord use `getFs()` / `getPath()` / `getCrypto()`
 instead of importing `node:*` directly, and there are zero bare `node:*`
@@ -129,7 +129,7 @@ No code changes.
 
 ### BC-2 — `getEnv()` accessor + migrate 6 activerecord files (~80 LOC) ✅ #1251
 
-Add `getEnv` to `packages/activesupport/src/environment.ts` with two
+Add `getEnv` to `packages/activesupport/lib/environment.ts` with two
 overloads:
 
 ```ts

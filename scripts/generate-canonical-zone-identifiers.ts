@@ -1,6 +1,6 @@
 /**
  * Regenerates `CANONICAL_ZONE_IDENTIFIERS`
- * (packages/activesupport/src/values/time-zone.ts), the tzdata
+ * (packages/activesupport/lib/values/time-zone.ts), the tzdata
  * backward-compatibility links `TimeZone.countryZones` folds away so that
  * `Intl.Locale#getTimeZones` answers what `TZInfo::Country#zone_identifiers`
  * answers (activesupport/lib/active_support/values/time_zone.rb:275).

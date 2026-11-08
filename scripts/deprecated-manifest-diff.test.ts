@@ -8,7 +8,7 @@ const expected: DeprecatedManifest = {
       "unsignedDecimal",
       "unsignedFloat",
     ],
-    "packages/activesupport/src/core-ext/benchmark.ts": ["ms"],
+    "packages/activesupport/lib/core-ext/benchmark.ts": ["ms"],
   },
 };
 
@@ -23,9 +23,9 @@ describe("diffDeprecatedManifest", () => {
 
   it("reports a file dropped by a partial regeneration as lost", () => {
     const actual = structuredClone(expected);
-    delete actual.files["packages/activesupport/src/core-ext/benchmark.ts"];
+    delete actual.files["packages/activesupport/lib/core-ext/benchmark.ts"];
     expect(diffDeprecatedManifest(expected, actual)).toEqual({
-      lost: ["packages/activesupport/src/core-ext/benchmark.ts: ms"],
+      lost: ["packages/activesupport/lib/core-ext/benchmark.ts: ms"],
       extra: [],
       drifted: true,
     });
@@ -40,10 +40,10 @@ describe("diffDeprecatedManifest", () => {
 
   it("reports an entry the recompute no longer produces as stale", () => {
     const actual = structuredClone(expected);
-    actual.files["packages/activesupport/src/core-ext/benchmark.ts"] = ["ms", "realtime"];
+    actual.files["packages/activesupport/lib/core-ext/benchmark.ts"] = ["ms", "realtime"];
     expect(diffDeprecatedManifest(expected, actual)).toEqual({
       lost: [],
-      extra: ["packages/activesupport/src/core-ext/benchmark.ts: realtime"],
+      extra: ["packages/activesupport/lib/core-ext/benchmark.ts: realtime"],
       drifted: true,
     });
   });

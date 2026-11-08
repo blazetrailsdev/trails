@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * build but not for the test run fails to resolve only under vitest.
  */
 export const packageEntries: Array<[string, string]> = [
-  ["@blazetrails/activesupport", "../activesupport/src/index.ts"],
+  ["@blazetrails/activesupport", "../activesupport/lib/index.ts"],
   ["@blazetrails/ruby-compat", "../ruby-compat/lib/index.ts"],
   ["@blazetrails/arel", "../arel/lib/index.ts"],
   ["@blazetrails/activemodel", "../activemodel/src/index.ts"],
@@ -65,7 +65,7 @@ export const packageEntries: Array<[string, string]> = [
  * instead, so these are only used by vitest.
  */
 export const subpathPrefixes: Array<[string, string]> = [
-  ["@blazetrails/activesupport/", "../activesupport/src/"],
+  ["@blazetrails/activesupport/", "../activesupport/lib/"],
   ["@blazetrails/ruby-compat/", "../ruby-compat/lib/"],
   ["@blazetrails/arel/test", "../arel/test"],
 ];

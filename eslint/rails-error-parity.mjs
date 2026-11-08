@@ -2,7 +2,7 @@
  * ESLint rule: rails-error-parity. Error classes are observable API, so our
  * hierarchy must mirror Rails and Rails-mirroring source must throw ported
  * error classes. Scoped (via eslint.config.mjs) to
- * `packages/{activerecord,activemodel,activesupport,arel}/src/**\/*.ts` excluding
+ * `packages/{activerecord,activemodel,activesupport,arel}/{src,lib}/**\/*.ts` excluding
  * `*.test.ts`:
  *
  *   1. On any in-scope file: every manifest error class whose Rails source

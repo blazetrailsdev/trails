@@ -1733,7 +1733,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/src/",
   activerecord: "packages/activerecord/src/",
-  activesupport: "packages/activesupport/src/",
+  activesupport: "packages/activesupport/test/",
   rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",

@@ -410,7 +410,7 @@ export interface KindHistogram {
  * spells `toBe` — the very matcher a port also uses for `assert_equal` on a
  * primitive — so TRAILS_MAP scores `toBe` as `equal` and the only trails
  * spelling that scores `same` is the `assertSame` helper
- * (activesupport/src/testing/assertions.ts:605). A package activesupport
+ * (activesupport/lib/testing/assertions.ts:605). A package activesupport
  * itself depends on — i18n, date, ruby-compat — cannot import that helper, so
  * without the fold every faithful port of an `assert_same` down there is a
  * permanent false mismatch. Folding both sides leaves an `assertSame` port

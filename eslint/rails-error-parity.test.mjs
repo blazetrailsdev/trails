@@ -72,15 +72,15 @@ const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
 const rackFile = path.join(REPO_ROOT, "packages/rack/lib/response.ts");
-const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/src/errors.ts");
-const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/src/duration.ts");
+const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/lib/errors.ts");
+const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/lib/duration.ts");
 // Scattered (non-errors.ts) file: DelegationError maps here via delegation.rb.
-const asScatteredFile = path.join(REPO_ROOT, "packages/activesupport/src/delegation.ts");
+const asScatteredFile = path.join(REPO_ROOT, "packages/activesupport/lib/delegation.ts");
 // Nested scattered file: the manifest's snake_case Ruby path must map onto
 // this kebab-case source path for the parity check to match it.
 const asNestedFile = path.join(
   REPO_ROOT,
-  "packages/activesupport/src/core-ext/string/output-safety.ts",
+  "packages/activesupport/lib/core-ext/string/output-safety.ts",
 );
 
 // Class declarations for synthetic errors.ts files; `nl` joins into a file.

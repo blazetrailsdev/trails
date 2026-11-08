@@ -241,7 +241,7 @@ export default defineConfig(
       "packages/arel/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -259,7 +259,7 @@ export default defineConfig(
       "packages/ruby-compat/lib/process-adapter.ts",
       "packages/ruby-compat/lib/repl-adapter.ts",
       "packages/ruby-compat/lib/zlib-adapter.ts",
-      "packages/activesupport/src/http-adapter.ts",
+      "packages/activesupport/lib/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/src/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
@@ -380,7 +380,7 @@ export default defineConfig(
       "packages/arel/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -392,10 +392,10 @@ export default defineConfig(
       "**/*.test.ts",
       "**/*.test-d.ts",
       // Temporal bridge — the canonical Date↔Instant adapter.
-      "packages/activesupport/src/temporal.ts",
+      "packages/activesupport/lib/temporal.ts",
       // Test infrastructure: travelTo, fixture helpers, etc.
-      "packages/activesupport/src/testing/**",
-      "packages/activesupport/src/testing-helpers.ts",
+      "packages/activesupport/lib/testing/**",
+      "packages/activesupport/lib/testing-helpers.ts",
     ],
     rules: {
       "blazetrails/no-native-date": "error",
@@ -439,7 +439,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/lib/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -471,7 +471,7 @@ export default defineConfig(
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
@@ -507,7 +507,7 @@ export default defineConfig(
     files: [
       "packages/activerecord/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -596,7 +596,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/lib/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -637,7 +637,7 @@ export default defineConfig(
           },
         },
         {
-          files: ["packages/activejob/lib/**/*.ts", "packages/activesupport/src/**/*.ts"],
+          files: ["packages/activejob/lib/**/*.ts", "packages/activesupport/lib/**/*.ts"],
           ignores: ["**/*.test.ts", "**/test-helpers/**"],
           rules: {
             "blazetrails/class-to-string-seat": "error",
@@ -678,7 +678,7 @@ export default defineConfig(
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/arel/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -919,7 +919,7 @@ export default defineConfig(
       "packages/arel/{lib,test}/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
     ],
     rules: {
       // `warn`, not `error`: `.toArray()` is the established relation
@@ -1121,7 +1121,7 @@ export default defineConfig(
 
   // ── activesupport ──
   {
-    files: ["packages/activesupport/src/**/*.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-this-alias": "off",
@@ -1131,7 +1131,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/activesupport/src/**/*.test.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-unused-expressions": "off",
     },

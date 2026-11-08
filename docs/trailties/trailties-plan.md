@@ -339,7 +339,7 @@ when 3–4 target helpers gain the required setter surface.
 
 - Migrate AR + actionpack `trailtie.ts` files from `extends BaseRailtie from
 "@blazetrails/activesupport"` to `@blazetrails/trailties` `Trailtie`;
-  delete `packages/activesupport/src/railtie.ts`. Blocked on B1.
+  delete `packages/activesupport/lib/railtie.ts`. Blocked on B1.
 
 ---
 
@@ -355,7 +355,7 @@ when 3–4 target helpers gain the required setter surface.
 - **GCM in `MessageEncryptor`** (~150 LOC): flip `EncryptedFile.CIPHER` to
   `aes-128-gcm`. `crypto-adapter.ts` already exposes optional `getAuthTag()`.
 - **`ActiveSupport::Messages::Codec` port** (~250 LOC): `Codec.with(default_serializer:)`
-  global flip. Some infrastructure already exists at `packages/activesupport/src/messages/`.
+  global flip. Some infrastructure already exists at `packages/activesupport/lib/messages/`.
 
 ---
 

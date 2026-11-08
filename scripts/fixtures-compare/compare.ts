@@ -12,7 +12,7 @@ import {
   pluralize,
   singularize,
   underscore,
-} from "../../packages/activesupport/src/index.js";
+} from "../../packages/activesupport/lib/index.js";
 import { parse as tseParse } from "../../packages/tse-compiler/lib/index.js";
 import {
   ARUNIT2_SCHEMA,

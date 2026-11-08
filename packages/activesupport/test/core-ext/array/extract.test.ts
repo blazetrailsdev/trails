@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { extractBang } from "../../../lib/index.js";
+
+describe("ExtractTest", () => {
+  it("extract", () => {
+    const numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const arrayId = numbers;
+
+    const oddNumbers = extractBang(numbers, (n) => n % 2 !== 0);
+
+    expect(oddNumbers).toEqual([1, 3, 5, 7, 9]);
+    expect(numbers).toEqual([0, 2, 4, 6, 8]);
+    expect(numbers).toBe(arrayId);
+  });
+
+  it("extract without block", () => {
+    const numbers = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const arrayId = numbers;
+
+    let error: unknown;
+    try {
+      (extractBang as (array: number[]) => number[])(numbers);
+    } catch (e) {
+      error = e;
+    }
+
+    expect(error).toBeInstanceOf(TypeError);
+    expect(numbers.length).toBe(10);
+
+    const oddNumbers = extractBang(numbers, (n) => n % 2 !== 0);
+
+    expect(oddNumbers).toEqual([1, 3, 5, 7, 9]);
+    expect(numbers).toEqual([0, 2, 4, 6, 8]);
+    expect(numbers).toBe(arrayId);
+  });
+
+  it("extract on empty array", () => {
+    const emptyArray: number[] = [];
+    const arrayId = emptyArray;
+
+    const newEmptyArray = extractBang(emptyArray, () => false);
+
+    expect(newEmptyArray).toEqual([]);
+    expect(emptyArray).toEqual([]);
+    expect(emptyArray).toBe(arrayId);
+  });
+});

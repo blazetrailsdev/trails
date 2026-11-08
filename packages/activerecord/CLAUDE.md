@@ -21,7 +21,7 @@ In trails the query is `await`ed, and that costs four shapes Rails has no
 counterpart for:
 
 - **`applyThenable`** (`relation/thenable.ts`) **/ `stripThenable`**
-  (`activesupport/src/strip-thenable.ts`). `await rel` has to evaluate the
+  (`activesupport/lib/strip-thenable.ts`). `await rel` has to evaluate the
   relation, so `Relation.prototype` carries `then` / `catch` / `finally`
   forwarding to `toArray()`. JS unwraps a thenable _returned_ from an `async`
   body, so a builder returning a relation would evaluate it; `stripThenable` is

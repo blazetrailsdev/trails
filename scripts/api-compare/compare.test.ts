@@ -2501,7 +2501,7 @@ describe("selectMisplacedFile", () => {
   it("never resolves onto the package barrel", () => {
     // The barrel re-exports the whole package, so it out-hits every real file
     // and would clear all three thresholds. It is a re-export site, not a port
-    // location — PR #6225's `acts_like.rb ↦ activesupport/src/index.ts`.
+    // location — PR #6225's `acts_like.rb ↦ activesupport/lib/index.ts`.
     expect(selectMisplacedFile(hits(["index.ts", 8], ["a.ts", 1]), 10)).toBeNull();
   });
 
@@ -2578,7 +2578,7 @@ describe("buildEntitiesByName", () => {
   });
 
   it("does not add dep-package entities for a package with no blazetrails deps (e.g. activesupport)", () => {
-    const concern = cls("packages/activesupport/src/concern.ts", "Concern");
+    const concern = cls("packages/activesupport/lib/concern.ts", "Concern");
     const ts = makeManifest({
       activesupport: { classes: { Concern: concern } },
       activemodel: { classes: { Model: cls("packages/activemodel/src/model.ts", "Model") } },

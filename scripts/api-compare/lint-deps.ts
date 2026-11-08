@@ -721,7 +721,7 @@ export function isUnportedRubyRef(ref: string): boolean {
  * The spellings a TS ref may answer a Ruby dep ref by: its leaf constant, or
  * the whole path joined, which is how a constant whose leaf is a JS global is
  * exported (`ActiveSupport::JSON` is `ActiveSupportJSON`,
- * activesupport/src/json.ts).
+ * activesupport/lib/json.ts).
  */
 export function rubyRefSpellings(ref: string): string[] {
   const leaf = normalizeRubyRef(ref);

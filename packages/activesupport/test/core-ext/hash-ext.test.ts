@@ -1,0 +1,1217 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { extractBang, sliceBang } from "../../lib/core-ext/hash/slice.js";
+import { RuntimeError } from "../../lib/rexml/document.js";
+import * as XmlMini from "../../lib/xml-mini.js";
+import * as XmlMini_REXML from "../../lib/xml-mini/rexml.js";
+import * as XmlMini_Nokogiri from "../../lib/xml-mini/nokogiri.js";
+import * as XmlMini_NokogiriSAX from "../../lib/xml-mini/nokogirisax.js";
+import {
+  assertNothingRaised,
+  assertRaise,
+  assertRaises,
+  assertPredicate,
+  assertRespondTo,
+  assertNil,
+} from "../../lib/testing/assertions.js";
+import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
+import { BigDecimal } from "../../lib/core-ext/big-decimal/conversions.js";
+import { DisallowedType, XMLConverter } from "../../lib/core-ext/hash/conversions.js";
+
+import * as HashExt from "../../lib/hash-utils.js";
+import { ArgumentError, FrozenError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  fromXml,
+  deepMerge,
+  deepMergeBang,
+  exceptBang,
+  deepTransformKeys,
+  deepTransformValues,
+  deepDup,
+  symbolizeKeys,
+  stringifyKeys,
+  deepSymbolizeKeys,
+  symbolizeKeysBang,
+  deepSymbolizeKeysBang,
+  deepStringifyKeys,
+  reverseMerge,
+  reverseMergeBang,
+  reverseUpdate,
+  withDefaults,
+  withDefaultsBang,
+  deepTransformKeysBang,
+  deepTransformValuesBang,
+  stringifyKeysBang,
+  deepStringifyKeysBang,
+  assertValidKeys,
+  toParam,
+  toXml,
+  fromTrustedXml,
+} from "../../lib/hash-utils.js";
+import { Hash } from "@blazetrails/ruby-compat";
+
+describe("HashExtTest", () => {
+  const strings = () => ({ a: 1, b: 2 });
+  const nestedStrings = () => ({ a: { b: { c: 3 } } });
+  const symbols = () => ({ ":a": 1, ":b": 2 });
+  const nestedSymbols = () => ({ ":a": { ":b": { ":c": 3 } } });
+  const mixed = () => ({ ":a": 1, b: 2 });
+  const nestedMixed = () => ({ a: { ":b": { c: 3 } } });
+  const stringArrayOfHashes = () => ({ a: [{ b: 2 }, { c: 3 }, 4] });
+  const symbolArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { ":c": 3 }, 4] });
+  const mixedArrayOfHashes = () => ({ ":a": [{ ":b": 2 }, { c: 3 }, 4] });
+  const integers = () =>
+    new Map<unknown, unknown>([
+      [0, 1],
+      [1, 2],
+    ]);
+  const nestedIntegers = () => new Map<unknown, unknown>([[0, new Map([[1, new Map([[2, 3]])]])]]);
+  const illegalSymbols = () => new Map<unknown, unknown>([[[], 3]]);
+  const nestedIllegalSymbols = () => new Map<unknown, unknown>([[[], new Map([[[], 3]])]]);
+  const upcaseStrings = () => ({ A: 1, B: 2 });
+  const nestedUpcaseStrings = () => ({ A: { B: { C: 3 } } });
+  const upcaseArrayOfHashes = () => ({ A: [{ B: 2 }, { C: 3 }, 4] });
+  const upcase = (key: string) => (isSymbol(key) ? symbolToS(key) : String(key)).toUpperCase();
+  it("methods", () => {
+    const h = HashExt;
+    assertRespondTo(h, "deepTransformKeys");
+    assertRespondTo(h, "deepTransformKeysBang");
+    assertRespondTo(h, "deepTransformValues");
+    assertRespondTo(h, "deepTransformValuesBang");
+    assertRespondTo(h, "symbolizeKeys");
+    assertRespondTo(h, "symbolizeKeysBang");
+    assertRespondTo(h, "deepSymbolizeKeys");
+    assertRespondTo(h, "deepSymbolizeKeysBang");
+    assertRespondTo(h, "stringifyKeys");
+    assertRespondTo(h, "stringifyKeysBang");
+    assertRespondTo(h, "deepStringifyKeys");
+    assertRespondTo(h, "deepStringifyKeysBang");
+    assertRespondTo(h, "toOptions");
+    assertRespondTo(h, "toOptionsBang");
+    assertRespondTo(h, "exceptBang");
+  });
+
+  it("deep transform keys", () => {
+    expect(deepTransformKeys(nestedSymbols(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(nestedStrings(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(nestedMixed(), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeys(stringArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
+    expect(deepTransformKeys(symbolArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
+    expect(deepTransformKeys(mixedArrayOfHashes(), upcase)).toEqual(upcaseArrayOfHashes());
+  });
+
+  it("deep transform keys not mutates", () => {
+    const original = { a: { b: 1 } };
+    deepTransformKeys(original, (k) => k.toUpperCase());
+    expect(original).toEqual({ a: { b: 1 } });
+  });
+
+  it("deep transform keys!", () => {
+    expect(deepTransformKeysBang(deepDup(nestedSymbols()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(nestedStrings()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(nestedMixed()), upcase)).toEqual(nestedUpcaseStrings());
+    expect(deepTransformKeysBang(deepDup(stringArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
+    expect(deepTransformKeysBang(deepDup(symbolArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
+    expect(deepTransformKeysBang(deepDup(mixedArrayOfHashes()), upcase)).toEqual(
+      upcaseArrayOfHashes(),
+    );
+  });
+
+  it("deep transform keys with bang mutates", () => {
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepTransformKeysBang(transformedHash, upcase);
+    expect(transformedHash).toEqual(nestedUpcaseStrings());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
+  });
+
+  it("deep transform values", () => {
+    expect(deepTransformValues(strings(), (value) => String(value))).toEqual({ a: "1", b: "2" });
+    expect(deepTransformValues(nestedStrings(), (value) => String(value))).toEqual({
+      a: { b: { c: "3" } },
+    });
+    expect(deepTransformValues(stringArrayOfHashes(), (value) => String(value))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
+  });
+
+  it("deep transform values not mutates", () => {
+    const original = { a: 1, b: 2 };
+    deepTransformValues(original, (v) => (v as number) * 2);
+    expect(original).toEqual({ a: 1, b: 2 });
+  });
+
+  it("deep transform values!", () => {
+    expect(deepTransformValuesBang(strings(), (value) => String(value))).toEqual({
+      a: "1",
+      b: "2",
+    });
+    expect(deepTransformValuesBang(nestedStrings(), (value) => String(value))).toEqual({
+      a: { b: { c: "3" } },
+    });
+    expect(deepTransformValuesBang(stringArrayOfHashes(), (value) => String(value))).toEqual({
+      a: [{ b: "2" }, { c: "3" }, "4"],
+    });
+  });
+
+  it("deep transform values with bang mutates", () => {
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepTransformValuesBang(transformedHash, (value) => String(value));
+    expect(transformedHash).toEqual({ a: { ":b": { c: "3" } } });
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
+  });
+
+  it("symbolize keys", () => {
+    expect(symbolizeKeys(symbols())).toEqual(symbols());
+    expect(symbolizeKeys(strings())).toEqual(symbols());
+    expect(symbolizeKeys(mixed())).toEqual(symbols());
+  });
+
+  it("symbolize keys not mutates", () => {
+    const obj = { a: 1 };
+    symbolizeKeys(obj);
+    expect(obj).toEqual({ a: 1 });
+  });
+
+  it("deep symbolize keys", () => {
+    expect(deepSymbolizeKeys(nestedSymbols())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(nestedStrings())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(nestedMixed())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeys(stringArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeys(symbolArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeys(mixedArrayOfHashes())).toEqual(symbolArrayOfHashes());
+  });
+
+  it("deep symbolize keys not mutates", () => {
+    const obj = { a: { b: 1 } };
+    deepSymbolizeKeys(obj);
+    expect(obj).toEqual({ a: { b: 1 } });
+  });
+
+  it("symbolize keys!", () => {
+    expect(symbolizeKeysBang(symbols())).toEqual(symbols());
+    expect(symbolizeKeysBang(strings())).toEqual(symbols());
+    expect(symbolizeKeysBang(mixed())).toEqual(symbols());
+  });
+
+  it("symbolize keys with bang mutates", () => {
+    const original = mixed();
+    const transformedHash = { ...original };
+    deepSymbolizeKeysBang(transformedHash);
+    expect(transformedHash).toEqual(symbols());
+    expect(original).toEqual({ ":a": 1, b: 2 });
+  });
+
+  it("deep symbolize keys!", () => {
+    expect(deepSymbolizeKeysBang(nestedSymbols())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(nestedStrings())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(nestedMixed())).toEqual(nestedSymbols());
+    expect(deepSymbolizeKeysBang(stringArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeysBang(symbolArrayOfHashes())).toEqual(symbolArrayOfHashes());
+    expect(deepSymbolizeKeysBang(mixedArrayOfHashes())).toEqual(symbolArrayOfHashes());
+  });
+
+  it("deep symbolize keys with bang mutates", () => {
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepSymbolizeKeysBang(transformedHash);
+    expect(transformedHash).toEqual(nestedSymbols());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
+  });
+
+  it("symbolize keys preserves keys that cant be symbolized", () => {
+    expect(symbolizeKeys(illegalSymbols() as never)).toEqual(illegalSymbols());
+    expect(symbolizeKeysBang(illegalSymbols() as never)).toEqual(illegalSymbols());
+  });
+
+  it("deep symbolize keys preserves keys that cant be symbolized", () => {
+    expect(deepSymbolizeKeys(nestedIllegalSymbols())).toEqual(nestedIllegalSymbols());
+    expect(deepSymbolizeKeysBang(nestedIllegalSymbols() as never)).toEqual(nestedIllegalSymbols());
+  });
+
+  it("symbolize keys preserves integer keys", () => {
+    expect(symbolizeKeys(integers() as never)).toEqual(integers());
+    expect(symbolizeKeysBang(integers() as never)).toEqual(integers());
+  });
+
+  it("deep symbolize keys preserves integer keys", () => {
+    expect(deepSymbolizeKeys(nestedIntegers())).toEqual(nestedIntegers());
+    expect(deepSymbolizeKeysBang(nestedIntegers() as never)).toEqual(nestedIntegers());
+  });
+
+  it("stringify keys", () => {
+    expect(stringifyKeys(symbols())).toEqual(strings());
+    expect(stringifyKeys(strings())).toEqual(strings());
+    expect(stringifyKeys(mixed())).toEqual(strings());
+  });
+
+  it("stringify keys not mutates", () => {
+    const transformedHash = mixed();
+    stringifyKeys(transformedHash);
+    expect(transformedHash).toEqual(mixed());
+  });
+
+  it("deep stringify keys", () => {
+    expect(deepStringifyKeys(nestedSymbols())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(nestedStrings())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(nestedMixed())).toEqual(nestedStrings());
+    expect(deepStringifyKeys(stringArrayOfHashes())).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeys(symbolArrayOfHashes())).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeys(mixedArrayOfHashes())).toEqual(stringArrayOfHashes());
+  });
+
+  it("deep stringify keys not mutates", () => {
+    const transformedHash = deepDup(nestedMixed());
+    deepStringifyKeys(transformedHash);
+    expect(transformedHash).toEqual(nestedMixed());
+  });
+
+  it("stringify keys!", () => {
+    expect(stringifyKeysBang(symbols())).toEqual(strings());
+    expect(stringifyKeysBang(strings())).toEqual(strings());
+    expect(stringifyKeysBang(mixed())).toEqual(strings());
+  });
+
+  it("stringify keys with bang mutates", () => {
+    const original = mixed();
+    const transformedHash = { ...original };
+    stringifyKeysBang(transformedHash);
+    expect(transformedHash).toEqual(strings());
+    expect(original).toEqual({ ":a": 1, b: 2 });
+  });
+
+  it("deep stringify keys!", () => {
+    expect(deepStringifyKeysBang(deepDup(nestedSymbols()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(nestedStrings()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(nestedMixed()))).toEqual(nestedStrings());
+    expect(deepStringifyKeysBang(deepDup(stringArrayOfHashes()))).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeysBang(deepDup(symbolArrayOfHashes()))).toEqual(stringArrayOfHashes());
+    expect(deepStringifyKeysBang(deepDup(mixedArrayOfHashes()))).toEqual(stringArrayOfHashes());
+  });
+
+  it("deep stringify keys with bang mutates", () => {
+    const original = nestedMixed();
+    const transformedHash = deepDup(original);
+    deepStringifyKeysBang(transformedHash);
+    expect(transformedHash).toEqual(nestedStrings());
+    expect(original).toEqual({ a: { ":b": { c: 3 } } });
+  });
+
+  it("assert valid keys", async () => {
+    await assertNothingRaised(() => {
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny"]);
+      assertValidKeys({ failure: "stuff", funny: "business" }, "failure", "funny");
+    });
+    await assertNothingRaised(() => {
+      assertValidKeys({ failure: "stuff", funny: "business" }, ["failure", "funny", "sunny"]);
+      assertValidKeys({ failure: "stuff", funny: "business" }, "failure", "funny", "sunny");
+    });
+
+    let exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure, :funny");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, "failure", "funny");
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure, :funny");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure"]);
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure");
+
+    exception = await assertRaise([ArgumentError], {}, () => {
+      assertValidKeys({ failore: "stuff", funny: "business" }, "failure");
+    });
+    expect(exception.message).toEqual("Unknown key: :failore. Valid keys are: :failure");
+  });
+
+  it("deep merge", () => {
+    const hash1 = { a: "a", b: "b", c: { c1: "c1", c2: "c2", c3: { d1: "d1" } } };
+    const hash2 = { a: 1, c: { c1: 2, c3: { d2: "d2" } } };
+    const expected = { a: 1, b: "b", c: { c1: 2, c2: "c2", c3: { d1: "d1", d2: "d2" } } };
+    expect(deepMerge(hash1, hash2)).toEqual(expected);
+
+    deepMergeBang(hash1, hash2);
+    expect(hash1).toEqual(expected);
+  });
+
+  it("deep merge with block", () => {
+    const hash1 = {
+      ":a": "a",
+      ":b": "b",
+      ":c": { ":c1": "c1", ":c2": "c2", ":c3": { ":d1": "d1" } },
+    };
+    const hash2 = { ":a": 1, ":c": { ":c1": 2, ":c3": { ":d2": "d2" } } };
+    const expected = {
+      ":a": [":a", "a", 1],
+      ":b": "b",
+      ":c": { ":c1": [":c1", "c1", 2], ":c2": "c2", ":c3": { ":d1": "d1", ":d2": "d2" } },
+    };
+    expect(deepMerge(hash1, hash2, (k, o, n) => [k, o, n])).toEqual(expected);
+
+    deepMergeBang(hash1, hash2, (k, o, n) => [k, o, n]);
+    expect(hash1).toEqual(expected);
+  });
+
+  it("deep merge with falsey values", () => {
+    const a = { x: true, y: 1 };
+    const b = { x: false, y: 0 };
+    const result = deepMerge(a, b);
+    expect(result.x).toBe(false);
+    expect(result.y).toBe(0);
+  });
+
+  it("reverse merge", () => {
+    const defaults = Object.freeze({ ":d": 0, ":a": "x", ":b": "y", ":c": 10 });
+    const options = { ":a": 1, ":b": 2 };
+    const expected = { ":d": 0, ":a": 1, ":b": 2, ":c": 10 };
+
+    expect(reverseMerge(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    let merged = { ...options };
+    expect(reverseMergeBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+
+    expect(Object.keys(merged)).toEqual(Object.keys(expected));
+
+    merged = { ...options };
+    expect(reverseUpdate(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("with defaults aliases reverse merge", () => {
+    const defaults = Object.freeze({ ":a": "x", ":b": "y", ":c": 10 });
+    const options = { ":a": 1, ":b": 2 };
+    const expected = { ":a": 1, ":b": 2, ":c": 10 };
+
+    expect(withDefaults(options, defaults)).toEqual(expected);
+    expect(options).not.toEqual(expected);
+
+    const merged = { ...options };
+    expect(withDefaultsBang(merged, defaults)).toEqual(expected);
+    expect(merged).toEqual(expected);
+  });
+
+  it("slice inplace", () => {
+    const original: Record<string, unknown> = { a: "x", b: "y", c: 10 };
+    const expectedReturn = { c: 10 };
+    const expectedOriginal = { a: "x", b: "y" };
+
+    expect(sliceBang(original, "a", "b")).toEqual(expectedReturn);
+
+    expect(original).toEqual(expectedOriginal);
+  });
+
+  it("slice inplace with an array key", () => {
+    const arrayKey = ["a", "b"];
+    const original = new Hash<unknown, unknown>();
+    original.set("a", "x");
+    original.set("b", "y");
+    original.set("c", 10);
+    original.set(arrayKey, "an array key");
+    const expected = new Hash<unknown, unknown>();
+    expected.set("a", "x");
+    expected.set("b", "y");
+
+    expect(sliceBang(original, arrayKey, "c")).toEqual(expected);
+  });
+
+  it("slice bang does not override default", () => {
+    const hash = new Hash<string, number>(0);
+    hash.set("a", 1);
+    hash.set("b", 2);
+
+    sliceBang(hash, "a");
+
+    expect(hash.get("c")).toBe(0);
+  });
+
+  it("slice bang does not override default proc", () => {
+    const hash = new Hash<string, unknown>((h: Hash<string, unknown>, k: string) => {
+      h.set(k, []);
+      return h.get(k);
+    });
+    hash.set("a", 1);
+    hash.set("b", 2);
+
+    sliceBang(hash, "a");
+
+    expect(hash.get("c")).toEqual([]);
+  });
+
+  it("extract", () => {
+    const h = { a: 1, b: 2, c: 3 };
+    const extracted = extractBang(h, "a", "b");
+    expect(extracted).toEqual({ a: 1, b: 2 });
+    expect(h).toEqual({ c: 3 });
+  });
+
+  it("extract nils", () => {
+    const original: Record<string, unknown> = { a: null, b: null };
+    const expected = { a: null };
+    const remaining = { b: null };
+    const extracted: Record<string, unknown> = extractBang(original, "a", "x");
+
+    expect(extracted).toEqual(expected);
+    assertNil(extracted["a"]);
+    expect(extracted["x"]).toBeUndefined();
+    expect(original).toEqual(remaining);
+  });
+
+  it("except", () => {
+    const original = { a: "x", b: "y", c: 10 };
+    const expected = { a: "x", b: "y" };
+
+    expect(exceptBang(original, "c")).toEqual(expected);
+    expect(original).toEqual(expected);
+  });
+
+  it("except with more than one argument", () => {
+    const original = { a: "x", b: "y", c: 10 };
+    const expected = { a: "x" };
+
+    expect(exceptBang(original, "b", "c")).toEqual(expected);
+    expect(original).toEqual(expected);
+  });
+
+  it("except with original frozen", async () => {
+    const original = Object.freeze({ ":a": "x", ":b": "y" });
+    await assertRaise([FrozenError], {}, () => exceptBang(original, ":a"));
+  });
+});
+class ToParam extends String {
+  toParam(): string {
+    return `${this}-1`;
+  }
+}
+
+describe("HashExtToParamTests", () => {
+  it("string hash", () => {
+    expect(toParam({})).toBe("");
+    expect(toParam({ hello: "world" })).toBe("hello=world");
+    expect(toParam({ hello: 10 })).toBe("hello=10");
+    expect(toParam({ hello: "world", say_bye: true })).toBe("hello=world&say_bye=true");
+  });
+
+  it("number hash", () => {
+    expect(toParam({ 10: 20, 30: 40, 50: 60 })).toBe("10=20&30=40&50=60");
+  });
+
+  it("to param hash", () => {
+    const hash = new Hash<ToParam, ToParam>();
+    hash.set(new ToParam("custom"), new ToParam("param"));
+    hash.set(new ToParam("custom2"), new ToParam("param2"));
+    expect(toParam(hash)).toBe("custom-1=param-1&custom2-1=param2-1");
+  });
+
+  it("to param hash escapes its keys and values", () => {
+    expect(toParam({ "param 1": "A string with / characters & that should be ? escaped" })).toBe(
+      "param+1=A+string+with+%2F+characters+%26+that+should+be+%3F+escaped",
+    );
+  });
+
+  it("to param orders by key in ascending order", () => {
+    expect(toParam({ b: "1", c: "0", a: "2" })).toBe("a=2&b=1&c=0");
+  });
+});
+
+async function runWithGem(
+  gemName: string,
+  block: (gem: Record<string, any>) => void,
+): Promise<void> {
+  let gem: Record<string, any>;
+  try {
+    gem = await import(gemName);
+  } catch (e) {
+    if (
+      !(
+        e instanceof Error &&
+        (e as { code?: string }).code === "ERR_MODULE_NOT_FOUND" &&
+        e.message.includes(gemName)
+      )
+    ) {
+      throw e;
+    }
+    return;
+  }
+  block(gem);
+}
+
+let nokogiriSyntaxError: (new (...args: any[]) => Error) | undefined;
+
+class IWriteMyOwnXML {
+  toXml(options: XmlMini.ToXmlOptions): void {
+    options.indent ??= 2;
+    const xml = (options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent));
+    if (!options.skipInstruct) xml.instruct();
+    xml.openTag("level_one");
+    xml.tag("second_level", "content");
+    xml.closeTag("level_one");
+  }
+}
+
+function hashToXmlTests(engine: string): void {
+  describe("HashToXmlTest", () => {
+    let defaultBackend: XmlMini.XmlMiniBackend | null | undefined;
+    let xmlOptions: XmlMini.ToXmlOptions;
+
+    beforeEach(() => {
+      xmlOptions = { root: "person", skipInstruct: true, indent: 0 };
+    });
+
+    beforeEach(async () => {
+      defaultBackend = XmlMini.backend();
+      await XmlMini.setBackend(engine);
+    });
+
+    afterEach(async () => {
+      await XmlMini.setBackend(defaultBackend);
+    });
+
+    it("one level", () => {
+      const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions);
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street>Paulina</street>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("one level dasherize false", () => {
+      const xml = toXml(
+        { name: "David", street_name: "Paulina" },
+        { ...xmlOptions, dasherize: false },
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street_name>Paulina</street_name>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("one level dasherize true", () => {
+      const xml = toXml(
+        { name: "David", street_name: "Paulina" },
+        { ...xmlOptions, dasherize: true },
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street-name>Paulina</street-name>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("one level camelize true", () => {
+      const xml = toXml(
+        { name: "David", street_name: "Paulina" },
+        { ...xmlOptions, camelize: true },
+      );
+      expect(xml.slice(0, 8)).toBe("<Person>");
+      expect(xml).toContain("<StreetName>Paulina</StreetName>");
+      expect(xml).toContain("<Name>David</Name>");
+    });
+
+    it("one level camelize lower", () => {
+      const xml = toXml(
+        { name: "David", street_name: "Paulina" },
+        { ...xmlOptions, camelize: "lower" },
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<streetName>Paulina</streetName>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("one level with types", () => {
+      const xml = toXml(
+        {
+          name: "David",
+          street: "Paulina",
+          age: 26,
+          age_in_millis: 820497600000,
+          moved_on: RubyDate.civil(2005, 11, 15),
+          resident: ":yes",
+        },
+        xmlOptions,
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street>Paulina</street>");
+      expect(xml).toContain("<name>David</name>");
+      expect(xml).toContain('<age type="integer">26</age>');
+      expect(xml).toContain('<age-in-millis type="integer">820497600000</age-in-millis>');
+      expect(xml).toContain('<moved-on type="date">2005-11-15</moved-on>');
+      expect(xml).toContain('<resident type="symbol">yes</resident>');
+    });
+
+    it("one level with nils", () => {
+      const xml = toXml({ name: "David", street: "Paulina", age: null }, xmlOptions);
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street>Paulina</street>");
+      expect(xml).toContain("<name>David</name>");
+      expect(xml).toContain('<age nil="true"/>');
+    });
+
+    it("one level with skipping types", () => {
+      const xml = toXml(
+        { name: "David", street: "Paulina", age: null },
+        { ...xmlOptions, skipTypes: true },
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street>Paulina</street>");
+      expect(xml).toContain("<name>David</name>");
+      expect(xml).toContain('<age nil="true"/>');
+    });
+
+    it("one level with yielding", () => {
+      const xml = toXml({ name: "David", street: "Paulina" }, xmlOptions, (x) => {
+        x.tag("creator", "Rails");
+      });
+
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<street>Paulina</street>");
+      expect(xml).toContain("<name>David</name>");
+      expect(xml).toContain("<creator>Rails</creator>");
+    });
+
+    it("two levels", () => {
+      const xml = toXml({ name: "David", address: { street: "Paulina" } }, xmlOptions);
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<address><street>Paulina</street></address>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("two levels with second level overriding to xml", () => {
+      const xml = toXml(
+        { name: "David", address: { street: "Paulina" }, child: new IWriteMyOwnXML() },
+        xmlOptions,
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain("<address><street>Paulina</street></address>");
+      expect(xml).toContain("<level_one><second_level>content</second_level></level_one>");
+    });
+
+    it("two levels with array", () => {
+      const xml = toXml(
+        { name: "David", addresses: [{ street: "Paulina" }, { street: "Evergreen" }] },
+        xmlOptions,
+      );
+      expect(xml.slice(0, 8)).toBe("<person>");
+      expect(xml).toContain('<addresses type="array"><address>');
+      expect(xml).toContain("<address><street>Paulina</street></address>");
+      expect(xml).toContain("<address><street>Evergreen</street></address>");
+      expect(xml).toContain("<name>David</name>");
+    });
+
+    it("three levels with array", () => {
+      const xml = toXml(
+        { name: "David", addresses: [{ streets: [{ name: "Paulina" }, { name: "Paulina" }] }] },
+        xmlOptions,
+      );
+      expect(xml).toContain(
+        '<addresses type="array"><address><streets type="array"><street><name>',
+      );
+    });
+
+    it("multiple records from xml with attributes other than type ignores them without exploding", async () => {
+      const topicsXml = `
+      <topics type="array" page="1" page-count="1000" per-page="2">
+        <topic>
+          <title>The First Topic</title>
+          <author-name>David</author-name>
+          <id type="integer">1</id>
+          <approved type="boolean">false</approved>
+          <replies-count type="integer">0</replies-count>
+          <replies-close-in type="integer">2592000000</replies-close-in>
+          <written-on type="date">2003-07-16</written-on>
+          <viewed-at type="datetime">2003-07-16T09:28:00+0000</viewed-at>
+          <content>Have a nice day</content>
+          <author-email-address>david@loudthinking.com</author-email-address>
+          <parent-id nil="true"></parent-id>
+        </topic>
+        <topic>
+          <title>The Second Topic</title>
+          <author-name>Jason</author-name>
+          <id type="integer">1</id>
+          <approved type="boolean">false</approved>
+          <replies-count type="integer">0</replies-count>
+          <replies-close-in type="integer">2592000000</replies-close-in>
+          <written-on type="date">2003-07-16</written-on>
+          <viewed-at type="datetime">2003-07-16T09:28:00+0000</viewed-at>
+          <content>Have a nice day</content>
+          <author-email-address>david@loudthinking.com</author-email-address>
+          <parent-id></parent-id>
+        </topic>
+      </topics>
+    `;
+
+      const expectedTopicHash = stringifyKeys({
+        title: "The First Topic",
+        author_name: "David",
+        id: 1,
+        approved: false,
+        replies_count: 0,
+        replies_close_in: 2592000000,
+        written_on: RubyDate.civil(2003, 7, 16),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
+        content: "Have a nice day",
+        author_email_address: "david@loudthinking.com",
+        parent_id: null,
+      });
+
+      expect(((await fromXml(topicsXml)) as any)["topics"][0]).toEqual(expectedTopicHash);
+    });
+
+    it("single record from xml", async () => {
+      const topicXml = `
+      <topic>
+        <title>The First Topic</title>
+        <author-name>David</author-name>
+        <id type="integer">1</id>
+        <approved type="boolean"> true </approved>
+        <replies-count type="integer">0</replies-count>
+        <replies-close-in type="integer">2592000000</replies-close-in>
+        <written-on type="date">2003-07-16</written-on>
+        <viewed-at type="datetime">2003-07-16T09:28:00+0000</viewed-at>
+        <author-email-address>david@loudthinking.com</author-email-address>
+        <parent-id></parent-id>
+        <ad-revenue type="decimal">1.5</ad-revenue>
+        <optimum-viewing-angle type="float">135</optimum-viewing-angle>
+      </topic>
+    `;
+
+      const expectedTopicHash = stringifyKeys({
+        title: "The First Topic",
+        author_name: "David",
+        id: 1,
+        approved: true,
+        replies_count: 0,
+        replies_close_in: 2592000000,
+        written_on: RubyDate.civil(2003, 7, 16),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
+        author_email_address: "david@loudthinking.com",
+        parent_id: null,
+        ad_revenue: new BigDecimal("1.50"),
+        optimum_viewing_angle: 135.0,
+      });
+
+      expect(((await fromXml(topicXml)) as any)["topic"]).toEqual(expectedTopicHash);
+    });
+
+    it("single record from xml with nil values", async () => {
+      const topicXml = `
+      <topic>
+        <title></title>
+        <id type="integer"></id>
+        <approved type="boolean"></approved>
+        <written-on type="date"></written-on>
+        <viewed-at type="datetime"></viewed-at>
+        <parent-id></parent-id>
+      </topic>
+    `;
+
+      const expectedTopicHash = stringifyKeys({
+        title: null,
+        id: null,
+        approved: null,
+        written_on: null,
+        viewed_at: null,
+        parent_id: null,
+      });
+
+      expect(((await fromXml(topicXml)) as any)["topic"]).toEqual(expectedTopicHash);
+    });
+
+    it("multiple records from xml", async () => {
+      const topicsXml = `
+      <topics type="array">
+        <topic>
+          <title>The First Topic</title>
+          <author-name>David</author-name>
+          <id type="integer">1</id>
+          <approved type="boolean">false</approved>
+          <replies-count type="integer">0</replies-count>
+          <replies-close-in type="integer">2592000000</replies-close-in>
+          <written-on type="date">2003-07-16</written-on>
+          <viewed-at type="datetime">2003-07-16T09:28:00+0000</viewed-at>
+          <content>Have a nice day</content>
+          <author-email-address>david@loudthinking.com</author-email-address>
+          <parent-id nil="true"></parent-id>
+        </topic>
+        <topic>
+          <title>The Second Topic</title>
+          <author-name>Jason</author-name>
+          <id type="integer">1</id>
+          <approved type="boolean">false</approved>
+          <replies-count type="integer">0</replies-count>
+          <replies-close-in type="integer">2592000000</replies-close-in>
+          <written-on type="date">2003-07-16</written-on>
+          <viewed-at type="datetime">2003-07-16T09:28:00+0000</viewed-at>
+          <content>Have a nice day</content>
+          <author-email-address>david@loudthinking.com</author-email-address>
+          <parent-id></parent-id>
+        </topic>
+      </topics>
+    `;
+
+      const expectedTopicHash = stringifyKeys({
+        title: "The First Topic",
+        author_name: "David",
+        id: 1,
+        approved: false,
+        replies_count: 0,
+        replies_close_in: 2592000000,
+        written_on: RubyDate.civil(2003, 7, 16),
+        viewed_at: RubyTime.utc(2003, 7, 16, 9, 28),
+        content: "Have a nice day",
+        author_email_address: "david@loudthinking.com",
+        parent_id: null,
+      });
+
+      expect(((await fromXml(topicsXml)) as any)["topics"][0]).toEqual(expectedTopicHash);
+    });
+
+    it("single record from xml with attributes other than type", async () => {
+      const topicXml = `
+    <rsp stat="ok">
+      <photos page="1" pages="1" perpage="100" total="16">
+        <photo id="175756086" owner="55569174@N00" secret="0279bf37a1" server="76" title="Colored Pencil PhotoBooth Fun" ispublic="1" isfriend="0" isfamily="0"/>
+      </photos>
+    </rsp>
+    `;
+
+      const expectedTopicHash = stringifyKeys({
+        id: "175756086",
+        owner: "55569174@N00",
+        secret: "0279bf37a1",
+        server: "76",
+        title: "Colored Pencil PhotoBooth Fun",
+        ispublic: "1",
+        isfriend: "0",
+        isfamily: "0",
+      });
+
+      expect(((await fromXml(topicXml)) as any)["rsp"]["photos"]["photo"]).toEqual(
+        expectedTopicHash,
+      );
+    });
+
+    it("all caps key from xml", async () => {
+      const testXml = `
+      <ABC3XYZ>
+        <TEST>Lorem Ipsum</TEST>
+      </ABC3XYZ>
+    `;
+
+      const expectedHash = {
+        ABC3XYZ: {
+          TEST: "Lorem Ipsum",
+        },
+      };
+
+      expect(await fromXml(testXml)).toEqual(expectedHash);
+    });
+
+    it("empty array from xml", async () => {
+      const blogXml = `
+      <blog>
+        <posts type="array"></posts>
+      </blog>
+    `;
+      const expectedBlogHash = { blog: { posts: [] } };
+      expect(await fromXml(blogXml)).toEqual(expectedBlogHash);
+    });
+
+    it("empty array with whitespace from xml", async () => {
+      const blogXml = `
+      <blog>
+        <posts type="array">
+        </posts>
+      </blog>
+    `;
+      const expectedBlogHash = { blog: { posts: [] } };
+      expect(await fromXml(blogXml)).toEqual(expectedBlogHash);
+    });
+
+    it("array with one entry from xml", async () => {
+      const blogXml = `
+      <blog>
+        <posts type="array">
+          <post>a post</post>
+        </posts>
+      </blog>
+    `;
+      const expectedBlogHash = { blog: { posts: ["a post"] } };
+      expect(await fromXml(blogXml)).toEqual(expectedBlogHash);
+    });
+
+    it("array with multiple entries from xml", async () => {
+      const blogXml = `
+      <blog>
+        <posts type="array">
+          <post>a post</post>
+          <post>another post</post>
+        </posts>
+      </blog>
+    `;
+      const expectedBlogHash = { blog: { posts: ["a post", "another post"] } };
+      expect(await fromXml(blogXml)).toEqual(expectedBlogHash);
+    });
+
+    it("file from xml", async () => {
+      const blogXml = `
+      <blog>
+        <logo type="file" name="logo.png" content_type="image/png">
+        </logo>
+      </blog>
+    `;
+      const hash = (await fromXml(blogXml)) as any;
+      expect(Object.hasOwn(hash, "blog")).toBeTruthy();
+      expect(Object.hasOwn(hash["blog"], "logo")).toBeTruthy();
+
+      const file = hash["blog"]["logo"];
+      expect(file.originalFilename).toBe("logo.png");
+      expect(file.contentType).toBe("image/png");
+    });
+
+    it("file from xml with defaults", async () => {
+      const blogXml = `
+      <blog>
+        <logo type="file">
+        </logo>
+      </blog>
+    `;
+      const file = ((await fromXml(blogXml)) as any)["blog"]["logo"];
+      expect(file.originalFilename).toBe("untitled");
+      expect(file.contentType).toBe("application/octet-stream");
+    });
+
+    it("tag with attrs and whitespace", async () => {
+      const xml = `
+      <blog name="bacon is the best">
+      </blog>
+    `;
+      const hash = (await fromXml(xml)) as any;
+      expect(hash["blog"]["name"]).toBe("bacon is the best");
+    });
+
+    it("empty cdata from xml", async () => {
+      const xml = "<data><![CDATA[]]></data>";
+
+      expect(((await fromXml(xml)) as any)["data"]).toBe(
+        XmlMini.backend() === XmlMini_NokogiriSAX ? null : "",
+      );
+    });
+
+    it("xsd like types from xml", async () => {
+      const baconXml = `
+    <bacon>
+      <weight type="double">0.5</weight>
+      <price type="decimal">12.50</price>
+      <chunky type="boolean"> 1 </chunky>
+      <expires-at type="dateTime">2007-12-25T12:34:56+0000</expires-at>
+      <notes type="string"></notes>
+      <illustration type="base64Binary">YmFiZS5wbmc=</illustration>
+      <caption type="binary" encoding="base64">VGhhdCdsbCBkbywgcGlnLg==</caption>
+    </bacon>
+    `;
+
+      const expectedBaconHash = stringifyKeys({
+        weight: 0.5,
+        chunky: true,
+        price: new BigDecimal("12.50"),
+        expires_at: RubyTime.utc(2007, 12, 25, 12, 34, 56),
+        notes: "",
+        illustration: "babe.png",
+        caption: "That'll do, pig.",
+      });
+
+      expect(((await fromXml(baconXml)) as any)["bacon"]).toEqual(expectedBaconHash);
+    });
+
+    it("type trickles through when unknown", async () => {
+      const productXml = `
+    <product>
+      <weight type="double">0.5</weight>
+      <image type="ProductImage"><filename>image.gif</filename></image>
+
+    </product>
+    `;
+
+      const expectedProductHash = stringifyKeys({
+        weight: 0.5,
+        image: { type: "ProductImage", filename: "image.gif" },
+      });
+
+      expect(((await fromXml(productXml)) as any)["product"]).toEqual(expectedProductHash);
+    });
+
+    it("from xml raises on disallowed type attributes", async () => {
+      await assertRaises([DisallowedType], {}, () =>
+        fromXml('<product><name type="foo">value</name></product>', ["foo"]),
+      );
+    });
+
+    it("from xml disallows symbol and yaml types by default", async () => {
+      await assertRaises([DisallowedType], {}, () =>
+        fromXml('<product><name type="symbol">value</name></product>'),
+      );
+
+      await assertRaises([DisallowedType], {}, () =>
+        fromXml('<product><name type="yaml">value</name></product>'),
+      );
+    });
+
+    it("from xml array one", async () => {
+      const expected = { numbers: { type: "Array", value: "1" } };
+      expect(await fromXml('<numbers type="Array"><value>1</value></numbers>')).toEqual(expected);
+    });
+
+    it("from xml array many", async () => {
+      const expected = { numbers: { type: "Array", value: ["1", "2"] } };
+      expect(
+        await fromXml('<numbers type="Array"><value>1</value><value>2</value></numbers>'),
+      ).toEqual(expected);
+    });
+
+    it("from trusted xml allows symbol and yaml types", async () => {
+      const expected = { product: { name: ":value" } };
+      expect(await fromTrustedXml('<product><name type="symbol">value</name></product>')).toEqual(
+        expected,
+      );
+      const yamlHash = (await fromTrustedXml(
+        '<product><name type="yaml">:value</name></product>',
+      )) as any;
+      yamlHash["product"]["name"] = await yamlHash["product"]["name"];
+      expect(yamlHash).toEqual(expected);
+    });
+
+    it("kernel method names to xml", async () => {
+      const hash = { throw: { ball: "red" } };
+      const expected = "<person><throw><ball>red</ball></throw></person>";
+
+      await assertNothingRaised(() => {
+        expect(toXml(hash, xmlOptions)).toBe(expected);
+      });
+    });
+
+    it("empty string works for typecast xml value", async () => {
+      await assertNothingRaised(() => {
+        new XMLConverter("").toH();
+      });
+    });
+
+    it("escaping to xml", () => {
+      const hash = stringifyKeys({
+        bare_string: "First & Last Name",
+        pre_escaped_string: "First &amp; Last Name",
+      });
+
+      const expectedXml =
+        "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+      expect(toXml(hash, xmlOptions)).toBe(expectedXml);
+    });
+
+    it("unescaping from xml", async () => {
+      const xmlString =
+        "<person><bare-string>First &amp; Last Name</bare-string><pre-escaped-string>First &amp;amp; Last Name</pre-escaped-string></person>";
+      const expectedHash = stringifyKeys({
+        bare_string: "First & Last Name",
+        pre_escaped_string: "First &amp; Last Name",
+      });
+      expect(((await fromXml(xmlString)) as any)["person"]).toEqual(expectedHash);
+    });
+
+    it("roundtrip to xml from xml", async () => {
+      const hash = stringifyKeys({
+        bare_string: "First & Last Name",
+        pre_escaped_string: "First &amp; Last Name",
+      });
+
+      expect(((await fromXml(toXml(hash, xmlOptions))) as any)["person"]).toEqual(hash);
+    });
+
+    it("datetime xml type with utc time", async () => {
+      const alertXml = `
+      <alert>
+        <alert_at type="datetime">2008-02-10T15:30:45Z</alert_at>
+      </alert>
+    `;
+      const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt).toEqual(RubyTime.utc(2008, 2, 10, 15, 30, 45));
+    });
+
+    it("datetime xml type with non utc time", async () => {
+      const alertXml = `
+      <alert>
+        <alert_at type="datetime">2008-02-10T10:30:45-05:00</alert_at>
+      </alert>
+    `;
+      const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt).toEqual(RubyTime.utc(2008, 2, 10, 15, 30, 45));
+    });
+
+    it("datetime xml type with far future date", async () => {
+      const alertXml = `
+      <alert>
+        <alert_at type="datetime">2050-02-10T15:30:45Z</alert_at>
+      </alert>
+    `;
+      const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
+      assertPredicate(alertAt, (t: RubyTime) => t.isUtc());
+      expect(alertAt.year).toEqual(2050);
+      expect(alertAt.month).toEqual(2);
+      expect(alertAt.day).toEqual(10);
+      expect(alertAt.hour).toEqual(15);
+      expect(alertAt.min).toEqual(30);
+      expect(alertAt.sec).toEqual(45);
+    });
+
+    it("to xml dups options", () => {
+      const options = { skipInstruct: true };
+      toXml({}, options);
+      expect(options).toEqual({ skipInstruct: true });
+    });
+
+    it("expansion count is limited", async () => {
+      const backend = XmlMini.backend();
+      const expected =
+        backend === XmlMini_REXML
+          ? RuntimeError
+          : backend === XmlMini_Nokogiri
+            ? nokogiriSyntaxError
+            : backend === XmlMini_NokogiriSAX
+              ? RuntimeError
+              : undefined;
+
+      await assertRaises([expected!], {}, () => {
+        const attackXml = `
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE member [
+        <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+        <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+        <!ENTITY c "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+        <!ENTITY d "&e;&e;&e;&e;&e;&e;&e;&e;&e;&e;">
+        <!ENTITY e "&f;&f;&f;&f;&f;&f;&f;&f;&f;&f;">
+        <!ENTITY f "&g;&g;&g;&g;&g;&g;&g;&g;&g;&g;">
+        <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+      ]>
+      <member>
+      &a;
+      </member>
+      `;
+        return fromXml(attackXml);
+      });
+    });
+  });
+}
+
+hashToXmlTests("REXML");
+
+await runWithGem("@blazetrails/nokogiri", (Nokogiri) => {
+  nokogiriSyntaxError = Nokogiri.XML.SyntaxError;
+  hashToXmlTests("Nokogiri");
+  hashToXmlTests("NokogiriSAX");
+});

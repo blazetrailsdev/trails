@@ -42,7 +42,7 @@ export default [
   {
     files: [
       "packages/arel/lib/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -78,7 +78,7 @@ export default [
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",

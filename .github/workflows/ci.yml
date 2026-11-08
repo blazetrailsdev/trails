@@ -1664,7 +1664,7 @@ jobs:
       - name: Install a pg_dump matching the server major
         run: |
           sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+          sudo curl -fsSL --retry 5 --retry-all-errors --connect-timeout 20 -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
             https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
             https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
@@ -1673,8 +1673,9 @@ jobs:
             -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.list \
             -o Dir::Etc::sourceparts=- \
             -o APT::Get::List-Cleanup=0 \
+            -o Acquire::Retries=5 \
             -qq
-          sudo apt-get install -y -qq postgresql-client-17
+          sudo apt-get install -y -qq -o Acquire::Retries=5 postgresql-client-17
           pg_dump --version
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
@@ -2403,7 +2404,7 @@ jobs:
         # `pnpm rails-privates:manifest` and commit the result.
         run: |
           set -euo pipefail
-          artifact=packages/activesupport/src/support/rails-private-methods.generated.ts
+          artifact=packages/activesupport/test/support/rails-private-methods.generated.ts
           if git diff --quiet -- "$artifact"; then
             echo "$artifact is in sync with a fresh regeneration."
             exit 0

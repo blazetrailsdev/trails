@@ -1415,7 +1415,7 @@ describe("CI runs every tooling test suite", () => {
       expect(
         (await runGate("vendor/rails/v8.0.2/actioncable/lib/action_cable.rb")).actioncable_only,
       ).toBe("false");
-      expect((await runGate("packages/activesupport/src/index.ts")).actioncable_affected).toBe(
+      expect((await runGate("packages/activesupport/lib/index.ts")).actioncable_affected).toBe(
         "true",
       );
       for (const dep of ["i18n", "nokogiri", "rack-session", "rack-test", "html-sanitizer"]) {

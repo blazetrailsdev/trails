@@ -18,6 +18,7 @@
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { libRoot } from "../scripts/layout/package-roots.ts";
 import { describe, it, expect } from "vitest";
 // Reuse the rule's own namespace map + path mapping so this file-independent
 // check can never drift from the file-driven rule it backstops.
@@ -25,7 +26,6 @@ import { PKG_NS, rubyToSrcRel } from "./rails-error-parity.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const libRoot = (pkg) => (pkg === "arel" ? "lib" : "src");
 
 function entryKey(e) {
   return `${e.package}::${e.rubyFile}::${e.name}`;
@@ -153,7 +153,7 @@ describe("rails-error-parity unported allowlist", () => {
       },
     };
     // baz.ts "exists"; foo_bar.rb maps to foo-bar.ts (snake→kebab) and is absent.
-    const exists = async (rel) => rel === "packages/activesupport/src/baz.ts";
+    const exists = async (rel) => rel === "packages/activesupport/lib/baz.ts";
 
     const result = await findUnported(manifest, exists);
     expect(result).toEqual([

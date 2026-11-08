@@ -29,7 +29,7 @@ the Proxy calls back through.
 
 The alternative — `serializableHash` / `asJson` returning `Promise`
 unconditionally — was rejected because `asJson` is the recursive dispatcher
-behind the whole JSON encoder (`activesupport/src/core-ext/object/json.ts`,
+behind the whole JSON encoder (`activesupport/lib/core-ext/object/json.ts`,
 standing in for Ruby's `as_json` method lookup, with ~19 definitions feeding
 it): an async `asJson` makes every collection containing a model async, the
 encoder async, and **`to_json` a `Promise`** where Rails' returns a String — a
