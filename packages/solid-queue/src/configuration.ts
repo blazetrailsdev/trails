@@ -12,15 +12,7 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
-import {
-  File,
-  Pathname,
-  RuntimeError,
-  Struct,
-  constSet,
-  env,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { File, Pathname, RuntimeError, Struct, env, rbInspect } from "@blazetrails/ruby-compat";
 import { RecurringTask } from "./recurring-task.js";
 import { Record } from "./record.js";
 
@@ -39,11 +31,9 @@ export class Process extends Struct.new("kind", "attributes") {
 }
 
 export class Configuration extends Model {
-  declare static Process: typeof Process;
+  static Process = Process;
 
   static {
-    constSet(this, "Process", Process);
-
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
     this.validate(":ensureCorrectlySizedThreadPool");
