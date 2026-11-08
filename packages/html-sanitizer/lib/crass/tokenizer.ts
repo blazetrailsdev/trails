@@ -238,7 +238,7 @@ export class Tokenizer {
     }
   }
 
-  private consumeBadUrl(): string {
+  consumeBadUrl(): string {
     let text = "";
 
     while (!this.s.isEos()) {
@@ -261,7 +261,7 @@ export class Tokenizer {
     return text;
   }
 
-  private consumeComments(): Node | null {
+  consumeComments(): Node | null {
     if (this.s.peek(2) === "/*") {
       this.s.consume();
       this.s.consume();
@@ -279,7 +279,7 @@ export class Tokenizer {
     return null;
   }
 
-  private consumeEscaped(): string {
+  consumeEscaped(): string {
     if (this.s.isEos()) return "\ufffd";
 
     const hexStr = this.s.scan(RE_HEX);
@@ -298,7 +298,7 @@ export class Tokenizer {
     return this.s.consume();
   }
 
-  private consumeIdent(): Node {
+  consumeIdent(): Node {
     const value = this.consumeName();
 
     if (this.s.peek() === "(") {
@@ -320,7 +320,7 @@ export class Tokenizer {
     }
   }
 
-  private consumeName(): string {
+  consumeName(): string {
     let result = "";
 
     while (!this.s.isEos()) {
@@ -345,7 +345,7 @@ export class Tokenizer {
     return result;
   }
 
-  private consumeNumber(): [string, number, string] {
+  consumeNumber(): [string, number, string] {
     let repr = "";
     let type = "integer";
 
@@ -367,7 +367,7 @@ export class Tokenizer {
     return [repr, this.convertStringToNumber(repr), type];
   }
 
-  private consumeNumeric(): Node {
+  consumeNumeric(): Node {
     const number = this.consumeNumber();
     const repr = number[0];
     let value = number[1];
@@ -388,7 +388,7 @@ export class Tokenizer {
     }
   }
 
-  private consumeString(ending: string | null = null): Node {
+  consumeString(ending: string | null = null): Node {
     if (ending === null) ending = this.s.current;
     let value = "";
 
@@ -419,7 +419,7 @@ export class Tokenizer {
     return this.createToken("string", { value });
   }
 
-  private consumeUnicodeRange(): Node {
+  consumeUnicodeRange(): Node {
     let value = this.s.scan(RE_HEX) ?? "";
 
     while (value.length < 6) {
@@ -447,7 +447,7 @@ export class Tokenizer {
     return this.createToken("unicode_range", range);
   }
 
-  private consumeUrl(): Node {
+  consumeUrl(): Node {
     let value = "";
 
     this.s.scan(RE_WHITESPACE);
@@ -482,7 +482,7 @@ export class Tokenizer {
     return this.createToken("url", { value });
   }
 
-  private convertStringToNumber(str: string): number {
+  convertStringToNumber(str: string): number {
     const matches = RE_NUMBER_STR.exec(str)!.groups!;
 
     const s = matches.sign === "-" ? -1 : 1;
@@ -501,7 +501,7 @@ export class Tokenizer {
     return value;
   }
 
-  private createToken(type: string, properties: Record<string, unknown> = {}): Node {
+  createToken(type: string, properties: Record<string, unknown> = {}): Node {
     return {
       node: type,
       pos: this.s.marker,
@@ -510,13 +510,13 @@ export class Tokenizer {
     };
   }
 
-  private preprocess(input: string): string {
+  preprocess(input: string): string {
     return String(input)
       .replace(/\r\n|[\r\f]/g, "\n")
       .replaceAll("\0", "\ufffd");
   }
 
-  private isStartIdentifier(text: string | null = null): boolean {
+  isStartIdentifier(text: string | null = null): boolean {
     if (text === null) text = (this.s.current ?? "") + this.s.peek(2);
 
     switch (text[0]) {
@@ -535,7 +535,7 @@ export class Tokenizer {
     }
   }
 
-  private isStartNumber(text: string | null = null): boolean {
+  isStartNumber(text: string | null = null): boolean {
     if (text === null) text = (this.s.current ?? "") + this.s.peek(2);
 
     switch (text[0]) {
@@ -564,7 +564,7 @@ export class Tokenizer {
     return tokens;
   }
 
-  private isValidEscape(text: string | null = null): boolean {
+  isValidEscape(text: string | null = null): boolean {
     if (text === null) text = (this.s.current ?? "") + this.s.peek();
     return text[0] === "\\" && text[1] !== "\n";
   }
