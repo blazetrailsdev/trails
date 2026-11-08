@@ -1,7 +1,7 @@
 # @blazetrails/actioncable
 
 The server half of Action Cable, ported from the `actioncable` gem: every file under
-`actioncable/lib/action_cable` except `engine.rb` has a counterpart under `src/`
+`actioncable/lib/action_cable` except `engine.rb` has a counterpart under `lib/`
 at the Rails path.
 
 - `channel/`: `Channel::Base` with its callbacks, naming, broadcasting,
@@ -35,5 +35,5 @@ npm install @rails/actioncable@~8.0.200
 Use the release matching the vendored Rails version (Rails 8.0.2 publishes as
 `8.0.200`). This package depends on it only for development, pinned to that
 release in `package.json`, for the interop test in
-`src/published-client.trails.test.ts`. When `vendor/rails` is bumped, move that
+`test/published-client.trails.test.ts`. When `vendor/rails` is bumped, move that
 pin with it.

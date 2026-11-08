@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { rbFBinding, TopLevel } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "./configuration-file.js";
 
 describe("ConfigurationFile render", () => {
@@ -27,8 +28,33 @@ describe("ConfigurationFile render", () => {
   it("evaluates against the given context", () => {
     const path = writeYaml("adapter: <%= adapter %>\ndatabase: <%= name %>_test\n");
     expect(
-      ConfigurationFile.parse(path, { context: { adapter: "sqlite3", name: "trails" } }),
+      ConfigurationFile.parse(path, {
+        context: rbFBinding({ adapter: "sqlite3", name: "trails" }),
+      }),
     ).toEqual({ adapter: "sqlite3", database: "trails_test" });
+  });
+
+  it("reads self's members and top-level constants through a binding", () => {
+    const constants = TopLevel as Record<string, unknown>;
+    constants.RenderShared = "constant";
+    constants.RenderOnly = "top";
+    try {
+      const path = writeYaml("a: <%= RenderShared %>\nb: <%= RenderOnly %>\nc: <%= who() %>\n");
+      const self = {
+        RenderShared: "member",
+        who() {
+          return this === self ? "self" : "other";
+        },
+      };
+      expect(ConfigurationFile.parse(path, { context: rbFBinding(self) })).toEqual({
+        a: "member",
+        b: "top",
+        c: "self",
+      });
+    } finally {
+      delete constants.RenderShared;
+      delete constants.RenderOnly;
+    }
   });
 
   it("evaluates code tags for control flow", () => {

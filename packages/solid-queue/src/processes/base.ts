@@ -1,13 +1,20 @@
 import { demodulize, include } from "@blazetrails/activesupport";
 import { Process, SecureRandom, Socket, rbModName } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
-import { Callbacks } from "./callbacks.js";
+import { Callbacks, type ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { Procline } from "./procline.js";
 import { Registrable } from "./registrable.js";
 import type { Process as ProcessRecord } from "../process.js";
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` of the process concerns (`processes/base.rb:6-7`). */
 export class Base {
+  declare static beforeBoot: CallbacksClassMethods["beforeBoot"];
+  declare static aroundBoot: CallbacksClassMethods["aroundBoot"];
+  declare static afterBoot: CallbacksClassMethods["afterBoot"];
+  declare static beforeShutdown: CallbacksClassMethods["beforeShutdown"];
+  declare static aroundShutdown: CallbacksClassMethods["aroundShutdown"];
+  declare static afterShutdown: CallbacksClassMethods["afterShutdown"];
+
   static {
     include(this, Callbacks);
     include(this, AppExecutor);

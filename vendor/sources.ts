@@ -55,11 +55,29 @@ export interface PackageEntry {
    */
   compareApi?: boolean;
   /**
+   * Why `compareApi` is false, in one sentence. Required whenever it is:
+   * `validateSources` refuses an exclusion with no reason, and the package
+   * summary appends it to the package's description, so `/packages/<name>`
+   * says why its API tile is empty.
+   */
+  apiExcludedReason?: string;
+  /**
+   * The `packages/<dir>` that ports this entry, when it is not the entry's own
+   * name (`rails-html-sanitizer` → `html-sanitizer`). Read only by the package
+   * summary's counterpart lookup; api-compare keys on `name`.
+   */
+  portedBy?: string;
+  /**
    * Default true. Mirror of `compareApi` for test-compare. globalid sets this
    * to false in wave 5 (its tests aren't wired into test-compare yet); wave 6
    * flips it on alongside its api-compare wiring.
    */
   compareTests?: boolean;
+  /**
+   * Why `compareTests` is false, naming the story that enrolls it. Required
+   * whenever it is, the way `apiExcludedReason` is for `compareApi`.
+   */
+  testsExcludedReason?: string;
 }
 
 export interface UpstreamSource {
@@ -182,8 +200,28 @@ export const SOURCES: readonly UpstreamSource[] = [
         compareTests: true,
       },
       {
+        name: "actionmailbox",
+        libPath: "actionmailbox/lib/action_mailbox",
+        libEntryFile: "actionmailbox/lib/action_mailbox.rb",
+        extraLibPaths: [
+          "actionmailbox/app/models/action_mailbox",
+          "actionmailbox/app/jobs/action_mailbox",
+          "actionmailbox/app/controllers/action_mailbox",
+          "actionmailbox/app/controllers/rails/conductor",
+        ],
+        testPath: "actionmailbox/test",
+        compareApi: true,
+        compareTests: true,
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
+        extraLibPaths: [
+          "activerecord/lib/rails",
+          "actioncable/lib/rails",
+          "activejob/lib/rails",
+          "actionmailer/lib/rails",
+        ],
         testPath: "railties/test",
       },
     ],
@@ -193,7 +231,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rack/rack.git",
-      ref: "v3.1.14",
+      ref: "v3.2.8",
     },
     // libPath points at `lib/rack/` (the Rack module root) for symmetry with
     // how Rails subgems are mapped — see e.g. activerecord/lib/active_record.
@@ -271,7 +309,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // TS-side workspace dir is `packages/did-you-mean/src`; api-compare
+        // TS-side workspace dir is `packages/did-you-mean/lib`; api-compare
         // derives that from the package name, so use the kebab form.
         name: "did-you-mean",
         libPath: "lib/did_you_mean",
@@ -458,8 +496,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/image_processing",
         libEntryFile: "lib/image_processing.rb",
         testPath: "test",
-        compareApi: false,
-        compareTests: false,
+        compareTests: true,
       },
     ],
   },
@@ -529,20 +566,19 @@ export const SOURCES: readonly UpstreamSource[] = [
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
-        // api-compare would extract once it is enrolled.
+        // api-compare extracts.
         name: "date",
         libPath: "lib",
         testPath: "test/date",
-        // Vendored-only: the gem's surface is implemented in C, so the Ruby
-        // extractor sees almost nothing. Measured by RFC 0088-date-gem-port's
+        // The gem's surface is implemented in C, so the Ruby extractor sees
+        // almost nothing. Measured by RFC 0088-date-gem-port's
         // `date-c-source-extractor-decision` spike, running
         // `scripts/api-compare/extract-ruby-api.rb` against this `libPath`:
         // `date: 2 classes, 0 modules, 12 public methods (1 internal)` — all of
         // `lib/date.rb`'s `Date#infinite?` and the `:nodoc:` `Date::Infinity`,
-        // against 2,805 lines of port. So `compareApi` stays off; the C sources
-        // are a read-anchor, and they need no `UNPORTED_FILES` entry because
-        // the extractor globs `**/*.rb` and never sees them.
-        compareApi: false,
+        // against 2,805 lines of port. parity:api scores what matches there;
+        // the C sources are a read-anchor, and they need no `UNPORTED_FILES`
+        // entry because the extractor globs `**/*.rb` and never sees them.
         // `test/date/` is the gate for this cluster — 12 files, 145 `def test_`
         // methods — and it is the only fidelity measure the date port has:
         // per RFC 0088 the gem's test suite is the measure, not a
@@ -583,7 +619,11 @@ export const SOURCES: readonly UpstreamSource[] = [
         // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on
         // those members then dropped, is its own story (RFC 0098).
         compareApi: false,
+        apiExcludedReason:
+          "no packages/minitest exists; the port is a slice of activesupport's testing/assertions.ts.",
         compareTests: false,
+        testsExcludedReason:
+          "no packages/minitest exists; mapping it is map-vendored-minitest-and-drop-norailsequivalent.",
       },
     ],
   },
@@ -600,7 +640,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "rails-dom-testing",
         libPath: "lib/rails/dom/testing",
         libEntryFile: "lib/rails/dom/testing.rb",
-        compareTests: false,
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -617,8 +658,8 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "nokogiri",
         libPath: "lib/nokogiri",
-        compareApi: false,
-        compareTests: false,
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -629,15 +670,15 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/ruby/racc.git",
       // The runtime nokogiri's generated CSS parser runs on
       // (vendor/nokogiri/v1.18.3/lib/nokogiri/css/parser.rb:4 names Racc 1.8.0);
-      // a read-anchor for packages/nokogiri/src/racc.
+      // a read-anchor for packages/nokogiri/lib/racc.
       ref: "v1.8.0",
     },
     packages: [
       {
         name: "racc",
         libPath: "lib/racc",
-        compareApi: false,
-        compareTests: false,
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -652,8 +693,9 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "rails-html-sanitizer",
         libPath: "lib/rails/html",
-        compareApi: false,
-        compareTests: false,
+        portedBy: "html-sanitizer",
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -668,8 +710,8 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "loofah",
         libPath: "lib/loofah",
-        compareApi: false,
-        compareTests: false,
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -684,8 +726,8 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "crass",
         libPath: "lib/crass",
-        compareApi: false,
-        compareTests: false,
+        testPath: "test",
+        compareTests: true,
       },
     ],
   },
@@ -704,7 +746,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       // `git diff v3_3_11 v3_4_10 -- rational.c range.c re.c object.c` is
       // +581/-285. The host toolchain is `ruby 3.3.11 (2026-03-26 revision
       // 1f2d15125a)` — the SHA this ref resolves to — and
-      // `packages/date/src/date.ts:1229-1231` writes its behavioural claim as
+      // `packages/date/lib/date.ts:1229-1231` writes its behavioural claim as
       // "on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`".
       //
       // `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
@@ -720,7 +762,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // Keyed to the TS package it measures — `packages/ruby-compat/src` —
+        // Keyed to the TS package it measures — `packages/ruby-compat/lib` —
         // not to the source name, because the test comparator maps a package
         // key onto a TS src dir (scripts/test-compare/compare.ts pkgDirs).
         name: "ruby-compat",
@@ -774,6 +816,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         // points at. `compareApi` stays off permanently; no later story flips
         // it.
         compareApi: false,
+        apiExcludedReason:
+          "a port of Ruby itself, not of a gem: trails-only (see TS_ONLY_PACKAGES in scripts/api-compare/config.ts).",
       },
     ],
   },
@@ -805,6 +849,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "erubi",
+    origin: {
+      type: "git",
+      url: "https://github.com/jeremyevans/erubi.git",
+      ref: "1.13.1",
+    },
+    packages: [
+      {
+        name: "erubi",
+        libPath: "lib/erubi",
+        libEntryFile: "lib/erubi.rb",
+        testPath: "test",
+        portedBy: "tse-compiler",
+      },
+    ],
+  },
+  {
     name: "solid_cache",
     origin: {
       type: "git",
@@ -817,7 +878,27 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/solid_cache",
         testPath: "test",
         compareApi: false,
+        apiExcludedReason: "no packages/solid-cache exists yet.",
         compareTests: false,
+        testsExcludedReason:
+          "no packages/solid-cache exists yet; enrolled by solid-cache-package-skeleton.",
+      },
+    ],
+  },
+  {
+    name: "tzinfo",
+    origin: {
+      type: "git",
+      url: "https://github.com/tzinfo/tzinfo.git",
+      ref: "v2.0.6",
+    },
+    packages: [
+      {
+        name: "tzinfo",
+        libPath: "lib/tzinfo",
+        libEntryFile: "lib/tzinfo.rb",
+        compareTests: false,
+        testsExcludedReason: "enrolled by tzinfo-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -1011,6 +1092,16 @@ export function validateSources(sources: readonly UpstreamSource[]): void {
       packageNames.add(pkg.name);
       if (!pkg.libPath) {
         throw new Error(`vendor/sources.ts: package "${pkg.name}" missing libPath`);
+      }
+      if (pkg.compareApi === false && !pkg.apiExcludedReason) {
+        throw new Error(
+          `vendor/sources.ts: package "${pkg.name}" sets compareApi: false without an apiExcludedReason`,
+        );
+      }
+      if (pkg.compareTests === false && !pkg.testsExcludedReason) {
+        throw new Error(
+          `vendor/sources.ts: package "${pkg.name}" sets compareTests: false without a testsExcludedReason`,
+        );
       }
     }
   }

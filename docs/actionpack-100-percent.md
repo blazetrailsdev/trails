@@ -415,7 +415,7 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
 - [ ] ~37 tests: T-AC14b follow-up — remaining `FilterTest` tests
       (skipping/rendering/redirection/around filters) +
       `YieldingAroundFiltersTest`. Target file:
-      `packages/actionpack/src/action-controller/controller/filters.test.ts`.
+      `packages/actionpack/test/action-controller/controller/filters.test.ts`.
 - [ ] 4 skipped tests pending callbacks impl gaps: non-yielding around
       halt, `beforeActions` reflection API (`addedActionToInheritanceGraph`,
       `baseClassInIsolation`, `prependingAction`).

@@ -1,4 +1,4 @@
-import { Dir, File, rbInspect } from "@blazetrails/ruby-compat";
+import { Dir, File, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];
@@ -16,6 +16,11 @@ export class Root {
 
   constructor(path: string | null) {
     this.path = path;
+  }
+
+  set(path: string, value: string | string[]): Path {
+    const glob = this.get(path) ? this.get(path)!.glob : undefined;
+    return this.add(path, { with: value, glob });
   }
 
   add(path: string, options: PathOptions = {}): Path {
@@ -223,7 +228,9 @@ export class Path {
       const doesExist = File.isExist(f);
 
       if (!doesExist && File.isSymlink(f)) {
-        throw new Error(`File ${rbInspect(f)} is a symlink that does not point to a valid file`);
+        throw new RuntimeError(
+          `File ${rbInspect(f)} is a symlink that does not point to a valid file`,
+        );
       }
       return doesExist;
     });

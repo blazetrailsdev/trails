@@ -30,8 +30,8 @@ const ROOT = path.resolve(__dirname, "..");
 const PACKAGE_DIRS: Record<string, string> = {
   actionview: "packages/actionview/src",
   arel: "packages/arel/src",
-  date: "packages/date/src",
-  "did-you-mean": "packages/did-you-mean/src",
+  date: "packages/date/test",
+  "did-you-mean": "packages/did-you-mean/test",
   globalid: "packages/globalid/src",
   i18n: "packages/i18n/src",
 };

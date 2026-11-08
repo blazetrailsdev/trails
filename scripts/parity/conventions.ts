@@ -59,6 +59,12 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rb: "js",
   ERB: "TSE",
   Erb: "Tse",
+  // irb is Interactive Ruby; the trails console evaluates TypeScript, so
+  // `IRBConsole` (railties/lib/rails/commands/console/irb_console.rb) and the
+  // irb port it drives are spelled TSREPL.
+  irb: "tsrepl",
+  IRB: "TSREPL",
+  Irb: "Tsrepl",
   // trails lints with ESLint, never RuboCop: `apply_rubocop_autocorrect_after_generate!`
   // (railties/lib/rails/configuration.rb:134-139), `skip_rubocop?`
   // (generators/app_base.rb:392-393) and `create_rubocop_file`
@@ -280,7 +286,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `json.ts`, `ActiveSupport::JSON::Encoding` on `json/encoding.ts`.
   "activesupport:json/decoding.rb": "json.ts",
   // The `Time` arm is the reopening of `Time` itself, ported onto trails'
-  // `Time` (`packages/date/src/time.ts`) by the mixin idiom, so it has its own
+  // `Time` (`packages/date/lib/time.ts`) by the mixin idiom, so it has its own
   // file; the entry splits the bucket off `object/blank.rb` (Time's first
   // reopening).
   "activesupport:core_ext/time/calculations.rb": "core-ext/time/calculations.ts",
@@ -394,6 +400,12 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // from config.ts — porting it to config.ts would CREATE an import cycle.
   "activerecord-test-support:config.rb": "connection.ts",
   "actionview:dependency_tracker/ruby_tracker.rb": "dependency-tracker/tse-tracker.ts",
+  "trailties:generators/channel/channel_generator.rb":
+    "generators/trails/channel/channel-generator.ts",
+  "trailties:generators/job/job_generator.rb": "generators/trails/job/job-generator.ts",
+  "trailties:generators/mailer/mailer_generator.rb": "generators/trails/mailer/mailer-generator.ts",
+  "trailties:generators/test_unit/channel_generator.rb":
+    "generators/test-unit/channel/channel-generator.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */
@@ -1029,7 +1041,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "Concern, so in Ruby it joins the *host's* constructor chain via `super` " +
       "when a class does `include ActiveModel::API`. TypeScript has no " +
       "expression for that: `include()` " +
-      "(packages/ruby-compat/src/include.ts) copies prototype members and " +
+      "(packages/ruby-compat/lib/include.ts) copies prototype members and " +
       "cannot install a constructor, so the port keeps the Rails name as an " +
       "exported `initialize` function that each including class calls from its " +
       "own constructor (model.ts). There is no TS `constructor` at the mapped " +
@@ -1110,7 +1122,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "it so `Object#acts_like?` can find it with `respond_to?`. Two things " +
       "follow, and they differ by receiver. (1) `Time#acts_like_time?` IS " +
       "ported, as a real marker method: trails' `::Time` is a class the port " +
-      "owns (packages/date/src/time.ts), so the reopening ports literally and " +
+      "owns (packages/date/lib/time.ts), so the reopening ports literally and " +
       "`Object.actsLike` answers its `:time` arm through `respond_to?` exactly " +
       "as Ruby does. It is skipped HERE only because activesupport cannot " +
       "reopen another package's class, so the member lands at that class rather " +
@@ -1120,7 +1132,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "no reopening to define a marker in at all, and RFC 0098 " +
       "(`time-with-zone-residue-structural-blockers`) landed the decision that " +
       "`@blazetrails/date` answers for them with the `actsLikeDate` / " +
-      "`actsLikeTime` predicates (packages/date/src/acts-like.ts) that " +
+      "`actsLikeTime` predicates (packages/date/lib/acts-like.ts) that " +
       "`Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing " +
       "markers on the `Temporal` polyfill prototypes at import time was rejected " +
       "as a global side effect on a third-party package; the cost recorded there " +

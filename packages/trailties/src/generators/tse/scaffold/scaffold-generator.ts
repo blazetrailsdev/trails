@@ -1,3 +1,4 @@
+import "../../../constants.tse-scaffold-scaffold-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`erb/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
   dasherize,
@@ -7,7 +8,7 @@ import {
   singularize,
   underscore,
 } from "@blazetrails/activesupport";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
 import { format, File } from "@blazetrails/ruby-compat";

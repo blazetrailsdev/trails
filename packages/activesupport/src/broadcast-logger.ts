@@ -22,22 +22,6 @@ export class BroadcastLogger extends Logger {
     this.progname = "Broadcast";
 
     this.broadcastTo(...loggers);
-
-    return new Proxy(this, {
-      get(target, name, receiver) {
-        if (typeof name === "symbol" || Reflect.has(target, name)) {
-          return Reflect.get(target, name, receiver);
-        }
-        if (!target.respondToMissing(name, false)) return undefined;
-        return (...args: unknown[]) => target.methodMissing(name, ...args);
-      },
-      has(target, name) {
-        return (
-          Reflect.has(target, name) ||
-          (typeof name === "string" && target.respondToMissing(name, false))
-        );
-      },
-    });
   }
 
   broadcastTo(...loggers: Logger[]): this {
@@ -188,7 +172,7 @@ export class BroadcastLogger extends Logger {
     return true;
   }
 
-  private methodMissing(name: string, ...args: unknown[]): unknown {
+  methodMissing(name: string, ...args: unknown[]): unknown {
     const loggers = this.broadcasts.filter((logger) => rbObjRespondTo(logger, name));
 
     if (loggers.length === 0) {
@@ -204,7 +188,7 @@ export class BroadcastLogger extends Logger {
     }
   }
 
-  private respondToMissing(method: string, includeAll: boolean): boolean {
+  respondToMissing(method: string, includeAll: boolean): boolean {
     return this.broadcasts.some((logger) => rbObjRespondTo(logger, method));
   }
 }
@@ -212,3 +196,21 @@ export class BroadcastLogger extends Logger {
 BroadcastLogger.prototype.log = BroadcastLogger.prototype.add;
 
 ActiveSupport.BroadcastLogger = BroadcastLogger;
+
+Object.setPrototypeOf(
+  BroadcastLogger.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(BroadcastLogger.prototype) as object) as object, {
+    get(target, name, receiver: BroadcastLogger) {
+      if (
+        typeof name === "symbol" ||
+        Reflect.has(target, name) ||
+        receiver === BroadcastLogger.prototype ||
+        !Object.hasOwn(receiver, "broadcasts")
+      ) {
+        return Reflect.get(target, name, receiver);
+      }
+      if (!receiver.respondToMissing(name, false)) return undefined;
+      return (...args: unknown[]) => receiver.methodMissing(name, ...args);
+    },
+  }),
+);

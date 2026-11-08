@@ -1,3 +1,4 @@
+import "../../constants.testing-behavior.generated.js";
 import {
   Dir,
   File,
@@ -9,12 +10,12 @@ import {
   type FileUtils,
 } from "@blazetrails/ruby-compat";
 import { Stream, capture, classAttribute } from "@blazetrails/activesupport";
-import type { GeneratorBase, GeneratorConfig } from "../base.js";
+import type { Base, GeneratorConfig } from "../base.js";
 import { GeneratedAttribute } from "../generated-attribute.js";
 
 type GeneratorClassHost = {
   start(givenArgs?: string[], config?: GeneratorConfig): Promise<unknown>;
-  new (args?: unknown[], localOptions?: unknown, config?: GeneratorConfig): GeneratorBase;
+  new (args?: unknown[], localOptions?: unknown, config?: GeneratorConfig): Base;
 };
 
 export interface BehaviorHost {
@@ -23,7 +24,7 @@ export interface BehaviorHost {
   defaultArguments?: string[];
   generatorClass?: GeneratorClassHost;
   /** @internal */
-  _generator?: GeneratorBase;
+  _generator?: Base;
 }
 
 export const ClassMethods = {
@@ -64,7 +65,7 @@ export function generator(
   args: unknown[] = this.defaultArguments!,
   options: unknown = {},
   config: GeneratorConfig = {},
-): GeneratorBase {
+): Base {
   return (this._generator ??= new this.generatorClass!(args, options, {
     destinationRoot: this.destinationRoot,
     ...config,

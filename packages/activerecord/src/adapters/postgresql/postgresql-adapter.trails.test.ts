@@ -336,14 +336,17 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.execute("BEGIN");
-        const client = other._rawConnection as unknown as Record<string, unknown>;
+        const client = (other._rawConnection as Connection).client as unknown as Record<
+          string,
+          unknown
+        >;
 
         expect("_commandSettled" in other).toBe(false);
 
         expect(client._activeQuery ?? null).toBeNull();
         expect(other._rawConnection!.transactionStatus()).toBe(2);
 
-        const inFlight = (other._rawConnection as pg.Client).query("SELECT pg_sleep(0.2)");
+        const inFlight = other._rawConnection!.query("SELECT pg_sleep(0.2)");
         expect(client._activeQuery ?? null).not.toBeNull();
         expect(other._rawConnection!.transactionStatus()).toBe(1);
 
@@ -1196,7 +1199,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         connectionString: PG_TEST_URL,
       });
       expect(client).toBeInstanceOf(Connection);
-      await client.end();
+      await client.close();
     });
 
     it("newClient translates unknown host errors to ConnectionNotEstablished", async () => {
@@ -1212,10 +1215,10 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("in-flight acquire adoption race", () => {
-    type Deferred = { promise: Promise<pg.Client>; resolve: (c: pg.Client) => void };
+    type Deferred = { promise: Promise<PGConnection>; resolve: (c: PGConnection) => void };
     const defer = (): Deferred => {
-      let resolve!: (c: pg.Client) => void;
-      const promise = new Promise<pg.Client>((r) => (resolve = r));
+      let resolve!: (c: PGConnection) => void;
+      const promise = new Promise<PGConnection>((r) => (resolve = r));
       return { promise, resolve };
     };
 
@@ -1230,7 +1233,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("disconnectBang waits behind a connect holding the adapter lock and closes the client it seats", async () => {
       const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       const client = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(client, "end");
+      const endSpy = vi.spyOn(client, "close");
       const first = defer();
       const spy = vi
         .spyOn(PostgreSQLAdapter, "newClient")
@@ -1248,7 +1251,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(a._rawConnectionForTest()).toBeNull();
       } finally {
         spy.mockRestore();
-        await client.end().catch(() => {});
+        await client.close().catch(() => {});
       }
     });
 
@@ -1256,7 +1259,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await a.connect();
-        const raw = a._rawConnectionForTest() as PGConnection & Connection;
+        const raw = a._rawConnectionForTest() as Connection;
         const client = raw.client;
         const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
         await raw.query("BEGIN");
@@ -1294,7 +1297,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await a.connect();
-        const raw = a._rawConnectionForTest() as PGConnection;
+        const raw = a._rawConnectionForTest()!;
         const connect = vi.spyOn(pg.Client.prototype, "connect");
         try {
           connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
@@ -1340,12 +1343,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("connected?", () => {
     it("connected? is false after the raw connection is finished", async () => {
       await adapter.execute("SELECT 1");
-      const rawConnection = (adapter as unknown as { _rawConnection: pg.Client | null })
+      const rawConnection = (adapter as unknown as { _rawConnection: PGConnection | null })
         ._rawConnection;
       expect(rawConnection).not.toBeNull();
       expect(adapter.isConnected()).toBe(true);
 
-      await rawConnection!.end();
+      await rawConnection!.close();
 
       expect(adapter.isConnected()).toBe(false);
     });

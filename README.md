@@ -36,12 +36,13 @@ against `main` at `4837c7ba7a`, on Linux with Node 24.16.0 and SQLite, with
 
 ### 1. Build the framework from a checkout
 
-Use **Node 24** or later; the workspace's `engines` field enforces it at
+Use **Node 26** or later; the workspace's `engines` field enforces it at
 `pnpm install`.
 
 ```sh
 git clone https://github.com/blazetrailsdev/trails.git
 cd trails
+npm install -g corepack   # Node 26 no longer bundles corepack
 corepack enable
 pnpm install
 pnpm build            # tsc --build over the workspace, ~10s
@@ -649,9 +650,9 @@ What the prose above means in practice:
 
 ## Requirements
 
-- **Node >= 24**, enforced by `engines`. The repo and a generated app pin
-  `24.16.0` in `.node-version`.
-- **pnpm**, through `corepack enable`. The repo pins `pnpm@12.3.4`.
+- **Node >= 26**, enforced by `engines`. The repo and a generated app pin
+  `26.13.0` in `.node-version`.
+- **pnpm**, through `corepack enable` (Node 26 dropped the bundled corepack: `npm install -g corepack` first). The repo pins `pnpm@12.3.4`.
 - **TypeScript 7.1** for the workspace, pinned to the exact nightly
   `7.1.0-dev.20260920.1` that CI builds with. The pin moves to 7.1 stable when
   it ships (scheduled 2026-11-24). The packages that touch the compiler API use
@@ -673,6 +674,7 @@ in the tasks repo).
 ## Development
 
 ```sh
+npm install -g corepack   # Node 26 no longer bundles corepack
 corepack enable
 pnpm install
 pnpm build                                   # tsc --build, ~10s cold

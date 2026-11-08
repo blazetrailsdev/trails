@@ -1,9 +1,9 @@
 import "./active-job.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
-import { AbstractController, ActionDispatch } from "@blazetrails/actionpack";
-import { ActionMailer, Base, deprecator } from "@blazetrails/actionmailer";
-import { TestHelper } from "@blazetrails/actionmailer/test-helper";
-import { ClearTestDeliveries } from "@blazetrails/actionmailer/test-case";
+import { AbstractController } from "@blazetrails/actionpack";
+import type { Base } from "@blazetrails/actionmailer";
+import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
+import { deprecator } from "@blazetrails/actionmailer/deprecator";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -25,15 +25,11 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-type AppRoutes = Parameters<typeof AbstractController.Trailties.RoutesHelpers.with>[0] & {
-  mountedHelpers(): object;
-};
-
 type MailerClass = typeof Base & {
-  smtpSettings: Record<string, unknown> | null;
   logger?: unknown;
 };
 
+/** @inventedArm import — PERMANENT */
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -71,9 +67,8 @@ export class Trailtie extends BaseTrailtie {
       options.relativeUrlRoot ??= app.config.relativeUrlRoot;
 
       onLoad("action_mailer", function (this: MailerClass) {
-        const routes = app.routes() as AppRoutes;
-        /** @missingRailsCall AbstractController::UrlFor — CONVERGEABLE abstract-controller-url-for-module */
-        include(this as never, ActionDispatch.Routing.UrlFor as never);
+        const routes = app.routes();
+        include(this as never, AbstractController.UrlFor as never);
         AbstractController.Trailties.RoutesHelpers.with(routes, false)(this as never);
         include(this as never, routes.mountedHelpers() as never);
 
@@ -102,11 +97,6 @@ export class Trailtie extends BaseTrailtie {
           rbFSend(this, `${k}=`, v);
         });
       });
-
-      onLoad("action_dispatch_integration_test", function (this: new () => object) {
-        include(this, TestHelper);
-        include(this, ClearTestDeliveries);
-      });
     });
 
     this.initializer(
@@ -123,6 +113,16 @@ export class Trailtie extends BaseTrailtie {
         if (rbObjRespondTo(this.config, "compileMethods")) {
           (this.config as { compileMethods(): void }).compileMethods();
         }
+      });
+    });
+
+    this.initializer("action_mailer.base", { after: "make_routes_lazy" }, async () => {
+      const { TestHelper } = await import("@blazetrails/actionmailer/test-helper");
+      const { ClearTestDeliveries } = await import("@blazetrails/actionmailer/test-case");
+      await import("../mailers-controller.js");
+      onLoad("action_dispatch_integration_test", function (this: new () => object) {
+        include(this, TestHelper);
+        include(this, ClearTestDeliveries);
       });
     });
 

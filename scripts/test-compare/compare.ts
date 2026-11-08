@@ -82,7 +82,7 @@ import {
   unconsumedAssertionReceipts,
 } from "./assertion-receipts.js";
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
-import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
+import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
@@ -164,7 +164,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
     // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
-    // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
+    // as rack-session above, so both sides land on `packages/rack-test/lib/<x>`.
     let rest = rubyFile;
     if (pkg === "rack-test") {
       if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);
@@ -184,6 +184,17 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
       path
         .basename(rest, ".rb")
         .replace(/_spec$/, "")
+        .replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
+  if (pkg === "solid-queue" || pkg === "solid-cable") {
+    const rest = rubyFile.replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
+    const dir = path.dirname(rest).replace(/_/g, "-");
+    const tsFile =
+      path
+        .basename(rest, ".rb")
+        .replace(/_test$/, "")
         .replace(/_/g, "-") + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
@@ -222,7 +233,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     // `test`, so every spec repeats that root as a leading `session_` segment
     // (`spec_session_pool.rb` mirrors `lib/rack/session/pool.rb`). Drop it, the
     // same redundant-leading-segment case as the i18n branch below, so both
-    // sides land on `packages/rack-session/src/pool`.
+    // sides land on `packages/rack-session/lib/pool`.
     let base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
     if (pkg === "rack-session") base = base.replace(/^session_/, "");
     const kebab = base.replace(/_/g, "-");
@@ -258,25 +269,30 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   const kebab = base.replace(/_/g, "-");
   const tsFile = /_behavior$/.test(rawBase) ? kebab + ".ts" : kebab + ".test.ts";
 
-  let tsDir =
-    dir === "."
-      ? ""
-      : dir
-          .split("/")
-          .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
-          .join("/")
-          .replace(/_/g, "-");
-
-  // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
-  tsDir = tsDir
-    .replace(/\berb\b/g, "tse")
-    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
-  const mappedTsFile = tsFile
-    .replace(/\berb\b/g, "tse")
-    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+  const tsDir = dir === "." ? "" : rubyTestDirToTs(dir);
+  const mappedTsFile = renameErbAndRails(tsFile);
 
   if (!tsDir) return mappedTsFile;
   return path.join(tsDir, mappedTsFile);
+}
+
+// Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
+function renameErbAndRails(segment: string): string {
+  return segment
+    .replace(/\berb\b/g, "tse")
+    .replace(/\brails\b(?!-(?:dom-testing|html-sanitizer|api))/g, "trails");
+}
+
+/** A Ruby test directory (`connection_adapters/erb`) as the TS directory the
+ *  conventions table puts it at (`connection-adapters/tse`). */
+function rubyTestDirToTs(dir: string): string {
+  return renameErbAndRails(
+    dir
+      .split("/")
+      .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
+      .join("/")
+      .replace(/_/g, "-"),
+  );
 }
 
 /**
@@ -1719,37 +1735,48 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/src/",
   rack: "packages/rack/src/",
-  "rack-session": "packages/rack-session/src/",
-  "rack-test": "packages/rack-test/src/",
-  rackup: "packages/rackup/src/",
-  bcrypt: "packages/bcrypt/src/",
-  msgpack: "packages/msgpack/src/",
-  marcel: "packages/marcel/src/",
-  "mini-mime": "packages/mini-mime/src/",
-  "net-smtp": "packages/net-smtp/src/",
+  "rack-session": "packages/rack-session/test/",
+  "rack-test": "packages/rack-test/test/",
+  rackup: "packages/rackup/test/",
+  bcrypt: "packages/bcrypt/test/",
+  msgpack: "packages/msgpack/test/",
+  marcel: "packages/marcel/test/",
+  "mini-mime": "packages/mini-mime/test/",
+  "net-smtp": "packages/net-smtp/test/",
   rake: "packages/rake/src/",
-  chronic: "packages/chronic/src/",
-  builder: "packages/builder/src/",
-  "et-orbi": "packages/et-orbi/src/",
+  chronic: "packages/chronic/test/",
+  builder: "packages/builder/test/",
+  "et-orbi": "packages/et-orbi/test/",
   raabro: "packages/raabro/src/",
-  fugit: "packages/fugit/src/",
+  fugit: "packages/fugit/test/",
   zeitwerk: "packages/zeitwerk/src/",
-  actiondispatch: "packages/actionpack/src/action-dispatch/",
-  actioncontroller: "packages/actionpack/src/action-controller/",
-  abstractcontroller: "packages/actionpack/src/abstract-controller/",
+  actiondispatch: "packages/actionpack/test/action-dispatch/",
+  actioncontroller: "packages/actionpack/test/action-controller/",
+  abstractcontroller: "packages/actionpack/test/abstract-controller/",
   actionview: "packages/actionview/src/",
-  actioncable: "packages/actioncable/src/",
+  "rails-dom-testing": "packages/actionview/src/rails-dom-testing/assertions/",
+  "image-processing": "packages/image-processing/test/",
+  actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/src/",
-  actionmailer: "packages/actionmailer/src/",
+  actionmailer: "packages/actionmailer/test/",
+  actionmailbox: "packages/actionmailbox/src/",
   activestorage: "packages/activestorage/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",
-  "did-you-mean": "packages/did-you-mean/src/",
+  "did-you-mean": "packages/did-you-mean/test/",
   i18n: "packages/i18n/src/",
-  date: "packages/date/src/",
-  "ruby-compat": "packages/ruby-compat/src/",
+  date: "packages/date/test/",
+  "ruby-compat": "packages/ruby-compat/test/",
   thor: "packages/thor/src/",
   mail: "packages/mail/src/",
+  "solid-queue": "packages/solid-queue/src/",
+  "solid-cable": "packages/solid-cable/test/",
+  erubi: "packages/tse-compiler/test/",
+  nokogiri: "packages/nokogiri/test/",
+  racc: "packages/nokogiri/test/racc/",
+  "rails-html-sanitizer": "packages/html-sanitizer/test/",
+  loofah: "packages/html-sanitizer/test/loofah/",
+  crass: "packages/html-sanitizer/test/crass/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {

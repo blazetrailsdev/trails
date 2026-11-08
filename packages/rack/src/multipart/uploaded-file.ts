@@ -4,7 +4,9 @@ import {
   FileUtils,
   StringIO,
   Tempfile,
-  methodMissingProxy,
+  methodMissingPrototype,
+  rbFSend,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
@@ -64,8 +66,6 @@ export class UploadedFile {
       this._tempfile = tempfile;
     }
     this.contentType = contentType;
-
-    return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile._tempfile });
   }
 
   get path(): string | undefined {
@@ -74,5 +74,17 @@ export class UploadedFile {
 
   get localPath(): string | undefined {
     return this.path;
+  }
+
+  respondToMissing(name: string, _includeAll = false): boolean {
+    return rbObjRespondTo(this._tempfile, name);
+  }
+
+  methodMissing(methodName: string, ...args: unknown[]): unknown {
+    return rbFSend(this._tempfile, methodName, ...args);
+  }
+
+  static {
+    methodMissingPrototype(this, { delegate: (uploadedFile) => uploadedFile._tempfile });
   }
 }

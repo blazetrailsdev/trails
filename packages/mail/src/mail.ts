@@ -1,7 +1,6 @@
 import { Time } from "@blazetrails/date";
 import {
-  forceEncoding,
-  IO,
+  File,
   kernelRand,
   Process,
   rbObjAsString,
@@ -15,7 +14,7 @@ import { Configuration } from "./configuration.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
 
-interface MailConstants {
+export interface MailConstants {
   Message: typeof Message;
   Part: typeof Part;
   SMTP: typeof import("./network/delivery-methods/smtp.js").SMTP;
@@ -26,6 +25,7 @@ interface MailConstants {
   TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
   Parsers?: typeof import("./parsers.js");
+  YAML: typeof import("./yaml.js").YAML;
   BccField: typeof import("./fields/bcc-field.js").BccField;
   CcField: typeof import("./fields/cc-field.js").CcField;
   CommentsField: typeof import("./fields/comments-field.js").CommentsField;
@@ -59,6 +59,7 @@ interface MailConstants {
   UnstructuredField: typeof import("./fields/unstructured-field.js").UnstructuredField;
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
+  readFromString(mailAsString: string): Message;
   defaults(block: (this: Configuration) => unknown): unknown;
   deliveryMethod(): unknown;
   RANDOM_TAG: string;
@@ -134,13 +135,12 @@ export const Mail: MailConstants = {
     for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
   },
 
-  /**
-   * @missingRailsCall open — CONVERGEABLE ruby-compat-io-read-async-to-eof
-   * @missingRailsCall read — CONVERGEABLE ruby-compat-io-read-async-to-eof
-   * @inventedArm forceEncoding — CONVERGEABLE mail-message-parses-binary-raw-source
-   */
   async read(filename: string): Promise<Message> {
-    return Mail.new(forceEncoding((await IO.binreadAsync(filename))!, "UTF-8"));
+    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
+  },
+
+  readFromString(mailAsString: string): Message {
+    return Mail.new(mailAsString);
   },
 
   randomTag(): string {

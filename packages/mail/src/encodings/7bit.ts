@@ -19,7 +19,7 @@ export class SevenBit extends EightBit {
     return Utilities.binaryUnsafeToCrlf(str);
   }
 
-  static override isCompatibleInput(str: string): boolean {
+  static override isCompatibleInput(str: string | Uint8Array): boolean {
     return isAsciiOnly(str) && super.isCompatibleInput(str);
   }
 }

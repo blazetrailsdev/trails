@@ -1,10 +1,11 @@
+import "../../../constants.test-unit-controller-controller-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-export class ControllerGenerator extends NamedBase {
+export class ControllerGenerator extends Base {
   static {
     void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "action action" });

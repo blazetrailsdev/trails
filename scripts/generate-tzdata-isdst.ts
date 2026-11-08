@@ -1,5 +1,5 @@
 /**
- * Regenerates `TZDATA_ISDST` (packages/date/src/tzdata-isdst.ts), the tzdata
+ * Regenerates `TZDATA_ISDST` (packages/date/lib/tzdata-isdst.ts), the tzdata
  * `isdst` bit MRI's `Time#isdst` (`ruby/time.c` `time_isdst`, which answers
  * `tm.tm_isdst`) and `TZInfo::TimezonePeriod#dst?` both read straight off the
  * zone's transition records.
@@ -17,11 +17,11 @@
  * the sibling table.
  *
  * Run with `pnpm tsx scripts/generate-tzdata-isdst.ts` to print the module for
- * writing over packages/date/src/tzdata-isdst.ts.
+ * writing over packages/date/lib/tzdata-isdst.ts.
  */
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Temporal } from "../packages/date/src/index.js";
+import { Temporal } from "../packages/date/lib/index.js";
 import { RUBY_ZONEINFO_PREAMBLE, tzdataVersion, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
@@ -202,7 +202,7 @@ export function encodeGaps(gaps: [number, number][]): string {
     .join(",");
 }
 
-/** The module packages/date/src/tzdata-isdst.ts carries, tables and reader both. */
+/** The module packages/date/lib/tzdata-isdst.ts carries, tables and reader both. */
 export function serializeTable(zoneRecords: Record<string, ZoneRecords>): string {
   const rows: string[] = [];
   const baseRows: string[] = [];

@@ -1,3 +1,4 @@
+import "../constants.tse.generated.js";
 import { NamedBase } from "./named-base.js";
 
 export class Base extends NamedBase {

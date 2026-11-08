@@ -22,7 +22,7 @@ async function sendBlobByteRangeData(
   const ranges = Utils.getByteRanges(rangeHeader, blob.byte_size!);
 
   if (isBlank(ranges) || ranges!.every((range) => isBlank(range))) {
-    return this.head("range_not_satisfiable");
+    return this.head(":range_not_satisfiable");
   }
 
   let contentType: string;
@@ -68,7 +68,7 @@ async function sendBlobByteRangeData(
       disposition ??
       DEFAULT_BLOB_STREAMING_DISPOSITION,
     filename: (await blob.filename).sanitized(),
-    status: "partial_content",
+    status: ":partial_content",
     type: contentType,
   });
 }
@@ -101,10 +101,10 @@ async function sendBlobStream(
       } catch (error) {
         if (error instanceof FileNotFoundError) {
           this.expiresNow();
-          this.head("not_found");
+          this.head(":not_found");
         } else {
           this.expiresNow();
-          this.head("internal_server_error");
+          this.head(":internal_server_error");
           throw error;
         }
       }

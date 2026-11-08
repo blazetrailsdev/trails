@@ -10,14 +10,14 @@ describe("BacktraceCleanerTest", () => {
     cleaner = new BacktraceCleaner();
   });
 
-  test("#clean should consider traces from irb lines as User code", () => {
+  test("#clean should consider traces from tsrepl lines as User code", () => {
     const backtrace = [
-      "(irb):1",
+      "(tsrepl):1",
       "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",
       "bin/trails:4:in `<main>'",
     ];
     const result = cleaner.clean(backtrace);
-    expect(result[0]).toBe("(irb):1");
+    expect(result[0]).toBe("(tsrepl):1");
     expect(result.length).toBe(1);
   });
 
@@ -34,7 +34,7 @@ describe("BacktraceCleanerTest", () => {
 
   test("#clean can filter for noise", () => {
     const backtrace = [
-      "(irb):1",
+      "(tsrepl):1",
       "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",
       "bin/trails:4:in `<main>'",
     ];
@@ -71,8 +71,8 @@ describe("BacktraceCleanerTest", () => {
     expect(result[0]).toBe("app/views/application/index.html.tse:4");
   });
 
-  test("#clean_frame should consider traces from irb lines as User code", () => {
-    expect(cleaner.cleanFrame("(irb):1")).toBe("(irb):1");
+  test("#clean_frame should consider traces from tsrepl lines as User code", () => {
+    expect(cleaner.cleanFrame("(tsrepl):1")).toBe("(tsrepl):1");
     expect(
       cleaner.cleanFrame("/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'"),
     ).toBeUndefined();
@@ -90,7 +90,7 @@ describe("BacktraceCleanerTest", () => {
   });
 
   test("#clean_frame can filter for noise", () => {
-    expect(cleaner.cleanFrame("(irb):1", "noise")).toBeUndefined();
+    expect(cleaner.cleanFrame("(tsrepl):1", "noise")).toBeUndefined();
     expect(
       cleaner.cleanFrame(
         "/Path/to/rails/railties/lib/rails/commands/console.rb:77:in `start'",

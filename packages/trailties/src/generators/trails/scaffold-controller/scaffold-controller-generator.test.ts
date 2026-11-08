@@ -69,14 +69,14 @@ describe("ScaffoldControllerGeneratorTest", () => {
       await t.assertInstanceMethod("update", content, (m) => {
         assertMatch(/this\.user\.update\(this\.userParams\(\)\)/, m);
         assertMatch(/this\.redirectTo\(this\.user/, m);
-        assertMatch(/status: "see_other"/, m);
+        assertMatch(/status: ":see_other"/, m);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
         assertMatch(/this\.user\.destroy/, m);
         assertMatch(/User was successfully destroyed/, m);
         assertMatch(/this\.redirectTo\(this\.usersPath\(\)/, m);
-        assertMatch(/status: "see_other"/, m);
+        assertMatch(/status: ":see_other"/, m);
       });
 
       await t.assertInstanceMethod("setUser", content, (m) => {
@@ -383,13 +383,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
       assertMatch(/it\("should get index"/, content);
       assertMatch(
         new RegExp(
-          `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: "json" \\}\\)`,
+          `t\\.post\\(t\\.usersUrl\\(\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: ":json" \\}\\)`,
         ),
         content,
       );
       assertMatch(
         new RegExp(
-          `t\\.patch\\(t\\.userUrl\\(t\\["@user"\\]\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: "json" \\}\\)`,
+          `t\\.patch\\(t\\.userUrl\\(t\\["@user"\\]\\), \\{ params: \\{ ${POLYMORPHIC_PARAMS} \\}, as: ":json" \\}\\)`,
         ),
         content,
       );

@@ -1,3 +1,4 @@
+import "../constants.database.generated.js";
 export const DATABASES = ["mysql", "postgresql", "sqlite3", "mariadb-mysql"] as const;
 export type DatabaseName = (typeof DATABASES)[number];
 
@@ -102,7 +103,7 @@ export class PostgreSQL extends Database {
 export class SQLite3 extends Database {
   readonly name = "sqlite3";
   readonly template = "config/databases/sqlite3.yml";
-  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^12.6.2" };
+  readonly pkgDependency: PkgDependency = { name: "better-sqlite3", version: "^13.0.3" };
   override readonly basePackage = "sqlite3";
   override readonly featureName = "ghcr.io/rails/devcontainer/features/sqlite3";
 }

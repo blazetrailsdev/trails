@@ -13,7 +13,6 @@ import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { DrawCallback } from "@blazetrails/actionpack";
 import { ActionController } from "@blazetrails/actionpack";
-import { Base } from "@blazetrails/activerecord";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
@@ -291,8 +290,9 @@ export async function _registerAutoloaded(_cpath: unknown, value: unknown): Prom
   if (typeof value !== "function") return;
   if (value.prototype instanceof ActionController.Metal) {
     await defineController(value);
-  } else if (value.prototype instanceof Base) {
-    DescendantsTracker.registerSubclass(rbClassSuperclass(value as never) as never, value as never);
+  } else {
+    const superclass = rbClassSuperclass(value as never);
+    if (superclass != null) DescendantsTracker.registerSubclass(superclass, value as never);
   }
 }
 

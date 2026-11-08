@@ -20,9 +20,10 @@ import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrail
 import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, wrap } from "@blazetrails/activesupport";
 import { EngineConfiguration } from "../engine/configuration.js";
-import type { Annotation } from "../source-annotation-extractor.js";
+import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
 import type { Root } from "../paths.js";
+import { DummyConfig } from "./dummy-config.js";
 
 export interface PublicFileServer {
   enabled: boolean;
@@ -61,7 +62,7 @@ export class Configuration extends EngineConfiguration {
   assumeSsl = false;
   forceSsl = false;
   sslOptions: SslOptions = {};
-  timeZone = "UTC";
+  timeZone: string | null | false = "UTC";
   beginningOfWeek: WeekDay = ":monday";
   logger: unknown = null;
   logLevel: LogLevel | number | string = "debug";
@@ -450,7 +451,7 @@ export class Configuration extends EngineConfiguration {
   }
 
   annotations(): typeof Annotation {
-    return Trails.SourceAnnotationExtractor!.Annotation;
+    return SourceAnnotationExtractor.Annotation;
   }
 
   inspect(): string {
@@ -536,6 +537,8 @@ export class Configuration extends EngineConfiguration {
   }
   set apiOnly(value: boolean) {
     this._apiOnly = value;
+    this.generators().apiOnly = value;
+
     this._debugExceptionResponseFormat ??= "api";
   }
 
@@ -558,6 +561,7 @@ export class Configuration extends EngineConfiguration {
 
   override paths(): Root {
     const paths = super.paths();
+    if (!paths.get("config/database")) paths.add("config/database", { with: "config/database.ts" });
     if (!paths.get("config/environment"))
       paths.add("config/environment", { with: "config/environment.ts" });
     if (!paths.get("lib/templates")) paths.add("lib/templates");
@@ -566,6 +570,28 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("public/javascripts")) paths.add("public/javascripts");
     if (!paths.get("public/stylesheets")) paths.add("public/stylesheets");
     return paths;
+  }
+
+  /** @missingRailsCall parse — PERMANENT */
+  async loadDatabaseYaml(): Promise<Record<string, unknown>> {
+    let path: string | undefined;
+    if ((path = (await this.paths().get("config/database")!.existent())[0]) !== undefined) {
+      const originalRailsConfig = Trails.application!.config;
+
+      try {
+        Trails.application!.config = new DummyConfig(
+          originalRailsConfig,
+        ) as unknown as Configuration;
+        const mod = (await import(
+          `${getPath().pathToFileURL!(path).href}?loadDatabaseYaml=${Date.now()}`
+        )) as { default?: unknown };
+        return (mod.default ?? mod) as Record<string, unknown>;
+      } finally {
+        Trails.application!.config = originalRailsConfig;
+      }
+    } else {
+      return {};
+    }
   }
 
   async defaultLogFile(): Promise<File> {
@@ -613,26 +639,6 @@ export class Custom {
 
   constructor() {
     this.#configurations = new Map();
-    return new Proxy(this, {
-      get(target, method, receiver) {
-        if (typeof method === "symbol" || method in target) {
-          return Reflect.get(target, method, receiver);
-        }
-        return target.methodMissing(method);
-      },
-      set(target, method, value, receiver) {
-        if (typeof method === "symbol" || method in target) {
-          return Reflect.set(target, method, value, receiver);
-        }
-        target.methodMissing(`${method}=`, value);
-        return true;
-      },
-      has(target, method) {
-        return typeof method === "symbol"
-          ? method in target
-          : target.respondToMissing(method, false);
-      },
-    });
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
@@ -653,3 +659,27 @@ export class Custom {
     return true;
   }
 }
+
+Object.setPrototypeOf(
+  Custom.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Custom.prototype) as object) as object, {
+    get(target, method, receiver: Custom) {
+      if (typeof method === "symbol" || method in target || receiver === Custom.prototype) {
+        return Reflect.get(target, method, receiver);
+      }
+      return receiver.methodMissing(method);
+    },
+    set(target, method, value, receiver: Custom) {
+      if (typeof method === "symbol" || method in target || receiver === Custom.prototype) {
+        return Reflect.set(target, method, value, receiver);
+      }
+      receiver.methodMissing(`${method}=`, value);
+      return true;
+    },
+    has(target, method) {
+      return typeof method === "symbol"
+        ? method in target
+        : Custom.prototype.respondToMissing(method, false);
+    },
+  }),
+);

@@ -11,15 +11,12 @@ import {
   stringInspect,
   RuntimeError,
   rbObjAsString,
-  rbStrDump,
   isPlainHash,
   Hash,
   eachPair,
   rbObjIsKindOf,
-  kernelInteger,
   IO,
   Encoding,
-  URI,
   toEnum,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
@@ -43,6 +40,7 @@ import {
   HEAD,
   HTTP_HOST,
   RACK_SESSION,
+  RACK_PROTOCOL,
   RACK_LOGGER,
   RACK_MULTIPART_BUFFER_SIZE,
   RACK_MULTIPART_TEMPFILE_FACTORY,
@@ -185,7 +183,7 @@ export class Wrapper {
   private status: any = null;
   private headers: any = null;
   private _body: any = null;
-  private _invoked: string | null = null;
+  private _consumed: string | null = null;
   private _contentLength: string | null = null;
   private _closed = false;
   private size = 0;
@@ -235,6 +233,13 @@ export class Wrapper {
     return [this.status, this.headers, this];
   }
 
+  /** @internal */
+  private assertRequired(key: string): any {
+    if (!Object.hasOwn(this.env!, key)) throw new LintError(`env missing required key ${key}`);
+
+    return this.env![key];
+  }
+
   /**
    * @inventedArm isPlainHash — CONVERGEABLE ruby-compat-respond-to-answers-hash-store-fetch-delete-clear
    * @missingRailsArgs frozen? — PERMANENT
@@ -245,7 +250,121 @@ export class Wrapper {
     }
     if (Object.isFrozen(env)) throw new LintError("env should not be frozen, but is");
 
-    const protocols = this.env!["rack.protocol"];
+    const keys = Reflect.ownKeys(env).filter((key) => typeof key !== "string");
+    if (keys.length !== 0) {
+      throw new LintError(`env contains non-string keys: ${rbInspect(keys)}`);
+    }
+
+    for (const [key, value] of Object.entries(env)) {
+      if (key.includes(".")) continue;
+
+      if (typeof value !== "string" && !(value instanceof Uint8Array)) {
+        throw new LintError(`env variable ${key} has non-string value ${rbInspect(value)}`);
+      }
+
+      if (value instanceof Uint8Array) continue;
+
+      if (/[\x80-\xff]/.test(String.fromCharCode(...b(value)))) {
+        throw new LintError(
+          `env variable ${key} has value containing non-ASCII characters and has non-ASCII-8BIT encoding ${rbInspect(value)} encoding: UTF-8`,
+        );
+      }
+    }
+
+    const requestMethod = this.assertRequired(REQUEST_METHOD);
+    if (!/^[0-9A-Za-z!#$%&'*+.^_`|~-]+$/.test(requestMethod)) {
+      throw new LintError(`REQUEST_METHOD unknown: ${rbInspect(requestMethod)}`);
+    }
+
+    const scriptName = env[SCRIPT_NAME];
+    if (scriptName != null) {
+      if (scriptName !== "" && !/^\//.test(scriptName)) {
+        throw new LintError("SCRIPT_NAME must start with /");
+      }
+
+      if (scriptName === "/") {
+        throw new LintError("SCRIPT_NAME cannot be '/', make it '' and PATH_INFO '/'");
+      }
+    }
+
+    const pathInfo = env[PATH_INFO];
+    if ((scriptName == null || scriptName === "") && (pathInfo == null || pathInfo === "")) {
+      throw new LintError(
+        "One of SCRIPT_NAME or PATH_INFO must be set (make PATH_INFO '/' if SCRIPT_NAME is empty)",
+      );
+    }
+
+    if (pathInfo === Lint.REQUEST_PATH_ASTERISK_FORM) {
+      if (requestMethod !== OPTIONS) {
+        throw new LintError("Only OPTIONS requests may have PATH_INFO set to '*' (asterisk-form)");
+      }
+    } else if (pathInfo != null && Lint.REQUEST_PATH_AUTHORITY_FORM.test(pathInfo)) {
+      if (requestMethod !== CONNECT) {
+        throw new LintError(
+          "Only CONNECT requests may have PATH_INFO set to an authority (authority-form)",
+        );
+      }
+    } else if (pathInfo != null && Lint.REQUEST_PATH_ABSOLUTE_FORM.test(pathInfo)) {
+      if (requestMethod === CONNECT || requestMethod === OPTIONS) {
+        throw new LintError(
+          "CONNECT and OPTIONS requests must not have PATH_INFO set to a URI (absolute-form)",
+        );
+      }
+    } else if (pathInfo != null && Lint.REQUEST_PATH_ORIGIN_FORM.test(pathInfo)) {
+      /** @empty */
+    } else if (pathInfo === "" || pathInfo == null) {
+      /** @empty */
+    } else {
+      throw new LintError(
+        "PATH_INFO must start with a '/' and must not include a fragment part starting with '#' (origin-form)",
+      );
+    }
+
+    this.assertRequired(QUERY_STRING);
+
+    const serverName = this.assertRequired(SERVER_NAME);
+    if (!Lint.SERVER_NAME_PATTERN.test(serverName)) {
+      throw new LintError("env[SERVER_NAME] must be a valid host");
+    }
+
+    const serverProtocol = this.assertRequired(SERVER_PROTOCOL);
+    if (!/HTTP\/\d(\.\d)?/.test(serverProtocol)) {
+      throw new LintError("env[SERVER_PROTOCOL] does not match HTTP/\\d(\\.\\d)?");
+    }
+
+    const serverPort = env[SERVER_PORT];
+    if (serverPort != null) {
+      if (!/^\d+$/.test(serverPort)) {
+        throw new LintError("env[SERVER_PORT] is not an Integer");
+      }
+    }
+
+    const contentLength = env["CONTENT_LENGTH"];
+    if (contentLength != null) {
+      if (!/^\d+$/.test(contentLength)) {
+        throw new LintError(`Invalid CONTENT_LENGTH: ${rbInspect(contentLength)}`);
+      }
+    }
+
+    const httpHost = env[HTTP_HOST];
+    if (httpHost != null) {
+      if (!Lint.HTTP_HOST_PATTERN.test(httpHost)) {
+        throw new LintError("env[HTTP_HOST] must be a valid authority");
+      }
+    }
+
+    for (const header of ["HTTP_CONTENT_TYPE", "HTTP_CONTENT_LENGTH"]) {
+      if (Object.hasOwn(env, header)) {
+        throw new LintError(`env contains ${header}, must use ${header.slice(5)}`);
+      }
+    }
+
+    const rackUrlScheme = this.assertRequired(RACK_URL_SCHEME);
+    if (!Lint.ALLOWED_SCHEMES.includes(rackUrlScheme)) {
+      throw new LintError(`rack.url_scheme unknown: ${rbInspect(rackUrlScheme)}`);
+    }
+
+    const protocols = env[RACK_PROTOCOL];
     if (protocols != null && protocols !== false) {
       if (
         !(Array.isArray(protocols) && protocols.every((protocol) => typeof protocol === "string"))
@@ -300,20 +419,20 @@ export class Wrapper {
       }
     }
 
-    const bufsize = env[RACK_MULTIPART_BUFFER_SIZE];
-    if (bufsize != null && bufsize !== false) {
-      if (!(Number.isInteger(bufsize) && bufsize > 0)) {
+    const rackMultipartBufferSize = env[RACK_MULTIPART_BUFFER_SIZE];
+    if (rackMultipartBufferSize != null && rackMultipartBufferSize !== false) {
+      if (!(Number.isInteger(rackMultipartBufferSize) && rackMultipartBufferSize > 0)) {
         throw new LintError("rack.multipart.buffer_size must be an Integer > 0 if specified");
       }
     }
 
-    const tempfileFactory = env[RACK_MULTIPART_TEMPFILE_FACTORY];
-    if (tempfileFactory != null && tempfileFactory !== false) {
-      if (!rbObjRespondTo(tempfileFactory, "call")) {
+    const rackMultipartTempfileFactory = env[RACK_MULTIPART_TEMPFILE_FACTORY];
+    if (rackMultipartTempfileFactory != null && rackMultipartTempfileFactory !== false) {
+      if (!rbObjRespondTo(rackMultipartTempfileFactory, "call")) {
         throw new LintError("rack.multipart.tempfile_factory must respond to #call");
       }
       env[RACK_MULTIPART_TEMPFILE_FACTORY] = (filename: string, contentType: string) => {
-        const io = tempfileFactory(filename, contentType);
+        const io = rackMultipartTempfileFactory(filename, contentType);
         if (!rbObjRespondTo(io, "append")) {
           throw new LintError("rack.multipart.tempfile_factory return value must respond to #<<");
         }
@@ -321,64 +440,9 @@ export class Wrapper {
       };
     }
 
-    for (const header of [
-      REQUEST_METHOD,
-      SERVER_NAME,
-      QUERY_STRING,
-      SERVER_PROTOCOL,
-      RACK_ERRORS,
-    ]) {
-      if (!Object.hasOwn(env, header)) throw new LintError(`env missing required key ${header}`);
-    }
+    this.checkHijack(env);
 
-    const serverPort = env[SERVER_PORT];
-    if (serverPort != null) {
-      try {
-        kernelInteger(serverPort);
-      } catch {
-        throw new LintError("env[SERVER_PORT] is not an Integer");
-      }
-    }
-
-    try {
-      URI.parse(`http://${rbObjAsString(env[SERVER_NAME])}/`);
-    } catch {
-      throw new LintError(`${rbObjAsString(env[SERVER_NAME])} must be a valid authority`);
-    }
-
-    try {
-      URI.parse(`http://${rbObjAsString(env[HTTP_HOST])}/`);
-    } catch {
-      throw new LintError(`${rbObjAsString(env[HTTP_HOST])} must be a valid authority`);
-    }
-
-    const serverProtocol = env[SERVER_PROTOCOL];
-    if (!/HTTP\/\d(\.\d)?/.test(serverProtocol)) {
-      throw new LintError("env[SERVER_PROTOCOL] does not match HTTP/\\d(\\.\\d)?");
-    }
-
-    for (const header of ["HTTP_CONTENT_TYPE", "HTTP_CONTENT_LENGTH"]) {
-      if (Object.hasOwn(env, header)) {
-        throw new LintError(`env contains ${header}, must use ${header.slice(5)}`);
-      }
-    }
-
-    for (const [key, value] of Object.entries(env)) {
-      if (key.includes(".")) continue;
-      if (value instanceof Uint8Array) continue;
-      if (typeof value !== "string") {
-        throw new LintError(`env variable ${key} has non-string value ${rbInspect(value)}`);
-      }
-      if (/[\x80-\xff]/.test(String.fromCharCode(...b(value)))) {
-        throw new LintError(
-          `env variable ${key} has value containing non-ASCII characters and has non-ASCII-8BIT encoding ${rbInspect(value)} encoding: UTF-8`,
-        );
-      }
-    }
-
-    if (!["http", "https"].includes(env[RACK_URL_SCHEME])) {
-      throw new LintError(`rack.url_scheme unknown: ${rbInspect(env[RACK_URL_SCHEME])}`);
-    }
+    this.checkEarlyHints(env);
 
     const rackInput = env[RACK_INPUT];
     if (rackInput != null && rackInput !== false) {
@@ -386,77 +450,16 @@ export class Wrapper {
       this.env![RACK_INPUT] = new InputWrapper(rackInput);
     }
 
-    const rackErrors = env[RACK_ERRORS];
+    const rackErrors = this.assertRequired(RACK_ERRORS);
     this.checkErrorStream(rackErrors);
     this.env![RACK_ERRORS] = new ErrorWrapper(rackErrors);
 
-    this.checkHijack(env);
-
-    this.checkEarlyHints(env);
-
-    if (!/^[0-9A-Za-z!#$%&'*+.^_`|~-]+$/.test(env[REQUEST_METHOD])) {
-      throw new LintError(`REQUEST_METHOD unknown: ${rbStrDump(env[REQUEST_METHOD])}`);
-    }
-
-    if (
-      Object.hasOwn(env, SCRIPT_NAME) &&
-      env[SCRIPT_NAME] !== "" &&
-      !/^\//.test(env[SCRIPT_NAME])
-    ) {
-      throw new LintError("SCRIPT_NAME must start with /");
-    }
-
-    if (Object.hasOwn(env, PATH_INFO)) {
-      const pathInfo = env[PATH_INFO];
-      if (pathInfo === Lint.REQUEST_PATH_ASTERISK_FORM) {
-        if (env[REQUEST_METHOD] !== OPTIONS) {
-          throw new LintError(
-            "Only OPTIONS requests may have PATH_INFO set to '*' (asterisk-form)",
-          );
-        }
-      } else if (Lint.REQUEST_PATH_AUTHORITY_FORM.test(pathInfo)) {
-        if (env[REQUEST_METHOD] !== CONNECT) {
-          throw new LintError(
-            "Only CONNECT requests may have PATH_INFO set to an authority (authority-form)",
-          );
-        }
-      } else if (Lint.REQUEST_PATH_ABSOLUTE_FORM.test(pathInfo)) {
-        if (env[REQUEST_METHOD] === CONNECT || env[REQUEST_METHOD] === OPTIONS) {
-          throw new LintError(
-            "CONNECT and OPTIONS requests must not have PATH_INFO set to a URI (absolute-form)",
-          );
-        }
-      } else if (Lint.REQUEST_PATH_ORIGIN_FORM.test(pathInfo)) {
-        /** @empty */
-      } else if (pathInfo === "") {
-        /** @empty */
-      } else {
-        throw new LintError(
-          "PATH_INFO must start with a '/' and must not include a fragment part starting with '#' (origin-form)",
-        );
-      }
-    }
-
-    if (Object.hasOwn(env, "CONTENT_LENGTH") && !/^\d+$/.test(env["CONTENT_LENGTH"])) {
-      throw new LintError(`Invalid CONTENT_LENGTH: ${env["CONTENT_LENGTH"]}`);
-    }
-
-    if (!(env[SCRIPT_NAME] != null || env[PATH_INFO] != null)) {
-      throw new LintError(
-        "One of SCRIPT_NAME or PATH_INFO must be set (make PATH_INFO '/' if SCRIPT_NAME is empty)",
-      );
-    }
-
-    if (!(env[SCRIPT_NAME] !== "/")) {
-      throw new LintError("SCRIPT_NAME cannot be '/', make it '' and PATH_INFO '/'");
-    }
-
-    const callables = env[RACK_RESPONSE_FINISHED];
-    if (callables != null && callables !== false) {
-      if (!Array.isArray(callables)) {
+    const rackResponseFinished = env[RACK_RESPONSE_FINISHED];
+    if (rackResponseFinished != null && rackResponseFinished !== false) {
+      if (!Array.isArray(rackResponseFinished)) {
         throw new LintError("rack.response_finished must be an array of callable objects");
       }
-      for (const callable of callables) {
+      for (const callable of rackResponseFinished) {
         if (!rbObjRespondTo(callable, "call")) {
           throw new LintError(
             "rack.response_finished values must respond to call(env, status, headers, error)",
@@ -564,7 +567,7 @@ export class Wrapper {
 
       if (key.startsWith("rack.")) return;
 
-      if (key === "status") throw new LintError("header must not contain status");
+      if (key === "status") throw new LintError("headers must not contain status");
       if (/[(),/:;<=>?@[\\\]{}\p{Cc}]/u.test(key)) {
         throw new LintError(`invalid header name: ${key}`);
       }
@@ -583,7 +586,8 @@ export class Wrapper {
   }
 
   checkHeaderValue(key: string, value: string): void {
-    if (/[^\x20-\u{10ffff}]/u.test(value)) {
+    // eslint-disable-next-line no-control-regex -- lint.rb:745 `/[\x00\x0A\x0D]/`
+    if (/[\x00\x0A\x0D]/.test(value)) {
       throw new LintError(`invalid header value ${key}: ${stringInspect(value)}`);
     }
   }
@@ -655,8 +659,12 @@ export class Wrapper {
 
   verifyToPath(): void {
     if (rbObjRespondTo(this._body, "toPath")) {
-      if (!File.isExist(this._body.toPath())) {
-        throw new LintError("The file identified by body.to_path does not exist");
+      const optionalPath = this._body.toPath();
+
+      if (optionalPath != null) {
+        if (!(typeof optionalPath === "string" && File.isExist(optionalPath))) {
+          throw new LintError("body.to_path must be nil or a path to an existing file");
+        }
       }
     }
   }
@@ -666,13 +674,13 @@ export class Wrapper {
       throw new LintError("Enumerable Body must respond to each");
     }
 
-    if (this._invoked != null) {
-      throw new LintError(`Response body must only be invoked once (${this._invoked})`);
+    if (this._consumed != null) {
+      throw new LintError(`Response body must only be called once (${this._consumed})`);
     }
 
     if (this._closed) throw new LintError("Response body is already closed");
 
-    this._invoked = "each";
+    this._consumed = "each";
 
     const iterate = (chunk: unknown) => {
       if (typeof chunk !== "string" && !(chunk instanceof Uint8Array)) {
@@ -738,13 +746,13 @@ export class Wrapper {
       throw new LintError("Streaming Body must respond to call");
     }
 
-    if (this._invoked != null) {
-      throw new LintError(`Response body must only be invoked once (${this._invoked})`);
+    if (this._consumed != null) {
+      throw new LintError(`Response body must only be called once (${this._consumed})`);
     }
 
     if (this._closed) throw new LintError("Response body is already closed");
 
-    this._invoked = "call";
+    this._consumed = "call";
 
     return this._body.call(new StreamWrapper(stream));
   }
@@ -781,7 +789,33 @@ export class Wrapper {
   }
 }
 
+const _H = "[0-9A-Fa-f]";
+const _DEC_OCTET = "(?:[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5]|\\d)";
+const _IPV4_ADDRESS = `${_DEC_OCTET}\\.${_DEC_OCTET}\\.${_DEC_OCTET}\\.${_DEC_OCTET}`;
+const _LS32 = `(?:${_H}{1,4}:${_H}{1,4}|${_IPV4_ADDRESS})`;
+const _IPV6_ADDRESS = [
+  `(?:${_H}{1,4}:){6}${_LS32}`,
+  `::(?:${_H}{1,4}:){5}${_LS32}`,
+  `${_H}{1,4}?::(?:${_H}{1,4}:){4}${_LS32}`,
+  `(?:(?:${_H}{1,4}:)?${_H}{1,4})?::(?:${_H}{1,4}:){3}${_LS32}`,
+  `(?:(?:${_H}{1,4}:){0,2}${_H}{1,4})?::(?:${_H}{1,4}:){2}${_LS32}`,
+  `(?:(?:${_H}{1,4}:){0,3}${_H}{1,4})?::${_H}{1,4}:${_LS32}`,
+  `(?:(?:${_H}{1,4}:){0,4}${_H}{1,4})?::${_LS32}`,
+  `(?:(?:${_H}{1,4}:){0,5}${_H}{1,4})?::${_H}{1,4}`,
+  `(?:(?:${_H}{1,4}:){0,6}${_H}{1,4})?::`,
+].join("|");
+const _HOST_PATTERN =
+  `(?:\\[(?:(?:${_IPV6_ADDRESS})|(?:v${_H}+\\.[!$&-.0-9:;=A-Z_a-z~]+))\\]` +
+  `|${_IPV4_ADDRESS}` +
+  `|(?:%${_H}${_H}|[!$&-.0-9;=A-Z_a-z~])*)`;
+
 export class Lint {
+  static readonly ALLOWED_SCHEMES = ["https", "http", "wss", "ws"];
+
+  static readonly HOST_PATTERN = _HOST_PATTERN;
+  static readonly SERVER_NAME_PATTERN = new RegExp(`^${_HOST_PATTERN}$`);
+  static readonly HTTP_HOST_PATTERN = new RegExp(`^${_HOST_PATTERN}(:\\d*)?$`);
+
   static readonly REQUEST_PATH_ORIGIN_FORM = /^\/[^#]*$/;
   /** @missingRailsCall make_regexp — CONVERGEABLE uri-rfc2396-parser-make-regexp-unported */
   static readonly REQUEST_PATH_ABSOLUTE_FORM = /^[a-zA-Z][-+.a-zA-Z\d]*:[^\s]*$/;
@@ -791,6 +825,8 @@ export class Lint {
   private app: RackApp | { call: RackApp };
 
   constructor(app: RackApp | { call: RackApp }) {
+    if (!rbObjRespondTo(app, "call")) throw new LintError("app must respond to call");
+
     this.app = app;
   }
 

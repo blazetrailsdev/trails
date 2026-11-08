@@ -1660,9 +1660,9 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   it("use zone", () => {
     setZone("Alaska");
     useZone("Hawaii", () => {
-      expect(timeZone()!.name).toBe("Hawaii");
+      expect((timeZone() as TimeZone).name).toBe("Hawaii");
     });
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
   });
 
   it("use zone with exception raised", () => {
@@ -1672,7 +1672,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
         throw new Error("test");
       });
     }).toThrow("test");
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
   });
 
   it("use zone raises on invalid timezone", () => {
@@ -1680,7 +1680,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     expect(() => {
       useZone("No such timezone exists", () => {});
     }).toThrow();
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
   });
 
   it("time at precision", () => {
@@ -1692,11 +1692,11 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time zone getter and setter", () => {
     setZone(TimeZone.find("Alaska"));
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
     setZone("Alaska");
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
     setZone(Duration.hours(-9));
-    expect(timeZone()!.name).toBe("Alaska");
+    expect((timeZone() as TimeZone).name).toBe("Alaska");
     setZone(null);
     assertNil(timeZone());
   });
@@ -1705,11 +1705,11 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     const oldDefault = zoneDefault();
     try {
       setZoneDefault(TimeZone.find("Alaska"));
-      expect(timeZone()!.name).toBe("Alaska");
+      expect((timeZone() as TimeZone).name).toBe("Alaska");
       setZone(TimeZone.find("Hawaii"));
-      expect(timeZone()!.name).toBe("Hawaii");
+      expect((timeZone() as TimeZone).name).toBe("Hawaii");
       setZone(null);
-      expect(timeZone()!.name).toBe("Alaska");
+      expect((timeZone() as TimeZone).name).toBe("Alaska");
     } finally {
       setZoneDefault(oldDefault);
     }
@@ -1717,11 +1717,11 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
 
   it("time zone setter is thread safe", () => {
     useZone("Paris", () => {
-      expect(timeZone()!.name).toBe("Paris");
+      expect((timeZone() as TimeZone).name).toBe("Paris");
       useZone("Alaska", () => {
-        expect(timeZone()!.name).toBe("Alaska");
+        expect((timeZone() as TimeZone).name).toBe("Alaska");
       });
-      expect(timeZone()!.name).toBe("Paris");
+      expect((timeZone() as TimeZone).name).toBe("Paris");
     });
   });
 
@@ -1729,17 +1729,17 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
     const tzinfo = Timezone.get("America/New_York");
     setZone(tzinfo as unknown as string);
     expect(timeZone()).toBeInstanceOf(TimeZone);
-    expect(timeZone()!.tzinfo).toEqual(tzinfo);
-    expect(timeZone()!.name).toEqual("America/New_York");
-    expect(timeZone()!.utcOffset).toEqual(-18_000);
+    expect((timeZone() as TimeZone).tzinfo).toEqual(tzinfo);
+    expect((timeZone() as TimeZone).name).toEqual("America/New_York");
+    expect((timeZone() as TimeZone).utcOffset).toEqual(-18_000);
   });
 
   it("time zone setter with tzinfo timezone identifier does lookup and wraps in trails time zone", () => {
     setZone("America/New_York");
     expect(timeZone()).toBeInstanceOf(TimeZone);
-    expect(timeZone()!.tzinfo.name).toEqual("America/New_York");
-    expect(timeZone()!.name).toEqual("America/New_York");
-    expect(timeZone()!.utcOffset).toEqual(-18_000);
+    expect((timeZone() as TimeZone).tzinfo.name).toEqual("America/New_York");
+    expect((timeZone() as TimeZone).name).toEqual("America/New_York");
+    expect((timeZone() as TimeZone).utcOffset).toEqual(-18_000);
   });
 
   it("time zone setter with invalid zone", () => {

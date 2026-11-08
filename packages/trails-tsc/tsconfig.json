@@ -3,16 +3,15 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "lib",
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../activesupport" },
     { "path": "../ruby-compat" },
     { "path": "../tse-compiler" },
     { "path": "../zeitwerk" },
     { "path": "../actionview" }
-  ],
-  "exclude": ["src/**/*.test.ts"]
+  ]
 }

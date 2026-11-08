@@ -1,5 +1,5 @@
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
-import { getPath } from "@blazetrails/ruby-compat";
+import { rbFLoad } from "@blazetrails/ruby-compat";
 
 export interface RouteSetLike {
   disableClearAndFinalize?: boolean;
@@ -7,8 +7,6 @@ export interface RouteSetLike {
   finalizeBang(): void;
   eagerLoadBang(): void;
 }
-
-let loads = 0;
 
 export class RoutesReloader {
   paths: string[] = [];
@@ -75,12 +73,7 @@ export class RoutesReloader {
 
   /** @internal */
   private async loadPaths(): Promise<void> {
-    const p = getPath();
-    for (const path of this.paths) {
-      const url = p.pathToFileURL!(path);
-      url.searchParams.set("load", String(++loads));
-      await import(url.href);
-    }
+    for (const path of this.paths) await rbFLoad(path);
     await this.runAfterLoadPaths();
   }
 

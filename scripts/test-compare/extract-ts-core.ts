@@ -73,8 +73,9 @@ interface HelperDef {
  * longer collide — each suite's tests expand their own. The Ruby side resolves
  * symmetrically, by innermost enclosing class/module rather than source range.
  *
- * Still static: receiver calls (`obj.foo()`) and runtime-dispatched helpers are
- * out of scope, which is fine for a report-only count.
+ * Still static: a receiver call (`obj.foo()`) folds only where `obj` is declared
+ * as an instance of a same-file class ({@link addInstanceMethods}); other
+ * receivers and runtime-dispatched helpers are out of scope.
  */
 export type HelperMap = Map<string, HelperDef[]>;
 
@@ -120,9 +121,8 @@ export function collectLibTests(content: string, file: string, namespace: string
  * Only-grow, like its twin.
  */
 export const REQUIRED_TEST_MODULES: Record<string, string> = {
-  commonSubscriptionAdapterTest:
-    "packages/actioncable/src/test-helpers/subscription-adapter/common.ts",
-  channelPrefixTest: "packages/actioncable/src/test-helpers/subscription-adapter/channel-prefix.ts",
+  commonSubscriptionAdapterTest: "packages/actioncable/test/support/subscription-adapter/common.ts",
+  channelPrefixTest: "packages/actioncable/test/support/subscription-adapter/channel-prefix.ts",
 };
 
 /** The top-level function `name` declared in a required test-module file. */
@@ -140,10 +140,21 @@ export function collectRequiredTests(content: string, file: string, name: string
 }
 
 function isReceiverExpect(call: ts.CallExpression): boolean {
+  if (
+    !ts.isPropertyAccessExpression(call.expression) ||
+    call.expression.name.text !== "expect" ||
+    expectChainMatcher(call) !== null
+  ) {
+    return false;
+  }
+  const [name, retval] = call.arguments;
   return (
-    ts.isPropertyAccessExpression(call.expression) &&
-    call.expression.name.text === "expect" &&
-    expectChainMatcher(call) === null
+    name !== undefined &&
+    retval !== undefined &&
+    ts.isStringLiteralLike(name) &&
+    !ts.isStringLiteralLike(retval) &&
+    !ts.isArrayLiteralExpression(retval) &&
+    !ts.isObjectLiteralExpression(retval)
   );
 }
 
@@ -201,6 +212,9 @@ function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string
   if (!ts.isPropertyAccessExpression(expression)) return null;
   if (isAssertionDotCall(expression)) return (expression.expression as ts.Identifier).text;
   const owner = expression.expression;
+  if (ts.isIdentifier(owner) && helpers.has(`${owner.text}.${expression.name.text}`)) {
+    return `${owner.text}.${expression.name.text}`;
+  }
   if (isTestObject(owner)) return expression.name.text;
   const namespace = ts.isIdentifier(owner)
     ? owner.text
@@ -231,7 +245,54 @@ function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
     ts.forEachChild(n, (c) => walk(c, inner));
   };
   walk(sourceFile, sourceFile);
+  addInstanceMethods(sourceFile, add);
   return helpers;
+}
+
+/**
+ * The methods of a same-file test class, keyed `instance.method` for each
+ * variable declared as an instance of it (`let tc: LegacyRouteSetTests`,
+ * `const tc = new LegacyRouteSetTests()`), so `tc.testNamedRouteMethod()` folds
+ * like a bare call. This is the TS shape of a Rails test calling a helper
+ * instance method of its own class bare (`routing_test.rb:839-842`), which the
+ * Ruby twin folds as a same-file `def`.
+ */
+function addInstanceMethods(
+  sourceFile: ts.SourceFile,
+  add: (name: string, body: ts.Node, scope: ts.Node, lambda: boolean) => void,
+): void {
+  const classes = new Map<string, ts.MethodDeclaration[]>();
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
+    const methods = stmt.members.filter(
+      (m): m is ts.MethodDeclaration => ts.isMethodDeclaration(m) && !!m.body,
+    );
+    classes.set(stmt.name.text, methods);
+  }
+  if (classes.size === 0) return;
+  const className = (decl: ts.VariableDeclaration): string | null => {
+    const type = decl.type;
+    if (type && ts.isTypeReferenceNode(type) && ts.isIdentifier(type.typeName)) {
+      return type.typeName.text;
+    }
+    const init = decl.initializer;
+    if (init && ts.isNewExpression(init) && ts.isIdentifier(init.expression)) {
+      return init.expression.text;
+    }
+    return null;
+  };
+  const walk = (n: ts.Node, scope: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name)) {
+      const methods = classes.get(className(n) ?? "");
+      for (const m of methods ?? []) {
+        if (ts.isIdentifier(m.name) && !isAssertionCallee(m.name.text))
+          add(`${n.name.text}.${m.name.text}`, m.body!, scope, false);
+      }
+    }
+    const inner = ts.isBlock(n) || ts.isModuleBlock(n) || ts.isCaseBlock(n) ? n : scope;
+    ts.forEachChild(n, (c) => walk(c, inner));
+  };
+  walk(sourceFile, sourceFile);
 }
 
 /**

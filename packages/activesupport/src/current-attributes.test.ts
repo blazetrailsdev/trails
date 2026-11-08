@@ -1,10 +1,10 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { CurrentAttributes } from "./current-attributes.js";
-import { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { assertSame, assertNil } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
+import type { TimeZone } from "./values/time-zone.js";
 
 describe("CurrentAttributesTest", () => {
   class Person {
@@ -94,9 +94,7 @@ describe("CurrentAttributesTest", () => {
     declare counterCallable: number;
   };
 
-  const Current = methodMissingProxy(CurrentClass, {
-    delegate: (klass) => klass.instance(),
-  }) as typeof CurrentClass & InstanceType<typeof CurrentClass>;
+  const Current = CurrentClass as typeof CurrentClass & InstanceType<typeof CurrentClass>;
 
   let originalTimeZone: ReturnType<typeof zone>;
 
@@ -154,16 +152,16 @@ describe("CurrentAttributesTest", () => {
 
   it("set auxiliary class via overwritten method", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(zone()!.name).toBe("Central Time (US & Canada)");
+    expect((zone() as TimeZone).name).toBe("Central Time (US & Canada)");
     expect(Session.current).toBe(42);
   });
 
   it("resets auxiliary classes via callback", () => {
     Current.person = new Person(42, "David", "Central Time (US & Canada)");
-    expect(zone()!.name).toBe("Central Time (US & Canada)");
+    expect((zone() as TimeZone).name).toBe("Central Time (US & Canada)");
 
     Current.reset();
-    expect(zone()!.name).toBe("UTC");
+    expect((zone() as TimeZone).name).toBe("UTC");
     expect(Session.previous).toBe(42);
     assertNil(Session.current);
   });
@@ -247,7 +245,7 @@ describe("CurrentAttributesTest", () => {
   });
 
   it("respond_to? for methods that have not been called", () => {
-    expect("respondToTest" in Current).toBe(true);
+    expect(rbObjRespondTo(Current, "respondToTest")).toBe(true);
   });
 
   it("CurrentAttributes defaults do not leak between classes", () => {

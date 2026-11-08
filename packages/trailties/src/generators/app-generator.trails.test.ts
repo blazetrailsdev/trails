@@ -121,6 +121,13 @@ describe("AppGenerator (trails-only)", () => {
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });
 
+  it("--main without pnpm writes the bare branch specifier", () => {
+    const generator = new AppGenerator(["my-app"], { main: true }, { destinationRoot: tmpDir });
+    expect(generator.trailsGemfileEntry("@blazetrails/trailties", "npm")).toBe(
+      "github:blazetrailsdev/trails#main",
+    );
+  });
+
   it("--dev points every @blazetrails package at the local checkout", async () => {
     await new AppGenerator(
       ["my-app"],

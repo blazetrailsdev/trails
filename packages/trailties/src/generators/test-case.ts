@@ -1,3 +1,4 @@
+import "../constants.test-case.generated.js";
 import { FileUtils } from "@blazetrails/ruby-compat";
 import "../generators.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";

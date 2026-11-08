@@ -1,4 +1,4 @@
-import { buildTemplates } from "../packages/trails-tsc/src/index.js";
+import { buildTemplates } from "../packages/trails-tsc/lib/index.js";
 
 const fixtures = decodeURIComponent(
   new URL("../packages/thor/src/test-helpers/fixtures", import.meta.url).pathname,

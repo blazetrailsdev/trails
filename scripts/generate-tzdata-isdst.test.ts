@@ -4,14 +4,14 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { TZDATA_VERSION, tzdataIsdst } from "../packages/date/src/tzdata-isdst.js";
+import { TZDATA_VERSION, tzdataIsdst } from "../packages/date/lib/tzdata-isdst.js";
 import { zoneinfo, zoneinfoEnv } from "./tzdata-zoneinfo.js";
 
 const execFileAsync = promisify(execFile);
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const GENERATOR = path.join(REPO_ROOT, "scripts", "generate-tzdata-isdst.ts");
-const TZDATA_ISDST = path.join(REPO_ROOT, "packages", "date", "src", "tzdata-isdst.ts");
+const TZDATA_ISDST = path.join(REPO_ROOT, "packages", "date", "lib", "tzdata-isdst.ts");
 
 /**
  * The generator needs `ruby` with the `tzinfo` gem, and `curl` / `zic` to build

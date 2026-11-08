@@ -1,0 +1,130 @@
+import {
+  ArgumentError,
+  Encoding,
+  File,
+  FileUtils,
+  NoMethodError,
+  type Pathname,
+  RuntimeError,
+  StringIO,
+  Tempfile,
+  methodMissingPrototype,
+  rbFSend,
+  rbObjClassname,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
+export interface UploadedFile {
+  /** @noRailsEquivalent PERMANENT */
+  size(): number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly pos: number;
+  /** @noRailsEquivalent PERMANENT */
+  read(): string;
+  /** @noRailsEquivalent PERMANENT */
+  rewind(): number;
+  /** @noRailsEquivalent PERMANENT */
+  setEncoding(extEnc: Encoding | string): File | StringIO<string | Uint8Array>;
+  /** @noRailsEquivalent PERMANENT */
+  binmode(): File | StringIO<string | Uint8Array>;
+  /** @noRailsEquivalent PERMANENT */
+  isEof(): boolean;
+  /** @noRailsEquivalent PERMANENT */
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): string;
+  /** @noRailsEquivalent PERMANENT */
+  close(): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class UploadedFile {
+  originalFilename: string | null;
+
+  tempfile!: Tempfile | StringIO<string | Uint8Array>;
+
+  contentType: string | null;
+
+  constructor(
+    content: StringIO<string | Uint8Array> | string | Pathname,
+    contentType: string | null = "text/plain",
+    binary: boolean = false,
+    { originalFilename = null }: { originalFilename?: string | null } = {},
+  ) {
+    this.contentType = contentType;
+    this.originalFilename = originalFilename;
+
+    if (content instanceof StringIO) {
+      this.initializeFromStringio(content);
+    } else {
+      this.initializeFromFilePath(content);
+    }
+
+    if (binary) this.tempfile.binmode();
+  }
+
+  methodMissing(methodName: string, ...args: unknown[]): unknown {
+    return rbFSend(this.tempfile, methodName, ...args);
+  }
+
+  respondToMissing(methodName: string, _includePrivate: boolean = false): boolean {
+    return rbObjRespondTo(this.tempfile, methodName);
+  }
+
+  get path(): string | null {
+    const tempfile = this.tempfile;
+    if (!("path" in tempfile)) {
+      throw new NoMethodError(
+        `undefined method 'path' for an instance of ${rbObjClassname(tempfile)}`,
+      );
+    }
+    return tempfile.path();
+  }
+
+  get localPath(): string | null {
+    return this.path;
+  }
+
+  /**
+   * Append to given buffer in 64K chunks to avoid multiple large
+   * copies of file data in memory.  Rewind tempfile before and
+   * after to make sure all data in tempfile is appended to the
+   * buffer.
+   *
+   * Ruby's `buf` is a mutable String `readpartial` refills in place
+   * (`vendor/ruby/v3.3.11/io.c:3590`); JS strings are immutable, so the reusable buffer
+   * is the `Uint8Array` `IO#read`'s `str` argument already takes.
+   */
+  appendTo(buffer: StringIO<string | Uint8Array>): null {
+    this.tempfile.rewind();
+
+    const buf = new Uint8Array(65_536);
+    while (!this.tempfile.isEof()) buffer.write(this.tempfile.readpartial(65_536, buf));
+
+    this.tempfile.rewind();
+
+    return null;
+  }
+
+  private initializeFromStringio(stringio: StringIO<string | Uint8Array>): void {
+    if (this.originalFilename == null)
+      throw new ArgumentError("Missing `original_filename` for StringIO object");
+
+    this.tempfile = stringio;
+  }
+
+  private initializeFromFilePath(path: string | Pathname): void {
+    if (!File.isExist(path)) throw new RuntimeError(`${path} file does not exist`);
+
+    this.originalFilename ??= File.basename(path);
+    const extension = File.extname(this.originalFilename);
+
+    this.tempfile = Tempfile.new([File.basename(this.originalFilename, extension), extension]);
+    this.tempfile.setEncoding(Encoding.BINARY);
+
+    FileUtils.copyFile(path, this.tempfile.path()!);
+  }
+
+  static {
+    methodMissingPrototype(this, { delegate: (uploadedFile) => uploadedFile.tempfile });
+  }
+}

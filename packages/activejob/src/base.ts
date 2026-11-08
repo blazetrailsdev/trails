@@ -9,6 +9,7 @@ import {
   extend,
   Hash,
   include,
+  NoMethodError,
   rbHashSRuby2KeywordsHash,
   rbObjClass,
   rbObjIsKindOf,
@@ -100,6 +101,7 @@ export class Base {
   /**
    * @inventedArm if — PERMANENT
    * @inventedArm getPrototypeOf — PERMANENT
+   * @inventedArm throw — PERMANENT
    * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.2/activejob/lib/active_job/core.rb:93-102
    */
   constructor(...arguments_: unknown[]) {
@@ -120,7 +122,9 @@ export class Base {
     this.priority = klass.priority;
     this.executions = 0;
     this.exceptionExecutions = {};
-    this.timezone = zone()?.name ?? null;
+    const timeZone = zone();
+    if (timeZone === false) throw new NoMethodError("undefined method `name' for false", "name");
+    this.timezone = timeZone?.name ?? null;
   }
 }
 include(Base, Core);

@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  type Binding,
   capitalize,
   constGet,
   File,
@@ -16,7 +17,7 @@ import { Rack } from "./namespaces.js";
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
 
-export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Builder => rbFBinding(builder);
+export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Binding => rbFBinding(builder);
 
 export class Builder {
   private _use: Array<(app: RackApp) => RackApp> = [];
@@ -65,10 +66,7 @@ export class Builder {
 
     config = config.replace(/^#(?!\\)[^\n]*\n/gm, "\n");
 
-    const endMatch = config.match(/^__END__\s*$/m);
-    if (endMatch && typeof endMatch.index === "number") {
-      config = config.substring(0, endMatch.index);
-    }
+    config = config.replace(/^__END__\n[\s\S]*(?![\s\S])/m, "");
 
     return this.newFromString(config, path, options);
   }
@@ -79,15 +77,18 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
-    const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Builder;
+    const binding = rbProcCall(BUILDER_TOPLEVEL_BINDING, builder) as Binding;
     const source =
       `(function (builder, topLevel) { with (topLevel) { return (function () { "use strict"; ${builderScript}\n})(); } })` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(binding, TopLevel);
+    ((0, eval)(source) as (b: Builder, topLevel: object) => void)(
+      binding.receiver as Builder,
+      TopLevel,
+    );
     return builder.toApp();
   }
 
-  use(middleware: any, ...args: any[]): this {
+  use(middleware: any, ...args: any[]): null {
     const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
     if (this._map) {
       const mapping = this._map;
@@ -103,23 +104,26 @@ export class Builder {
             ...(block ? [block] : []),
           ),
     );
-    return this;
+
+    return null;
   }
 
-  run(app: RackApp): this;
-  run(app: null, block: RackApp): this;
-  run(app: RackApp | null, block?: RackApp): this {
+  run(app: RackApp): null;
+  run(app: null, block: RackApp): null;
+  run(app: RackApp | null, block?: RackApp): null {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
     this._run = app || block!;
-    return this;
+
+    return null;
   }
 
-  map(path: string, block: (builder: Builder) => void): this {
+  map(path: string, block: (builder: Builder) => void): null {
     this._map ??= {};
     this._map[path] = block;
-    return this;
+
+    return null;
   }
 
   warmup(prc: (app: RackApp) => void): this {

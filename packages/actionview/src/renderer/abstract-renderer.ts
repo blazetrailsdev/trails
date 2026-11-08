@@ -24,20 +24,20 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer | null>;
+  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer | Uint8Array | null>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
     buffer: unknown,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | null>;
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | Uint8Array | null>;
 }
 
 export interface ViewContext {
   readonly lookupContext?: LookupContext | null;
-  _layoutFor?(...args: unknown[]): string | SafeBuffer | null | Promise<SafeBuffer>;
-  viewFlow?: { set(key: string, content: string | SafeBuffer): void };
+  _layoutFor?(...args: unknown[]): string | SafeBuffer | Uint8Array | null | Promise<SafeBuffer>;
+  viewFlow?: { set(key: string, content: unknown): void };
   prefixPartialPathWithControllerNamespace?: boolean;
   viewRenderer: { cacheHits: Record<string, unknown> };
 }
@@ -79,7 +79,7 @@ export class RenderedTemplate {
   static readonly EMPTY_SPACER: RenderedTemplate = new RenderedTemplate("", null);
 
   constructor(
-    readonly body: string | SafeBuffer,
+    readonly body: string | SafeBuffer | Uint8Array,
     readonly template: RenderableTemplate | null,
   ) {}
 
@@ -273,7 +273,7 @@ export abstract class AbstractRenderer {
 
   /** @internal */
   buildRenderedTemplate(
-    content: string | SafeBuffer,
+    content: string | SafeBuffer | Uint8Array,
     template: RenderableTemplate | null,
   ): RenderedTemplate {
     return new RenderedTemplate(content, template);

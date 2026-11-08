@@ -1,5 +1,5 @@
 import { Concern, extend, include, isPresent } from "@blazetrails/activesupport";
-import type { Base } from "@blazetrails/activerecord";
+import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
@@ -68,6 +68,7 @@ export class ClassMethods {
 
 export class Executable {
   static readonly [classModule] = true;
+  declare static finished: () => Relation<Job>;
   declare static ClassMethods: typeof ClassMethods;
   declare id: number;
   declare finished_at: Time | null;

@@ -13212,13 +13212,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "create_routes",
-    "digest": "f79725148a856dc9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "create_session",
     "digest": "fb9a68f78eea649c",
     "ref": "v8.0.2"
@@ -13438,13 +13431,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "reset!",
     "digest": "63a2777433b509fd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "reset_routes",
-    "digest": "3f75514427f48b75",
     "ref": "v8.0.2"
   },
   {
@@ -24982,13 +24968,6 @@
     "rubyFile": "validations.rb",
     "rubyName": "_define_before_model_callback",
     "digest": "010d16c30c76bae3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
-    "rubyFile": "validations.rb",
-    "rubyName": "_merge_attributes",
-    "digest": "9ad332c79d0a93aa",
     "ref": "v8.0.2"
   },
   {
@@ -74220,8 +74199,9 @@
     "package": "rack",
     "rubyFile": "auth/abstract/request.rb",
     "rubyName": "request",
-    "digest": "b1c18347554a8d8d",
-    "ref": "v3.1.14"
+    "digest": "7e4f834956e33e0d",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74346,8 +74326,9 @@
     "package": "rack",
     "rubyFile": "builder.rb",
     "rubyName": "map",
-    "digest": "a1bc49a4f6855a46",
-    "ref": "v3.1.14"
+    "digest": "495eef6b93e15cb2",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74367,8 +74348,9 @@
     "package": "rack",
     "rubyFile": "builder.rb",
     "rubyName": "run",
-    "digest": "f0a2ca4890c3c376",
-    "ref": "v3.1.14"
+    "digest": "abf3b56dd23d3b6a",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74381,8 +74363,9 @@
     "package": "rack",
     "rubyFile": "builder.rb",
     "rubyName": "use",
-    "digest": "ec9cae7579665f11",
-    "ref": "v3.1.14"
+    "digest": "8dea06a83e687e90",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74451,8 +74434,9 @@
     "package": "rack",
     "rubyFile": "conditional_get.rb",
     "rubyName": "call",
-    "digest": "6283d414f138d243",
-    "ref": "v3.1.14"
+    "digest": "54d8c4b81c499bb9",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74598,15 +74582,17 @@
     "package": "rack",
     "rubyFile": "directory.rb",
     "rubyName": "check_forbidden",
-    "digest": "a808846ff7dde8e6",
-    "ref": "v3.1.14"
+    "digest": "f00d1d556faf25b9",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "directory.rb",
     "rubyName": "each",
-    "digest": "1c296c791f31f51a",
-    "ref": "v3.1.14"
+    "digest": "fbbdc96780dd28f6",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74633,8 +74619,9 @@
     "package": "rack",
     "rubyFile": "directory.rb",
     "rubyName": "initialize",
-    "digest": "893811738862fb81",
-    "ref": "v3.1.14"
+    "digest": "8cf9d8fce53856dd",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74808,8 +74795,9 @@
     "package": "rack",
     "rubyFile": "files.rb",
     "rubyName": "fail",
-    "digest": "16f8cb686810e1b2",
-    "ref": "v3.1.14"
+    "digest": "8d241506f80c9561",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -74864,8 +74852,9 @@
     "package": "rack",
     "rubyFile": "head.rb",
     "rubyName": "call",
-    "digest": "f0e131bfed1a6c68",
-    "ref": "v3.1.14"
+    "digest": "2e383793db084c01",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75046,22 +75035,25 @@
     "package": "rack",
     "rubyFile": "lint.rb",
     "rubyName": "check_error_stream",
-    "digest": "9fc68a72ba67472d",
-    "ref": "v3.1.14"
+    "digest": "a8728c91dd42fad4",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "lint.rb",
     "rubyName": "check_header_value",
-    "digest": "27c910ba3b19488f",
-    "ref": "v3.1.14"
+    "digest": "1d8f783ad876ba6b",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "lint.rb",
     "rubyName": "check_headers",
-    "digest": "036dd1dcfe935a5a",
-    "ref": "v3.1.14"
+    "digest": "d42eb6d3cb4d588e",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75074,8 +75066,9 @@
     "package": "rack",
     "rubyFile": "lint.rb",
     "rubyName": "initialize",
-    "digest": "906bc9f4b7510ad3",
-    "ref": "v3.1.14"
+    "digest": "1759f66f50d2f7ef",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75100,24 +75093,11 @@
   },
   {
     "package": "rack",
-    "rubyFile": "logger.rb",
-    "rubyName": "call",
-    "digest": "9a5ad18cf60cc778",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
-    "rubyFile": "logger.rb",
-    "rubyName": "initialize",
-    "digest": "cf2bd5fd10c551ec",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
     "rubyFile": "media_type.rb",
     "rubyName": "params",
-    "digest": "5d612cfee4410dfb",
-    "ref": "v3.1.14"
+    "digest": "4b2de86220c65e32",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75130,8 +75110,9 @@
     "package": "rack",
     "rubyFile": "media_type.rb",
     "rubyName": "type",
-    "digest": "e705d336ba5566aa",
-    "ref": "v3.1.14"
+    "digest": "d75b2c610f7d163f",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75291,8 +75272,9 @@
     "package": "rack",
     "rubyFile": "mock_response.rb",
     "rubyName": "body",
-    "digest": "cfcc5e73b59b543e",
-    "ref": "v3.1.14"
+    "digest": "1997086a350e6bdb",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75312,8 +75294,9 @@
     "package": "rack",
     "rubyFile": "mock_response.rb",
     "rubyName": "identify_cookie_attributes",
-    "digest": "edaa520e1b95e115",
-    "ref": "v3.1.14"
+    "digest": "5675165f48ed8072",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75333,8 +75316,9 @@
     "package": "rack",
     "rubyFile": "mock_response.rb",
     "rubyName": "parse_cookies_from_header",
-    "digest": "7cec4473d992d91c",
-    "ref": "v3.1.14"
+    "digest": "9021d0ceae47408b",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75458,13 +75442,6 @@
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
-    "rubyName": "dequote",
-    "digest": "47e36f67a31921d7",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
-    "rubyFile": "multipart/parser.rb",
     "rubyName": "each",
     "digest": "3411f4bb7d27ab93",
     "ref": "v3.1.14"
@@ -75508,29 +75485,33 @@
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "handle_fast_forward",
-    "digest": "056868baf58c2b14",
-    "ref": "v3.1.14"
+    "digest": "729d2e1e53bca510",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "handle_mime_body",
-    "digest": "958ae4faeb43879e",
-    "ref": "v3.1.14"
+    "digest": "f0f34ccaf04a8e84",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "handle_mime_head",
-    "digest": "d1299b1d7bd67bbe",
-    "ref": "v3.1.14"
+    "digest": "db0863c2ec6753e2",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "initialize",
-    "digest": "42fbc667f4fdc4e1",
-    "ref": "v3.1.14"
+    "digest": "506d49f313fa46e5",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75564,15 +75545,17 @@
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "parse",
-    "digest": "7e5341ae7aba5cad",
-    "ref": "v3.1.14"
+    "digest": "7fc68964ae869cd3",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "parse_boundary",
-    "digest": "b974347d5fe4f3d6",
-    "ref": "v3.1.14"
+    "digest": "697ab389367e602d",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75585,15 +75568,17 @@
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "read_data",
-    "digest": "f25c0520bd1cfdbd",
-    "ref": "v3.1.14"
+    "digest": "c9f8c5a4b11b1020",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "multipart/parser.rb",
     "rubyName": "result",
-    "digest": "a0731e621bf1c928",
-    "ref": "v3.1.14"
+    "digest": "518619f1e53585dd",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -75850,13 +75835,6 @@
   {
     "package": "rack",
     "rubyFile": "query_parser.rb",
-    "rubyName": "check_query_string",
-    "digest": "bfe916c12c7c1c0c",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
-    "rubyFile": "query_parser.rb",
     "rubyName": "initialize",
     "digest": "2f2e56b8d6d2252b",
     "ref": "v3.1.14"
@@ -75907,15 +75885,17 @@
     "package": "rack",
     "rubyFile": "query_parser.rb",
     "rubyName": "parse_nested_query",
-    "digest": "c798fc0ebb3f475f",
-    "ref": "v3.1.14"
+    "digest": "11871ede794a4613",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "query_parser.rb",
     "rubyName": "parse_query",
-    "digest": "c5d08e3f0f11c5d6",
-    "ref": "v3.1.14"
+    "digest": "6e0cf8033619c61e",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76005,15 +75985,17 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "GET",
-    "digest": "bcc8e84a85aedd63",
-    "ref": "v3.1.14"
+    "digest": "85cc30d1b2daf189",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "POST",
-    "digest": "2adb0ff2653f4e88",
-    "ref": "v3.1.14"
+    "digest": "37ec3bb18006b0b1",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76054,8 +76036,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "base_url",
-    "digest": "c34c67742d1064dd",
-    "ref": "v3.1.14"
+    "digest": "a97189654d9ee3c7",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76152,8 +76135,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "forwarded_authority",
-    "digest": "0437562c5e187b80",
-    "ref": "v3.1.14"
+    "digest": "8c5f27173531aaa9",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76243,8 +76227,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "host_with_port",
-    "digest": "8a3e17b828f35b62",
-    "ref": "v3.1.14"
+    "digest": "7c97291ead6be6e8",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76257,8 +76242,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "initialize",
-    "digest": "bc1afff9ffaa3da0",
-    "ref": "v3.1.14"
+    "digest": "36d8c4f1d07ee640",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76271,8 +76257,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "ip",
-    "digest": "8a0f1a129126ab71",
-    "ref": "v3.1.14"
+    "digest": "e018136ea62ca724",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76327,8 +76314,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "parse_multipart",
-    "digest": "1da02421e1a988cb",
-    "ref": "v3.1.14"
+    "digest": "3a315f4f6bad1fd7",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76397,8 +76385,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "query_parser",
-    "digest": "a81ed17ba75f04d0",
-    "ref": "v3.1.14"
+    "digest": "2736d7f27f5c924f",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76412,13 +76401,6 @@
     "rubyFile": "request.rb",
     "rubyName": "referer",
     "digest": "029c52b1af891b4a",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
-    "rubyFile": "request.rb",
-    "rubyName": "reject_trusted_ip_addresses",
-    "digest": "528ae7b373c9472f",
     "ref": "v3.1.14"
   },
   {
@@ -76502,8 +76484,9 @@
     "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "split_header",
-    "digest": "d61d24de4b0ed939",
-    "ref": "v3.1.14"
+    "digest": "45923182759ca946",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -76552,13 +76535,6 @@
     "rubyFile": "request.rb",
     "rubyName": "user_agent",
     "digest": "c690df0d1c4d962c",
-    "ref": "v3.1.14"
-  },
-  {
-    "package": "rack",
-    "rubyFile": "request.rb",
-    "rubyName": "values_at",
-    "digest": "72c48134532de9d4",
     "ref": "v3.1.14"
   },
   {
@@ -76978,8 +76954,9 @@
     "package": "rack",
     "rubyFile": "rewindable_input.rb",
     "rubyName": "call",
-    "digest": "fe6a98a927caa6ef",
-    "ref": "v3.1.14"
+    "digest": "244fb91295eb34c8",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77069,22 +77046,25 @@
     "package": "rack",
     "rubyFile": "sendfile.rb",
     "rubyName": "initialize",
-    "digest": "e172c173daaff0d5",
-    "ref": "v3.1.14"
+    "digest": "c6d2ba431363363c",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "sendfile.rb",
     "rubyName": "map_accel_path",
-    "digest": "cbfabd9fee96ed5b",
-    "ref": "v3.1.14"
+    "digest": "ced875ba28f20d4b",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "sendfile.rb",
     "rubyName": "variation",
-    "digest": "e2be0c2b6fc7e68d",
-    "ref": "v3.1.14"
+    "digest": "f5126ff79fe4e654",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77174,8 +77154,9 @@
     "package": "rack",
     "rubyFile": "static.rb",
     "rubyName": "applicable_rules",
-    "digest": "940541466d0c5be2",
-    "ref": "v3.1.14"
+    "digest": "d1447650447f2cb2",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77195,8 +77176,9 @@
     "package": "rack",
     "rubyFile": "static.rb",
     "rubyName": "initialize",
-    "digest": "e193ff33d9762668",
-    "ref": "v3.1.14"
+    "digest": "57219441cfd830c0",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77209,8 +77191,9 @@
     "package": "rack",
     "rubyFile": "static.rb",
     "rubyName": "route_file",
-    "digest": "03c7c8d17ddceafa",
-    "ref": "v3.1.14"
+    "digest": "be5d2034cadfa4aa",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77279,8 +77262,9 @@
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "byte_ranges",
-    "digest": "230b6502c3649052",
-    "ref": "v3.1.14"
+    "digest": "a55d0ee6263457f0",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77356,15 +77340,17 @@
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "forwarded_values",
-    "digest": "d28c899dc1e9b681",
-    "ref": "v3.1.14"
+    "digest": "c313365faebe480c",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "get_byte_ranges",
-    "digest": "b4b5b2e48d8a789e",
-    "ref": "v3.1.14"
+    "digest": "4bae7afbecccde06",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77447,15 +77433,17 @@
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "select_best_encoding",
-    "digest": "3dd1dbfe348a0599",
-    "ref": "v3.1.14"
+    "digest": "4f6b9e39a7291427",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "set_cookie_header",
-    "digest": "491673975959c99b",
-    "ref": "v3.1.14"
+    "digest": "65ab4700ce485593",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77468,8 +77456,9 @@
     "package": "rack",
     "rubyFile": "utils.rb",
     "rubyName": "status_code",
-    "digest": "df5fbd35038b059e",
-    "ref": "v3.1.14"
+    "digest": "73b9357403e2157d",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack",
@@ -77496,8 +77485,9 @@
     "package": "rack",
     "rubyFile": "version.rb",
     "rubyName": "release",
-    "digest": "b02bc368aeede1f2",
-    "ref": "v3.1.14"
+    "digest": "78fbb2454335fe13",
+    "ref": "v3.2.8",
+    "reason": "verified against v3.2.8 by bump-vendored-rack-anchor-to-3-2"
   },
   {
     "package": "rack-session",

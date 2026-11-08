@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,32 +14,19 @@ import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import "../trailties/action-cable.js";
+import { Engine as ActionMailboxEngine } from "@blazetrails/actionmailbox/engine";
+import { ActionMailbox } from "@blazetrails/actionmailbox";
 import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
+import { days, Logger } from "@blazetrails/activesupport";
 import { env, getFs, Pathname, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
 import { Trails, _resetTrailsEnv } from "../trails.js";
+import { EnvHelpers } from "../test-helpers/env-helpers.js";
+import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 
-function switchEnv(key: string, value: string | undefined, block: () => void): void {
-  const old = env[key];
-  setEnv(key, value);
-  try {
-    block();
-  } finally {
-    setEnv(key, old);
-  }
-}
-
-function withTrailsEnv(trailsEnv: string | undefined, block: () => void): void {
-  _resetTrailsEnv();
-  switchEnv("TRAILS_ENV", trailsEnv, () => switchEnv("NODE_ENV", undefined, block));
-}
-
-function withRackEnv(rackEnv: string | undefined, block: () => void): void {
-  _resetTrailsEnv();
-  switchEnv("NODE_ENV", rackEnv, () => switchEnv("TRAILS_ENV", undefined, block));
-}
+const envHelpers = new EnvHelpers();
 
 let appPath: string;
 
@@ -53,17 +40,30 @@ async function app(trailsEnv: string): Promise<Application> {
   class A extends Application {}
   Application.register(A, appPath);
   const application = A.instance();
+  Trails.application = application;
   await application.root();
   return application;
 }
 
 describe("ConfigurationTest", () => {
+  useInMemoryDatabaseUrl();
   const trailsEnv = env.TRAILS_ENV;
   const sanitizerVendor = SanitizeHelper.sanitizerVendor;
+  const actionMailbox = { ...ActionMailboxEngine.config.actionMailbox };
+  let trailsApplication: Application | null;
+
+  beforeAll(() => {
+    trailsApplication = Trails.application;
+  });
+
+  afterAll(() => {
+    Trails.application = trailsApplication;
+  });
 
   beforeEach(async () => {
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
     await mkdir(join(appPath, "config"));
+    await writeFile(join(appPath, "config", "storage.ts"), "export default {};\n");
     await writeFile(join(appPath, "config.ts"), "");
   });
 
@@ -72,19 +72,25 @@ describe("ConfigurationTest", () => {
     SanitizeHelper.sanitizerVendor = sanitizerVendor;
     Application.appClass = null;
     delete ActionViewTrailtie.config.actionView.cacheTemplateLoading;
+    Object.assign(ActionMailboxEngine.config.actionMailbox, actionMailbox);
+    ActionMailboxEngine.config.actionMailbox.queues!.set(
+      "incineration",
+      "action_mailbox_incineration",
+    );
+    ActionMailboxEngine.config.actionMailbox.queues!.set("routing", "action_mailbox_routing");
     setEnv("TRAILS_ENV", trailsEnv);
     _resetTrailsEnv();
     await rm(appPath, { recursive: true, force: true });
   });
 
-  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", () => {
-    withTrailsEnv("", () => {
+  it("Trails.env falls back to development if TRAILS_ENV is blank and RACK_ENV is nil", async () => {
+    await envHelpers.withTrailsEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
 
-  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", () => {
-    withRackEnv("", () => {
+  it("Trails.env falls back to development if RACK_ENV is blank and TRAILS_ENV is nil", async () => {
+    await envHelpers.withRackEnv("", () => {
       expect(Trails.env.toString()).toBe("development");
     });
   });
@@ -188,6 +194,17 @@ describe("ConfigurationTest", () => {
     config = (await application.configFor("custom", { env: "test" })) as OrderedOptions;
     expect(config).toBeInstanceOf(OrderedOptions);
     expect(config.get("some_key")).toBe("default");
+  });
+
+  it("config_for makes all hash methods available", async () => {
+    await setCustomConfig(`export default { development: { foo: 0, bar: { baz: 1 } } };`);
+    const actual = (await (await app("development")).configFor("custom")) as OrderedOptions;
+    expect(actual.toH()).toEqual({ foo: 0, bar: { baz: 1 } });
+    expect(actual.keys()).toEqual(["foo", "bar"]);
+    expect(actual.values()).toEqual([0, { baz: 1 }]);
+    expect(actual.toH()).toEqual({ foo: 0, bar: { baz: 1 } });
+    expect(actual.get("foo")).toBe(0);
+    expect(actual.get("bar")).toEqual({ baz: 1 });
   });
 
   it("config.action_view.cache_template_loading with config.enable_reloading default", async () => {
@@ -334,8 +351,101 @@ describe("ConfigurationTest", () => {
   it("ActionCable.server.config.cable is set when missing configuration for the current environment", async () => {
     await writeFile(join(appPath, "config", "cable.ts"), "export default { test: {} };\n");
     const application = await app("missing");
+    application.config.secretKeyBase = "secret";
     await application.initializeBang();
 
     expect((ActionCable.server() as CableServer).config.cable).toBeInstanceOf(Object);
+  });
+
+  it("ActionMailbox.logger is Rails.logger by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActionMailbox.logger).toBe(Trails.logger);
+  });
+
+  it("ActionMailbox.logger can be configured", async () => {
+    class MyLogger extends Logger {}
+    const application = await app("development");
+    application.config.actionMailbox.logger = new MyLogger(null);
+    await application.initializeBang();
+
+    expect(ActionMailbox.logger!.constructor.name).toBe("MyLogger");
+  });
+
+  it("ActionMailbox.incinerate_after is 30.days by default", async () => {
+    await (await app("development")).initializeBang();
+
+    expect(ActionMailbox.incinerateAfter).toEqual(days(30));
+  });
+
+  it("ActionMailbox.incinerate_after can be configured", async () => {
+    const application = await app("development");
+    application.config.actionMailbox.incinerateAfter = days(14);
+    await application.initializeBang();
+
+    expect(ActionMailbox.incinerateAfter).toEqual(days(14));
+  });
+
+  it("ActionMailbox.queues[:incineration] is :action_mailbox_incineration by default in 6.0", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.incineration).toBe("action_mailbox_incineration");
+  });
+
+  it("ActionMailbox.queues[:incineration] is nil by default in 6.1", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.incineration).toBeNull();
+  });
+
+  it("ActionMailbox.queues[:incineration] can be configured", async () => {
+    const application = await app("development");
+    application.config.actionMailbox.queues!.set("incineration", "another_queue");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.incineration).toBe("another_queue");
+  });
+
+  it("ActionMailbox.queues[:routing] is :action_mailbox_routing by default in 6.0", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.0");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.routing).toBe("action_mailbox_routing");
+  });
+
+  it("ActionMailbox.queues[:routing] is nil by default in 6.1", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("6.1");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.routing).toBeNull();
+  });
+
+  it("ActionMailbox.queues[:routing] can be configured", async () => {
+    const application = await app("development");
+    application.config.actionMailbox.queues!.set("routing", "another_queue");
+    await application.initializeBang();
+
+    expect(ActionMailbox.queues.routing).toBe("another_queue");
+  });
+
+  it("ActionMailbox.storage_service is nil by default (default service)", async () => {
+    await (await app("development")).initializeBang();
+    expect(ActionMailbox.storageService).toBeNull();
+  });
+
+  it("ActionMailbox.storage_service can be configured", async () => {
+    const application = await app("development");
+    application.config.activeStorage.serviceConfigurations = {
+      email: { root: join(appPath, "email"), service: "Disk" },
+    };
+    application.config.actionMailbox.storageService = "email";
+    await application.initializeBang();
+    expect(ActionMailbox.storageService).toBe("email");
   });
 });

@@ -1,0 +1,68 @@
+import { defaultTreeAdapter, html, parseFragment, type DefaultTreeAdapterMap } from "parse5";
+
+import { Document } from "./document.js";
+import { childNodes, Node } from "./node.js";
+import { NodeSet } from "../xml/node-set.js";
+
+type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
+
+export class DocumentFragment {
+  errors: unknown[];
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  readonly _node: Parse5Parent;
+
+  constructor(
+    public document: Document,
+    input: string | null = null,
+    context: Node | string | null = null,
+    _options: Record<string, unknown> = {},
+  ) {
+    this.errors = [];
+    this._node = defaultTreeAdapter.createDocumentFragment();
+    if (input == null) return;
+
+    if (typeof context === "string") {
+      context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
+    }
+    this._node =
+      context !== null && context.isElement()
+        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
+        : parseFragment(input);
+  }
+
+  static parse(
+    input: string,
+    _encoding: string | null = null,
+    options: { context?: Node | string | null } = {},
+  ): DocumentFragment {
+    const { context = null, ...rest } = options;
+
+    const document = new Document();
+    document.encoding = "UTF-8";
+
+    return new DocumentFragment(document, input, context, rest);
+  }
+
+  get children(): Node[] {
+    return childNodes(this._node, this.document);
+  }
+
+  css(...args: unknown[]): NodeSet {
+    if (this.children.length > 0) {
+      return new NodeSet(this.document, this.children).css(...args);
+    } else {
+      return new NodeSet(this.document);
+    }
+  }
+
+  atCss(...args: unknown[]): Node | undefined {
+    return this.css(...args).first();
+  }
+
+  toString(): string {
+    return this.children.map((child) => child.toString()).join("");
+  }
+}

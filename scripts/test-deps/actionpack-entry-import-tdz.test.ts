@@ -6,7 +6,7 @@
 // `polymorphic-routes.ts` while it is still evaluating, crashing with
 // `ReferenceError: Cannot access 'HelperMethodBuilder' before initialization`.
 // `RoutesProxy` now resolves at call time through the `ActionDispatch::Routing`
-// Autoload namespace (`packages/actionpack/src/namespaces.ts`, mirroring
+// Autoload namespace (`packages/actionpack/lib/namespaces.ts`, mirroring
 // `action_dispatch/routing.rb:254`) — see CLAUDE.md, "Call-time constant
 // resolution".
 //

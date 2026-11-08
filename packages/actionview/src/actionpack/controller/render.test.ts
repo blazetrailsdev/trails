@@ -108,7 +108,7 @@ class TestController extends ActionController.Base {
     this.layout(":determineLayout");
     this.beforeAction(
       (c) => {
-        (c as TestController).request.setFormat("xml");
+        (c as TestController).request.format = "xml";
       },
       { only: "renderWithFilters" },
     );
@@ -224,7 +224,7 @@ class TestController extends ActionController.Base {
   }
 
   async renderingNothingOnLayout(): Promise<void> {
-    await this.head("ok");
+    await this.head(":ok");
   }
 
   async accessingParamsInTemplateWithLayout(): Promise<void> {
@@ -705,7 +705,7 @@ class TestController extends ActionController.Base {
       case "layoutOverridingLayout":
         return "layouts/talk_from_action";
       case "renderImplicitHtmlTemplateFromXhrRequest":
-        return this.request.xhr ? "layouts/xhr" : "layouts/standard";
+        return this.request.isXhr() ? "layouts/xhr" : "layouts/standard";
     }
   }
 }

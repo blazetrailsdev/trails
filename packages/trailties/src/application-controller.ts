@@ -1,5 +1,6 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { TopLevel, htmlSafe } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
 
 export class ApplicationController extends ActionController.Base {
   static {
@@ -13,7 +14,7 @@ export class ApplicationController extends ActionController.Base {
         html: htmlSafe(
           "<p>For security purposes, this information is only available to local requests.</p>",
         ),
-        status: "forbidden",
+        status: ":forbidden",
       });
     }
   }
@@ -29,7 +30,7 @@ export class ApplicationController extends ActionController.Base {
   }
 }
 
-ApplicationController.prependViewPath(new URL("./templates", import.meta.url).href);
+ApplicationController.prependViewPath(File.expandPath("templates", import.meta.dirname));
 ApplicationController.beforeAction(":disableContentSecurityPolicyNonceBang");
 ApplicationController.contentSecurityPolicy(undefined, undefined, (policy) => {
   policy.scriptSrc(":self", ":unsafe_inline");

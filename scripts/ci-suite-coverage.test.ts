@@ -869,7 +869,7 @@ describe("CI runs every tooling test suite", () => {
         ),
         "vitest.config.ts": VITEST_BEFORE.replace(
           '  "@blazetrails/rack": ',
-          '  "@blazetrails/rack-session/": "packages/rack-session/src/",\n  "@blazetrails/rack": ',
+          '  "@blazetrails/rack-session/": "packages/rack-session/lib/",\n  "@blazetrails/rack": ',
         ),
       }),
     );
@@ -1378,12 +1378,12 @@ describe("CI runs every tooling test suite", () => {
     { timeout: 60_000 },
     async () => {
       const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-      const cable = "packages/actioncable/src/server/base.ts";
+      const cable = "packages/actioncable/lib/server/base.ts";
 
       const cableOnly = await runGate(
         [
           cable,
-          "packages/actioncable/src/server/base.test.ts",
+          "packages/actioncable/test/server/base.test.ts",
           "scripts/parity/unported-files/actioncable.ts",
         ].join("\n"),
       );
@@ -1480,14 +1480,14 @@ describe("CI runs every tooling test suite", () => {
       expect(storage.activerecord_affected).toBe("true");
       expect(storage.ar_scope).toBe("packages/activestorage");
       expect(storage.sqlite_only).toBe("false");
-      expect((await runGate("packages/trails-tsc/src/index.ts")).ar_scope).toBe(
+      expect((await runGate("packages/trails-tsc/lib/index.ts")).ar_scope).toBe(
         "packages/activerecord-cli packages/solid-cable packages/solid-queue",
       );
       expect(
         (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
       ).toBe("");
       expect(
-        (await runGate("packages/ruby-compat/src/a.ts\npackages/activestorage/src/b.ts"))
+        (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/src/b.ts"))
           .sqlite_only,
       ).toBe("false");
       expect(
@@ -1640,7 +1640,7 @@ describe("CI runs every tooling test suite", () => {
     const yml = await readFile(CI_YML, "utf8");
     const wf = parseYaml(yml);
     const runGate = await gateRunner(yml);
-    const cable = await runGate("packages/actioncable/src/version.ts");
+    const cable = await runGate("packages/actioncable/lib/version.ts");
     expect(cable.actioncable_only).toBe("true");
     expect(cable.comparison_affected).toBe("true");
     expect(wf.jobs["rails-comparison"].if).toContain("actioncable_only != 'true'");

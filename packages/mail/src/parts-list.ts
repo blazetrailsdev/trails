@@ -1,42 +1,38 @@
 import type { ContentTypeField } from "./fields/content-type-field.js";
 import type { Part } from "./part.js";
-import { cmp, NoMethodError, sortBy } from "@blazetrails/ruby-compat";
+import { cmp, DelegateClass, NoMethodError, sortBy } from "@blazetrails/ruby-compat";
 import { toYaml, type YAML } from "@blazetrails/ruby-compat/yaml";
 import { AttachmentsList } from "./attachments-list.js";
 import { Mail } from "./mail.js";
 
 export type PartsListPart = Part;
 
-export class PartsList extends Array<PartsListPart> {
-  /** @noRailsEquivalent PERMANENT */
-  static override get [Symbol.species](): ArrayConstructor {
-    return Array;
-  }
+export class PartsList extends (DelegateClass(Array) as new (
+  obj: PartsListPart[],
+) => PartsListPart[] & { __getobj__(): PartsListPart[] }) {
+  declare parts: PartsListPart[];
 
-  /** @missingRailsCall new — CONVERGEABLE mail-message-spec-port */
   constructor(...args: unknown[]) {
-    super();
+    let parts: PartsListPart[];
     if (typeof args[0] === "number") {
-      for (let i = 0; i < args[0]; i++) this.push((args[1] ?? null) as PartsListPart);
-    } else if (args[0] != null) {
-      this.push(...(args[0] as PartsListPart[]));
+      parts = new Array<PartsListPart>(args[0]).fill((args[1] ?? null) as PartsListPart);
+    } else {
+      parts = args[0] != null ? Array.from(args[0] as PartsListPart[]) : [];
     }
-  }
-
-  get parts(): this {
-    return this;
+    super(parts);
+    this.parts = parts;
   }
 
   encodeWith(coder: YAML.Coder): void {
-    coder.representObject(null, Array.from(this));
+    coder.representObject(null, this.parts);
   }
 
   toYaml(options: Record<string, unknown> = {}): string {
-    return toYaml(Array.from(this), options);
+    return toYaml(this.parts, options);
   }
 
   attachments(): AttachmentsList {
-    return new AttachmentsList(this);
+    return new AttachmentsList(this.parts);
   }
 
   collect(block?: (o: PartsListPart) => unknown): unknown {
@@ -45,7 +41,7 @@ export class PartsList extends Array<PartsListPart> {
       for (const o of this) ary.push(block(o) as PartsListPart);
       return ary;
     } else {
-      return Array.from(this);
+      return this.parts;
     }
   }
 
@@ -128,19 +124,19 @@ export class PartsList extends Array<PartsListPart> {
 
   override sort(compareFn?: (a: PartsListPart, b: PartsListPart) => number): this {
     return new (this.constructor as typeof PartsList)(
-      Array.from(this).sort(compareFn ?? ((a, b) => cmp(a, b) ?? 0)),
+      [...this.parts].sort(compareFn ?? ((a, b) => cmp(a, b) ?? 0)),
     ) as this;
   }
 
   sortBang(order: string[]): PartsListPart[] {
     let i = 0;
-    const sorted = sortBy(Array.from(this), (a: PartsListPart) => {
+    const sorted = sortBy(this.parts, (a: PartsListPart) => {
       const value = this.getOrderValue(a, order);
       value.push((i += 1));
       return value;
     });
-    this.length = 0;
-    for (const p of sorted) this.push(p);
+    this.parts.length = 0;
+    for (const p of sorted) this.parts.push(p);
     return sorted;
   }
 

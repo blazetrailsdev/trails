@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { stderr } from "@blazetrails/ruby-compat";
+import { ArgumentError, stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 
 describe("Utils.statusCode", () => {
@@ -23,6 +23,10 @@ describe("Utils.statusCode", () => {
     expect(Utils.statusCode("")).toBe(0);
     expect(Utils.statusCode("  ")).toBe(0);
   });
+
+  it("converts a non-numeric String with to_i", () => {
+    expect(Utils.statusCode("abc")).toBe(0);
+  });
 });
 
 describe("Utils.setCookieHeader", () => {
@@ -35,6 +39,26 @@ describe("Utils.setCookieHeader", () => {
     expect(Utils.setCookieHeader("foo", { value: "bar", sameSite: ":Lax" })).toBe(
       "foo=bar; samesite=lax",
     );
+  });
+
+  it("guards each attribute with Ruby truthiness", () => {
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: null })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: false })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", domain: "", path: "" })).toBe(
+      "foo=bar; domain=; path=",
+    );
+  });
+});
+
+describe("Utils.unescape", () => {
+  it("decodes a non-UTF-8 percent-escape without raising", () => {
+    expect(() => Utils.unescape("%E2")).not.toThrow();
+    expect(Utils.unescape("a+b%20c")).toBe("a b c");
+  });
+
+  it("raises ArgumentError for a malformed percent-escape", () => {
+    expect(() => Utils.unescape("%zz")).toThrow(ArgumentError);
+    expect(() => Utils.unescape("%zz")).toThrow("invalid %-encoding (%zz)");
   });
 });
 

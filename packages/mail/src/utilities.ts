@@ -1,5 +1,6 @@
 import { Mail } from "./mail.js";
 import {
+  binaryString,
   ArgumentError,
   b,
   byteslice,
@@ -259,7 +260,8 @@ export const Utilities = {
     return "<" + str + ">";
   },
 
-  decodeBase64(str: string): Uint8Array {
+  decodeBase64(str: string | Uint8Array): Uint8Array {
+    if (str instanceof Uint8Array) str = binaryString(str);
     if (!str.endsWith("=") && str.length % 4 !== 0) {
       str = str.padEnd((str.length + 3) & ~3, "=");
     }

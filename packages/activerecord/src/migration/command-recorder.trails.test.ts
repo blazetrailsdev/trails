@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
@@ -74,8 +75,8 @@ describe("CommandRecorder", () => {
 
   it("does not forward a private delegate member, the way public_send does not", () => {
     const recorder = new CommandRecorder({ _secret: () => "no", visible: () => "yes" });
-    expect("_secret" in recorder).toBe(false);
-    expect("visible" in recorder).toBe(true);
+    expect(rbObjRespondTo(recorder, "_secret")).toBe(false);
+    expect(rbObjRespondTo(recorder, "visible")).toBe(true);
     expect(() => (recorder as unknown as { _secret(): string })._secret()).toThrow(
       /undefined method '_secret'/,
     );
@@ -377,5 +378,21 @@ describe("CommandRecorder", () => {
         ["removeColumn", ["fruits", "qty", "unsigned_integer"], undefined],
       ]);
     });
+  });
+});
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends CommandRecorder {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub({ visible: () => "yes" }) as Sub & { visible(): string };
+    expect(sub.secret()).toBe(1);
+    expect(sub.visible()).toBe("yes");
+    expect(sub instanceof CommandRecorder).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
   });
 });

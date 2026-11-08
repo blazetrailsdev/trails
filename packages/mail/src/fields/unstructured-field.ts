@@ -8,6 +8,8 @@ import {
   rbObjDup,
   rbObjEncoding,
   stringSplit,
+  binaryBytes,
+  binaryString,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "../constants.js";
 import { Encodings } from "../encodings.js";
@@ -21,7 +23,7 @@ export class UnstructuredField extends CommonField {
       value = value.join(", ");
     } else if (value instanceof Uint8Array && rbObjEncoding(value) === Encoding.ASCII_8BIT) {
       const utf8 = forceEncoding(rbObjDup(value), Encoding.UTF_8);
-      if (isValidEncoding(utf8 as never, Encoding.UTF_8)) value = utf8;
+      if (isValidEncoding(utf8, Encoding.UTF_8)) value = utf8;
     }
 
     if (charset == null && (typeof value === "string" || value instanceof Uint8Array)) {
@@ -63,32 +65,34 @@ export class UnstructuredField extends CommonField {
     return result.join("\r\n ");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall map — CONVERGEABLE mail-message-spec-port
-   */
+  /** @internal */
   protected fold(prepend = 0): string[] {
     const encoding = this.normalizedEncoding();
-    const decodedString = rbObjAsString(this.decoded());
+    const decoded = rbObjAsString(this.decoded()) as string | Uint8Array;
+    const binary = decoded instanceof Uint8Array;
+    const decodedString = binary ? binaryString(decoded) : decoded;
     const shouldEncode = !isAsciiOnly(decodedString);
-    let words: string[];
+    let words: (string | Uint8Array)[];
     if (shouldEncode) {
       let first = true;
-      words = stringSplit(decodedString, /[ \t]/).flatMap((word) => {
-        if (first) {
-          first = !first;
-        } else {
-          word = ` ${word}`;
-        }
-        if (!isAsciiOnly(word)) {
-          return word;
-        } else {
-          return word.match(/[^\n]{7}|[^\n]+$/gm) ?? [];
-        }
-      });
+      words = stringSplit(decodedString, /[ \t]/)
+        .map((word): string | Uint8Array | string[] => {
+          if (first) {
+            first = !first;
+          } else {
+            word = ` ${word}`;
+          }
+          if (!isAsciiOnly(word)) {
+            return word;
+          } else {
+            return word.match(/[^\n]{7}|[^\n]+$/gm) ?? [];
+          }
+        })
+        .flat();
     } else {
       words = stringSplit(decodedString, /[ \t]/);
     }
+    if (binary) words = words.map((word) => binaryBytes(word as string));
 
     const foldedLines: string[] = [];
     while (words.length !== 0) {
@@ -97,7 +101,7 @@ export class UnstructuredField extends CommonField {
       let line = "";
       let firstWord = true;
       while (words.length !== 0) {
-        let word = words[0] as string | Uint8Array;
+        let word = words[0];
 
         if (this.charset != null) {
           word = Encodings.transcodeCharset(word, String(rbObjEncoding(word)), this.charset);

@@ -29,6 +29,7 @@ describe("RailtieTest", () => {
 
   beforeEach(() => {
     deprecators = new Deprecators();
+    Trailtie.config.set("timeZone", "UTC");
     app = {
       config: Trailtie.config,
       deprecators,
@@ -139,6 +140,7 @@ describe("RailtieTest", () => {
     const custom = new DigestClass("sha256", "OpenSSL::Digest::SHA256");
     const appConfig: Record<string, unknown> = {
       activeSupport: { hashDigestClass: custom } satisfies ActiveSupportConfig,
+      timeZone: "UTC",
     };
     const yieldedApp = {
       config: appConfig,

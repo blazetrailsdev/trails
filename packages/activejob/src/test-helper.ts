@@ -1,3 +1,4 @@
+import "./constants.test-helper.generated.js";
 import {
   Concern,
   DescendantsTracker,
@@ -10,6 +11,7 @@ import {
   extend,
   kernelArray,
   onLoad,
+  symbolizeKeys,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import {
@@ -226,11 +228,11 @@ export async function assertEnqueuedWith(
 
   const expected: Payload = Object.fromEntries(
     Object.entries({
-      ":job": job,
-      ":args": args,
-      ":at": at,
-      ":queue": queue,
-      ":priority": priority,
+      job,
+      args,
+      at,
+      queue,
+      priority,
     }).filter(([, value]) => value != null),
   );
   const expectedArgs = this.prepareArgsForAssertion(expected);
@@ -269,11 +271,11 @@ export async function assertEnqueuedWith(
     (enqueuedJob) => enqueuedJob["job_class"] === toS(job),
   );
 
-  let message = `No enqueued job found with ${rbInspect(expected)}`;
+  let message = `No enqueued job found with ${rbInspect(symbolizeKeys(expected))}`;
   if (potentialMatches.length === 0) {
     message += "\n\nNo jobs were enqueued";
   } else if (matchingClass.length === 0) {
-    message += `\n\nNo jobs of class ${toS(expected[":job"])} were enqueued, job classes enqueued: `;
+    message += `\n\nNo jobs of class ${toS(expected["job"])} were enqueued, job classes enqueued: `;
     message += potentialMatches.map((job) => job["job_class"]).join(", ");
   } else {
     message += `\n\nPotential matches: ${matchingClass.map((job) => toS(job)).join("\n")}`;
@@ -301,11 +303,11 @@ export async function assertPerformedWith(
 
   const expected: Payload = Object.fromEntries(
     Object.entries({
-      ":job": job,
-      ":args": args,
-      ":at": at,
-      ":queue": queue,
-      ":priority": priority,
+      job,
+      args,
+      at,
+      queue,
+      priority,
     }).filter(([, value]) => value != null),
   );
   const expectedArgs = this.prepareArgsForAssertion(expected);
@@ -344,11 +346,11 @@ export async function assertPerformedWith(
     (enqueuedJob) => enqueuedJob["job_class"] === toS(job),
   );
 
-  let message = `No performed job found with ${rbInspect(expected)}`;
+  let message = `No performed job found with ${rbInspect(symbolizeKeys(expected))}`;
   if (potentialMatches.length === 0) {
     message += "\n\nNo jobs were performed";
   } else if (matchingClass.length === 0) {
-    message += `\n\nNo jobs of class ${toS(expected[":job"])} were performed, job classes performed: `;
+    message += `\n\nNo jobs of class ${toS(expected["job"])} were performed, job classes performed: `;
     message += potentialMatches.map((job) => job["job_class"]).join(", ");
   } else {
     message += `\n\nPotential matches: ${matchingClass.map((job) => toS(job)).join("\n")}`;
@@ -441,7 +443,7 @@ export function jobsWith(
   this.validateOption({ only, except });
 
   return rbObjDup(jobs).filter((job) => {
-    const jobClass: { queueName: unknown } = fetch(job, ":job");
+    const jobClass: { queueName: unknown } = fetch(job, "job");
 
     if (only != null && only !== false) {
       if (!(this.filterAsProc(only)(job) as boolean)) return false;
@@ -450,12 +452,12 @@ export function jobsWith(
     }
 
     if (queue != null && queue !== false) {
-      if (toS(queue) !== (Object.hasOwn(job, ":queue") ? job[":queue"] : jobClass.queueName))
+      if (toS(queue) !== (Object.hasOwn(job, "queue") ? job["queue"] : jobClass.queueName))
         return false;
     }
 
-    if (at != null && at !== false && job[":at"] != null && job[":at"] !== false) {
-      if ((job[":at"] as number) > toF(at)) return false;
+    if (at != null && at !== false && job["at"] != null && job["at"] !== false) {
+      if ((job["at"] as number) > toF(at)) return false;
     }
 
     if (block != null) block(job);
@@ -468,7 +470,7 @@ export function jobsWith(
 export function filterAsProc(filter: Filter): (job: Payload) => unknown {
   if (rbObjIsProc(filter)) return filter as (job: Payload) => unknown;
 
-  return (job) => kernelArray(filter).includes(fetch(job, ":job"));
+  return (job) => kernelArray(filter).includes(fetch(job, "job"));
 }
 
 /** @internal */
@@ -516,14 +518,14 @@ export async function flushEnqueuedJobs(
 /** @internal */
 export function prepareArgsForAssertion(args: Payload): Payload {
   const arguments_ = rbObjDup(args);
-  if (typeof arguments_[":queue"] === "string" && arguments_[":queue"].startsWith(":")) {
-    arguments_[":queue"] = arguments_[":queue"].slice(1);
+  if (typeof arguments_["queue"] === "string" && arguments_["queue"].startsWith(":")) {
+    arguments_["queue"] = arguments_["queue"].slice(1);
   }
 
-  if (actsLike.call(arguments_[":at"], "time")) {
-    const at = arguments_[":at"] as Time;
+  if (actsLike.call(arguments_["at"], "time")) {
+    const at = arguments_["at"] as Time;
     const atRange = new Range(at.minus(1), at.plus(1));
-    arguments_[":at"] = (at: Time) => atRange.cover(at);
+    arguments_["at"] = (at: Time) => atRange.cover(at);
   }
   return arguments_;
 }
@@ -531,11 +533,11 @@ export function prepareArgsForAssertion(args: Payload): Payload {
 /** @internal */
 export async function deserializeArgsForAssertion(job: Payload): Promise<Payload> {
   const newJob = rbObjDup(job);
-  if (newJob[":at"] != null && newJob[":at"] !== false) {
-    newJob[":at"] = Time.at(newJob[":at"] as number);
+  if (newJob["at"] != null && newJob["at"] !== false) {
+    newJob["at"] = Time.at(newJob["at"] as number);
   }
-  if (newJob[":args"] != null && newJob[":args"] !== false) {
-    newJob[":args"] = await Arguments.deserialize(newJob[":args"] as unknown[]);
+  if (newJob["args"] != null && newJob["args"] !== false) {
+    newJob["args"] = await Arguments.deserialize(newJob["args"] as unknown[]);
   }
   return newJob;
 }
@@ -545,10 +547,10 @@ export async function instantiateJob(
   payload: Payload,
   { skipDeserializeArguments = false }: { skipDeserializeArguments?: boolean } = {},
 ): Promise<unknown> {
-  const job = (payload[":job"] as { deserialize(payload: Payload): DeserializableJob }).deserialize(
+  const job = (payload["job"] as { deserialize(payload: Payload): DeserializableJob }).deserialize(
     payload,
   );
-  if (Object.hasOwn(payload, ":at")) job.scheduledAt = Time.at(payload[":at"] as number);
+  if (Object.hasOwn(payload, "at")) job.scheduledAt = Time.at(payload["at"] as number);
   if (!skipDeserializeArguments) await job.deserializeArgumentsIfNeeded();
   return job;
 }

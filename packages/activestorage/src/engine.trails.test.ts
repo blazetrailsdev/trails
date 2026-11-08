@@ -36,7 +36,7 @@ describe("ActiveStorage::Engine", () => {
 
   it("draws nothing when draw_routes is false", async () => {
     const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;
-    const before = routes.routes.length;
+    const before = routes.routes().length;
     ActiveStorage.drawRoutes = false;
     try {
       // @ts-expect-error a query string forces a fresh evaluation
@@ -44,7 +44,7 @@ describe("ActiveStorage::Engine", () => {
     } finally {
       ActiveStorage.drawRoutes = true;
     }
-    expect(routes.routes.length).toBe(before);
+    expect(routes.routes().length).toBe(before);
   });
 
   it("replays active_storage_reflection for a class loaded after the hook fired", () => {

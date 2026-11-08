@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
+  File,
   fsAdapterConfig,
+  RuntimeError,
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
@@ -91,12 +93,20 @@ describe("PathsTest", () => {
     install(true);
     root = new Root("/foo/bar");
     root.add("app", { with: "/app", loadPath: true });
-    expect(root.get("app")!.isLoadPath()).toBe(true);
+    expect(root.get("app")!.isLoadPath()).toBeTruthy();
     expect(await root.loadPaths()).toEqual(["/app"]);
   });
 
   test("load paths does NOT include files", async () => {
-    root.add("app/README.md", { loadPath: true });
+    root.add("app/README.md", {
+      autoloadOnce: true,
+      eagerLoad: true,
+      autoload: true,
+      loadPath: true,
+    });
+    expect(await root.autoloadOnce()).toEqual([]);
+    expect(await root.eagerLoad()).toEqual([]);
+    expect(await root.autoloadPaths()).toEqual([]);
     expect(await root.loadPaths()).toEqual([]);
   });
 
@@ -137,8 +147,21 @@ describe("PathsIntegrationTest", () => {
       posixPath,
     );
     fsAdapterConfig.adapter = "sym";
+    expect(File.isSymlink("/foo/bar.rb")).toEqual(true);
+
     root = new Root("/foo");
     root.add("bar.rb");
-    await expect(root.get("bar.rb")!.existent()).rejects.toThrow(/symlink/);
+
+    let exception: Error | undefined;
+    await expect(
+      root
+        .get("bar.rb")!
+        .existent()
+        .catch((error: Error) => {
+          exception = error;
+          throw error;
+        }),
+    ).rejects.toThrow(RuntimeError);
+    expect(exception!.message).toMatch(File.expandPath("/foo/bar.rb"));
   });
 });

@@ -1,3 +1,4 @@
+import "../../../constants.test-unit-scaffold-scaffold-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`test_unit/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
   include,
@@ -6,18 +7,18 @@ import {
   singularize,
   underscore,
 } from "@blazetrails/activesupport";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import { format, File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { TEMPLATES } from "./templates.js";
 
 export interface ScaffoldGenerator
   extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
-export class ScaffoldGenerator extends NamedBase {
+export class ScaffoldGenerator extends Base {
   /** @internal */
   declare controllerName: string;
   /** @internal */

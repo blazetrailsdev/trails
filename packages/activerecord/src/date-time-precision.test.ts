@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -277,7 +278,7 @@ describe("DateTimePrecisionTest", () => {
         });
         await Foo.loadSchema();
         await inTimeZone("Pacific Time (US & Canada)", () => {
-          const time = zone()!.now();
+          const time = (zone() as TimeZone).now();
           expect((new Foo({ happened_at: time }) as any).happened_at.zone).toBe(time.zone);
         });
       });

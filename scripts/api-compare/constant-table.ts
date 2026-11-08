@@ -19,6 +19,7 @@ import {
   rubyFileToTs,
 } from "../parity/conventions.js";
 import { DIR_TO_PACKAGES, ROOT_DIR } from "./config.js";
+import { libRoot } from "../layout/package-roots.js";
 
 /** The `TS_CLASS_RENAMES` a Ruby path keeps: `Rails::Railtie` is `Rails::Trailtie`. */
 export const BRAND_RENAMES = ["Railtie", "Railties"];
@@ -35,6 +36,7 @@ export interface PackageLayout {
 /** A package with no row has its directories for roots. */
 export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   actioncable: { root: "ActionCable" },
+  actionmailbox: { root: "ActionMailbox", siblings: true },
   actionpack: {
     collapse: [
       "action-controller/metal",
@@ -46,6 +48,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
       "action-dispatch/http",
     ],
   },
+  actionmailer: { root: "ActionMailer", siblings: true },
   actionview: { root: "ActionView", collapse: ["renderer"] },
   activejob: { root: "ActiveJob" },
   activemodel: { root: "ActiveModel", siblings: true },
@@ -83,7 +86,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
 };
 
 function srcRoot(dir: string): string {
-  return File.join(ROOT_DIR, "packages", dir, "src");
+  return File.join(ROOT_DIR, "packages", dir, libRoot(dir));
 }
 
 function fileInflections(dir: string): Record<string, string> {

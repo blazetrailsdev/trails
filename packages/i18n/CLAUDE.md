@@ -54,7 +54,7 @@ where Rails returns a String, and an async `translate` makes it return a
   `translated_month_names` / `translated_date_order` (`:510`, `:566`),
   `weekday_options_for_select` (`form-options-helper.ts:271`), and
   `AbstractController::Translation#localize`
-  (`packages/actionpack/src/abstract-controller/translation.ts:56`).
+  (`packages/actionpack/lib/abstract-controller/translation.ts:56`).
 
 Two validator constructors translate as well (`activemodel/validations.ts:339`,
 `activerecord/validations.ts:29`), and a JS constructor cannot await at all.

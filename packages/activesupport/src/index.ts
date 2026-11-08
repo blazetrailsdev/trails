@@ -212,7 +212,6 @@ export {
   toXml,
   fromXml,
   fromTrustedXml,
-  HASH_CONVERSIONS,
 } from "./hash-utils.js";
 
 export { XMLConverter, DisallowedType, DISALLOWED_TYPES } from "./core-ext/hash/conversions.js";
@@ -275,7 +274,10 @@ export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 export { toF, toI } from "./core-ext/string/conversions.js";
 export { endsWith, startsWith } from "./core-ext/string/starts-ends-with.js";
-export { threadMattrAccessor } from "./core-ext/module/attribute-accessors-per-thread.js";
+export {
+  threadMattrAccessor,
+  threadMattrKey,
+} from "./core-ext/module/attribute-accessors-per-thread.js";
 
 export {
   delegate,
@@ -562,7 +564,6 @@ export {
 export type { Included, Extended, ModuleVisibility } from "@blazetrails/ruby-compat/include";
 export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
-export { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 export { prepend } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 

@@ -326,7 +326,10 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
       "ActiveRecord::RecordInvalid",
       "ActiveRecord::RecordNotSaved",
     ]);
-    await runTrailtieInitializers(ActionDispatchTrailtie, { deprecators: new Deprecators() });
+    await runTrailtieInitializers(ActionDispatchTrailtie, {
+      deprecators: new Deprecators(),
+      config: new Configuration("/app"),
+    });
     expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
     expect(new ExceptionWrapper(null, new RecordInvalid(null)).statusCode).toBe(422);
     expect(new ExceptionWrapper(null, new StaleObjectError()).statusCode).toBe(409);

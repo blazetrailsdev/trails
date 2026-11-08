@@ -1,6 +1,7 @@
+import "../../../constants.trails-devcontainer-devcontainer-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
+import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
 
@@ -22,7 +23,7 @@ export interface DevcontainerGeneratorOptions extends GeneratorOptions {
 
 type ResolvedOptions = Required<Omit<DevcontainerGeneratorOptions, keyof GeneratorOptions>>;
 
-export class DevcontainerGenerator extends GeneratorBase {
+export class DevcontainerGenerator extends Base {
   static {
     this.classOption("appName", { type: "string", default: "trails_app", desc: "Name of the app" });
     this.classOption("database", {
@@ -102,7 +103,7 @@ export class DevcontainerGenerator extends GeneratorBase {
       dev,
       kamal,
       sqliteDriver: this.options.sqliteDriver ?? "better-sqlite3",
-      nodeVersion: this.options.nodeVersion ?? "24.16.0",
+      nodeVersion: this.options.nodeVersion ?? "26.13.0",
     };
     this.database = Database.build(database);
   }

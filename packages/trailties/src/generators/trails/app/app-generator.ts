@@ -1,13 +1,26 @@
+import "../../../constants.trails-app-app-generator.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
-import { File, rbRegSUnion } from "@blazetrails/ruby-compat";
+import {
+  File,
+  STDOUT,
+  env,
+  exit,
+  included,
+  rbArgv,
+  rbRegSUnion,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
+import { presence } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
 import { Trails } from "../../../trails.js";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 import { VERSION } from "../../../gem-version.js";
+import { CredentialsGenerator } from "../credentials/credentials-generator.js";
+import { MasterKeyGenerator } from "../master-key/master-key-generator.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
@@ -47,15 +60,11 @@ const TRAILS = "trails";
 export class ActionMethods {
   declare readonly options: AppBaseOptions;
   /** @internal */
-  declare private generator: AppGenerator;
+  declare protected generator: AppGenerator;
 
   constructor(generator: AppGenerator) {
     this.generator = generator;
     this.options = generator.options;
-    return new Proxy(this, {
-      get: (target, key, receiver) =>
-        key in target ? Reflect.get(target, key, receiver) : target.methodMissing(key),
-    });
   }
 
   /** @internal */
@@ -121,16 +130,46 @@ export class ActionMethods {
     ](...args);
   }
 
-  /** @internal */
-  private methodMissing(key: string | symbol): unknown {
+  methodMissing(key: string | symbol): unknown {
     const value = (this.generator as unknown as Record<string | symbol, unknown>)[key];
     return typeof value === "function" ? value.bind(this.generator) : value;
   }
 }
 
+const spliced = new WeakSet<object>();
+
+const METHOD_MISSING_HANDLER: ProxyHandler<object> = {
+  get: (target, key, receiver: ActionMethods) =>
+    key in target || !Object.hasOwn(receiver, "generator")
+      ? Reflect.get(target, key, receiver)
+      : receiver.methodMissing(key),
+};
+
+Object.setPrototypeOf(
+  ActionMethods.prototype,
+  new Proxy(
+    Object.create(Object.getPrototypeOf(ActionMethods.prototype) as object) as object,
+    METHOD_MISSING_HANDLER,
+  ),
+);
+
+(ActionMethods as unknown as Record<symbol, unknown>)[included] = (base: object): void => {
+  if (typeof base !== "function") return;
+  if (base.prototype instanceof ActionMethods || spliced.has(base.prototype)) return;
+  spliced.add(base.prototype);
+  Object.setPrototypeOf(
+    base.prototype,
+    new Proxy(
+      Object.create(Object.getPrototypeOf(base.prototype) as object) as object,
+      METHOD_MISSING_HANDLER,
+    ),
+  );
+};
+
 Trails.ActionMethods = ActionMethods;
 
 export class AppBuilder extends ActionMethods {
+  declare readonly options: AppBaseOptions & AppGeneratorOptions;
   /** @internal */
   declare private readonly database: AppGenerator["database"];
   /** @internal */
@@ -143,6 +182,8 @@ export class AppBuilder extends ActionMethods {
   declare private readonly skipThruster: () => boolean | undefined;
   /** @internal */
   declare private readonly skipBrakeman: () => boolean | undefined;
+  /** @internal */
+  declare private readonly trailsCommand: OmitThisParameter<AppGenerator["trailsCommand"]>;
   /** @internal */
   declare private readonly gitInitCommand: () => Promise<string>;
   /** @internal */
@@ -319,6 +360,34 @@ export class AppBuilder extends ActionMethods {
     }
   }
 
+  async masterKey(): Promise<void> {
+    if (this.options.pretend || this.options.dummyApp) return;
+
+    const masterKeyGenerator = new MasterKeyGenerator([], {
+      quiet: this.options.quiet,
+      force: this.options.force,
+    });
+    await masterKeyGenerator.addMasterKeyFileSilently();
+    await masterKeyGenerator.ignoreMasterKeyFileSilently();
+  }
+
+  async credentials(): Promise<void> {
+    if (this.options.pretend || this.options.dummyApp) return;
+
+    await new CredentialsGenerator([], { quiet: true }).addCredentialsFile();
+  }
+
+  async credentialsDiffEnroll(): Promise<void> {
+    if (this.options.skipDecryptedDiffs || this.options.dummyApp || this.options.pretend) return;
+
+    await this.generator.shell.mute(() =>
+      this.trailsCommand("credentials:diff --enroll", {
+        inline: true,
+        shell: this.generator.shell,
+      }),
+    );
+  }
+
   /** @missingRailsArgs template — PERMANENT */
   async databaseYml(): Promise<void> {
     await this.template(this.database.template, "config/database.ts");
@@ -478,6 +547,8 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createConfigFiles");
     this.methodAdded("updateConfigFiles");
     this.removeCommand("updateConfigFiles");
+    this.methodAdded("createMasterKey");
+    this.methodAdded("createCredentials");
     this.methodAdded("createBootFile");
     this.methodAdded("createActiveRecordFiles");
     this.methodAdded("createDbFiles");
@@ -500,6 +571,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("deleteNewFrameworkDefaults");
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
+    this.publicCommand("generateBundlerBinstub");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
@@ -592,6 +664,15 @@ export class AppGenerator extends AppBase {
 
   async updateConfigFiles(): Promise<void> {
     await this.build("configWhenUpdating");
+  }
+
+  async createMasterKey(): Promise<void> {
+    await this.build("masterKey");
+  }
+
+  async createCredentials(): Promise<void> {
+    await this.build("credentials");
+    await this.build("credentialsDiffEnroll");
   }
 
   /** @missingRailsArgs template — PERMANENT */
@@ -726,5 +807,91 @@ export class AppGenerator extends AppBase {
   /** @internal */
   protected getBuilderClass(): new (generator: never) => object {
     return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
+  }
+}
+
+export class ARGVScrubber {
+  /** @internal */
+  private argv: string[];
+
+  constructor(argv: string[] = rbArgv()) {
+    this.argv = argv;
+  }
+
+  async prepareBang(): Promise<string[]> {
+    this.handleVersionRequestBang(this.argv[0]);
+    return this.handleInvalidCommandBang(this.argv[0], this.argv, () =>
+      this.handleRailsRcBang(this.argv.slice(1)),
+    );
+  }
+
+  static async defaultRcFile(): Promise<string> {
+    const xdgConfigHome = presence(env.XDG_CONFIG_HOME) ?? "~/.config";
+    const xdgRailsrc = File.expandPath("trails/railsrc", xdgConfigHome);
+    if (await File.isExistAsync(xdgRailsrc)) {
+      return xdgRailsrc;
+    } else {
+      return File.expandPath("~/.trailsrc");
+    }
+  }
+
+  /** @internal */
+  private handleVersionRequestBang(argument: string | undefined): void {
+    if (["--version", "-v"].includes(argument!)) {
+      STDOUT.puts(`Trails ${VERSION.STRING}`);
+      exit(0);
+    }
+  }
+
+  /** @internal */
+  private async handleInvalidCommandBang(
+    argument: string | undefined,
+    argv: string[],
+    block: () => Promise<string[]>,
+  ): Promise<string[]> {
+    if (argument === "new") {
+      return block();
+    } else {
+      return ["--help", ...argv.slice(1)];
+    }
+  }
+
+  /** @internal */
+  private async handleRailsRcBang(argv: string[]): Promise<string[]> {
+    if (argv.find((arg) => arg === "--no-rc") !== undefined) {
+      return argv.filter((arg) => arg !== "--no-rc");
+    } else {
+      return this.railsrc(argv, (rcArgv, rc) => this.insertRailsrcIntoArgvBang(rcArgv, rc));
+    }
+  }
+
+  /** @internal */
+  private async railsrc(
+    argv: string[],
+    block: (argv: string[], rc: string) => Promise<string[]>,
+  ): Promise<string[]> {
+    const customrc = argv.findIndex((x) => x.includes("--rc="));
+    if (customrc !== -1) {
+      const fname = File.expandPath(argv[customrc].replace(/--rc=/g, ""));
+      return block([...argv.slice(0, customrc), ...argv.slice(customrc + 1)], fname);
+    } else {
+      return block(argv, await (this.constructor as typeof ARGVScrubber).defaultRcFile());
+    }
+  }
+
+  /** @internal */
+  private async readRcFile(railsrc: string): Promise<string[]> {
+    const extraArgs = (await File.readlinesAsync(railsrc)).flatMap((line) =>
+      stringSplit(stringSplit(line, "#", 2)[0]),
+    );
+    STDOUT.puts(`Using ${extraArgs.join(" ")} from ${railsrc}`);
+    return extraArgs;
+  }
+
+  /** @internal */
+  private async insertRailsrcIntoArgvBang(argv: string[], railsrc: string): Promise<string[]> {
+    if (!(await File.isExistAsync(railsrc))) return argv;
+    const extraArgs = await this.readRcFile(railsrc);
+    return [...argv.slice(0, 1), ...extraArgs, ...argv.slice(1)];
   }
 }

@@ -38,6 +38,17 @@ repo owner set this (reversing trails#8573, which had made `action_name` the
 Rails spelling): an application names its own methods, and two spellings for
 one action with a conversion between them was rejected in favour of one rule.
 
+**A non-action helper is `_`-prefixed or `#private`.** Rails' `action_methods`
+is `public_instance_methods(true) - internal_methods`
+(`actionpack/lib/abstract_controller/base.rb:77-107`), so a `private def` helper
+is never an action. TypeScript's `private` keyword leaves nothing at run time
+(CLAUDE.md, "Method visibility is compile-time only"), so a `private` method is
+listed by `actionMethods()` and dispatchable through a dynamic `:action`
+segment. A controller's helper is written `_setPost()`, which a callback can
+still name (`beforeAction(":_setPost")`), or as an ES `#setPost()` method, which
+is not on the prototype at all; `actionMethods()` and `isAvailableAction()` skip
+both (`abstract-controller/base.trails.test.ts`).
+
 **What lives in a file is kebab-case.** A template's file name and a
 lazy-lookup locale key are the action's name in kebab-case: the action
 `nextBundle` renders `next-bundle.html.tse` and scopes `t(".title")` by
@@ -58,7 +69,7 @@ name becomes a file name or a locale key, and each site carries
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
 - `ActionMailer::Base#collectResponsesFromTemplates`
-  (`actionmailer/src/base.ts`; `base.rb:991-1002`), which also dasherizes the
+  (`actionmailer/lib/base.ts`; `base.rb:991-1002`), which also dasherizes the
   default `mailer_name` directory, as `localPrefixes` does
 
 The DIRECTORY a controller's templates are looked up in is kebab-case too.
@@ -89,7 +100,7 @@ under `layouts` and drop the prefix. A layout the application names itself is
 looked up as written.
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
-template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
+template a controller's `render` call names (`trails-tsc/lib/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal
 `template:` as written. The conversion sits at these call sites and not inside
 the template resolver, because the resolver is also handed names an application
@@ -227,7 +238,7 @@ is `super(msg)` and then `set_backtrace $!.backtrace if $!`. JS has no
 equivalent: a `catch` binds its exception to a local only, and no hook runs on
 entry to a `catch` that could seat a carrier. **The exception being rescued is
 passed as a trailing `errinfo` parameter.** `excSetupMessage(mesg, errinfo)`
-(`ruby-compat/src/exception.ts`) is the shape for `raise`'s implicit `cause:`,
+(`ruby-compat/lib/exception.ts`) is the shape for `raise`'s implicit `cause:`,
 and `new BadRequest(msg, errinfo)` is the shape for a constructor that reads
 `$!`. A carrier that every rescue site has to set would be an invented call at
 each site, and would still be wrong as soon as an `await` interleaved two
@@ -261,6 +272,22 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## A colon-leading route path is a Symbol (`Mapper#map_match`'s `path_types`)
+
+`Mapper#map_match` (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/routing/mapper.rb:1962-2006`)
+groups its paths by class: a String is a path (`post ":action"` draws
+`/:action(.:format)` with a dynamic segment), a Symbol is an action
+(`post :action` draws `/action(.:format)`, `path_for_action`, `:1887-1895`).
+A Ruby Symbol is a colon-leading JS string (root CLAUDE.md, § "Ruby idioms that
+do not translate literally"), so the two are one JS value at the Mapper's
+signature, and `mapMatch` reads `/^:\w+[?!=]?$/` as the Symbol arm.
+
+So a String path that starts with `:` is written with its leading slash:
+Rails' `post ":action", to: ...`
+(`actionpack/test/dispatch/request/multipart_params_parsing_test.rb:162`) is
+`this.post("/:action", { to })`. `Mapping.normalize_path` (`mapper.rb:116-117`, called at `:2058`)
+draws both spellings as the same route. Ruled by the repo owner on 2026-11-06.
 
 ## `method_missing` definers in this package
 

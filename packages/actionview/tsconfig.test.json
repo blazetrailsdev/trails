@@ -3,11 +3,11 @@
   "compilerOptions": {
     "outDir": "dist-test",
     "paths": {
-      "@blazetrails/actionpack": ["../actionpack/src/index.ts"],
+      "@blazetrails/actionpack": ["../actionpack/lib/index.ts"],
       "@blazetrails/activemodel": ["../activemodel/src/index.ts"],
       "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
       "@blazetrails/rack": ["../rack/src/index.ts"],
-      "@blazetrails/trails-tsc": ["../trails-tsc/src/index.ts"],
+      "@blazetrails/trails-tsc": ["../trails-tsc/lib/index.ts"],
       "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"],
       "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
     }

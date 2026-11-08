@@ -1,8 +1,9 @@
+import "../../../constants.trails-resource-resource-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`resource_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import { include, type Included, pluralize } from "@blazetrails/activesupport";
 import { ModelGenerator, type ModelGeneratorOptions } from "../model/model-generator.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
-import type { GeneratorBase, GeneratorConfig } from "../../base.js";
+import type { Base, GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 export interface ResourceGeneratorOptions extends ModelGeneratorOptions {
@@ -41,7 +42,7 @@ include(ResourceGenerator, ResourceHelpers);
 ResourceGenerator.hookFor(
   "resourceController",
   { required: true },
-  function (this: GeneratorBase, controller: GeneratorClass) {
+  function (this: Base, controller: GeneratorClass) {
     return this.invoke(controller, [
       (this as ResourceGenerator).controllerName,
       (this.options as ResourceGeneratorOptions).actions,

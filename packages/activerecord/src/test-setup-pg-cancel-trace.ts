@@ -13,7 +13,7 @@ interface CancelRecord {
 }
 
 interface TracedAdapter {
-  _rawConnection: { processID?: number | null; transactionStatus(): number } | null;
+  _rawConnection: { client: { processID?: number | null }; transactionStatus(): number } | null;
   cancelAnyRunningQuery(...args: unknown[]): Promise<void>;
 }
 
@@ -83,7 +83,7 @@ if (!proto[WRAPPED_KEY]) {
   proto.cancelAnyRunningQuery = function (this: TracedAdapter, ...args: unknown[]) {
     state.records.push({
       at: now(),
-      pid: this._rawConnection?.processID,
+      pid: this._rawConnection?.client.processID,
       transactionStatus:
         this._rawConnection == null ? "no raw connection" : this._rawConnection.transactionStatus(),
       ...currentTest(),

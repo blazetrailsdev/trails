@@ -1,10 +1,9 @@
+import "../constants.generated-attribute.generated.js";
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
-import { Error as ThorError } from "@blazetrails/thor/error";
+import { Error as GeneratorError } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-
-export class GeneratorError extends ThorError {}
 
 export type AttrOptions = Record<string, unknown>;
 export type IndexType = "index" | "uniq" | undefined;

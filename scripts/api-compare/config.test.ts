@@ -24,10 +24,10 @@ describe("PACKAGE_DIRS", () => {
   });
 
   it.each([
-    ["actiondispatch", "packages/actionpack/src/action-dispatch"],
-    ["actioncontroller", "packages/actionpack/src/action-controller"],
-    ["abstractcontroller", "packages/actionpack/src/abstract-controller"],
-    ["actionpackversion", "packages/actionpack/src/action-pack"],
+    ["actiondispatch", "packages/actionpack/lib/action-dispatch"],
+    ["actioncontroller", "packages/actionpack/lib/action-controller"],
+    ["abstractcontroller", "packages/actionpack/lib/abstract-controller"],
+    ["actionpackversion", "packages/actionpack/lib/action-pack"],
     ["arel", "packages/arel/src"],
     ["trailties", "packages/trailties/src"],
   ])("spells %s's src dir the way the repo does", (pkg, dir) => {
@@ -55,9 +55,9 @@ describeManifest("rails-private-methods manifest", () => {
   });
 
   it.each([
-    ["packages/actionpack/src/action-controller/base.ts", "contentSecurityPolicy"],
+    ["packages/actionpack/lib/action-controller/base.ts", "contentSecurityPolicy"],
     [
-      "packages/actionpack/src/action-controller/metal/content-security-policy.ts",
+      "packages/actionpack/lib/action-controller/metal/content-security-policy.ts",
       "contentSecurityPolicy",
     ],
     ["packages/activemodel/src/attributes.ts", "attribute"],

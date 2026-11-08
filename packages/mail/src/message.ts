@@ -1,9 +1,13 @@
 import {
+  rbEqual,
+  binaryBytes,
+  binaryString,
   cmp,
   flatten,
   NoMethodError,
   rbObjAsString,
   rbObjDup,
+  rbObjRespondTo,
   rbObjId,
   strip,
   stringSplit,
@@ -13,7 +17,19 @@ import {
   Exception,
   StandardError,
   rtest,
+  constGet,
+  eachPair,
+  Hash,
+  hashAref,
+  hashDelete,
+  NameError,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbDeclareIvar,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
+import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "./body.js";
 import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
@@ -32,6 +48,7 @@ import { IndifferentHash } from "./indifferent-hash.js";
 import { Mail } from "./mail.js";
 import type { PartsList } from "./parts-list.js";
 import { Utilities } from "./utilities.js";
+import { YAML as MailYAML } from "./yaml.js";
 
 type MessageBlock = ((this: Message, message: Message) => unknown) | undefined;
 
@@ -52,24 +69,25 @@ export class Message {
   protected _separateParts = false;
   protected _textPart: Message | null = null;
   protected _htmlPart: Message | null = null;
+  /** @internal */
+  protected _errors: unknown = null;
   protected _header: Header | null = null;
   protected _charset: string | null;
   protected _defaultedCharset = true;
   protected _smtpEnvelopeFrom: unknown = null;
   protected _smtpEnvelopeTo: unknown = null;
+  performDeliveries = true;
+  raiseDeliveryErrors = true;
+  deliveryHandler: unknown = null;
+  /** @internal */
+  _deliveryMethod: unknown = null;
   protected _transportEncoding: unknown;
   protected _markForDelete = false;
-  protected _rawSource = "";
+  protected _rawSource: string | Uint8Array = "";
   protected _rawEnvelope: unknown = null;
   protected _envelope: Envelope | null = null;
   protected _deliveryStatusPart: Part | null | undefined;
   protected _attachment: unknown = undefined;
-
-  deliveryHandler: unknown = null;
-  /** @internal */
-  _deliveryMethod: unknown = null;
-  performDeliveries = true;
-  raiseDeliveryErrors = true;
 
   static get defaultCharset(): string {
     return defaultCharset;
@@ -87,10 +105,10 @@ export class Message {
     this._transportEncoding = Encodings.getEncoding("7bit");
 
     const first = flatten(args)[0];
-    if (typeof first === "object" && first !== null && !(first instanceof Body)) {
+    if (rbObjRespondTo(first, "eachPair")) {
       this.initWithHash(first as Record<string, unknown>);
     } else {
-      this.initWithString(rbObjAsString(first ?? ""));
+      this.initWithString(rbObjAsString(first ?? "") as string | Uint8Array);
     }
 
     if (block !== undefined) {
@@ -184,7 +202,7 @@ export class Message {
     return reply;
   }
 
-  compare(other: Message | null): number | null {
+  compareTo(other: Message | null): number | null {
     if (other == null) {
       return 1;
     } else {
@@ -195,23 +213,24 @@ export class Message {
 
   equals(other: Message | null | undefined): boolean {
     if (typeof other?.encoded !== "function") return false;
+
     if (present(this.messageId()) && present(other.messageId())) {
-      return this.encoded() === other.encoded();
+      return rbEqual(this.encoded(), other.encoded());
     } else {
-      const m = new (this.constructor as typeof Message)(this.encoded());
+      const m = rbObjDup(this);
       m.setMessageId("<temp@test>");
-      const o = new (other.constructor as typeof Message)(other.encoded());
+      const o = rbObjDup(other);
       o.setMessageId("<temp@test>");
-      return m.encoded() === o.encoded();
+      return rbEqual(m.encoded(), o.encoded());
     }
   }
 
   initializeCopy(_original: Message): this {
-    this._header = this._header!.constructor === Header ? new Header(this._header.encoded()) : null;
+    this._header = rbObjDup(this._header!);
     return this;
   }
 
-  get rawSource(): string {
+  get rawSource(): string | Uint8Array {
     return this._rawSource;
   }
 
@@ -245,8 +264,8 @@ export class Message {
     return this._header!;
   }
 
-  headers(hash: Record<string, unknown> = {}): void {
-    for (const [k, v] of Object.entries(hash)) this.header().set(k, v);
+  headers(hash: Record<string, unknown> | Hash<string, unknown> = {}): void {
+    eachPair(hash, (k, v) => this.header().set(k, v));
   }
 
   errors(): unknown[] {
@@ -928,12 +947,13 @@ export class Message {
     this.addRequiredFields();
   }
 
-  encoded(): string {
+  encoded(): string | Uint8Array {
     this.readyToSendBang();
     let buffer = this.header().encoded();
     buffer += "\r\n";
     const body = this.body().encoded(this.contentTransferEncoding() as string | null);
-    buffer += typeof body === "string" ? body : new TextDecoder("latin1").decode(body);
+    if (body instanceof Uint8Array) return new Uint8Array([...binaryBytes(buffer), ...body]);
+    buffer += body;
     return buffer;
   }
 
@@ -950,12 +970,57 @@ export class Message {
     return this;
   }
 
+  toYaml(opts: Record<string, unknown> = {}): string {
+    const hash: Record<string, unknown> = {};
+    hash["headers"] = {};
+    this.header().fields.forEach((field) => {
+      (hash["headers"] as Record<string, unknown>)[field.name] = field.value;
+    });
+    if (this.deliveryHandler != null && this.deliveryHandler !== false) {
+      hash["delivery_handler"] = rbObjAsString(this.deliveryHandler);
+    }
+    hash["transport_encoding"] = rbObjAsString(this.transportEncoding());
+    const specialVariables = ["@header", "@delivery_handler", "@transport_encoding"];
+    if (this.isMultipart()) {
+      hash["multipart_body"] = [];
+      this.body().parts.map((part) => (hash["multipart_body"] as string[]).push(part.toYaml()));
+      specialVariables.push("@body", "@text_part", "@html_part");
+    }
+    for (const v of rbObjInstanceVariables(this).filter((v) => !specialVariables.includes(v))) {
+      hash[v] = rbObjIvarGet(this, v);
+    }
+    return toYaml(hash, opts);
+  }
+
+  static fromYaml(str: string): Message {
+    const hash = MailYAML.load(str) as Hash<string, unknown>;
+    const m = new this({ headers: hashAref(hash, "headers") });
+    hashDelete(hash, "headers");
+    eachPair(hash, (k, v) => {
+      if (k === "delivery_handler") {
+        try {
+          if (!Utilities.isBlank(v)) m.deliveryHandler = constGet(TopLevel, v as string);
+        } catch (e) {
+          if (!(e instanceof NameError)) throw e;
+        }
+      } else if (k === "transport_encoding") {
+        m.transportEncoding(v);
+      } else if (k === "multipart_body") {
+        (v as string[]).map((part) => m.addPart(Mail.Part.fromYaml(part) as Part));
+      } else if (/^@/.test(k)) {
+        rbObjIvarSet(m, k, v);
+      }
+    });
+    return m;
+  }
+
   static fromHash(hash: Record<string, unknown>): Message {
     return new Message(hash);
   }
 
   toString(): string {
-    return this.encoded();
+    const encoded = this.encoded();
+    return encoded instanceof Uint8Array ? binaryString(encoded) : encoded;
   }
 
   inspect(): string {
@@ -1030,11 +1095,17 @@ export class Message {
 
   /** @internal */
   protected parseMessage(): void {
-    const [headerPart, bodyPart] = stringSplit(
-      this.rawSource.replace(/^[\s\0]+/, ""),
+    const rawSource = this.rawSource;
+    const binary = rawSource instanceof Uint8Array;
+    let [headerPart, bodyPart]: (string | Uint8Array | undefined)[] = stringSplit(
+      (binary ? binaryString(rawSource) : rawSource).replace(/^[\0\t\n\v\f\r ]+/, ""),
       new RegExp(`${Constants.LAX_CRLF.source}${Constants.LAX_CRLF.source}`),
       2,
     );
+    if (binary) {
+      headerPart = headerPart == null ? headerPart : binaryBytes(headerPart);
+      bodyPart = bodyPart == null ? bodyPart : binaryBytes(bodyPart);
+    }
     this.setHeader(headerPart ?? null);
     this.setBody(bodyPart ?? null);
   }
@@ -1063,13 +1134,16 @@ export class Message {
 
   /** @internal */
   private setEnvelopeHeader(): void {
-    const rawString = rbObjAsString(this.rawSource);
+    const rawSource = rbObjAsString(this.rawSource) as string | Uint8Array;
+    const binary = rawSource instanceof Uint8Array;
+    const rawString = binary ? binaryString(rawSource) : rawSource;
     const matchData = new RegExp(
       `^From\\s+([^:\\s]${Constants.TEXT.source}*)${Constants.LAX_CRLF.source}`,
     ).exec(rawString);
     if (matchData) {
       this.setEnvelope(matchData[1]);
-      this._rawSource = rawString.replace(matchData[0], "");
+      const rest = rawString.replace(matchData[0], "");
+      this._rawSource = binary ? binaryBytes(rest) : rest;
     }
   }
 
@@ -1191,7 +1265,7 @@ export class Message {
   }
 
   /** @internal */
-  protected initWithString(string: string): void {
+  protected initWithString(string: string | Uint8Array): void {
     this._rawSource = string;
     this.setEnvelopeHeader();
     this.parseMessage();
@@ -1256,3 +1330,24 @@ export class Message {
   }
 }
 Mail.Message = Message;
+rbDeclareIvar(Message, "@body", "_body");
+rbDeclareIvar(Message, "@body_raw", "_bodyRaw");
+rbDeclareIvar(Message, "@separate_parts", "_separateParts");
+rbDeclareIvar(Message, "@text_part", "_textPart");
+rbDeclareIvar(Message, "@html_part", "_htmlPart");
+rbDeclareIvar(Message, "@errors", "_errors");
+rbDeclareIvar(Message, "@header", "_header");
+rbDeclareIvar(Message, "@charset", "_charset");
+rbDeclareIvar(Message, "@defaulted_charset", "_defaultedCharset");
+rbDeclareIvar(Message, "@smtp_envelope_from", "_smtpEnvelopeFrom");
+rbDeclareIvar(Message, "@smtp_envelope_to", "_smtpEnvelopeTo");
+rbDeclareIvar(Message, "@perform_deliveries", "performDeliveries");
+rbDeclareIvar(Message, "@raise_delivery_errors", "raiseDeliveryErrors");
+rbDeclareIvar(Message, "@delivery_method", "_deliveryMethod");
+rbDeclareIvar(Message, "@transport_encoding", "_transportEncoding");
+rbDeclareIvar(Message, "@mark_for_delete", "_markForDelete");
+rbDeclareIvar(Message, "@raw_source", "_rawSource");
+rbDeclareIvar(Message, "@raw_envelope", "_rawEnvelope");
+rbDeclareIvar(Message, "@envelope", "_envelope");
+rbDeclareIvar(Message, "@delivery_status_part", "_deliveryStatusPart");
+rbDeclareIvar(Message, "@attachment", "_attachment");

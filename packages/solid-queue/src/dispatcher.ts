@@ -28,15 +28,10 @@ export class Dispatcher extends Poller {
   static {
     include(this, LifecycleHooks);
 
-    const host = this as unknown as {
-      afterBoot(name: string): void;
-      beforeShutdown(name: string): void;
-      afterShutdown(name: string): void;
-    };
-    host.afterBoot(":runStartHooks");
-    host.afterBoot(":startConcurrencyMaintenance");
-    host.beforeShutdown(":stopConcurrencyMaintenance");
-    host.afterShutdown(":runStopHooks");
+    this.afterBoot(":runStartHooks");
+    this.afterBoot(":startConcurrencyMaintenance");
+    this.beforeShutdown(":stopConcurrencyMaintenance");
+    this.afterShutdown(":runStopHooks");
   }
 
   batchSize: number;

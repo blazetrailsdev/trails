@@ -3,9 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "references": [{ "path": "../ruby-compat" }],
-  "exclude": ["src/**/*.test.ts"]
+  "include": ["lib"],
+  "references": [{ "path": "../ruby-compat" }]
 }

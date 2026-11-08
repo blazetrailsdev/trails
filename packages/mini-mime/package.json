@@ -20,12 +20,12 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:db",
-    "build:db": "cp -R src/db dist/"
+    "build:db": "cp -R lib/db dist/"
   },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   }
 }

@@ -3,10 +3,14 @@
   "compilerOptions": {
     "outDir": "dist-test",
     "paths": {
-      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/src/test-helpers/*.ts"]
+      "@blazetrails/actioncable/test-helpers/*": ["../actioncable/test/support/*.ts"]
     }
   },
   "exclude": [],
   "include": ["src/**/*.test.ts", "src/test-helpers/**/*", "src/**/__fixtures__"],
-  "references": [{ "path": "./tsconfig.json" }, { "path": "../actioncable/tsconfig.test.json" }]
+  "references": [
+    { "path": "./tsconfig.json" },
+    { "path": "../actionmailbox" },
+    { "path": "../actioncable/tsconfig.test.json" }
+  ]
 }

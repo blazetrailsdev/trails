@@ -1,3 +1,4 @@
+import "../../../constants.trails-channel-channel-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
 import { dasherize, type GeneratorOptions } from "../../base.js";
@@ -73,10 +74,7 @@ export class ChannelGenerator extends NamedBase {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing
-   */
+  /** @internal */
   private async createChannelFile(): Promise<void> {
     await this.template(
       "channel.ts",
@@ -130,7 +128,7 @@ export class ChannelGenerator extends NamedBase {
     if (await this.isUsingBun()) {
       await this.run("bun add @rails/actioncable");
     } else if (await this.isUsingNode()) {
-      await this.run("pnpm add @rails/actioncable");
+      await this.run("yarn add @rails/actioncable");
     }
   }
 
@@ -147,6 +145,7 @@ pin_all_from "app/javascript/channels", under: "channels"
   /** @internal */
   private __fileName?: string;
 
+  /** @internal */
   override get fileName(): string {
     return (this.__fileName ??= super.fileName.replace(/_channel$/i, ""));
   }

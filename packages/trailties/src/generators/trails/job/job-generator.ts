@@ -1,3 +1,4 @@
+import "../../../constants.trails-job-job-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
@@ -33,7 +34,6 @@ export class JobGenerator extends NamedBase {
   /** @internal */
   private _applicationJobFileName?: string;
 
-  /** @missingRailsArgs template — PERMANENT */
   async createJobFile(): Promise<void> {
     await this.template(
       "job.ts",
@@ -47,21 +47,22 @@ export class JobGenerator extends NamedBase {
     });
   }
 
+  /** @internal */
   parentClassName(): string {
     return this.options.parent!;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall mountable_engine? — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms
-   */
+  /** @internal */
   private applicationJobFileName(): string {
-    return (this._applicationJobFileName ??= `app/jobs/application-job${this.ext()}`);
+    return (this._applicationJobFileName ??= this.isMountableEngine()
+      ? `app/jobs/${this.namespacedPath()}/application-job${this.ext()}`
+      : `app/jobs/application-job${this.ext()}`);
   }
 
   /** @internal */
   private __fileName?: string;
 
+  /** @internal */
   override get fileName(): string {
     return (this.__fileName ??= super.fileName.replace(/_job$/i, ""));
   }

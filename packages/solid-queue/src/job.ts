@@ -54,6 +54,7 @@ export class Job extends Record {
   declare isScheduled: () => Promise<boolean>;
   declare isClaimed: typeof Executable.prototype.isClaimed;
   declare isFailed: typeof Executable.prototype.isFailed;
+  declare static finished: () => Relation<Job>;
   declare static clearable: (options?: {
     finishedBefore?: unknown;
     className?: string | null;
@@ -62,6 +63,7 @@ export class Job extends Record {
   declare static releaseAllConcurrencyLocks: typeof ConcurrencyControlsClassMethods.releaseAllConcurrencyLocks;
   declare claimedExecution: Promise<Base | null>;
   declare failedExecution: Promise<FailedExecution | null>;
+  declare recurringExecution: Promise<import("./recurring-execution.js").RecurringExecution | null>;
   declare blockedExecution: Promise<Base | null>;
   declare concurrencyLimit: () => number | null;
   declare concurrencyDuration: () => Duration;

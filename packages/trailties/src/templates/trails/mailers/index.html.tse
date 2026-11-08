@@ -1,0 +1,15 @@
+<h1><%= this.pageTitle %></h1>
+
+<% if (this.previews.length > 0) { %>
+  <% for (const preview of this.previews) { %>
+  <h3><%= linkTo(ActiveSupport.Inflector.titleize(preview.previewName()), urlFor({ controller: "trails/mailers", action: "preview", path: preview.previewName() })) %></h3>
+  <ul>
+  <% for (const email of preview.emails()) { %>
+  <li><%= linkTo(email, urlFor({ controller: "trails/mailers", action: "preview", path: `${preview.previewName()}/${email}` })) %></li>
+  <% } %>
+  </ul>
+  <% } %>
+<% } else { %>
+  <p>You have not defined any Action Mailer Previews.</p>
+  <p>Read <%= linkTo("Action Mailer Basics", "https://guides.rubyonrails.org/action_mailer_basics.html#previewing-emails") %> to learn how to define your first.</p>
+<% } %>

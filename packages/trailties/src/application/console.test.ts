@@ -3,8 +3,10 @@ import { PassThrough } from "node:stream";
 import type { REPLServer } from "node:repl";
 import { RouteSet } from "@blazetrails/actionpack";
 import {
+  STDIN,
   TopLevel,
   constSet,
+  getProcessAdapter,
   rbModRemoveConst,
   registerReplAdapter,
   replAdapterConfig,
@@ -78,6 +80,8 @@ describe("FullStackConsoleTest", () => {
 
   beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(STDIN, "isTty").mockReturnValue(true);
+    vi.spyOn(getProcessAdapter(), "exit").mockImplementation((() => undefined) as never);
     class ApplicationController {
       static helpers() {
         return { truncate: (s: string) => `${s.slice(0, 27)}...` };
@@ -129,5 +133,11 @@ describe("FullStackConsoleTest", () => {
     await spawnConsole("-e development");
 
     await writePrompt("(await newSession()).constructor.name", "Session");
+  });
+
+  it("app helper method", async () => {
+    await spawnConsole("-e development");
+
+    await writePrompt("(await app()).fooPath()", "/foo");
   });
 });

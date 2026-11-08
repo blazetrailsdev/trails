@@ -1,11 +1,12 @@
+import { onLoad } from "@blazetrails/activesupport";
+import type { TestCase } from "@blazetrails/activesupport/test-case";
+import { File, extend, rbFLoad } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
+import { Trails } from "../trails.js";
+import { LineFiltering } from "./line-filtering.js";
 
 type GeneratorsDsl = Record<string, (namespace: string, configuration?: object) => void>;
 
-/**
- * @missingRailsCall initializer — CONVERGEABLE test-unit-railtie-line-filtering-and-rake-tasks
- * @missingRailsCall rake_tasks — CONVERGEABLE test-unit-railtie-line-filtering-and-rake-tasks
- */
 export class TestUnitRailtie extends Trailtie {
   static {
     Trailtie.register(this);
@@ -17,7 +18,18 @@ export class TestUnitRailtie extends Trailtie {
       c.integrationTool("test_unit");
       c.systemTests("test_unit");
     });
+
+    this.initializer("test_unit.line_filtering", () => {
+      onLoad("active_support_test_case", function (this: typeof TestCase) {
+        extend(this, LineFiltering);
+      });
+    });
+
+    this.rakeTasks(async () => {
+      await rbFLoad(File.join(import.meta.dirname, `testing${File.extname(import.meta.filename)}`));
+    });
   }
 }
 
 Object.defineProperty(TestUnitRailtie, "name", { value: "Trails::TestUnitRailtie" });
+Trails.TestUnitRailtie = TestUnitRailtie;

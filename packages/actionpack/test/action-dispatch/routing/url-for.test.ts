@@ -1,0 +1,296 @@
+import { describe, expect, it, vi } from "vitest";
+import { ModelName } from "@blazetrails/activemodel";
+
+import { type Hash, include, RuntimeError } from "@blazetrails/ruby-compat";
+
+import { UrlFor as AbstractControllerUrlFor } from "../../../lib/abstract-controller/url-for.js";
+import { Parameters } from "../../../lib/action-controller/metal/strong-parameters.js";
+
+import {
+  _routesIvar,
+  _routesContext,
+  _withRoutes,
+  fullUrlFor,
+  optimizeRoutesGeneration,
+  routeFor,
+  urlFor,
+  urlOptions,
+  type UrlForHost,
+  type UrlForOptions,
+  type UrlForRoutes,
+} from "../../../lib/action-dispatch/routing/url-for.js";
+import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
+
+function makeRoutes(): UrlForRoutes & {
+  calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]>;
+} {
+  const calls: Array<[Record<string, unknown> | Hash<string, unknown>, string | null | undefined]> =
+    [];
+  return {
+    calls,
+    urlFor(opts, routeName) {
+      calls.push([opts, routeName ?? null]);
+      return `/generated?${Object.keys(opts).sort().join(",")}`;
+    },
+    isOptimizeRoutesGeneration() {
+      return true;
+    },
+  };
+}
+
+function makeHost(overrides: Partial<UrlForHost> = {}): UrlForHost {
+  const { _routes: routes = makeRoutes(), ...rest } = overrides;
+  const host = {
+    get _routes(): UrlForRoutes | null {
+      return (this as unknown as Record<symbol, UrlForRoutes | null>)[_routesIvar] ?? routes;
+    },
+    defaultUrlOptions: {},
+    urlOptions() {
+      return urlOptions.call(this);
+    },
+    ...rest,
+  } as UrlForHost;
+  return host;
+}
+
+describe("ActionDispatch::Routing::UrlFor", () => {
+  it("urlFor() delegates to fullUrlFor", () => {
+    const host = makeHost();
+    const spy = vi.spyOn(host._routes as UrlForRoutes, "urlFor");
+    urlFor.call(host, { controller: "users", action: "new" });
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it("nil options → _routes.urlFor(urlOptions)", () => {
+    const host = makeHost({ defaultUrlOptions: { host: "example.com" } });
+    const out = fullUrlFor.call(host, null);
+    expect(out).toBe("/generated?host");
+  });
+
+  it("string options → returned verbatim", () => {
+    expect(fullUrlFor.call(makeHost(), "/already/built")).toBe("/already/built");
+  });
+
+  it("hash options merge under urlOptions and strip use_route", () => {
+    const host = makeHost({ defaultUrlOptions: { host: "example.com" } });
+    const routes = host._routes as ReturnType<typeof makeRoutes>;
+    fullUrlFor.call(host, { controller: "posts", useRoute: "post" });
+    const [opts, routeName] = routes.calls[0];
+    expect(routeName).toBe("post");
+    expect(opts).toEqual({ host: "example.com", controller: "posts" });
+    expect(opts).not.toHaveProperty("useRoute");
+  });
+
+  it("use_route accepts Symbol (Rails parity) → uses description", () => {
+    const host = makeHost();
+    const routes = host._routes as ReturnType<typeof makeRoutes>;
+    fullUrlFor.call(host, { useRoute: ":post" });
+    expect(routes.calls[0][1]).toBe("post");
+  });
+
+  it("explicit option wins over urlOptions default", () => {
+    const host = makeHost({ defaultUrlOptions: { host: "default.test" } });
+    const routes = host._routes as ReturnType<typeof makeRoutes>;
+    fullUrlFor.call(host, { host: "override.test" });
+    expect(routes.calls[0][0]).toEqual({ host: "override.test" });
+  });
+
+  it("symbol options delegate to HelperMethodBuilder.url().handleStringCall", () => {
+    const userUrl = vi.fn(() => "/users");
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
+    const result = fullUrlFor.call(host, ":user");
+    expect(result).toBe("/users");
+    expect(userUrl).toHaveBeenCalledOnce();
+  });
+
+  it("class options delegate to HelperMethodBuilder.url().handleClassCall", () => {
+    const usersUrl = vi.fn(() => "/users");
+    class User {
+      static modelName = new ModelName(this, null, "User");
+    }
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["usersUrl"] = usersUrl;
+    const result = fullUrlFor.call(host, User);
+    expect(result).toBe("/users");
+    expect(usersUrl).toHaveBeenCalledOnce();
+  });
+
+  it("model instance options delegate to HelperMethodBuilder.url().handleModelCall", () => {
+    const userUrl = vi.fn(() => "/users/1");
+    const modelName = new ModelName(class User {}, null, "User");
+    class UserRecord {
+      toModel() {
+        return { modelName, isPersisted: () => true };
+      }
+    }
+    const user = new UserRecord();
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
+    const result = fullUrlFor.call(host, user);
+    expect(result).toBe("/users/1");
+    expect(userUrl).toHaveBeenCalledOnce();
+  });
+
+  it("array options delegate to host.polymorphicUrl when present", () => {
+    const polymorphicUrl = vi.fn(() => "/posts/1");
+    const host = makeHost({ polymorphicUrl });
+    const result = fullUrlFor.call(host, [{ id: 1 }, { only_path: true }]);
+    expect(result).toBe("/posts/1");
+    expect(polymorphicUrl).toHaveBeenCalledWith([{ id: 1 }], { only_path: true });
+  });
+
+  it("routeFor calls `${name}_url` on the host (matches generateRouteHelpers)", () => {
+    const userUrl = vi.fn(() => "/users/42");
+    const host = makeHost();
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
+    expect(routeFor.call(host, "user", { id: 42 })).toBe("/users/42");
+    expect(userUrl).toHaveBeenCalledWith({ id: 42 });
+  });
+
+  it("routeFor throws when helper missing", () => {
+    expect(() => routeFor.call(makeHost(), "missing")).toThrow(/missingUrl/);
+  });
+
+  it("permitted ActionController::Parameters route through hash branch", () => {
+    const params = new Parameters({ controller: "posts", action: "show", id: 7 });
+    params.permitBang();
+    const host = makeHost();
+    const routes = host._routes as ReturnType<typeof makeRoutes>;
+    fullUrlFor.call(host, params);
+    expect(Object.fromEntries(routes.calls[0][0] as Hash<string, unknown>)).toEqual({
+      controller: "posts",
+      action: "show",
+      id: 7,
+    });
+  });
+
+  it("leaves the caller's hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const options = { controller: "posts", action: "show" };
+    fullUrlFor.call(host, options);
+    expect(options).toEqual({ controller: "posts", action: "show" });
+  });
+
+  it("leaves a permitted Parameters' hash untouched when url_options are merged in", () => {
+    const host = makeHost({ urlOptions: () => ({ host: "www.example.com" }) });
+    const params = new Parameters({ controller: "posts", action: "show" });
+    params.permitBang();
+    fullUrlFor.call(host, params);
+    expect(params.toH().has("host")).toBeFalsy();
+  });
+
+  it("unpermitted Parameters throw UnfilteredParameters from toH()", () => {
+    const params = new Parameters({ id: 1 });
+    expect(() => fullUrlFor.call(makeHost(), params)).toThrow(/unpermitted|unfiltered/i);
+  });
+
+  it("class instance with toH() but not a Parameters falls through to HelperMethodBuilder", () => {
+    class FakeParams {
+      toH() {
+        return { id: 1 };
+      }
+    }
+    expect(() => fullUrlFor.call(makeHost(), new FakeParams() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
+  });
+
+  it("class-instance options fall through to HelperMethodBuilder dispatch", () => {
+    class Post {
+      id = 1;
+    }
+    expect(() => fullUrlFor.call(makeHost(), new Post() as unknown as UrlForOptions)).toThrow(
+      TypeError,
+    );
+  });
+
+  it("optimizeRoutesGeneration requires empty defaultUrlOptions", () => {
+    expect(optimizeRoutesGeneration.call(makeHost())).toBe(true);
+    expect(optimizeRoutesGeneration.call(makeHost({ defaultUrlOptions: { host: "x" } }))).toBe(
+      false,
+    );
+  });
+
+  it("optimizeRoutesGeneration asks the RouteSet predicate", () => {
+    const routes = new RouteSet();
+    const host = makeHost({ _routes: routes });
+    expect(optimizeRoutesGeneration.call(host)).toBe(true);
+    routes.defaultUrlOptions = { host: "example.com" };
+    expect(optimizeRoutesGeneration.call(host)).toBe(false);
+  });
+
+  it("_withRoutes swaps _routes for the block and restores", () => {
+    const host = makeHost();
+    const original = host._routes;
+    const temp = makeRoutes();
+    const seen = _withRoutes.call(host, temp, () => host._routes);
+    expect(seen).toBe(temp);
+    expect(host._routes).toBe(original);
+  });
+
+  it("_withRoutes restores _routes even when block throws", () => {
+    const host = makeHost();
+    const original = host._routes;
+    expect(() =>
+      _withRoutes.call(host, makeRoutes(), () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(host._routes).toBe(original);
+  });
+
+  it("_withRoutes rejects an AsyncFunction block before invoking it", async () => {
+    const host = makeHost();
+    const original = host._routes;
+    let ran = false;
+    const block = async () => {
+      ran = true;
+      await Promise.resolve();
+    };
+    expect(() => _withRoutes.call(host, makeRoutes(), block as never)).toThrow(/AsyncFunction/);
+    expect(ran).toBe(false);
+    expect(host._routes).toBe(original);
+  });
+
+  it("_withRoutes rejects a sync block that returns a Promise", () => {
+    const host = makeHost();
+    expect(() => _withRoutes.call(host, makeRoutes(), (() => Promise.resolve(1)) as never)).toThrow(
+      /Promise/,
+    );
+  });
+
+  it("_routesContext returns the host itself", () => {
+    const host = makeHost();
+    expect(_routesContext.call(host)).toBe(host);
+  });
+
+  it("urlOptions default returns defaultUrlOptions", () => {
+    const host = makeHost({ defaultUrlOptions: { host: "x.test", port: 3000 } });
+    expect(urlOptions.call(host)).toEqual({ host: "x.test", port: 3000 });
+  });
+
+  it("throws Rails-shaped NO_ROUTES_MESSAGE when _routes missing", () => {
+    const host = makeHost();
+    Object.defineProperty(
+      host,
+      "_routes",
+      Object.getOwnPropertyDescriptor(AbstractControllerUrlFor, "_routes")!,
+    );
+    expect(() => fullUrlFor.call(host, null)).toThrow(RuntimeError);
+    expect(() => fullUrlFor.call(host, null)).toThrow(/include routing helpers explicitly/);
+  });
+});
+
+describe("ActionDispatch::Routing::UrlFor#route_for against a drawn RouteSet", () => {
+  it("dispatches to the named route's url helper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/users/:id", { to: "users#show", as: "user" });
+    });
+    class Host {}
+    include(Host, routes.urlHelpers());
+    const host = new Host() as unknown as { routeFor(name: string, ...args: unknown[]): string };
+    expect(host.routeFor("user", 42, { host: "example.com" })).toBe("http://example.com/users/42");
+  });
+});

@@ -48,7 +48,7 @@ export class Body {
 
 /** @internal */
 export class StreamingTemplateRenderer extends TemplateRenderer<
-  Promise<Body | (string | SafeBuffer | null)[]>
+  Promise<Body | (string | SafeBuffer | Uint8Array | null)[]>
 > {
   /** @internal */
   protected override async renderTemplate(
@@ -56,7 +56,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"] = null,
     locals: Record<string, unknown> = {},
-  ): Promise<Body | (string | SafeBuffer | null)[]> {
+  ): Promise<Body | (string | SafeBuffer | Uint8Array | null)[]> {
     if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
       const rendered = await super.renderTemplate(view, template, layoutName, locals);
       return [(rendered as unknown as RenderedTemplate).body];
@@ -107,7 +107,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
         if (fiber.isAlive()) {
           const content = await template.render(view, locals, null, {}, yielder);
 
-          view.viewFlow.set("layout", content as string | SafeBuffer);
+          view.viewFlow.set("layout", content);
 
           while (fiber.isAlive()) await fiber.resume();
         }

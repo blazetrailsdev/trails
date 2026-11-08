@@ -12,17 +12,24 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
-import { File, Pathname, RuntimeError, env, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Pathname,
+  RuntimeError,
+  Struct,
+  constSet,
+  env,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { RecurringTask } from "./recurring-task.js";
 import { Record } from "./record.js";
+import { SolidQueue } from "./solid-queue.js";
 
 type Options = { [key: string]: unknown };
 
-class Process {
-  constructor(
-    public kind: string,
-    public attributes: Options,
-  ) {}
+export class Process extends Struct.new("kind", "attributes") {
+  declare kind: string;
+  declare attributes: Options;
 
   instantiate(): object {
     const klass = safeConstantize(`SolidQueue::${titleize(this.kind)}`) as new (
@@ -33,9 +40,12 @@ class Process {
 }
 
 export class Configuration extends Model {
-  static Process = Process;
+  declare static Process: typeof Process;
 
   static {
+    constSet(SolidQueue, "Configuration", this);
+    constSet(this, "Process", Process);
+
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
     this.validate(":ensureCorrectlySizedThreadPool");

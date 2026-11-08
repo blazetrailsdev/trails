@@ -330,6 +330,15 @@ export class Trailtie extends BaseTrailtie {
       ConnectionPool.installExecutorHooks();
     });
 
+    this.initializer("active_record.clear_active_connections", () => {
+      this.config.afterInitialize(() => {
+        onLoad("active_record", async (base: typeof Base) => {
+          base.connectionHandler.clearActiveConnectionsBang("all");
+          await base.connectionHandler.flushIdleConnectionsBang("all");
+        });
+      });
+    });
+
     this.initializer("active_record.log_runtime", () => {
       onLoad(
         "action_controller",
@@ -409,3 +418,4 @@ export class Trailtie extends BaseTrailtie {
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActiveRecord::Railtie" });
+ActiveRecord.ActiveRecord.Railtie = Trailtie;

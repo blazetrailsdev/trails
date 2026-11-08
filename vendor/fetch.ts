@@ -46,7 +46,7 @@ import {
   vendoredRoot,
   versionDir,
 } from "./sources.js";
-import { SpellChecker } from "../packages/did-you-mean/src/spell-checker.js";
+import { SpellChecker } from "../packages/did-you-mean/lib/spell-checker.js";
 
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(VENDOR_DIR, "..");

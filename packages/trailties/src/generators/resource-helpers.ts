@@ -1,8 +1,9 @@
+import "../constants.resource-helpers.generated.js";
 import { NameError, camelize, constantize, underscore } from "@blazetrails/activesupport";
 import { include, included } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ModelHelpers } from "./model-helpers.js";
-import type { GeneratorBase } from "./base.js";
+import type { Base } from "./base.js";
 import type { NamedBase } from "./named-base.js";
 
 export interface ResourceHelpersHost extends NamedBase {
@@ -61,7 +62,7 @@ function controllerI18nScope(this: ResourceHelpersHost): string {
 /** @internal */
 function ormClass(this: ResourceHelpersHost): typeof ActiveModel {
   return (this._ormClass ??= (() => {
-    if (!(this.constructor as typeof GeneratorBase).classOptions()["orm"]) {
+    if (!(this.constructor as typeof Base).classOptions()["orm"]) {
       throw new Error("You need to have :orm as class option to invoke orm_class and orm_instance");
     }
 
@@ -94,7 +95,7 @@ export const ResourceHelpers = {
   ormInstance,
 
   [included](base: unknown): void {
-    const klass = base as typeof GeneratorBase & (new (...args: never[]) => GeneratorBase);
+    const klass = base as typeof Base & (new (...args: never[]) => Base);
     include(klass, ModelHelpers);
     klass.classOption("modelName", { type: "string", desc: "ModelName to be used" });
   },

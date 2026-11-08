@@ -25,6 +25,9 @@
     "bcryptjs": "^3.0.3"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
+  },
+  "optionalDependencies": {
+    "bcrypt": "^6.0.0"
   }
 }

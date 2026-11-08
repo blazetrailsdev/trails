@@ -1512,7 +1512,7 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * The two symbol-keyed members trails uses to port a Ruby Concern's hooks —
  * `included do ... end` and `def self.extended(base)` — as
  * `static [included](base)` / `static [extended](base)`, keyed by the symbols
- * `packages/ruby-compat/src/include.ts` exports
+ * `packages/ruby-compat/lib/include.ts` exports
  * (`Symbol.for("@blazetrails/ruby-compat:included")` and its `extended`
  * twin). CLAUDE.md § "Module mixins" ratifies the shape repo-wide.
  *
@@ -1963,8 +1963,11 @@ function resolveDelegatedClass(
  * Packages whose Ruby-name credit comes from their own names only, so the
  * verdict does not change with which other gems the artifact holds: the scoped
  * lane's `rails-api.json` carries thor and its mixins, the full lane every gem.
+ * globalid, fugit and raabro each declare a `ParseOptions` shape that would
+ * otherwise score `moved` off `Nokogiri::XML::ParseOptions`, a gem none of them
+ * depends on.
  */
-const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor"]);
+const OWN_MOVED_CREDIT_PACKAGES = new Set(["thor", "globalid", "fugit", "raabro"]);
 
 /** The Ruby-name oracle a file in `pkg` is scored against. */
 function creditCandidates(

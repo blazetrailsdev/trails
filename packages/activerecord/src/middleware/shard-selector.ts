@@ -1,3 +1,4 @@
+import type { RackApp, RackResponse } from "@blazetrails/rack";
 import { fetch, rbProcCall } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
@@ -14,10 +15,10 @@ export class ShardSelector {
   readonly resolver: ShardResolverFn;
   readonly options: { lock?: boolean | null };
 
-  private readonly app: (env: Record<string, unknown>) => Promise<unknown>;
+  private readonly app: RackApp | { call: RackApp };
 
   constructor(
-    app: (env: Record<string, unknown>) => Promise<unknown>,
+    app: RackApp | { call: RackApp },
     resolver: ShardResolverFn,
     options: { lock?: boolean | null } = {},
   ) {
@@ -31,7 +32,7 @@ export class ShardSelector {
 
     const shard = this.selectedShard(request);
 
-    return this.setShard(shard, () => rbProcCall(this.app, env) as ReturnType<typeof this.app>);
+    return this.setShard(shard, () => rbProcCall(this.app, env) as Promise<RackResponse>);
   }
 
   /** @internal */

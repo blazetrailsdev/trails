@@ -13,13 +13,22 @@ import { ACTIONPACK_UNPORTED_FILES } from "./actionpack.js";
 import { ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES } from "./activerecord-test-support.js";
 import { ACTIONVIEW_UNPORTED_FILES } from "./actionview.js";
 import { ACTIVEJOB_UNPORTED_FILES } from "./activejob.js";
+import { ACTIONMAILBOX_UNPORTED_FILES } from "./actionmailbox.js";
 import { ACTIVESTORAGE_UNPORTED_FILES } from "./activestorage.js";
 import { ACTIVESUPPORT_UNPORTED_FILES } from "./activesupport.js";
 import { DATE_UNPORTED_FILES } from "./date.js";
 import { DID_YOU_MEAN_UNPORTED_FILES } from "./did-you-mean.js";
 import { GLOBALID_UNPORTED_FILES } from "./globalid.js";
 import { I18N_UNPORTED_FILES } from "./i18n.js";
+import { NOKOGIRI_UNPORTED_FILES } from "./nokogiri.js";
+import { RACC_UNPORTED_FILES } from "./racc.js";
+import { RAILS_HTML_SANITIZER_UNPORTED_FILES } from "./rails-html-sanitizer.js";
+import { LOOFAH_UNPORTED_FILES } from "./loofah.js";
+import { CRASS_UNPORTED_FILES } from "./crass.js";
+import { IMAGE_PROCESSING_UNPORTED_FILES } from "./image-processing.js";
 import { RACKUP_UNPORTED_FILES } from "./rackup.js";
+import { RAILS_DOM_TESTING_UNPORTED_FILES } from "./rails-dom-testing.js";
+import { SOLID_QUEUE_UNPORTED_FILES } from "./solid-queue.js";
 import { THOR_UNPORTED_FILES } from "./thor.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
@@ -33,6 +42,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...ACTIONPACK_UNPORTED_FILES,
   ...ACTIONVIEW_UNPORTED_FILES,
   ...ACTIVEJOB_UNPORTED_FILES,
+  ...ACTIONMAILBOX_UNPORTED_FILES,
   ...ACTIVESTORAGE_UNPORTED_FILES,
   ...ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES,
   ...ACTIVESUPPORT_UNPORTED_FILES,
@@ -40,7 +50,15 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...DID_YOU_MEAN_UNPORTED_FILES,
   ...GLOBALID_UNPORTED_FILES,
   ...I18N_UNPORTED_FILES,
+  ...NOKOGIRI_UNPORTED_FILES,
+  ...RACC_UNPORTED_FILES,
+  ...RAILS_HTML_SANITIZER_UNPORTED_FILES,
+  ...LOOFAH_UNPORTED_FILES,
+  ...CRASS_UNPORTED_FILES,
+  ...IMAGE_PROCESSING_UNPORTED_FILES,
   ...RACKUP_UNPORTED_FILES,
+  ...RAILS_DOM_TESTING_UNPORTED_FILES,
+  ...SOLID_QUEUE_UNPORTED_FILES,
   ...THOR_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,

@@ -1,3 +1,4 @@
+import "../../../constants.trails-model-model-generator.generated.js";
 import type { GeneratorConfig, GeneratorOptions } from "../../base.js";
 /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ModelHelpers` (`model_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
@@ -8,7 +9,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { format } from "@blazetrails/ruby-compat";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 

@@ -1,4 +1,12 @@
-import { ArgumentError, Fiber, Thread, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Fiber,
+  getAsyncContext,
+  Thread,
+  rbObjDup,
+  type AsyncContext,
+  type AsyncContextAdapter,
+} from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
@@ -38,6 +46,41 @@ Fiber.prototype.setActiveSupportExecutionState = setActiveSupportExecutionState;
 
 let _isolationLevel: IsolationLevel | null = null;
 let _scope: typeof Thread | typeof Fiber;
+
+interface Fork {
+  context: Thread | Fiber;
+  key: IsolatedKey;
+  state: Store;
+  parent: Fork | null;
+}
+
+let _adapter: AsyncContextAdapter | null = null;
+let _forks: AsyncContext<Fork> | null = null;
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function forks(): AsyncContext<Fork> {
+  const adapter = getAsyncContext();
+  if (!_forks || _adapter !== adapter) {
+    _adapter = adapter;
+    _forks = adapter.create<Fork>();
+  }
+  return _forks;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function forkedState(key: IsolatedKey): Store {
+  const context = IsolatedExecutionState.context();
+  for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
+    if (fork.context === context && fork.key === key) return fork.state;
+  }
+  return state();
+}
 
 /** @internal */
 function state(): Store {
@@ -83,26 +126,47 @@ export const IsolatedExecutionState = {
     );
   },
   get<T = unknown>(key: IsolatedKey): T | undefined {
-    return state().get(key) as T | undefined;
+    return forkedState(key).get(key) as T | undefined;
   },
   set<T>(key: IsolatedKey, value: T): T {
-    state().set(key, value);
+    forkedState(key).set(key, value);
     return value;
   },
   isKey(key: IsolatedKey): boolean {
-    return state().has(key);
+    return forkedState(key).has(key);
   },
   delete<T = unknown>(key: IsolatedKey): T | undefined {
-    const s = state();
+    const s = forkedState(key);
     const value = s.get(key) as T | undefined;
     s.delete(key);
     return value;
   },
   clear(): void {
     state().clear();
+    const context = IsolatedExecutionState.context();
+    for (let fork = forks().getStore() ?? null; fork; fork = fork.parent) {
+      if (fork.context === context) fork.state.clear();
+    }
   },
   context(): Thread | Fiber {
     return IsolatedExecutionState.scope.current();
+  },
+  /** @noRailsEquivalent PERMANENT */
+  fork<T>(key: IsolatedKey, block: () => T): T {
+    const forked: Store = new Map();
+    if (IsolatedExecutionState.isKey(key)) {
+      const value = IsolatedExecutionState.get(key);
+      forked.set(key, value == null ? value : rbObjDup(value));
+    }
+    return forks().run(
+      {
+        context: IsolatedExecutionState.context(),
+        key,
+        state: forked,
+        parent: forks().getStore() ?? null,
+      },
+      block,
+    );
   },
   shareWith(other: Thread | Fiber): void {
     const otherState = other.activeSupportExecutionState();

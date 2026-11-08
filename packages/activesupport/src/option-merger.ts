@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { deepMerge, isPlainObject } from "./hash-utils.js";
 
 export class OptionMerger {
@@ -11,15 +12,6 @@ export class OptionMerger {
   constructor(context: any, options: Record<string, unknown>) {
     this.context = context;
     this.options = options;
-
-    return new Proxy(context, {
-      getPrototypeOf: (): object => OptionMerger.prototype,
-      get: (target: object, property: string | symbol): unknown => {
-        const value = Reflect.get(target, property);
-        if (typeof value !== "function") return value;
-        return (...args: unknown[]) => this.methodMissing(property as string, ...args);
-      },
-    }) as unknown as OptionMerger;
   }
 
   private methodMissing(method: string, ...args: unknown[]): unknown {
@@ -41,4 +33,27 @@ export class OptionMerger {
 
     return this.context[method](...args);
   }
+
+  /** @internal */
+  private respondToMissing(name: string, includePrivate = false): boolean {
+    return rbObjRespondTo(this.context, name);
+  }
 }
+
+Object.setPrototypeOf(
+  OptionMerger.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(OptionMerger.prototype) as object) as object, {
+    get(target, property, receiver) {
+      if (typeof property === "symbol" || receiver === OptionMerger.prototype) {
+        return Reflect.get(target, property, receiver);
+      }
+      const value = Reflect.get((receiver as unknown as { context: object }).context, property);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]) =>
+        (receiver as { methodMissing(...args: unknown[]): unknown }).methodMissing(
+          property,
+          ...args,
+        );
+    },
+  }),
+);

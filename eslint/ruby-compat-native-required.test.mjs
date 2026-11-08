@@ -151,7 +151,7 @@ describe("ruby-compat-native-required.json", () => {
     const listed = JSON.parse(
       fs.readFileSync(path.join(__dirname, "ruby-compat-native-required.json"), "utf8"),
     );
-    const compat = await import("../packages/ruby-compat/src/index.ts");
+    const compat = await import("../packages/ruby-compat/lib/index.ts");
     const dropped = LISTED_FLOOR.filter((h) => h in compat && !Object.hasOwn(listed, h));
     expect(dropped).toEqual([]);
   });
@@ -160,7 +160,7 @@ describe("ruby-compat-native-required.json", () => {
     const listed = JSON.parse(
       fs.readFileSync(path.join(__dirname, "ruby-compat-native-required.json"), "utf8"),
     );
-    const compat = await import("../packages/ruby-compat/src/index.ts");
+    const compat = await import("../packages/ruby-compat/lib/index.ts");
     for (const [helper, entry] of Object.entries(listed)) {
       expect(typeof compat[helper], helper).toBe("function");
       expect(entry.member, helper).toBeTypeOf("string");

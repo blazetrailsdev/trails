@@ -1,4 +1,4 @@
-import { b, pack, strCount, unpack } from "@blazetrails/ruby-compat";
+import { b, binaryString, pack, strCount, unpack } from "@blazetrails/ruby-compat";
 import { Encodings } from "../encodings.js";
 import { Utilities } from "../utilities.js";
 import { EightBit } from "./8bit.js";
@@ -14,10 +14,14 @@ export class QuotedPrintable extends SevenBit {
     return EightBit.canEncode(enc);
   }
 
-  static override decode(str: string): Uint8Array {
+  static override decode(str: string | Uint8Array): Uint8Array {
+    const crlf = Utilities.toCrlf(str);
     return Utilities.toLf(
       unpack(
-        Utilities.toCrlf(str).replace(/(?:=0D=0A|=0D|=0A)\r\n/g, "\r\n"),
+        (crlf instanceof Uint8Array ? binaryString(crlf) : crlf).replace(
+          /(?:=0D=0A|=0D|=0A)\r\n/g,
+          "\r\n",
+        ),
         "M*",
       )[0] as Uint8Array,
     );
@@ -27,13 +31,15 @@ export class QuotedPrintable extends SevenBit {
     return Utilities.toCrlf(pack([Utilities.toLf(str)], "M"));
   }
 
-  static override cost(str: string): number {
-    const c = strCount(str, ["\x09\x0a\x0d\x20-\x3c\x3e-\x7e"]);
+  static override cost(str: string | Uint8Array): number {
+    const c = strCount(str instanceof Uint8Array ? binaryString(str) : str, [
+      "\x09\x0a\x0d\x20-\x3c\x3e-\x7e",
+    ]);
     const total = (b(str).length - c) * 3 + c;
     return total / b(str).length;
   }
 
-  static override isCompatibleInput(_str: string): boolean {
+  static override isCompatibleInput(_str: string | Uint8Array): boolean {
     return true;
   }
 

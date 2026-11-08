@@ -1,6 +1,7 @@
+import "../constants.migration.generated.js";
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { Dir, File, rbStrToI } from "@blazetrails/ruby-compat";
+import { Dir, File, rbFBinding, rbStrToI, strNew, TSE } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
@@ -56,6 +57,7 @@ export interface MigrationTemplateHost extends CreateMigrationHost {
     block?: Exclude<MigrationRenderer, string> | null,
   ): Promise<string | undefined>;
   setMigrationAssignsBang(destination: string): void;
+  findInSourcePaths(file: string): Promise<string>;
 }
 
 export const Migration = {
@@ -81,19 +83,27 @@ export const Migration = {
     this.migrationClassName = camelize(this.migrationFileName);
   },
 
-  /** @missingRailsCall find_in_source_paths — CONVERGEABLE migration-template-expands-the-source-template-path */
   async migrationTemplate(
     this: MigrationTemplateHost,
-    source: () => string | Promise<string>,
+    source: string,
     destination: string,
     config: CreateMigrationConfig = {},
   ): Promise<string | undefined> {
+    source = File.expandPath(await this.findInSourcePaths(String(source)));
+
     this.setMigrationAssignsBang(destination);
 
     const [dir, base] = File.split(destination);
     const numberedDestination = File.join(dir, ["%migration_number%", base].join("_"));
 
-    const file = await this.createMigration(numberedDestination, null, config, source);
+    const file = await this.createMigration(numberedDestination, null, config, async () => {
+      const erb = new TSE(strNew(Array.from(await File.binreadAsync(source))), {
+        trimMode: "-",
+        eoutvar: "@output_buffer",
+      });
+      erb.filename = source;
+      return erb.result(rbFBinding(this));
+    });
     return Generators.addGeneratedFile(file!);
   },
 };

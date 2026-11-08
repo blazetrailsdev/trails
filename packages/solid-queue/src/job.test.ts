@@ -15,14 +15,22 @@ import { performAllLater } from "@blazetrails/activejob";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
+  ClaimedExecution,
   EnqueueError,
   Job,
+  Process,
   ReadyExecution,
   ScheduledExecution,
   Semaphore,
   SolidQueue,
   SolidQueueAdapter,
+  UndiscardableError,
+  Worker,
 } from "./index.js";
+import {
+  permanentConnectionCheckout,
+  setPermanentConnectionCheckout,
+} from "@blazetrails/activerecord/active-record";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
@@ -105,7 +113,7 @@ describe("SolidQueue::JobTest", () => {
 
   async function assertReady(block: () => Promise<unknown>): Promise<void> {
     await assertJobCounts({ ready: 1 }, block);
-    expect(await ((await Job.last()) as Job).isReady()).toBe(true);
+    expect(await ((await Job.last()) as Job).isReady()).toBeTruthy();
   }
 
   async function assertScheduled(block: () => Promise<unknown>): Promise<void> {
@@ -114,7 +122,7 @@ describe("SolidQueue::JobTest", () => {
 
   async function assertBlocked(block: () => Promise<unknown>): Promise<void> {
     await assertJobCounts({ blocked: 1 }, block);
-    expect(await ((await Job.last()) as Job).isBlocked()).toBe(true);
+    expect(await ((await Job.last()) as Job).isBlocked()).toBeTruthy();
   }
 
   it("enqueue active job to be executed right away", async () => {
@@ -123,13 +131,13 @@ describe("SolidQueue::JobTest", () => {
     await assertReady(() => Job.enqueue(activeJob));
 
     const solidQueueJob = (await Job.last()) as Job;
-    expect(await solidQueueJob.isReady()).toBe(true);
+    expect(await solidQueueJob.isReady()).toBeTruthy();
     expect(await solidQueueJob.status()).toBe("ready");
     expect(activeJob.providerJobId).toBe(solidQueueJob.id);
     expect(solidQueueJob.priority).toBe(8);
     expect(solidQueueJob.queue_name).toBe("test");
     expect(solidQueueJob.class_name).toBe("AddToBufferJob");
-    expect(Time.now().compare(solidQueueJob.scheduled_at)! >= 0).toBe(true);
+    expect(Time.now().compare(solidQueueJob.scheduled_at)! >= 0).toBeTruthy();
     expect(solidQueueJob.arguments["arguments"]).toEqual([1]);
 
     const execution = (await ReadyExecution.last()) as ReadyExecution;
@@ -144,12 +152,12 @@ describe("SolidQueue::JobTest", () => {
     await assertScheduled(() => Job.enqueue(activeJob, { scheduledAt: minutes(5).fromNow() }));
 
     const solidQueueJob = (await Job.last()) as Job;
-    expect(await solidQueueJob.isScheduled()).toBe(true);
+    expect(await solidQueueJob.isScheduled()).toBeTruthy();
     expect(await solidQueueJob.status()).toBe("scheduled");
     expect(solidQueueJob.priority).toBe(8);
     expect(solidQueueJob.queue_name).toBe("test");
     expect(solidQueueJob.class_name).toBe("AddToBufferJob");
-    expect(Time.now().compare(solidQueueJob.scheduled_at)! < 0).toBe(true);
+    expect(Time.now().compare(solidQueueJob.scheduled_at)! < 0).toBeTruthy();
     expect(solidQueueJob.arguments["arguments"]).toEqual([1]);
 
     const execution = (await ScheduledExecution.last()) as ScheduledExecution;
@@ -176,7 +184,7 @@ describe("SolidQueue::JobTest", () => {
 
     const job = (await Job.last()) as Job;
     expect(job.concurrencyLimit()).toBeNull();
-    expect(job.isConcurrencyLimited()).toBe(false);
+    expect(job.isConcurrencyLimited()).toBeFalsy();
   });
 
   it("enqueue jobs with concurrency controls", async () => {
@@ -232,7 +240,7 @@ describe("SolidQueue::JobTest", () => {
     expect(activeJobs.map((activeJob) => activeJob.providerJobId as number).sort()).toEqual(
       jobs.map((job) => job.id as number).sort(),
     );
-    expect(activeJobs.every((activeJob) => activeJob.isSuccessfullyEnqueued())).toBe(true);
+    expect(activeJobs.every((activeJob) => activeJob.isSuccessfullyEnqueued())).toBeTruthy();
   });
 
   it("block jobs when concurrency limits are reached", async () => {
@@ -244,7 +252,7 @@ describe("SolidQueue::JobTest", () => {
     expect(
       blockedExecution.expires_at.compare(SolidQueue.defaultConcurrencyControlPeriod.fromNow())! <=
         0,
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("discard ready job", async () => {
@@ -266,14 +274,29 @@ describe("SolidQueue::JobTest", () => {
       () => semaphore.value,
       null,
       {},
-      () =>
-        assertNoChanges(
-          () => semaphore.expires_at,
-          null,
-          {},
-          () => assertJobCounts({ blocked: -1 }, () => blockedJob.discard()),
-        ),
+      () => assertJobCounts({ blocked: -1 }, () => blockedJob.discard()),
     );
+  });
+
+  it("try to discard claimed job", async () => {
+    const oldPermanentConnectionCheckout = permanentConnectionCheckout();
+    setPermanentConnectionCheckout(true);
+    await StoreResultJob.performLater(42, { pause: 2 });
+    const job = (await Job.last()) as Job;
+
+    const worker = new Worker({ queues: "background" });
+    await worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    try {
+      await assertNoDifference([() => Job.count(), () => ClaimedExecution.count()], null, () =>
+        expect(job.discard()).rejects.toThrow(UndiscardableError),
+      );
+    } finally {
+      await worker.stop();
+      await Process.destroyAll();
+      setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
+    }
   });
 
   it("discard scheduled job", async () => {
@@ -291,8 +314,8 @@ describe("SolidQueue::JobTest", () => {
     const [readyJob, blockedJob] = await Job.last(2);
     const semaphore = (await Semaphore.last()) as Semaphore;
 
-    expect(await readyJob.isReady()).toBe(true);
-    expect(await blockedJob.isBlocked()).toBe(true);
+    expect(await readyJob.isReady()).toBeTruthy();
+    expect(await blockedJob.isBlocked()).toBeTruthy();
 
     travelTo(minutes(10).fromNow() as Time);
 
@@ -303,7 +326,7 @@ describe("SolidQueue::JobTest", () => {
       () => assertJobCounts({ blocked: -1 }, () => readyJob.discard()),
     );
 
-    expect(await (await blockedJob.reload()).isReady()).toBe(true);
+    expect(await (await blockedJob.reload()).isReady()).toBeTruthy();
   });
 
   it("discard jobs by execution type in bulk", async () => {

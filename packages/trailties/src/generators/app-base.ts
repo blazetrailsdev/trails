@@ -1,3 +1,4 @@
+import "../constants.app-base.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
 import {
   Dir,
@@ -19,9 +20,9 @@ import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../trails.js";
 import { Generators } from "../generators.js";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
+import { Base, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
-import { GeneratorError } from "./generated-attribute.js";
+import { Error as GeneratorError } from "./base.js";
 import { AppName } from "./app-name.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
@@ -51,7 +52,7 @@ export interface AppBase extends Included<typeof AppName> {
   shebang(): string;
 }
 
-export abstract class AppBase extends GeneratorBase {
+export abstract class AppBase extends Base {
   declare appPath: string;
   declare options: AppBaseOptions;
   declare trailsTemplate?: string;
@@ -507,11 +508,20 @@ ${requireStatements.join("\n")}`;
     return !!(this.options.dev || this.options.edge || this.options.main);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall rails_version_specifier — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
+   */
   trailsGemfileEntry(name: string, packageManager: string): string {
+    const subdirectory =
+      packageManager === "pnpm" ? `&path:/packages/${name.replace("@blazetrails/", "")}` : "";
     if (this.options.dev) {
       const path = this.trailsDevPackages()[name];
       return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
+    } else if (this.options.edge) {
+      return `github:blazetrailsdev/trails#${this.edgeBranch()}${subdirectory}`;
+    } else if (this.options.main) {
+      return `github:blazetrailsdev/trails#main${subdirectory}`;
     } else {
       return "*";
     }
@@ -706,6 +716,25 @@ ${requireStatements.join("\n")}`;
   /** @internal */
   protected async runInstall(): Promise<void> {
     if (this.isInstall()) this.installCommand("install");
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall bundle_command — PERMANENT
+   */
+  protected async generateBundlerBinstub(): Promise<void> {
+    if (this.isInstall()) {
+      const pm = getPackageManager(this.destinationRoot, {
+        fallback: (this as unknown as { packageManager?: string }).packageManager,
+      });
+      await this.createFile(
+        `bin/${pm.name}`,
+        `import { spawnSync } from "node:child_process";\n\n` +
+          `const { status } = spawnSync(${JSON.stringify(pm.name)}, process.argv.slice(2), { stdio: "inherit" });\n` +
+          `process.exit(status ?? 1);\n`,
+        { verbose: false },
+      );
+    }
   }
 
   /** @internal */

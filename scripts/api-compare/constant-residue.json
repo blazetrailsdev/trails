@@ -36,40 +36,49 @@
       "remote-connections.ts::InvalidIdentifiersError": "ActionCable::RemoteConnections::RemoteConnection::InvalidIdentifiersError"
     }
   },
-  "actionmailer": {
-    "rows": 25,
+  "actionmailbox": {
+    "rows": 10,
     "excluded": [],
-    "unwalked": [],
+    "unwalked": [
+      "gem-version.ts::VERSION",
+      "inbound-email/routable.ts::Routable",
+      "relayer.ts::Relayer.Result",
+      "router.ts::Router.RoutingError"
+    ],
+    "residue": {}
+  },
+  "actionmailer": {
+    "rows": 31,
+    "excluded": [],
+    "unwalked": [
+      "base.ts::Base.LateAttachmentsProxy",
+      "callbacks.ts::Callbacks",
+      "delivery-methods.ts::DeliveryMethods",
+      "form-builder.ts::FormBuilder",
+      "gem-version.ts::VERSION",
+      "mail-helper.ts::MailHelper",
+      "parameterized.ts::Parameterized",
+      "preview.ts::Previews",
+      "queued-delivery.ts::QueuedDelivery",
+      "rescuable.ts::Rescuable",
+      "test-helper.ts::TestHelper"
+    ],
     "residue": {
-      "base.ts::Base": "ActionMailer::Base",
-      "base.ts::Base.LateAttachmentsProxy": "ActionMailer::Base::LateAttachmentsProxy",
       "base.ts::NullMail": "ActionMailer::Base::NullMail",
-      "callbacks.ts::Callbacks": "ActionMailer::Callbacks",
       "callbacks.ts::ClassMethods": "ActionMailer::Callbacks::ClassMethods",
-      "collector.ts::Collector": "ActionMailer::Collector",
       "delivery-methods.ts::ClassMethods": "ActionMailer::DeliveryMethods::ClassMethods",
-      "delivery-methods.ts::DeliveryMethods": "ActionMailer::DeliveryMethods",
       "form-builder.ts::ClassMethods": "ActionMailer::FormBuilder::ClassMethods",
-      "form-builder.ts::FormBuilder": "ActionMailer::FormBuilder",
-      "gem-version.ts::VERSION": "ActionMailer::VERSION",
-      "inline-preview-interceptor.ts::InlinePreviewInterceptor": "ActionMailer::InlinePreviewInterceptor",
-      "log-subscriber.ts::LogSubscriber": "ActionMailer::LogSubscriber",
-      "mail-delivery-job.ts::MailDeliveryJob": "ActionMailer::MailDeliveryJob",
-      "mail-helper.ts::MailHelper": "ActionMailer::MailHelper",
-      "message-delivery.ts::MessageDelivery": "ActionMailer::MessageDelivery",
       "parameterized.ts::ClassMethods": "ActionMailer::Parameterized::ClassMethods",
       "parameterized.ts::Mailer": "ActionMailer::Parameterized::Mailer",
       "parameterized.ts::MessageDelivery": "ActionMailer::Parameterized::MessageDelivery",
-      "parameterized.ts::Parameterized": "ActionMailer::Parameterized",
       "preview.ts::ClassMethods": "ActionMailer::Previews::ClassMethods",
-      "preview.ts::Preview": "ActionMailer::Preview",
-      "preview.ts::Previews": "ActionMailer::Previews",
-      "queued-delivery.ts::QueuedDelivery": "ActionMailer::QueuedDelivery",
-      "rescuable.ts::Rescuable": "ActionMailer::Rescuable"
+      "test-case.ts::Behavior": "ActionMailer::TestCase::Behavior",
+      "test-case.ts::ClassMethods": "ActionMailer::TestCase::Behavior::ClassMethods",
+      "test-case.ts::ClearTestDeliveries": "ActionMailer::TestCase::ClearTestDeliveries"
     }
   },
   "actionpack": {
-    "rows": 323,
+    "rows": 325,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -91,6 +100,8 @@
       "abstract-controller/rendering.ts::Rendering",
       "abstract-controller/trailties/routes-helpers.ts::RoutesHelpers",
       "abstract-controller/translation.ts::Translation",
+      "abstract-controller/url-for.ts::ClassMethods",
+      "abstract-controller/url-for.ts::UrlFor",
       "action-controller/api/api-rendering.ts::ApiRendering",
       "action-controller/caching.ts::Caching",
       "action-controller/form-builder.ts::ClassMethods",
@@ -357,7 +368,7 @@
     }
   },
   "activejob": {
-    "rows": 46,
+    "rows": 50,
     "excluded": [],
     "unwalked": [
       "arguments.ts::Arguments",
@@ -372,7 +383,8 @@
     "residue": {
       "arguments.ts::DeserializationError": "ActiveJob::DeserializationError",
       "arguments.ts::SerializationError": "ActiveJob::SerializationError",
-      "enqueuing.ts::EnqueueError": "ActiveJob::EnqueueError"
+      "enqueuing.ts::EnqueueError": "ActiveJob::EnqueueError",
+      "test-helper.ts::ClassMethods": "ActiveJob::TestHelper::TestQueueAdapter::ClassMethods"
     }
   },
   "activemodel": {
@@ -390,8 +402,8 @@
       "type/helpers/mutable.ts::Mutable",
       "type/helpers/time-value.ts::TimeValue",
       "type/serialize-cast-value.ts::SerializeCastValue",
-      "validations/absence.ts::HelperMethods",
-      "validations/callbacks.ts::Callbacks"
+      "validations/callbacks.ts::Callbacks",
+      "validations/helper-methods.ts::HelperMethods"
     ],
     "residue": {
       "attribute-methods.ts::AttrNames": "ActiveModel::AttributeMethods::AttrNames",
@@ -971,6 +983,19 @@
     "unwalked": ["handlers.ts::Handlers"],
     "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
   },
+  "date": {
+    "rows": 1,
+    "excluded": [
+      "date.ts::Date",
+      "date.ts::DateTime",
+      "date.ts::ERANGE",
+      "date.ts::SubMinuteOffsetZonedDateTime",
+      "time.ts::Time",
+      "time.ts::Timezone"
+    ],
+    "unwalked": [],
+    "residue": { "date.ts::DateInfinity": "Date::Infinity" }
+  },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
@@ -995,6 +1020,17 @@
       "uri/gid.ts::MissingModelIdError": "URI::GID::MissingModelIdError"
     }
   },
+  "html-sanitizer": {
+    "rows": 4,
+    "excluded": [
+      "full-sanitizer.ts::FullSanitizer",
+      "link-sanitizer.ts::LinkSanitizer",
+      "safe-list-sanitizer.ts::SafeListSanitizer",
+      "sanitizer.ts::Sanitizer"
+    ],
+    "unwalked": [],
+    "residue": {}
+  },
   "i18n": {
     "rows": 27,
     "excluded": [],
@@ -1007,8 +1043,19 @@
       "locale/tag/rfc4646.ts::Parser": "I18n::Locale::Tag::Rfc4646::Parser"
     }
   },
+  "image-processing": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "builder.ts::Builder": "ImageProcessing::Builder",
+      "chainable.ts::Chainable": "ImageProcessing::Chainable",
+      "pipeline.ts::Pipeline": "ImageProcessing::Pipeline",
+      "processor.ts::Processor": "ImageProcessing::Processor"
+    }
+  },
   "mail": {
-    "rows": 104,
+    "rows": 105,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
       "encodings.ts::Encodings",
@@ -1045,7 +1092,8 @@
       "network/delivery-methods/sendmail.ts::Sendmail": "Mail::Sendmail",
       "network/delivery-methods/smtp-connection.ts::SMTPConnection": "Mail::SMTPConnection",
       "network/delivery-methods/smtp.ts::SMTP": "Mail::SMTP",
-      "network/delivery-methods/test-mailer.ts::TestMailer": "Mail::TestMailer"
+      "network/delivery-methods/test-mailer.ts::TestMailer": "Mail::TestMailer",
+      "yaml.ts::YAML": "Mail::YAML"
     }
   },
   "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
@@ -1101,9 +1149,40 @@
       "smtp.ts::SMTPUnsupportedCommand": "Net::SMTPUnsupportedCommand"
     }
   },
+  "nokogiri": {
+    "rows": 25,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "css/node.ts::Node": "Nokogiri::CSS::Node",
+      "css/parser.ts::Parser": "Nokogiri::CSS::Parser",
+      "css/selector-cache.ts::SelectorCache": "Nokogiri::CSS::SelectorCache",
+      "css/syntax-error.ts::SyntaxError": "Nokogiri::CSS::SyntaxError",
+      "css/tokenizer.ts::ScanError": "Nokogiri::CSS::Tokenizer::ScanError",
+      "css/tokenizer.ts::Tokenizer": "Nokogiri::CSS::Tokenizer",
+      "css/xpath-visitor.ts::BuiltinsConfig": "Nokogiri::CSS::XPathVisitor::BuiltinsConfig",
+      "css/xpath-visitor.ts::DoctypeConfig": "Nokogiri::CSS::XPathVisitor::DoctypeConfig",
+      "css/xpath-visitor.ts::XPathVisitor": "Nokogiri::CSS::XPathVisitor",
+      "html5/document-fragment.ts::DocumentFragment": "Nokogiri::HTML5::DocumentFragment",
+      "html5/document.ts::Document": "Nokogiri::HTML5::Document",
+      "html5/node.ts::Node": "Nokogiri::HTML5::Node",
+      "racc/parser.ts::ParseError": "Racc::ParseError",
+      "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
+      "xml/document.ts::XmlDocument": "Nokogiri::XML::Document",
+      "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",
+      "xml/node-set.ts::NodeSet": "Nokogiri::XML::NodeSet",
+      "xml/node.ts::XmlNode": "Nokogiri::XML::Node",
+      "xml/parse-options.ts::ParseOptions": "Nokogiri::XML::ParseOptions",
+      "xml/sax/document.ts::SaxDocument": "Nokogiri::XML::SAX::Document",
+      "xml/sax/parser.ts::SaxParser": "Nokogiri::XML::SAX::Parser",
+      "xml/syntax-error.ts::SyntaxError": "Nokogiri::XML::SyntaxError",
+      "xml/xpath-context.ts::XPathContext": "Nokogiri::XML::XPathContext",
+      "xml/xpath/syntax-error.ts::SyntaxError": "Nokogiri::XML::XPath::SyntaxError"
+    }
+  },
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
   "rack": {
-    "rows": 59,
+    "rows": 60,
     "excluded": [],
     "unwalked": ["bad-request.ts::BadRequest", "multipart.ts::Multipart"],
     "residue": {
@@ -1179,7 +1258,7 @@
     "residue": {}
   },
   "solid-queue": {
-    "rows": 60,
+    "rows": 61,
     "excluded": [
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",
@@ -1218,8 +1297,9 @@
     }
   },
   "trailties": {
-    "rows": 68,
+    "rows": 150,
     "excluded": [
+      "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
       "assets/vite-manifest.ts::ViteManifest",
       "commands/build.ts::BuildCommand",
@@ -1247,15 +1327,16 @@
       "command.ts::CorrectableNameError": "Trails::Command::CorrectableNameError",
       "command.ts::UnrecognizedCommandError": "Trails::Command::UnrecognizedCommandError",
       "commands/app/update-command.ts::UpdateCommand": "Trails::Command::App::UpdateCommand",
+      "commands/application.ts::ApplicationCommand": "Trails::Command::ApplicationCommand",
       "commands/console.ts::Console": "Trails::Console",
       "commands/console.ts::ConsoleCommand": "Trails::Command::ConsoleCommand",
-      "commands/console/irb-console.ts::AppInstance": "Trails::Console::AppInstance",
-      "commands/console/irb-console.ts::ControllerHelper": "Trails::Console::ControllerHelper",
-      "commands/console/irb-console.ts::ControllerInstance": "Trails::Console::ControllerInstance",
-      "commands/console/irb-console.ts::IRBConsole": "Trails::Console::IRBConsole",
-      "commands/console/irb-console.ts::NewSession": "Trails::Console::NewSession",
-      "commands/console/irb-console.ts::RailsHelperBase": "Trails::Console::TrailsHelperBase",
-      "commands/console/irb-console.ts::ReloadHelper": "Trails::Console::ReloadHelper",
+      "commands/console/tsrepl-console.ts::AppInstance": "Trails::Console::AppInstance",
+      "commands/console/tsrepl-console.ts::ControllerHelper": "Trails::Console::ControllerHelper",
+      "commands/console/tsrepl-console.ts::ControllerInstance": "Trails::Console::ControllerInstance",
+      "commands/console/tsrepl-console.ts::NewSession": "Trails::Console::NewSession",
+      "commands/console/tsrepl-console.ts::RailsHelperBase": "Trails::Console::TrailsHelperBase",
+      "commands/console/tsrepl-console.ts::ReloadHelper": "Trails::Console::ReloadHelper",
+      "commands/console/tsrepl-console.ts::TSREPLConsole": "Trails::Console::TSREPLConsole",
       "commands/credentials.ts::CredentialsCommand": "Trails::Command::CredentialsCommand",
       "commands/credentials/credentials-command/diffing.ts::Diffing": "Trails::Command::CredentialsCommand::Diffing",
       "commands/db/system/change/change-command.ts::ChangeCommand": "Trails::Command::Db::System::ChangeCommand",
@@ -1266,6 +1347,7 @@
       "commands/encrypted.ts::EncryptedCommand": "Trails::Command::EncryptedCommand",
       "commands/generate.ts::GenerateCommand": "Trails::Command::GenerateCommand",
       "commands/notes.ts::NotesCommand": "Trails::Command::NotesCommand",
+      "commands/plugin.ts::PluginCommand": "Trails::Command::PluginCommand",
       "commands/rake.ts::RakeCommand": "Trails::Command::RakeCommand",
       "commands/routes.ts::RoutesCommand": "Trails::Command::RoutesCommand",
       "commands/runner.ts::RunnerCommand": "Trails::Command::RunnerCommand",
@@ -1283,6 +1365,81 @@
       "engine/lazy-route-set.ts::LazyRouteSet": "Trails::Engine::LazyRouteSet",
       "engine/trailties.ts::Trailties": "Trails::Engine::Trailties",
       "gem-version.ts::VERSION": "Trails::VERSION",
+      "generators/actions/create-migration.ts::CreateMigration": "Trails::Generators::Actions::CreateMigration",
+      "generators/active-model.ts::ActiveModel": "Trails::Generators::ActiveModel",
+      "generators/active-record/application-record/application-record-generator.ts::ApplicationRecordGenerator": "ActiveRecord::Generators::ApplicationRecordGenerator",
+      "generators/active-record/migration/migration-generator.ts::MigrationGenerator": "ActiveRecord::Generators::MigrationGenerator",
+      "generators/active-record/model/model-generator.ts::ModelGenerator": "ActiveRecord::Generators::ModelGenerator",
+      "generators/active-record/multi-db/multi-db-generator.ts::MultiDbGenerator": "ActiveRecord::Generators::MultiDbGenerator",
+      "generators/app-base.ts::AppBase": "Trails::Generators::AppBase",
+      "generators/app-name.ts::AppName": "Trails::Generators::AppName",
+      "generators/base.ts::Base": "Trails::Generators::Base",
+      "generators/base.ts::Error": "Trails::Generators::Error",
+      "generators/database.ts::Database": "Trails::Generators::Database",
+      "generators/database.ts::MariaDBMySQL2": "Trails::Generators::Database::MariaDBMySQL2",
+      "generators/database.ts::MySQL2": "Trails::Generators::Database::MySQL2",
+      "generators/database.ts::PostgreSQL": "Trails::Generators::Database::PostgreSQL",
+      "generators/database.ts::SQLite3": "Trails::Generators::Database::SQLite3",
+      "generators/generated-attribute.ts::GeneratedAttribute": "Trails::Generators::GeneratedAttribute",
+      "generators/migration.ts::ClassMethods": "Trails::Generators::Migration::ClassMethods",
+      "generators/migration.ts::Migration": "Trails::Generators::Migration",
+      "generators/model-helpers.ts::ModelHelpers": "Trails::Generators::ModelHelpers",
+      "generators/named-base.ts::NamedBase": "Trails::Generators::NamedBase",
+      "generators/resource-helpers.ts::ResourceHelpers": "Trails::Generators::ResourceHelpers",
+      "generators/test-case.ts::TestCase": "Trails::Generators::TestCase",
+      "generators/test-unit.ts::Base": "TestUnit::Generators::Base",
+      "generators/test-unit/authentication/authentication-generator.ts::AuthenticationGenerator": "TestUnit::Generators::AuthenticationGenerator",
+      "generators/test-unit/channel/channel-generator.ts::ChannelGenerator": "TestUnit::Generators::ChannelGenerator",
+      "generators/test-unit/controller/controller-generator.ts::ControllerGenerator": "TestUnit::Generators::ControllerGenerator",
+      "generators/test-unit/generator/generator-generator.ts::GeneratorGenerator": "TestUnit::Generators::GeneratorGenerator",
+      "generators/test-unit/helper/helper-generator.ts::HelperGenerator": "TestUnit::Generators::HelperGenerator",
+      "generators/test-unit/integration/integration-generator.ts::IntegrationGenerator": "TestUnit::Generators::IntegrationGenerator",
+      "generators/test-unit/job/job-generator.ts::JobGenerator": "TestUnit::Generators::JobGenerator",
+      "generators/test-unit/mailer/mailer-generator.ts::MailerGenerator": "TestUnit::Generators::MailerGenerator",
+      "generators/test-unit/model/model-generator.ts::ModelGenerator": "TestUnit::Generators::ModelGenerator",
+      "generators/test-unit/plugin/plugin-generator.ts::PluginGenerator": "TestUnit::Generators::PluginGenerator",
+      "generators/test-unit/scaffold/scaffold-generator.ts::ScaffoldGenerator": "TestUnit::Generators::ScaffoldGenerator",
+      "generators/test-unit/system/system-generator.ts::SystemGenerator": "TestUnit::Generators::SystemGenerator",
+      "generators/testing/assertions.ts::Assertions": "Trails::Generators::Testing::Assertions",
+      "generators/testing/behavior.ts::Behavior": "Trails::Generators::Testing::Behavior",
+      "generators/testing/behavior.ts::ClassMethods": "Trails::Generators::Testing::Behavior::ClassMethods",
+      "generators/testing/setup-and-teardown.ts::SetupAndTeardown": "Trails::Generators::Testing::SetupAndTeardown",
+      "generators/trails/app/app-generator.ts::ARGVScrubber": "Trails::Generators::ARGVScrubber",
+      "generators/trails/app/app-generator.ts::ActionMethods": "Trails::ActionMethods",
+      "generators/trails/app/app-generator.ts::AppBuilder": "Trails::AppBuilder",
+      "generators/trails/app/app-generator.ts::AppGenerator": "Trails::Generators::AppGenerator",
+      "generators/trails/application-record/application-record-generator.ts::ApplicationRecordGenerator": "Trails::Generators::ApplicationRecordGenerator",
+      "generators/trails/authentication/authentication-generator.ts::AuthenticationGenerator": "Trails::Generators::AuthenticationGenerator",
+      "generators/trails/benchmark/benchmark-generator.ts::BenchmarkGenerator": "Trails::Generators::BenchmarkGenerator",
+      "generators/trails/channel/channel-generator.ts::ChannelGenerator": "Trails::Generators::ChannelGenerator",
+      "generators/trails/controller/controller-generator.ts::ControllerGenerator": "Trails::Generators::ControllerGenerator",
+      "generators/trails/credentials/credentials-generator.ts::CredentialsGenerator": "Trails::Generators::CredentialsGenerator",
+      "generators/trails/db/system/change/change-generator.ts::ChangeGenerator": "Trails::Generators::Db::System::ChangeGenerator",
+      "generators/trails/devcontainer/devcontainer-generator.ts::DevcontainerGenerator": "Trails::Generators::DevcontainerGenerator",
+      "generators/trails/encrypted-file/encrypted-file-generator.ts::EncryptedFileGenerator": "Trails::Generators::EncryptedFileGenerator",
+      "generators/trails/encryption-key-file/encryption-key-file-generator.ts::EncryptionKeyFileGenerator": "Trails::Generators::EncryptionKeyFileGenerator",
+      "generators/trails/generator/generator-generator.ts::GeneratorGenerator": "Trails::Generators::GeneratorGenerator",
+      "generators/trails/helper/helper-generator.ts::HelperGenerator": "Trails::Generators::HelperGenerator",
+      "generators/trails/integration-test/integration-test-generator.ts::IntegrationTestGenerator": "Trails::Generators::IntegrationTestGenerator",
+      "generators/trails/job/job-generator.ts::JobGenerator": "Trails::Generators::JobGenerator",
+      "generators/trails/mailer/mailer-generator.ts::MailerGenerator": "Trails::Generators::MailerGenerator",
+      "generators/trails/master-key/master-key-generator.ts::MasterKeyGenerator": "Trails::Generators::MasterKeyGenerator",
+      "generators/trails/migration/migration-generator.ts::MigrationGenerator": "Trails::Generators::MigrationGenerator",
+      "generators/trails/model/model-generator.ts::ModelGenerator": "Trails::Generators::ModelGenerator",
+      "generators/trails/plugin/plugin-generator.ts::PluginBuilder": "Trails::PluginBuilder",
+      "generators/trails/plugin/plugin-generator.ts::PluginGenerator": "Trails::Generators::PluginGenerator",
+      "generators/trails/resource-route/resource-route-generator.ts::ResourceRouteGenerator": "Trails::Generators::ResourceRouteGenerator",
+      "generators/trails/resource/resource-generator.ts::ResourceGenerator": "Trails::Generators::ResourceGenerator",
+      "generators/trails/scaffold-controller/scaffold-controller-generator.ts::ScaffoldControllerGenerator": "Trails::Generators::ScaffoldControllerGenerator",
+      "generators/trails/scaffold/scaffold-generator.ts::ScaffoldGenerator": "Trails::Generators::ScaffoldGenerator",
+      "generators/trails/script/script-generator.ts::ScriptGenerator": "Trails::Generators::ScriptGenerator",
+      "generators/trails/system-test/system-test-generator.ts::SystemTestGenerator": "Trails::Generators::SystemTestGenerator",
+      "generators/trails/task/task-generator.ts::TaskGenerator": "Trails::Generators::TaskGenerator",
+      "generators/tse.ts::Base": "TSE::Generators::Base",
+      "generators/tse/authentication/authentication-generator.ts::AuthenticationGenerator": "TSE::Generators::AuthenticationGenerator",
+      "generators/tse/controller/controller-generator.ts::ControllerGenerator": "TSE::Generators::ControllerGenerator",
+      "generators/tse/mailer/mailer-generator.ts::MailerGenerator": "TSE::Generators::MailerGenerator",
+      "generators/tse/scaffold/scaffold-generator.ts::ScaffoldGenerator": "TSE::Generators::ScaffoldGenerator",
       "health-controller.ts::HealthController": "Trails::HealthController",
       "info-controller.ts::InfoController": "Trails::InfoController",
       "info.ts::Info": "Trails::Info",
@@ -1295,6 +1452,11 @@
       "rack.ts::Rack": "Trails::Rack",
       "rack/logger.ts::Logger": "Trails::Rack::Logger",
       "rack/silence-request.ts::SilenceRequest": "Trails::Rack::SilenceRequest",
+      "source-annotation-extractor.ts::Annotation": "Trails::SourceAnnotationExtractor::Annotation",
+      "source-annotation-extractor.ts::Parser": "Trails::SourceAnnotationExtractor::ParserExtractor::Parser",
+      "source-annotation-extractor.ts::ParserExtractor": "Trails::SourceAnnotationExtractor::ParserExtractor",
+      "source-annotation-extractor.ts::PatternExtractor": "Trails::SourceAnnotationExtractor::PatternExtractor",
+      "source-annotation-extractor.ts::SourceAnnotationExtractor": "Trails::SourceAnnotationExtractor",
       "trailtie.ts::Trailtie": "Trails::Trailtie",
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
       "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",

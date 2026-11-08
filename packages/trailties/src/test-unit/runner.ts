@@ -213,6 +213,7 @@ export class Runner {
 
   /** @internal */
   private static async testLocations(tests: string[], name: RegExp | null): Promise<string[]> {
+    await TestParser.requireParser();
     const locations: string[] = [];
     for (const path of tests) {
       const patterns = this.filters.filter(([file]) => file === path);

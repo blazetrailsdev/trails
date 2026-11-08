@@ -1,0 +1,767 @@
+import { ActionController } from "../../namespaces.js";
+import type { Callbacks as ASCallbacks, Extended } from "@blazetrails/activesupport";
+import { TypeError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Base64,
+  chomp,
+  OpenSSL,
+  rbObjRespondTo,
+  rtest,
+  SecureRandom,
+  URI,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
+import {
+  ActiveSupportJSON,
+  extend,
+  include,
+  included,
+  isBlank,
+  SecurityUtils,
+} from "@blazetrails/activesupport";
+import {
+  CookieJar,
+  setCookieJar,
+  type RequestCookieMethodsHost,
+} from "../../action-dispatch/middleware/cookies.js";
+import { SessionHash } from "@blazetrails/rack-session";
+import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
+import type { Req } from "../../action-dispatch/request/session.js";
+import { ActionControllerError } from "./exceptions.js";
+import type {
+  afterAction,
+  beforeAction,
+  CallbackOptions,
+  skipBeforeAction,
+} from "../../abstract-controller/callbacks.js";
+import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
+
+export class InvalidAuthenticityToken extends ActionControllerError {
+  constructor(message?: string) {
+    super(message ?? "ActionController::InvalidAuthenticityToken");
+  }
+}
+
+export class InvalidCrossOriginRequest extends ActionControllerError {
+  constructor(message?: string) {
+    super(message ?? "ActionController::InvalidCrossOriginRequest");
+  }
+}
+
+export interface ProtectionMethods {
+  handleUnverifiedRequest(): void | Promise<void>;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export type NullSessionRequest = Req &
+  PersistedRequest &
+  RequestCookieMethodsHost & {
+    session: unknown;
+    flash: unknown;
+    sessionOptions: Record<string, unknown>;
+  };
+
+export class NullSessionHash extends SessionHash {
+  constructor(req: PersistedRequest) {
+    super(null as unknown as Persisted, req);
+    this.data = {};
+    this.loaded = true;
+  }
+
+  override async destroy(): Promise<void> {}
+
+  override isExists(): boolean {
+    return true;
+  }
+
+  isEnabled(): boolean {
+    return false;
+  }
+}
+
+export class NullCookieJar extends CookieJar {
+  override write(..._args: unknown[]): void {}
+}
+
+type Controller = Record<string, unknown>;
+
+export class NullSession implements ProtectionMethods {
+  private _controller: Controller;
+  constructor(controller: Controller) {
+    this._controller = controller;
+  }
+  handleUnverifiedRequest(): void {
+    const request = this._controller.request as NullSessionRequest;
+    request.session = new NullSessionHash(request);
+    request.flash = null;
+    request.sessionOptions = { skip: true };
+    setCookieJar.call(request, NullCookieJar.build(request, {}));
+  }
+}
+
+export class ResetSession implements ProtectionMethods {
+  private _controller: Controller;
+  constructor(controller: Controller) {
+    this._controller = controller;
+  }
+  async handleUnverifiedRequest(): Promise<void> {
+    await (this._controller as { resetSession(): Promise<void> }).resetSession();
+  }
+}
+
+export class Exception implements ProtectionMethods {
+  warningMessage: string | undefined = undefined;
+  constructor(_controller: Controller) {}
+  handleUnverifiedRequest(): void {
+    throw new InvalidAuthenticityToken(this.warningMessage);
+  }
+}
+
+export class SessionStore {
+  fetch(request: CsrfRequest): string | null {
+    return (request.session!.get("_csrf_token") as string | undefined) ?? null;
+  }
+
+  store(request: CsrfRequest, csrfToken: string): void {
+    request.session!.set("_csrf_token", csrfToken);
+  }
+
+  reset(request: CsrfRequest): void {
+    request.session!.delete("_csrf_token");
+  }
+}
+
+export class CookieStore {
+  private _cookieName: string;
+
+  constructor(cookie = "csrf_token") {
+    this._cookieName = cookie;
+  }
+
+  fetch(request: CsrfRequest): string | null {
+    const contents = request.cookieJar().encrypted.get(this._cookieName);
+    if (contents == null) return null;
+
+    let value: { token?: string; session_id?: { public_id?: string } };
+    try {
+      value = JSON.parse(contents as string) as typeof value;
+    } catch {
+      return null;
+    }
+    if (
+      value.session_id?.public_id !==
+      (request.session!.idWas?.() as { publicId?: string } | null | undefined)?.publicId
+    )
+      return null;
+
+    return value.token ?? null;
+  }
+
+  store(request: CsrfRequest, csrfToken: string): void {
+    request.cookieJar().encrypted.permanent.set(this._cookieName, {
+      value: ActiveSupportJSON.encode({ token: csrfToken, session_id: request.session!.id?.() }),
+      httpOnly: true,
+      sameSite: ":lax",
+    });
+  }
+
+  reset(request: CsrfRequest): void {
+    request.cookieJar().delete(this._cookieName);
+  }
+}
+
+export function warningMessage(origin?: string | null, baseUrl?: string | null): string {
+  if (origin && baseUrl && origin !== baseUrl) {
+    return `HTTP Origin header (${origin}) didn't match request.base_url (${baseUrl})`;
+  }
+  return "Can't verify CSRF token authenticity.";
+}
+
+export function resetCsrfToken(
+  this: { csrfTokenStorageStrategy?: CsrfTokenStorage },
+  request: CsrfRequest,
+): void {
+  delete request.env![CSRF_TOKEN_ENV_KEY];
+  this.csrfTokenStorageStrategy!.reset(request);
+}
+
+export function commitCsrfToken(
+  this: { csrfTokenStorageStrategy?: CsrfTokenStorage },
+  request: CsrfRequest,
+): void {
+  const csrfToken = request.env![CSRF_TOKEN_ENV_KEY];
+  if (csrfToken != null) this.csrfTokenStorageStrategy!.store(request, csrfToken as string);
+}
+
+/** @internal */
+export interface RequestForgeryProtectionHost
+  extends Extended<typeof ASCallbacks.ClassMethods>, HelpersClassMethods {
+  new (...args: never[]): unknown;
+  configAccessor(...names: string[]): void;
+  helperMethod: OmitThisParameter<typeof helperMethod>;
+  beforeAction: typeof beforeAction;
+  appendAfterAction: typeof afterAction;
+  skipBeforeAction: typeof skipBeforeAction;
+  requestForgeryProtectionToken: string | null;
+  forgeryProtectionStrategy: ProtectionMethodCtor | null;
+  allowForgeryProtection: boolean | null;
+  logWarningOnCsrfFailure: boolean;
+  forgeryProtectionOriginCheck: boolean;
+  perFormCsrfTokens: boolean;
+  csrfTokenStorageStrategy: CsrfTokenStorage;
+  protectionMethodClass: typeof protectionMethodClass;
+  storageStrategy: typeof storageStrategy;
+  isStorageStrategy: typeof isStorageStrategy;
+}
+
+export class RequestForgeryProtection {
+  static readonly AUTHENTICITY_TOKEN_LENGTH = 32;
+
+  static ProtectionMethods = {
+    name: "ActionController::RequestForgeryProtection::ProtectionMethods",
+  };
+
+  static ClassMethods = {
+    protectFromForgery,
+    skipForgeryProtection,
+    protectionMethodClass,
+    storageStrategy,
+    isStorageStrategy,
+  };
+
+  static [included](base: RequestForgeryProtectionHost): void {
+    extend(base, RequestForgeryProtection.ClassMethods);
+    include(base, {
+      resetCsrfToken,
+      commitCsrfToken,
+      verifyAuthenticityToken,
+      handleUnverifiedRequest,
+      unverifiedRequestWarningMessage,
+      verifySameOriginRequest,
+      markForSameOriginVerificationBang,
+      isMarkedForSameOriginVerification,
+      isNonXhrJavascriptResponse,
+      isVerifiedRequest,
+      isAnyAuthenticityTokenValid,
+      requestAuthenticityTokens,
+      formAuthenticityToken,
+      maskedAuthenticityToken,
+      isValidAuthenticityToken,
+      unmaskToken,
+      maskToken,
+      compareWithRealToken,
+      compareWithGlobalToken,
+      isValidPerFormCsrfToken,
+      realCsrfToken,
+      perFormCsrfToken,
+      globalCsrfToken,
+      csrfTokenHmac,
+      xorByteStrings,
+      formAuthenticityParam,
+      isProtectAgainstForgery,
+      isValidRequestOrigin,
+      normalizeActionPath,
+      normalizeRelativeActionPath,
+      generateCsrfToken,
+      encodeCsrfToken,
+      decodeCsrfToken,
+    });
+
+    base.configAccessor("requestForgeryProtectionToken");
+    if (!rtest(base.requestForgeryProtectionToken))
+      base.requestForgeryProtectionToken = "authenticity_token";
+
+    base.configAccessor("forgeryProtectionStrategy");
+    base.forgeryProtectionStrategy = null;
+
+    base.configAccessor("allowForgeryProtection");
+    if (base.allowForgeryProtection == null) base.allowForgeryProtection = true;
+
+    base.configAccessor("logWarningOnCsrfFailure");
+    base.logWarningOnCsrfFailure = true;
+
+    base.configAccessor("forgeryProtectionOriginCheck");
+    base.forgeryProtectionOriginCheck = false;
+
+    base.configAccessor("perFormCsrfTokens");
+    base.perFormCsrfTokens = false;
+
+    base.configAccessor("csrfTokenStorageStrategy");
+    base.csrfTokenStorageStrategy = new SessionStore();
+
+    base.helperMethod("formAuthenticityToken");
+    base.helperMethod("isProtectAgainstForgery");
+  }
+}
+
+export function protectFromForgery(
+  this: RequestForgeryProtectionHost,
+  options: Record<string, unknown> = {},
+): void {
+  options = { prepend: false, ...options };
+
+  this.forgeryProtectionStrategy = this.protectionMethodClass(
+    rtest(options.with)
+      ? (options.with as ProtectionMethodName | ProtectionMethodCtor)
+      : "null_session",
+  );
+  if (!rtest(this.requestForgeryProtectionToken))
+    this.requestForgeryProtectionToken = "authenticity_token";
+
+  this.csrfTokenStorageStrategy = this.storageStrategy(
+    rtest(options.store)
+      ? (options.store as "session" | "cookie" | CsrfTokenStorage)
+      : new SessionStore(),
+  );
+
+  this.beforeAction(":verifyAuthenticityToken", options as CallbackOptions);
+  this.appendAfterAction(":verifySameOriginRequest");
+}
+
+export function skipForgeryProtection(
+  this: RequestForgeryProtectionHost,
+  options: Record<string, unknown> = {},
+): void {
+  this.skipBeforeAction(":verifyAuthenticityToken", {
+    raise: false,
+    ...options,
+  } as CallbackOptions);
+}
+
+/** @internal */
+export interface CsrfRequest {
+  method: string;
+  isGet(): boolean;
+  isHead(): boolean;
+  origin?: string | null;
+  baseUrl: string;
+  path: string;
+  requestMethod: string;
+  mediaType?: string | null;
+  isXhr(): boolean;
+  xCsrfToken?: string | null;
+  env?: Record<string, unknown>;
+  session?: {
+    get(key: string): unknown;
+    set(key: string, value: unknown): void;
+    delete(key: string): unknown;
+    id?(): unknown;
+    idWas?(): unknown;
+  };
+  cookieJar(): CookieJar;
+}
+
+/** @internal */
+export interface CsrfTokenStorage {
+  fetch(request: CsrfRequest): string | null | undefined;
+  store(request: CsrfRequest, csrfToken: string): void;
+  reset(request: CsrfRequest): void;
+}
+
+/** @internal */
+export interface CsrfController {
+  request: CsrfRequest;
+  session?: { isEnabled?: () => boolean } | Record<string, unknown> | null;
+  params?: { get(key: string): unknown };
+  mediaType?: string | null;
+  handleUnverifiedRequest: typeof handleUnverifiedRequest;
+  unverifiedRequestWarningMessage: typeof unverifiedRequestWarningMessage;
+  markForSameOriginVerificationBang: typeof markForSameOriginVerificationBang;
+  isMarkedForSameOriginVerification: typeof isMarkedForSameOriginVerification;
+  isNonXhrJavascriptResponse: typeof isNonXhrJavascriptResponse;
+  isVerifiedRequest: typeof isVerifiedRequest;
+  isAnyAuthenticityTokenValid: typeof isAnyAuthenticityTokenValid;
+  requestAuthenticityTokens: typeof requestAuthenticityTokens;
+  maskedAuthenticityToken: typeof maskedAuthenticityToken;
+  isValidAuthenticityToken: typeof isValidAuthenticityToken;
+  unmaskToken: typeof unmaskToken;
+  maskToken: typeof maskToken;
+  compareWithRealToken: typeof compareWithRealToken;
+  compareWithGlobalToken: typeof compareWithGlobalToken;
+  isValidPerFormCsrfToken: typeof isValidPerFormCsrfToken;
+  realCsrfToken: typeof realCsrfToken;
+  perFormCsrfToken: typeof perFormCsrfToken;
+  globalCsrfToken: typeof globalCsrfToken;
+  csrfTokenHmac: typeof csrfTokenHmac;
+  xorByteStrings: typeof xorByteStrings;
+  formAuthenticityParam: typeof formAuthenticityParam;
+  isProtectAgainstForgery: typeof isProtectAgainstForgery;
+  isValidRequestOrigin: typeof isValidRequestOrigin;
+  normalizeActionPath: typeof normalizeActionPath;
+  normalizeRelativeActionPath: typeof normalizeRelativeActionPath;
+  generateCsrfToken: typeof generateCsrfToken;
+  encodeCsrfToken: typeof encodeCsrfToken;
+  decodeCsrfToken: typeof decodeCsrfToken;
+  allowForgeryProtection?: boolean;
+  forgeryProtectionOriginCheck?: boolean;
+  perFormCsrfTokens?: boolean;
+  requestForgeryProtectionToken?: string;
+  csrfTokenStorageStrategy?: CsrfTokenStorage;
+  _markedForSameOriginVerification?: boolean | null;
+  logger?: { warn(msg: string): void } | null;
+  logWarningOnCsrfFailure?: boolean;
+  forgeryProtectionStrategy?: new (controller: CsrfController) => ProtectionMethods;
+}
+
+const CROSS_ORIGIN_JAVASCRIPT_WARNING =
+  "Security warning: an embedded <script> tag on another site requested " +
+  "protected JavaScript. If you know what you're doing, go ahead and disable " +
+  "forgery protection on this action to permit cross-origin JavaScript embedding.";
+
+const NULL_ORIGIN_MESSAGE =
+  "The browser returned a 'null' origin for a request with origin-based " +
+  "forgery protection turned on. This usually means you have the 'no-referrer' " +
+  "Referrer-Policy header enabled, or that the request came from a site that " +
+  "refused to give its origin. This makes it impossible for Trails to verify " +
+  "the source of the requests. Likely the best solution is to change your " +
+  "referrer policy to something less strict like same-origin or strict-origin. " +
+  "If you cannot change the referrer policy, you can disable origin checking " +
+  "with the Trails.application.config.action_controller.forgery_protection_origin_check setting.";
+
+/** @internal */
+export function isProtectAgainstForgery(this: CsrfController): boolean {
+  return (
+    rtest(this.allowForgeryProtection) &&
+    (!rbObjRespondTo(this.session, "isEnabled") ||
+      (this.session as { isEnabled(): boolean }).isEnabled())
+  );
+}
+
+/** @internal */
+export function isValidRequestOrigin(this: CsrfController): boolean {
+  if (this.forgeryProtectionOriginCheck) {
+    if (this.request.origin === "null") throw new InvalidAuthenticityToken(NULL_ORIGIN_MESSAGE);
+    return this.request.origin == null || this.request.origin === this.request.baseUrl;
+  } else {
+    return true;
+  }
+}
+
+/** @internal */
+export function markForSameOriginVerificationBang(this: CsrfController): boolean {
+  const value = this.request.isGet();
+  this._markedForSameOriginVerification = value;
+  return value;
+}
+
+/** @internal */
+export function isMarkedForSameOriginVerification(this: CsrfController): boolean {
+  return this._markedForSameOriginVerification ?? false;
+}
+
+/** @internal */
+export function isNonXhrJavascriptResponse(this: CsrfController): boolean {
+  return /^(?:text|application)\/javascript/.test(this.mediaType ?? "") && !this.request.isXhr();
+}
+
+/** @internal */
+export function verifySameOriginRequest(this: CsrfController): void {
+  if (this.isMarkedForSameOriginVerification() && this.isNonXhrJavascriptResponse()) {
+    if (this.logger && this.logWarningOnCsrfFailure) {
+      this.logger.warn(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+    }
+    throw new InvalidCrossOriginRequest(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+  }
+}
+
+/** @internal */
+export async function verifyAuthenticityToken(this: CsrfController): Promise<void> {
+  this.markForSameOriginVerificationBang();
+
+  if (!this.isVerifiedRequest()) {
+    if (this.logger && this.logWarningOnCsrfFailure)
+      this.logger.warn(this.unverifiedRequestWarningMessage());
+
+    await this.handleUnverifiedRequest();
+  }
+}
+
+/** @internal */
+export async function handleUnverifiedRequest(this: CsrfController): Promise<void> {
+  const protectionStrategy = new this.forgeryProtectionStrategy!(this);
+
+  if ("warningMessage" in protectionStrategy) {
+    (protectionStrategy as Exception).warningMessage = this.unverifiedRequestWarningMessage();
+  }
+
+  await protectionStrategy.handleUnverifiedRequest();
+}
+
+/** @internal */
+export function unverifiedRequestWarningMessage(this: CsrfController): string {
+  if (this.isValidRequestOrigin()) {
+    return "Can't verify CSRF token authenticity.";
+  }
+  return `HTTP Origin header (${this.request.origin}) didn't match request.base_url (${this.request.baseUrl})`;
+}
+
+/** @internal */
+export function isVerifiedRequest(this: CsrfController): boolean {
+  return (
+    !this.isProtectAgainstForgery() ||
+    this.request.isGet() ||
+    this.request.isHead() ||
+    (this.isValidRequestOrigin() && this.isAnyAuthenticityTokenValid())
+  );
+}
+
+const CSRF_TOKEN_ENV_KEY = "action_controller.csrf_token";
+const GLOBAL_CSRF_TOKEN_IDENTIFIER = "!real_csrf_token";
+
+/** @internal */
+export function generateCsrfToken(): string {
+  return SecureRandom.urlsafeBase64(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+}
+
+/** @internal */
+export function encodeCsrfToken(csrfToken: Bytes): string {
+  return Base64.urlsafeEncode64(csrfToken, { padding: false });
+}
+
+/** @internal */
+export function decodeCsrfToken(encodedCsrfToken: string): Bytes {
+  return Buffer.from(Base64.urlsafeDecode64(encodedCsrfToken), "latin1");
+}
+
+/** @internal */
+export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
+  s2 = Buffer.from(s2);
+  const size = s1.length;
+  let i = 0;
+  while (i < size) {
+    if (s2[i] === undefined) throw new TypeError("nil can't be coerced into Integer");
+    s2[i] = s1[i] ^ s2[i];
+    i += 1;
+  }
+  return s2;
+}
+
+/** @internal */
+export function realCsrfToken(this: CsrfController, _session?: unknown): Bytes {
+  const csrfToken = (
+    CSRF_TOKEN_ENV_KEY in this.request.env!
+      ? this.request.env[CSRF_TOKEN_ENV_KEY]
+      : (this.request.env![CSRF_TOKEN_ENV_KEY] =
+          this.csrfTokenStorageStrategy!.fetch(this.request) ?? this.generateCsrfToken())
+  ) as string;
+  return this.decodeCsrfToken(csrfToken);
+}
+
+/** @internal */
+export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Bytes {
+  return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.realCsrfToken(session), identifier);
+}
+
+/** @internal */
+export function globalCsrfToken(this: CsrfController, session?: unknown): Bytes {
+  return this.csrfTokenHmac(session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
+}
+
+/** @internal */
+export function perFormCsrfToken(
+  this: CsrfController,
+  session: unknown,
+  actionPath: string,
+  method: string,
+): Bytes {
+  return this.csrfTokenHmac(session, `${actionPath}#${method.toLowerCase()}`);
+}
+
+/** @internal */
+export function maskToken(this: CsrfController, rawToken: Bytes): string {
+  const oneTimePad = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = this.xorByteStrings(oneTimePad, rawToken);
+  const maskedToken = Buffer.concat([oneTimePad, encryptedCsrfToken]);
+  return this.encodeCsrfToken(maskedToken);
+}
+
+/** @internal */
+export function unmaskToken(this: CsrfController, maskedToken: Bytes): Bytes {
+  const oneTimePad = maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = maskedToken.subarray(
+    RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH,
+  );
+  return this.xorByteStrings(oneTimePad, encryptedCsrfToken);
+}
+
+/** @internal */
+export function formAuthenticityToken(
+  this: CsrfController,
+  { formOptions = {} }: { formOptions?: { action?: string; method?: string } } = {},
+): string {
+  return this.maskedAuthenticityToken({ formOptions: formOptions });
+}
+
+/** @internal */
+export function maskedAuthenticityToken(
+  this: CsrfController,
+  { formOptions = {} }: { formOptions?: { action?: string; method?: string } } = {},
+): string {
+  const { action, method } = formOptions;
+  let rawToken: Bytes;
+  if (this.perFormCsrfTokens && action != null && method != null) {
+    const actionPath = this.normalizeActionPath(action);
+    rawToken = this.perFormCsrfToken(null, actionPath, method);
+  } else {
+    rawToken = this.globalCsrfToken();
+  }
+  return this.maskToken(rawToken);
+}
+
+/** @internal */
+export function formAuthenticityParam(this: CsrfController): unknown {
+  return this.params!.get(this.requestForgeryProtectionToken!);
+}
+
+/** @internal */
+export function requestAuthenticityTokens(this: CsrfController): unknown[] {
+  return [this.formAuthenticityParam(), this.request.xCsrfToken];
+}
+
+/** @internal */
+export function compareWithRealToken(
+  this: CsrfController,
+  token: Bytes,
+  session?: unknown,
+): boolean {
+  return SecurityUtils.fixedLengthSecureCompare(token, this.realCsrfToken(session));
+}
+
+/** @internal */
+export function compareWithGlobalToken(
+  this: CsrfController,
+  token: Bytes,
+  session?: unknown,
+): boolean {
+  return SecurityUtils.fixedLengthSecureCompare(token, this.globalCsrfToken(session));
+}
+
+/** @internal */
+export function isValidPerFormCsrfToken(
+  this: CsrfController,
+  token: Bytes,
+  session?: unknown,
+): boolean {
+  if (rtest(this.perFormCsrfTokens)) {
+    const correctToken = this.perFormCsrfToken(
+      session,
+      chomp(this.request.path, "/"),
+      this.request.requestMethod,
+    );
+
+    return SecurityUtils.fixedLengthSecureCompare(token, correctToken);
+  } else {
+    return false;
+  }
+}
+
+/** @internal */
+export function isValidAuthenticityToken(
+  this: CsrfController,
+  session: unknown,
+  encodedMaskedToken: unknown,
+): boolean {
+  if (typeof encodedMaskedToken !== "string" || encodedMaskedToken.length === 0) return false;
+  let maskedToken: Bytes;
+  try {
+    maskedToken = this.decodeCsrfToken(encodedMaskedToken);
+  } catch (e) {
+    if (e instanceof ArgumentError) return false;
+    throw e;
+  }
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
+    return this.compareWithRealToken(maskedToken);
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
+    const csrfToken = this.unmaskToken(maskedToken);
+    return (
+      this.compareWithGlobalToken(csrfToken) ||
+      this.compareWithRealToken(csrfToken) ||
+      this.isValidPerFormCsrfToken(csrfToken)
+    );
+  }
+  return false;
+}
+
+/** @internal */
+export function isAnyAuthenticityTokenValid(this: CsrfController): boolean {
+  return this.requestAuthenticityTokens().some((token) =>
+    this.isValidAuthenticityToken(this.session, token),
+  );
+}
+
+export type ProtectionMethodName = "null_session" | "reset_session" | "exception";
+type ProtectionMethodCtor = new (controller: Controller) => ProtectionMethods;
+
+/** @internal */
+export function protectionMethodClass(
+  this: unknown,
+  name: ProtectionMethodName | ProtectionMethodCtor,
+): ProtectionMethodCtor {
+  if (name === "null_session") {
+    return NullSession;
+  } else if (name === "reset_session") {
+    return ResetSession;
+  } else if (name === "exception") {
+    return Exception;
+  } else if (typeof name === "function") {
+    return name;
+  } else {
+    throw new ArgumentError(
+      "Invalid request forgery protection method, use :null_session, :exception, :reset_session, or a custom forgery protection class.",
+    );
+  }
+}
+
+/** @internal */
+export function storageStrategy(
+  this: { isStorageStrategy: typeof isStorageStrategy },
+  name: "session" | "cookie" | CsrfTokenStorage,
+): CsrfTokenStorage {
+  if (name === "session") {
+    return new SessionStore();
+  } else if (name === "cookie") {
+    return new CookieStore("csrf_token");
+  } else {
+    if (this.isStorageStrategy(name)) return name;
+    throw new ArgumentError(
+      "Invalid CSRF token storage strategy, use :session, :cookie, or a custom CSRF token storage class.",
+    );
+  }
+}
+
+/** @internal */
+export function isStorageStrategy(this: unknown, object: unknown): object is CsrfTokenStorage {
+  return (
+    rbObjRespondTo(object, "fetch") &&
+    rbObjRespondTo(object, "store") &&
+    rbObjRespondTo(object, "reset")
+  );
+}
+
+/** @internal */
+export function normalizeRelativeActionPath(this: CsrfController, relActionPath: string): string {
+  const uri = URI.parse(this.request.path ?? "/");
+  uri.path = uri.path + `/${relActionPath}`;
+  uri.path = uri.path.replace(/\/\.\//g, "/");
+
+  return chomp(uri.path, "/");
+}
+
+/** @internal */
+export function normalizeActionPath(this: CsrfController, actionPath: string): string {
+  const uri = URI.parse(actionPath);
+
+  if (uri.isRelative() && (isBlank(actionPath) || !actionPath.startsWith("/"))) {
+    return this.normalizeRelativeActionPath(uri.path!);
+  } else {
+    return chomp(uri.path!, "/");
+  }
+}
+
+Object.defineProperty(NullSessionHash, "name", {
+  value:
+    "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
+});
+
+ActionController.RequestForgeryProtection = RequestForgeryProtection;

@@ -26,7 +26,7 @@
  * and was never visible here.
  *
  * A `src/**` lint sees neither half: it cannot see a transitive edge at all,
- * and `packages/ruby-compat/src/**` joining the `no-node-builtins` rule only
+ * and `packages/ruby-compat/lib/**` joining the `no-node-builtins` rule only
  * closes the first for this package's own files.
  *
  * There is no exemption. The package's tests compile in their own project

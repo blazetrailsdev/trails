@@ -1,4 +1,5 @@
 import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
@@ -14,7 +15,7 @@ export class Configuration extends InheritableOptions {
 
   /** @missingRailsCall class_eval — PERMANENT */
   static compileMethodsBang(keys: string[]): void {
-    for (const key of keys.filter((m) => !(m in this.prototype))) {
+    for (const key of keys.filter((m) => !rbModMethodDefined(this, m))) {
       Object.defineProperty(this.prototype, key, {
         get(this: Configuration): unknown {
           return this._get(key);

@@ -1,0 +1,9 @@
+import { ApplicationSystemTestCase } from "<%= "../".repeat(this.classPathParts.length + 1) %>application-system-test-case<%= this.ext() %>";
+
+export class <%= ActiveSupport.Inflector.pluralize(this.className().split("::").pop()) %>Test extends ApplicationSystemTestCase {
+  // test("visiting the index", async () => {
+  //   await visit(<%= this.pluralTableName() %>Url);
+  //
+  //   assertSelector("h1", { text: "<%= this.className() %>" });
+  // });
+}

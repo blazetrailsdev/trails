@@ -150,17 +150,17 @@ export default defineConfig(
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
-      "packages/actionpack/src/action-dispatch/journey/visualizer/**",
+      "packages/actionpack/lib/action-dispatch/journey/visualizer/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
-      "packages/actionpack/src/test-helpers/fixtures/public/**",
-      "packages/actionpack/src/test-helpers/fixtures/公共/**",
+      "packages/actionpack/test/fixtures/public/**",
+      "packages/actionpack/test/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
-      "packages/marcel/src/test-helpers/fixtures/**",
+      "packages/marcel/test/fixtures/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
-      "packages/mini-magick/src/test-helpers/fixtures/**",
+      "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
       "packages/activestorage/src/test-helpers/fixtures/files/**",
-      // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
+      // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
       "**/.trails/**",
@@ -243,22 +243,22 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
       // Adapter implementations — these ARE the abstraction layer
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
       "packages/activesupport/src/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/src/tsc-wrapper/**",
@@ -282,7 +282,7 @@ export default defineConfig(
   // `types: []` does not fence them either, because vitest's own types
   // re-reference @types/node transitively for the whole program.
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "no-restricted-globals": [
@@ -356,7 +356,7 @@ export default defineConfig(
     files: [
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -382,7 +382,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
@@ -409,14 +409,14 @@ export default defineConfig(
   // catch it behind an `as any`, which is how six association call sites drifted
   // (four dead `typeof … === "function"` gates, two raising `?.()`).
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-getter-called-as-method": "error",
     },
   },
 
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     ignores: ["**/*.test.ts", "**/*.test-d.ts"],
     rules: {
       "blazetrails/no-q-suffix-predicate": "error",
@@ -429,7 +429,7 @@ export default defineConfig(
   // `AsyncFunction` tag. A non-`async` promise-returning `isEmpty` carries no
   // such tag, so its query would be issued before anything could see it.
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/async-querying-empty": "error",
     },
@@ -441,16 +441,16 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
-      "packages/actioncable/src/**/*.ts",
+      "packages/actioncable/lib/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],
@@ -476,13 +476,13 @@ export default defineConfig(
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
-      "packages/actioncable/src/**/*.ts",
+      "packages/actioncable/lib/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -529,20 +529,20 @@ export default defineConfig(
 
   {
     files: [
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
-      "packages/date/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
+      "packages/date/lib/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/msgpack/src/**/*.ts",
-      "packages/rack-session/src/**/*.ts",
-      "packages/rack-test/src/**/*.ts",
+      "packages/msgpack/lib/**/*.ts",
+      "packages/rack-session/lib/**/*.ts",
+      "packages/rack-test/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
@@ -584,7 +584,7 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/inlined-from-placement": "error",
       "blazetrails/perf-tag-placement": "error",
@@ -598,7 +598,7 @@ export default defineConfig(
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
     ],
@@ -627,7 +627,7 @@ export default defineConfig(
           files: [
             "packages/arel/src/**/*.ts",
             "packages/activemodel/src/**/*.ts",
-            "packages/actioncable/src/**/*.ts",
+            "packages/actioncable/lib/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
           ],
@@ -657,8 +657,8 @@ export default defineConfig(
           files: [
             "packages/actionview/src/**/*.test.ts",
             "packages/arel/src/**/*.test.ts",
-            "packages/date/src/**/*.test.ts",
-            "packages/did-you-mean/src/**/*.test.ts",
+            "packages/date/test/**/*.test.ts",
+            "packages/did-you-mean/test/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
             "packages/i18n/src/**/*.test.ts",
           ],
@@ -675,7 +675,7 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
@@ -778,7 +778,7 @@ export default defineConfig(
   //    origin/main by `pnpm parity:lint:counts`, so only NEW standalone usages
   //    fail. See eslint/no-standalone-associations.mjs. ──
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-standalone-associations": "warn",
     },
@@ -809,18 +809,18 @@ export default defineConfig(
   //    in sync with the same block in eslint/rails-private-jsdoc.config.mjs,
   //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: [
       "**/*.test.ts",
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
     ],
     rules: {
       "blazetrails/ruby-compat-needs-mri-citation": "error",
@@ -866,14 +866,14 @@ export default defineConfig(
       "blazetrails/thor-command-registration": [
         "error",
         {
-          baseClasses: [
-            "GeneratorBase",
-            "NamedBase",
-            "AppBase",
-            "ModelGenerator",
-            "ResourceGenerator",
+          baseClasses: ["NamedBase", "AppBase", "ModelGenerator", "ResourceGenerator"],
+          baseImports: [
+            "command/base.js",
+            "/base.js",
+            "generators/tse.js",
+            "/tse.js",
+            "@blazetrails/trailties/generators",
           ],
-          baseImports: ["command/base.js", "generators/tse.js", "/tse.js"],
         },
       ],
     },
@@ -932,7 +932,7 @@ export default defineConfig(
 
   // ── ruby-compat-native-required: the native form where it is the same operation (RFC 0194) ──
   {
-    files: ["packages/*/src/**/*.ts"],
+    files: ["packages/*/{src,lib,test}/**/*.ts"],
     rules: {
       "blazetrails/ruby-compat-native-required": "error",
     },
@@ -994,7 +994,7 @@ export default defineConfig(
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/rack-session/src/**/*.ts",
+      "packages/rack-session/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
@@ -1076,7 +1076,7 @@ export default defineConfig(
   // ── no conditionals in tests (all packages except activerecord) ──
   {
     files: [
-      "packages/*/src/**/*.test.ts",
+      "packages/*/{src,lib,test}/**/*.test.ts",
       "packages/*/dx-tests/**/*.test.ts",
       "packages/*/virtualized-dx-tests/**/*.test.ts",
     ],
@@ -1090,13 +1090,13 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/marcel/src/extension.test.ts"],
+    files: ["packages/marcel/test/extension.test.ts"],
     rules: {
       "vitest/no-conditional-tests": "off",
     },
   },
   {
-    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
+    files: ["packages/marcel/test/support/test-helper.ts"],
     rules: {
       "no-useless-assignment": "off",
       "prefer-const": ["error", { destructuring: "all" }],
@@ -1154,7 +1154,7 @@ export default defineConfig(
   // ── actionpack + trailties ──
   {
     files: [
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/{lib,test}/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],

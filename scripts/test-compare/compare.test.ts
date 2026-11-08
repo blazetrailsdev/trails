@@ -217,6 +217,23 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("drops solid_queue's and solid_cable's test bucket dirs", () => {
+    expect(rubyToConventionTs("models/solid_queue/ready_execution_test.rb", "solid-queue")).toBe(
+      "ready-execution.test.ts",
+    );
+    expect(rubyToConventionTs("unit/worker_test.rb", "solid-queue")).toBe("worker.test.ts");
+    expect(rubyToConventionTs("integration/puma/plugin_test.rb", "solid-queue")).toBe(
+      "integration/puma/plugin.test.ts",
+    );
+    expect(
+      rubyToConventionTs(
+        "lib/action_cable/subscription_adapter/solid_cable_test.rb",
+        "solid-cable",
+      ),
+    ).toBe("action-cable/subscription-adapter/solid-cable.test.ts");
+    expect(rubyToConventionTs("jobs/trim_job_test.rb", "solid-cable")).toBe("trim-job.test.ts");
+  });
+
   it("strips raabro's _spec suffix", () => {
     expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
   });
@@ -394,17 +411,17 @@ describe("misplacedLocation", () => {
 describe("sharingPackages", () => {
   it("counts actiondispatch's Rails names when actioncontroller reads its TS files", () => {
     const file = (f: string) => ({ file: f, testCases: [] });
-    const dispatch = file("packages/actionpack/src/action-dispatch/uploaded-file.test.ts");
+    const dispatch = file("packages/actionpack/test/action-dispatch/uploaded-file.test.ts");
     const ts = {
       source: "typescript",
       generatedAt: "",
       packages: {
         actiondispatch: { files: [dispatch] },
         actioncontroller: {
-          files: [file("packages/actionpack/src/action-controller/test-case.test.ts"), dispatch],
+          files: [file("packages/actionpack/test/action-controller/test-case.test.ts"), dispatch],
         },
         abstractcontroller: {
-          files: [file("packages/actionpack/src/abstract-controller/callbacks.test.ts")],
+          files: [file("packages/actionpack/test/abstract-controller/callbacks.test.ts")],
         },
       },
     } as unknown as Parameters<typeof sharingPackages>[1];
@@ -721,5 +738,14 @@ describe("patternMatchOrder", () => {
       { pattern: ["T", "eager loads everything (multiple root directories) <expr>"] },
     ];
     expect(patternMatchOrder(testCases)).toEqual([2, 0, 1]);
+  });
+});
+
+describe("erubi wiring", () => {
+  it("reads erubi's TS tests from tse-compiler", async () => {
+    const { getPackageTestFiles } = await import("./extract-ts-tests.js");
+    const files = getPackageTestFiles()["erubi"];
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.every((f) => f.startsWith(PKG_SRC_DIRS.erubi))).toBe(true);
   });
 });

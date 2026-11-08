@@ -3,7 +3,7 @@ import { zoneDefault } from "@blazetrails/activesupport";
 export class Timezone {
   get isUtc(): boolean {
     const defaultZone = zoneDefault();
-    if (defaultZone != null) {
+    if (defaultZone != null && defaultZone !== false) {
       return defaultZone.name === "UTC";
     } else {
       return true;

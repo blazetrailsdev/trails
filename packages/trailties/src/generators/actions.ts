@@ -1,3 +1,4 @@
+import type { Basic } from "@blazetrails/thor/shell/basic";
 import {
   env as ENV,
   File,
@@ -171,6 +172,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export interface TrailsCommandOptions extends RakeOptions {
   inline?: boolean;
+  shell?: Basic;
 }
 
 /** @inventedArm rbFRequire — PERMANENT */

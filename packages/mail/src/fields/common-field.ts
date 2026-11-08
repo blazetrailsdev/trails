@@ -1,4 +1,10 @@
-import { rbObjAsString, casecmp, type Encoding } from "@blazetrails/ruby-compat";
+import {
+  binaryBytes,
+  binaryString,
+  rbObjAsString,
+  casecmp,
+  type Encoding,
+} from "@blazetrails/ruby-compat";
 
 const FILENAME_RE = /\b(filename|name)=([^;"\r\n]+[ \t\r\n\f\v][^;"\r\n]+)/;
 
@@ -80,10 +86,15 @@ export class CommonField {
     return casecmp(rbObjAsString(this.name), rbObjAsString(fieldName)) === 0;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm binaryString — PERMANENT
+   */
   protected ensureFilenameQuoted(value: unknown): unknown {
     if (typeof value === "string") {
       return value.replace(FILENAME_RE, '$1="$2"');
+    } else if (value instanceof Uint8Array) {
+      return binaryBytes(binaryString(value).replace(FILENAME_RE, '$1="$2"'));
     } else {
       return value;
     }

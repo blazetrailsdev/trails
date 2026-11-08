@@ -14,10 +14,15 @@ export function actsLike(this: unknown, duck: string): boolean {
   }
 }
 
+/** @perf 627ns — PERMANENT */
+const _tsNames = new Map<string, string>();
+
 function respondTo(this: unknown, rubyName: string): boolean {
   if (this == null) return false;
-  const tsName = rubyName
-    .replace(/\?$/, "")
-    .replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+  let tsName = _tsNames.get(rubyName);
+  if (tsName === undefined) {
+    tsName = rubyName.replace(/\?$/, "").replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+    _tsNames.set(rubyName, tsName);
+  }
   return typeof (this as Record<string, unknown>)[tsName] === "function";
 }

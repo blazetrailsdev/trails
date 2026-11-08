@@ -20,8 +20,8 @@ import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 export default [
   {
     ignores: [
-      "packages/marcel/src/test-helpers/fixtures/**",
-      "packages/mini-magick/src/test-helpers/fixtures/**",
+      "packages/marcel/test/fixtures/**",
+      "packages/mini-magick/test/fixtures/**",
       "packages/activestorage/src/test-helpers/fixtures/files/**",
       "packages/rack/test/cgi/assets/**",
     ],
@@ -44,16 +44,16 @@ export default [
       "packages/arel/src/**/*.ts",
       "packages/activesupport/src/**/*.ts",
       "packages/activemodel/src/**/*.ts",
-      "packages/actionpack/src/**/*.ts",
+      "packages/actionpack/lib/**/*.ts",
       "packages/actionview/src/**/*.ts",
-      "packages/actioncable/src/**/*.ts",
+      "packages/actioncable/lib/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
     ],
@@ -83,13 +83,13 @@ export default [
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/did-you-mean/src/**/*.ts",
-      "packages/bcrypt/src/**/*.ts",
+      "packages/did-you-mean/lib/**/*.ts",
+      "packages/bcrypt/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
-      "packages/actioncable/src/**/*.ts",
+      "packages/actioncable/lib/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
-      "packages/ruby-compat/src/**/*.ts",
+      "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -113,18 +113,18 @@ export default [
   // must stay in sync with the `ruby-compat-needs-mri-citation` block in
   // eslint.config.mjs.
   {
-    files: ["packages/ruby-compat/src/**/*.ts"],
+    files: ["packages/ruby-compat/{lib,test}/**/*.ts"],
     ignores: [
       "**/*.test.ts",
-      "packages/ruby-compat/src/async-context-adapter.ts",
-      "packages/ruby-compat/src/child-process-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/fs-adapter.ts",
-      "packages/ruby-compat/src/http-adapter.ts",
-      "packages/ruby-compat/src/os-adapter.ts",
-      "packages/ruby-compat/src/process-adapter.ts",
-      "packages/ruby-compat/src/repl-adapter.ts",
-      "packages/ruby-compat/src/zlib-adapter.ts",
+      "packages/ruby-compat/lib/async-context-adapter.ts",
+      "packages/ruby-compat/lib/child-process-adapter.ts",
+      "packages/ruby-compat/lib/crypto-adapter.ts",
+      "packages/ruby-compat/lib/fs-adapter.ts",
+      "packages/ruby-compat/lib/http-adapter.ts",
+      "packages/ruby-compat/lib/os-adapter.ts",
+      "packages/ruby-compat/lib/process-adapter.ts",
+      "packages/ruby-compat/lib/repl-adapter.ts",
+      "packages/ruby-compat/lib/zlib-adapter.ts",
     ],
     languageOptions: {
       parser: tseslint.parser,

@@ -58,7 +58,7 @@ export class RoutesCommand extends Base {
 
   /** @internal */
   private inspector(): RoutesInspector {
-    return new RoutesInspector(Trails.application!.routes().routes);
+    return new RoutesInspector(Trails.application!.routes().routes());
   }
 
   /** @internal */

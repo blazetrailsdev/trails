@@ -57,7 +57,7 @@ jobs:
   # `packages/website/` and affects the site build.
   changes:
     name: Detect changed paths
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
@@ -121,7 +121,7 @@ jobs:
           ADDITIVE_CANDIDATE_RE='^(pnpm-lock\.yaml|tsconfig[^/]*\.json|vitest[^/]*\.config\.ts)$'
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
-          AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activejob|activemodel|activestorage|bcrypt|activesupport|globalid|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|solid-cable|solid-queue|trails-tsc|tzinfo|vitest-matchers)/'
+          AR_PKGS_RE='^packages/(activerecord|actionmailbox|activerecord-cli|arel|activejob|activemodel|activestorage|bcrypt|activesupport|globalid|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|solid-cable|solid-queue|trails-tsc|tzinfo|vitest-matchers)/'
           DB_ADAPTER_RE='^(packages/activerecord/src/(adapters/(postgresql|abstract-mysql-adapter)|connection-adapters/(postgresql|mysql|mysql2|abstract-mysql-adapter|abstract/|abstract-adapter\.ts|column\.ts|adapter-args\.ts|sql-classification\.ts|pool))|packages/arel/src/visitors/(postgres|mysql)|packages/activerecord-cli/src/__e2e__/(postgres|mysql))'
           AP_PKGS_RE='^packages/(actionpack|actionview|activemodel|bcrypt|activesupport|rack|rack-test|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|tzinfo|vitest-matchers)/'
           AV_PKGS_RE='^packages/(actionview|activesupport|date|vitest-matchers)/'
@@ -365,7 +365,7 @@ jobs:
           AR_SCOPE: ${{ steps.filter.outputs.ar_scope }}
           UNIT_PACKAGES: ${{ steps.filter.outputs.unit_packages }}
         run: |
-          hosted='"ubuntu-latest"'
+          hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
           sqlite_shards='[1, 2]'
@@ -405,7 +405,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
-  # `ubuntu-latest`). GitHub treats `runs-on:` as one literal label when given
+  # `ubuntu-24.04`). GitHub treats `runs-on:` as one literal label when given
   # a string, so a comma-separated value like `self-hosted,Linux,X64` will
   # NOT match any runner. If a multi-label selector is ever needed, switch
   # this expression to `fromJSON(vars.RUNNER)` and store the variable as a
@@ -414,7 +414,7 @@ jobs:
     name: Build & Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -427,7 +427,7 @@ jobs:
     name: Lint (${{ matrix.shard }})
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -501,7 +501,7 @@ jobs:
     if: github.event.schedule != '0 7 * * *'
     # Needs the PR body for the attribution step; the diff-based steps need
     # full history (fetch-depth: 0) to diff against the PR base SHA.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       # contents: read for the two checkout-based steps (prettier reads the
@@ -528,11 +528,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24.21.0
+          node-version: 26.13.0
           # The prettier step runs via `npx` and never installs pnpm, but
-          # setup-node v5 defaults `package-manager-cache: true` and would
+          # setup-node defaults `package-manager-cache: true` and would
           # try to cache the pnpm store from the `packageManager` field in
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
@@ -885,7 +885,7 @@ jobs:
       needs.changes.outputs.guides_affected == 'true' &&
       (github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'run-guides'))
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -905,7 +905,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -919,7 +919,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -954,6 +954,7 @@ jobs:
           scripts/rails-find
           scripts/sync-stats
           scripts/parity
+          scripts/layout
           eslint/
           scripts/strip-asany.test.ts
           scripts/tasks-shim.test.ts
@@ -1087,7 +1088,7 @@ jobs:
       (needs.changes.outputs.trailties_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'))
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1129,7 +1130,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actionpack_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1148,7 +1149,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.actionpack_affected == 'true' ||
       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1180,7 +1181,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.actioncable_only == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1192,7 +1193,7 @@ jobs:
       - if: needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
-          $(git ls-files 'packages/actioncable/src/*.ts')
+          $(git ls-files 'packages/actioncable/lib/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
         run: pnpm vitest run packages/thor
       - if: needs.changes.outputs.thor_only == 'true'
@@ -1207,7 +1208,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trailties_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -1234,7 +1235,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
@@ -1352,9 +1353,10 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - if: needs.changes.outputs.ar_scope != ''
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
@@ -1382,7 +1384,7 @@ jobs:
       (github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -1398,7 +1400,7 @@ jobs:
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
 
@@ -1418,7 +1420,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
@@ -1463,7 +1465,7 @@ jobs:
     needs: changes
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # TRAILS_TEST_FORKS=1 serializes the cli suite onto one worker (see below),
     # and its trails-tsc E2E tests run heavy tsc compiles under v8 coverage on a
     # 2-vCPU runner, so allow more wall time than the multi-fork trails-tsc job.
@@ -1511,7 +1513,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1537,7 +1539,7 @@ jobs:
     # `needs`, so a skip here never trips the all-jobs gate.
     if: false
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1587,7 +1589,7 @@ jobs:
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # 3-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
     # the CI critical path; vitest --shard splits the file set across three free
@@ -1680,7 +1682,8 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
         run: pnpm vitest run $AR_SCOPE
         env:
@@ -1691,7 +1694,7 @@ jobs:
           PGUSER: rails
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: postgresql
           PGHOST: localhost
@@ -1721,7 +1724,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actioncable_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
       redis:
@@ -1737,7 +1740,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/redis.test.ts
+      - run: pnpm vitest run packages/actioncable/test/subscription-adapter/redis.test.ts
         env:
           REDIS_URL: redis://localhost:6379/1
 
@@ -1752,7 +1755,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actioncable_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
       postgres:
@@ -1778,7 +1781,7 @@ jobs:
         run: |
           psql -h localhost -U postgres -d activerecord_unittest \
             -v ON_ERROR_STOP=1 -f scripts/db-init/postgres/01-rails-role.sql
-      - run: pnpm vitest run packages/actioncable/src/subscription-adapter/postgresql.test.ts
+      - run: pnpm vitest run packages/actioncable/test/subscription-adapter/postgresql.test.ts
         env:
           ARCONN: postgresql
           PGHOST: localhost
@@ -1798,7 +1801,7 @@ jobs:
       false &&
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       mysql:
@@ -1840,7 +1843,7 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1878,7 +1881,7 @@ jobs:
       github.event.pull_request.draft == false ||
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job above for the rationale. Each matrix leg gets its own
@@ -1919,7 +1922,8 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - uses: ./.github/actions/activestorage-media-binaries
+      - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
+        uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
         run: pnpm vitest run $AR_SCOPE
         env:
@@ -1929,7 +1933,7 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1959,7 +1963,7 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
       contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       mariadb:
@@ -1990,7 +1994,7 @@ jobs:
             GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
             FLUSH PRIVILEGES;"
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/activestorage/ packages/actionmailbox/
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -2014,7 +2018,7 @@ jobs:
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2043,7 +2047,7 @@ jobs:
       needs.changes.outputs.comparison_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true' &&
       needs.changes.outputs.actioncable_only != 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -2118,7 +2122,7 @@ jobs:
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
           rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
           method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/src packages/activemodel/src
-          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/globalid/src packages/i18n/src --max-warnings 0
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/test packages/did-you-mean/test packages/globalid/src packages/i18n/src --max-warnings 0
           dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
           detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
           test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
@@ -2494,7 +2498,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
       (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
@@ -2531,7 +2535,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2570,7 +2574,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2597,7 +2601,7 @@ jobs:
       needs.changes.outputs.parity_sqlite == 'true' &&
       needs.schema-parity-rails.result == 'success' &&
       needs.schema-parity-trails.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2620,7 +2624,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       # Minted once per workflow run and consumed by both dump jobs so they
@@ -2642,7 +2646,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -2678,7 +2682,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.parity_sqlite == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       PARITY_FROZEN_AT: ${{ needs.query-parity-frozen-at.outputs.value }}
@@ -2707,7 +2711,7 @@ jobs:
       needs.changes.outputs.parity_sqlite == 'true' &&
       needs.query-parity-rails.result == 'success' &&
       needs.query-parity-trails.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -2760,7 +2764,7 @@ jobs:
       - query-parity-rails
       - query-parity-trails
       - query-parity-diff
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       issues: write

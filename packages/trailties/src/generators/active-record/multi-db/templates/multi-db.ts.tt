@@ -1,0 +1,44 @@
+// Multi-db Configuration
+//
+// This file is used for configuration settings related to multiple databases.
+//
+// Enable Database Selector
+//
+// Inserts middleware to perform automatic connection switching.
+// The `databaseSelector` object is used to pass options to the DatabaseSelector
+// middleware. The `delay` is used to determine how long to wait after a write
+// to send a subsequent read to the primary.
+//
+// The `databaseResolver` class is used by the middleware to determine which
+// database is appropriate to use based on the time delay.
+//
+// The `databaseResolverContext` class is used by the middleware to set
+// timestamps for the last write to the primary. The resolver uses the context
+// class timestamps to determine how long to wait before reading from the
+// replica.
+//
+// By default Trails will store a last write timestamp in the session. The
+// DatabaseSelector middleware is designed as such you can define your own
+// strategy for connection switching and pass that into the middleware through
+// these configuration options.
+//
+// Trails.application.configure(function () {
+//   this.config.activeRecord.databaseSelector = { delay: 2 };
+//   this.config.activeRecord.databaseResolver = ActiveRecord.Middleware.DatabaseSelector.Resolver;
+//   this.config.activeRecord.databaseResolverContext = ActiveRecord.Middleware.DatabaseSelector.Resolver.Session;
+// });
+//
+// Enable Shard Selector
+//
+// Inserts middleware to perform automatic shard swapping. The `shardSelector` object
+// can be used to pass options to the `ShardSelector` middleware. The `lock` option is
+// used to determine whether shard swapping should be prohibited for the request.
+//
+// The `shardResolver` option is used by the middleware to determine which shard
+// to switch to. The application must provide a mechanism for finding the shard name
+// in a function. See guides for an example.
+//
+// Trails.application.configure(function () {
+//   this.config.activeRecord.shardSelector = { lock: true };
+//   this.config.activeRecord.shardResolver = async (request) => (await Tenant.findByBang({ host: request.host })).shard;
+// });

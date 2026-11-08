@@ -1,0 +1,38 @@
+{
+  "name": "@blazetrails/actionmailbox",
+  "version": "0.1.0",
+  "description": "Inbound email routing for Trails, mirroring the actionmailbox gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/mail": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

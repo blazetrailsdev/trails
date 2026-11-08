@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { actsLike, zone as timeZone } from "@blazetrails/activesupport";
+import { actsLike, zone as timeZone, type TimeZone } from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
@@ -98,7 +98,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
 /** @internal */
 function setTimeZoneWithoutConversion(value: unknown): unknown {
   if (value == null || value === false) return null;
-  const utc = timeZone()!.localToUtc(value as RubyTime);
+  const utc = (timeZone() as TimeZone).localToUtc(value as RubyTime);
   return utc == null ? null : inTimeZone.call(utc as DateOrTime);
 }
 

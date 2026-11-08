@@ -3,6 +3,8 @@ import { Connection, connect } from "./connection.js";
 import {
   ConnectionBad,
   Error as PGError,
+  PG_DIAG_MESSAGE_PRIMARY,
+  PG_DIAG_SEVERITY,
   PG_DIAG_SOURCE_FUNCTION,
   PG_DIAG_SQLSTATE,
   ServerError,
@@ -24,6 +26,8 @@ export const PG = {
   UnableToSend,
   PG_DIAG_SQLSTATE,
   PG_DIAG_SOURCE_FUNCTION,
+  PG_DIAG_MESSAGE_PRIMARY,
+  PG_DIAG_SEVERITY,
   TextEncoder: { Array: TextEncoderArray },
   TextDecoder: { Array: TextDecoderArray },
 };

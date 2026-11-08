@@ -1,0 +1,461 @@
+import {
+  deleteIf,
+  extend,
+  include,
+  InvalidURIError,
+  Module,
+  NoMethodError,
+  rbFSend,
+  rbObjClassname,
+  rbObjClone,
+  rbObjMethod,
+  rbObjRespondTo,
+  rbObjSingletonClass,
+  URI,
+  type Method,
+} from "@blazetrails/ruby-compat";
+import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesupport";
+import { RouteSet, type Config } from "../../routing/route-set.js";
+import { RoutingError } from "../../../action-controller/metal/exceptions.js";
+import type { TestRequest } from "../../../action-controller/test-case.js";
+import { ActionController, ActionDispatch } from "../../../namespaces.js";
+import type { IntegrationTest, Session } from "../integration.js";
+
+export interface RoutingAssertionsHost {
+  routes?: RouteSet;
+  controller?: unknown;
+}
+
+export interface PathWithMethod {
+  path: string;
+  method?: string | null;
+}
+
+type Options = Record<string, unknown>;
+
+const URL_FORM_RE = /:\/\//;
+
+/** @internal */
+export interface TestClass<H> {
+  setup(...args: ((this: H) => void)[]): void;
+  teardown(...args: ((this: H) => void)[]): void;
+}
+
+export const WithIntegrationRouting = {
+  ClassMethods: {
+    withRouting(this: TestClass<IntegrationTest>, block: (routes: RouteSet) => unknown): void {
+      let oldRoutes: RouteSet | undefined;
+      let oldRoutesCallMethod: Method | undefined;
+      let oldIntegrationSession: Session | undefined;
+
+      this.setup(function () {
+        oldRoutes = (this.app as { routes(): RouteSet }).routes();
+        oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+        oldIntegrationSession = this.integrationSession;
+        this.createRoutes(block);
+      });
+
+      this.teardown(function () {
+        this.resetRoutes(oldRoutes!, oldRoutesCallMethod!, oldIntegrationSession!);
+      });
+    },
+  },
+
+  withRouting<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const oldRoutes = (this.app as { routes(): RouteSet }).routes();
+    const oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+    const oldIntegrationSession = this.integrationSession;
+    let result: T;
+    try {
+      result = this.createRoutes(block);
+    } catch (e) {
+      this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+      throw e;
+    }
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      return Promise.resolve(result).finally(() =>
+        this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession),
+      ) as T;
+    }
+    this.resetRoutes(oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+    return result;
+  },
+
+  /** @internal */
+  createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const app = this.app as { routes(): RouteSet; _routes: RouteSet };
+    const routes = new RouteSet();
+
+    this._originalRoutes ??= app.routes();
+    const routesCallMethod = rbObjMethod(routes, "call");
+    (rbObjSingletonClass(this._originalRoutes).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => routesCallMethod.call(...args);
+
+    const https = this.integrationSession.isHttps();
+    const host = this.integrationSession.host;
+
+    app._routes = routes;
+    const klass = class extends ActionDispatch.Integration.Session {};
+    include(klass, app.routes().urlHelpers());
+    include(klass, app.routes().mountedHelpers());
+    this._integrationSession = new klass(app);
+    this._integrationSession.httpsBang(https);
+    this._integrationSession.hostBang(host);
+    this.routes = routes;
+
+    return block(routes);
+  },
+
+  /** @internal */
+  resetRoutes(
+    this: IntegrationTest,
+    oldRoutes: RouteSet,
+    oldRoutesCallMethod: Method,
+    oldIntegrationSession: Session,
+  ): void {
+    (this.app as { _routes: RouteSet })._routes = oldRoutes;
+    (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => oldRoutesCallMethod.call(...args);
+    this._integrationSession = oldIntegrationSession;
+    this.routes = oldRoutes;
+  },
+};
+extend(WithIntegrationRouting, Concern);
+
+export type WithIntegrationRouting = {
+  withRouting: (typeof WithIntegrationRouting)["withRouting"];
+  /** @internal */
+  createRoutes: (typeof WithIntegrationRouting)["createRoutes"];
+  /** @internal */
+  resetRoutes: (typeof WithIntegrationRouting)["resetRoutes"];
+};
+
+// eslint-disable-next-line @typescript-eslint/no-namespace -- `RoutingAssertions::ClassMethods` (`routing.rb:79`), whose `with_routing` shares its name with the instance method.
+export namespace ClassMethods {
+  export function withRouting(
+    this: TestClass<RoutingAssertionsHost>,
+    block: (routes: RouteSet) => unknown,
+  ): void {
+    let oldRoutes: RouteSet | undefined;
+    let oldController: unknown;
+
+    this.setup(function () {
+      [oldRoutes, oldController] = [this.routes, this.controller];
+      createRoutes.call(this, null, block);
+    });
+
+    this.teardown(function () {
+      resetRoutes.call(this, oldRoutes, oldController);
+    });
+  }
+}
+
+export function setup(this: RoutingAssertionsHost): void {
+  if (this.routes == null) this.routes = undefined;
+}
+
+export function withRouting<T>(
+  this: RoutingAssertionsHost,
+  config: Config | null | ((routes: RouteSet) => T),
+  block?: (routes: RouteSet) => T,
+): T {
+  if (typeof config === "function") [config, block] = [null, config];
+  const [oldRoutes, oldController] = [this.routes, this.controller];
+  let result: T;
+  try {
+    result = createRoutes.call<RoutingAssertionsHost, [Config | null, (r: RouteSet) => T], T>(
+      this,
+      config,
+      block!,
+    );
+  } catch (e) {
+    resetRoutes.call(this, oldRoutes, oldController);
+    throw e;
+  }
+  if (typeof (result as { then?: unknown } | null)?.then === "function") {
+    return Promise.resolve(result).finally(() =>
+      resetRoutes.call(this, oldRoutes, oldController),
+    ) as T;
+  }
+  resetRoutes.call(this, oldRoutes, oldController);
+  return result;
+}
+
+export function assertRecognizes(
+  this: RoutingAssertionsHost,
+  expectedOptions: Options,
+  path: string | PathWithMethod,
+  extras: Options = {},
+  msg?: string | (() => string),
+): void {
+  if (typeof path !== "string" && String(path.method ?? "") === "all") {
+    for (const method of ["get", "post", "put", "delete"] as const) {
+      assertRecognizes.call(this, expectedOptions, { ...path, method }, extras, msg);
+    }
+    return;
+  }
+  const request = recognizedRequestFor.call(this, path, extras, msg);
+
+  expectedOptions = { ...expectedOptions };
+
+  msg = message(
+    msg ?? null,
+    "",
+    () =>
+      `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
+  );
+
+  assertEqual(expectedOptions, request.pathParameters, msg);
+}
+
+export function assertGenerates(
+  this: RoutingAssertionsHost,
+  expectedPath: string,
+  options: Options,
+  defaults: Options = {},
+  extras: Options = {},
+  message?: string,
+): void {
+  if (URL_FORM_RE.test(expectedPath)) {
+    expectedPath = failOn(InvalidURIError, message, () => {
+      const uri = URI.parse(expectedPath);
+      return String(uri.path ?? "") === "" ? "/" : uri.path!;
+    });
+  } else {
+    expectedPath = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+  }
+  const routes = requireRoutes(this);
+  options = { ...options };
+  const [generatedPath, queryStringKeys] = routes.generateExtras(options, defaults);
+  const foundExtras = Object.fromEntries(
+    Object.entries(options).filter(([k]) => queryStringKeys.includes(k)),
+  );
+  let msg = message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`;
+  assertEqual(extras, foundExtras, msg);
+
+  msg = message ?? `The generated path <${generatedPath}> did not match <${expectedPath}>`;
+  assertEqual(expectedPath, generatedPath, msg);
+}
+
+export function assertRouting(
+  this: RoutingAssertionsHost,
+  path: string | PathWithMethod,
+  options: Options,
+  defaults: Options = {},
+  extras: Options = {},
+  message?: string,
+): void {
+  assertRecognizes.call(this, options, path, extras, message);
+  const controller = options["controller"];
+  const defaultController = defaults["controller"];
+  if (
+    typeof controller === "string" &&
+    controller.includes("/") &&
+    typeof defaultController === "string" &&
+    defaultController.includes("/")
+  ) {
+    options = { ...options, controller: `/${controller}` };
+  }
+  const generateOptions = deleteIf({ ...options }, (k) => Object.hasOwn(defaults, k));
+  const pathStr = typeof path === "string" ? path : path.path;
+  assertGenerates.call(this, pathStr, generateOptions, defaults, extras, message);
+}
+
+export function methodMissing(
+  this: RoutingAssertionsHost,
+  selector: string,
+  ...args: unknown[]
+): unknown {
+  if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
+    return rbFSend(this.controller, selector, ...args);
+  } else {
+    const super_ = RoutingAssertions.superMethod(this, "methodMissing");
+    if (super_ !== undefined) return super_(selector, ...args);
+    throw new NoMethodError(
+      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
+      selector,
+      args,
+      false,
+      { receiver: this },
+    );
+  }
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function spliceMethodMissing(link: object): void {
+  Object.setPrototypeOf(
+    link,
+    new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
+      get(target, prop, receiver: RoutingAssertionsHost) {
+        const value = Reflect.get(target, prop, receiver);
+        if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+          return value;
+        }
+        if (prop === "controller" || prop === "routes") return value;
+        if (receiver.controller != null && receiver.routes?.namedRoutes?.isRouteDefined(prop)) {
+          return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
+        }
+        return value;
+      },
+    }),
+  );
+}
+
+/** @internal */
+export function recognizedRequestFor(
+  this: RoutingAssertionsHost,
+  path: string | PathWithMethod,
+  extras: Options = {},
+  msg?: string | (() => string),
+): TestRequest {
+  const method = typeof path === "string" ? "get" : String(path.method ?? "get");
+  path = typeof path === "string" ? path : path.path;
+
+  const controller = this.controller;
+  const request = ActionController.TestRequest.create(
+    (controller as object | undefined)?.constructor ?? null,
+  );
+  if (URL_FORM_RE.test(path)) {
+    failOn(InvalidURIError, msg, () => {
+      const uri = URI.parse(path as string);
+      request.env["rack.url_scheme"] = uri.scheme ?? "http";
+      if (uri.host != null) request.host = uri.host;
+      if (uri.port != null) request.port = uri.port;
+      request.path = String(uri.path ?? "") === "" ? "/" : uri.path!;
+    });
+  } else {
+    if (!path.startsWith("/")) path = `/${path}`;
+    request.path = path;
+  }
+  request.env["REQUEST_METHOD"] = method.toUpperCase();
+
+  const params = failOn(RoutingError, msg, () =>
+    requireRoutes(this).recognizePath(path, { method, extras }),
+  );
+  request.pathParameters = params;
+  return request;
+}
+
+/** @internal */
+export function createRoutes<T>(
+  this: RoutingAssertionsHost,
+  config: Config | null,
+  block: (routes: RouteSet) => T,
+): T {
+  this.routes = new RouteSet(config ?? RouteSet.DEFAULT_CONFIG);
+  if (this.controller != null) {
+    this.controller = rbObjClone(this.controller as object);
+    const _routes = this.routes;
+
+    include(
+      rbObjSingletonClass(this.controller as object) as new () => object,
+      _routes.urlHelpers(),
+    );
+
+    if (rbObjRespondTo(this.controller, "viewContextClass")) {
+      const viewContextClass = class extends (
+        this.controller as { viewContextClass(): new (...args: never[]) => object }
+      ).viewContextClass() {};
+      include(viewContextClass, _routes.urlHelpers());
+
+      const customViewContext = new Module((mod) => {
+        mod.defineMethod("viewContextClass", () => viewContextClass);
+      });
+      extend(this.controller as object, customViewContext);
+    }
+  }
+  return block(this.routes);
+}
+
+/** @internal */
+export function resetRoutes(
+  this: RoutingAssertionsHost,
+  oldRoutes: RouteSet | undefined,
+  oldController: unknown,
+): void {
+  this.routes = oldRoutes;
+  if (this.controller != null) {
+    this.controller = oldController;
+  }
+}
+
+/** @internal */
+export function failOn<T>(
+  exceptionClass: new (...args: never[]) => Error,
+  message: string | (() => string) | undefined,
+  block: () => T,
+): T {
+  try {
+    return block();
+  } catch (e) {
+    if (e instanceof exceptionClass) {
+      /** @inventedArm conditional — PERMANENT */
+      throw new Assertion((typeof message === "function" ? message() : message) ?? e.message);
+    }
+    throw e;
+  }
+}
+
+function requireRoutes(host: RoutingAssertionsHost): RouteSet {
+  if (!host.routes) {
+    throw new Error("No routes available — set `this.routes` to a RouteSet first.");
+  }
+  return host.routes;
+}
+
+const inspect = (v: unknown): string => {
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+};
+
+export type RoutingAssertions = {
+  setup(): void;
+  withRouting: typeof withRouting;
+  assertRecognizes: typeof assertRecognizes;
+  assertGenerates: typeof assertGenerates;
+  assertRouting: typeof assertRouting;
+  methodMissing: typeof methodMissing;
+  /** @internal */
+  createRoutes: typeof createRoutes;
+  /** @internal */
+  resetRoutes: typeof resetRoutes;
+  /** @internal */
+  recognizedRequestFor: typeof recognizedRequestFor;
+  /** @internal */
+  failOn: typeof failOn;
+};
+
+export const RoutingAssertions = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      setup,
+      withRouting,
+      assertRecognizes,
+      assertGenerates,
+      assertRouting,
+      methodMissing,
+      createRoutes,
+      resetRoutes,
+      recognizedRequestFor,
+      failOn,
+    });
+  });
+
+  (
+    mod as unknown as { included(base: null, block: (this: { prototype: object }) => void): void }
+  ).included(null, function (this: { prototype: object }) {
+    spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
+  });
+});

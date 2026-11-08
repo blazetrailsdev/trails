@@ -37,10 +37,14 @@
       "default": "./dist/app-path.js"
     },
     "./commands": {
-      "types": "./dist/bin.d.ts",
-      "default": "./dist/bin.js"
+      "types": "./dist/commands.d.ts",
+      "default": "./dist/commands.js"
     },
     "./generators": "./dist/generators/index.js",
+    "./generators/test-case": {
+      "types": "./dist/generators/test-case.d.ts",
+      "default": "./dist/generators/test-case.js"
+    },
     "./autoloaders": {
       "types": "./dist/autoloaders.d.ts",
       "default": "./dist/autoloaders.js"
@@ -104,7 +108,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'runner', 'test']) require('fs').cpSync('src/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('src/templates/trails', 'dist/templates/trails', { recursive: true })\" && trails-tsc-views build --views dist/templates/trails --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
+    "build:templates": "node -e \"require('fs').cpSync('src/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'runner', 'test']) require('fs').cpSync('src/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('src/templates', 'dist/templates', { recursive: true })\" && trails-tsc-views build --views dist/templates --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
   },
   "files": [
     "dist",
@@ -137,17 +141,24 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/activerecord-cli": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/et-orbi": "workspace:*",
+    "@blazetrails/mail": "workspace:*",
+    "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {
+    "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/actionmailbox": {
+      "optional": true
+    },
     "@blazetrails/activestorage": {
       "optional": true
     },
@@ -156,6 +167,6 @@
     }
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   }
 }

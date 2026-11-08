@@ -19,6 +19,7 @@ import {
   rbFLoad,
   getFs,
   getPath,
+  rbFRequireFile,
   LOAD_PATH,
   Pathname,
   constGet,
@@ -155,6 +156,9 @@ export class Application extends Engine {
     const newCfg = new Configuration(klass.findRoot(klass.calledFrom()));
     this._config = newCfg;
     return newCfg;
+  }
+  set config(configuration: Configuration) {
+    this._config = configuration;
   }
 
   get deprecators(): Deprecators {
@@ -375,7 +379,7 @@ export class Application extends Engine {
 
   async requireEnvironmentBang(): Promise<void> {
     const environment = (await (await this.paths()).get("config/environment")!.existent())[0];
-    if (environment) await import(getPath().pathToFileURL!(environment).href);
+    if (environment) await rbFRequireFile(environment);
   }
 
   routesReloader(): RoutesReloader {

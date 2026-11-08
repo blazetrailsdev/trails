@@ -3,16 +3,20 @@ import { LoadError, rbFRequire } from "@blazetrails/ruby-compat";
 export type {} from "./trailties/active-record.js";
 export type {} from "./trailties/action-controller.js";
 export type {} from "./trailties/action-view.js";
+export type {} from "./trailties/action-mailer.js";
 export type {} from "./trailties/active-job.js";
 
 const activeStorageEngine = "@blazetrails/activestorage/engine";
+const actionMailboxEngine = "@blazetrails/actionmailbox/engine";
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/railtie": () => import("./trailties/active-record.js"),
   "active_storage/engine": () => import(activeStorageEngine),
   "action_controller/railtie": () => import("./trailties/action-controller.js"),
   "action_view/railtie": () => import("./trailties/action-view.js"),
+  "action_mailer/railtie": () => import("./trailties/action-mailer.js"),
   "active_job/railtie": () => import("./trailties/active-job.js"),
   "action_cable/engine": () => import("./trailties/action-cable.js"),
+  "action_mailbox/engine": () => import(actionMailboxEngine),
   "trails/test_unit/railtie": () => import("./test-unit/trailtie.js"),
 };
 

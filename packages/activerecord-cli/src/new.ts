@@ -5,7 +5,7 @@ import { AR_DEV_DEPS, AR_SCRIPTS, init } from "./init.js";
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
 const DRIVER_VERSIONS: Record<Driver, Record<string, string>> = {
-  "better-sqlite3": { "better-sqlite3": "^12.6.2" },
+  "better-sqlite3": { "better-sqlite3": "^13.0.3" },
   "node-sqlite": {},
   pg: { pg: "^8.19.0" },
   mysql2: { mysql2: "^3.18.2" },

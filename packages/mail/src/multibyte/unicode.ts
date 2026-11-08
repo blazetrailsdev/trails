@@ -1,5 +1,11 @@
 import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
-import { ArgumentError, pack } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  bytes as rbBytes,
+  NoMethodError,
+  pack,
+  unpack,
+} from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
 
@@ -49,6 +55,12 @@ const _database = {
     lvt: (cp: number) => isHangulSyllable(cp, false),
     extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
   } as Record<BoundaryClass, number | ((cp: number) => boolean)>,
+  cp1252: Object.fromEntries(
+    Array.from({ length: 32 }, (_, i) => [
+      0x80 + i,
+      new TextDecoder("windows-1252").decode(Uint8Array.of(0x80 + i)).codePointAt(0)!,
+    ]),
+  ) as Record<number, number>,
 };
 
 function caseEq(
@@ -146,9 +158,66 @@ export const Unicode = {
     return ActiveSupportUnicode.compose(codepoints);
   },
 
-  /** @missingRailsCall map — CONVERGEABLE mail-message-spec-port */
   tidyBytes(string: string, force: boolean = false): string {
-    return ActiveSupportUnicode.tidyBytes(string, force);
+    if (force) {
+      return pack(
+        unpack(
+          pack(
+            (unpack(Uint8Array.from(rbBytes(string)), "C*") as number[])
+              .map((b) => tidyByte(b))
+              .flat()
+              .filter((x) => x != null),
+            "C*",
+          ),
+          "U*",
+        ) as number[],
+        "U*",
+      );
+    }
+
+    const bytes: (number | number[])[] = unpack(Uint8Array.from(rbBytes(string)), "C*") as number[];
+    let contsExpected = 0;
+    let lastLead = 0;
+
+    bytes.forEach((_, i) => {
+      const byte = bytes[i] as number;
+      const isCont = byte > 127 && byte < 192;
+      const isLead = byte > 191 && byte < 245;
+      const isUnused = byte > 240;
+      const isRestricted = byte > 244;
+
+      if (isUnused || isRestricted) {
+        bytes[i] = tidyByte(byte);
+      } else if (isCont) {
+        if (contsExpected === 0) bytes[i] = tidyByte(byte);
+        else contsExpected -= 1;
+      } else {
+        if (contsExpected > 0) {
+          for (let j = 1; j <= i - lastLead; j++) bytes[i - j] = tidyByte(bytes[i - j]);
+          contsExpected = 0;
+        }
+        if (isLead) {
+          if (i === bytes.length - 1) {
+            bytes[i] = tidyByte(bytes.at(-1) as number);
+          } else {
+            contsExpected = byte < 224 ? 1 : byte < 240 ? 2 : 3;
+            lastLead = i;
+          }
+        }
+      }
+    });
+    return bytes.length === 0
+      ? ""
+      : pack(
+          unpack(
+            pack(
+              bytes.flat().filter((x) => x != null),
+              "C*",
+            ),
+            "U*",
+          ) as number[],
+          "U*",
+        );
   },
 
   normalize(string: string, form: string | null = null): string {
@@ -192,3 +261,20 @@ export const Unicode = {
     );
   },
 };
+
+function tidyByte(byte: number | number[]): number[] {
+  /** @inventedArm if — PERMANENT */
+  if (typeof byte !== "number") {
+    throw new NoMethodError("undefined method `<' for an instance of Array", "<");
+  }
+  if (byte < 160) {
+    return unpack(
+      Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
+      "C*",
+    ) as number[];
+  } else if (byte < 192) {
+    return [194, byte];
+  } else {
+    return [195, byte - 64];
+  }
+}

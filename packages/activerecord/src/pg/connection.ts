@@ -3,6 +3,8 @@ import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decode
 import {
   ConnectionBad,
   Error as PGError,
+  PG_DIAG_MESSAGE_PRIMARY,
+  PG_DIAG_SEVERITY,
   PG_DIAG_SOURCE_FUNCTION,
   PG_DIAG_SQLSTATE,
   ServerError,
@@ -10,29 +12,7 @@ import {
 } from "./exceptions.js";
 import { PG } from "./pg.js";
 
-export interface PGConnection extends pg.Client {
-  prepare(stmtName: string, sql: string): Promise<void>;
-  execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result>;
-  asyncExec(sql: string | null): Promise<PG.Result>;
-  sendQuery(sql: string): void;
-  getLastResult(): Promise<PG.Result | null>;
-  execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
-  exec(sql: string | null): Promise<PG.Result>;
-  escapeString(str: string): string;
-  waitForNotify(
-    timeout?: number | null,
-    block?: (relname: string, bePid: number, extra: string | undefined) => unknown,
-  ): Promise<string | null>;
-  unescapeBytea(value: string | Uint8Array): Buffer;
-  transactionStatus(): number;
-  status(): number;
-  reset(): Promise<void>;
-  cancel(): Promise<string | null>;
-  asyncCancel(): Promise<string | null>;
-  block(timeout?: number | null): Promise<boolean>;
-  socketIo(): { reopen(path: string): void } | null;
-  typeMapForResults: PGTypeMapByOid;
-}
+export type PGConnection = Connection;
 
 type QueryConfig = string | Record<string, unknown> | null;
 type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>;
@@ -92,13 +72,43 @@ export class Connection {
     }
   }
 
-  query(...args: unknown[]): unknown {
-    const pending = (this.client.query as unknown as (...args: unknown[]) => unknown)(...args) as
-      | { catch?: unknown }
-      | null
-      | undefined;
-    if (typeof pending?.catch !== "function") return pending;
-    return (pending as Promise<unknown>).catch((error: unknown) => raise(this, error));
+  query(...args: unknown[]): Promise<pg.QueryResult> {
+    try {
+      return Promise.resolve(
+        (this.client.query as unknown as (...args: unknown[]) => unknown)(...args),
+      ).catch((error: unknown) => raise(this, error)) as Promise<pg.QueryResult>;
+    } catch (error) {
+      return Promise.reject(pgError(this, error));
+    }
+  }
+
+  async close(): Promise<void> {
+    try {
+      await this.client.end();
+    } catch (error) {
+      raise(this, error);
+    }
+  }
+
+  async setClientEncoding(encoding: string): Promise<void> {
+    await this.query(`SET client_encoding TO '${this.escapeString(encoding)}'`);
+  }
+
+  setNoticeReceiver(
+    block: (result: { errorField(fieldcode: number): string | null }) => void,
+  ): void {
+    this.client.removeAllListeners("notice");
+    this.client.on("notice", (notice: { message?: string; code?: string; severity?: string }) => {
+      const errorField = (fieldcode: number): string | null =>
+        fieldcode === PG_DIAG_MESSAGE_PRIMARY
+          ? (notice.message ?? null)
+          : fieldcode === PG_DIAG_SQLSTATE
+            ? (notice.code ?? null)
+            : fieldcode === PG_DIAG_SEVERITY
+              ? (notice.severity ?? null)
+              : null;
+      block({ errorField });
+    });
   }
 
   connect(): Promise<unknown> {
@@ -165,7 +175,7 @@ export class Connection {
           resolve();
         },
       };
-      this.query(submittable);
+      this.query(submittable).catch(reject);
     });
   }
 
@@ -192,6 +202,14 @@ export class Connection {
 
   exec(sql: string | null): Promise<PG.Result> {
     return this.asyncExec(sql);
+  }
+
+  isFinished(): boolean {
+    return this.client._ending === true || this.client._ended === true;
+  }
+
+  escapeIdentifier(str: string): string {
+    return `"${str.replace(/"/g, '""')}"`;
   }
 
   escapeString(str: string): string {
@@ -457,39 +475,6 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
   return Buffer.from(bytes);
 }
 
-const HANDLER: ProxyHandler<Connection> = {
-  get(conn, name) {
-    if (name in conn) {
-      const value: unknown = Reflect.get(conn, name);
-      return typeof value === "function" ? value.bind(conn) : value;
-    }
-    const client = conn.client;
-    const value: unknown = Reflect.get(client, name);
-    if (typeof value !== "function") return value;
-    return (...args: unknown[]): unknown => {
-      try {
-        const pending = value.apply(client, args) as { catch?: unknown } | null | undefined;
-        if (typeof pending?.catch !== "function") return pending;
-        return (pending as Promise<unknown>).catch((error: unknown) => raise(conn, error));
-      } catch (error) {
-        raise(conn, error);
-      }
-    };
-  },
-  set(conn, name, value) {
-    return Reflect.set(name in conn ? conn : conn.client, name, value);
-  },
-  has(conn, name) {
-    return name in conn || name in conn.client;
-  },
-  defineProperty(conn, name, descriptor) {
-    return Reflect.defineProperty(name in conn ? conn : conn.client, name, descriptor);
-  },
-  deleteProperty(conn, name) {
-    return Reflect.deleteProperty(name in conn ? conn : conn.client, name);
-  },
-};
-
 const STRING_OIDS = new Set([
   114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
 ]);
@@ -541,7 +526,7 @@ export function conndefaultsHash(): Record<string, string | null> {
   return hash;
 }
 
-export async function connect(connParams: Record<string, unknown>): Promise<PGConnection> {
+export async function connect(connParams: Record<string, unknown>): Promise<Connection> {
   const config: pg.ClientConfig = Object.fromEntries(
     Object.entries(connParams).map(([key, value]) => [CONNINFO_KEYWORDS[key] ?? key, value]),
   );
@@ -556,10 +541,7 @@ export async function connect(connParams: Record<string, unknown>): Promise<PGCo
   return client;
 }
 
-export function pgConnection<T extends object>(
-  client: T,
-  connParams?: pg.ClientConfig,
-): T & PGConnection {
-  if (client instanceof Connection) return client as unknown as T & PGConnection;
-  return new Proxy(new Connection(client, connParams), HANDLER) as unknown as T & PGConnection;
+export function pgConnection(client: object, connParams?: pg.ClientConfig): Connection {
+  if (client instanceof Connection) return client;
+  return new Connection(client, connParams);
 }

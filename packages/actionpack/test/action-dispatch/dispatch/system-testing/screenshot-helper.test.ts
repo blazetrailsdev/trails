@@ -1,0 +1,247 @@
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
+import { assert, assertEqual, assertNot, TopLevel } from "@blazetrails/activesupport";
+import {
+  takeScreenshot,
+  takeFailedScreenshot,
+  imageName,
+  imagePath,
+  htmlPath,
+  relativeImagePath,
+  screenshotsDir,
+  ScreenshotHelper,
+  outputType,
+  displayImage,
+  incrementUnique,
+  inlineBase64,
+  supportsScreenshot,
+} from "../../../../lib/action-dispatch/system-testing/test-helpers/screenshot-helper.js";
+import type { BrowserType } from "playwright";
+import { requirePlaywright } from "../../../../lib/action-dispatch/system-testing/driver.js";
+
+const foundExecutable = new URL(import.meta.url).pathname;
+const { chromium, firefox } = (await requirePlaywright()) as {
+  chromium: BrowserType;
+  firefox: BrowserType;
+};
+vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
+vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
+
+const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
+  await import("../../../support/abstract-unit.js");
+
+const root = (path: string): string => new Pathname(Dir.pwd()).join(path).toString();
+
+describe("ScreenshotHelperTest", () => {
+  let trails: typeof TopLevel.Trails;
+  let host: InstanceType<typeof DrivenBySeleniumWithChrome>;
+
+  beforeEach(() => {
+    host = new DrivenBySeleniumWithChrome("x");
+    host._screenshotCounter = undefined;
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "");
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
+    trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(Dir.pwd()) } as unknown as typeof TopLevel.Trails;
+  });
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("image path is saved in tmp directory", () => {
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
+  });
+
+  it("image path unique counter is changed when incremented", () => {
+    incrementUnique.call(host);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
+  });
+
+  it("image path unique counter generates different path in same test", () => {
+    incrementUnique.call(host);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
+    incrementUnique.call(host);
+    assertEqual(root("tmp/screenshots/2_x.png"), imagePath.call(host));
+  });
+
+  it("image path uses the Vitest.save_path to set a custom directory", () => {
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = "custom_dir";
+    try {
+      assertEqual(root("custom_dir/0_x.png"), imagePath.call(host));
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
+  });
+
+  it("image path includes failures text if test did not pass", () => {
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    assertEqual(root("tmp/screenshots/failures_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/failures_x.html"), htmlPath.call(host));
+  });
+
+  it("image path does not include failures text if test skipped", () => {
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    vi.spyOn(host, "isSkipped").mockReturnValue(true);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/0_x.html"), htmlPath.call(host));
+  });
+
+  it("image name truncates names over 225 characters including counter", () => {
+    const longHost = new DrivenBySeleniumWithChrome("x".repeat(400));
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.png`), imagePath.call(longHost));
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.html`), htmlPath.call(longHost));
+  });
+
+  it("defaults to simple output for the screenshot", () => {
+    expect(outputType()).toBe("simple");
+  });
+
+  it("Non word characters are replaced with dashes in paths", () => {
+    const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span");
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.png"), imagePath.call(h));
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.html"), htmlPath.call(h));
+  });
+
+  it("take_screenshot allows changing screenshot display format via screenshot: kwarg", () => {
+    const msgs: string[] = [];
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
+    const page = {
+      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+      content: vi.fn().mockResolvedValue("<html></html>"),
+    };
+    host._page = page as unknown as typeof host._page;
+    return takeScreenshot.call(host, { screenshot: "artifact" }).then(() => {
+      const out = msgs.join("\n");
+      expect(out).toMatch(/url=artifact:\/\/.+?tmp\/screenshots\/1_x\.png/);
+      consoleSpy.mockRestore();
+    });
+  });
+
+  it("take_screenshot saves HTML and shows link to it when using html: kwarg", () => {
+    const msgs: string[] = [];
+    let calledSaveHtml = false;
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
+    const page = {
+      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
+    };
+    host._page = page as unknown as typeof host._page;
+    return takeScreenshot.call(host, { html: true }).then(() => {
+      const out = msgs.join("\n");
+      assert(calledSaveHtml);
+      expect(out).toMatch(/\[Screenshot HTML\].+?tmp\/screenshots\/1_x\.html/);
+      consoleSpy.mockRestore();
+    });
+  });
+
+  it("take_screenshot saves HTML and shows link to it when using TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML env", () => {
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "1");
+    const msgs: string[] = [];
+    let calledSaveHtml = false;
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
+    const page = {
+      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
+    };
+    host._page = page as unknown as typeof host._page;
+    return takeScreenshot.call(host).then(() => {
+      const out = msgs.join("\n");
+      assert(calledSaveHtml);
+      expect(out).toMatch(/\[Screenshot HTML\].+?tmp\/screenshots\/1_x\.html/);
+      consoleSpy.mockRestore();
+    });
+  });
+
+  it("take_screenshot allows changing screenshot display format via TRAILS_SYSTEM_TESTING_SCREENSHOT env", () => {
+    vi.stubEnv("TRAILS_SYSTEM_TESTING_SCREENSHOT", "artifact");
+    const msgs: string[] = [];
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
+    const page = {
+      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+      content: vi.fn().mockResolvedValue("<html></html>"),
+    };
+    host._page = page as unknown as typeof host._page;
+    return takeScreenshot.call(host).then(() => {
+      expect(msgs.join("\n")).toMatch(/url=artifact:\/\/.+?tmp\/screenshots\/1_x\.png/);
+      consoleSpy.mockRestore();
+    });
+  });
+
+  it("take_failed_screenshot persists the image path in the test metadata", () => {
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    const page = {
+      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+      content: vi.fn().mockResolvedValue("<html></html>"),
+    };
+    host._page = page as unknown as typeof host._page;
+    const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    return takeFailedScreenshot.call(host).then(() => {
+      assertEqual(relativeImagePath.call(host), host.metadata["failure_screenshot_path"]);
+      consoleSpy.mockRestore();
+    });
+  });
+
+  it("image path returns the absolute path from root", () => {
+    const parent = new Pathname(Dir.pwd()).join("..");
+    TopLevel.Trails = { root: () => parent } as unknown as typeof TopLevel.Trails;
+    assertEqual(parent.join("tmp/screenshots/0_x.png").toString(), imagePath.call(host));
+  });
+
+  it("screenshotsDir defaults to tmp/screenshots", () => {
+    expect(screenshotsDir()).toBe("tmp/screenshots");
+  });
+
+  it("inlineBase64 encodes a string", () => {
+    expect(inlineBase64("hello")).toBe(Buffer.from("hello").toString("base64"));
+  });
+
+  it("displayImage reads the screenshot off disk in inline mode", () => {
+    const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47]);
+    const dir = File.join(mkdtempSync(join(tmpdir(), "trails-screenshot-")), "tmp", "screenshots");
+    FileUtils.mkdirP(dir);
+    File.binwrite(File.join(dir, `${imageName.call(host)}.png`), "\u0089PNG");
+    const originalSavePath = ScreenshotHelper.screenshotDirectory;
+    ScreenshotHelper.screenshotDirectory = dir;
+    vi.spyOn(globalThis.process, "cwd").mockReturnValue("");
+
+    try {
+      const msg = displayImage.call(host, { html: false, screenshotOutput: "inline" });
+      expect(msg).toContain(Buffer.from(bytes).toString("base64"));
+    } finally {
+      ScreenshotHelper.screenshotDirectory = originalSavePath;
+    }
+  });
+
+  it("displayImage shows screenshot path in simple mode", () => {
+    const msg = displayImage.call(host, { html: false, screenshotOutput: "simple" });
+    expect(msg).toMatch(/\[Screenshot Image\]/);
+    expect(msg).not.toMatch(/\[Screenshot HTML\]/);
+  });
+});
+
+describe("RackTestScreenshotsTest", () => {
+  it("rack_test driver does not support screenshot", () => {
+    const test = new DrivenByRackTest("rack_test driver does not support screenshot");
+    assertNot(supportsScreenshot.call(test));
+  });
+});
+
+describe("SeleniumScreenshotsTest", () => {
+  it("selenium driver supports screenshot", () => {
+    const test = new DrivenBySeleniumWithChrome("selenium driver supports screenshot");
+    assert(supportsScreenshot.call(test));
+  });
+});

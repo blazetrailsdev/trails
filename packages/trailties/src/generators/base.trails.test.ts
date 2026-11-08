@@ -1,12 +1,12 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorConfig } from "./base.js";
+import { Base, type GeneratorConfig } from "./base.js";
 import { Generators, type GeneratorClass } from "../generators.js";
 
-class Host extends GeneratorBase {}
+class Host extends Base {}
 
-describe("GeneratorBase#relativeToOriginalDestinationRoot", () => {
+describe("Base#relativeToOriginalDestinationRoot", () => {
   const base = new Host([], {}, { destinationRoot: "/app" });
 
   it("strips the destination root and its leading dot", () => {
@@ -29,9 +29,9 @@ describe("GeneratorBase#relativeToOriginalDestinationRoot", () => {
   });
 });
 
-describe("GeneratorBase.classOption defaults from Generators.options / Generators.aliases", () => {
+describe("Base.classOption defaults from Generators.options / Generators.aliases", () => {
   it("fills :default and :aliases from the :trails namespace", () => {
-    class WidgetGenerator extends GeneratorBase {
+    class WidgetGenerator extends Base {
       static {
         this.classOption("templateEngine", { type: "string" });
       }
@@ -46,7 +46,7 @@ describe("GeneratorBase.classOption defaults from Generators.options / Generator
     const options = Generators.options();
     options["gadget"] = { orm: "active_record" };
     try {
-      class GadgetGenerator extends GeneratorBase {
+      class GadgetGenerator extends Base {
         static {
           this.classOption("orm", { type: "string" });
           this.classOption("widgets", { type: "boolean", default: true });
@@ -60,10 +60,10 @@ describe("GeneratorBase.classOption defaults from Generators.options / Generator
   });
 });
 
-describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
+describe("Base runtime options (Thor's add_runtime_options!)", () => {
   it("parses --pretend / -f / -q / -s as options, not attributes", async () => {
     let seen: { options: Record<string, unknown>; attributes: string[] } | undefined;
-    class RecordingGenerator extends GeneratorBase {
+    class RecordingGenerator extends Base {
       static {
         this.argument("name");
         this.argument("attributes", { type: "array", default: [] });
@@ -85,8 +85,8 @@ describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
   });
 });
 
-describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)", () => {
-  class Writer extends GeneratorBase {
+describe("Base#createFile conflict behavior (Thor's CreateFile#invoke!)", () => {
+  class Writer extends Base {
     static {
       this.methodAdded("write");
     }
@@ -130,8 +130,8 @@ describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)
   });
 });
 
-describe("GeneratorBase.hookFor", () => {
-  class HookedGenerator extends GeneratorBase {
+describe("Base.hookFor", () => {
+  class HookedGenerator extends Base {
     static ran: string[] = [];
     static {
       this.argument("name");
@@ -144,7 +144,7 @@ describe("GeneratorBase.hookFor", () => {
   }
 
   it("registers a class option defaulting from Generators.options and records [in, as]", () => {
-    class AwesomeGenerator extends GeneratorBase {
+    class AwesomeGenerator extends Base {
       static {
         this.hookFor("testFramework", "orm", { as: "controller", in: "trails" });
       }
@@ -164,7 +164,7 @@ describe("GeneratorBase.hookFor", () => {
   it("start invokes the hooked generator after its own run, looking it up by [value, in, as]", async () => {
     const ran: string[] = [];
     HookedGenerator.ran = ran;
-    class InvokingGenerator extends GeneratorBase {
+    class InvokingGenerator extends Base {
       static {
         this.argument("name");
         this.methodAdded("perform");
@@ -194,7 +194,7 @@ describe("GeneratorBase.hookFor", () => {
   });
 
   it("skips the hook when the option is unset, and reports a hook that does not resolve", async () => {
-    class SilentGenerator extends GeneratorBase {
+    class SilentGenerator extends Base {
       static {
         this.hookFor("testFramework");
       }
@@ -218,7 +218,7 @@ describe("GeneratorBase.hookFor", () => {
   });
 
   it("raises when a required class option has neither a value nor a default", async () => {
-    class RequiredGenerator extends GeneratorBase {
+    class RequiredGenerator extends Base {
       static {
         this.classOption("widget", { type: "string", required: true });
       }
@@ -235,7 +235,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("yields the instance and the hooked class to a block instead of invoking it", async () => {
     const yielded: unknown[] = [];
-    class BlockGenerator extends GeneratorBase {
+    class BlockGenerator extends Base {
       static {
         this.hookFor("testFramework", (instance, klass) => {
           yielded.push(instance, klass);
@@ -256,9 +256,9 @@ describe("GeneratorBase.hookFor", () => {
 
   it("instance_execs a one-argument block with the hooked class", async () => {
     const yielded: unknown[] = [];
-    class ExecGenerator extends GeneratorBase {
+    class ExecGenerator extends Base {
       static {
-        this.hookFor("testFramework", function (this: GeneratorBase, klass: GeneratorClass) {
+        this.hookFor("testFramework", function (this: Base, klass: GeneratorClass) {
           yielded.push(this, klass);
         });
       }
@@ -277,7 +277,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("raises when the invocation's option was never declared", () => {
     expect(() => {
-      class UndeclaredGenerator extends GeneratorBase {
+      class UndeclaredGenerator extends Base {
         static {
           this.hookFor("testFramework");
           this.removeHookFor("testFramework");
@@ -293,7 +293,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("invokes a hooked class with the block's own args, as ResourceGenerator's hook does", async () => {
     const seen: string[] = [];
-    class ArgsHookedGenerator extends GeneratorBase {
+    class ArgsHookedGenerator extends Base {
       static {
         this.argument("name");
         this.argument("actions", { type: "array", default: [] });
@@ -305,14 +305,11 @@ describe("GeneratorBase.hookFor", () => {
         seen.push(this.name, ...this.actions.flat());
       }
     }
-    class ResourceLikeGenerator extends GeneratorBase {
+    class ResourceLikeGenerator extends Base {
       static {
-        this.hookFor(
-          "resourceController",
-          function (this: GeneratorBase, controller: GeneratorClass) {
-            return this.invoke(controller, ["Accounts", ["index", "show"]]);
-          },
-        );
+        this.hookFor("resourceController", function (this: Base, controller: GeneratorClass) {
+          return this.invoke(controller, ["Accounts", ["index", "show"]]);
+        });
       }
     }
     const find = vi
@@ -327,9 +324,9 @@ describe("GeneratorBase.hookFor", () => {
   });
 
   it("raises when invoke cannot resolve its class", async () => {
-    class Invoker extends GeneratorBase {
+    class Invoker extends Base {
       static {
-        this.hookFor("testFramework", function (this: GeneratorBase, _klass: GeneratorClass) {
+        this.hookFor("testFramework", function (this: Base, _klass: GeneratorClass) {
           return this.invoke("nope");
         });
       }
@@ -350,7 +347,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("parses the invoking argv against the hooked class's own class options", async () => {
     let received: unknown;
-    class FixtureGenerator extends GeneratorBase {
+    class FixtureGenerator extends Base {
       static {
         this.classOption("fixtureReplacement", { type: "string" });
         this.methodAdded("perform");
@@ -359,7 +356,7 @@ describe("GeneratorBase.hookFor", () => {
         received = (this.options as unknown as Record<string, unknown>)["fixtureReplacement"];
       }
     }
-    class ModelLikeGenerator extends GeneratorBase {
+    class ModelLikeGenerator extends Base {
       static {
         this.hookFor("testFramework");
       }
@@ -379,7 +376,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("shares the invocation registry, so a class invoked twice runs its commands once", async () => {
     let runs = 0;
-    class OnceGenerator extends GeneratorBase {
+    class OnceGenerator extends Base {
       static {
         this.methodAdded("perform");
       }
@@ -387,9 +384,9 @@ describe("GeneratorBase.hookFor", () => {
         runs++;
       }
     }
-    class TwiceGenerator extends GeneratorBase {
+    class TwiceGenerator extends Base {
       static {
-        this.hookFor("testFramework", function (this: GeneratorBase, klass: GeneratorClass) {
+        this.hookFor("testFramework", function (this: Base, klass: GeneratorClass) {
           return this.invoke(klass).then(() => this.invoke(klass));
         });
       }
@@ -407,9 +404,9 @@ describe("GeneratorBase.hookFor", () => {
 
   it("invoke with a command dispatches only that command", async () => {
     const ran: string[] = [];
-    class CommandsGenerator extends GeneratorBase {
+    class CommandsGenerator extends Base {
       static {
-        this.hookFor("testFramework", function (this: GeneratorBase, _klass: GeneratorClass) {
+        this.hookFor("testFramework", function (this: Base, _klass: GeneratorClass) {
           ran.push("hook");
         });
         this.methodAdded("perform");
@@ -418,9 +415,9 @@ describe("GeneratorBase.hookFor", () => {
         ran.push("perform");
       }
     }
-    class Caller extends GeneratorBase {
+    class Caller extends Base {
       static {
-        this.hookFor("orm", function (this: GeneratorBase, _klass: GeneratorClass) {
+        this.hookFor("orm", function (this: Base, _klass: GeneratorClass) {
           return this.invoke(CommandsGenerator as unknown as GeneratorClass, "perform");
         });
       }
@@ -437,7 +434,7 @@ describe("GeneratorBase.hookFor", () => {
   });
 
   it("removeHookFor raises NameError for a hook that was never added, as undef_method does", () => {
-    class NoHookGenerator extends GeneratorBase {}
+    class NoHookGenerator extends Base {}
     expect(() => NoHookGenerator.removeHookFor("testFramework")).toThrow(
       "undefined method `testFrameworkGenerator' for class `#<Class:NoHookGenerator>'",
     );
@@ -445,7 +442,7 @@ describe("GeneratorBase.hookFor", () => {
 
   it("invoke raises when the resolved class is not a generator, and hands the child parentOptions", async () => {
     let parent: unknown;
-    class ChildGenerator extends GeneratorBase {
+    class ChildGenerator extends Base {
       static {
         this.methodAdded("perform");
       }
@@ -454,9 +451,9 @@ describe("GeneratorBase.hookFor", () => {
       }
     }
     class NotAGenerator {}
-    class ParentGenerator extends GeneratorBase {
+    class ParentGenerator extends Base {
       static {
-        this.hookFor("testFramework", function (this: GeneratorBase, klass: GeneratorClass) {
+        this.hookFor("testFramework", function (this: Base, klass: GeneratorClass) {
           return this.invoke(klass);
         });
       }
@@ -478,15 +475,15 @@ describe("GeneratorBase.hookFor", () => {
   });
 
   it("invoke with a command the class does not register raises, as Thor's all_commands lookup does", async () => {
-    class Target extends GeneratorBase {
+    class Target extends Base {
       static {
         this.methodAdded("perform");
       }
       perform(): void {}
     }
-    class Caller extends GeneratorBase {
+    class Caller extends Base {
       static {
-        this.hookFor("orm", function (this: GeneratorBase, _klass: GeneratorClass) {
+        this.hookFor("orm", function (this: Base, _klass: GeneratorClass) {
           return this.invoke(Target as unknown as GeneratorClass, "hooks");
         });
       }
@@ -504,7 +501,7 @@ describe("GeneratorBase.hookFor", () => {
   });
 });
 
-describe("GeneratorBase.defaultSourceRoot", () => {
+describe("Base.defaultSourceRoot", () => {
   it("resolves base_name/generator_name/templates under base_root", async () => {
     const { MigrationGenerator } = await import("./active-record/migration/migration-generator.js");
     expect(await MigrationGenerator.sourceRoot()).toBe(
@@ -513,12 +510,12 @@ describe("GeneratorBase.defaultSourceRoot", () => {
   });
 
   it("is nil when the generator has no templates directory", async () => {
-    class WidgetGenerator extends GeneratorBase {}
+    class WidgetGenerator extends Base {}
     expect(await WidgetGenerator.sourceRoot()).toBeUndefined();
   });
 });
 
-describe("GeneratorBase.help", () => {
+describe("Base.help", () => {
   it("--help prints the generator's banner, options and USAGE description", async () => {
     const help = await capture("stdout", () =>
       Generators.invoke("channel", ["--help"], { destinationRoot: "/tmp" }),

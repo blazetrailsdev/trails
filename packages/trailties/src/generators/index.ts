@@ -7,7 +7,7 @@ export type { MigrationGeneratorOptions } from "./active-record/migration/migrat
 export { ControllerGenerator } from "./trails/controller/controller-generator.js";
 export type { ControllerGeneratorOptions } from "./trails/controller/controller-generator.js";
 export { ScaffoldGenerator } from "./trails/scaffold/scaffold-generator.js";
-export { GeneratorBase } from "./base.js";
+export { Base, Error } from "./base.js";
 export type { GeneratorOptions } from "./base.js";
 export { NamedBase } from "./named-base.js";
 
@@ -17,7 +17,7 @@ export { ScriptGenerator } from "./trails/script/script-generator.js";
 export { AuthenticationGenerator } from "./trails/authentication/authentication-generator.js";
 export { GeneratorGenerator } from "./trails/generator/generator-generator.js";
 export type { GeneratorGeneratorOptions } from "./trails/generator/generator-generator.js";
-export { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
+export { GeneratedAttribute } from "./generated-attribute.js";
 export type { AttrOptions, IndexType } from "./generated-attribute.js";
 export { ActiveModel } from "./active-model.js";
 export { AppBase } from "./app-base.js";
@@ -27,3 +27,4 @@ export type { DatabaseName, PkgDependency, DockerService } from "./database.js";
 export * from "./migration.js";
 export * from "./model-helpers.js";
 export * from "./resource-helpers.js";
+export * as ActiveRecordMigration from "./active-record/migration.js";

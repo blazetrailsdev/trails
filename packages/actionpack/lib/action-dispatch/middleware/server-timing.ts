@@ -1,0 +1,92 @@
+import { rbProcCall } from "@blazetrails/ruby-compat";
+import {
+  Notifications,
+  IsolatedExecutionState,
+  isPresent,
+  type NotificationSubscriber,
+  type NotificationEvent as Event,
+} from "@blazetrails/activesupport";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import { SERVER_TIMING } from "../constants.js";
+
+/** @internal */
+export class Subscriber {
+  private static _instance: Subscriber | null = null;
+  static readonly KEY = "action_dispatch_server_timing_events";
+  private _subscriber: NotificationSubscriber | null = null;
+
+  static instance(): Subscriber {
+    return (this._instance ??= new Subscriber());
+  }
+
+  call(event: Event): void {
+    const events = IsolatedExecutionState.get<Event[]>(Subscriber.KEY);
+    if (events) events.push(event);
+  }
+
+  async collectEvents(block: () => Promise<void>): Promise<Event[]> {
+    const events: Event[] = [];
+    IsolatedExecutionState.set(Subscriber.KEY, events);
+    try {
+      await block();
+      return events;
+    } finally {
+      IsolatedExecutionState.delete(Subscriber.KEY);
+    }
+  }
+
+  ensureSubscribed(): void {
+    this._subscriber ??= Notifications.subscribe(/^[^!]/, (e) => this.call(e));
+  }
+
+  /** @missingRailsName subscriber — PERMANENT */
+  unsubscribe(): void {
+    if (this._subscriber) {
+      Notifications.unsubscribe(this._subscriber);
+      this._subscriber = null;
+    }
+  }
+}
+
+export class ServerTiming {
+  static Subscriber = Subscriber;
+
+  private app: RackApp | { call: RackApp };
+  private subscriber: Subscriber;
+
+  static unsubscribe(): void {
+    Subscriber.instance().unsubscribe();
+  }
+
+  constructor(app: RackApp | { call: RackApp }) {
+    this.app = app;
+    this.subscriber = Subscriber.instance();
+    this.subscriber.ensureSubscribed();
+  }
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    let response: RackResponse | undefined;
+    const events = await this.subscriber.collectEvents(async () => {
+      response = await (rbProcCall(this.app, env) as Promise<RackResponse>);
+    });
+
+    const headers = response![1];
+
+    const byName = new Map<string, number>();
+    for (const event of events) {
+      byName.set(event.name, (byName.get(event.name) ?? 0) + event.duration);
+    }
+    const headerInfo: Array<string | string[]> = [];
+    for (const [name, duration] of byName) {
+      headerInfo.push(`${name};dur=${duration.toFixed(2)}`);
+    }
+
+    const existing = headers[SERVER_TIMING] as string | string[];
+    if (isPresent(existing)) {
+      headerInfo.unshift(existing);
+    }
+    headers[SERVER_TIMING] = headerInfo.flat(Infinity).join(", ");
+
+    return response!;
+  }
+}

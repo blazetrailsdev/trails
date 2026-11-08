@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
+import { GeneratedAttribute } from "./generated-attribute.js";
+import { Error as GeneratorError } from "./base.js";
 import { assertFieldDefaultValue, assertFieldType } from "./testing/assertions.js";
 
 describe("GeneratedAttribute", () => {

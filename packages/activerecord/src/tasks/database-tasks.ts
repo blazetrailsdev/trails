@@ -791,8 +791,10 @@ export class DatabaseTasks {
     return hash.digest("hex");
   }
 
-  static setupInitialDatabaseYaml(): RawConfigurations {
-    return {};
+  static async setupInitialDatabaseYaml(): Promise<RawConfigurations> {
+    if (TopLevel.Trails === undefined) return {};
+
+    return (await TopLevel.Trails.application!.config.loadDatabaseYaml()) as RawConfigurations;
   }
 
   static forEach(databases: RawConfigurations | HashConfig[], fn: (name: string) => void): void {
@@ -936,15 +938,12 @@ export async function checkCurrentProtectedEnvironmentBang(dbConfig: HashConfig)
 /** @internal */
 export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean> {
   const { NoDatabaseError } = await import("../errors.js");
-  const { SchemaMigration } = await import("../schema-migration.js");
-  return DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
+  return DatabaseTasks.withTemporaryPool(dbConfig, async () => {
     let alreadyInitialized: boolean | null = false;
     for (;;) {
       try {
-        const adapter = await pool.leaseConnection();
-        await adapter.execute("SELECT 1");
-        const sm = new SchemaMigration(adapter.pool);
-        alreadyInitialized = await sm.tableExists();
+        alreadyInitialized =
+          await DatabaseTasks.migrationConnectionPool().schemaMigration.tableExists();
         break;
       } catch (error) {
         if (!(error instanceof NoDatabaseError)) throw error;

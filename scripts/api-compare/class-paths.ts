@@ -33,6 +33,7 @@ import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
 import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
+import { libRoot } from "../layout/package-roots.js";
 import type { ClassInfo } from "@blazetrails/parity/types";
 
 const run = promisify(execFile);
@@ -41,12 +42,14 @@ const GENERATED = "constants.generated.ts";
 /** The table for the classes in files outside the package entry's graph, which those files import. */
 const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 
-/** The api-compare packages whose classes are not loaded from the package entry. */
+/** The api-compare packages with no constant table: `activerecord-test-support`, whose classes are not loaded from the package entry. */
 const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {
+  actionmailer: "test-case.ts",
   actionpack: "system-testing.ts",
+  activejob: "test-case.ts",
   activerecord: "fixtures.ts",
   activestorage: "transformers/image-processing-transformer.ts",
 };
@@ -66,8 +69,11 @@ const LAZY_DIRS: Record<string, string[]> = {
     "test-databases.ts",
     "testing/query-assertions.ts",
   ],
+  actionmailbox: ["inbound-email.ts", "inbound-email/"],
+  actionmailer: ["test-case.ts", "test-helper.ts"],
+  activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
-  trailties: ["commands/", "command.ts"],
+  trailties: ["commands/", "command.ts", "generators/"],
 };
 
 /**
@@ -128,12 +134,14 @@ async function tsconfigExcludes(dir: string): Promise<string[]> {
 /**
  * trails spells a renamed token its own way in a constant too: `Handlers::ERB`
  * is `Handlers::TSE`, and a `TS_CLASS_RENAMES` segment is renamed as
- * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`.
+ * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`. The
+ * `Erb` namespace is the TSE brand, so `Erb::Generators` is `TSE::Generators`.
  */
 function renameTokens(fqn: string): string {
   let out = fqn
     .split("::")
     .map((seg) => (BRAND_RENAMES.includes(seg) ? TS_CLASS_RENAMES[seg] : seg))
+    .map((seg) => (seg === "Erb" ? TOKEN_RENAMES.ERB : seg))
     .join("::");
   for (const [tok, to] of Object.entries(TOKEN_RENAMES)) {
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -151,7 +159,7 @@ function renameTokens(fqn: string): string {
  */
 async function entryGraph(dir: string, subpath?: string): Promise<Set<string>> {
   const cwd = path.join(ROOT_DIR, "packages", dir);
-  const srcRoot = path.join(cwd, "src");
+  const srcRoot = path.join(cwd, libRoot(dir));
   const entry =
     subpath ?? (await entryFile(cwd)).replace(/^\.\/dist\//, "").replace(/\.js$/, ".ts");
   const seen = new Set<string>();
@@ -198,6 +206,8 @@ function isSelfNamespace(source: string, file: string, tsName: string): boolean 
 
 /** Paired classes a table cannot import, which `--check` reports. */
 const unexported: string[] = [];
+/** Walked exports paired with several Ruby classes, none seated; reported, not gated. */
+const ambiguousUnseated = new Set<string>();
 /** Paired Ruby modules with no exported binding; reported, not gated. */
 const unexportedModules: string[] = [];
 
@@ -207,7 +217,7 @@ const unexportedModules: string[] = [];
  * false for a module the pairing fell back to, which a lazy file never seats.
  */
 async function placement(dir: string) {
-  const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
+  const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
   const excluded = await tsconfigExcludes(dir);
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
@@ -219,7 +229,7 @@ async function placement(dir: string) {
     sources.get(file) ??
     sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
-    const rel = path.join("src", file);
+    const rel = path.join(libRoot(dir), file);
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&
@@ -296,7 +306,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const tsPkg = ts.packages[pkg];
     if (!tsPkg || SKIPPED.has(pkg) || (only !== undefined && pkg !== only)) continue;
     const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
-    const srcRoot = path.join(ROOT_DIR, "packages", dir, "src");
+    const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
 
     const paired = new Map<string, ClassPathEntry>();
@@ -305,9 +315,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const ambiguous = new Map<string, string[]>();
     for (const kind of ["classes", "modules"] as const) {
       const tsByFileName = new Map<string, ClassInfo>();
+      const tsByLowerFileName = new Map<string, ClassInfo>();
       const tsKinds = kind === "modules" ? (["modules", "classes"] as const) : ([kind] as const);
       for (const cls of tsKinds.flatMap((k) => Object.values(tsPkg[k] ?? {}))) {
         if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
+        if (cls.file) tsByLowerFileName.set(`${cls.file}::${cls.name}`.toLowerCase(), cls);
       }
       for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
         if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
@@ -320,10 +332,8 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsFile,
           tsByFileName,
         );
-        tsCls ??=
-          kind === "classes"
-            ? tsByFileName.get(`${tsFile}::${fqn.split("::").at(-2)}${short}`)
-            : undefined;
+        const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
+        tsCls ??= kind === "classes" ? tsByLowerFileName.get(prefixed) : undefined;
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;
@@ -360,13 +370,16 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     };
     for (const [key, candidate] of paired) {
       let entry = candidate;
-      if (ambiguous.has(key)) {
-        const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
-        if (seated === undefined) continue;
-        entry = { ...entry, fqn: seated };
-      }
       const placed = place.at(entry.file, !fallbackModules.has(key));
       if (placed === null) continue;
+      if (ambiguous.has(key)) {
+        const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
+        if (seated === undefined) {
+          ambiguousUnseated.add(`${dir}/${entry.file}::${entry.tsName}`);
+          continue;
+        }
+        entry = { ...entry, fqn: seated };
+      }
       const source = await read(entry.file);
       const reached = await tsPath(entry);
       if (reached !== null) {
@@ -375,8 +388,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         entries.push({ ...entry, namespace: true });
       } else if (fallbackModules.has(key)) continue;
       else if (modules.has(key)) {
-        unexportedModules.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
-      } else unexported.push(`${dir}/src/${entry.file}: ${entry.tsName} (${entry.fqn})`);
+        unexportedModules.push(
+          `${dir}/${libRoot(dir)}/${entry.file}: ${entry.tsName} (${entry.fqn})`,
+        );
+      } else
+        unexported.push(`${dir}/${libRoot(dir)}/${entry.file}: ${entry.tsName} (${entry.fqn})`);
     }
     byDir.set(dir, entries);
   }
@@ -537,7 +553,7 @@ export function renderCoreClassPaths(): string {
 
 /** The per-file tables on disk, so one left with no paired classes is still visited. */
 async function lazyTablesOnDisk(dir: string): Promise<string[]> {
-  const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, "src"));
+  const files = await fs.readdir(path.join(ROOT_DIR, "packages", dir, libRoot(dir)));
   return files.filter(
     (file) =>
       /^constants\..+\.generated\.ts$/.test(file) &&
@@ -553,7 +569,10 @@ async function lazyFilesMissingTable(dir: string, entries: ClassPathEntry[]): Pr
   const missing = new Set<string>();
   for (const { file, table } of entries) {
     if (!table || !prefixes.some((prefix) => file.startsWith(prefix))) continue;
-    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    const source = await fs.readFile(
+      path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
+      "utf8",
+    );
     if (!source.includes(`/${table.replace(/\.ts$/, ".js")}"`)) missing.add(file);
   }
   return [...missing];
@@ -648,6 +667,27 @@ function renamedKey(key: string): string {
 }
 
 /**
+ * The Ruby classes defined at top level (`class DummyConfig`,
+ * `railties/lib/rails/application/dummy_config.rb:3`). A TS class of the same
+ * name needs no table row, since its JS name is already its Ruby path, so its
+ * exclusion is not new surface.
+ */
+async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
+  const ruby = await readJson<Manifest>("rails-api.json").catch(() => null);
+  const out = new Set<string>();
+  for (const [pkg, rubyPkg] of Object.entries(ruby?.packages ?? {})) {
+    if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;
+    const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
+    const subDir = path.relative(srcRoot, packageSrcDir(pkg));
+    for (const [fqn, info] of Object.entries(rubyPkg.classes ?? {})) {
+      if (fqn.includes("::") || !info.file) continue;
+      out.add(`${path.join(subDir, rubyFileToTs(info.file, pkg))}::${fqn}`);
+    }
+  }
+  return out;
+}
+
+/**
  * The keys `record` adds to `excluded` over `base` with no receipt. A
  * package new to the record starts from an empty list.
  */
@@ -657,11 +697,20 @@ export async function unreceiptedExclusions(
   base: Record<string, ConstantResidue>,
 ): Promise<string[]> {
   const before = new Set((base[dir]?.excluded ?? []).map(renamedKey));
+  const topLevel = await topLevelRubyConstants(dir);
   const out: string[] = [];
   for (const key of record.excluded) {
     if (before.has(key)) continue;
     const [file, tsName] = splitKey(key);
-    const source = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "src", file), "utf8");
+    if (topLevel.has(key)) continue;
+    if (ambiguousUnseated.has(`${dir}/${key}`)) {
+      console.warn(`${dir}: ${key} pairs with several Ruby classes and none is seated`);
+      continue;
+    }
+    const source = await fs.readFile(
+      path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
+      "utf8",
+    );
     if (!isReceipted(source, tsName)) out.push(key);
   }
   return out;
@@ -751,7 +800,7 @@ async function main(): Promise<void> {
     )
   ).flat();
   if (only === undefined || only === "ruby-compat") {
-    const target = path.join(ROOT_DIR, "packages/ruby-compat/src", GENERATED);
+    const target = path.join(ROOT_DIR, "packages/ruby-compat/lib", GENERATED);
     const next = await prettier.format(renderCoreClassPaths(), {
       ...(await prettier.resolveConfig(target)),
       filepath: target,
@@ -766,7 +815,7 @@ async function main(): Promise<void> {
     }
   }
   for (const [dir, table, entries] of targets) {
-    const target = path.join(ROOT_DIR, "packages", dir, "src", table);
+    const target = path.join(ROOT_DIR, "packages", dir, libRoot(dir), table);
     if (entries.length === 0) {
       const exists = await fs.access(target).then(
         () => true,
@@ -809,7 +858,7 @@ async function main(): Promise<void> {
   if (check) {
     for (const [dir, entries] of tables) {
       for (const file of await lazyFilesMissingTable(dir, entries)) {
-        console.error(`${dir}/src/${file} does not import its constant table`);
+        console.error(`${dir}/${libRoot(dir)}/${file} does not import its constant table`);
         process.exitCode = 1;
       }
       if (entries.length > 0) {

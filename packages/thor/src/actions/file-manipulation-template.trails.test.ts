@@ -7,6 +7,7 @@ import {
   getFs,
   include,
   LoadError,
+  rbFBinding,
   StringIO,
 } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
@@ -136,7 +137,7 @@ describe("Thor::Actions copy_file, link_file, get and template (trails)", () => 
       host().template(
         "doc/config.rb",
         "out.rb",
-        { context: { klass: ":Other" } },
+        { context: rbFBinding({ klass: ":Other" }) },
         (content: string) => content.toUpperCase(),
       ),
     );

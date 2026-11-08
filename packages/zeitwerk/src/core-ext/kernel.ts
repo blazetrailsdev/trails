@@ -1,4 +1,5 @@
 import {
+  Kernel,
   LOADED_FEATURES,
   NotImplementedError,
   getAsyncContext,
@@ -123,3 +124,15 @@ export async function autoloadGet(cref: Cref): Promise<unknown> {
   }
   return cref.get();
 }
+
+const zeitwerkOriginalRequire = Kernel.require;
+
+/** @missingRailsCall __on_file_autoloaded — CONVERGEABLE zeitwerk-kernel-require-load-path-feature-arm */
+Kernel.require = async function (path: string): Promise<boolean> {
+  const loader = Registry.loaderFor(path);
+  if (loader != null) {
+    return require(path);
+  } else {
+    return zeitwerkOriginalRequire(path);
+  }
+};

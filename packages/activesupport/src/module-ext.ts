@@ -25,12 +25,12 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
 }
 
 /** @missingRailsArgs generate_method_missing — PERMANENT */
-export function delegateMissingTo<T extends object>(
-  this: T,
+export function delegateMissingTo(
+  this: { prototype: object },
   target: string,
   options: { allowNil?: boolean } = {},
-): T {
-  return Delegation.generateMethodMissing(this, target, options);
+): void {
+  Delegation.generateMethodMissing(this, target, options);
 }
 
 export interface MattrOptions {

@@ -4,7 +4,7 @@ import { Utilities } from "./utilities.js";
 interface EnvelopeMail {
   smtpEnvelopeFrom(): unknown;
   smtpEnvelopeTo(): unknown;
-  encoded(): string;
+  encoded(): string | Uint8Array;
 }
 
 export class SmtpEnvelope {
@@ -12,7 +12,7 @@ export class SmtpEnvelope {
 
   private _from!: string;
   private _to!: string[];
-  private _message!: string;
+  private _message!: string | Uint8Array;
 
   constructor(mail: EnvelopeMail) {
     this.from = mail.smtpEnvelopeFrom() as string;
@@ -44,11 +44,11 @@ export class SmtpEnvelope {
     this._to = (Array.isArray(addr) ? addr : [addr]).map((addr) => this.validateAddr("To", addr));
   }
 
-  get message(): string {
+  get message(): string | Uint8Array {
     return this._message;
   }
 
-  set message(message: string) {
+  set message(message: string | Uint8Array) {
     if (Utilities.isBlank(message)) {
       throw new ArgumentError("SMTP message may not be blank");
     }

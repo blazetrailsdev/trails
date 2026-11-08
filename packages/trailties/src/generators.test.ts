@@ -60,6 +60,34 @@ describe("GeneratorsTest", () => {
     expect(klass!.namespace()).toEqual("trails:model");
   });
 
+  it("find by namespace with context", async () => {
+    const klass = await Generators.findByNamespace("test_unit", null, "model");
+    expect(klass).toBeTruthy();
+    expect(klass!.namespace()).toEqual("test-unit:model");
+  });
+
+  it("fallbacks for generators on find by namespace", async () => {
+    Generators.fallbacks()["remarkable"] = "test_unit";
+    try {
+      const klass = await Generators.findByNamespace("plugin", "remarkable");
+      expect(klass).toBeTruthy();
+      expect(klass!.namespace()).toEqual("test-unit:plugin");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+
+  it("fallbacks for generators on find by namespace with context", async () => {
+    Generators.fallbacks()["remarkable"] = "test_unit";
+    try {
+      const klass = await Generators.findByNamespace("remarkable", "trails", "plugin");
+      expect(klass).toBeTruthy();
+      expect(klass!.namespace()).toEqual("test-unit:plugin");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+
   it("trails generators help with builtin information", async () => {
     const output = await help();
     /* eslint-disable no-regex-spaces -- the indent width is `print_list`'s, verbatim from generators_test.rb:141-144 */

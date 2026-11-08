@@ -1,7 +1,6 @@
 import type { TCPSocket } from "@blazetrails/ruby-compat";
 
-export { RELEASE, release } from "./version.js";
-export { RELEASE as VERSION } from "./version.js";
+export { VERSION, RELEASE, release } from "./version.js";
 
 export type RackEnv = Record<string, unknown>;
 
@@ -51,7 +50,7 @@ export {
 export { Builder } from "./builder.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
-export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
+export { DEFAULT_PORTS, Request, Env as RequestEnv, Helpers as RequestHelpers } from "./request.js";
 export { Response, Raw, Helpers as ResponseHelpers } from "./response.js";
 export {
   CONTENT_TYPE,

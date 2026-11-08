@@ -193,34 +193,45 @@ describe("ConfigurationTest", () => {
     let configuration = new Configuration({
       recurringScheduleFile: configFilePath("recurring_with_invalid"),
     });
-    expect(await configuration.isValid()).toBe(false);
-    expect(configuration.errors.fullMessages.length).toBe(1);
-    const error = configuration.errors.fullMessages[0];
+    expect(await configuration.isValid()).toBeFalsy();
+    expect(configuration.errors.fullMessages.length === 1).toBeTruthy();
+    const error = configuration.errors.fullMessages[0]!;
 
-    expect(error).toContain("Invalid recurring tasks");
-    expect(error).toContain(
-      "periodic_invalid_class: Class name doesn't correspond to an existing class",
-    );
-    expect(error).toContain(
-      "periodic_incorrect_schedule: Schedule is not a supported recurring schedule",
-    );
+    expect(error.includes("Invalid recurring tasks")).toBeTruthy();
+    expect(
+      error.includes("periodic_invalid_class: Class name doesn't correspond to an existing class"),
+    ).toBeTruthy();
+    expect(
+      error.includes("periodic_incorrect_schedule: Schedule is not a supported recurring schedule"),
+    ).toBeTruthy();
 
-    expect(await new Configuration({ skipRecurring: true }).isValid()).toBe(true);
+    expect(
+      await new Configuration({
+        recurringScheduleFile: configFilePath("empty_recurring"),
+      }).isValid(),
+    ).toBeTruthy();
+    expect(await new Configuration({ skipRecurring: true }).isValid()).toBeTruthy();
 
     configuration = new Configuration({
       recurringScheduleFile: configFilePath("recurring_with_production_only"),
     });
-    expect(await configuration.isValid()).toBe(true);
+    expect(await configuration.isValid()).toBeTruthy();
+    await assertProcesses(configuration, "scheduler", 0);
+
+    configuration = new Configuration({
+      recurringScheduleFile: configFilePath("recurring_with_empty"),
+    });
+    expect(await configuration.isValid()).toBeTruthy();
     await assertProcesses(configuration, "scheduler", 0);
 
     configuration = new Configuration({ skipRecurring: true, dispatchers: [], workers: [] });
-    expect(await configuration.isValid()).toBe(false);
+    expect(await configuration.isValid()).toBeFalsy();
     expect(configuration.errors.fullMessages).toEqual(["No processes configured"]);
 
     configuration = new Configuration({
       workers: [{ queues: "background", threads: 50, polling_interval: 10 }],
     });
-    expect(await configuration.isValid()).toBe(false);
+    expect(await configuration.isValid()).toBeFalsy();
     expect(configuration.errors.fullMessages[0]).toMatch(
       /Solid Queue is configured to use \d+ threads but the database connection pool is \d+. Increase it in `config\/database.yml`/,
     );

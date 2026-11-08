@@ -1,30 +1,39 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
-import { Trails } from "./trails.js";
+import { Dir, File, LoadError, rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat";
+import type * as Ast from "typescript/unstable/ast";
 import type { Node } from "typescript/unstable/ast";
+import type * as Scanner from "typescript/unstable/ast/scanner";
+import type * as Sync from "typescript/unstable/sync";
 import type { API } from "typescript/unstable/sync";
+
+const TOKENIZER_FEATURES = [
+  "typescript/unstable/ast",
+  "typescript/unstable/ast/scanner",
+  "typescript/unstable/sync",
+] as const;
 
 /** @noRailsEquivalent PERMANENT */
 async function requireTokenizer() {
   try {
-    const [ast, scanner, sync] = await Promise.all([
-      import("typescript/unstable/ast"),
-      import("typescript/unstable/ast/scanner"),
-      import("typescript/unstable/sync"),
-    ]);
-    return {
-      API: sync.API,
-      SyntaxKind: ast.SyntaxKind,
-      isLiteralLike: (node: Node) =>
-        ast.isStringLiteralLikeNode(node) ||
-        ast.isTemplateHead(node) ||
-        ast.isTemplateMiddle(node) ||
-        ast.isTemplateTail(node) ||
-        ast.isRegularExpressionLiteral(node),
-      createScanner: scanner.createScanner,
-    };
-  } catch {
-    return null;
+    for (const feature of TOKENIZER_FEATURES)
+      await rbFRequire({ [feature]: () => import(feature) }, feature);
+  } catch (e) {
+    if (e instanceof LoadError) return null;
+    throw e;
   }
+  const ast = rbRequireLoaded("typescript/unstable/ast") as unknown as typeof Ast;
+  const scanner = rbRequireLoaded("typescript/unstable/ast/scanner") as unknown as typeof Scanner;
+  const sync = rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync;
+  return {
+    API: sync.API,
+    SyntaxKind: ast.SyntaxKind,
+    isLiteralLike: (node: Node) =>
+      ast.isStringLiteralLikeNode(node) ||
+      ast.isTemplateHead(node) ||
+      ast.isTemplateMiddle(node) ||
+      ast.isTemplateTail(node) ||
+      ast.isRegularExpressionLiteral(node),
+    createScanner: scanner.createScanner,
+  };
 }
 
 let tokenizer: Awaited<ReturnType<typeof requireTokenizer>> | undefined;
@@ -103,6 +112,8 @@ export class Parser {
 }
 
 export class ParserExtractor {
+  static Parser = Parser;
+
   constructor(public pattern: RegExp) {}
 
   annotations(file: string): Annotation[] {
@@ -172,14 +183,20 @@ export function resetAnnotationRegistry(): void {
 }
 
 function registerDefaults(): void {
-  const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
+  const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`, "m");
   Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", (tag) =>
     tokenizer
-      ? new ParserExtractor(new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`))
+      ? new ParserExtractor(
+          new RegExp(`(?://|/\\*|^\\s*\\*)\\s*(${tag}):?\\s*(.*?)\\s*(?:\\*/)?$`, "m"),
+        )
       : slash(tag),
   );
   Annotation.registerExtensions("css", "scss", "sass", "less", slash);
-  Annotation.registerExtensions("yml", "yaml", (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
+  Annotation.registerExtensions(
+    "yml",
+    "yaml",
+    (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`, "m"),
+  );
   Annotation.registerExtensions(
     "ejs",
     "tse",
@@ -190,6 +207,8 @@ function registerDefaults(): void {
 registerDefaults();
 
 export class SourceAnnotationExtractor {
+  static ParserExtractor = ParserExtractor;
+  static PatternExtractor = PatternExtractor;
   static Annotation = Annotation;
 
   /** @inventedArm requireTokenizer — PERMANENT */
@@ -251,5 +270,3 @@ export class SourceAnnotationExtractor {
     return lines.map((l) => `${l}\n`).join("");
   }
 }
-
-Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;

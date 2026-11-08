@@ -36,9 +36,10 @@
     "@blazetrails/trailties": "workspace:*"
   },
   "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   }
 }

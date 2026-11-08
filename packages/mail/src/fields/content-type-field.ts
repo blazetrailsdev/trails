@@ -1,4 +1,11 @@
-import { type Encoding, NoMethodError, rbObjAsString, strip } from "@blazetrails/ruby-compat";
+import {
+  binaryBytes,
+  binaryString,
+  type Encoding,
+  NoMethodError,
+  rbObjAsString,
+  strip,
+} from "@blazetrails/ruby-compat";
 import { ContentTypeElement } from "../elements/content-type-element.js";
 import { Encodings } from "../encodings.js";
 import { Field } from "../field.js";
@@ -64,10 +71,10 @@ export class ContentTypeField extends NamedStructuredField {
 
   attemptToClean(): ContentTypeElement {
     try {
-      return new ContentTypeElement(this.sanitize(this.value as string));
+      return new ContentTypeElement(this.sanitize(this.value as string | Uint8Array));
     } catch (e) {
       if (!(e instanceof Field.ParseError)) throw e;
-      return new ContentTypeElement(this.getMimeType(this.value as string));
+      return new ContentTypeElement(this.getMimeType(this.value as string | Uint8Array));
     }
   }
 
@@ -143,8 +150,12 @@ export class ContentTypeField extends NamedStructuredField {
     }
   }
 
-  /** @internal */
-  private sanitize(val: string): string {
+  /**
+   * @internal
+   * @inventedArm binaryString — PERMANENT
+   */
+  private sanitize(val: string | Uint8Array): string | Uint8Array {
+    if (val instanceof Uint8Array) return binaryBytes(this.sanitize(binaryString(val)) as string);
     val = val
       .replace(/\s*=\s*/g, "=")
       .replace(/[; ]+/g, "; ")
@@ -189,9 +200,12 @@ export class ContentTypeField extends NamedStructuredField {
     }
   }
 
-  /** @internal */
-  private getMimeType(val: string): string {
-    const m = /^([\w-]+)\/([\w-]+);.+$/im.exec(val);
+  /**
+   * @internal
+   * @inventedArm binaryString — PERMANENT
+   */
+  private getMimeType(val: string | Uint8Array): string {
+    const m = /^([\w-]+)\/([\w-]+);.+$/im.exec(val instanceof Uint8Array ? binaryString(val) : val);
     return m ? `${m[1]}/${m[2]}` : "text/plain";
   }
 }

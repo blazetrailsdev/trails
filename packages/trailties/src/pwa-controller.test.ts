@@ -28,3 +28,20 @@ describe("PWAController", () => {
     expect(render).toHaveBeenCalledWith({ template: "pwa/manifest", layout: false });
   });
 });
+
+describe("skip_forgery_protection", () => {
+  it.each([
+    ["./pwa-controller.js", "PwaController"],
+    ["./welcome-controller.js", "WelcomeController"],
+  ])("%s calls skipForgeryProtection in its class body", async (file, name) => {
+    vi.resetModules();
+    const { ActionController } = await import("@blazetrails/actionpack");
+    const spy = vi.spyOn(ActionController.Base, "skipForgeryProtection");
+    try {
+      const mod = (await import(file)) as Record<string, unknown>;
+      expect(spy.mock.contexts).toContain(mod[name]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

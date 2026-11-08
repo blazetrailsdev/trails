@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
@@ -407,7 +408,9 @@ describe("BasicsTest", async () => {
     await self().withEnvTz(easternTimeZone(), async () => {
       await self().withTimezoneConfig({ default: "utc" }, async () => {
         await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
-          const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
+          const time = ((await import("@blazetrails/activesupport")).zone() as TimeZone).local(
+            2000,
+          );
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
           expect(savedTime).toEqual(time);
@@ -435,7 +438,9 @@ describe("BasicsTest", async () => {
     await self().withEnvTz(easternTimeZone(), async () => {
       await self().withTimezoneConfig({ default: "local" }, async () => {
         await self().withTimezoneConfig({ zone: "Central Time (US & Canada)" }, async () => {
-          const time = (await import("@blazetrails/activesupport")).zone()!.local(2000);
+          const time = ((await import("@blazetrails/activesupport")).zone() as TimeZone).local(
+            2000,
+          );
           const topic = (await Topic.create({ written_on: time })) as any;
           const savedTime = (await ((await Topic.find(topic.id)) as any).reload()).written_on;
           expect(savedTime).toEqual(time);

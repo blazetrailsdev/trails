@@ -6,8 +6,9 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
-import { RuntimeError, StringIO, rbModName, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat";
 import {
+  ClaimedExecution,
   Job,
   Process,
   ReadyExecution,
@@ -17,47 +18,19 @@ import {
   Worker,
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
+import { RaisingJob } from "./test-helpers/raising-job.js";
+import { ExpectedTestError } from "./test-helpers/expected-test-error.js";
+import { ErrorBuffer } from "./test-helpers/error-buffer.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
-
-class ExpectedTestError extends RuntimeError {}
-constSet(TopLevel, "ExpectedTestError", ExpectedTestError);
-
-class RaisingJob extends ApplicationJob {
-  static {
-    this.queueAs("background");
-  }
-
-  perform(raising: new (message: string) => Error, _identifier: string): void {
-    throw new raising(`This is a ${rbModName(raising)} exception`);
-  }
-}
-
-constSet(TopLevel, "RaisingJob", RaisingJob);
-
-class ErrorBuffer {
-  errors: [Error, unknown][] = [];
-
-  report(error: Error, options: unknown): void {
-    this.errors.push([error, options]);
-  }
-
-  get messages(): string[] {
-    return this.errors.map((error) => error[0].message);
-  }
-}
-
-const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
-
-async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
-  const end = Date.now() + timeout * 1000;
-  while (Date.now() < end && (await block())) await sleep(0.05);
-}
-
-async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
-  await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
-}
+import {
+  assertMetadata,
+  sleep,
+  waitWhileWithTimeout,
+  waitForRegisteredProcesses,
+  assertNoRegisteredProcesses,
+} from "./test-helpers/processes-test-helper.js";
 
 async function waitForJobsToFinishFor(timeout = 1) {
   await waitWhileWithTimeout(timeout, () => Job.where({ finished_at: null }).isAny());
@@ -105,9 +78,7 @@ describe("WorkerTest", () => {
 
     const process = (await Process.first()) as Process;
     expect(process.kind).toBe("Worker");
-    expect(process.metadata.get("queues")).toBe("background");
-    expect(process.metadata.get("polling_interval")).toBe(0.2);
-    expect(process.metadata.get("thread_pool_size")).toBe(3);
+    assertMetadata(process, { queues: "background", polling_interval: 0.2, thread_pool_size: 3 });
   });
 
   it("errors on polling are passed to on_thread_error and re-raised", async () => {
@@ -116,9 +87,9 @@ describe("WorkerTest", () => {
       errors.push((error as Error).message);
     };
 
-    vi.spyOn(ReadyExecution, "claim").mockRejectedValue(
-      new ExpectedTestError("everything is broken"),
-    );
+    const claim = vi
+      .spyOn(ReadyExecution, "claim")
+      .mockRejectedValue(new ExpectedTestError("everything is broken"));
 
     await AddToBufferJob.performLater("hey!");
 
@@ -129,6 +100,35 @@ describe("WorkerTest", () => {
     await expect(worker.stop()).rejects.toThrow(ExpectedTestError);
 
     expect(errors).toEqual(["everything is broken"]);
+    expect(claim).toHaveBeenCalled();
+  });
+
+  it("errors on claimed executions are reported via Rails error subscriber regardless of on_thread_error setting", async () => {
+    const originalOnThreadError = SolidQueue.onThreadError;
+    SolidQueue.onThreadError = null;
+
+    const subscriber = new ErrorBuffer();
+    ActiveSupport.errorReporter.subscribe(subscriber);
+
+    try {
+      const result = vi.spyOn(ClaimedExecution, "Result").mockImplementation(() => {
+        throw new ExpectedTestError("everything is broken");
+      });
+
+      await AddToBufferJob.performLater("hey!");
+
+      await worker.start();
+
+      await waitForJobsToFinishFor(1);
+      await worker.wakeUp();
+
+      expect(result).toHaveBeenCalled();
+      expect(subscriber.errors.length).toBe(1);
+      expect(subscriber.messages()[0]).toBe("everything is broken");
+    } finally {
+      ActiveSupport.errorReporter.unsubscribe(subscriber);
+      SolidQueue.onThreadError = originalOnThreadError;
+    }
   });
 
   it("errors on claimed executions are reported via Rails error subscriber", async () => {
@@ -145,7 +145,7 @@ describe("WorkerTest", () => {
       await worker.wakeUp();
 
       expect(subscriber.errors.length).toBe(1);
-      expect(subscriber.messages[0]).toBe("This is a ExpectedTestError exception");
+      expect(subscriber.messages()[0]).toBe("This is a ExpectedTestError exception");
     } finally {
       ActiveSupport.errorReporter.unsubscribe(subscriber);
       SolidQueue.appExecutor = null;
@@ -240,7 +240,7 @@ describe("WorkerTest", () => {
 
     await worker.stop();
     await waitForRegisteredProcesses(0, { timeout: 1 });
-    expect(await Process.isNone()).toBe(true);
+    await assertNoRegisteredProcesses();
   });
 
   it("run inline", async () => {
@@ -267,7 +267,7 @@ describe("WorkerTest", () => {
       await worker.start();
       await waitForRegisteredProcesses(1, { timeout: 1 });
 
-      expect(worker.pool.isShutdown()).toBe(false);
+      expect(worker.pool.isShutdown()).toBeFalsy();
 
       const process = (await Process.first()) as Process;
       expect(process.kind).toBe("Worker");
@@ -275,7 +275,7 @@ describe("WorkerTest", () => {
       await process.deregister();
 
       await waitWhileWithTimeout(2, async () => !worker.pool.isShutdown());
-      expect(worker.pool.isShutdown()).toBe(true);
+      expect(worker.pool.isShutdown()).toBeTruthy();
     } finally {
       SolidQueue.processHeartbeatInterval = oldHeartbeatInterval;
     }

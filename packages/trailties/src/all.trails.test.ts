@@ -25,7 +25,7 @@ describe("trails/all", () => {
           `import "../dist/all.js";
 import { Application } from "../dist/index.js";
 export function read(config: InstanceType<typeof Application>["config"]) {
-  return [config.activeRecord, config.actionController, config.actionView, config.activeJob, config.i18n];
+  return [config.activeRecord, config.actionController, config.actionView, config.actionMailer, config.activeJob, config.i18n];
 }
 `,
         );
@@ -81,10 +81,13 @@ export function read(config: InstanceType<typeof Application>["config"]) {
       "actionDispatch",
       "actionController",
       "actionView",
+      "actionMailer",
+      "actionMailbox",
     ]) {
       expect(app.deprecators.get(framework), framework).toBeDefined();
     }
     expect(app.config.activeJob).toBeDefined();
+    expect(app.config.actionMailer).toBeDefined();
     expect(Base.queueAdapterName).toBe("test");
     expect(Base.logger).toBe(Trails.logger);
     expect(rbObjRespondTo(RecordBase, "hasOneAttached")).toBe(true);

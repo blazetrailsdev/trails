@@ -168,15 +168,7 @@ export class Attachment extends Record {
   }
 }
 
-Object.setPrototypeOf(
-  Attachment.prototype,
-  delegateMissingTo.call(
-    Object.create(Object.getPrototypeOf(Attachment.prototype) as object, {
-      constructor: { value: Attachment },
-    }),
-    "blob",
-  ),
-);
+delegateMissingTo.call(Attachment, "blob");
 
 ActiveStorage.Attachment = Attachment;
 

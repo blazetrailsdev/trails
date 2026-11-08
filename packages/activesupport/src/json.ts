@@ -3,6 +3,7 @@ import { JSON as RbJSON } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding, type EncodeOptions } from "./json/encoding.js";
 import { zone } from "./time-zone-config.js";
+import type { TimeZone } from "./values/time-zone.js";
 import { ActiveSupport } from "./namespaces.js";
 import * as JSON from "./json.js";
 
@@ -29,7 +30,7 @@ function convertDatesFrom(data: unknown): unknown {
     }
   } else if (typeof data === "string" && DATETIME_REGEX.test(data)) {
     try {
-      return zone()!.parse(data);
+      return (zone() as TimeZone).parse(data);
     } catch (error) {
       if (!(error instanceof ArgumentError)) throw error;
       return data;

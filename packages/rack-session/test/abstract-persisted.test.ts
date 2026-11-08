@@ -1,0 +1,104 @@
+import { StringIO } from "@blazetrails/ruby-compat";
+import { Request, Raw } from "@blazetrails/rack";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import type { PersistedRequest, PersistedSession } from "../lib/index.js";
+import { Persisted, SessionHash } from "../lib/index.js";
+
+const request = (env: Record<string, unknown> = {}): PersistedRequest =>
+  new Request(env) as unknown as PersistedRequest;
+
+describe("Rack::Session::Abstract::Persisted", () => {
+  let klass: typeof Persisted;
+  let pers: Persisted;
+
+  beforeEach(async () => {
+    klass = Persisted;
+    pers = new klass(undefined);
+  });
+
+  it("#generated_sid generates a session identifier", async () => {
+    expect(pers.generateSid()).toMatch(/^[0-9a-fA-F]+$/);
+    expect(pers.generateSid(null)).toMatch(/^[0-9a-fA-F]+$/);
+
+    const obj = {
+      hex(_: number): string {
+        throw new NotImplementedError();
+      },
+    };
+    expect(pers.generateSid(obj)).toMatch(/^[0-9a-fA-F]+$/);
+  });
+
+  it("#commit_session? returns false if :skip option is given", async () => {
+    expect(pers.isCommitSession(request(), {} as unknown as PersistedSession, { skip: true })).toBe(
+      false,
+    );
+  });
+
+  it("#commit_session writes to rack.errors if session cannot be written", async () => {
+    pers = new klass(undefined);
+    pers.writeSession = async () => undefined;
+    const errors = new StringIO();
+    const env: Record<string, unknown> = { "rack.errors": errors };
+    const req = request(env);
+    const store = {
+      loadSession: () => ["id", {}],
+      sessionExists: () => true,
+    } as unknown as Persisted;
+    const session = (env["rack.session"] = new SessionHash(store, req));
+    session.set("foo", "bar");
+    await pers.commitSession(req, new Raw(200, {}));
+    errors.rewind();
+    expect(errors.read()).toBe(
+      "Warning! Rack::Session::Abstract::Persisted failed to save session. Content dropped.\n",
+    );
+  });
+
+  it("#cookie_value returns its argument", async () => {
+    const obj = {};
+    expect(pers.cookieValue(obj)).toBe(obj);
+  });
+
+  it("#session_class returns the default session class", async () => {
+    expect(pers.sessionClass()).toBe(SessionHash);
+  });
+
+  it("#find_session raises", async () => {
+    expect(() => pers.findSession(null as never, null)).toThrow(Error);
+  });
+
+  it("#write_session raises", async () => {
+    await expect(
+      pers.writeSession(null as never, null, null as never, null as never),
+    ).rejects.toThrow(Error);
+  });
+
+  it("#delete_session raises", async () => {
+    await expect(pers.deleteSession(null as never, null, null as never)).rejects.toThrow(Error);
+  });
+
+  describe("#security_matches?", () => {
+    it("#security_matches? returns true if secure cookie is off", async () => {
+      expect(pers.isSecurityMatches(new Request({}) as unknown as PersistedRequest, {})).toBe(true);
+    });
+
+    it("#security_matches? returns true if ssl is on", async () => {
+      const req = new Request({});
+      req.setHeader("HTTPS", "on");
+      expect(pers.isSecurityMatches(req as unknown as PersistedRequest, { secure: true })).toBe(
+        true,
+      );
+    });
+
+    it("#security_matches? returns true if assume_ssl option is set", async () => {
+      const req = request();
+      const persWithPersist = new klass(undefined, { assumeSsl: true });
+      expect(persWithPersist.isSecurityMatches(req, { secure: true })).toBe(true);
+    });
+
+    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", async () => {
+      expect(pers.isSecurityMatches(request(), { secure: true })).toBe(false);
+    });
+  });
+});

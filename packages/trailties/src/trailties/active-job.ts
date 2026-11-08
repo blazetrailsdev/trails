@@ -183,3 +183,4 @@ export class Trailtie extends BaseTrailtie {
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActiveJob::Railtie" });
+ActiveJob.Railtie = Trailtie;

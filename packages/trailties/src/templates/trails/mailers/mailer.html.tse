@@ -1,0 +1,12 @@
+<h1><%= this.pageTitle %></h1>
+
+<% if (this._preview.emails().length > 0) { %>
+  <ul>
+  <% for (const email of this._preview.emails()) { %>
+  <li><%= linkTo(email, urlFor({ controller: "trails/mailers", action: "preview", path: `${this._preview.previewName()}/${email}` })) %></li>
+  <% } %>
+  </ul>
+<% } else { %>
+  <p>You have not defined any actions for <%= RubyCompat.rbModName(this._preview) %>.</p>
+  <p>Read <%= linkTo("Action Mailer Basics", "https://guides.rubyonrails.org/action_mailer_basics.html#previewing-emails") %> to learn how to define your first.</p>
+<% } %>

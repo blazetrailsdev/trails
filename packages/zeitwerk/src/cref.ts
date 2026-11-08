@@ -1,5 +1,8 @@
 import {
   TopLevel,
+  autoloadDelete,
+  rbAutoloadP,
+  rbAutoloadStr,
   constDefined,
   constSet,
   include,
@@ -13,9 +16,6 @@ import { RealModName } from "./real-mod-name.js";
 function _seat(mod: object): object {
   return mod === Object ? TopLevel : mod;
 }
-
-/** @noRailsEquivalent PERMANENT */
-const _autoloads = new WeakMap<object, Map<string, string>>();
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface Cref extends Included<typeof RealModName> {}
@@ -39,14 +39,12 @@ export class Cref {
 
   isAutoload(): string | null {
     if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return null;
-    return _autoloads.get(this.mod)?.get(this.cname) ?? null;
+    return rbAutoloadP(this.mod, this.cname);
   }
 
   autoload(abspath: string): void {
     if (constDefined(_seat(this.mod) as { readonly name: string }, this.cname, false)) return;
-    let cnames = _autoloads.get(this.mod);
-    if (cnames === undefined) _autoloads.set(this.mod, (cnames = new Map()));
-    cnames.set(this.cname, abspath);
+    rbAutoloadStr(this.mod, this.cname, abspath);
   }
 
   /** @inventedArm if — PERMANENT */
@@ -56,7 +54,7 @@ export class Cref {
   }
 
   set<T>(value: T): T {
-    _autoloads.get(this.mod)?.delete(this.cname);
+    autoloadDelete(this.mod, this.cname);
     return constSet(_seat(this.mod) as { readonly name: string }, this.cname, value);
   }
 
@@ -67,7 +65,7 @@ export class Cref {
   /** @inventedArm if — PERMANENT */
   remove(): unknown {
     const autoloadPath = this.isAutoload();
-    _autoloads.get(this.mod)?.delete(this.cname);
+    autoloadDelete(this.mod, this.cname);
     if (autoloadPath != null) return null;
     return rbModRemoveConst(this.mod, this.cname);
   }

@@ -1,15 +1,16 @@
 import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
-import type { GeneratorBase, GeneratorConfig } from "./generators/base.js";
+import type { Base, GeneratorConfig } from "./generators/base.js";
+import { noColorBang } from "./command/behavior.js";
 import { Trails } from "./trails.js";
 import type {
   AfterGenerateCallback,
   Generators as GeneratorsConfiguration,
 } from "./configuration.js";
 
-export type GeneratorClass = Omit<typeof GeneratorBase, "prototype"> & {
-  readonly prototype: GeneratorBase;
+export type GeneratorClass = Omit<typeof Base, "prototype"> & {
+  readonly prototype: Base;
   readonly name: string;
 };
 
@@ -30,6 +31,7 @@ let _lookupPaths: URL[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
 let _fallbacks: Record<string, unknown> | undefined;
+let _templatesPath: string[] | undefined;
 let _afterGenerateCallbacks: AfterGenerateCallback[] | undefined;
 let _generatedFiles: string[] | undefined;
 
@@ -87,11 +89,19 @@ export class Generators {
   }
 
   static configureBang(config: GeneratorsConfiguration): void {
+    if (config.apiOnly) Generators.apiOnlyBang();
+    if (!config.colorizeLogging) noColorBang();
     deepMergeBang(Generators.aliases(), config.aliases as never);
     deepMergeBang(Generators.options(), config.options as never);
     Object.assign(Generators.fallbacks(), config.fallbacks);
+    Generators.templatesPath().push(...config.templates);
+    Generators.templatesPath().splice(0, Infinity, ...new Set(Generators.templatesPath()));
     Generators.hideNamespaces(...config.hiddenNamespaces);
     Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
+  }
+
+  static templatesPath(): string[] {
+    return (_templatesPath ??= []);
   }
 
   static aliases(): Record<string, Record<string, unknown>> {
@@ -228,6 +238,20 @@ export class Generators {
     return Generators.subclasses().map((k) => k.namespace());
   }
 
+  static apiOnlyBang(): void {
+    Generators.hideNamespaces("assets", "helper", "css", "js");
+
+    Object.assign(Generators.options().trails, {
+      api: true,
+      assets: false,
+      helper: false,
+      templateEngine: null,
+    });
+
+    Generators.options().mailer ??= {};
+    Generators.options().mailer.templateEngine ??= "tse";
+  }
+
   static hiddenNamespaces(): string[] {
     return (_hiddenNamespaces ??= ["trails", "resource-route", "devcontainer"]);
   }
@@ -339,13 +363,13 @@ export class Generators {
 
 async function requireGenerator(base: URL, path: string): Promise<void> {
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
-  const { GeneratorBase } = await import("./generators/base.js");
+  const { Base } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
   const namespace = getPath()
     .dirname(path.slice(urlToPath(base).length))
     .split(/[\\/]/);
   for (const value of Object.values(mod)) {
-    if (typeof value === "function" && value.prototype instanceof GeneratorBase) {
+    if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;
       klass.namespace(namespace.join(":"));
       _subclasses ??= [];

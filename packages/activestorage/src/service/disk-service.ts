@@ -57,7 +57,7 @@ export class DiskService extends Service {
     } else {
       return await this.instrument("download", { key: key }, async () => {
         try {
-          return (await IO.binreadAsync(this.pathFor(key)))!;
+          return await IO.binreadAsync(this.pathFor(key));
         } catch (error) {
           if (error instanceof Errno.ENOENT) throw new FileNotFoundError();
           throw error;

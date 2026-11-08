@@ -1,0 +1,647 @@
+import { describe, it, expect } from "vitest";
+import { UrlGenerationError } from "../../../lib/action-controller/metal/exceptions.js";
+import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
+import type { RouterRequest } from "../../../lib/action-dispatch/journey/router.js";
+
+function trailsEnv(env: Record<string, unknown>, klass = Request): RouterRequest {
+  return new klass(rackEnv(env)) as unknown as RouterRequest;
+}
+
+function rackEnv(env: Record<string, unknown>): Record<string, unknown> {
+  return {
+    "rack.version": [1, 1],
+    "rack.input": new StringIO(),
+    "rack.errors": new StringIO(),
+    "rack.multithread": true,
+    "rack.multiprocess": true,
+    "rack.run_once": false,
+    REQUEST_METHOD: "GET",
+    SERVER_NAME: "example.org",
+    SERVER_PORT: "80",
+    QUERY_STRING: "",
+    PATH_INFO: "/content",
+    "rack.url_scheme": "http",
+    HTTPS: "off",
+    SCRIPT_NAME: "",
+    CONTENT_LENGTH: "0",
+    ...env,
+  };
+}
+
+function _generate(
+  routeSet: RouteSet,
+  routeName: string | null,
+  options: Record<string, unknown>,
+  recall: Record<string, unknown>,
+): [string, Record<string, string>] {
+  const path = routeSet.generate(routeName, options, recall).path(null);
+  const captures = new Set<string>();
+  for (const route of routeSet.routes().routes) {
+    for (const name of route.segmentKeys) captures.add(name);
+  }
+  const params: Record<string, string> = {};
+  for (const [key, val] of Object.entries(options)) {
+    if (captures.has(key) || key === "controller" || key === "action") continue;
+    if (val == null) continue;
+    params[key] = String(val);
+  }
+  return [path, params];
+}
+
+describe("TestRouter", () => {
+  it("dashes", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo-bar-baz", { to: "foo#bar" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/foo-bar-baz" });
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+    expect(called).toBeTruthy();
+  });
+
+  it("unicode", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/ほげ", { to: "foo#bar" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/%E3%81%BB%E3%81%92" });
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+    expect(called).toBeTruthy();
+  });
+
+  it("regexp first precedence", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/whois/:domain", { constraints: { domain: /\w+\.[\w.]+/ }, to: "foo#bar" });
+      this.get("/whois/:id(.:format)", { to: "foo#baz" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/whois/example.com" });
+
+    const list: { path: { spec: unknown } }[] = [];
+    routeSet.router.recognize(env, (r) => {
+      list.push(r as unknown as { path: { spec: unknown } });
+    });
+    expect(list.length).toEqual(2);
+
+    const r = list[0];
+
+    expect(String(r.path.spec)).toEqual("/whois/:domain(.:format)");
+  });
+
+  it("required parts verified are anchored", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo/:id", { constraints: { id: /\d/ }, anchor: false, to: "foo#bar" });
+    });
+
+    expect(() => routeSet.urlFor({ controller: "foo", action: "bar", id: "10" }, null)).toThrow(
+      UrlGenerationError,
+    );
+  });
+
+  it("required parts are verified when building", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo/:id", { constraints: { id: /\d+/ }, anchor: false, to: "foo#bar" });
+    });
+
+    const [path] = _generate(routeSet, null, { controller: "foo", action: "bar", id: "10" }, {});
+    expect(path).toEqual("/foo/10");
+
+    expect(() => _generate(routeSet, null, { id: "aa" }, {})).toThrow(UrlGenerationError);
+  });
+
+  it("only required parts are verified", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo(/:id)", { constraints: { id: /\d/ }, to: "foo#bar" });
+    });
+
+    let [path] = _generate(routeSet, null, { controller: "foo", action: "bar", id: "10" }, {});
+    expect(path).toEqual("/foo/10");
+
+    [path] = _generate(routeSet, null, { controller: "foo", action: "bar" }, {});
+    expect(path).toEqual("/foo");
+
+    [path] = _generate(routeSet, null, { controller: "foo", action: "bar", id: "aa" }, {});
+    expect(path).toEqual("/foo/aa");
+  });
+
+  it("knows what parts are missing from named route", () => {
+    const routeName = "gorby_thunderhorse";
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo/:id", { as: routeName, constraints: { id: /\d+/ }, to: "foo#bar" });
+    });
+
+    let error: Error | undefined;
+    expect(() => {
+      try {
+        _generate(routeSet, routeName, {}, {});
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow(UrlGenerationError);
+
+    expect(error!.message).toMatch(/missing required keys: \[:id\]/);
+  });
+
+  it("does not include missing keys message", () => {
+    const routeName = "gorby_thunderhorse";
+    const routeSet = new RouteSet();
+
+    let error: Error | undefined;
+    expect(() => {
+      try {
+        _generate(routeSet, routeName, {}, {});
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow(UrlGenerationError);
+
+    expect(error!.message).not.toMatch(/missing required keys: \[\]/);
+  });
+
+  it("x cascade", async () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/messages(.:format)", { to: "foo#bar" });
+    });
+    const resp = await routeSet.router.serve(
+      trailsEnv({ REQUEST_METHOD: "GET", PATH_INFO: "/lol" }),
+    );
+    expect(resp[2]).toEqual(["Not Found"]);
+    expect(resp[1]["x-cascade"]).toEqual("pass");
+    expect(resp[0]).toEqual(404);
+  });
+
+  it("clear trailing slash from script name on root unanchored routes", async () => {
+    const app = () => [200, {}, ["success!"]] as const;
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/weblog", { to: app });
+    });
+
+    const env = trailsEnv({ SCRIPT_NAME: "", PATH_INFO: "/weblog" });
+    const resp = await routeSet.router.serve(env);
+    expect(resp[2]).toEqual(["success!"]);
+    expect(env.scriptName).toEqual("");
+  });
+
+  it("defaults merge correctly", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo(/:id)", { to: "foo#bar", defaults: { id: null } });
+    });
+
+    let env = trailsEnv({ PATH_INFO: "/foo/10" });
+    routeSet.router.recognize(env, (_r, params) => {
+      expect(params).toEqual({ id: "10", controller: "foo", action: "bar" });
+    });
+
+    env = trailsEnv({ PATH_INFO: "/foo" });
+    routeSet.router.recognize(env, (_r, params) => {
+      expect(params).toEqual({ id: null, controller: "foo", action: "bar" });
+    });
+  });
+
+  it("recognize with unbound regexp", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo", { anchor: false, to: "foo#bar" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/foo/bar" });
+
+    routeSet.router.recognize(env, () => {});
+
+    expect(env.scriptName).toEqual("/foo");
+    expect(env.pathInfo).toEqual("/bar");
+  });
+
+  it("bound regexp keeps path info", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#bar" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/foo" });
+
+    const before = env.scriptName;
+
+    routeSet.router.recognize(env, () => {});
+
+    expect(env.scriptName).toEqual(before);
+    expect(env.pathInfo).toEqual("/foo");
+  });
+
+  it("path not found", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      for (const path of [
+        "/messages(.:format)",
+        "/messages/new(.:format)",
+        "/messages/:id/edit(.:format)",
+        "/messages/:id(.:format)",
+      ]) {
+        this.get(path, { to: "foo#bar" });
+      }
+    });
+    const env = trailsEnv({ PATH_INFO: "/messages/unknown/path" });
+    let yielded = false;
+
+    routeSet.router.recognize(env, () => {
+      yielded = true;
+    });
+    expect(yielded).toBeFalsy();
+  });
+
+  it("required part in recall", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/messages/:a/:b", { to: "foo#bar" });
+    });
+
+    const [path] = _generate(
+      routeSet,
+      null,
+      { controller: "foo", action: "bar", a: "a" },
+      { b: "b" },
+    );
+    expect(path).toEqual("/messages/a/b");
+  });
+
+  it("splat in recall", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/*path", { to: "foo#bar" });
+    });
+
+    const [path] = _generate(routeSet, null, { controller: "foo", action: "bar" }, { path: "b" });
+    expect(path).toEqual("/b");
+  });
+
+  it("recall should be used when scoring", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/messages/:action(/:id(.:format))", { to: "foo#bar" });
+      this.get("/messages/:id(.:format)", { to: "bar#baz" });
+    });
+
+    const [path] = _generate(routeSet, null, { controller: "foo", id: 10 }, { action: "index" });
+    expect(path).toEqual("/messages/index/10");
+  });
+
+  it("nil path parts are ignored", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(.:format))", { to: "tasks#lol" });
+    });
+
+    const params = { controller: "tasks", format: null };
+    const extras = { action: "lol" };
+
+    const [path] = _generate(routeSet, null, params, extras);
+    expect(path).toEqual("/tasks/index");
+  });
+
+  it("generate slash", () => {
+    const params: Record<string, string> = { controller: "tasks", action: "show" };
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/", { ...params });
+    });
+
+    const [path] = _generate(routeSet, null, params, {});
+    expect(path).toEqual("/");
+  });
+
+  it("generate id", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
+    });
+
+    const [path, params] = _generate(
+      routeSet,
+      null,
+      { id: 1, controller: "tasks", action: "show" },
+      {},
+    );
+    expect(path).toEqual("/tasks/show");
+    expect(params).toEqual({ id: "1" });
+  });
+
+  it("generate escapes", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
+    });
+
+    const [path] = _generate(routeSet, null, { controller: "tasks", action: "a/b c+d" }, {});
+    expect(path).toEqual("/tasks/a%2Fb%20c+d");
+  });
+
+  it("generate escapes with namespaced controller", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
+    });
+
+    const [path] = _generate(routeSet, null, { controller: "admin/tasks", action: "a/b c+d" }, {});
+    expect(path).toEqual("/admin/tasks/a%2Fb%20c+d");
+  });
+
+  it("generate extra params", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
+    });
+
+    const [path, params] = _generate(
+      routeSet,
+      null,
+      { id: 1, controller: "tasks", action: "show", relative_url_root: null },
+      {},
+    );
+    expect(path).toEqual("/tasks/show");
+    expect(params).toEqual({ id: "1" });
+  });
+
+  it("generate missing keys no matches different format keys", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller/:action/:name", { to: "foo#bar" });
+    });
+    const primaryParameters = {
+      id: 1,
+      controller: "tasks",
+      action: "show",
+      relative_url_root: null,
+    };
+    const redirectionParameters = { action: "show" };
+    const missingKey = "name";
+    const missingParameters = { [missingKey]: "task_1" };
+    const requestParameters = {
+      ...primaryParameters,
+      ...redirectionParameters,
+      ...missingParameters,
+    };
+
+    const message = `No route matches {:action=>"show", :controller=>"tasks", :id=>1, :${missingKey}=>nil, :relative_url_root=>nil}`;
+
+    let error: Error | undefined;
+    expect(() => {
+      try {
+        _generate(routeSet, null, { ...requestParameters, name: null }, requestParameters);
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow(UrlGenerationError);
+    expect(error!.message).toEqual(message);
+  });
+
+  it("generate uses recall if needed", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+    });
+
+    const [path, params] = _generate(
+      routeSet,
+      null,
+      { controller: "tasks", id: 10 },
+      { action: "index" },
+    );
+    expect(path).toEqual("/tasks/index/10");
+    expect(params).toEqual({});
+  });
+
+  it("generate with name", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar", as: "tasks" });
+    });
+
+    const [path, params] = _generate(
+      routeSet,
+      "tasks",
+      { controller: "tasks" },
+      { controller: "tasks", action: "index" },
+    );
+    expect(path).toEqual("/tasks/index");
+    expect(params).toEqual({});
+  });
+
+  for (const [requestPath, expected] of Object.entries({
+    "/content": { controller: "content" },
+    "/content/list": { controller: "content", action: "list" },
+    "/content/show/10": { controller: "content", action: "show", id: "10" },
+  } as Record<string, Record<string, string>>)) {
+    it(`recognize ${Object.keys(expected).join(" ")}`, () => {
+      const routeSet = new RouteSet();
+      routeSet.draw(function () {
+        this.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+      });
+      const route = [...routeSet.router.routes][0];
+
+      const env = trailsEnv({ PATH_INFO: requestPath });
+      let called = false;
+
+      routeSet.router.recognize(env, (r, params) => {
+        expect(r).toEqual(route);
+        expect(params).toEqual({ action: "bar", ...expected });
+        called = true;
+      });
+
+      expect(called).toBeTruthy();
+    });
+  }
+
+  for (const [name, [requestPath, expected]] of Object.entries({
+    segment: ["/a%2Fb%20c+d/splat", { segment: "a/b c+d", splat: "splat" }],
+    splat: ["/segment/a/b%20c+d", { segment: "segment", splat: "a/b c+d" }],
+  } as const)) {
+    it(`recognize ${name}`, () => {
+      const routeSet = new RouteSet();
+      routeSet.draw(function () {
+        this.get("/:segment/*splat", { to: "foo#bar" });
+      });
+
+      const env = trailsEnv({ PATH_INFO: requestPath });
+      let called = false;
+      const route = [...routeSet.router.routes][0];
+
+      routeSet.router.recognize(env, (r, params) => {
+        expect(r).toEqual(route);
+        expect(params).toEqual({ ...expected, controller: "foo", action: "bar" });
+        called = true;
+      });
+
+      expect(called).toBeTruthy();
+    });
+  }
+
+  it("namespaced controller", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(/:id))", { constraints: { controller: /.+?/ } });
+    });
+    const route = [...routeSet.router.routes][0];
+
+    const env = trailsEnv({ PATH_INFO: "/admin/users/show/10" });
+    let called = false;
+    const expected = {
+      controller: "admin/users",
+      action: "show",
+      id: "10",
+    };
+
+    routeSet.router.recognize(env, (r, params) => {
+      expect(r).toEqual(route);
+      expect(params).toEqual(expected);
+      called = true;
+    });
+    expect(called).toBeTruthy();
+  });
+
+  it("recognize literal", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/books(/:action(.:format))", { controller: "books" });
+    });
+    const route = [...routeSet.router.routes][0];
+
+    const env = trailsEnv({ PATH_INFO: "/books/list.rss" });
+    const expected = { controller: "books", action: "list", format: "rss" };
+    let called = false;
+    routeSet.router.recognize(env, (r, params) => {
+      expect(r).toEqual(route);
+      expect(params).toEqual(expected);
+      called = true;
+    });
+
+    expect(called).toBeTruthy();
+  });
+
+  it("recognize head route", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { via: "head", to: "foo#bar" });
+    });
+
+    const env = trailsEnv({
+      PATH_INFO: "/books/list.rss",
+      REQUEST_METHOD: "HEAD",
+    });
+
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+
+    expect(called).toBeTruthy();
+  });
+
+  it("recognize head request as get route", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/books(/:action(.:format))", { to: "foo#bar" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "HEAD" });
+
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+
+    expect(called).toBeTruthy();
+  });
+
+  it("recognize cares about get verbs", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ":get" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
+
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+
+    expect(called).toBeFalsy();
+  });
+
+  it("recognize cares about post verbs", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ":post" });
+    });
+
+    const env = trailsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
+
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+
+    expect(called).toBeTruthy();
+  });
+
+  it("multi verb recognition", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: [":post", ":get"] });
+    });
+
+    for (const verb of ["POST", "GET"]) {
+      const env = trailsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: verb });
+
+      let called = false;
+      routeSet.router.recognize(env, () => {
+        called = true;
+      });
+
+      expect(called).toBeTruthy();
+    }
+
+    const env = trailsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "PUT" });
+
+    let called = false;
+    routeSet.router.recognize(env, () => {
+      called = true;
+    });
+
+    expect(called).toBeFalsy();
+  });
+
+  it("eager load with routes", () => {
+    const routeSet = new RouteSet();
+    routeSet.draw(function () {
+      this.get("/foo-bar", { to: "foo#bar" });
+    });
+    expect(routeSet.router.eagerLoadBang()).toBeUndefined();
+  });
+
+  it("eager load without routes", () => {
+    const routeSet = new RouteSet();
+    expect(routeSet.router.eagerLoadBang()).toBeUndefined();
+  });
+});

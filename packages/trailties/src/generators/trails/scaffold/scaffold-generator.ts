@@ -1,3 +1,4 @@
+import "../../../constants.trails-scaffold-scaffold-generator.generated.js";
 import { ResourceGenerator } from "../resource/resource-generator.js";
 
 export class ScaffoldGenerator extends ResourceGenerator {}

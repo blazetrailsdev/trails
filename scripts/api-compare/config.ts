@@ -1,6 +1,7 @@
 import * as path from "path";
 
 import { apiComparePackages } from "../../vendor/sources.js";
+import { libRoot } from "../layout/package-roots.js";
 
 export const SCRIPT_DIR = __dirname;
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -47,6 +48,11 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   mysql2: "activerecord",
   pg: "activerecord",
   sqlite3: "activerecord",
+  racc: "nokogiri",
+  "rails-html-sanitizer": "html-sanitizer",
+  loofah: "html-sanitizer",
+  crass: "html-sanitizer",
+  erubi: "tse-compiler",
 };
 
 /**
@@ -113,6 +119,9 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   mysql2: "mysql2",
   pg: "pg",
   sqlite3: "sqlite",
+  racc: "racc",
+  loofah: "loofah",
+  crass: "crass",
 };
 
 /**
@@ -148,7 +157,7 @@ export interface PackageRoots {
  *
  * Derived from `TS_EXTRACT_PACKAGES` rather than a `packages/` listing so the
  * freshness guards see the same tree the extractor does: workspaces that are not
- * api-compared (`activerecord-cli`, `trails-tsc`, `tse-compiler`, `website`, …)
+ * api-compared (`activerecord-cli`, `trails-tsc`, `website`, …)
  * cannot affect the TS manifest and so must not be able to block a run.
  */
 export function apiComparePackageRoots(): PackageRoots[] {
@@ -167,8 +176,8 @@ export function packageSrcDir(pkg: string): string {
   const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
   const subDir = PACKAGE_SRC_SUBDIR[pkg];
   return subDir
-    ? path.join(ROOT_DIR, "packages", dirName, "src", subDir)
-    : path.join(ROOT_DIR, "packages", dirName, "src");
+    ? path.join(ROOT_DIR, "packages", dirName, libRoot(dirName), subDir)
+    : path.join(ROOT_DIR, "packages", dirName, libRoot(dirName));
 }
 
 /**
@@ -196,6 +205,7 @@ export const MANIFEST_PACKAGES = [
   "actioncable",
   "activejob",
   "actionmailer",
+  "actionmailbox",
   "activestorage",
   "trailties",
   "rack",
@@ -222,9 +232,9 @@ export const MANIFEST_PACKAGES = [
  * Ports permanently outside `eslint/rails-private-methods.json`, because there
  * is no Ruby source the privates projection can run over:
  *
- * - `date` — vendored, but `compareApi: false` (vendor/sources.ts): the Ruby
- *   `Date`/`DateTime` surface lives in C (`ext/date/date_core.c`), so the
- *   extractor sees no method visibilities to project.
+ * - `date` — api-compared, but its Ruby `Date`/`DateTime` surface lives in C
+ *   (`ext/date/date_core.c`), so the extractor sees almost no method
+ *   visibilities to project.
  * - `html-sanitizer`, `activerecord-cli` — not vendored sources at all; they
  *   have no gem counterpart in `vendor/`.
  *

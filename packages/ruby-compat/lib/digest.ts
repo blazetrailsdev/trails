@@ -1,0 +1,143 @@
+import { getCrypto, type HashAdapter } from "./crypto-adapter.js";
+import { getFs, type Bytes } from "./fs-adapter.js";
+import { Base64 } from "./base64.js";
+import { rbGetPath, type PathLike } from "./file.js";
+
+/**
+ * One `Digest::Class` subclass (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:20`),
+ * over the algorithm the constant names.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest::Class`
+ * (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:20`), which Rails calls
+ * (`activerecord/lib/active_record/encryption/key.rb:24`) without defining.
+ */
+export class DigestClass {
+  /** @noRailsEquivalent PERMANENT */
+  readonly algorithm: string;
+
+  /**
+   * `Module#name` (`vendor/ruby/v3.3.11/object.c:2263`), the constant path this class
+   * is bound to, which `Digest::UUID.uuid_from_hash` interpolates into its
+   * `ArgumentError` (`activesupport/lib/active_support/core_ext/digest/uuid.rb:25`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  readonly name: string;
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:20 */
+  constructor(algorithm: string, name: string) {
+    this.algorithm = algorithm;
+    this.name = name;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:26 */
+  new(): DigestInstance {
+    return new DigestInstance(this.algorithm);
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:458 */
+  digest(data: string | Uint8Array): Bytes {
+    return this.new().update(data).digest();
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:645 */
+  hexdigest(data: string | Uint8Array): string {
+    return getCrypto().createHash(this.algorithm).update(data).digest("hex");
+  }
+
+  /**
+   * `Digest::Class.file` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:48-50`),
+   * `new.file(name)`, async because the file is read.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:48
+   */
+  async file(name: string | PathLike): Promise<DigestInstance> {
+    return await this.new().file(name);
+  }
+
+  /**
+   * `Digest::Class.base64digest` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:55-57`),
+   * `[digest(str)].pack('m0')`: strict Base64 with no line feeds.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:55
+   */
+  base64digest(str: string | Uint8Array): string {
+    return Base64.strictEncode64(this.digest(str));
+  }
+}
+
+/**
+ * The running digest `Digest::Class.new` answers, which
+ * `Rack::ETag#digest_body` feeds part by part (`vendor/rack/v3.2.8/lib/rack/etag.rb:65`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest::Instance`
+ * (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:60`), which Rack calls without
+ * defining.
+ */
+export class DigestInstance {
+  /** @noRailsEquivalent PERMANENT */
+  readonly algorithm: string;
+
+  private readonly impl: HashAdapter;
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:339 */
+  constructor(algorithm: string) {
+    this.algorithm = algorithm;
+    this.impl = getCrypto().createHash(algorithm);
+  }
+
+  /**
+   * `Digest::Instance#file` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:63-71`),
+   * which feeds the file's bytes to `update` and answers `self`. The file is
+   * read whole through the backend's async `readFile`.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:63
+   */
+  async file(name: string | PathLike): Promise<this> {
+    this.update(Uint8Array.from(await getFs().readFile(rbGetPath(name))));
+    return this;
+  }
+
+  /**
+   * `Digest::Instance#base64digest` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:82-84`)
+   * in its no-argument form, `[digest].pack('m0')`.
+   *
+   * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:82
+   */
+  base64digest(): string {
+    return Base64.strictEncode64(this.digest());
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:143 */
+  update(data: string | Uint8Array): this {
+    this.impl.update(data);
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:245 */
+  hexdigest(): string {
+    return this.impl.digest("hex");
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/digest.c:225 */
+  digest(): Bytes {
+    return this.impl.digest();
+  }
+}
+
+/**
+ * `Digest` (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:8`), the three constants
+ * Rails names — `Digest::MD5` (`digest.rb:9`), `Digest::SHA1`
+ * (`encryption/key.rb:24`) and `Digest::SHA256` (`rack/etag.rb:65`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest`
+ * (`vendor/ruby/v3.3.11/ext/digest/lib/digest.rb:8`), which no Rails file defines.
+ */
+export const Digest = {
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/md5/md5init.c:41 */
+  MD5: new DigestClass("md5", "Digest::MD5"),
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/sha1/sha1init.c:41 */
+  SHA1: new DigestClass("sha1", "Digest::SHA1"),
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/digest/sha2/lib/sha2.rb:44 */
+  SHA256: new DigestClass("sha256", "Digest::SHA256"),
+};

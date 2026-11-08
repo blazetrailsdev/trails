@@ -39,6 +39,7 @@ describe("vendor/sources.ts", () => {
         "activejob",
         "actionmailer",
         "activestorage",
+        "actionmailbox",
         "activemodel",
         "activerecord",
         "activerecord-test-support",
@@ -52,13 +53,13 @@ describe("vendor/sources.ts", () => {
   it("declares the rack source (wave 2)", () => {
     const rack = SOURCES.find((s) => s.name === "rack");
     expect(rack).toBeDefined();
-    expect(rack!.origin.ref).toBe("v3.1.14");
+    expect(rack!.origin.ref).toBe("v3.2.8");
     expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib/rack", testPath: "test" }]);
   });
 
   it("declares the rack-session source, enrolled in both compares", () => {
     // Rack 3 moved Rack::Session out of rack into its own gem, so vendor/rack
-    // (v3.1.14) has no lib/rack/session/. v2.1.0 is what
+    // (v3.2.8) has no lib/rack/session/. v2.1.0 is what
     // vendor/rails/Gemfile.lock:440 resolves.
     const rackSession = SOURCES.find((s) => s.name === "rack-session");
     expect(rackSession).toBeDefined();
@@ -131,10 +132,7 @@ describe("vendor/sources.ts", () => {
     ]);
   });
 
-  it("declares the date source, enrolled in test-compare only", () => {
-    // api-compare stays off deliberately: the gem's surface is C
-    // (ext/date/date_core.c), so extract-ruby-api.rb credits only the 12
-    // methods in lib/date.rb. RFC 0088 `date-c-source-extractor-decision`.
+  it("declares the date source, enrolled in api-compare and test-compare", () => {
     const date = SOURCES.find((s) => s.name === "date");
     expect(date).toBeDefined();
     expect(date!.origin).toEqual({
@@ -142,8 +140,8 @@ describe("vendor/sources.ts", () => {
       url: "https://github.com/ruby/date.git",
       ref: "v3.4.1",
     });
-    expect(apiComparePackages()).not.toContain("date");
-    expect(Object.keys(libPathsManifest())).not.toContain("date");
+    expect(apiComparePackages()).toContain("date");
+    expect(Object.keys(libPathsManifest())).toContain("date");
     expect(Object.keys(testPathsManifest())).toContain("date");
     expect(resolvePath("date", "test").endsWith("vendor/date/v3.4.1/test/date")).toBe(true);
   });
@@ -170,6 +168,7 @@ describe("vendor/sources.ts", () => {
         libPath: "lib",
         testPath: "spec/ruby",
         compareApi: false,
+        apiExcludedReason: expect.stringContaining("trails-only"),
       },
     ]);
     expect(apiComparePackages()).not.toContain("ruby-compat");
@@ -203,6 +202,7 @@ describe("vendor/sources.ts", () => {
       "activejob",
       "actionmailer",
       "activestorage",
+      "actionmailbox",
       "rack-test",
       "did-you-mean",
       "globalid",
@@ -212,11 +212,14 @@ describe("vendor/sources.ts", () => {
       "marcel",
       "builder",
       "mini-magick",
+      "image-processing",
       "rake",
       "thor",
       "zeitwerk",
       "rails-dom-testing",
       "i18n",
+      "erubi",
+      "tzinfo",
       "solid-queue",
       "solid-cable",
       "et-orbi",
@@ -392,6 +395,7 @@ describe("vendor/sources.ts", () => {
         "activejob",
         "actionmailer",
         "activestorage",
+        "actionmailbox",
         "activemodel",
         "activerecord",
         "activerecord-test-support",
@@ -400,11 +404,16 @@ describe("vendor/sources.ts", () => {
         "bcrypt",
         "builder",
         "chronic",
+        "crass",
+        "date",
         "did-you-mean",
+        "erubi",
         "et-orbi",
         "fugit",
         "globalid",
         "i18n",
+        "image-processing",
+        "loofah",
         "mail",
         "marcel",
         "mini-magick",
@@ -412,19 +421,23 @@ describe("vendor/sources.ts", () => {
         "msgpack",
         "mysql2",
         "net-smtp",
+        "nokogiri",
         "pg",
         "raabro",
+        "racc",
         "rack",
         "rack-session",
         "rack-test",
         "rackup",
         "rails-dom-testing",
+        "rails-html-sanitizer",
         "rake",
         "sqlite3",
         "solid-cable",
         "solid-queue",
         "thor",
         "trailties",
+        "tzinfo",
         "zeitwerk",
       ].sort(),
     );
@@ -439,7 +452,7 @@ describe("vendor/sources.ts", () => {
     expect(
       m["abstractcontroller"].endsWith("vendor/rails/v8.0.2/actionpack/lib/abstract_controller"),
     ).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/v3.1.14/lib/rack")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.2.8/lib/rack")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/lib/global_id")).toBe(true);
   });
 
@@ -455,6 +468,7 @@ describe("vendor/sources.ts", () => {
         "activejob",
         "actionmailer",
         "activestorage",
+        "actionmailbox",
         "activemodel",
         "activerecord",
         "activesupport",
@@ -462,23 +476,31 @@ describe("vendor/sources.ts", () => {
         "bcrypt",
         "builder",
         "chronic",
+        "crass",
         "date",
         "did-you-mean",
+        "erubi",
         "et-orbi",
         "fugit",
         "globalid",
         "i18n",
+        "loofah",
+        "image-processing",
         "mail",
         "marcel",
         "mini-magick",
         "mini-mime",
         "msgpack",
         "net-smtp",
+        "nokogiri",
         "raabro",
+        "racc",
         "rack",
         "rack-session",
         "rack-test",
         "rackup",
+        "rails-html-sanitizer",
+        "rails-dom-testing",
         "rake",
         "ruby-compat",
         "solid-cable",
@@ -489,9 +511,12 @@ describe("vendor/sources.ts", () => {
       ].sort(),
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
+    expect(m["erubi"].endsWith("vendor/erubi/1.13.1/test")).toBe(true);
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
-    expect(m["rack"].endsWith("vendor/rack/v3.1.14/test")).toBe(true);
+    expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
+    expect(m["image-processing"].endsWith("vendor/image_processing/v1.14.0/test")).toBe(true);
+    expect(m["rails-dom-testing"].endsWith("vendor/rails-dom-testing/v2.2.0/test")).toBe(true);
   });
 
   it("validateSources rejects missing libPath", () => {
@@ -504,5 +529,16 @@ describe("vendor/sources.ts", () => {
       },
     ];
     expect(() => validateSources(bad)).toThrow(/missing libPath/);
+  });
+
+  it("validateSources rejects compareTests: false without a testsExcludedReason", () => {
+    const bad: UpstreamSource[] = [
+      {
+        name: "x",
+        origin: { type: "git", url: "u", ref: "r" },
+        packages: [{ name: "p", libPath: "lib", compareTests: false }],
+      },
+    ];
+    expect(() => validateSources(bad)).toThrow(/compareTests: false without a testsExcludedReason/);
   });
 });

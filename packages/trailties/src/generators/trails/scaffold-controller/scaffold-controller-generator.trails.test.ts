@@ -40,7 +40,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
       async destroy(): Promise<void> {
         this.redirectTo(this.postsPath(), {
           notice: "Post was successfully destroyed.",
-          status: "see_other",
+          status: ":see_other",
         });
       }
     }
@@ -142,6 +142,16 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     const content = controller();
     expect(content).toContain('return this.params.expect({ post: ["title"] });');
     expect(content).not.toContain(" as Record<string, unknown>");
+  });
+
+  it("returns params.fetch's Parameters with no cast when there are no attributes", async () => {
+    await ScaffoldControllerGenerator.start(["Post"], { destinationRoot: tmpDir });
+
+    const content = controller();
+    expect(content).toContain(
+      '  private postParams() {\n    return this.params.fetch("post", {});',
+    );
+    expect(content).not.toContain("Record<string, unknown>");
   });
 });
 

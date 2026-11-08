@@ -54,10 +54,12 @@ const kebab = (rubyPath) => rubyPath.replaceAll("_", "-");
  * `activemodel/lib/active_model/api.rb` is `packages/activemodel/src/api.ts`,
  * the gem's own namespace directory dropped, and
  * `actionpack/lib/action_controller/metal.rb` keeps a directory that is not
- * the gem's name as `packages/actionpack/src/action-controller/metal.ts`.
+ * the gem's name as `packages/actionpack/lib/action-controller/metal.ts`.
  */
 function mirrorsCitedFile(filename, rubyPath) {
-  const ts = /(?:^|\/)packages\/([^/]+)\/src\/(.+)\.ts$/.exec(filename.replaceAll("\\", "/"));
+  const ts = /(?:^|\/)packages\/([^/]+)\/(?:src|lib)\/(.+)\.ts$/.exec(
+    filename.replaceAll("\\", "/"),
+  );
   const rb = /^([^/]+)\/lib\/(.+)$/.exec(rubyPath);
   if (ts === null || rb === null || ts[1] !== rb[1]) return false;
   const [namespace, ...rest] = kebab(rb[2]).split("/");

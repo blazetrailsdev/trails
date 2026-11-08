@@ -12,7 +12,6 @@ import { Engine } from "./engine.js";
 import { Trailtie } from "./trailtie.js";
 import type { Autoloaders } from "./autoloaders.js";
 import type { Generators } from "./generators.js";
-import type { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
@@ -24,8 +23,10 @@ import { InfoController } from "./info-controller.js";
 import { WelcomeController } from "./welcome-controller.js";
 import { HealthController } from "./health-controller.js";
 import { PwaController } from "./pwa-controller.js";
+import type { MailersController } from "./mailers-controller.js";
 import * as TrailsConfiguration from "./configuration.js";
 import * as Paths from "./paths.js";
+import { SourceAnnotationExtractor } from "./source-annotation-extractor.js";
 
 let _application: Application | null = null;
 
@@ -43,13 +44,15 @@ let _backtraceCleaner: BacktraceCleaner | undefined;
 export class Trails {
   declare static HealthController: typeof HealthController;
   declare static InfoController: typeof InfoController;
+  declare static MailersController: typeof MailersController;
   declare static PwaController: typeof PwaController;
   declare static WelcomeController: typeof WelcomeController;
   declare static Configuration: typeof TrailsConfiguration;
   declare static Paths: typeof Paths;
+  declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
   declare static Generators?: typeof Generators;
-  declare static SourceAnnotationExtractor?: typeof SourceAnnotationExtractor;
+  declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   /** @noRailsEquivalent PERMANENT */
   declare static TrailsTsc?: typeof TrailsTsc;
 
@@ -173,9 +176,17 @@ export class Trails {
   }
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function _resetEnv(): void {
+  _env = undefined;
+}
+
 /** @internal */
 export function _resetTrailsEnv(): void {
-  _env = undefined;
+  _resetEnv();
   _backtraceCleaner = undefined;
 }
 
@@ -188,3 +199,4 @@ Trails.PwaController = PwaController;
 Trails.WelcomeController = WelcomeController;
 Trails.Configuration = TrailsConfiguration;
 Trails.Paths = Paths;
+Trails.SourceAnnotationExtractor = SourceAnnotationExtractor;

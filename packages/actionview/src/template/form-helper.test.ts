@@ -1,3 +1,4 @@
+import type { TimeZone } from "@blazetrails/activesupport";
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
@@ -1493,7 +1494,7 @@ describe("FormHelperTest", () => {
     try {
       const expected =
         '<input id="post_written_on" name="post[written_on]" type="date" value="2004-06-15" />';
-      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      post.written_on = (zone() as TimeZone).parse("2004-06-15 15:30:45");
       assertDomEqual(expected, view.dateField("post", "written_on"));
     } finally {
       setZone(previousTimeZone);
@@ -1575,7 +1576,7 @@ describe("FormHelperTest", () => {
     try {
       const expected =
         '<input id="post_written_on" name="post[written_on]" type="time" value="01:02:03.000" />';
-      post.written_on = zone()!.parse("2004-06-15 01:02:03");
+      post.written_on = (zone() as TimeZone).parse("2004-06-15 01:02:03");
       assertDomEqual(expected, view.timeField("post", "written_on"));
     } finally {
       setZone(previousTimeZone);
@@ -1663,7 +1664,7 @@ describe("FormHelperTest", () => {
     try {
       const expected =
         '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T15:30:45" />';
-      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      post.written_on = (zone() as TimeZone).parse("2004-06-15 15:30:45");
       assertDomEqual(expected, view.datetimeField("post", "written_on"));
     } finally {
       setZone(previousTimeZone);
@@ -1781,7 +1782,7 @@ describe("FormHelperTest", () => {
     try {
       const expected =
         '<input id="post_written_on" name="post[written_on]" type="month" value="2004-06" />';
-      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      post.written_on = (zone() as TimeZone).parse("2004-06-15 15:30:45");
       assertDomEqual(expected, view.monthField("post", "written_on"));
     } finally {
       setZone(previousTimeZone);
@@ -1821,7 +1822,7 @@ describe("FormHelperTest", () => {
     try {
       const expected =
         '<input id="post_written_on" name="post[written_on]" type="week" value="2004-W25" />';
-      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      post.written_on = (zone() as TimeZone).parse("2004-06-15 15:30:45");
       assertDomEqual(expected, view.weekField("post", "written_on"));
     } finally {
       setZone(previousTimeZone);

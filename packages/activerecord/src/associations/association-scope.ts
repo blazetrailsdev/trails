@@ -11,7 +11,7 @@ import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { kernelArray } from "@blazetrails/activesupport";
 import { eachCons, isEmpty, rbEqual, union } from "@blazetrails/ruby-compat";
-import { methodMissingProxy } from "@blazetrails/ruby-compat";
+import { SimpleDelegator } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;
@@ -26,12 +26,12 @@ type ChainReflection =
   | RuntimeReflection
   | (ReflectionProxy & (AssociationReflection | ThroughReflection | PolymorphicReflection));
 
-export class ReflectionProxy {
+export class ReflectionProxy extends SimpleDelegator {
   readonly aliasedTable: ArelTable | Nodes.TableAlias;
 
   constructor(reflection: AbstractReflection, aliasedTable: ArelTable | Nodes.TableAlias) {
+    super(reflection);
     this.aliasedTable = aliasedTable;
-    return methodMissingProxy(this, { delegate: () => reflection });
   }
 
   allIncludes<T>(_cb?: () => T): T | null {

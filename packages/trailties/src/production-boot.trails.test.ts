@@ -12,7 +12,7 @@ const FORBIDDEN_PACKAGES = new Set([
   "typescript-5",
 ]);
 const FORBIDDEN_MODULES =
-  /\/action-dispatch\/system-t|\/server\/dev-server\.ts$|\/trailties\/src\/(?:command|commands|generators)(?:\/|\.ts$)|\/trailties\/src\/test-unit\/(?:runner|test-parser)\.ts$/;
+  /\/action-dispatch\/system-t|\/server\/dev-server\.ts$|\/trailties\/src\/(?:command|commands|generators)(?:\/|\.ts$)/;
 const SPECIFIER =
   /^\s*(?:import|export)\b(?!\s+type\b)[^;]*?from\s+"([^"]+)"|^\s*import\s+"([^"]+)"|\bimport\(\s*"([^"]+)"\s*\)/gm;
 
@@ -28,7 +28,8 @@ async function workspaceModule(specifier: string): Promise<string | null> {
   };
   const target = pkg.exports?.[subpath ? `./${subpath}` : "."] ?? pkg.main!;
   const built = typeof target === "string" ? target : target.default;
-  return getPath().join(root, built.replace(/^(\.\/)?dist\//, "src/").replace(/\.js$/, ".ts"));
+  const libRoot = (await getFs().exists(getPath().join(root, "lib"))) ? "lib/" : "src/";
+  return getPath().join(root, built.replace(/^(\.\/)?dist\//, libRoot).replace(/\.js$/, ".ts"));
 }
 
 const fromRoot = (file: string): string =>

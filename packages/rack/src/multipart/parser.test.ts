@@ -92,18 +92,6 @@ describe("Rack::Multipart::Parser", () => {
     ).toThrow(BoundaryTooLongError);
   });
 
-  it("dequote strips surrounding quotes", () => {
-    expect(new Parser("b", null, 1024, qp).dequote('"hello"')).toBe("hello");
-  });
-
-  it("dequote handles backslash escapes", () => {
-    expect(new Parser("b", null, 1024, qp).dequote('"hel\\"lo"')).toBe('hel"lo');
-  });
-
-  it("dequote returns unquoted string unchanged", () => {
-    expect(new Parser("b", null, 1024, qp).dequote("plain")).toBe("plain");
-  });
-
   it("EOL is CRLF", () => expect(EOL).toBe("\r\n"));
   it("MULTIPART matches multipart content types", () => {
     expect(MULTIPART.test("multipart/form-data; boundary=x")).toBe(true);

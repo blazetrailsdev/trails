@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "./base.js";
+import { Base } from "./base.js";
 
-class GeneratorWithHook extends GeneratorBase {
+class GeneratorWithHook extends Base {
   static {
     this.hookFor("testFramework");
   }

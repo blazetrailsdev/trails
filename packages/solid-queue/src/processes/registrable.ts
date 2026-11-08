@@ -3,6 +3,7 @@ import { compact, included, isPresent } from "@blazetrails/activesupport";
 import { TimerTask, classModule, rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat";
 import type { Process } from "../process.js";
 import { SolidQueue } from "../solid-queue.js";
+import type { ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 
 interface RegistrableHost {
   process: Process | null;
@@ -19,11 +20,7 @@ interface RegistrableHost {
   wakeUp(): Promise<void>;
 }
 
-type RegistrableIncludingClass = { prototype: object } & {
-  afterBoot(...names: string[]): void;
-  beforeShutdown(...names: string[]): void;
-  afterShutdown(...names: string[]): void;
-};
+type RegistrableIncludingClass = { prototype: object } & CallbacksClassMethods;
 
 export class Registrable {
   static readonly [classModule] = true;

@@ -54,7 +54,7 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("a connection-level failure answers a nil result and is a ConnectionBad", async () => {
     const conn = await rawConnection();
-    await conn.end();
+    await conn.close();
     const error = (await conn.asyncExec("SELECT 1").catch((e: unknown) => e)) as PG.Error;
     expect(error.result).toBeNull();
     expect(error).toBeInstanceOf(PG.ConnectionBad);

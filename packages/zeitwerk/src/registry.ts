@@ -40,7 +40,11 @@ export const Registry = {
       const loader = new this.Loader!();
       loader.tag = name.slice(name.lastIndexOf("/") + 1);
       if (namespace !== Object) loader.tag = `${loader.realModName(namespace)}-${loader.tag}`;
-      await loader.pushDir(File.join(File.dirname(packageFile), "src"), { namespace });
+      const libDir = File.join(File.dirname(packageFile), "lib");
+      const rootDir = (await File.isDirectoryAsync(libDir))
+        ? libDir
+        : File.join(File.dirname(packageFile), "src");
+      await loader.pushDir(rootDir, { namespace });
       return (this.loadersByPackageFile[packageFile] = loader);
     });
   },

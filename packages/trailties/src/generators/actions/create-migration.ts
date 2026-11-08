@@ -1,7 +1,8 @@
+import "../../constants.actions-create-migration.generated.js";
 import { CreateFile } from "@blazetrails/thor/actions/create-file";
 import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
 import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
-import { GeneratorError } from "../generated-attribute.js";
+import { Error as GeneratorError } from "../base.js";
 
 export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";

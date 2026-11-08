@@ -5,7 +5,7 @@ import { tag as _tag, TagBuilder, tagBuilder as _tagBuilder } from "../helpers/t
 import { safeJoin, toSentence } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { submitTag as _submitTag } from "../helpers/form-tag-helper.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const tag = _tag.bind(view);
@@ -23,6 +23,24 @@ describe("TagHelperTest", () => {
     it("constructor stores view context", () => {
       const builder = new TagBuilder(view);
       expect(builder.viewContext).toBe(view);
+    });
+
+    it("emits a tag through the prototype chain on a real TagBuilder", () => {
+      class Builder extends TagBuilder {
+        #mark = "own";
+        mark() {
+          return this.#mark;
+        }
+      }
+      const builder = new Builder(view) as Builder & Record<string, any>;
+      expect(builder.mark()).toBe("own");
+      expect(builder.svg().toString()).toBe("<svg></svg>");
+      expect(builder).toBeInstanceOf(TagBuilder);
+      expect(Object.getPrototypeOf(builder)).toBe(Builder.prototype);
+      const memo = tagBuilder();
+      expect(Object.getPrototypeOf(memo)).toBe(TagBuilder.prototype);
+      expect(tagBuilder()).toBe(memo);
+      expect(rbObjRespondTo(memo, "svg")).toBe(true);
     });
 
     it("tagString builds a content tag", () => {

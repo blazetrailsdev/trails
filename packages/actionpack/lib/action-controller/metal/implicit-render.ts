@@ -1,0 +1,101 @@
+import { ActionController } from "../../namespaces.js";
+import { dasherize, underscore } from "@blazetrails/activesupport";
+import { include, rbCallSuper, rbInspect as inspect } from "@blazetrails/ruby-compat";
+
+import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
+
+import { BasicImplicitRender } from "./basic-implicit-render.js";
+
+export interface ImplicitRenderHost {
+  performed: boolean;
+  actionName: string;
+  constructor: { name: string };
+  request?: {
+    isGet?(): boolean;
+    format(): { symbol?: string | null };
+    isXhr?(): boolean;
+    formats?: ReadonlyArray<{ toString(): string }>;
+    variant?: unknown;
+  };
+  _prefixes?(): string[];
+  templateExists?(
+    action: string,
+    prefixes?: readonly string[],
+    partial?: boolean,
+    keys?: readonly string[],
+    options?: Record<string, readonly (string | symbol)[]>,
+  ): boolean;
+  isAnyTemplates?(action: string, prefixes?: readonly string[]): boolean;
+  head(status: number | string): void;
+  render(): void | Promise<void>;
+  logger?: { info(msg: string): void };
+}
+
+/**
+ * @missingRailsArgs inspect — PERMANENT
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
+export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
+  const name = this.constructor.name;
+  if (
+    this.templateExists?.(
+      dasherize(underscore(String(this.actionName))),
+      this._prefixes?.(),
+      false,
+      [],
+      {
+        variants: variantsFor(this.request?.variant),
+      },
+    )
+  ) {
+    return this.render();
+  }
+  if (this.isAnyTemplates?.(dasherize(underscore(String(this.actionName))), this._prefixes?.())) {
+    const message =
+      `${name}#${this.actionName} is missing a template ` +
+      "for this request format and variant.\n" +
+      `\nrequest.formats: ${inspect((this.request?.formats ?? []).map((f) => String(f)))}` +
+      `\nrequest.variant: ${inspect(variantsFor(this.request?.variant))}`;
+
+    throw new UnknownFormat(message);
+  }
+  if (isInteractiveBrowserRequest.call(this)) {
+    const message = `${name}#${this.actionName} is missing a template for request formats: ${(this.request?.formats ?? []).map((f) => String(f)).join(",")}`;
+    throw new MissingExactTemplate(message, this.constructor, this.actionName);
+  }
+  this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
+  return rbCallSuper(this, defaultRender) as void | Promise<void>;
+}
+
+/** @internal */
+function variantsFor(variant: unknown): readonly (string | symbol)[] {
+  if (variant == null) return [];
+  return Array.isArray(variant) ? [...(variant as readonly string[])] : [String(variant)];
+}
+
+/**
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
+export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
+  const sup = rbCallSuper(this, methodForAction, actionName) as string | undefined;
+  if (sup) return sup;
+  if (this.templateExists?.(dasherize(underscore(String(actionName))), this._prefixes?.()))
+    return "defaultRender";
+  return undefined;
+}
+
+/** @internal */
+export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
+  const req = this.request;
+  if (!req) return false;
+  return req.isGet?.() === true && req.format().symbol === ":html" && req.isXhr?.() !== true;
+}
+
+export const ImplicitRender = { defaultRender, methodForAction, isInteractiveBrowserRequest };
+include(ImplicitRender, BasicImplicitRender);
+
+ActionController.ImplicitRender = ImplicitRender;

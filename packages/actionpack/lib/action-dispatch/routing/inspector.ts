@@ -1,0 +1,371 @@
+import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
+import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
+import { RFC2396_PARSER, rbInspect, SimpleDelegator } from "@blazetrails/ruby-compat";
+import type { Endpoint } from "./endpoint.js";
+import type { Route } from "../journey/route.js";
+import { RouteSet } from "./route-set.js";
+import { Routing } from "../../namespaces.js";
+
+export interface CollectedRoute {
+  name: string;
+  verb: string;
+  path: string;
+  reqs: string;
+  sourceLocation?: string;
+}
+
+export interface RoutesFilter {
+  controller?: string;
+  grep?: string;
+}
+
+/** @internal */
+type NormalizedFilter = Record<string, RegExp | string> | null;
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the names SimpleDelegator forwards to Route (inspector.rb:10).
+export interface RouteWrapper extends Pick<
+  Route,
+  "app" | "requirements" | "parts" | "internal" | "verb" | "sourceLocation"
+> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class RouteWrapper extends SimpleDelegator {
+  private _reqs: string | undefined = undefined;
+
+  /** @internal */
+  isMatchesFilter(filter: string, value: RegExp | string): boolean {
+    if (filter === "exact_path_match") {
+      return (this.__getobj__() as Route).path.match(value as string) !== undefined;
+    }
+
+    const target = (this as unknown as Record<string, string | null | undefined>)[filter];
+    return target != null && (value as RegExp).test(target);
+  }
+
+  get endpoint(): string {
+    if ((this.app as Endpoint).dispatcher()) {
+      return `${this.controller}#${this.action}`;
+    } else if (
+      typeof this.rackApp === "function" &&
+      Object.getOwnPropertyDescriptor(this.rackApp, "prototype")?.writable !== false
+    ) {
+      return "Inline handler (Proc/Lambda)";
+    } else {
+      return rbInspect(this.rackApp);
+    }
+  }
+
+  get constraints(): Record<string, unknown> {
+    const { controller, action, ...constraints } = this.requirements;
+    return constraints;
+  }
+
+  get rackApp(): unknown {
+    return (this.app as Endpoint).rackApp();
+  }
+
+  get path(): string {
+    return (this.__getobj__() as Route).path.spec.toString();
+  }
+  get name(): string {
+    return (this.__getobj__() as Route).name ?? "";
+  }
+  get controller(): string {
+    return this.parts.includes("controller")
+      ? ":controller"
+      : (this.requirements.controller as string);
+  }
+  get action(): string {
+    return this.parts.includes("action") ? ":action" : (this.requirements.action as string);
+  }
+
+  get reqs(): string {
+    if (this._reqs !== undefined) return this._reqs;
+    let reqs = this.endpoint;
+    if (Object.keys(this.constraints).length !== 0) reqs += ` ${rbInspect(this.constraints)}`;
+    this._reqs = reqs;
+    return reqs;
+  }
+
+  /** @internal */
+  isInternal(): boolean {
+    return this.internal;
+  }
+
+  isEngine(): boolean {
+    return (this.app as Endpoint).engine();
+  }
+}
+
+export class RoutesInspector {
+  private readonly routes: Iterable<Route>;
+  private engines: Record<string, CollectedRoute[]>;
+
+  constructor(routes: Iterable<Route>) {
+    this.routes = routes;
+    this.engines = {};
+  }
+
+  format<F extends Omit<RoutesFormatter, "result"> & { result(): unknown } = Sheet>(
+    formatter: F = new Sheet() as RoutesFormatter as F,
+    filter: RoutesFilter = {},
+  ): ReturnType<F["result"]> {
+    this.engines = {};
+    const routesToDisplay = this.filterRoutes(this.normalizeFilter(filter));
+    const routes = this.collectRoutes(routesToDisplay);
+    if (routes.length === 0) {
+      formatter.noRoutes(this.collectRoutes(this.routes), filter);
+      return formatter.result() as ReturnType<F["result"]>;
+    }
+    formatter.header(routes);
+    formatter.section(routes);
+    for (const [name, engineRoutes] of Object.entries(this.engines)) {
+      formatter.sectionTitle(`Routes for ${name}`);
+      formatter.section(engineRoutes);
+    }
+    return formatter.result() as ReturnType<F["result"]>;
+  }
+
+  /** @internal */
+  private normalizeFilter(filter: RoutesFilter): NormalizedFilter {
+    if (filter.controller) {
+      return { controller: new RegExp(underscore(filter.controller).replace(/_?controller$/, "")) };
+    }
+    if (filter.grep) {
+      const re = new RegExp(filter.grep);
+      const path = RFC2396_PARSER.escape(filter.grep);
+      const normalizedPath = ("/" + path).replace(/\/+/g, "/");
+      return {
+        controller: re,
+        action: re,
+        verb: re,
+        name: re,
+        path: re,
+        exact_path_match: normalizedPath,
+      };
+    }
+    return null;
+  }
+
+  /** @internal */
+  private filterRoutes(filter: NormalizedFilter): Iterable<Route> {
+    if (filter) {
+      return Array.from(this.routes).filter((route) => {
+        const routeWrapper = new RouteWrapper(route);
+        return Object.entries(filter).some(([filterType, value]) =>
+          routeWrapper.isMatchesFilter(filterType, value),
+        );
+      });
+    } else {
+      return this.routes;
+    }
+  }
+
+  /** @internal */
+  private collectRoutes(routes: Iterable<Route>): CollectedRoute[] {
+    return Array.from(routes)
+      .map((route) => new RouteWrapper(route))
+      .filter((route) => !route.isInternal())
+      .map((route) => {
+        this.collectEngineRoutes(route);
+        return {
+          name: route.name,
+          verb: route.verb,
+          path: route.path,
+          reqs: route.reqs,
+          sourceLocation: route.sourceLocation ?? undefined,
+        };
+      });
+  }
+
+  /** @internal */
+  private collectEngineRoutes(route: RouteWrapper): void {
+    const name = route.endpoint;
+    if (!route.isEngine()) return;
+    if (this.engines[name]) return;
+
+    const routes = (route.rackApp as { routes(): unknown }).routes();
+    if (routes instanceof RouteSet) {
+      this.engines[name] = this.collectRoutes(routes.routes());
+    }
+  }
+}
+
+export interface RoutesFormatter {
+  result(): string;
+  sectionTitle(title: string): void;
+  section(routes: CollectedRoute[]): void;
+  header(routes: CollectedRoute[]): void;
+  noRoutes(routes: CollectedRoute[], filter: RoutesFilter): void;
+}
+
+export class Base implements RoutesFormatter {
+  protected buffer: string[] = [];
+
+  result(): string {
+    return this.buffer.join("\n");
+  }
+  sectionTitle(_title: string): void {}
+  section(_routes: CollectedRoute[]): void {}
+  header(_routes: CollectedRoute[]): void {}
+
+  noRoutes(routes: CollectedRoute[], filter: RoutesFilter): void {
+    let msg: string;
+    if (routes.length === 0) {
+      msg = "You don't have any routes defined!\n\nPlease add some routes in config/routes.rb.\n";
+    } else if (filter.controller !== undefined) {
+      msg = "No routes were found for this controller.";
+    } else if (filter.grep !== undefined) {
+      msg = "No routes were found for this grep pattern.";
+    } else {
+      msg = "";
+    }
+    this.buffer.push(msg);
+    this.buffer.push(
+      "For more information about routes, see the Rails guide: https://guides.rubyonrails.org/routing.html.",
+    );
+  }
+}
+
+export class Sheet extends Base {
+  override sectionTitle(title: string): void {
+    this.buffer.push(`\n${title}:`);
+  }
+  override section(routes: CollectedRoute[]): void {
+    this.buffer.push(this.drawSection(routes).join("\n"));
+  }
+  override header(routes: CollectedRoute[]): void {
+    this.buffer.push(this.drawHeader(routes));
+  }
+
+  /** @internal */
+  private drawSection(routes: CollectedRoute[]): string[] {
+    const [n, v, p] = this.widthsWithHeaders(routes);
+    return routes.map(
+      (r) => `${r.name.padStart(n)} ${r.verb.padEnd(v)} ${r.path.padEnd(p)} ${r.reqs}`,
+    );
+  }
+
+  /** @internal */
+  private drawHeader(routes: CollectedRoute[]): string {
+    const [n, v, p] = this.widths(routes);
+    return `${"Prefix".padStart(n)} ${"Verb".padEnd(v)} ${"URI Pattern".padEnd(p)} Controller#Action`;
+  }
+
+  /** @internal */
+  private widths(routes: CollectedRoute[]): [number, number, number] {
+    return [
+      Math.max(0, ...routes.map((r) => r.name.length)),
+      Math.max(0, ...routes.map((r) => r.verb.length)),
+      Math.max(0, ...routes.map((r) => r.path.length)),
+    ];
+  }
+
+  private widthsWithHeaders(routes: CollectedRoute[]): [number, number, number] {
+    const [n, v, p] = this.widths(routes);
+    return [Math.max(n, 6), Math.max(v, 4), Math.max(p, 11)];
+  }
+}
+
+export class Expanded extends Base {
+  private width: number;
+
+  constructor({ width = 80 }: { width?: number } = {}) {
+    super();
+    this.width = width;
+  }
+
+  override sectionTitle(title: string): void {
+    this.buffer.push(`\n[ ${title} ]`);
+  }
+  override section(routes: CollectedRoute[]): void {
+    this.buffer.push(this.drawExpandedSection(routes).join("\n"));
+  }
+
+  /** @internal */
+  private drawExpandedSection(routes: CollectedRoute[]): string[] {
+    return routes.map((r, i) => {
+      let rows =
+        `${this.routeHeader(i + 1)}\nPrefix            | ${r.name}\nVerb              | ${r.verb}\n` +
+        `URI               | ${r.path}\nController#Action | ${r.reqs}`;
+      if (r.sourceLocation) rows += `\nSource Location   | ${r.sourceLocation}`;
+      return rows;
+    });
+  }
+
+  /** @internal */
+  private routeHeader(index: number): string {
+    const prefix = `--[ Route ${index} ]`;
+    return prefix.length >= this.width ? prefix : prefix + "-".repeat(this.width - prefix.length);
+  }
+}
+
+export class Unused extends Sheet {
+  override header(routes: CollectedRoute[]): void {
+    this.buffer.push(`Found ${routes.length} unused ${pluralize("route", routes.length)}:\n`);
+    super.header(routes);
+  }
+
+  override noRoutes(_routes: CollectedRoute[], filter: RoutesFilter): void {
+    let msg: string;
+    if (filter.controller === undefined && filter.grep === undefined) {
+      msg = "No unused routes found.";
+    } else if (filter.controller !== undefined) {
+      msg = "No unused routes found for this controller.";
+    } else {
+      msg = "No unused routes found for this grep pattern.";
+    }
+    this.buffer.push(msg);
+  }
+}
+
+export const ConsoleFormatter = { Base, Sheet, Expanded, Unused };
+
+/** @internal */
+interface HtmlTableFormatterView {
+  render(options: object, locals?: object, block?: () => unknown): unknown;
+  raw(stringish: unknown): SafeBuffer;
+}
+
+export class HtmlTableFormatter {
+  private view: HtmlTableFormatterView;
+  private buffer: unknown[];
+
+  constructor(view: HtmlTableFormatterView) {
+    this.view = view;
+    this.buffer = [];
+  }
+
+  sectionTitle(title: string): void {
+    this.buffer.push(`<tr><th colspan="5">${title}</th></tr>`);
+  }
+
+  section(routes: CollectedRoute[]): void {
+    this.buffer.push(this.view.render({ partial: "routes/route", collection: routes }));
+  }
+
+  header(_routes: CollectedRoute[]): void {}
+
+  noRoutes(..._args: unknown[]): void {
+    this.buffer.push(`<p>You don't have any routes defined!</p>
+<ul>
+  <li>Please add some routes in <tt>config/routes.rb</tt>.</li>
+  <li>
+    For more information about routes, please see the Rails guide
+    <a href="https://guides.rubyonrails.org/routing.html">Rails Routing from the Outside In</a>.
+  </li>
+</ul>
+`);
+  }
+
+  async result(): Promise<SafeBuffer> {
+    const buffer = await Promise.all(this.buffer);
+    return this.view.raw(
+      await this.view.render({ layout: "routes/table" }, {}, () => {
+        return this.view.raw(buffer.join("\n"));
+      }),
+    );
+  }
+}
+
+Routing.HtmlTableFormatter = HtmlTableFormatter;

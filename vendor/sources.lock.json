@@ -24,6 +24,10 @@
       "ref": "v1.6.3",
       "sha": "f7703add765054b6e63ef581818a0c307fdd4abf"
     },
+    "erubi": {
+      "ref": "1.13.1",
+      "sha": "f1a0fb5bfb2a2604c0cf850d3c960bfc458421b6"
+    },
     "et-orbi": {
       "ref": "v1.2.11",
       "sha": "037e2074b009186d2da43e0e948069d874abe10c"
@@ -101,8 +105,8 @@
       "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
     },
     "rack": {
-      "ref": "v3.1.14",
-      "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
+      "ref": "v3.2.8",
+      "sha": "5f511d7d3d9d62becddcbd403dde813a67e10c81"
     },
     "rack-session": {
       "ref": "v2.1.0",
@@ -155,6 +159,10 @@
     "thor": {
       "ref": "v1.3.2",
       "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
+    },
+    "tzinfo": {
+      "ref": "v2.0.6",
+      "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
     },
     "zeitwerk": {
       "ref": "v2.7.2",

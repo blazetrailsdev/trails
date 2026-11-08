@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activesupport", "../activesupport/src/index.ts"],
-  ["@blazetrails/ruby-compat", "../ruby-compat/src/index.ts"],
+  ["@blazetrails/ruby-compat", "../ruby-compat/lib/index.ts"],
   ["@blazetrails/arel", "../arel/src/index.ts"],
   ["@blazetrails/activemodel", "../activemodel/src/index.ts"],
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],
@@ -32,29 +32,30 @@ export const packageEntries: Array<[string, string]> = [
     "../actionview/src/rails-dom-testing/testing.ts",
   ],
   ["@blazetrails/actionview", "../actionview/src/index.ts"],
-  ["@blazetrails/tse-compiler", "../tse-compiler/src/index.ts"],
-  ["@blazetrails/actionpack", "../actionpack/src/index.ts"],
+  ["@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"],
+  ["@blazetrails/actionpack", "../actionpack/lib/index.ts"],
   ["@blazetrails/trailties/all", "../trailties/src/all.ts"],
   ["@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"],
   ["@blazetrails/globalid/wire", "../globalid/src/wire.ts"],
   ["@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"],
   ["@blazetrails/globalid", "../globalid/src/index.ts"],
-  ["@blazetrails/actioncable", "../actioncable/src/index.ts"],
+  ["@blazetrails/actioncable", "../actioncable/lib/index.ts"],
   ["@blazetrails/solid-queue", "../solid-queue/src/index.ts"],
-  ["@blazetrails/solid-cable", "../solid-cable/src/index.ts"],
+  ["@blazetrails/solid-cable", "../solid-cable/lib/index.ts"],
+  ["@blazetrails/actionmailbox", "../actionmailbox/src/index.ts"],
   ["@blazetrails/activestorage", "../activestorage/src/index.ts"],
-  ["@blazetrails/bcrypt", "../bcrypt/src/index.ts"],
-  ["@blazetrails/date", "../date/src/index.ts"],
-  ["@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"],
+  ["@blazetrails/bcrypt", "../bcrypt/lib/index.ts"],
+  ["@blazetrails/date", "../date/lib/index.ts"],
+  ["@blazetrails/did-you-mean", "../did-you-mean/lib/index.ts"],
   ["@blazetrails/i18n", "../i18n/src/index.ts"],
-  ["@blazetrails/builder", "../builder/src/builder.ts"],
-  ["@blazetrails/marcel", "../marcel/src/marcel.ts"],
-  ["@blazetrails/chronic", "../chronic/src/chronic.ts"],
-  ["@blazetrails/tzinfo", "../tzinfo/src/index.ts"],
-  ["@blazetrails/et-orbi", "../et-orbi/src/et-orbi.ts"],
+  ["@blazetrails/builder", "../builder/lib/builder.ts"],
+  ["@blazetrails/marcel", "../marcel/lib/marcel.ts"],
+  ["@blazetrails/chronic", "../chronic/lib/chronic.ts"],
+  ["@blazetrails/tzinfo", "../tzinfo/lib/index.ts"],
+  ["@blazetrails/et-orbi", "../et-orbi/lib/et-orbi.ts"],
   ["@blazetrails/raabro", "../raabro/src/raabro.ts"],
-  ["@blazetrails/msgpack", "../msgpack/src/index.ts"],
-  ["@blazetrails/nokogiri", "../nokogiri/src/index.ts"],
+  ["@blazetrails/msgpack", "../msgpack/lib/index.ts"],
+  ["@blazetrails/nokogiri", "../nokogiri/lib/index.ts"],
 ];
 
 /**
@@ -65,7 +66,7 @@ export const packageEntries: Array<[string, string]> = [
  */
 export const subpathPrefixes: Array<[string, string]> = [
   ["@blazetrails/activesupport/", "../activesupport/src/"],
-  ["@blazetrails/ruby-compat/", "../ruby-compat/src/"],
+  ["@blazetrails/ruby-compat/", "../ruby-compat/lib/"],
   ["@blazetrails/arel/src", "../arel/src"],
 ];
 

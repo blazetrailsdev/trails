@@ -68,7 +68,7 @@ thread.** The `connection/` port, when it lands, follows these rules:
 
 The files this section will cover, none ported yet, so a grep finds every
 citation once they are:
-`packages/actioncable/src/connection/stream-event-loop.ts`,
+`packages/actioncable/lib/connection/stream-event-loop.ts`,
 `connection/stream.ts`, `connection/client-socket.ts`, and
 `connection/web-socket.ts` for that one call.
 

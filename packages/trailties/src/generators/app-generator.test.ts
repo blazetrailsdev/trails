@@ -1,475 +1,316 @@
-import { stdout } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as path from "node:path";
-import * as os from "node:os";
-import { assertNoMatch } from "@blazetrails/activesupport";
-import { execFile } from "node:child_process";
-import { AppGenerator, type AppDatabase } from "./trails/app/app-generator.js";
-import * as Assertions from "./testing/assertions.js";
+import { Dir, File, FileUtils, Gem, Process, rbFBackquote } from "@blazetrails/ruby-compat";
+import { assertNoChanges, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppGenerator } from "./trails/app/app-generator.js";
+import { TestCase } from "./test-case.js";
+import { runAppUpdate } from "./generators-test-helper.js";
 import { VERSION } from "../gem-version.js";
 import { Application } from "../application.js";
 import { Trails } from "../trails.js";
-import { Base as ThorBase } from "@blazetrails/thor/shell";
 
 class AppGeneratorApp extends Application {}
+const destinationRoot = Dir.mktmpdir();
+const templateRoot = Dir.mktmpdir();
 
-let tmpDir: string;
-let lines: string[];
-const destination = { destinationRoot: "" };
-const assertFile = Assertions.assertFile.bind(destination);
-const assertNoFile = Assertions.assertNoFile.bind(destination);
-const assertDirectory = Assertions.assertDirectory.bind(destination);
-const assertNoDirectory = Assertions.assertNoDirectory.bind(destination);
+class AppGeneratorTest extends TestCase {}
+AppGeneratorTest.destination(destinationRoot);
+AppGeneratorTest.tests(AppGenerator);
+AppGeneratorTest.arguments([destinationRoot]);
+registerSpecType(/^AppGenerator(Test)?$/, AppGeneratorTest);
+let t: TestCase;
+
+beforeEach((context) => {
+  t = context.testCase as TestCase;
+  t.prepareDestination();
+  Trails.application = AppGeneratorApp.instance();
+});
+
+afterEach(() => {
+  Trails.application = null;
+});
+
+afterAll(async () => {
+  await FileUtils.rmRfAsync([destinationRoot, templateRoot]);
+});
+
+const UNPORTED = [
+  "--no-skip-action-cable",
+  "--no-skip-action-mailer",
+  "--no-skip-active-job",
+  "--no-skip-active-storage",
+];
 
 function assertGem(name: string): Promise<void> {
-  return assertFile("my-app/package.json", new RegExp(`"${name}": `));
+  return t.assertFile("package.json", new RegExp(`"${name}": `));
 }
 
 function assertNoGem(name: string): Promise<void> {
-  return assertFile("my-app/package.json", (content) => {
+  return t.assertFile("package.json", (content: string) => {
     assertNoMatch(new RegExp(`"${name}": `), content);
   });
 }
 
-beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
-  destination.destinationRoot = tmpDir;
-  lines = [];
-  vi.spyOn(stdout, "write").mockImplementation(
-    (chunk) => lines.push(String(chunk).replace(/\n$/, "")) > 0,
-  );
-});
-
-const startDir = process.cwd();
-afterEach(() => {
-  process.chdir(startDir);
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-const UNPORTED = {
-  skipActionCable: false,
-  skipActionMailer: false,
-  skipActiveJob: false,
-  skipActiveStorage: false,
-};
-
-function makeGen(
-  database: AppDatabase = "sqlite",
-  opts: { skipDocker?: boolean; [k: `skip${string}`]: boolean | undefined } = {},
-) {
-  return new AppGenerator(
-    ["my-app"],
-    { database, skipInstall: true, ...opts },
-    { destinationRoot: tmpDir },
-  );
+function json(content: string) {
+  return JSON.parse(content);
 }
 
 describe("AppGeneratorTest", () => {
   it("version control initializes git repo", async () => {
-    await makeGen().invokeAll();
-    await assertDirectory("my-app/.git");
+    await t.runGenerator([t.destinationRoot]);
+    await t.assertDirectory(".git");
   });
 
   it("app update", async () => {
-    await makeGen().invokeAll();
+    await t.runGenerator();
 
-    const defaultsPath = `my-app/config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
+    const defaultsPath = `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
 
-    assertNoFile(defaultsPath);
-    assertNoFile("my-app/config/initializers/cors.ts");
+    t.assertNoFile(defaultsPath);
+    t.assertNoFile("config/initializers/cors.ts");
 
-    const shell = new ThorBase.shell() as InstanceType<typeof ThorBase.shell> & {
-      _alwaysForce: boolean;
-    };
-    shell._alwaysForce = true;
-    Trails.application = AppGeneratorApp.instance();
+    await runAppUpdate.call(t);
+
+    await t.assertFile(defaultsPath);
+    t.assertNoFile("config/initializers/cors.ts");
+  });
+
+  it("app update supports skip", async () => {
+    await t.runGenerator();
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await File.open(config, "a", (file) => file.puts("// some configuration"));
+      await assertNoChanges(
+        () => File.readlinesAsync(config),
+        null,
+        {},
+        () => runAppUpdate.call(t, t.destinationRoot, { flags: "--skip" }),
+      );
+    });
+  });
+
+  it("app update supports pretend", async () => {
+    await t.runGenerator();
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await File.open(config, "a", (file) => file.puts("// some configuration"));
+      await assertNoChanges(
+        () => File.readlinesAsync(config),
+        null,
+        {},
+        () => runAppUpdate.call(t, t.destinationRoot, { flags: "--pretend --force" }),
+      );
+      const defaultsPath = `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`;
+      t.assertNoFile(defaultsPath);
+    });
+  });
+
+  it("app update does not remove rack cors if already present", async () => {
+    await t.runGenerator();
+    await FileUtils.touchAsync(`${t.destinationRoot}/config/initializers/cors.ts`);
+    await runAppUpdate.call(t);
+
+    await t.assertFile("config/initializers/cors.ts");
+  });
+
+  it("app update generates public folders", async () => {
+    await t.runGenerator();
+
+    await FileUtils.rmRfAsync(`${t.destinationRoot}/public/406-unsupported-browser.html`);
+
+    await runAppUpdate.call(t);
+
+    await t.assertFile("public/406-unsupported-browser.html");
+  });
+
+  it("app update preserves skip active job", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip action mailbox", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-mailbox"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip action text", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-action-text"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip brakeman", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-brakeman"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/brakeman"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip eslint", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-eslint"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/eslint"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip thruster", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-thruster"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      await assertNoChanges(
+        () => File.isExist("bin/thrust"),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("app update preserves skip test", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-test"]);
+
+    await Dir.chdir(t.destinationRoot, async () => {
+      const config = "config/application.ts";
+      await assertNoChanges(
+        async () => (await File.readlinesAsync(config)).filter((l) => /import /.test(l)),
+        null,
+        {},
+        () => runAppUpdate.call(t),
+      );
+    });
+  });
+
+  it("edge option", async () => {
+    const stub = vi.spyOn(Trails, "gemVersion").mockReturnValue(new Gem.Version("2.1.0"));
     try {
-      await new AppGenerator(
-        ["my-app"],
-        { database: "sqlite", skipInstall: true, update: true },
-        { destinationRoot: appPath(), shell },
-      ).updateConfigFiles();
+      await t.runGenerator([t.destinationRoot, "--edge"]);
     } finally {
-      Trails.application = null;
+      stub.mockRestore();
     }
-
-    await assertFile(
-      defaultsPath,
-      /this\.config\.activeSupport\.toTimePreservesTimezone = ":zone";[\s\S]*this\.config\.actionDispatch\.strictFreshness = true;/,
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#2-1-stable&path:\/packages\/trailties"/,
     );
-    assertNoFile("my-app/config/initializers/cors.ts");
+  });
+
+  it("edge option during alpha", async () => {
+    const stub = vi.spyOn(Trails, "gemVersion").mockReturnValue(new Gem.Version("2.1.0.alpha"));
+    try {
+      await t.runGenerator([t.destinationRoot, "--edge"]);
+    } finally {
+      stub.mockRestore();
+    }
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+    );
+  });
+
+  it("main option", async () => {
+    await t.runGenerator([t.destinationRoot, "--main"]);
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+    );
+  });
+
+  it("master option", async () => {
+    await t.runGenerator([t.destinationRoot, "--master"]);
+    await t.assertFile(
+      "package.json",
+      /"@blazetrails\/trailties": "github:blazetrailsdev\/trails#main&path:\/packages\/trailties"/,
+    );
   });
 
   it("skip git", async () => {
-    await makeGen("sqlite", { skipGit: true }).invokeAll();
-    assertNoFile("my-app/.gitignore");
-    assertNoFile("my-app/.gitattributes");
-    assertNoDirectory("my-app/.git");
-  });
-});
-
-function appPath(...segments: string[]) {
-  return path.join(tmpDir, "my-app", ...segments);
-}
-
-function exists(...segments: string[]) {
-  return fs.existsSync(appPath(...segments));
-}
-
-describe("AppGenerator", () => {
-  it("creates application directory structure", async () => {
-    await makeGen().invokeAll();
-
-    expect(exists("package.json")).toBe(true);
-    expect(exists("tsconfig.json")).toBe(true);
-    expect(exists(".gitignore")).toBe(true);
-    expect(exists(".gitattributes")).toBe(true);
-    expect(exists(".node-version")).toBe(true);
-    expect(exists("README.md")).toBe(true);
-    expect(exists("config.ts")).toBe(true);
-    expect(exists("Dockerfile")).toBe(true);
-    expect(exists(".dockerignore")).toBe(true);
-    expect(exists("eslint.config.mjs")).toBe(true);
-
-    expect(exists("bin/eslint")).toBe(true);
-    expect(exists("bin/trails")).toBe(true);
-    expect(exists("bin/setup")).toBe(true);
-    expect(exists("bin/dev")).toBe(true);
-
-    expect(exists("config/application.ts")).toBe(true);
-    expect(exists("config/environment.ts")).toBe(true);
-    expect(exists("config/routes.ts")).toBe(true);
-    expect(exists("config/database.ts")).toBe(true);
-    expect(exists("config/environments/development.ts")).toBe(true);
-    expect(exists("config/environments/test.ts")).toBe(true);
-    expect(exists("config/environments/production.ts")).toBe(true);
-    expect(exists("config/initializers/content-security-policy.ts")).toBe(true);
-    expect(exists("config/initializers/filter-parameter-logging.ts")).toBe(true);
-    expect(exists("config/initializers/inflections.ts")).toBe(true);
-    expect(exists("config/initializers/permissions-policy.ts")).toBe(true);
-    expect(exists("config/locales/en.json")).toBe(true);
-
-    expect(exists("app/controllers/application-controller.ts")).toBe(true);
-    expect(exists("app/controllers/concerns/.keep")).toBe(true);
-    expect(exists("app/models/application-record.ts")).toBe(true);
-    expect(exists("app/models/concerns/.keep")).toBe(true);
-    expect(exists("app/helpers/application-helper.ts")).toBe(true);
-    expect(exists("app/views/layouts/application.html.tse")).toBe(true);
-    expect(exists("app/assets/stylesheets/application.css")).toBe(true);
-    expect(exists("app/assets/images/.keep")).toBe(true);
-    expect(exists("vite.config.ts")).toBe(true);
-
-    expect(exists("db/seeds.ts")).toBe(true);
-    expect(exists("db/schema.ts")).toBe(false);
-
-    expect(exists("test/test-helper.ts")).toBe(true);
-    expect(exists("test/global-setup.ts")).toBe(true);
-    expect(exists("test/models/.keep")).toBe(true);
-    expect(exists("test/controllers/.keep")).toBe(true);
-    expect(exists("test/helpers/.keep")).toBe(true);
-    expect(exists("test/integration/.keep")).toBe(true);
-    expect(exists("test/fixtures/files/.keep")).toBe(true);
-
-    expect(exists("public/index.html")).toBe(false);
-    expect(exists("public/404.html")).toBe(true);
-    expect(exists("public/422.html")).toBe(true);
-    expect(exists("public/500.html")).toBe(true);
-    expect(exists("public/robots.txt")).toBe(true);
-    expect(exists("public/favicon.ico")).toBe(true);
-
-    expect(exists("lib/tasks/.keep")).toBe(true);
-    expect(exists("log/.keep")).toBe(true);
-    expect(exists("tmp/.keep")).toBe(true);
-    expect(exists("tmp/pids/.keep")).toBe(true);
-    expect(exists("vendor/.keep")).toBe(true);
-  });
-
-  it("skips scaffolding for subsystems trails has no package for", async () => {
-    await makeGen().invokeAll();
-
-    expect(exists("config/puma.ts")).toBe(false);
-    expect(exists("config/storage.ts")).toBe(false);
-    expect(exists("app/mailers")).toBe(false);
-    expect(exists("app/channels")).toBe(false);
-    expect(exists("app/views/layouts/mailer.html.tse")).toBe(false);
-    expect(exists("app/views/layouts/mailer.text.tse")).toBe(false);
-  });
-
-  it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
-    await makeGen("sqlite").invokeAll();
-
-    expect(exists("storage/.keep")).toBe(true);
-  });
-
-  it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
-    await makeGen("postgres").invokeAll();
-
-    expect(exists("storage")).toBe(false);
-  });
-
-  it("writes the sqlite3 database under storage/", async () => {
-    await makeGen("sqlite").invokeAll();
-
-    const config = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(config).toContain('database: "storage/development.sqlite3"');
-    expect(config).toContain('database: "storage/test.sqlite3"');
-    expect(config).toContain('database: "storage/production.sqlite3"');
-  });
-
-  it("does not ignore db/*.sqlite3 in the generated .gitignore", async () => {
-    await makeGen("sqlite").invokeAll();
-
-    const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
-    expect(gitignore).not.toContain("sqlite3");
-    expect(gitignore).toContain("/storage/*");
-  });
-
-  it("emits each subsystem's scaffolding once its skip flag is off", async () => {
-    await makeGen("sqlite", UNPORTED).invokeAll();
-
-    expect(exists("config/cable.ts")).toBe(true);
-    expect(exists("config/storage.ts")).toBe(true);
-    expect(exists("app/jobs/application-job.ts")).toBe(true);
-    expect(exists("app/mailers/application-mailer.ts")).toBe(true);
-    expect(exists("app/views/layouts/mailer.html.tse")).toBe(true);
-    expect(exists("app/views/layouts/mailer.text.tse")).toBe(true);
-    expect(exists("storage/.keep")).toBe(true);
+    await t.runGenerator([t.destinationRoot, "--skip-git", "--full"]);
+    t.assertNoFile(".gitignore");
+    t.assertNoFile(".gitattributes");
+    t.assertNoDirectory(".git");
   });
 
   it("generator if skip action cable is given", async () => {
-    await makeGen("sqlite", { skipActionCable: true }).invokeAll();
-    await assertFile("my-app/config/application.ts", (content) => {
-      expect(content).toMatch(
-        /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-cable";/m,
-      );
-    });
-    expect(exists("config/cable.ts")).toBe(false);
-    await assertFile("my-app/package.json", (content) => {
-      assertNoMatch(/@blazetrails\/actioncable/, content);
-    });
-    await assertFile("my-app/config/environments/development.ts", (content) => {
-      assertNoMatch(/actionCable/, content);
+    await t.runGenerator([t.destinationRoot, "--skip-action-cable"]);
+    await t.assertFile(
+      "config/application.ts",
+      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-cable";/m,
+    );
+    t.assertNoFile("config/cable.ts");
+    await t.assertFile("package.json", (content: string) => {
+      assertNoMatch(/"redis"/, content);
     });
   });
 
   it("implied options with conflicting option", async () => {
     await expect(
-      makeGen("sqlite", { skipActiveJob: true, skipActiveStorage: false }).invokeAll(),
+      t.runGenerator([t.destinationRoot, "--skip-active-job", "--no-skip-active-storage"]),
     ).rejects.toThrow(/conflicting option/i);
   });
 
-  it("--api implies its options and a default run reports nothing", async () => {
-    const api = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, api: true },
-      { destinationRoot: tmpDir },
-    );
-    expect(api.options.skipAssetPipeline).toBe(true);
-    expect(api.options.skipJavascript).toBe(true);
-    makeGen().reportImpliedOptions();
-    expect(lines.join("\n")).not.toMatch(/will also be activated/);
-    const minimal = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, minimal: true, skipActionText: false },
-      { destinationRoot: tmpDir },
-    );
-    expect(() => minimal.reportImpliedOptions()).not.toThrow();
-  });
-
   it("skip active job option", async () => {
-    await makeGen("sqlite", { skipActiveJob: true }).invokeAll();
+    await t.runGenerator([t.destinationRoot, "--skip-active-job"]);
 
     for (const env of ["production", "development", "test"]) {
-      await assertFile(`my-app/config/environments/${env}.ts`, (content) => {
+      await t.assertFile(`config/environments/${env}.ts`, (content: string) => {
         assertNoMatch(/activeJob/, content);
       });
     }
   });
 
-  it("skip git", async () => {
-    await makeGen("sqlite", { skipGit: true }).invokeAll();
-    await assertNoFile("my-app/.gitignore");
-    await assertNoFile("my-app/.gitattributes");
-    await assertNoDirectory("my-app/.git");
-  });
-
-  it("generates valid package.json", async () => {
-    await makeGen().invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.name).toBe("my-app");
-    expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
-    expect(pkg.dependencies["@blazetrails/activerecord"]).toBeDefined();
-    expect(pkg.dependencies["@blazetrails/activemodel"]).toBeDefined();
-    expect(fs.existsSync(appPath("app/jobs/application-job.ts"))).toBe(true);
-    expect(pkg.dependencies["@blazetrails/activejob"]).toBeDefined();
-    expect(pkg.scripts["db:migrate"]).toBeDefined();
-    expect(pkg.scripts["db:seed"]).toBeDefined();
-    expect(pkg.scripts["db:setup"]).toBeDefined();
-    expect(pkg.devDependencies.vite).toBeDefined();
-    expect(pkg.devDependencies.tsx).toBeUndefined();
-    expect(pkg.devDependencies.typescript).toBe("^5.8.0");
-    expect(pkg.scripts["db:seed"]).toBe("trails db:seed");
-    expect(pkg.scripts.dev).toBe("trails server");
-    expect(pkg.scripts.trails).toBe("trails");
-    const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
-    expect(tsconfig.compilerOptions.rewriteRelativeImportExtensions).toBe(true);
-    expect(tsconfig.compilerOptions.erasableSyntaxOnly).toBe(true);
-    const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
-    expect(binstub("trails")).toContain(
-      'setAppPath(join(import.meta.dirname, "../config/application.ts"));',
-    );
-    expect(binstub("trails")).toContain('await import("@blazetrails/trailties/commands");');
-    expect(binstub("setup")).toContain("bin/trails");
-    expect(binstub("dev")).toContain('"trails"');
-    for (const n of ["dev"]) {
-      expect(binstub(n)).toContain("spawnSync");
-      expect(binstub(n)).not.toContain('.join(" ")');
-      expect(binstub(n)).toContain("fileURLToPath(import.meta.url)");
-    }
-    const readme = fs.readFileSync(appPath("README.md"), "utf-8");
-    expect(readme).not.toMatch(/^\| `trails /m);
-  });
-
-  it("emits prepare hook that builds .tse views", async () => {
-    await makeGen().invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views app/views");
-    expect(pkg.scripts.postinstall).toBeUndefined();
-    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
-    expect(pkg.dependencies["@blazetrails/date"]).toBeDefined();
-    expect(pkg.devDependencies["@types/node"]).toBeDefined();
-    const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
-    expect(gitignore).toContain("/.trails/");
-  });
-
-  it("exports *.tse with types before default", async () => {
-    await makeGen().invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    const tseExport = pkg.exports["./*.tse"];
-    expect(tseExport).toBeDefined();
-    expect(tseExport.types).toBe("./.trails/views/*.tse.d.ts");
-    expect(tseExport.default).toBe("./.trails/views/*.tse.js");
-    const keys = Object.keys(tseExport);
-    expect(keys.indexOf("types")).toBeLessThan(keys.indexOf("default"));
-  });
-
-  it("tsconfig includes .trails alongside the app tree so augmentation participates in type-check", async () => {
-    await makeGen().invokeAll();
-    const tsconfig = JSON.parse(fs.readFileSync(appPath("tsconfig.json"), "utf-8"));
-    expect(tsconfig.include).toContain(".trails/template-registry-augmentation.d.ts");
-    expect(tsconfig.include).toContain(".trails/views");
-    expect(tsconfig.include).toEqual(expect.arrayContaining(["app", "config", "db"]));
-    expect(tsconfig.compilerOptions.rootDir).toBe(".");
-    expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
-    expect(tsconfig.compilerOptions.types).toEqual(["node"]);
-    expect(tsconfig.compilerOptions.plugins).toEqual([
-      { name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" },
-    ]);
-  });
-
-  it("configures postgres database", async () => {
-    await makeGen("postgres").invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.dependencies.pg).toBeDefined();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("postgresql");
-  });
-
-  it("configures mysql database", async () => {
-    await makeGen("mysql").invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.dependencies.mysql2).toBeDefined();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("mysql2");
-  });
-
-  it("configures sqlite database by default", async () => {
-    await makeGen("sqlite").invokeAll();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain("sqlite3");
-  });
-
-  it("sqlite database config uses the sqlite3 adapter without a side-effect driver import", async () => {
-    await makeGen("sqlite").invokeAll();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain('adapter: "sqlite3"');
-    expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/");
-  });
-
-  it("--package-manager npm uses npm install in bin/setup", async () => {
-    const gen = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, packageManager: "npm" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    const setup = fs.readFileSync(appPath("bin/setup"), "utf-8");
-    expect(setup).toContain("npm install");
-    expect(setup).not.toContain("pnpm");
-  });
-
-  it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
-    const gen = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, sqliteDriver: "node-sqlite" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain('adapter: "node-sqlite"');
-    expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
-  });
-
-  it("rejects an unknown sqlite driver", () => {
-    expect(
-      () =>
-        new AppGenerator(
-          ["my-app"],
-          { skipInstall: true, sqliteDriver: "bogus-driver" as never },
-          { destinationRoot: tmpDir },
-        ),
-    ).toThrow(/Unknown SQLite driver/);
-  });
-
-  it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
-    const gen = new AppGenerator(
-      ["my-app"],
-      { skipInstall: true, database: "sqlite", sqliteDriver: "expo-sqlite" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    const dbConfig = fs.readFileSync(appPath("config/database.ts"), "utf-8");
-    expect(dbConfig).toContain('adapter: "expo-sqlite"');
-    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf-8"));
-    expect(pkg.dependencies["expo-sqlite"]).toBeDefined();
-    expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
-  });
-
-  it("skips docker files when --skip-docker", async () => {
-    await makeGen("sqlite", { skipDocker: true }).invokeAll();
-    expect(exists("Dockerfile")).toBe(false);
-    expect(exists(".dockerignore")).toBe(false);
-  });
-
   it("inclusion of eslint", async () => {
-    await makeGen().invokeAll();
+    await t.runGenerator();
     await assertGem("eslint");
-    await assertFile(
-      "my-app/config/environments/development.ts",
+    await t.assertFile(
+      "config/environments/development.ts",
       /\/\/ Apply autocorrection by ESLint to files generated by `bin\/trails generate`\./,
     );
   });
 
   it("eslint is skipped if required", async () => {
-    await makeGen("sqlite", { skipEslint: true }).invokeAll();
+    await t.runGenerator([t.destinationRoot, "--skip-eslint"]);
 
     await assertNoGem("eslint");
-    assertNoFile("my-app/bin/eslint");
-    assertNoFile("my-app/eslint.config.mjs");
-    await assertFile("my-app/config/environments/development.ts", (content) => {
+    t.assertNoFile("bin/eslint");
+    t.assertNoFile("eslint.config.mjs");
+    await t.assertFile("config/environments/development.ts", (content: string) => {
       assertNoMatch(
         /\/\/ Apply autocorrection by ESLint to files generated by `bin\/trails generate`\./,
         content,
@@ -478,153 +319,448 @@ describe("AppGenerator", () => {
   });
 
   it("inclusion of ci files", async () => {
-    await makeGen().invokeAll();
-    await assertFile("my-app/.github/workflows/ci.yml");
-    await assertFile("my-app/.github/dependabot.yml");
+    await t.runGenerator();
+    await t.assertFile(".github/workflows/ci.yml");
+    await t.assertFile(".github/dependabot.yml");
   });
 
   it("ci files are skipped if required", async () => {
-    await makeGen("sqlite", { skipCi: true }).invokeAll();
+    await t.runGenerator([t.destinationRoot, "--skip-ci"]);
 
-    assertNoFile("my-app/.github/workflows/ci.yml");
-    assertNoFile("my-app/.github/dependabot.yml");
+    t.assertNoFile(".github/workflows/ci.yml");
+    t.assertNoFile(".github/dependabot.yml");
   });
 
   it("generated files have no eslint warnings", async () => {
-    await makeGen().invokeAll();
-    fs.symlinkSync(
+    await t.runGenerator();
+    await FileUtils.lnSAsync(
       new URL("../../../../node_modules", import.meta.url).pathname,
-      appPath("node_modules"),
+      File.join(t.destinationRoot, "node_modules"),
     );
 
-    const { success, output } = await new Promise<{ success: boolean; output: string }>((resolve) =>
-      execFile(appPath("bin/eslint"), [], { cwd: appPath() }, (error, stdout, stderr) =>
-        resolve({ success: error === null, output: stdout + stderr }),
-      ),
-    );
+    await Dir.chdir(t.destinationRoot, async () => {
+      const output = await rbFBackquote("./bin/eslint 2>&1");
 
-    expect(success, `bin/eslint did not exit successfully:\n${output}`).toBe(true);
+      expect(
+        Process.lastStatus!.isSuccess(),
+        `bin/eslint did not exit successfully:\n${output}`,
+      ).toBe(true);
+    });
   }, 60_000);
 
-  it("includes app name in generated files", async () => {
-    await makeGen().invokeAll();
-
-    const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
-    expect(appConfig).toContain("MyApp");
-
-    const layout = fs.readFileSync(appPath("app/views/layouts/application.html.tse"), "utf-8");
-    expect(layout).toContain(`contentFor("title") ?? "My App"`);
-  });
-
-  it("rejects a name whose constant is already in use", async () => {
-    await expect(
-      new AppGenerator(
-        ["string"],
-        { skipInstall: true },
-        { destinationRoot: "/tmp/string" },
-      ).createRoot(),
-    ).rejects.toThrow(
-      "Invalid application name string, constant String is already in use. Please choose another application name.",
-    );
-  });
-
-  it("generates an application class that subclasses Application", async () => {
-    await makeGen().invokeAll();
-
-    const appConfig = fs.readFileSync(appPath("config/application.ts"), "utf-8");
-    expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
-    expect(appConfig).toContain("export class MyApp extends Application {");
-    expect(appConfig).toContain("Application.register(this, import.meta.dirname);");
-
-    const environment = fs.readFileSync(appPath("config/environment.ts"), "utf-8");
-    expect(environment).toContain(`import "./application.ts";`);
-    expect(environment).toContain("await Trails.initialize()");
-    const importer = environment.indexOf("loader.importer = (url) => import(url);");
-    expect(importer).toBeGreaterThan(-1);
-    expect(importer).toBeLessThan(environment.indexOf("await Trails.initialize()"));
-
-    const configRu = fs.readFileSync(appPath("config.ts"), "utf-8");
-    expect(configRu).toContain(`import "./config/environment.ts";`);
-    expect(configRu).toContain("export const Config = Trails.application;");
-    expect(configRu).toContain("await Trails.application.loadServer();");
-  });
-
   it("invalid application name raises an error", async () => {
-    const gen = new AppGenerator(
-      ["43-things"],
-      { skipInstall: true, database: "sqlite" },
-      { destinationRoot: tmpDir },
+    const content = await capture("stderr", () =>
+      t.runGenerator([File.join(t.destinationRoot, "43-things")]),
     );
-    await expect(gen.invokeAll()).rejects.toThrow(
-      "Invalid application name 43-things. Please give a name which does not start with numbers.",
+    expect(content).toBe(
+      "Invalid application name 43-things. Please give a name which does not start with numbers.\n",
     );
   });
 
   it("invalid application name is fixed", async () => {
-    const gen = new AppGenerator(
-      ["things-43"],
-      { skipInstall: true, database: "sqlite" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    await assertFile("things-43/config/environment.ts", /Trails\.initialize\(\)/);
-    await assertFile("things-43/config/application.ts", /^export class Things43 /m);
+    await t.runGenerator([File.join(t.destinationRoot, "things-43")]);
+    await t.assertFile("things-43/config/environment.ts", /Trails\.initialize\(\)/);
+    await t.assertFile("things-43/config/application.ts", /^export class Things43 /m);
   });
 
   it("name option", async () => {
-    const gen = new AppGenerator(
-      ["app-dir"],
-      { skipInstall: true, name: "my-app", database: "sqlite" },
-      { destinationRoot: tmpDir },
-    );
-    await gen.invokeAll();
-    await assertFile("app-dir/config/application.ts", /^export class MyApp /m);
-  });
-
-  it("types drawRoutes against Mapper", async () => {
-    await makeGen().invokeAll();
-
-    const routes = fs.readFileSync(appPath("config/routes.ts"), "utf-8");
-    expect(routes).toContain(`import { Trails } from "@blazetrails/trailties";`);
-    expect(routes).toContain("Trails.application.routes().draw(function () {");
-    expect(routes).not.toContain(": any");
-  });
-
-  it("snapshots emitted TypeScript sources", async () => {
-    await makeGen("sqlite", UNPORTED).invokeAll();
-    const read = (...segs: string[]) => fs.readFileSync(appPath(...segs), "utf-8");
-    expect(read("app/controllers/application-controller.ts")).toMatchSnapshot(
-      "application-controller.ts",
-    );
-    expect(read("app/models/application-record.ts")).toMatchSnapshot("application-record.ts");
-    expect(read("app/helpers/application-helper.ts")).toMatchSnapshot("application-helper.ts");
-    expect(read("app/jobs/application-job.ts")).toMatchSnapshot("application-job.ts");
-    expect(read("app/mailers/application-mailer.ts")).toMatchSnapshot("application-mailer.ts");
-    expect(read("config/application.ts")).toMatchSnapshot("config/application.ts");
-    expect(read("config/routes.ts")).toMatchSnapshot("config/routes.ts");
-    expect(read("config/cable.ts")).toMatchSnapshot("config/cable.ts");
-    expect(read("config/storage.ts")).toMatchSnapshot("config/storage.ts");
-    expect(read("config/environments/development.ts")).toMatchSnapshot(
-      "environments/development.ts",
-    );
-    expect(read("config/environments/test.ts")).toMatchSnapshot("environments/test.ts");
-    expect(read("config/environments/production.ts")).toMatchSnapshot("environments/production.ts");
-    expect(read("test/test-helper.ts")).toMatchSnapshot("test-helper.ts");
-    expect(read("test/global-setup.ts")).toMatchSnapshot("global-setup.ts");
-    expect(read("config.ts")).toMatchSnapshot("config.ts");
-    expect(read("vite.config.ts")).toMatchSnapshot("vite.config.ts");
+    await t.runGenerator([t.destinationRoot, "--name=my-app"]);
+    await t.assertFile("config/application.ts", /^export class MyApp /m);
   });
 
   it("template from absolute path", async () => {
-    const template = path.join(tmpDir, "template.mjs");
-    fs.writeFileSync(template, 'export default (g) => g.say("It works from file!");\n');
-    await makeGen("sqlite", { template } as never).invokeAll();
-    expect(lines.join("\n")).toMatch("It works from file!");
+    const template = File.join(templateRoot, "template.mjs");
+    await File.writeAsync(template, 'export default (g) => g.say("It works from file!");\n');
+    expect(await t.runGenerator([t.destinationRoot, "-m", template])).toMatch(
+      "It works from file!",
+    );
   });
 
   it("template raises an error with invalid path", async () => {
-    const content = makeGen("sqlite", { template: "non/existent/path" } as never).invokeAll();
-    await expect(content).rejects.toThrow(/The template \[.*\] could not be loaded/);
-    await expect(content).rejects.toThrow(/non\/existent\/path/);
+    const content = await capture("stderr", () =>
+      t.runGenerator([t.destinationRoot, "-m", "non/existent/path"]),
+    );
+
+    expect(content).toMatch(/The template \[.*\] could not be loaded/);
+    expect(content).toMatch(/non\/existent\/path/);
+  });
+});
+
+describe("AppGenerator", () => {
+  it("creates application directory structure", async () => {
+    await t.runGenerator();
+
+    for (const path of [
+      "package.json",
+      "tsconfig.json",
+      ".gitignore",
+      ".gitattributes",
+      ".node-version",
+      "README.md",
+      "config.ts",
+      "Dockerfile",
+      ".dockerignore",
+      "eslint.config.mjs",
+      "bin/eslint",
+      "bin/trails",
+      "bin/setup",
+      "bin/dev",
+      "config/application.ts",
+      "config/environment.ts",
+      "config/routes.ts",
+      "config/database.ts",
+      "config/environments/development.ts",
+      "config/environments/test.ts",
+      "config/environments/production.ts",
+      "config/initializers/content-security-policy.ts",
+      "config/initializers/filter-parameter-logging.ts",
+      "config/initializers/inflections.ts",
+      "config/initializers/permissions-policy.ts",
+      "config/locales/en.json",
+      "app/controllers/application-controller.ts",
+      "app/controllers/concerns/.keep",
+      "app/models/application-record.ts",
+      "app/models/concerns/.keep",
+      "app/helpers/application-helper.ts",
+      "app/views/layouts/application.html.tse",
+      "app/assets/stylesheets/application.css",
+      "app/assets/images/.keep",
+      "vite.config.ts",
+      "db/seeds.ts",
+      "test/test-helper.ts",
+      "test/global-setup.ts",
+      "test/models/.keep",
+      "test/controllers/.keep",
+      "test/helpers/.keep",
+      "test/integration/.keep",
+      "test/fixtures/files/.keep",
+      "public/404.html",
+      "public/422.html",
+      "public/500.html",
+      "public/robots.txt",
+      "public/favicon.ico",
+      "lib/tasks/.keep",
+      "log/.keep",
+      "tmp/.keep",
+      "tmp/pids/.keep",
+      "vendor/.keep",
+    ])
+      await t.assertFile(path);
+    t.assertNoFile("db/schema.ts");
+    t.assertNoFile("public/index.html");
+  });
+
+  it("skips scaffolding for subsystems trails has no package for", async () => {
+    await t.runGenerator();
+
+    for (const path of [
+      "config/puma.ts",
+      "config/storage.ts",
+      "app/mailers",
+      "app/channels",
+      "app/views/layouts/mailer.html.tse",
+      "app/views/layouts/mailer.text.tse",
+    ])
+      t.assertNoFile(path);
+  });
+
+  it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
+
+    await t.assertFile("storage/.keep");
+  });
+
+  it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=postgresql"]);
+
+    t.assertNoDirectory("storage");
+  });
+
+  it("writes the sqlite3 database under storage/", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
+
+    await t.assertFile("config/database.ts", (config: string) => {
+      expect(config).toContain('database: "storage/development.sqlite3"');
+      expect(config).toContain('database: "storage/test.sqlite3"');
+      expect(config).toContain('database: "storage/production.sqlite3"');
+    });
+  });
+
+  it("does not ignore db/*.sqlite3 in the generated .gitignore", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
+
+    await t.assertFile(".gitignore", (gitignore: string) => {
+      expect(gitignore).not.toContain("sqlite3");
+      expect(gitignore).toContain("/storage/*");
+    });
+  });
+
+  it("emits each subsystem's scaffolding once its skip flag is off", async () => {
+    await t.runGenerator([t.destinationRoot, ...UNPORTED]);
+
+    for (const path of [
+      "config/cable.ts",
+      "config/storage.ts",
+      "app/jobs/application-job.ts",
+      "app/mailers/application-mailer.ts",
+      "app/views/layouts/mailer.html.tse",
+      "app/views/layouts/mailer.text.tse",
+      "storage/.keep",
+    ])
+      await t.assertFile(path);
+  });
+
+  it("--api implies its options and a default run reports nothing", async () => {
+    const api = new AppGenerator(
+      [t.destinationRoot],
+      { skipInstall: true, api: true },
+      { destinationRoot: t.destinationRoot },
+    );
+    expect(api.options.skipAssetPipeline).toBe(true);
+    expect(api.options.skipJavascript).toBe(true);
+    const output = await capture("stdout", () =>
+      new AppGenerator(
+        [t.destinationRoot],
+        { skipInstall: true },
+        { destinationRoot: t.destinationRoot },
+      ).reportImpliedOptions(),
+    );
+    expect(output).not.toMatch(/will also be activated/);
+    const minimal = new AppGenerator(
+      [t.destinationRoot],
+      { skipInstall: true, minimal: true, skipActionText: false },
+      { destinationRoot: t.destinationRoot },
+    );
+    expect(() => minimal.reportImpliedOptions()).not.toThrow();
+  });
+
+  it("generates valid package.json", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my-app")]);
+    await t.assertFile("my-app/package.json", (content: string) => {
+      const pkg = json(content);
+      expect(pkg.name).toBe("my-app");
+      expect(pkg.dependencies["better-sqlite3"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/activerecord"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/activemodel"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/activejob"]).toBeDefined();
+      expect(pkg.scripts["db:migrate"]).toBeDefined();
+      expect(pkg.scripts["db:seed"]).toBeDefined();
+      expect(pkg.scripts["db:setup"]).toBeDefined();
+      expect(pkg.devDependencies.vite).toBeDefined();
+      expect(pkg.devDependencies.tsx).toBeUndefined();
+      expect(pkg.devDependencies.typescript).toBe("^5.8.0");
+      expect(pkg.scripts["db:seed"]).toBe("trails db:seed");
+      expect(pkg.scripts.dev).toBe("trails server");
+      expect(pkg.scripts.trails).toBe("trails");
+    });
+    await t.assertFile("my-app/app/jobs/application-job.ts");
+    await t.assertFile("my-app/tsconfig.json", (content: string) => {
+      const tsconfig = json(content);
+      expect(tsconfig.compilerOptions.rewriteRelativeImportExtensions).toBe(true);
+      expect(tsconfig.compilerOptions.erasableSyntaxOnly).toBe(true);
+    });
+    await t.assertFile("my-app/bin/trails", (trails: string) => {
+      expect(trails).toContain(
+        'const APP_PATH = join(import.meta.dirname, "../config/application.ts");',
+      );
+      expect(trails).toContain("setAppPath(APP_PATH);");
+      expect(trails).toContain('await import("@blazetrails/trailties/commands");');
+    });
+    await t.assertFile("my-app/bin/setup", /bin\/trails/);
+    await t.assertFile("my-app/bin/dev", (dev: string) => {
+      expect(dev).toContain('"trails"');
+      expect(dev).toContain("spawnSync");
+      expect(dev).not.toContain('.join(" ")');
+      expect(dev).toContain("fileURLToPath(import.meta.url)");
+    });
+    await t.assertFile("my-app/README.md", (readme: string) => {
+      expect(readme).not.toMatch(/^\| `trails /m);
+    });
+  });
+
+  it("emits prepare hook that builds .tse views", async () => {
+    await t.runGenerator();
+    await t.assertFile("package.json", (content: string) => {
+      const pkg = json(content);
+      expect(pkg.scripts.prepare).toBe("trails-tsc-views build --views app/views");
+      expect(pkg.scripts.postinstall).toBeUndefined();
+      expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toBeDefined();
+      expect(pkg.dependencies["@blazetrails/date"]).toBeDefined();
+      expect(pkg.devDependencies["@types/node"]).toBeDefined();
+    });
+    await t.assertFile(".gitignore", /\/\.trails\//);
+  });
+
+  it("exports *.tse with types before default", async () => {
+    await t.runGenerator();
+    await t.assertFile("package.json", (content: string) => {
+      const tseExport = json(content).exports["./*.tse"];
+      expect(tseExport).toBeDefined();
+      expect(tseExport.types).toBe("./.trails/views/*.tse.d.ts");
+      expect(tseExport.default).toBe("./.trails/views/*.tse.js");
+      const keys = Object.keys(tseExport);
+      expect(keys.indexOf("types")).toBeLessThan(keys.indexOf("default"));
+    });
+  });
+
+  it("tsconfig includes .trails alongside the app tree so augmentation participates in type-check", async () => {
+    await t.runGenerator();
+    await t.assertFile("tsconfig.json", (content: string) => {
+      const tsconfig = json(content);
+      expect(tsconfig.include).toContain(".trails/template-registry-augmentation.d.ts");
+      expect(tsconfig.include).toContain(".trails/views");
+      expect(tsconfig.include).toEqual(expect.arrayContaining(["app", "config", "db"]));
+      expect(tsconfig.compilerOptions.rootDir).toBe(".");
+      expect(tsconfig.compilerOptions.allowArbitraryExtensions).toBe(true);
+      expect(tsconfig.compilerOptions.types).toEqual(["node"]);
+      expect(tsconfig.compilerOptions.plugins).toEqual([
+        { name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" },
+      ]);
+    });
+  });
+
+  it("configures postgres database", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=postgresql"]);
+    await t.assertFile("package.json", (content: string) => {
+      expect(json(content).dependencies.pg).toBeDefined();
+    });
+    await t.assertFile("config/database.ts", /postgresql/);
+  });
+
+  it("configures mysql database", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=mysql"]);
+    await t.assertFile("package.json", (content: string) => {
+      expect(json(content).dependencies.mysql2).toBeDefined();
+    });
+    await t.assertFile("config/database.ts", /mysql2/);
+  });
+
+  it("configures sqlite database by default", async () => {
+    await t.runGenerator();
+    await t.assertFile("config/database.ts", /sqlite3/);
+  });
+
+  it("sqlite database config uses the sqlite3 adapter without a side-effect driver import", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3"]);
+    await t.assertFile("config/database.ts", (dbConfig: string) => {
+      expect(dbConfig).toContain('adapter: "sqlite3"');
+      expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/");
+    });
+  });
+
+  it("--package-manager npm uses npm install in bin/setup", async () => {
+    await t.runGenerator([t.destinationRoot, "--package-manager=npm"]);
+    await t.assertFile("bin/setup", (setup: string) => {
+      expect(setup).toContain("npm install");
+      expect(setup).not.toContain("pnpm");
+    });
+  });
+
+  it("--sqlite-driver node-sqlite omits better-sqlite3 dep", async () => {
+    await t.runGenerator([t.destinationRoot, "--sqlite-driver=node-sqlite"]);
+    await t.assertFile("package.json", (content: string) => {
+      expect(json(content).dependencies["better-sqlite3"]).toBeUndefined();
+    });
+    await t.assertFile("config/database.ts", (dbConfig: string) => {
+      expect(dbConfig).toContain('adapter: "node-sqlite"');
+      expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
+    });
+  });
+
+  it("rejects an unknown sqlite driver", () => {
+    expect(() => t.generator([t.destinationRoot], { sqliteDriver: "bogus-driver" })).toThrow(
+      /Unknown SQLite driver/,
+    );
+  });
+
+  it("scaffolds the expo-sqlite adapter for --sqlite-driver expo-sqlite", async () => {
+    await t.runGenerator([t.destinationRoot, "--database=sqlite3", "--sqlite-driver=expo-sqlite"]);
+    await t.assertFile("config/database.ts", /adapter: "expo-sqlite"/);
+    await t.assertFile("package.json", (content: string) => {
+      const pkg = json(content);
+      expect(pkg.dependencies["expo-sqlite"]).toBeDefined();
+      expect(pkg.dependencies["better-sqlite3"]).toBeUndefined();
+    });
+  });
+
+  it("skips docker files when --skip-docker", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-docker"]);
+    t.assertNoFile("Dockerfile");
+    t.assertNoFile(".dockerignore");
+  });
+
+  it("includes app name in generated files", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my-app")]);
+
+    await t.assertFile("my-app/config/application.ts", /MyApp/);
+    await t.assertFile("my-app/app/views/layouts/application.html.tse", (layout: string) => {
+      expect(layout).toContain(`contentFor("title") ?? "My App"`);
+    });
+  });
+
+  it("rejects a name whose constant is already in use", async () => {
+    const content = await capture("stderr", () =>
+      t.runGenerator([File.join(t.destinationRoot, "string")]),
+    );
+    expect(content).toBe(
+      "Invalid application name string, constant String is already in use. Please choose another application name.\n",
+    );
+  });
+
+  it("generates an application class that subclasses Application", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my-app")]);
+
+    await t.assertFile("my-app/config/application.ts", (appConfig: string) => {
+      expect(appConfig).toContain(`import { Application } from "@blazetrails/trailties";`);
+      expect(appConfig).toContain("export class MyApp extends Application {");
+      expect(appConfig).toContain("Application.register(this, import.meta.dirname);");
+    });
+    await t.assertFile("my-app/config/environment.ts", (environment: string) => {
+      expect(environment).toContain(`import "./application.ts";`);
+      expect(environment).toContain("await Trails.initialize()");
+      const importer = environment.indexOf("loader.importer = (url) => import(url);");
+      expect(importer).toBeGreaterThan(-1);
+      expect(importer).toBeLessThan(environment.indexOf("await Trails.initialize()"));
+    });
+    await t.assertFile("my-app/config.ts", (configRu: string) => {
+      expect(configRu).toContain(`import "./config/environment.ts";`);
+      expect(configRu).toContain("export const Config = Trails.application;");
+      expect(configRu).toContain("await Trails.application.loadServer();");
+    });
+  });
+
+  it("types drawRoutes against Mapper", async () => {
+    await t.runGenerator();
+
+    await t.assertFile("config/routes.ts", (routes: string) => {
+      expect(routes).toContain(`import { Trails } from "@blazetrails/trailties";`);
+      expect(routes).toContain("Trails.application.routes().draw(function () {");
+      expect(routes).not.toContain(": any");
+    });
+  });
+
+  it("snapshots emitted TypeScript sources", async () => {
+    await t.runGenerator([File.join(t.destinationRoot, "my-app"), ...UNPORTED]);
+    for (const [path, name] of [
+      ["app/controllers/application-controller.ts", "application-controller.ts"],
+      ["app/models/application-record.ts", "application-record.ts"],
+      ["app/helpers/application-helper.ts", "application-helper.ts"],
+      ["app/jobs/application-job.ts", "application-job.ts"],
+      ["app/mailers/application-mailer.ts", "application-mailer.ts"],
+      ["config/application.ts", "config/application.ts"],
+      ["config/routes.ts", "config/routes.ts"],
+      ["config/cable.ts", "config/cable.ts"],
+      ["config/storage.ts", "config/storage.ts"],
+      ["config/environments/development.ts", "environments/development.ts"],
+      ["config/environments/test.ts", "environments/test.ts"],
+      ["config/environments/production.ts", "environments/production.ts"],
+      ["test/test-helper.ts", "test-helper.ts"],
+      ["test/global-setup.ts", "global-setup.ts"],
+      ["config.ts", "config.ts"],
+      ["vite.config.ts", "vite.config.ts"],
+    ])
+      await t.assertFile(`my-app/${path}`, (content: string) => {
+        expect(content).toMatchSnapshot(name);
+      });
   });
 });

@@ -11,6 +11,13 @@ import {
   type HelperMap,
 } from "./extract-ts-core.js";
 import { scopeOf } from "../api-compare/scope.js";
+import { testRoots } from "../layout/package-roots.js";
+
+function globInTestRoots(pkg: string, pattern: string): string[] {
+  return testRoots(pkg).flatMap((root) =>
+    globSync(`packages/${pkg}/${root}/${pattern}`, { cwd: ROOT_DIR }),
+  );
+}
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
 
@@ -18,7 +25,7 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-function getPackageTestFiles(): Record<string, string[]> {
+export function getPackageTestFiles(): Record<string, string[]> {
   const packages = [
     "arel",
     "activemodel",
@@ -41,6 +48,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "actioncable",
     "activejob",
     "actionmailer",
+    "actionmailbox",
     "activestorage",
     "trailties",
     "globalid",
@@ -50,47 +58,60 @@ function getPackageTestFiles(): Record<string, string[]> {
     "ruby-compat",
     "thor",
     "mini-magick",
+    "image-processing",
     "mail",
     "mini-mime",
     "net-smtp",
     "rake",
+    "solid-queue",
+    "solid-cable",
   ];
-  const packageAliases: Record<string, string> = {};
+  const packageAliases: Record<string, [dir: string, pattern: string, ignore?: string]> = {
+    erubi: ["tse-compiler", "**/*.test.ts"],
+    nokogiri: ["nokogiri", "**/*.test.ts", "racc/"],
+    racc: ["nokogiri", "racc/**/*.test.ts"],
+    "rails-html-sanitizer": ["html-sanitizer", "*.test.ts"],
+    loofah: ["html-sanitizer", "loofah/**/*.test.ts"],
+    crass: ["html-sanitizer", "crass/**/*.test.ts"],
+  };
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
-    const pattern = `packages/${pkg}/src/**/*.test.ts`;
-    // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
-    const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
-    const files = [
-      ...globSync(pattern, { cwd: ROOT_DIR }),
-      ...globSync(behaviorPattern, { cwd: ROOT_DIR }),
-    ].sort();
+    const files = testRoots(pkg)
+      .flatMap((root) => [
+        ...globSync(`packages/${pkg}/${root}/**/*.test.ts`, { cwd: ROOT_DIR }),
+        // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
+        ...globSync(`packages/${pkg}/${root}/**/behaviors/*-behavior.ts`, { cwd: ROOT_DIR }),
+      ])
+      .sort();
 
     result[pkg] = files;
   }
 
   // ActionPack special handling
-  const actionDispatchFiles = globSync("packages/actionpack/src/action-dispatch/**/*.test.ts", {
-    cwd: ROOT_DIR,
-  }).sort();
-  const actionControllerFiles = globSync("packages/actionpack/src/action-controller/**/*.test.ts", {
-    cwd: ROOT_DIR,
-  }).sort();
-  const abstractControllerFiles = globSync(
-    "packages/actionpack/src/abstract-controller/**/*.test.ts",
-    {
-      cwd: ROOT_DIR,
-    },
+  const actionDispatchFiles = globInTestRoots("actionpack", "action-dispatch/**/*.test.ts").sort();
+  const actionControllerFiles = globInTestRoots(
+    "actionpack",
+    "action-controller/**/*.test.ts",
+  ).sort();
+  const abstractControllerFiles = globInTestRoots(
+    "actionpack",
+    "abstract-controller/**/*.test.ts",
   ).sort();
   result["actiondispatch"] = actionDispatchFiles;
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
+  result["rails-dom-testing"] = globInTestRoots(
+    "actionview",
+    "rails-dom-testing/**/*.test.ts",
+  ).sort();
 
-  // Aliased packages (trailties → cli)
-  for (const [alias, dir] of Object.entries(packageAliases)) {
-    const files = globSync(`packages/${dir}/src/**/*.test.ts`, { cwd: ROOT_DIR }).sort();
+  // Aliased packages (erubi → tse-compiler, the html-sanitizer gems, ...)
+  for (const [alias, [dir, pattern, ignore]] of Object.entries(packageAliases)) {
+    const files = globInTestRoots(dir, pattern)
+      .filter((f) => ignore === undefined || !f.includes(`/test/${ignore}`))
+      .sort();
     result[alias] = files;
   }
 

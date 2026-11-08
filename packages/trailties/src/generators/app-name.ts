@@ -1,6 +1,7 @@
+import "../constants.app-name.generated.js";
 import { File, TopLevel, constDefined } from "@blazetrails/ruby-compat";
 import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
-import { GeneratorError } from "./generated-attribute.js";
+import { Error as GeneratorError } from "./base.js";
 
 interface AppNameHost {
   options: { name?: string };

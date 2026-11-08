@@ -44,8 +44,11 @@ function streamingLayout(head: string, foot: string) {
 }
 
 async function collectChunks(
-  body: Body | (string | SafeBuffer | null)[] | Promise<Body | (string | SafeBuffer | null)[]>,
-): Promise<(string | SafeBuffer | null)[]> {
+  body:
+    | Body
+    | (string | SafeBuffer | Uint8Array | null)[]
+    | Promise<Body | (string | SafeBuffer | Uint8Array | null)[]>,
+): Promise<(string | SafeBuffer | Uint8Array | null)[]> {
   const resolved = await body;
   if (Array.isArray(resolved)) return resolved;
   const chunks: string[] = [];

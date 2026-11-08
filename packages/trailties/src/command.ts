@@ -10,7 +10,9 @@ import {
   exit,
   prepend,
   rbArgv,
+  rbAryReplace,
   rbInspect,
+  rbObjDup,
   stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
@@ -186,12 +188,12 @@ function splitNamespace(namespace: string): [string, string] {
 
 /** @internal */
 async function withArgv(argv: string[], block: () => Promise<void>): Promise<void> {
-  const originalArgv = [...rbArgv()];
-  rbArgv().splice(0, rbArgv().length, ...argv);
+  const originalArgv = rbObjDup(rbArgv());
+  rbAryReplace(rbArgv(), argv);
   try {
     await block();
   } finally {
-    rbArgv().splice(0, rbArgv().length, ...originalArgv);
+    rbAryReplace(rbArgv(), originalArgv);
   }
 }
 

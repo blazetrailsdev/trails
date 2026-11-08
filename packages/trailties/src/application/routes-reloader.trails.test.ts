@@ -89,7 +89,7 @@ describe("RoutesReloader", () => {
         `import { BlogEngine } from "./blog-engine.ts";\n` + drawInto("BlogEngine", "/blog"),
       );
       const { BlogEngine } = (await import(`${tmp}/blog-engine.ts`)) as {
-        BlogEngine: { instance(): { routes(): RouteSetLike & { routes: { length: number } } } };
+        BlogEngine: { instance(): { routes(): RouteSetLike & { routes(): { length: number } } } };
       };
       const engineRoutes = BlogEngine.instance().routes();
       const app = makeRouteSet();
@@ -101,7 +101,7 @@ describe("RoutesReloader", () => {
       await r.reloadBang();
 
       expect(app.calls).toEqual(["clear", "get /posts", "finalize"]);
-      expect(engineRoutes.routes.length).toBe(1);
+      expect(engineRoutes.routes().length).toBe(1);
     } finally {
       FileUtils.rmRf(tmp);
     }

@@ -22,14 +22,10 @@ export class Scheduler extends Base {
     include(this, Runnable);
     include(this, LifecycleHooks);
 
-    const host = this as unknown as {
-      afterBoot(name: string): void;
-      beforeShutdown(name: string): void;
-    };
-    host.afterBoot(":runStartHooks");
-    host.afterBoot(":scheduleRecurringTasks");
-    host.beforeShutdown(":unscheduleRecurringTasks");
-    host.beforeShutdown(":runStopHooks");
+    this.afterBoot(":runStartHooks");
+    this.afterBoot(":scheduleRecurringTasks");
+    this.beforeShutdown(":unscheduleRecurringTasks");
+    this.beforeShutdown(":runStopHooks");
   }
 
   recurringSchedule: RecurringSchedule;

@@ -1,6 +1,6 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { File, Hash, hashDelete, rbFSystem } from "@blazetrails/ruby-compat";
+import { File, Hash, hashAset, hashDelete, rbFSystem } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 type MiddlewareOperation = (middleware: any) => void;
@@ -85,14 +85,6 @@ export type GeneratorsConfigHash = Hash<unknown, Record<string, unknown>>;
 
 export type AfterGenerateCallback = (files: string[]) => void | Promise<void>;
 
-function namespaceHash(): GeneratorsConfigHash {
-  return new Hash<unknown, Record<string, unknown>>((h, k) => {
-    const value: Record<string, unknown> = {};
-    h.set(k, value);
-    return value;
-  });
-}
-
 export class Generators {
   aliases: GeneratorsConfigHash;
   options: GeneratorsConfigHash;
@@ -112,29 +104,18 @@ export class Generators {
   }
 
   constructor() {
-    this.aliases = namespaceHash();
-    this.options = namespaceHash();
+    this.aliases = new Hash<unknown, Record<string, unknown>>((h, k) =>
+      hashAset(h, k, {}),
+    ) as GeneratorsConfigHash;
+    this.options = new Hash<unknown, Record<string, unknown>>((h, k) =>
+      hashAset(h, k, {}),
+    ) as GeneratorsConfigHash;
     this.fallbacks = {};
     this.templates = [];
     this.colorizeLogging = true;
     this.apiOnly = false;
     this._hiddenNamespaces = [];
     this._afterGenerateCallbacks = [];
-
-    return new Proxy(this, {
-      get(target, name, receiver) {
-        if (typeof name === "symbol" || name in target) return Reflect.get(target, name, receiver);
-        if (PROTOCOL_PROBES.has(name)) return undefined;
-        return (...args: unknown[]) => target.methodMissing(name, ...args);
-      },
-      set(target, name, value, receiver) {
-        if (typeof name === "symbol" || name in target) {
-          return Reflect.set(target, name, value, receiver);
-        }
-        target.methodMissing(`${name}=`, value);
-        return true;
-      },
-    });
   }
 
   initializeCopy(_source: Generators): this {
@@ -199,3 +180,23 @@ export class Generators {
     return undefined;
   }
 }
+
+Object.setPrototypeOf(
+  Generators.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Generators.prototype) as object) as object, {
+    get(target, name, receiver: Generators) {
+      if (typeof name === "symbol" || name in target || receiver === Generators.prototype) {
+        return Reflect.get(target, name, receiver);
+      }
+      if (PROTOCOL_PROBES.has(name)) return undefined;
+      return (...args: unknown[]) => receiver.methodMissing(name, ...args);
+    },
+    set(target, name, value, receiver: Generators) {
+      if (typeof name === "symbol" || name in target || receiver === Generators.prototype) {
+        return Reflect.set(target, name, value, receiver);
+      }
+      receiver.methodMissing(`${name}=`, value);
+      return true;
+    },
+  }),
+);

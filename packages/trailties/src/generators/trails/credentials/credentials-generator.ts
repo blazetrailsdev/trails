@@ -1,14 +1,18 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
+import "../../../constants.trails-credentials-credentials-generator.generated.js";
+import { File } from "@blazetrails/ruby-compat";
+import { EncryptedConfiguration } from "@blazetrails/activesupport";
 import { SecureRandom } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { Base, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {
   skipSecretKeyBase?: boolean;
 }
 
-export class CredentialsGenerator extends GeneratorBase {
+const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+
+export class CredentialsGenerator extends Base {
   static {
+    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("contentPath", { default: "config/credentials.yml.enc" });
     this.argument("keyPath", { default: "config/master.key" });
     this.classOption("skipSecretKeyBase", { type: "boolean" });
@@ -25,8 +29,9 @@ export class CredentialsGenerator extends GeneratorBase {
       if (File.isExist(this.contentPath)) return;
       this.say(`Adding ${this.contentPath} to store encrypted credentials.`);
       this.say("");
-      const content = this.renderTemplate();
-      await this.encryptedFile().write(content);
+
+      const content = await this.renderTemplateToEncryptedFile();
+
       this.say("The following content has been encrypted with the Trails master key:");
       this.say("");
       this.say(content, "on_green");
@@ -36,11 +41,9 @@ export class CredentialsGenerator extends GeneratorBase {
     });
   }
 
-  private encryptedFile(): EncryptedFile {
-    const contentPath = this.contentPath;
-    FileUtils.mkdirP(File.dirname(contentPath));
-    return new EncryptedFile({
-      contentPath,
+  private encryptedFile(): EncryptedConfiguration {
+    return new EncryptedConfiguration({
+      configPath: this.contentPath,
       keyPath: this.keyPath,
       envKey: "TRAILS_MASTER_KEY",
       raiseIfMissingKey: true,
@@ -51,23 +54,20 @@ export class CredentialsGenerator extends GeneratorBase {
     return (this.memoSecretKeyBase ??= SecureRandom.hex(64));
   }
 
-  private renderTemplate(): string {
-    const lines = [
-      "# smtp:",
-      "#   user_name: my-smtp-user",
-      "#   password: my-smtp-password",
-      "#",
-      "# aws:",
-      "#   access_key_id: 123",
-      "#   secret_access_key: 345",
-    ];
-    if (!this.options.skipSecretKeyBase) {
-      lines.push(
-        "",
-        "# Used as the base secret for all MessageVerifiers in Trails, including the one protecting cookies.",
-        `secret_key_base: ${this.secretKeyBase()}`,
+  private async renderTemplateToEncryptedFile(): Promise<string | null> {
+    await this.emptyDirectory(File.dirname(this.contentPath));
+
+    let content: string | null = null;
+
+    await this.encryptedFile().change(async (tmpPath) => {
+      await this.template(
+        "credentials.yml",
+        tmpPath,
+        { force: true, verbose: false },
+        (rendered: string) => (content = rendered),
       );
-    }
-    return lines.join("\n") + "\n";
+    });
+
+    return content;
   }
 }

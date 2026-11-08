@@ -554,7 +554,7 @@ _individual_ method. A run of `static X = X` lines standing in for one Ruby
 survives as one construct.
 
 **Instance methods mixed in bulk** (Rails' `include QueryMethods`) are
-`include()` / `Included<>`; see `ruby-compat/src/include.ts` and `relation.ts` +
+`include()` / `Included<>`; see `ruby-compat/lib/include.ts` and `relation.ts` +
 `relation/query-methods.ts`. **Class methods mixed in bulk** (Rails'
 `extend SomeModule`, and the `ClassMethods` half of an
 `ActiveSupport::Concern`) are `extend()` / `Extended<>`.
@@ -563,7 +563,7 @@ survives as one construct.
 exported `included` symbol (`Symbol.for("@blazetrails/ruby-compat:included")`).
 `include()` calls it with the including class after the module's methods are
 installed, which is where Ruby runs the block; `extend()` does the same with
-`extended`. `ruby-compat/src/include.test.ts` covers both: "fires the included
+`extended`. `ruby-compat/test/include.test.ts` covers both: "fires the included
 callback after methods are copied" and "does not copy the included symbol onto
 the prototype".
 
@@ -909,7 +909,7 @@ For a module-eval read, two shapes are sanctioned, and only these:
   a ruby-compat internal (§ "Constant lookup is an import or a registry"),
   not the seat. `constGet` reads these seats at call time. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
-  top-level `Object` is `TopLevel` in `ruby-compat/src/object.ts`: the
+  top-level `Object` is `TopLevel` in `ruby-compat/lib/object.ts`: the
   defining gem seats it (`TopLevel.Trails = Trails`) and a reader names it at
   call time (`TopLevel.Trails!.env`), carrying a guard only where Rails has a
   `defined?`. A `globalThis` seat was rejected because a `declare global` in a
@@ -980,6 +980,25 @@ a plain `TypeError` at the call site — the JS analogue of that `NameError`. A
 surface. The two guarded reads of `ActiveRecord.Base?.` on a standalone
 adapter's own path are the one exception, recorded in the activerecord file.
 
+## A thread-local block stack forks per async block (`IsolatedExecutionState.fork`)
+
+Ruby's `thread_mattr_accessor` stores through `IsolatedExecutionState`, keyed
+on `Thread.current`
+(`vendor/rails/v8.0.2/activesupport/lib/active_support/isolated_execution_state.rb`),
+so a block that pushes onto a thread-local stack and pops in `ensure`
+(`Contexts.with_encryption_context`,
+`vendor/rails/v8.0.2/activerecord/lib/active_record/encryption/contexts.rb:33-43`)
+cannot interleave with a sibling. One trails `Thread` holds many in-flight
+promises, and a thread-local read carries no signal of which sibling is
+reading. So the block's entry opens the child context:
+`IsolatedExecutionState.fork(key, block)` runs the block with its own dup of
+that key's value, and `get` / `set` / `isKey` read through it. The `Thread`
+context itself is unchanged, so a block queries on its opener's leased
+connection. The one opening call carries `@inventedArm fork — PERMANENT`.
+
+This is a genuine language shortcoming, ratified repo-wide by the repo owner
+on 2026-11-05; a new instance is not a new decision to argue.
+
 ## The pool monitor guards only sections that span an `await` (`ConnectionPool`'s `MonitorMixin`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#the-pool-monitor-guards-only-sections-that-span-an-await-connectionpools-monitormixin); unchanged, heading kept for citations.
@@ -1046,7 +1065,7 @@ As a consequence:
   (`actionview/lib/action_view/helpers/form_helper.rb:2713-2718`) would read a
   single record as a collection. Its scoped skip for `core.rb` / `base.rb` is
   permanent, ruled by the repo owner on trails#8750.
-- `defineModule`'s section record (`ruby-compat/src/include.ts`), read by
+- `defineModule`'s section record (`ruby-compat/lib/include.ts`), read by
   `publicInstanceMethods`, is such a mechanism and stays. It is read once at
   load, where a Rails body enumerates `public_instance_methods`
   (`relation/delegation.rb:19`, `associations/collection_proxy.rb:1132-1133`),
@@ -1245,7 +1264,7 @@ the repo owner on 2026-10-21.
 shape to reach for, not the first. A string-keyed send throws away everything
 the call site knew: no TS type checks the receiver or the target, the Ruby name
 has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
-`RELOPS` inside `sendInternal`, `packages/ruby-compat/src/object.ts`), and a
+`RELOPS` inside `sendInternal`, `packages/ruby-compat/lib/object.ts`), and a
 direct property read becomes a prototype walk plus a table lookup. By
 repo-owner ruling on 2026-10-20:
 
@@ -1270,7 +1289,7 @@ Two fallbacks exist, and both are last resorts:
   a visitor's node kind, a Thor instruction. A registry is a declared map from
   the Ruby-visible name to a real, typed function, read at the call site;
   ruby-compat's own `OBJECT_METHOD_TABLE` and `TEMPORAL_METHOD_TABLE`
-  (`packages/ruby-compat/src/object.ts`) are that shape. Reach for it only once the
+  (`packages/ruby-compat/lib/object.ts`) are that shape. Reach for it only once the
   direct spelling is genuinely impossible, and keep it module-private where
   nothing outside the file reads it — a table is extra surface like any other
   name, and a registry written where a direct call would have done is its own
@@ -1459,7 +1478,7 @@ class of the object's own. It sits between the object and its class, and
 only `t2` the validator, and `t2.class` is still `Topic`.
 
 JS has no per-object class. `rbObjSingletonClass(obj)`
-(`ruby-compat/src/object.ts`) is the settled shape. It creates a subclass of
+(`ruby-compat/lib/object.ts`) is the settled shape. It creates a subclass of
 `obj.constructor` on first call and makes it `obj`'s prototype. Its
 `prototype.constructor` is set back to the real class, so `obj.constructor`
 keeps answering Ruby's `obj.class`. `rbModSingletonP` is

@@ -1,0 +1,222 @@
+import { describe, expect, it } from "vitest";
+import { Monitor, newCond } from "../lib/monitor.js";
+import { Thread } from "../lib/thread.js";
+
+describe("Monitor#mon_owned?", () => {
+  it("is true only inside the owning synchronize", async () => {
+    const monitor = new Monitor();
+    expect(monitor.isMonOwned()).toBe(false);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const inside = monitor.synchronize(async () => {
+      expect(monitor.isMonOwned()).toBe(true);
+      await gate;
+      return monitor.isMonOwned();
+    });
+    await Promise.resolve();
+    expect(monitor.isMonOwned()).toBe(false);
+    release();
+    expect(await inside).toBe(true);
+  });
+});
+
+describe("Monitor#synchronize", () => {
+  it("re-enters at once from a call nested in the holder's own block", async () => {
+    const monitor = new Monitor();
+    const result = await monitor.synchronize(() =>
+      monitor.synchronize(() => monitor.synchronize(() => "nested")),
+    );
+    expect(result).toBe("nested");
+  });
+
+  it("takes turns between sibling re-entries started under one holder", async () => {
+    const monitor = new Monitor();
+    let inside = 0;
+    const served: number[] = [];
+    await monitor.synchronize(() =>
+      Promise.all(
+        Array.from({ length: 10 }, (_unused, i) =>
+          monitor.synchronize(async () => {
+            inside += 1;
+            expect(inside).toBe(1);
+            served.push(i);
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            await monitor.synchronize(() => undefined);
+            inside -= 1;
+          }),
+        ),
+      ),
+    );
+    expect(served).toEqual(Array.from({ length: 10 }, (_unused, i) => i));
+  });
+});
+
+describe("Monitor#new_cond", () => {
+  it("gives a synchronize block's hold up for the wait, to another thread's synchronize", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    const log: string[] = [];
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(async () => {
+        log.push("waiter:enter");
+        await cond.waitWhile(() => !ready);
+        log.push("waiter:woken");
+      }),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        log.push("signaller:enter");
+        ready = true;
+        cond.broadcast();
+        log.push("signaller:exit");
+      }),
+    ).join();
+    await waiter.join();
+
+    expect(log).toEqual(["waiter:enter", "signaller:enter", "signaller:exit", "waiter:woken"]);
+  });
+
+  it("gives up every nested hold of the waiting thread", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(() =>
+        monitor.synchronize(async () => {
+          await cond.waitWhile(() => !ready);
+          return monitor.isMonOwned();
+        }),
+      ),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        ready = true;
+        cond.broadcast();
+      }),
+    ).join();
+
+    expect(await waiter.value()).toBe(true);
+  });
+});
+
+describe("Monitor#new_cond with a sibling queued under the waiter", () => {
+  it("restores the waiter's holds before the sibling is served", async () => {
+    const monitor = new Monitor();
+    const cond = newCond.call(monitor);
+    const log: string[] = [];
+    let ready = false;
+
+    const waiter = new Thread(() =>
+      monitor.synchronize(() =>
+        Promise.all([
+          monitor.synchronize(async () => {
+            log.push("inner:enter");
+            await Thread.pass();
+            await cond.waitWhile(() => !ready);
+            log.push("inner:exit");
+          }),
+          monitor.synchronize(() => {
+            log.push("sibling");
+          }),
+        ]),
+      ),
+    );
+    await Thread.pass();
+
+    await new Thread(() =>
+      monitor.synchronize(() => {
+        log.push("signaller");
+        ready = true;
+        cond.broadcast();
+      }),
+    ).join();
+    await waiter.join();
+
+    expect(log).toEqual(["inner:enter", "signaller", "inner:exit", "sibling"]);
+  });
+});
+
+describe("Monitor#synchronize after the holder's block returns", () => {
+  it("still serves a queued sibling re-entry", async () => {
+    const monitor = new Monitor();
+    let releaseFirst!: () => void;
+    const first = new Promise<void>((resolve) => (releaseFirst = resolve));
+    const served: string[] = [];
+    let children!: Promise<unknown>;
+
+    await monitor.synchronize(() => {
+      children = Promise.all([
+        monitor.synchronize(async () => {
+          await first;
+          served.push("first");
+        }),
+        monitor.synchronize(() => {
+          served.push("second");
+        }),
+      ]);
+    });
+    releaseFirst();
+    await children;
+
+    expect(served).toEqual(["first", "second"]);
+  });
+});
+
+describe("Monitor#enter", () => {
+  it("counts a re-entry, and leaves on the matching exit", () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    monitor.enter();
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(true);
+    monitor.exit();
+    expect(monitor.isMonOwned()).toBe(false);
+  });
+
+  it("holds another thread out until exit", async () => {
+    const monitor = new Monitor();
+    monitor.enter();
+    const order: string[] = [];
+    const other = new Thread(async () => {
+      await monitor.enter();
+      order.push("entered");
+      monitor.exit();
+    });
+    await Thread.pass();
+    order.push("exiting");
+    monitor.exit();
+    await other.join();
+    expect(order).toEqual(["exiting", "entered"]);
+  });
+
+  it("raises ThreadError from exit when not the owner", () => {
+    expect(() => new Monitor().exit()).toThrow("current fiber not owner");
+  });
+});
+
+describe("Monitor#enter", () => {
+  it("is owned by the fiber, so two fibers on one thread exclude each other", async () => {
+    const { Fiber } = await import("../lib/fiber.js");
+    const monitor = new Monitor();
+    const events: string[] = [];
+    const flow = (name: string) =>
+      new Fiber(async () => {
+        await monitor.enter();
+        await monitor.enter();
+        events.push(`${name} in`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push(`${name} out`);
+        monitor.exit();
+        monitor.exit();
+      }).resume();
+    await Promise.all([flow("a"), flow("b")]);
+    expect(events).toEqual(["a in", "a out", "b in", "b out"]);
+  });
+});

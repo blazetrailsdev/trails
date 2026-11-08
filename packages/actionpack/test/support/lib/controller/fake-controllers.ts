@@ -1,0 +1,71 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base } from "../../../../lib/action-controller/base.js";
+
+export class ContentController extends Base {}
+
+export const Admin: Record<string, typeof Base> = {
+  AccountsController: class AccountsController extends Base {},
+  PostsController: class PostsController extends Base {},
+  StuffController: class StuffController extends Base {},
+  UserController: class UserController extends Base {},
+  UsersController: class UsersController extends Base {},
+};
+
+export const Api: Record<string, typeof Base> = {
+  UsersController: class UsersController extends Base {},
+  ProductsController: class ProductsController extends Base {},
+};
+
+export class AccountController extends Base {}
+export class ArchiveController extends Base {}
+export class ArticlesController extends Base {}
+export class BarController extends Base {}
+export class BlogController extends Base {}
+export class BooksController extends Base {}
+export class CarsController extends Base {}
+export class CcController extends Base {}
+export class CController extends Base {}
+export class FooController extends Base {}
+export class GeocodeController extends Base {}
+export class NewsController extends Base {}
+export class NotesController extends Base {}
+export class PagesController extends Base {}
+export class PeopleController extends Base {}
+export class PostsController extends Base {}
+export class SubpathBooksController extends Base {}
+export class SymbolsController extends Base {}
+export class UserController extends Base {}
+export class UsersController extends Base {}
+
+for (const [mod, constants] of Object.entries({ Admin, Api })) {
+  constSet(TopLevel, mod, constants);
+  for (const [name, klass] of Object.entries(constants)) {
+    Object.defineProperty(klass, "name", { value: `${mod}::${name}` });
+  }
+}
+
+for (const klass of [
+  ContentController,
+  AccountController,
+  ArchiveController,
+  ArticlesController,
+  BarController,
+  BlogController,
+  BooksController,
+  CarsController,
+  CcController,
+  CController,
+  FooController,
+  GeocodeController,
+  NewsController,
+  NotesController,
+  PagesController,
+  PeopleController,
+  PostsController,
+  SubpathBooksController,
+  SymbolsController,
+  UserController,
+  UsersController,
+]) {
+  constSet(TopLevel, klass.name, klass);
+}

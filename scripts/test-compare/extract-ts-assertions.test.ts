@@ -22,18 +22,20 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["two expects"]).toBe(2);
   });
 
-  it("counts a receiver-form x.expect(...) as the Ruby extractor does", () => {
+  it("counts a receiver-form x.expect(...) only as Minitest::Mock#expect, as the Ruby extractor does", () => {
     const src = `
       it("receiver expect", () => {
         const name = params.expect({ person: "name" }).expect("name");
         params.expectBang("id");
+        params.expect("a", "b");
+        mock.expect("call", null, [1]);
         assertEqual("David", name);
         expect(name).toBe("David");
       });
     `;
-    const info = extractTestsFromSource(src, "packages/actionpack/src/x.test.ts");
-    expect(info.testCases[0].assertionCount).toBe(4);
-    expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
+    const info = extractTestsFromSource(src, "packages/actionpack/test/x.test.ts");
+    expect(info.testCases[0].assertionCount).toBe(3);
+    expect(info.testCases[0].assertionKinds).toEqual(["expect", "assertEqual", "toBe"]);
   });
 
   it("reads a two-argument mustBe / wontBe as assertPredicate / refutePredicate", () => {
@@ -46,7 +48,7 @@ describe("TS extractor assertion-count collection", () => {
         wontBe(x, "isNil");
       });
     `;
-    const info = extractTestsFromSource(src, "packages/rack-test/src/x.test.ts");
+    const info = extractTestsFromSource(src, "packages/rack-test/test/x.test.ts");
     expect(info.testCases[0].assertionKinds).toEqual([
       "assertPredicate",
       "refutePredicate",
@@ -96,6 +98,43 @@ describe("TS extractor assertion-count collection", () => {
       });
     `;
     expect(tsAssertionCounts(src)["inline def"]).toBe(5);
+  });
+
+  it("folds a same-file test-class method called through an instance", () => {
+    const src = `
+      class LegacyRouteSetTests {
+        testNamedRouteMethod(): void {
+          expect(a).toBe(1);
+          expect(b).toBe(2);
+        }
+      }
+      describe("LegacyRouteSetTests", () => {
+        let tc: LegacyRouteSetTests;
+        it("named routes array", () => {
+          tc.testNamedRouteMethod();
+          expect(c).toEqual(3);
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["named routes array"]).toBe(3);
+  });
+
+  it("counts an assert-named test-class method called through an instance once", () => {
+    const src = `
+      class C {
+        assertRouting(): void {
+          expect(a).toBe(1);
+          expect(b).toBe(2);
+        }
+      }
+      describe("C", () => {
+        let tc: C;
+        it("routing", () => {
+          tc.assertRouting();
+        });
+      });
+    `;
+    expect(tsAssertionCounts(src)["routing"]).toBe(1);
   });
 
   it("still expands a helper declared outside the test body per call site", () => {

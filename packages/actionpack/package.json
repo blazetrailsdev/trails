@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
+    "build:templates": "cp -R lib/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R lib/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
   },
   "files": [
     "dist"
@@ -56,7 +56,7 @@
     "ua-parser-js": "^2.0.9"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "devDependencies": {
     "@blazetrails/trails-tsc": "workspace:*",

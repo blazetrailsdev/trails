@@ -1,28 +1,14 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Rack } from "./namespaces.js";
 
 export class BodyProxy {
-  private body: any;
+  protected body: any;
   private block: () => void;
   private _closed = false;
 
   constructor(body: any, block: () => void) {
     this.body = body;
     this.block = block;
-    return new Proxy(this, {
-      has: (target, prop) =>
-        Reflect.has(target, prop) || (typeof prop === "string" && target.respondToMissing(prop)),
-      get: (target, prop, receiver) => {
-        if (
-          Reflect.has(target, prop) ||
-          typeof prop !== "string" ||
-          !target.respondToMissing(prop)
-        ) {
-          return Reflect.get(target, prop, receiver);
-        }
-        return (...args: unknown[]) => target.methodMissing(prop, ...args);
-      },
-    });
   }
 
   close(): void {
@@ -83,37 +69,52 @@ export class BodyProxy {
     }
   }
 
-  respondToMissing(methodName: string): boolean {
-    if (methodName === "toStr" || methodName === "to_str") return false;
-    if (methodName === "toArray" || methodName === "to_ary") {
-      return (
-        Array.isArray(this.body) ||
-        typeof this.body?.toArray === "function" ||
-        typeof this.body?.to_ary === "function"
-      );
+  respondToMissing(methodName: string, _includeAll = false): boolean {
+    switch (methodName) {
+      case "toStr":
+        return false;
+      default:
+        return rbObjRespondTo(this.body, methodName);
     }
-    if (methodName === "toPath" || methodName === "to_path") {
-      return typeof this.body?.toPath === "function" || typeof this.body?.to_path === "function";
-    }
-    return typeof this.body?.[methodName] === "function";
   }
 
   methodMissing(methodName: string, ...args: unknown[]): any {
-    if (methodName === "toStr" || methodName === "to_str") {
-      throw new Error("NoMethodError: undefined method 'to_str'");
+    switch (methodName) {
+      case "toStr":
+        throw new NoMethodError(
+          `undefined method 'to_str' for an instance of Rack::BodyProxy`,
+          "to_str",
+          args,
+          false,
+          { receiver: this },
+        );
+      case "toAry":
+        try {
+          return rbFSend(this.body, methodName, ...args);
+        } finally {
+          this.close();
+        }
+      default:
+        return rbFSend(this.body, methodName, ...args);
     }
-    if (methodName === "toArray" || methodName === "to_ary") {
-      try {
-        return Array.isArray(this.body) ? this.body : this.body.toArray(...args);
-      } finally {
-        this.close();
-      }
-    }
-    if (typeof this.body?.[methodName] === "function") {
-      return this.body[methodName](...args);
-    }
-    throw new Error(`NoMethodError: undefined method '${methodName}'`);
   }
 }
 
 Rack.BodyProxy = BodyProxy;
+
+Object.setPrototypeOf(
+  BodyProxy.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(BodyProxy.prototype) as object) as object, {
+    get: (target, prop, receiver: BodyProxy) => {
+      if (
+        Reflect.has(target, prop) ||
+        typeof prop !== "string" ||
+        receiver === BodyProxy.prototype ||
+        !receiver.respondToMissing(prop)
+      ) {
+        return Reflect.get(target, prop, receiver);
+      }
+      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+    },
+  }),
+);

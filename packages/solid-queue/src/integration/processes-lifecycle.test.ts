@@ -9,6 +9,7 @@ import { ApplicationJob } from "../test-helpers/application-job.js";
 import { JobResult, StoreResultJob } from "../test-helpers/job-result.js";
 import { loadAppSchema } from "../test-helpers/queue-schema.js";
 import {
+  assertNoRegisteredProcesses,
   runSupervisor,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
@@ -22,6 +23,12 @@ async function assertCompletedJobResults(value: string, queueName = "background"
   expect(await JobResult.where({ queue_name: queueName, status: "completed", value }).count()).toBe(
     count,
   );
+}
+
+async function assertCleanTermination() {
+  await waitForRegisteredProcesses(0, { timeout: 0.2 });
+  await assertNoRegisteredProcesses();
+  expect(await ClaimedExecution.isNone()).toBeTruthy();
 }
 
 describe("ProcessesLifecycleTest", () => {
@@ -71,8 +78,6 @@ describe("ProcessesLifecycleTest", () => {
     for (let i = 0; i < 6; i++) await assertCompletedJobResults(`job_${i}`, "default");
 
     await run.terminate();
-    await waitForRegisteredProcesses(0, { timeout: 0.2 });
-    expect(await Process.count()).toBe(0);
-    expect(await ClaimedExecution.count()).toBe(0);
+    await assertCleanTermination();
   });
 });

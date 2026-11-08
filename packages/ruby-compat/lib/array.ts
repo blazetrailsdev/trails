@@ -1,0 +1,1400 @@
+import { IndexError } from "./index-error.js";
+import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
+import { rbHash } from "./rb-hash.js";
+import { ArgumentError } from "./argument-error.js";
+import { cmp, rbCmpint } from "./comparable.js";
+import { Hash } from "./hash.js";
+import { eachCons, find, partition, sortBy } from "./enumerable.js";
+import { rbBigNorm, rbPlus } from "./numeric.js";
+import { NoMethodError } from "./no-method-error.js";
+import {
+  conversionMismatch,
+  isPlainHash,
+  rbBuiltinClassName,
+  rbObjClassname,
+  rbObjIsProc,
+  rtest,
+  toS,
+} from "./object.js";
+import { Base64 } from "./base64.js";
+import { Range } from "./range.js";
+import { b } from "./string/b.js";
+import { num2long } from "./string/support.js";
+import { TypeError } from "./type-error.js";
+
+/** `toofew` (`vendor/ruby/v3.3.11/pack.c:120`). */
+const toofew = "too few arguments";
+
+/** `endstr` (`vendor/ruby/v3.3.11/pack.c:42`), the types `<` / `>` may follow. */
+const endstr = "sSiIlLqQjJ";
+
+/** `BIGENDIAN_P()` (`vendor/ruby/v3.3.11/pack.c:58-75`): the host byte order. */
+const BIGENDIAN_P = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
+
+/** `uu_table` (`vendor/ruby/v3.3.11/pack.c:785`). */
+const uuTable = "`!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_";
+
+/** `b64_table` (`vendor/ruby/v3.3.11/pack.c:787`). */
+const b64Table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/** `unknown_directive` (`vendor/ruby/v3.3.11/pack.c:160`). */
+function unknownDirective(mode: string, type: string, fmt: string): never {
+  throw new ArgumentError(`unknown ${mode} directive '${type}' in '${fmt}'`);
+}
+
+/**
+ * `encodes` (`vendor/ruby/v3.3.11/pack.c:791`) — `len` bytes of `s0` as Base64
+ * (`type == 'm'`) or uuencoded (`type == 'u'`), plus the trailing newline
+ * `tailLf` asks for. MRI's `buff_size` flush has no analogue: a JS array grows.
+ */
+function encodes(str: string[], s0: Uint8Array, len: number, type: string, tailLf: number): void {
+  const buff: string[] = [];
+  const trans = type === "u" ? uuTable : b64Table;
+  let padding: string;
+  const s = s0;
+  let i = 0;
+
+  if (type === "u") {
+    buff.push(String.fromCharCode(len + 32));
+    padding = "`";
+  } else {
+    padding = "=";
+  }
+
+  while (len >= 3) {
+    buff.push(trans[0o77 & (s[i] >> 2)]);
+    buff.push(trans[0o77 & (((s[i] << 4) & 0o60) | ((s[i + 1] >> 4) & 0o17))]);
+    buff.push(trans[0o77 & (((s[i + 1] << 2) & 0o74) | ((s[i + 2] >> 6) & 0o3))]);
+    buff.push(trans[0o77 & s[i + 2]]);
+    i += 3;
+    len -= 3;
+  }
+
+  if (len === 2) {
+    buff.push(trans[0o77 & (s[i] >> 2)]);
+    buff.push(trans[0o77 & (((s[i] << 4) & 0o60) | ((s[i + 1] >> 4) & 0o17))]);
+    buff.push(trans[0o77 & (((s[i + 1] << 2) & 0o74) | ((0 >> 6) & 0o3))]);
+    buff.push(padding);
+  } else if (len === 1) {
+    buff.push(trans[0o77 & (s[i] >> 2)]);
+    buff.push(trans[0o77 & (((s[i] << 4) & 0o60) | ((0 >> 4) & 0o17))]);
+    buff.push(padding);
+    buff.push(padding);
+  }
+  if (tailLf) buff.push("\n");
+  str.push(buff.join(""));
+}
+
+/**
+ * `pack_pack` (`vendor/ruby/v3.3.11/pack.c:197`), narrowed to the `m` directive
+ * (`pack.c:663-690`) — Base64, wrapped at `len` input bytes per line, or
+ * strict with no line breaks at all when the count is an explicit `0`. `m0` is
+ * what `Rack::Test::Session#basic_authorize` packs with
+ * (`vendor/rack-test/v2.2.0/lib/rack/test.rb:199`) — and to `U` (`pack.c:645-660`),
+ * one UTF-8 character per Integer, which `ActiveSupport::Multibyte::Chars`
+ * packs codepoints with (`multibyte/chars.rb:136,144`) — and to the `C`, `E`,
+ * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
+ * (`cache/coder.rb:44,77-82`), and the `L>` `MessagePack::Bigint` packs its
+ * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`), and the `q>` `MessagePack::Timestamp`
+ * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`), and the `v`
+ * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.0/lib/rack/session/encryptor.rb:173`): `C`, `l`,
+ * `L`, `q`, `Q`, `S` (`pack.c:483-487`) and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
+ * an absolute byte position (`pack.c:617-639`), and to `u` (`pack.c:662-691`,
+ * uuencoded, its String read as its UTF-8 bytes) and `M` (`pack.c:693-698`,
+ * quoted-printable over `qpencode`), which the mail gem's
+ * `UnixToUnix` and `QuotedPrintable` encode with. Every other directive is a
+ * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
+ * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
+ *
+ * `C`, `E`, `l` and `@` answer bytes, one code unit per byte, as `m` does.
+ *
+ * A `U` result is a UTF-8 String (`pack.c:299-302`), so it is a JS string of
+ * those characters rather than of bytes; `String.fromCodePoint` is
+ * `rb_uv_to_utf8`, and raises past U+10FFFF, which JS strings cannot hold.
+ *
+ * The argument is read as bytes, one code unit per byte — ruby-compat's
+ * ASCII-8BIT convention — as `pack.c:663-690` reads `RSTRING_PTR` with no
+ * re-encoding. A caller holding a UTF-8 String passes its `String#b`.
+ *
+ * `*` is `0` for the `@Xxu` types, `1` for the `PMm` types and the array
+ * remainder otherwise (`pack.c:281-284`), so `m*` is `m` and `U*` takes every
+ * element. The
+ * `u`-only `len > 63` clamp (`pack.c:676`) is not reachable without that
+ * directive.
+ *
+ * The result is an ASCII-8BIT String, a `Uint8Array`, unless every directive
+ * is `m`, `M`, `u` or `U` (`enc_info`, `pack.c:298-310`, `:771-777`), when it
+ * is US-ASCII or UTF-8 text.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
+ * (`vendor/ruby/v3.3.11/pack.c:197`).
+ */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: "m" | "m0" | "M" | "u" | "U" | "U*",
+): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: `${"a" | "A" | "Z" | "b" | "B" | "h" | "H" | "c" | "C" | "s" | "S" | "l" | "L" | "q" | "Q" | "j" | "J" | "i" | "I" | "n" | "N" | "v" | "V" | "f" | "F" | "e" | "E" | "d" | "D" | "g" | "G" | "x" | "X" | "@" | "w" | "p" | "P"}${string}`,
+): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: string,
+): string | Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: string,
+): string | Uint8Array {
+  const res: string[] = [];
+  let encInfo = 1;
+  let p = 0;
+  const pend = fmt.length;
+  let idx = 0;
+
+  const nextfrom = (): string | Uint8Array | number | bigint => {
+    if (idx >= ary.length) throw new ArgumentError(toofew);
+    return ary[idx++];
+  };
+
+  /** `hex_table` (`vendor/ruby/v3.3.11/pack.c:839`). */
+  const hexTable = "0123456789ABCDEF";
+
+  /**
+   * `qpencode` (`vendor/ruby/v3.3.11/pack.c:842`), less MRI's 1024-byte buffer flush.
+   */
+  function qpencode(str: string[], s: Uint8Array, len: number): void {
+    const buff: string[] = [];
+    let n = 0;
+    let prev = -1;
+
+    for (const c of s) {
+      if (c > 126 || (c < 32 && c !== 0x0a && c !== 0x09) || c === 0x3d) {
+        buff.push("=", hexTable[c >> 4], hexTable[c & 0x0f]);
+        n += 3;
+        prev = -1;
+      } else if (c === 0x0a) {
+        if (prev === 0x20 || prev === 0x09) buff.push("=", "\n");
+        buff.push("\n");
+        n = 0;
+        prev = c;
+      } else {
+        buff.push(String.fromCharCode(c));
+        n++;
+        prev = c;
+      }
+      if (n > len) {
+        buff.push("=", "\n");
+        n = 0;
+        prev = 0x0a;
+      }
+    }
+    if (n > 0) buff.push("=", "\n");
+    str.push(buff.join(""));
+  }
+
+  while (p < pend) {
+    const type = fmt[p++];
+
+    if (/\s/.test(type)) continue;
+    if (type === "#") {
+      while (p < pend && fmt[p] !== "\n") {
+        p++;
+      }
+      continue;
+    }
+
+    switch (type) {
+      case "U":
+        if (encInfo === 1) encInfo = 2;
+        break;
+      case "m":
+      case "M":
+      case "u":
+        break;
+      default:
+        encInfo = 0;
+        break;
+    }
+
+    let explicitEndian = "";
+    while (fmt[p] === "<" || fmt[p] === ">") {
+      if (!endstr.includes(type)) {
+        throw new ArgumentError(`'${fmt[p]}' allowed only after types ${endstr}`);
+      }
+      if (explicitEndian) throw new RangeError("Can't use both '<' and '>'");
+      explicitEndian = fmt[p++];
+    }
+
+    let len: number;
+    if (fmt[p] === "*") {
+      len = "@Xxu".includes(type) ? 0 : "PMm".includes(type) ? 1 : ary.length - idx;
+      p++;
+    } else if (fmt[p] >= "0" && fmt[p] <= "9") {
+      let digits = "";
+      while (fmt[p] >= "0" && fmt[p] <= "9") digits += fmt[p++];
+      len = Number(digits);
+    } else {
+      len = 1;
+    }
+
+    if (type === "U") {
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number") {
+          throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(from)} into Integer`);
+        }
+        const l = Math.trunc(from);
+        if (l < 0) {
+          throw new RangeError("pack(U): value out of range");
+        }
+        res.push(String.fromCodePoint(l));
+      }
+      continue;
+    }
+    if (
+      type === "C" ||
+      type === "l" ||
+      type === "L" ||
+      type === "q" ||
+      type === "Q" ||
+      type === "S" ||
+      type === "v"
+    ) {
+      const integerSize =
+        type === "C" ? 1 : type === "v" || type === "S" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+      const bigendianP =
+        type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number" && typeof from !== "bigint") {
+          throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(from)} into Integer`);
+        }
+        let v = BigInt.asUintN(
+          integerSize * 8,
+          BigInt(typeof from === "number" ? Math.trunc(from) : from),
+        );
+        const intbuf: string[] = [];
+        for (let i = 0; i < integerSize; i++, v >>= 8n)
+          intbuf.push(String.fromCharCode(Number(v & 0xffn)));
+        res.push((bigendianP ? intbuf.reverse() : intbuf).join(""));
+      }
+      continue;
+    }
+    if (type === "E") {
+      while (len-- > 0) {
+        const from = nextfrom();
+        if (typeof from !== "number" && typeof from !== "bigint") {
+          throw new TypeError(`can't convert ${rbBuiltinClassName(from)} into Float`);
+        }
+        const tmp = new DataView(new ArrayBuffer(8));
+        tmp.setFloat64(0, Number(from), true);
+        for (let i = 0; i < 8; i++) res.push(String.fromCharCode(tmp.getUint8(i)));
+      }
+      continue;
+    }
+    if (type === "@") {
+      const str = res.join("");
+      len -= str.length;
+      res.length = 0;
+      res.push(len > 0 ? str + "\0".repeat(len) : str.slice(0, str.length + len));
+      continue;
+    }
+    if (type === "M") {
+      const from = nextfrom() as string | Uint8Array;
+      if (len <= 1) len = 72;
+      qpencode(res, from instanceof Uint8Array ? from : b(String(from)), len);
+      continue;
+    }
+    if (type !== "m" && type !== "u") unknownDirective("pack", type, fmt);
+
+    const from = nextfrom() as string | Uint8Array;
+    let s: Uint8Array;
+    if (from instanceof Uint8Array) s = from;
+    else s = b(from);
+    let ptr = 0;
+    let plen = s.length;
+
+    if (len === 0 && type === "m") {
+      encodes(res, s.subarray(ptr), plen, type, 0);
+      continue;
+    }
+    if (len <= 2) len = 45;
+    else if (len > 63 && type === "u") len = 63;
+    else len = Math.floor(len / 3) * 3;
+    while (plen > 0) {
+      const todo = plen > len ? len : plen;
+      encodes(res, s.subarray(ptr), todo, type, 1);
+      plen -= todo;
+      ptr += todo;
+    }
+  }
+
+  const str = res.join("");
+  if (encInfo !== 0) return str;
+  return Uint8Array.from(str, (c) => c.charCodeAt(0));
+}
+
+/**
+ * `rb_ary_fetch` (`vendor/ruby/v3.3.11/array.c:1961`) in its one-argument form:
+ * a negative index counts from the end, and one outside the array raises
+ * `IndexError` (`array.c:1981`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#fetch`.
+ */
+export function rbAryFetch<T>(ary: readonly T[], pos: number): T {
+  let idx = pos;
+  if (idx < 0) idx += ary.length;
+  if (idx < 0 || ary.length <= idx) {
+    throw new IndexError(
+      `index ${idx - (idx < 0 ? ary.length : 0)} outside of array bounds: ${-ary.length}...${ary.length}`,
+    );
+  }
+  return ary[idx];
+}
+
+/**
+ * `rb_ary_replace` (`vendor/ruby/v3.3.11/array.c:4531`): `copy`'s contents
+ * become `orig`'s, in place, and `copy` is returned.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#replace`.
+ */
+export function rbAryReplace<T>(copy: T[], orig: readonly T[]): T[] {
+  if (copy === orig) return copy;
+  copy.splice(0, copy.length, ...orig);
+  return copy;
+}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `h` and `H`
+ * directives (`vendor/ruby/v3.3.11/pack.c:1125,1145`).
+ */
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: `h${string}` | `H${string}`,
+  options?: { offset?: number },
+): string | null;
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `q` and `Q`
+ * directives (`vendor/ruby/v3.3.11/pack.c:1219,1225`), whose 64-bit value is a
+ * `bigint` past 2**53.
+ */
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: `${string}q${string}` | `${string}Q${string}`,
+  options?: { offset?: number },
+): number | bigint | null;
+/**
+ * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
+ * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
+ * the format pushes, or nil when none does. Narrowed to the directives
+ * {@link pack} answers bytes for — `C`, `l`, `L`, `q`, `Q`, `S` (`pack.c:1189`) and `v` through `unpack_integer`
+ * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
+ * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
+ * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
+ *
+ * `str` is read as bytes, one code unit per byte, as {@link pack} writes them,
+ * or as the bytes of a `Uint8Array`, the binary String seat.
+ * `PACK_LENGTH_ADJUST_SIZE` (`pack.c:904-912`) caps a count at what the rest
+ * of the string holds, so an item short of bytes pushes nothing.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
+ * (`vendor/ruby/v3.3.11/pack.c:1621`).
+ */
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: string,
+  options?: { offset?: number },
+): number | null;
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
+ * (`vendor/ruby/v3.3.11/pack.c:1621`).
+ */
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: string,
+  { offset = 0 }: { offset?: number } = {},
+): number | bigint | string | Uint8Array | null {
+  const ary = packUnpackInternal(str, fmt, UNPACK_1, offset);
+  return ary.length > 0 ? ary[0] : null;
+}
+
+/**
+ * `String#unpack` (`vendor/ruby/v3.3.11/pack.c:1611` `pack_unpack`):
+ * `pack_unpack_internal` in `UNPACK_ARRAY` mode, every item the format
+ * pushes. The directives are {@link unpack1}'s, plus `u` (`pack.c:1362`),
+ * `m` (`pack.c:1417`) and `M` (`pack.c:1498`), each pushing an ASCII-8BIT
+ * String, a `Uint8Array`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function unpack(
+  str: string | Uint8Array,
+  fmt: string,
+  { offset = 0 }: { offset?: number } = {},
+): (number | bigint | string | Uint8Array)[] {
+  return packUnpackInternal(str, fmt, UNPACK_ARRAY, offset);
+}
+
+const UNPACK_ARRAY = 0;
+const UNPACK_1 = 2;
+
+/** `pack_unpack_internal` (`vendor/ruby/v3.3.11/pack.c:936`). */
+function packUnpackInternal(
+  str: string | Uint8Array,
+  fmt: string,
+  mode: number,
+  offset: number,
+): (number | bigint | string | Uint8Array)[] {
+  const ary: (number | bigint | string | Uint8Array)[] = [];
+  if (offset < 0) throw new ArgumentError("offset can't be negative");
+  const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
+  const send = ptr.length;
+  if (offset > send) throw new ArgumentError("offset outside of string");
+
+  /**
+   * `hex2num` (`vendor/ruby/v3.3.11/pack.c:895`).
+   */
+  function hex2num(c: number): number {
+    const n = parseInt(String.fromCharCode(c), 36);
+    return Number.isNaN(n) || n >= 16 ? -1 : n;
+  }
+  /** `utf8_to_uv` (`vendor/ruby/v3.3.11/pack.c:1684`). */
+  function utf8ToUv(ptr: Uint8Array, p: number, lenp: number): [number, number] {
+    const utf8Limits = [0x0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000, 0x80000000];
+    let c = ptr[p++];
+    let uv = c;
+    let n: number;
+
+    if (!(uv & 0x80)) return [uv, 1];
+    if (!(uv & 0x40)) throw new ArgumentError("malformed UTF-8 character");
+
+    if (!(uv & 0x20)) {
+      n = 2;
+      uv &= 0x1f;
+    } else if (!(uv & 0x10)) {
+      n = 3;
+      uv &= 0x0f;
+    } else if (!(uv & 0x08)) {
+      n = 4;
+      uv &= 0x07;
+    } else if (!(uv & 0x04)) {
+      n = 5;
+      uv &= 0x03;
+    } else if (!(uv & 0x02)) {
+      n = 6;
+      uv &= 0x01;
+    } else {
+      throw new ArgumentError("malformed UTF-8 character");
+    }
+    if (n > lenp) {
+      throw new ArgumentError(
+        `malformed UTF-8 character (expected ${n} bytes, given ${lenp} bytes)`,
+      );
+    }
+    lenp = n--;
+    while (n--) {
+      c = ptr[p++];
+      if ((c & 0xc0) !== 0x80) throw new ArgumentError("malformed UTF-8 character");
+      uv = uv * 64 + (c & 0x3f);
+    }
+    if (uv < utf8Limits[lenp - 1]) throw new ArgumentError("redundant UTF-8 sequence");
+    return [uv, lenp];
+  }
+  let s = offset;
+  let p = 0;
+  const pend = fmt.length;
+
+  while (p < pend) {
+    let explicitEndian = "";
+    const type = fmt[p++];
+
+    if (/\s/.test(type)) continue;
+    if (type === "#") {
+      while (p < pend && fmt[p] !== "\n") {
+        p++;
+      }
+      continue;
+    }
+
+    while (fmt[p] === "<" || fmt[p] === ">") {
+      if (!endstr.includes(type)) {
+        throw new ArgumentError(`'${fmt[p]}' allowed only after types ${endstr}`);
+      }
+      if (explicitEndian) throw new RangeError("Can't use both '<' and '>'");
+      explicitEndian = fmt[p++];
+    }
+
+    let len: number;
+    if (p >= pend) {
+      len = 1;
+    } else if (fmt[p] === "*") {
+      len = send - s;
+      p++;
+    } else if (fmt[p] >= "0" && fmt[p] <= "9") {
+      let digits = "";
+      while (fmt[p] >= "0" && fmt[p] <= "9") digits += fmt[p++];
+      len = Number(digits);
+    } else {
+      len = type !== "@" ? 1 : 0;
+    }
+
+    if (
+      type === "C" ||
+      type === "l" ||
+      type === "L" ||
+      type === "q" ||
+      type === "Q" ||
+      type === "S" ||
+      type === "v"
+    ) {
+      const signedP = type === "l" || type === "q";
+      const integerSize =
+        type === "C" ? 1 : type === "v" || type === "S" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+      const bigendianP =
+        type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+      if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
+      while (len-- > 0) {
+        let val = 0n;
+        for (let i = 0; i < integerSize; i++) {
+          const byte = BigInt(ptr[bigendianP ? s + i : s + integerSize - 1 - i]);
+          val = (val << 8n) | byte;
+        }
+        ary.push(rbBigNorm(signedP ? BigInt.asIntN(integerSize * 8, val) : val));
+        if (mode === UNPACK_1) return ary;
+        s += integerSize;
+      }
+      continue;
+    }
+    if (type === "E") {
+      if (len > Math.floor((send - s) / 8)) len = Math.floor((send - s) / 8);
+      while (len-- > 0) {
+        const tmp = new DataView(new ArrayBuffer(8));
+        for (let i = 0; i < 8; i++) tmp.setUint8(i, ptr[s + i]);
+        ary.push(tmp.getFloat64(0, true));
+        if (mode === UNPACK_1) return ary;
+        s += 8;
+      }
+      continue;
+    }
+    if (type === "h") {
+      if (fmt[p - 1] === "*" || len > (send - s) * 2) len = (send - s) * 2;
+      let bits = 0;
+      let bitstr = "";
+      for (let i = 0; i < len; i++) {
+        if (i & 1) bits >>= 4;
+        else bits = ptr[s++];
+        bitstr += "0123456789abcdef"[bits & 15];
+      }
+      ary.push(bitstr);
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "H") {
+      if (fmt[p - 1] === "*" || len > (send - s) * 2) len = (send - s) * 2;
+      let bits = 0;
+      let bitstr = "";
+      for (let i = 0; i < len; i++) {
+        if (i & 1) bits <<= 4;
+        else bits = ptr[s++];
+        bitstr += "0123456789abcdef"[(bits >> 4) & 15];
+      }
+      ary.push(bitstr);
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "@") {
+      if (len > send) throw new ArgumentError("@ outside of string");
+      s = len;
+      continue;
+    }
+    if (type === "U") {
+      if (len > send - s) len = send - s;
+      while (len > 0 && s < send) {
+        const [l, alen] = utf8ToUv(ptr, s, send - s);
+        s += alen;
+        len--;
+        ary.push(l);
+        if (mode === UNPACK_1) return ary;
+      }
+      continue;
+    }
+    if (type === "u") {
+      const buf = new Uint8Array(Math.floor(((send - s) * 3) / 4));
+      let optr = 0;
+      let total = 0;
+      const uuChar = (): number =>
+        s < send && ptr[s] >= 0x20 && ptr[s] < 0x61 ? (ptr[s++] - 0x20) & 0o77 : 0;
+      while (s < send && ptr[s] > 0x20 && ptr[s] < 0x61) {
+        let n = (ptr[s++] - 0x20) & 0o77;
+        total += n;
+        if (total > buf.length) {
+          n -= total - buf.length;
+          total = buf.length;
+        }
+        while (n > 0) {
+          const mlen = n > 3 ? 3 : n;
+          const a = uuChar();
+          const bb = uuChar();
+          const c = uuChar();
+          const d = uuChar();
+          const hunk = [(a << 2) | (bb >> 4), (bb << 4) | (c >> 2), (c << 6) | d];
+          for (let i = 0; i < mlen; i++) buf[optr++] = hunk[i] & 0xff;
+          n -= mlen;
+        }
+        if (s < send && ptr[s] !== 0x0d && ptr[s] !== 0x0a) s++;
+        if (s < send && ptr[s] === 0x0d) s++;
+        if (s < send && ptr[s] === 0x0a) s++;
+      }
+      ary.push(buf.slice(0, total));
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "m") {
+      let src = "";
+      for (let i = s; i < send; i++) src += String.fromCharCode(ptr[i]);
+      const decoded = len === 0 ? Base64.strictDecode64(src) : Base64.decode64(src);
+      ary.push(Uint8Array.from(decoded, (c) => c.charCodeAt(0)));
+      s = send;
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    if (type === "M") {
+      const buf: number[] = [];
+      let ss = s;
+      while (s < send) {
+        if (ptr[s] === 0x3d) {
+          if (++s === send) break;
+          if (s + 1 < send && ptr[s] === 0x0d && ptr[s + 1] === 0x0a) s++;
+          if (ptr[s] !== 0x0a) {
+            const c1 = hex2num(ptr[s]);
+            if (c1 === -1) break;
+            if (++s === send) break;
+            const c2 = hex2num(ptr[s]);
+            if (c2 === -1) break;
+            buf.push((c1 << 4) | c2);
+          }
+        } else {
+          buf.push(ptr[s]);
+        }
+        s++;
+        ss = s;
+      }
+      ary.push(Uint8Array.from([...buf, ...ptr.subarray(ss, send)]));
+      s = send;
+      if (mode === UNPACK_1) return ary;
+      continue;
+    }
+    unknownDirective("unpack", type, fmt);
+  }
+
+  return ary;
+}
+
+/**
+ * Ruby `Array#slice` / `Array#[]` (`vendor/ruby/v3.3.11/array.c:1827` `rb_ary_aref`):
+ * `(index)` answers the element or nil, `(start, length)` a subarray
+ * (`rb_ary_aref2`, `:1837`), and a Range a subarray through
+ * `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`); an out-of-range start is nil.
+ * @noRailsEquivalent PERMANENT
+ */
+export function arySlice<T>(ary: readonly T[], arg: unknown, length?: unknown): T | T[] | null {
+  const argc = arguments.length - 1;
+  if (argc < 1 || argc > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
+  }
+  const alen = ary.length;
+  if (argc === 2) {
+    let beg = num2long(arg);
+    const len = num2long(length);
+    if (beg < 0) beg += alen;
+    return subseq(ary, beg, len);
+  }
+  if (arg instanceof Range) {
+    let beg = arg.begin ?? 0;
+    let end = arg.end ?? alen;
+    if (beg < 0) {
+      beg += alen;
+      if (beg < 0) return null;
+    }
+    if (end < 0) end += alen;
+    if (arg.end !== null && !arg.excludeEnd) end += 1;
+    return subseq(ary, beg, Math.max(0, end - beg));
+  }
+  const offset = num2long(arg);
+  const index = offset < 0 ? offset + alen : offset;
+  return index >= 0 && index < alen ? ary[index] : null;
+}
+
+function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
+  if (beg > ary.length || beg < 0 || len < 0) return null;
+  return ary.slice(beg, beg + len);
+}
+
+/**
+ * Mirrors: Ruby's Array#sort_by! — `vendor/ruby/v3.3.11/array.c:3593`
+ * `rb_ary_sort_by_bang`, which replaces the receiver's elements with
+ * `sort_by`'s result and answers the receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function sortByBang<T>(ary: T[], block: (item: T) => unknown): T[] {
+  const sorted = sortBy(ary, block);
+  ary.splice(0, ary.length, ...sorted);
+  return ary;
+}
+
+/**
+ * Ruby `Array#delete_if` (`vendor/ruby/v3.3.11/array.c:4330` `rb_ary_delete_if`):
+ * removes, in place, every element the block answers truthily for
+ * (`reject_bang_i`, `array.c:4225`) and answers the receiver. When the block
+ * raises, the elements not yet visited are kept after the ones already
+ * retained (`select_bang_ensure`, `array.c:3841`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryDeleteIf<T>(ary: T[], block: (item: T) => unknown): T[] {
+  let i1 = 0;
+  let i2 = 0;
+  try {
+    for (; i1 < ary.length; i1++) {
+      const v = ary[i1];
+      const result = block(v);
+      if (result != null && result !== false) continue;
+      if (i1 !== i2) {
+        ary[i2] = v;
+      }
+      i2++;
+    }
+  } finally {
+    const len = ary.length;
+    if (i2 < len && i2 < i1) {
+      let tail = 0;
+      if (i1 < len) {
+        tail = len - i1;
+        ary.copyWithin(i2, i1, len);
+      }
+      ary.length = i2 + tail;
+    }
+  }
+  return ary;
+}
+
+/**
+ * Ruby `Array#delete` (`vendor/ruby/v3.3.11/array.c:3973` `rb_ary_delete`): removes, in
+ * place, every element `==` to `item` (`rb_equal`, so a record matches by
+ * `ActiveRecord::Core#==`, not identity) and answers the last one removed.
+ * When nothing matched it answers the block's value for `item`, or nil.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T) => U): T | U {
+  let v = item;
+  let i2 = 0;
+  for (let i1 = 0; i1 < ary.length; i1++) {
+    const e = ary[i1];
+
+    if (rbEqual(e, item)) {
+      v = e;
+      continue;
+    }
+    if (i1 !== i2) {
+      ary[i2] = e;
+    }
+    i2++;
+  }
+  if (ary.length === i2) {
+    if (block) {
+      return block(item);
+    }
+    return undefined as U;
+  }
+
+  ary.length = i2;
+
+  return v;
+}
+
+/**
+ * Ruby `Array#delete_at` (`vendor/ruby/v3.3.11/array.c:4072` `rb_ary_delete_at_m`,
+ * over `rb_ary_delete_at`, `array.c:4027`): removes, in place, the element at
+ * `pos` and answers it. A negative `pos` counts back from the end, and one out
+ * of range either way answers `nil` and leaves the array alone.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function deleteAt<T>(ary: T[], pos: number): T | null {
+  pos = num2long(pos);
+  const len = ary.length;
+
+  if (pos >= len) return null;
+  if (pos < 0) {
+    pos += len;
+    if (pos < 0) return null;
+  }
+
+  const del = ary[pos];
+  ary.splice(pos, 1);
+  return del;
+}
+
+/**
+ * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
+ * the first element, or `nil` for an empty array. Any other enumerable is
+ * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
+ * `first_i` (`enum.c:1245`) breaks out of `each` at the first element. A
+ * receiver that is neither answers its own `first` (`rb_funcallv`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:1080`), a method called or a reader read, or raises `NoMethodError` (`rb_method_missing`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:869`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function first<T>(ary: Iterable<T>): T | null {
+  if (Array.isArray(ary)) return ary.length === 0 ? null : ary[0];
+  if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
+    const member = (ary as { first?: unknown } | null)?.first;
+    if (member !== undefined)
+      return (typeof member === "function" ? member.call(ary) : member) as T;
+    throw new NoMethodError(
+      ary == null
+        ? "undefined method 'first' for nil"
+        : `undefined method 'first' for an instance of ${rbObjClassname(ary)}`,
+    );
+  }
+  for (const i of ary) {
+    return i;
+  }
+  return null;
+}
+
+/**
+ * Ruby `Array#last` (`vendor/ruby/v3.3.11/array.c:1914` `rb_ary_last`): the last
+ * element, or `nil` for an empty array (`ary_last`, `array.c:1907`); with `n`,
+ * the last `n` elements in order. `n` past the length takes them all, and a
+ * negative `n` raises (`ary_take_first_or_last_n`, `array.c:1292-1307`). A
+ * non-Array receiver answers its own `last` (`rb_funcallv`, `vendor/ruby/v3.3.11/vm_eval.c:1080`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function last<T>(ary: readonly T[]): T | null;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+export function last<T>(ary: readonly T[], n: number): T[];
+/** @noRailsEquivalent PERMANENT — `rb_funcallv` (`vendor/ruby/v3.3.11/vm_eval.c:1080`) on a receiver's own `last`. */
+export function last(ary: { readonly last: unknown }): unknown;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+export function last<T>(ary: readonly T[] | { readonly last: unknown }, n?: number): unknown {
+  if (!Array.isArray(ary)) {
+    const member = (ary as { last?: unknown } | null)?.last;
+    if (member === undefined) {
+      throw new NoMethodError(
+        ary == null
+          ? "undefined method 'last' for nil"
+          : `undefined method 'last' for an instance of ${rbObjClassname(ary)}`,
+      );
+    }
+    return (
+      typeof member === "function" ? member.call(ary, ...(n === undefined ? [] : [n])) : member
+    ) as T;
+  }
+  const len = ary.length;
+  if (n === undefined) return len === 0 ? null : ary[len - 1];
+  n = num2long(n);
+  if (n > len) {
+    n = len;
+  } else if (n < 0) {
+    throw new ArgumentError("negative array size");
+  }
+  return ary.slice(len - n);
+}
+
+/**
+ * Ruby `Array#count` (`vendor/ruby/v3.3.11/array.c:6275` `rb_ary_count`): the number
+ * of elements the block answers truthily for (`RTEST`), or the length with no
+ * block. The `count(obj)` arm is not ported: nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryCount<T>(ary: readonly T[], block?: (item: T) => unknown): number {
+  if (!block) return ary.length;
+  let n = 0;
+  for (const v of ary) {
+    const result = block(v);
+    if (result != null && result !== false) n++;
+  }
+  return n;
+}
+
+/**
+ * Ruby `Array#reject` (`vendor/ruby/v3.3.11/array.c:4301` `rb_ary_reject`): a new
+ * array of the elements the block does not answer truthily for (`RTEST`,
+ * `ary_reject`, `:4210`). Each block result is awaited before the next element
+ * is yielded, so a block that awaits still runs in order, one at a time. The
+ * block-less enumerator arm is not ported: nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function aryReject<T>(ary: readonly T[], block: (item: T) => unknown): Promise<T[]> {
+  const result: T[] = [];
+  for (const v of ary) {
+    const yielded = await block(v);
+    if (yielded == null || yielded === false) result.push(v);
+  }
+  return result;
+}
+
+/**
+ * Ruby `Array#each` (`vendor/ruby/v3.3.11/array.c:2532` `rb_ary_each`): yields each
+ * element and returns the receiver. With no block it is
+ * `RETURN_SIZED_ENUMERATOR` (`:2535`), whose elements are the receiver's. A `Set`
+ * yields its members, and a `Map` or plain Hash its `[key, value]` pairs, as
+ * `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function each<R extends object>(
+  recv: R,
+  block?: (item: R extends Iterable<infer T> ? T : [string, unknown]) => unknown,
+): R {
+  if (!block) return recv;
+  const yielder = block as (item: unknown) => unknown;
+  const own = (recv as { each?: unknown }).each;
+  if (!isPlainHash(recv) && typeof own === "function") return own.call(recv, yielder) as R;
+  for (const i of isPlainHash(recv) ? Object.entries(recv) : (recv as Iterable<unknown>)) {
+    yielder(i);
+  }
+  return recv;
+}
+
+/**
+ * Ruby `Array#to_h` with no block (`vendor/ruby/v3.3.11/array.c:2988` `rb_ary_to_h`):
+ * a Hash of the receiver's `[key, value]` pairs. The block arm is not ported:
+ * nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, V>;
+/**
+ * The `to_h` send for any other receiver: its own `toH`, and a plain object,
+ * which is a Hash, answers itself (`vendor/ruby/v3.3.11/hash.c:3018` `rb_hash_to_h`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toH<T extends object>(obj: T | { toH(): T }): T;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_ary_to_h` (`vendor/ruby/v3.3.11/array.c:2988`). */
+export function toH(ary: object): unknown {
+  if (!Array.isArray(ary)) {
+    if (typeof (ary as { toH?: unknown }).toH === "function") {
+      return (ary as { toH(): unknown }).toH();
+    }
+    return ary;
+  }
+  const hash = new Hash<unknown, unknown>();
+  for (let i = 0; i < ary.length; i++) {
+    const keyValuePair = ary[i];
+    if (!Array.isArray(keyValuePair)) {
+      throw new TypeError(
+        `wrong element type ${rbBuiltinClassName(keyValuePair)} at ${i} (expected array)`,
+      );
+    }
+    if (keyValuePair.length !== 2) {
+      throw new ArgumentError(
+        `wrong array length at ${i} (expected 2, was ${keyValuePair.length})`,
+      );
+    }
+    hash.set(keyValuePair[0], keyValuePair[1]);
+  }
+  return hash;
+}
+
+/**
+ * Ruby `Array#to_a` (`vendor/ruby/v3.3.11/array.c:2952` `rb_ary_to_a`): the receiver
+ * itself, or a plain-Array copy of an instance of an Array subclass.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toA<T>(ary: T[]): T[] {
+  if (ary.constructor !== Array) {
+    const dup: T[] = [];
+    dup.push(...ary);
+    return dup;
+  }
+  return ary;
+}
+
+/**
+ * Ruby `Array#take` (`vendor/ruby/v3.3.11/array.c:7532` `rb_ary_take`): the first `n` elements.
+ * @noRailsEquivalent PERMANENT
+ */
+export function take<T>(ary: readonly T[], n: number): T[] {
+  const len = num2long(n);
+  if (len < 0) throw new ArgumentError("attempt to take negative size");
+  return ary.slice(0, len);
+}
+
+/**
+ * Ruby `Array#compact` (`vendor/ruby/v3.3.11/array.c:6240` `rb_ary_compact`): a new
+ * array with every `nil` element removed.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#compact`
+ *   (`vendor/ruby/v3.3.11/array.c:6240`).
+ */
+export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
+  return ary.filter((element) => element != null);
+}
+
+/**
+ * Ruby `Array#compact!` (`vendor/ruby/v3.3.11/array.c:6207` `rb_ary_compact_bang`):
+ * removes every `nil` element in place, answering the array, or `nil` when
+ * none was removed.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function compactBang<T>(ary: T[]): T[] | null {
+  let p = 0;
+  for (let t = 0; t < ary.length; t++) {
+    if (ary[t] != null) ary[p++] = ary[t];
+  }
+  if (ary.length === p) return null;
+  ary.length = p;
+  return ary;
+}
+
+/**
+ * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`, over
+ * `rb_check_convert_type_with_id`, `vendor/ruby/v3.3.11/object.c:3184`): an
+ * Array, its `to_ary`, or nil. A `to_ary` answering anything else raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckArrayType(ary: unknown): unknown[] | null {
+  if (Array.isArray(ary)) return ary;
+  const toAry = (ary as { toAry?: unknown } | null)?.toAry;
+  if (typeof toAry !== "function") return null;
+  const v: unknown = toAry.call(ary);
+  if (v == null) return null;
+  if (!Array.isArray(v)) conversionMismatch(ary, "Array", "to_ary", v);
+  return v;
+}
+
+/** `rb_check_to_array` (`vendor/ruby/v3.3.11/array.c:981`): the receiver's `to_a`, or nil. */
+function rbCheckToArray(ary: unknown): unknown[] | null {
+  if (ary == null) return [];
+  if (ary instanceof Map) return [...ary.entries()];
+  if (ary instanceof Set) return [...ary.values()];
+  if (typeof ary !== "object") return null;
+  const toA = (ary as { toA?: unknown }).toA;
+  if (typeof toA === "function") {
+    const v: unknown = toA.call(ary);
+    if (v == null) return null;
+    if (!Array.isArray(v)) conversionMismatch(ary, "Array", "to_a", v);
+    return v;
+  }
+  const proto: unknown = Object.getPrototypeOf(ary);
+  if (proto === Object.prototype || proto === null) return Object.entries(ary);
+  return null;
+}
+
+/**
+ * `Kernel#Array` (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, over
+ * `rb_Array`, `vendor/ruby/v3.3.11/object.c:3791`): the
+ * argument's `to_ary`, else its `to_a`, else the argument in a one-element
+ * Array.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFArray(val: unknown): unknown[] {
+  let tmp = rbCheckArrayType(val);
+
+  if (tmp === null) {
+    tmp = rbCheckToArray(val);
+    if (tmp === null) {
+      return [val];
+    }
+  }
+  return tmp;
+}
+
+/**
+ * Ruby `Array#flatten` with no level (`vendor/ruby/v3.3.11/array.c:6476`
+ * `rb_ary_flatten`, over `flatten`, `array.c:6305`): every element that
+ * answers {@link rbCheckArrayType} is replaced by its own flattened elements,
+ * and an array reached again on its own path raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function flatten(ary: readonly unknown[]): unknown[] {
+  const result: unknown[] = [];
+  const memo = new Set<unknown>([ary]);
+  const walk = (level: readonly unknown[]): void => {
+    for (const elt of level) {
+      const tmp = rbCheckArrayType(elt);
+      if (tmp === null) {
+        result.push(elt);
+        continue;
+      }
+      if (memo.has(tmp)) throw new ArgumentError("tried to flatten recursive array");
+      memo.add(tmp);
+      walk(tmp);
+      memo.delete(tmp);
+    }
+  };
+  walk(ary);
+  return result;
+}
+
+/**
+ * Ruby `Array#uniq` (`vendor/ruby/v3.3.11/array.c:6177` `rb_ary_uniq`): the elements in
+ * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
+ * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
+ * Ruby's `1` and `1` do, a tuple is `eql?` by its elements, and a value whose
+ * class defines only `==` stays distinct. With a block, each element is keyed
+ * on the block's result (`ary_make_hash_by`, `array.c:5361`) and the first
+ * element for each key is kept.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#uniq`
+ *   (`vendor/ruby/v3.3.11/array.c:6177`).
+ */
+export function uniq<T>(ary: readonly T[], block?: (element: T) => unknown): T[] {
+  const hash = new Map<number, unknown[]>();
+  const result: T[] = [];
+  for (const element of ary) {
+    const k = block ? block(element) : element;
+    const key = rbHash(k);
+    const bucket = hash.get(key) ?? [];
+    if (bucket.some((seen) => rbEql(seen, k))) continue;
+    bucket.push(k);
+    hash.set(key, bucket);
+    result.push(element);
+  }
+  return result;
+}
+
+/**
+ * Ruby `Array#include?` (`vendor/ruby/v3.3.11/array.c:5222` `rb_ary_includes`):
+ * whether an element is `==` to `item`. Each element is the receiver of the
+ * `rb_equal` send, so a class's own `==` answers where a JS `includes`
+ * compares identity.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryIncludes<T>(ary: readonly T[], item: unknown): boolean {
+  for (let i = 0; i < ary.length; i++) {
+    const e = ary[i];
+    if (rbEqual(e, item)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Ruby `Array#|` (`vendor/ruby/v3.3.11/array.c:5600` `rb_ary_or`): `ary1`'s
+ * elements then `ary2`'s, deduplicated across both the way `uniq` is — by
+ * `hash`/`eql?` (`rb_ary_union`, `array.c:5562`), so two separately built
+ * `eql?` tuples or Hashes collapse where a JS `includes` would keep both.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#|`
+ *   (`vendor/ruby/v3.3.11/array.c:5600`).
+ */
+export function union<T>(ary1: readonly T[], ary2: readonly T[]): T[] {
+  return uniq([...ary1, ...ary2]);
+}
+
+/**
+ * Ruby `Array#product` (`vendor/ruby/v3.3.11/array.c:7426` `rb_ary_product`), the
+ * block-less form: every combination taking one element from `ary` and one from
+ * each of `args`, the last array varying fastest.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#product`.
+ */
+export function product<T>(ary: readonly T[], ...args: (readonly T[])[]): T[][] {
+  let result: T[][] = ary.map((e) => [e]);
+  for (const other of args) {
+    result = result.flatMap((combo) => other.map((e) => [...combo, e]));
+  }
+  return result;
+}
+
+/**
+ * Ruby `Array#intersect?` (`vendor/ruby/v3.3.11/array.c:5680` `rb_ary_intersect_p`):
+ * whether the two arrays share an element, compared by `eql?` as
+ * `rb_ary_includes_by_eql` does. An empty array on either side answers false.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#intersect?`
+ *   (`vendor/ruby/v3.3.11/array.c:5680`).
+ */
+export function isIntersect<T>(ary1: readonly T[], ary2: readonly T[]): boolean {
+  if (ary1.length === 0 || ary2.length === 0) return false;
+  for (const v of ary1) {
+    if (ary2.some((e) => rbEql(e, v))) return true;
+  }
+  return false;
+}
+
+/**
+ * Ruby `Array#sort` without a block (`vendor/ruby/v3.3.11/array.c:3473` `rb_ary_sort`):
+ * a sorted copy, ordered by `sort_2` (`array.c:3301`), which sends `<=>` and
+ * hands the answer to `rb_cmpint`, so a `nil` `<=>` raises
+ * `ArgumentError: comparison of A with B failed`.
+ *
+ * @boundary: `ruby_qsort` (`vendor/ruby/v3.3.11/util.c:253`) is the platform `qsort_s`,
+ *  glibc's merge sort, which always passes the earlier element first. V8's
+ *  `Array#sort` does not, and the order names the classes in the message, so
+ *  the merge is written out.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#sort` (`vendor/ruby/v3.3.11/array.c:3473`).
+ */
+export function sort<T>(ary: readonly T[]): T[] {
+  const sort2 = (a: T, b: T): number => rbCmpint(cmp(a, b), a, b);
+  const msort = (b: T[]): T[] => {
+    if (b.length <= 1) return b;
+    const n1 = b.length >> 1;
+    const b1 = msort(b.slice(0, n1));
+    const b2 = msort(b.slice(n1));
+    const tmp: T[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < b1.length && j < b2.length) {
+      tmp.push(sort2(b1[i], b2[j]) <= 0 ? b1[i++] : b2[j++]);
+    }
+    return tmp.concat(b1.slice(i), b2.slice(j));
+  };
+  return msort([...ary]);
+}
+
+/**
+ * Ruby `Array#join` (`vendor/ruby/v3.3.11/array.c:2806` `rb_ary_join`, over
+ * `ary_join_1` at `:2778`): each element's string with `sep` between them. A
+ * nested Array is joined in place with the same `sep` (`ary_join_1_ary`,
+ * `:2760`), and one that contains itself raises `ArgumentError`. Every other
+ * element is sent `to_s` (`rb_obj_as_string`), so a Symbol (`":name"`)
+ * contributes its name. A nil `sep` is `$,`, which is nil: nothing between.
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryJoin(ary: readonly unknown[], sep: string | null = null): string {
+  return aryJoin1([ary], ary, sep ?? "");
+}
+
+/** `ary_join_1` (`vendor/ruby/v3.3.11/array.c:2778`). */
+function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string): string {
+  return ary
+    .map((val) => {
+      if (Array.isArray(val)) {
+        if (obj.includes(val)) throw new ArgumentError("recursive array join");
+        return aryJoin1([...obj, val], val, sep);
+      }
+      return toS(val);
+    })
+    .join(sep);
+}
+
+type ArrayMethod = (self: unknown[], ...args: never[]) => unknown;
+type Block = (...args: unknown[]) => unknown;
+
+/**
+ * The Array methods `rbFSend` dispatches and `basicObjRespondTo` answers for
+ * that a JS array has no member for, keyed by the camelCased Ruby name as
+ * `STRING_METHOD_TABLE` keys String's. They are the ones `Init_Array`
+ * (`vendor/ruby/v3.3.11/array.c:8606`) and `Enumerable`
+ * (`vendor/ruby/v3.3.11/enum.c:5047`) define that a Relation sends its
+ * records: by `delegate ..., to: :records`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation/delegation.rb:98-103`)
+ * and by `include Enumerable`
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/relation.rb:67`).
+ * A name the ported `Enumerable` module answers is not repeated here. `-`, `|` and `&` go by the method Ruby
+ * also names them (`difference`, `union`, `intersection`) and `+` is `plus`;
+ * a block is a trailing `rbObjIsProc` function, and with no block an
+ * entry answers a copy of the Array its enumerator would yield. A package
+ * that reopens Array, as ActiveSupport's `core_ext/array` does, assigns an
+ * entry.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Object.create(null), {
+  /** `rb_ary_to_a` (`vendor/ruby/v3.3.11/array.c:2952`). */
+  toA: (self) => toA(self),
+  /** `rb_ary_to_ary_m` (`vendor/ruby/v3.3.11/array.c:3019`). */
+  toAry: (self) => self,
+  /** `rb_ary_plus` (`vendor/ruby/v3.3.11/array.c:4879`). */
+  plus: (self, y: unknown) => rbPlus(self, y),
+  /** `rb_ary_difference_multi` (`vendor/ruby/v3.3.11/array.c:5430`), over `rb_ary_diff` (`:5384`). */
+  difference: (self, ...argv: unknown[][]) =>
+    argv.reduce((ary1, ary2) => ary1.filter((elt) => !ary2.some((e) => rbEql(e, elt))), [...self]),
+  /** `rb_ary_union_multi` (`vendor/ruby/v3.3.11/array.c:5635`). */
+  union: (self, ...argv: unknown[][]) => argv.reduce(union, uniq(self)),
+  /** `rb_ary_intersection_multi` (`vendor/ruby/v3.3.11/array.c:5541`), over `rb_ary_and` (`:5486`). */
+  intersection: (self, ...argv: unknown[][]) =>
+    argv.reduce((ary1, ary2) => uniq(ary1.filter((v) => ary2.some((e) => rbEql(e, v)))), [...self]),
+  /** `rb_ary_intersect_p` (`vendor/ruby/v3.3.11/array.c:5680`). */
+  isIntersect: (self, ary2: unknown[]) => isIntersect(self, ary2),
+  /** `rb_ary_index` (`vendor/ruby/v3.3.11/array.c:2026`). */
+  index: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self];
+    const [val] = argv;
+    const i = self.findIndex((e) => (rbObjIsProc(val) ? rtest(val(e)) : rbEqual(e, val)));
+    return i < 0 ? null : i;
+  },
+  /** `rb_ary_rindex` (`vendor/ruby/v3.3.11/array.c:2087`). */
+  rindex: (self, ...argv: unknown[]) => {
+    if (argv.length === 0) return [...self].reverse();
+    const [val] = argv;
+    for (let i = self.length; i--; ) {
+      if (rbObjIsProc(val) ? rtest(val(self[i])) : rbEqual(self[i], val)) return i;
+    }
+    return null;
+  },
+  /** `rb_ary_collect` (`vendor/ruby/v3.3.11/array.c:3625`). */
+  collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : [...self]),
+  /** `rb_ary_compact` (`vendor/ruby/v3.3.11/array.c:6240`). */
+  compact: (self) => compact(self),
+  /** `rb_ary_last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+  last: (self, ...argv: [number?]) => (argv.length === 0 ? last(self) : last(self, argv[0]!)),
+  /** `rb_ary_reject` (`vendor/ruby/v3.3.11/array.c:4301`). */
+  reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : [...self]),
+  /** `rb_ary_rotate_m` (`vendor/ruby/v3.3.11/array.c:3240`). */
+  rotate: (self, cnt: number = 1) => {
+    const n = self.length === 0 ? 0 : ((cnt % self.length) + self.length) % self.length;
+    return [...self.slice(n), ...self.slice(0, n)];
+  },
+  /** `Array#shuffle` (`vendor/ruby/v3.3.11/array.rb:26`), over `rb_ary_shuffle_bang` (`array.c:6497`). */
+  shuffle: (self) => {
+    const ary = [...self];
+    for (let i = ary.length; i > 1; ) {
+      const j = Math.floor(Math.random() * i--);
+      [ary[i], ary[j]] = [ary[j], ary[i]];
+    }
+    return ary;
+  },
+  /** `Array#sample` (`vendor/ruby/v3.3.11/array.rb:60`). */
+  sample: (self, ...args: [number?]) => {
+    if (args.length && args[0]! < 0) throw new ArgumentError("negative sample number");
+    const ary = ARRAY_METHOD_TABLE.shuffle(self) as unknown[];
+    return args.length ? ary.slice(0, args[0]) : (ary[0] ?? null);
+  },
+  /** `rb_ary_all_p` (`vendor/ruby/v3.3.11/array.c:7740`). */
+  isAll: (self, ...argv: unknown[]) =>
+    self.every((v) => (argv.length ? rbEqq(argv[0], v) : rtest(v))),
+  /** `enum_find` (`vendor/ruby/v3.3.11/enum.c:361`). */
+  detect: (self, ifNone?: unknown, block?: Block) => {
+    if (!block) return [...self];
+    return find(self, ...(ifNone === undefined ? [block] : [ifNone, block]));
+  },
+  /** `enum_partition` (`vendor/ruby/v3.3.11/enum.c:1102`). */
+  partition: (self, block?: Block) => (block ? partition(self, block) : partition(self)),
+  /** `enum_sort_by` (`vendor/ruby/v3.3.11/enum.c:1651`). */
+  sortBy: (self, block?: Block) =>
+    !block
+      ? [...self]
+      : self
+          .map((v) => [block(v), v])
+          .sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]))
+          .map((pair) => pair[1]),
+  /** `enum_each_with_index` (`vendor/ruby/v3.3.11/enum.c:2967`). */
+  eachWithIndex: (self, block?: Block) => {
+    if (!block) return self.map((v, i) => [v, i]);
+    self.forEach((v, i) => block(v, i));
+    return self;
+  },
+  /** `enum_each_cons` (`vendor/ruby/v3.3.11/enum.c:3244`). */
+  eachCons: (self, n: number, block?: Block) =>
+    block ? eachCons(self, n, (cons) => block(cons)) : eachCons(self, n),
+  /** `Enumerable#to_set` (`vendor/ruby/v3.3.11/prelude.rb:28`). */
+  toSet: (self) => new Set(self),
+} satisfies Record<string, ArrayMethod>);

@@ -1,0 +1,19 @@
+import { rbProcCall } from "@blazetrails/ruby-compat";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+
+export class AssumeSSL {
+  private app: RackApp | { call: RackApp };
+
+  constructor(app: RackApp | { call: RackApp }) {
+    this.app = app;
+  }
+
+  call(env: RackEnv): Promise<RackResponse> {
+    env["HTTPS"] = "on";
+    env["HTTP_X_FORWARDED_PORT"] = "443";
+    env["HTTP_X_FORWARDED_PROTO"] = "https";
+    env["rack.url_scheme"] = "https";
+
+    return rbProcCall(this.app, env) as Promise<RackResponse>;
+  }
+}

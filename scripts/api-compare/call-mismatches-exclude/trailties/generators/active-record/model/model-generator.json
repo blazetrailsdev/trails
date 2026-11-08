@@ -1,0 +1,9 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/active-record/model/model-generator.ts",
+    "rubyName": "create_migration_file",
+    "call": "migration_template",
+    "reason": "Surfaced when the Ruby manifest first recorded activerecord's lib/rails/generators: ModelGenerator extends NamedBase, not an ActiveRecord::Generators::Base that includes Migration, so it delegates to MigrationGenerator; CONVERGEABLE active-record-generators-base-port."
+  }
+]

@@ -13,6 +13,7 @@ import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,
   DeprecatedObjectProxy,
+  DeprecationProxy,
 } from "./proxy-wrappers.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 
@@ -130,5 +131,23 @@ describe("DeprecatedConstantProxy#const_missing", () => {
       expect(() => proxy.MISSING).toThrow(NameError);
       expect(() => proxy.MISSING).toThrow("uninitialized constant Undeprecated::Target::MISSING");
     });
+  });
+});
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends DeprecatedObjectProxy {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const deprecator = new Deprecation("1.0", "Test");
+    deprecator.behavior = "silence";
+    const sub = new Sub([1, 2, 3], "deprecated", deprecator) as Sub & { length: number };
+    expect(sub.secret()).toBe(1);
+    expect((sub as unknown as { includes(x: number): boolean }).includes(2)).toBe(true);
+    expect(sub instanceof DeprecationProxy).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
   });
 });

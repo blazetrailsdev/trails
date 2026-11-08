@@ -1,6 +1,7 @@
+import "../../../constants.trails-encrypted-file-encrypted-file-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { GeneratorBase } from "../../base.js";
+import { Base } from "../../base.js";
 
 const DEFAULT_TEMPLATE = `# aws:
 #   access_key_id: 123
@@ -8,7 +9,7 @@ const DEFAULT_TEMPLATE = `# aws:
 
 `;
 
-export class EncryptedFileGenerator extends GeneratorBase {
+export class EncryptedFileGenerator extends Base {
   static {
     this.methodAdded("addEncryptedFileSilently");
   }

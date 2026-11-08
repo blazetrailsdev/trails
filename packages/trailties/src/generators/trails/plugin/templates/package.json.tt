@@ -2,7 +2,7 @@
   "name": <%= JSON.stringify(this.name()) %>,
   "version": "0.1.0",
   "type": "module",
-  "author": <%= JSON.stringify(`${this.author()} <${this.email()}>`) %>,
+  "author": <%= JSON.stringify(`${this._author} <${this._email}>`) %>,
   "homepage": "TODO",
   "description": "TODO: Description of <%= this.camelizedModules() %>.",
 <% if (!this.isInsideApplication()) { -%>

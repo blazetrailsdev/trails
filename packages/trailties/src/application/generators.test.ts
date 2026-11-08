@@ -12,6 +12,9 @@ import { assertNoMatch, assertNothingRaised, capture } from "@blazetrails/active
 import { Configuration } from "./configuration.js";
 import type { Generators } from "../configuration.js";
 import { Generators as TrailsGenerators } from "../generators.js";
+import { Base as ThorBase } from "@blazetrails/thor/shell";
+import { Basic } from "@blazetrails/thor/shell/basic";
+import { Color } from "@blazetrails/thor/shell/color";
 
 type ConfiguredGenerators = Generators & Record<string, unknown>;
 
@@ -69,6 +72,44 @@ describe("GeneratorsTest", () => {
       expect(toHash(c.generators().options)).toEqual(expected);
       expect(toHash(c.generators().aliases)).toEqual({ plugin: { generator: "-g" } });
     });
+  });
+
+  it("generators no color on initialization", () => {
+    const shell = ThorBase.shell;
+    ThorBase.shell = Color;
+    try {
+      withBareConfig((c) => {
+        c.generators().colorizeLogging = false;
+        TrailsGenerators.configureBang(c.generators());
+      });
+
+      expect(ThorBase.shell).toBe(Basic);
+    } finally {
+      ThorBase.shell = shell;
+    }
+  });
+
+  it("api only generators hide assets, helper, js and css namespaces and set api option", () => {
+    const hidden = [...TrailsGenerators.hiddenNamespaces()];
+    const options = { ...TrailsGenerators.options().trails };
+    try {
+      withBareConfig((c) => {
+        c.apiOnly = true;
+        TrailsGenerators.configureBang(c.generators());
+      });
+
+      expect(TrailsGenerators.hiddenNamespaces()).toContain("assets");
+      expect(TrailsGenerators.hiddenNamespaces()).toContain("helper");
+      expect(TrailsGenerators.hiddenNamespaces()).toContain("js");
+      expect(TrailsGenerators.hiddenNamespaces()).toContain("css");
+      expect(TrailsGenerators.options().trails.api).toBeTruthy();
+      expect(TrailsGenerators.options().trails.assets).toBe(false);
+      expect(TrailsGenerators.options().trails.helper).toBe(false);
+      expect(TrailsGenerators.options().trails.templateEngine).toBeNull();
+    } finally {
+      TrailsGenerators.hiddenNamespaces().splice(0, Infinity, ...hidden);
+      Object.assign(TrailsGenerators.options().trails, options);
+    }
   });
 
   it("generators with string and hash for options should generate symbol keys", () => {

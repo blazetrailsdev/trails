@@ -1,17 +1,17 @@
+import "../../../constants.test-unit-channel-channel-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
+import { Base } from "../../test-unit.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-export class ChannelGenerator extends NamedBase {
+export class ChannelGenerator extends Base {
   static {
     void this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "ChannelTest" });
     this.methodAdded("createTestFiles");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
     await this.template(
       "channel_test.ts",

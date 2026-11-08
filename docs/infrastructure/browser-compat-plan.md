@@ -75,7 +75,7 @@ Node arm and a browser arm. `crypto.subtle` stays the `pbkdf2Async` route only.
 The digests are ports of MRI's own C implementations —
 `vendor/ruby/v3.3.11/ext/digest/md5/md5.c:199`, `sha1/sha1.c:132`,
 `sha2/sha2.c:449` — which are exactly the three `Digest` constants trails names
-(`ruby-compat/src/digest.ts`). So `ActiveSupport::Digest.hexdigest`,
+(`ruby-compat/lib/digest.ts`). So `ActiveSupport::Digest.hexdigest`,
 `MessageVerifier` and SHA-1/SHA-256 HMACs work in a browser with no call-site
 change. An algorithm outside those three raises `Digest method not supported`,
 as Node does. The AES-GCM cipher `MessageEncryptor` and
@@ -86,7 +86,7 @@ That covers `SecureRandom` (`hex`, `uuid`, `randomBytes`),
 `Instrumenter#uniqueId`, secure comparison, and asynchronous key derivation
 through `pbkdf2Async`. `randomBytes` returns a `Bytes` whose `toString()`
 accepts `hex`, `base64`, `binary`/`latin1` and `utf-8`, so no `Buffer` shim is
-needed — `Bytes` (`ruby-compat/src/fs-adapter.ts`) is `Uint8Array`-based and
+needed — `Bytes` (`ruby-compat/lib/fs-adapter.ts`) is `Uint8Array`-based and
 `Buffer` is a Node-adapter implementation detail.
 
 The members the `web` adapter does not yet serve are not silently absent. The seam

@@ -80,7 +80,7 @@ describeIfPg("PostgreSQL bytea round trip", () => {
       const result = await client.asyncExec("SELECT '\\x5c5c'::bytea, ARRAY['\\x5c5c'::bytea], 1");
       expect(result.values()).toEqual([["\\x5c5c", '{"\\\\x5c5c"}', "parsed by the caller"]]);
     } finally {
-      await client.end();
+      await client.close();
     }
   });
 });

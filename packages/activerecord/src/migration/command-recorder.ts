@@ -1,18 +1,17 @@
 import {
+  KERNEL_METHODS,
+  NoMethodError,
+  PROTOCOL_PROBES,
   hashDelete,
   include,
   isEmpty,
   rbFSend,
   rbObjDup,
+  rbObjRespondTo,
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import {
-  extractOptionsBang,
-  isBlank,
-  isPlainObject,
-  methodMissingProxy,
-} from "@blazetrails/activesupport";
+import { extractOptionsBang, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "../namespaces.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
@@ -32,7 +31,6 @@ export class CommandRecorder {
 
   constructor(delegate?: unknown) {
     this._delegate = delegate ?? null;
-    return methodMissingProxy(this, { delegate: (target) => target._delegate });
   }
 
   get delegate(): unknown {
@@ -515,7 +513,43 @@ export class CommandRecorder {
   joinTableName(table1: string, table2: string): string {
     return _joinTableName(table1, table2);
   }
+
+  respondToMissing(method: string, _includePrivate = false): boolean {
+    return !method.startsWith("_") && rbObjRespondTo(this.delegate, method);
+  }
 }
+
+Object.setPrototypeOf(
+  CommandRecorder.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(CommandRecorder.prototype) as object) as object, {
+    get(target, prop, receiver: CommandRecorder) {
+      const value = Reflect.get(target, prop, receiver);
+      if (
+        value !== undefined ||
+        typeof prop === "symbol" ||
+        Reflect.has(target, prop) ||
+        receiver === CommandRecorder.prototype
+      ) {
+        return value;
+      }
+      if (receiver.respondToMissing(prop)) {
+        const delegate = receiver.delegate as Record<string, unknown>;
+        const member = delegate[prop];
+        return typeof member === "function" ? member.bind(delegate) : member;
+      }
+      if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return value;
+      return (...args: unknown[]) => {
+        throw new NoMethodError(
+          `undefined method '${prop}' for an instance of ${receiver.constructor.name}`,
+          prop,
+          args,
+          false,
+          { receiver },
+        );
+      };
+    },
+  }),
+);
 
 const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createTable",

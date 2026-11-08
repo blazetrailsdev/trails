@@ -109,21 +109,6 @@ type TimeLike =
   | Temporal.PlainDate
   | Temporal.ZonedDateTime;
 
-/** @noRailsEquivalent PERMANENT */
-const METHOD_MISSING_HANDLER: ProxyHandler<TimeWithZone> = {
-  get(target, prop) {
-    if (Reflect.has(target, prop)) return Reflect.get(target, prop, target);
-    if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
-    return (...args: unknown[]) => target.methodMissing(prop, ...args);
-  },
-  has(target, prop) {
-    return (
-      Reflect.has(target, prop) ||
-      (typeof prop === "string" && target.respondToMissing(prop, false))
-    );
-  },
-};
-
 export class TimeWithZone {
   static toString(): string {
     return "ActiveSupport::TimeWithZone";
@@ -149,7 +134,6 @@ export class TimeWithZone {
     this._period = this._utc
       ? (period ?? undefined)
       : this._getPeriodAndEnsureValidLocalTime(period);
-    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   private get _zoned(): Temporal.ZonedDateTime {
@@ -926,10 +910,20 @@ export class TimeWithZone {
   }
 }
 
-rbDefineAllocFunc(
-  TimeWithZone,
-  (klass) => new Proxy(Object.create(klass.prototype) as TimeWithZone, METHOD_MISSING_HANDLER),
+Object.setPrototypeOf(
+  TimeWithZone.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(TimeWithZone.prototype) as object) as object, {
+    get(target, prop, receiver: TimeWithZone) {
+      if (Reflect.has(target, prop) || receiver === TimeWithZone.prototype) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop)) return undefined;
+      return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+    },
+  }),
 );
+
+rbDefineAllocFunc(TimeWithZone, (klass) => Object.create(klass.prototype) as TimeWithZone);
 
 YAML.loadTags["!ruby/object:ActiveSupport::TimeWithZone"] = "ActiveSupport::TimeWithZone";
 YAML.dumpTags.set(TimeWithZone, "!ruby/object:ActiveSupport::TimeWithZone");

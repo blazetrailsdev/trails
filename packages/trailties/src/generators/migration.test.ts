@@ -40,7 +40,13 @@ describe("migration", () => {
   });
 
   it("migrationTemplate prepends migration_number, sets assigns, and renders", async () => {
+    fs.writeFileSync(`${tmpDir}/migration.ts.tt`, "class <%= migrationClassName %> {}");
+    fs.writeFileSync(
+      `${tmpDir}/migration.ts.tt.js`,
+      "export default function () { return `class ${this.migrationClassName} {}`; }",
+    );
     const host = {
+      findInSourcePaths: async (file: string) => `${tmpDir}/${file}.tt`,
       shell: new Basic(),
       options: {},
       migrationNumber: "",
@@ -52,10 +58,7 @@ describe("migration", () => {
       action,
       ...Migration,
     };
-    const dest = await host.migrationTemplate(
-      () => `class ${host.migrationClassName} {}`,
-      "db/migrate/create_articles.rb",
-    );
+    const dest = await host.migrationTemplate("migration.ts", "db/migrate/create_articles.rb");
     expect(dest).toBe("db/migrate/20260101000000_create_articles.rb");
     expect(host.migrationFileName).toBe("create_articles");
     expect(host.migrationClassName).toBe("CreateArticles");

@@ -1,0 +1,8 @@
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper<%= this.ext() %>";
+import { ActionDispatch } from "@blazetrails/actionpack";
+
+export class <%= this.className().split("::").join("") %>Test extends ActionDispatch.IntegrationTest {
+  // test("the truth", () => {
+  //   assert(true);
+  // });
+}

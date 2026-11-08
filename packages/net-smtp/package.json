@@ -26,7 +26,7 @@
     "nodemailer": "^10.3.0"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   },
   "devDependencies": {
     "@types/node": "25.3.5",

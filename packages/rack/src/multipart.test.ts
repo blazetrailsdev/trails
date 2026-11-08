@@ -284,6 +284,20 @@ it("reaches a multipart total limit", () => {
   }
 });
 
+it("treats a multipart limit of 0 as no limit", () => {
+  const previousLimit = multipartTotalPartLimit();
+  setMultipartTotalPartLimit(0);
+  try {
+    const env = MockRequest.envFor("/", multipartFixture("three_files_three_fields"));
+    const params = parseMultipart(env)!;
+    expect(params["reply"]).toBe("yes");
+    expect(params["to"]).toBe("people");
+    expect(params["from"]).toBe("others");
+  } finally {
+    setMultipartTotalPartLimit(previousLimit);
+  }
+});
+
 it("returns nil if no UploadedFiles were used", () => {
   const data = buildMultipart({ people: [{ "submit-name": "Larry", files: "contents" }] });
   expect(data).toBeNull();
@@ -400,7 +414,7 @@ true\r
 it("parses quoted chars in name parameter", () => {
   const data = `--AaB03x\r
 content-type: text/plain\r
-content-disposition: attachment; name="quoted\\\\chars\\"in\rname"\r
+content-disposition: attachment; name="quoted\\\\chars\\"in\tname"\r
 \r
 true\r
 --AaB03x--\r
@@ -413,7 +427,7 @@ true\r
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
-  expect(params['quoted\\chars"in\rname']).toBe("true");
+  expect(params['quoted\\chars"in\tname']).toBe("true");
 });
 
 it("supports mixed case metadata", () => {
@@ -479,6 +493,51 @@ it("raises an exception if boundary is too long", () => {
   expect(() => parseFixture("content_type_and_no_filename", "A".repeat(71))).toThrow(
     BoundaryTooLongError,
   );
+});
+
+it("raises an exception if there are multiple boundries", () => {
+  let env = multipartFixture("content_type_and_no_filename");
+  env["CONTENT_TYPE"] += "; Boundary=FooBar42x";
+  env = MockRequest.envFor("/", env);
+  expect(() => {
+    parseMultipart(env);
+  }).toThrow(BoundaryTooLongError);
+
+  env = multipartFixture("content_type_and_no_filename");
+  env["CONTENT_TYPE"] =
+    `${env["CONTENT_TYPE"].replace("boundary=", "boundary =")}; Boundary=FooBar42x`;
+  env = MockRequest.envFor("/", env);
+  expect(() => {
+    parseMultipart(env);
+  }).toThrow(BoundaryTooLongError);
+
+  env = multipartFixture("content_type_and_no_filename");
+  env["CONTENT_TYPE"] =
+    `${env["CONTENT_TYPE"].replace("boundary=", "boundary =")}; Boundary =FooBar42x`;
+  env = MockRequest.envFor("/", env);
+  expect(() => {
+    parseMultipart(env);
+  }).toThrow(BoundaryTooLongError);
+});
+
+it("raises an exception if a boundary parameter precedes the one that is parsed", () => {
+  for (const contentType of [
+    "multipart/form-data; boundary=; boundary=AaB03x",
+    'multipart/form-data; boundary=""; boundary=AaB03x',
+    'multipart/form-data; boundary=";boundary=AaB03x"',
+    'multipart/form-data; boundary=",boundary=AaB03x"',
+    "multipart/form-data; boundary=;boundary=AaB03x",
+    "multipart/form-data; boundary=AaB03x; boundary*=utf-8''Zzz",
+    "multipart/form-data; boundary*=utf-8''Zzz; boundary=AaB03x",
+    "multipart/form-data; boundary=AaB03x; boundary*0=Zz; boundary*1=z",
+  ]) {
+    let env = multipartFixture("content_type_and_no_filename");
+    env["CONTENT_TYPE"] = contentType;
+    env = MockRequest.envFor("/", env);
+    expect(() => {
+      parseMultipart(env);
+    }, contentType).toThrow(BoundaryTooLongError);
+  }
 });
 
 it("raises a bad request exception if no body is given but content type indicates a multipart body", () => {
@@ -611,7 +670,7 @@ it("rejects insanely long boundaries", () => {
   const env = MockRequest.envFor("/", fixture);
   expect(() => {
     parseMultipart(env);
-  }).toThrow(EmptyContentError);
+  }).toThrow(BoundaryTooLongError);
   rd.close();
 
   const err = thr.next().value;
@@ -731,7 +790,58 @@ it("ignores content-disposition values over to 1536 bytes", () => {
   const filler = "a".repeat(1510);
   const body = `--${boundary}\r\nContent-Disposition: form-data;a=${filler}; filename="bar"; name="file"\r\ncontent-type:application/pdf\r\n\r\n\r\n--${boundary}--\r\n`;
   const params = parseMultipart(envFor(body, `multipart/form-data; boundary=${boundary}`))!;
-  expect(params).toEqual({ "text/plain": [""] });
+  expect(params).toEqual({ "application/pdf": [""] });
+});
+
+const quotedEscapeTestParse = (
+  parts: number,
+  escapesPerPart: number,
+): [Record<string, any>, string] => {
+  const boundary = "---------------------------932620571087722842402766118";
+  const escapedQuotes = '\\"'.repeat(escapesPerPart / 2);
+  const unescapedQuotes = '"'.repeat(escapesPerPart / 2);
+
+  const data = new StringIO();
+  for (let i = 0; i < parts; i++) {
+    data.write(`--${boundary}`);
+    data.write("\r\n");
+    data.write(
+      `Content-Disposition: form-data; name="a${i}${escapedQuotes}" filename="b${i}${escapedQuotes}"`,
+    );
+    data.write("\r\n");
+    data.write("content-type:application/pdf\r\n");
+    data.write("\r\n");
+    data.write(`--${boundary}--\r\n`);
+  }
+  data.rewind();
+
+  const fixture = {
+    CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
+    CONTENT_LENGTH: String(data.size()),
+    ":input": data,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  return [parseMultipart(env)!, unescapedQuotes];
+};
+
+it("allows up to 8192 quoted escapes during parsing", () => {
+  const parts = 32;
+  const [x, unescapedQuotes] = quotedEscapeTestParse(parts, 256);
+  expect(Object.keys(x)).toEqual(
+    Array.from({ length: parts }, (_, i) => `a${i}${unescapedQuotes}`),
+  );
+  for (let i = 0; i < parts; i++) {
+    const key = `a${i}${unescapedQuotes}`;
+    const v = x[key];
+    expect(v.filename).toBe(`b${i}${unescapedQuotes}`);
+    expect(v.name).toBe(key);
+  }
+});
+
+it("disallows more than 8192 quoted escapes during parsing", () => {
+  expect(() => quotedEscapeTestParse(32, 258)).toThrow(BoundaryTooLongError);
+  expect(() => quotedEscapeTestParse(33, 256)).toThrow(BoundaryTooLongError);
 });
 
 it("raises an EOF error on content-length mismatch", () => {
@@ -1049,3 +1159,28 @@ it("parses filename with unescaped percentage characters", () => {
   expect(files.name).toBe("document[attachment]");
   expect(files.tempfile.read()).toEqual(b("contents"));
 });
+
+it("prevents CRLF injection in parameter values via obs-fold", () => {
+  const data = `--AaB03x\r
+Content-Disposition: form-data; name="upload"; filename="test\r
+\t.txt"\r
+Content-Type: application/octet-stream;\r
+ name="file.php"\r
+\r
+<?php eval($_POST['x']); ?>\r
+--AaB03x--\r
+`;
+
+  const options = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(data.length),
+    ":input": new StringIO(data),
+  };
+  const env = MockRequest.envFor("/", options);
+  const params = parseMultipart(env)!;
+  expect(params["upload"].filename).toBe("test\t.txt");
+  expect(params["upload"].type).toBe('application/octet-stream; name="file.php"');
+});
+
+// PERMANENT-SKIP: asserts an ISO-2022-JP String encoding; CLAUDE.md, "A String has no encoding tag either".
+it.skip("supports ISO-2022-JP-encoded part", () => {});

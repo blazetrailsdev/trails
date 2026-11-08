@@ -1,7 +1,6 @@
 import type { RackHeaders } from "./index.js";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
-import { BodyProxy } from "./body-proxy.js";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
@@ -26,9 +25,8 @@ export class ConditionalGet {
       response[0] = 304;
       delete headers[CONTENT_TYPE];
       delete headers[CONTENT_LENGTH];
-      response[2] = new BodyProxy([], () => {
-        if (body != null && typeof body.close === "function") body.close();
-      });
+      if (rbObjRespondTo(body, "close")) body.close();
+      response[2] = [];
     }
 
     return response;
