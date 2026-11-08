@@ -67,8 +67,6 @@ export class DevcontainerGenerator extends Base {
       default: null,
       desc: "Skip Solid Cache, Queue, and Cable setup",
     });
-
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.sourcePaths().push(File.expandPath("../app/templates", __dir__));
 
     this.methodAdded("createDevcontainer");

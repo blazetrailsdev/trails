@@ -4,12 +4,6 @@ import { NamedBase } from "../../named-base.js";
 
 export class TaskGenerator extends NamedBase {
   static {
-    void this.sourceRoot(
-      File.expandPath(
-        "templates",
-        File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)),
-      ),
-    );
     this.argument("actions", { type: "array", default: [], banner: "action action" });
     this.methodAdded("createTaskFiles");
   }

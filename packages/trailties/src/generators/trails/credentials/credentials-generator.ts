@@ -8,11 +8,8 @@ export interface CredentialsGeneratorOptions extends GeneratorOptions {
   skipSecretKeyBase?: boolean;
 }
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export class CredentialsGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("contentPath", { default: "config/credentials.yml.enc" });
     this.argument("keyPath", { default: "config/master.key" });
     this.classOption("skipSecretKeyBase", { type: "boolean" });

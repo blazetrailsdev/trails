@@ -5,8 +5,6 @@ import { getPackageManager } from "../../../package-manager.js";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
 }
@@ -15,7 +13,6 @@ export class AuthenticationGenerator extends Base {
   declare options: AuthenticationGeneratorOptions;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.classOption("api", {
       type: "boolean",
       desc: "Generate API-only controllers and models, with no view templates",

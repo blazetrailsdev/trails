@@ -22,8 +22,6 @@ import { VERSION } from "../../../gem-version.js";
 import { CredentialsGenerator } from "../credentials/credentials-generator.js";
 import { MasterKeyGenerator } from "../master-key/master-key-generator.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
   skipActionMailer: true,
   skipActiveStorage: true,
@@ -483,7 +481,6 @@ export class AppGenerator extends AppBase {
   };
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.addSharedOptionsFor("application");
     this.classOption("version", {
       type: "boolean",

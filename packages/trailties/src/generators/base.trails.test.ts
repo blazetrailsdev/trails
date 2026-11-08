@@ -551,3 +551,49 @@ describe("Base.help", () => {
     expect(help).toContain(line);
   });
 });
+
+describe("Base names read the Ruby class path (base.rb:334-347)", () => {
+  it("answers base and generator names from Trails::Generators::TaskGenerator", async () => {
+    const { TaskGenerator } = await import("./trails/task/task-generator.js");
+    const klass = TaskGenerator as unknown as {
+      baseName(): string;
+      generatorName(): string;
+      namespace(): string;
+    };
+    expect(klass.baseName()).toBe("trails");
+    expect(klass.generatorName()).toBe("task");
+    expect(klass.namespace()).toBe("trails:task");
+  });
+
+  it("finds trails/task/templates and trails/app/templates as the default source root", async () => {
+    const { TaskGenerator } = await import("./trails/task/task-generator.js");
+    const { AppGenerator } = await import("./trails/app/app-generator.js");
+    expect(await TaskGenerator.sourceRoot()).toBe(
+      File.join(Base.baseRoot(), "trails/task/templates"),
+    );
+    expect(await AppGenerator.sourceRoot()).toBe(
+      File.join(Base.baseRoot(), "trails/app/templates"),
+    );
+  });
+
+  it("defaults hookFor's in / as to the Ruby base and generator names", async () => {
+    const { ModelGenerator } = await import("./trails/model/model-generator.js");
+    expect(ModelGenerator.hooks()["orm"]).toEqual(["trails", "model"]);
+  });
+
+  it("looks up defaultForOption under the Ruby generator name, then base name", async () => {
+    const { ModelGenerator } = await import("./test-unit/model/model-generator.js");
+    const klass = ModelGenerator as unknown as {
+      defaultForOption(
+        c: Record<string, Record<string, unknown>>,
+        n: string,
+        o: object,
+        d: unknown,
+      ): unknown;
+    };
+    expect(
+      klass.defaultForOption({ model: { x: 1 }, test_unit: { x: 2 }, trails: {} }, "x", {}, 0),
+    ).toBe(1);
+    expect(klass.defaultForOption({ test_unit: { x: 2 }, trails: {} }, "x", {}, 0)).toBe(2);
+  });
+});

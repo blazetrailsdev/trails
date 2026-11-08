@@ -282,7 +282,6 @@ this.config.actionController.includeAllHelpers = false;
 
 export class PluginGenerator extends AppBase {
   static {
-    void this.sourceRoot(File.expandPath("templates", import.meta.dirname));
     this.addSharedOptionsFor("plugin");
     this.classOption("dummyPath", {
       type: "string",

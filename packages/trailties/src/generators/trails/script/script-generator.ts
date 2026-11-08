@@ -1,12 +1,8 @@
 import "../../../constants.trails-script-script-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
-
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
 export class ScriptGenerator extends NamedBase {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("generateScript");
   }
 

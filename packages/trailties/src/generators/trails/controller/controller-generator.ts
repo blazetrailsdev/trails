@@ -4,8 +4,6 @@ import { dasherize, type GeneratorOptions } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { NamedBase } from "../../named-base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export interface ControllerGeneratorOptions extends GeneratorOptions {
   skipRoutes?: boolean;
   helper?: boolean;
@@ -15,7 +13,6 @@ export interface ControllerGeneratorOptions extends GeneratorOptions {
 export class ControllerGenerator extends NamedBase {
   static {
     Object.defineProperty(this, "name", { value: "Trails::Generators::ControllerGenerator" });
-    void this.sourceRoot(File.expandPath("templates", __dir__));
 
     this.argument("actions", { type: "array", default: [], banner: "action action" });
     this.classOption("skipRoutes", {

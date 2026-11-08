@@ -3,11 +3,8 @@ import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../tse.js";
 import { dasherize } from "../../base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
-
 export class MailerGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "method method" });
 
     this.methodAdded("copyViewFiles");
