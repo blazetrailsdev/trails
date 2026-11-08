@@ -1,6 +1,6 @@
 import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
 import { included } from "@blazetrails/ruby-compat";
-import type { GeneratorBase } from "./base.js";
+import type { Base } from "./base.js";
 import type { NamedBase } from "./named-base.js";
 
 // prettier-ignore
@@ -50,7 +50,7 @@ export const ModelHelpers = {
   isInflectionImpossible,
 
   [included](base: unknown): void {
-    (base as typeof GeneratorBase).classOption("forcePlural", {
+    (base as typeof Base).classOption("forcePlural", {
       type: "boolean",
       default: false,
       desc: "Do not singularize the model name, even if it appears plural",

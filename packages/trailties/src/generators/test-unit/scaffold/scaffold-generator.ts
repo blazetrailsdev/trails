@@ -6,7 +6,7 @@ import {
   singularize,
   underscore,
 } from "@blazetrails/activesupport";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import { format, File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorConfig, type GeneratorOptions } from "../../base.js";

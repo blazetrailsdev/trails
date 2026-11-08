@@ -5,9 +5,9 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
-import { GeneratorBase } from "./base.js";
+import { Base } from "./base.js";
 
-class TestGenerator extends GeneratorBase {}
+class TestGenerator extends Base {}
 
 const path: PathAdapter = {
   join: (...p) => p.filter(Boolean).join("/"),

@@ -211,6 +211,12 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "trailties",
         libPath: "railties/lib/rails",
+        extraLibPaths: [
+          "activerecord/lib/rails",
+          "actioncable/lib/rails",
+          "activejob/lib/rails",
+          "actionmailer/lib/rails",
+        ],
         testPath: "railties/test",
       },
     ],

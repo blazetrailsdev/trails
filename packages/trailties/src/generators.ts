@@ -1,7 +1,7 @@
 import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
-import type { GeneratorBase, GeneratorConfig } from "./generators/base.js";
+import type { Base, GeneratorConfig } from "./generators/base.js";
 import { noColorBang } from "./command/behavior.js";
 import { Trails } from "./trails.js";
 import type {
@@ -9,8 +9,8 @@ import type {
   Generators as GeneratorsConfiguration,
 } from "./configuration.js";
 
-export type GeneratorClass = Omit<typeof GeneratorBase, "prototype"> & {
-  readonly prototype: GeneratorBase;
+export type GeneratorClass = Omit<typeof Base, "prototype"> & {
+  readonly prototype: Base;
   readonly name: string;
 };
 
@@ -363,13 +363,13 @@ export class Generators {
 
 async function requireGenerator(base: URL, path: string): Promise<void> {
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
-  const { GeneratorBase } = await import("./generators/base.js");
+  const { Base } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
   const namespace = getPath()
     .dirname(path.slice(urlToPath(base).length))
     .split(/[\\/]/);
   for (const value of Object.values(mod)) {
-    if (typeof value === "function" && value.prototype instanceof GeneratorBase) {
+    if (typeof value === "function" && value.prototype instanceof Base) {
       const klass = value as unknown as GeneratorClass;
       klass.namespace(namespace.join(":"));
       _subclasses ??= [];

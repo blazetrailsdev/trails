@@ -1094,8 +1094,7 @@ class ApiExtractor
   def maybe_update_module_file(fqn, target)
     return unless @modules[fqn] || @classes[fqn]
     return if target[:named_file]
-    if File.basename(@current_file.to_s, ".rb") == fqn.to_s.gsub("::", "/").gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase &&
-       !fqn.to_s.include?("::")
+    if File.basename(@current_file.to_s, ".rb") == fqn.to_s.split("::").last.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase
       target[:named_file] = true
       target[:first_method_file] = @current_file
       target[:file] = @current_file

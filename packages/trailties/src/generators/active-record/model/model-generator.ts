@@ -112,19 +112,11 @@ ${staticBlock}}
   }
 
   async createModuleFile(): Promise<void> {
-    const regularClassPath = this.regularClassPath();
-    if (regularClassPath.length === 0) return;
-    const ext = this.ext();
-
+    if (this.regularClassPath().length === 0) return;
     if (this.behavior === "invoke") {
-      await this.createFile(
-        File.join("app/models", `${this.classPath().join("/")}${ext}`),
-        `export const ${camelize(regularClassPath.at(-1)!)} = {
-  get tableNamePrefix(): string {
-    return "${regularClassPath.join("_")}_";
-  },
-};
-`,
+      await this.template(
+        "module.ts",
+        File.join("app/models", `${this.classPath().join("/")}${this.ext()}`),
       );
     }
   }
@@ -143,7 +135,6 @@ ${staticBlock}}
     }
   }
 
-  /** @missingRailsCall module_namespacing — CONVERGEABLE generators-port-module-namespacing */
   private async generateAbstractClass(): Promise<void> {
     const path = File.join(
       "app/models",

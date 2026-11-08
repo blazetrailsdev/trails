@@ -1,7 +1,7 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { getPackageManager } from "../../../package-manager.js";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
+import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
@@ -10,7 +10,7 @@ export interface AuthenticationGeneratorOptions extends GeneratorOptions {
   api?: boolean;
 }
 
-export class AuthenticationGenerator extends GeneratorBase {
+export class AuthenticationGenerator extends Base {
   declare options: AuthenticationGeneratorOptions;
 
   static {
@@ -23,7 +23,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.hookFor(
       "templateEngine",
       { as: "authentication" },
-      function (this: GeneratorBase, templateEngine: GeneratorClass) {
+      function (this: Base, templateEngine: GeneratorClass) {
         if (!(this.options as AuthenticationGeneratorOptions).api)
           return this.invoke(templateEngine);
       },

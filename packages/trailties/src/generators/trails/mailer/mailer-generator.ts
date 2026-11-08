@@ -18,7 +18,6 @@ export class MailerGenerator extends NamedBase {
   /** @internal */
   private _applicationMailerFileName?: string;
 
-  /** @missingRailsArgs template — PERMANENT */
   async createMailerFile(): Promise<void> {
     await this.template(
       "mailer.ts",
@@ -43,10 +42,7 @@ export class MailerGenerator extends NamedBase {
     return (this.__fileName ??= super.fileName.replace(/_mailer$/i, ""));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall mountable_engine? — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms
-   */
+  /** @internal */
   private applicationMailerFileName(): string {
     return (this._applicationMailerFileName ??= `app/mailers/application-mailer${this.ext()}`);
   }

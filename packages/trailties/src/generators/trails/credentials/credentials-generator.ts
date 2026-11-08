@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { EncryptedConfiguration } from "@blazetrails/activesupport";
 import { SecureRandom } from "@blazetrails/ruby-compat";
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { Base, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {
   skipSecretKeyBase?: boolean;
@@ -9,7 +9,7 @@ export interface CredentialsGeneratorOptions extends GeneratorOptions {
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-export class CredentialsGenerator extends GeneratorBase {
+export class CredentialsGenerator extends Base {
   static {
     void this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("contentPath", { default: "config/credentials.yml.enc" });

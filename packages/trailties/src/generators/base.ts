@@ -19,11 +19,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
-import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
 import type { BaseConfig } from "@blazetrails/thor/base";
+import { Error as ThorError } from "@blazetrails/thor/error";
 import { Group, type GroupClass } from "@blazetrails/thor/group";
 import type { Invocation } from "@blazetrails/thor/invocation";
 import type { Command } from "@blazetrails/thor/command";
@@ -55,11 +55,7 @@ export interface HookForOptions extends ClassOptionConfig {
   verbose?: string | boolean;
 }
 
-type HookYield = (
-  instance: GeneratorBase,
-  klass: GeneratorClass,
-  command?: string | null,
-) => unknown;
+type HookYield = (instance: Base, klass: GeneratorClass, command?: string | null) => unknown;
 type HookExec = (this: never, klass: GeneratorClass) => unknown;
 
 export type HookBlock = HookYield | HookExec;
@@ -89,7 +85,9 @@ type GroupStatics = {
   fromSuperclass(method: string, defaultValue?: unknown): unknown;
 };
 
-export interface GeneratorBase extends Invocation {
+export class Error extends ThorError {}
+
+export interface Base extends Invocation {
   shell: ShellHost["shell"];
   say: ShellHost["say"];
   sayStatus: ShellHost["sayStatus"];
@@ -100,7 +98,7 @@ export interface GeneratorBase extends Invocation {
   concat: OmitThisParameter<typeof ThorActions.Actions.concat>;
 }
 
-export abstract class GeneratorBase extends (Group as unknown as (abstract new (
+export abstract class Base extends (Group as unknown as (abstract new (
   args?: unknown[],
   localOptions?: unknown,
   config?: GeneratorConfig,
@@ -111,6 +109,18 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
   declare static _namespace?: string;
   /** @internal */
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
+
+  /** @internal */
+  private _indentation?: number;
+
+  /**
+   * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
+   * @inlinedFrom Thor::Actions#initialize thor/v1.3.2/lib/thor/actions.rb:72-85
+   */
+  constructor(args: unknown[] = [], options: unknown = {}, config: GeneratorConfig = {}) {
+    super(args, options, config);
+    this._indentation = 0;
+  }
 
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
@@ -345,7 +355,7 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
       const last = this.extractLastModule(nesting);
 
       if (last && constDefined(last, camelize(lastName), false)) {
-        throw new GeneratorError(
+        throw new Error(
           `The name '${className}' is either already used in your application ` +
             "or reserved by Trails. Please choose an alternative or use --skip-collision-check " +
             "or --force to skip this check and run this generator again.",
@@ -438,8 +448,8 @@ export abstract class GeneratorBase extends (Group as unknown as (abstract new (
     }
   }
 
-  static baseclass(): typeof GeneratorBase {
-    return GeneratorBase;
+  static baseclass(): typeof Base {
+    return Base;
   }
 
   /** @internal */

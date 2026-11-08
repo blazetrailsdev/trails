@@ -402,8 +402,8 @@
       "type/helpers/mutable.ts::Mutable",
       "type/helpers/time-value.ts::TimeValue",
       "type/serialize-cast-value.ts::SerializeCastValue",
-      "validations/absence.ts::HelperMethods",
-      "validations/callbacks.ts::Callbacks"
+      "validations/callbacks.ts::Callbacks",
+      "validations/helper-methods.ts::HelperMethods"
     ],
     "residue": {
       "attribute-methods.ts::AttrNames": "ActiveModel::AttributeMethods::AttrNames",

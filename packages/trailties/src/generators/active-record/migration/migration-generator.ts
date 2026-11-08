@@ -80,7 +80,7 @@ export class MigrationGenerator extends NamedBase {
 
   async createMigrationFile(): Promise<void> {
     const name = this.name;
-    this.setLocalAssignsBang(underscore(name));
+    this.setLocalAssignsBang();
     this.validateFileName();
     await this.migrationTemplate(
       this._migrationTemplate,
@@ -204,13 +204,16 @@ export class MigrationGenerator extends NamedBase {
     if (!/^[_a-z0-9]+$/.test(this.fileName)) throw new IllegalMigrationNameError(this.fileName);
   }
 
-  private setLocalAssignsBang(fileName: string): void {
+  private setLocalAssignsBang(): void {
     this._migrationTemplate = "migration.ts";
     let m: RegExpMatchArray | null;
-    if ((m = fileName.match(/^(add)_.*_to_(.*)/) ?? fileName.match(/^(remove)_.*?_from_(.*)/))) {
+    if (
+      (m =
+        this.fileName.match(/^(add)_.*_to_(.*)/) ?? this.fileName.match(/^(remove)_.*?_from_(.*)/))
+    ) {
       this.migrationAction = m[1];
       this._tableName = this.normalizeTableName(m[2]);
-    } else if (/join_table/.test(fileName)) {
+    } else if (/join_table/.test(this.fileName)) {
       if (this.attributes.length === 2) {
         this.migrationAction = "join";
         this.joinTables = this.isPluralizeTableNames()
@@ -218,7 +221,7 @@ export class MigrationGenerator extends NamedBase {
           : this.attributes.map((a) => a.singularName());
         this.setIndexNames();
       }
-    } else if ((m = fileName.match(/^create_(.+)/))) {
+    } else if ((m = this.fileName.match(/^create_(.+)/))) {
       this._tableName = this.normalizeTableName(m[1]);
       this._migrationTemplate = "create_table_migration.ts";
     }

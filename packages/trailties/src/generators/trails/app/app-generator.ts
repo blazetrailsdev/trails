@@ -14,7 +14,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
 import { Trails } from "../../../trails.js";
-import { GeneratorError } from "../../generated-attribute.js";
+import { Error as GeneratorError } from "../../base.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 import { VERSION } from "../../../gem-version.js";

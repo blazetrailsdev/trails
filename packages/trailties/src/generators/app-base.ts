@@ -19,9 +19,9 @@ import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../trails.js";
 import { Generators } from "../generators.js";
-import { GeneratorBase, type GeneratorOptions, type GeneratorConfig } from "./base.js";
+import { Base, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
-import { GeneratorError } from "./generated-attribute.js";
+import { Error as GeneratorError } from "./base.js";
 import { AppName } from "./app-name.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
@@ -51,7 +51,7 @@ export interface AppBase extends Included<typeof AppName> {
   shebang(): string;
 }
 
-export abstract class AppBase extends GeneratorBase {
+export abstract class AppBase extends Base {
   declare appPath: string;
   declare options: AppBaseOptions;
   declare trailsTemplate?: string;

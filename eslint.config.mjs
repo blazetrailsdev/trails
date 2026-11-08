@@ -866,14 +866,14 @@ export default defineConfig(
       "blazetrails/thor-command-registration": [
         "error",
         {
-          baseClasses: [
-            "GeneratorBase",
-            "NamedBase",
-            "AppBase",
-            "ModelGenerator",
-            "ResourceGenerator",
+          baseClasses: ["NamedBase", "AppBase", "ModelGenerator", "ResourceGenerator"],
+          baseImports: [
+            "command/base.js",
+            "/base.js",
+            "generators/tse.js",
+            "/tse.js",
+            "@blazetrails/trailties/generators",
           ],
-          baseImports: ["command/base.js", "generators/tse.js", "/tse.js"],
         },
       ],
     },
