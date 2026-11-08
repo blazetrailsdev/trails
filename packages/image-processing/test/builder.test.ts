@@ -34,7 +34,7 @@ describe("ImageProcessing::Builder", () => {
 
     await pipeline.call();
 
-    expect(instrumenterCalled).toBe(true);
+    expect(instrumenterCalled).toBeTruthy();
   });
 
   it("handles instrumenter not returning pipeline result", async () => {

@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { Image as MiniMagickImage } from "@blazetrails/mini-magick/image";
 import type { CliTool } from "@blazetrails/mini-magick/tool";
 import {
@@ -9,6 +10,7 @@ import {
   stderr,
   Tempfile,
 } from "@blazetrails/ruby-compat";
+import { assertIncludes, assertRaises } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Error as MiniMagickError } from "@blazetrails/mini-magick";
 import { Error as ImageProcessingError } from "../lib/image-processing.js";
@@ -150,13 +152,13 @@ describe("ImageProcessing::MiniMagick", () => {
     await assertDimensions([150, 200], result);
 
     result = await MiniMagick.loader({ strip: true }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ strip: null }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ strip: false }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ colorspace: "Gray" }).call(portrait);
     expect((await new MiniMagickImage(result.path()).data())["colorspace"]).toEqual("Gray");
@@ -176,13 +178,13 @@ describe("ImageProcessing::MiniMagick", () => {
     expect(result.size()).toBeLessThan(20 * 1024);
 
     result = await MiniMagick.saver({ strip: true }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ strip: null }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ strip: false }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toEqual({});
+    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ colorspace: "Gray" }).call(portrait);
     expect((await new MiniMagickImage(result.path()).data())["colorspace"]).toEqual("Gray");
@@ -212,15 +214,15 @@ describe("ImageProcessing::MiniMagick", () => {
 
   describe(".valid_image?", () => {
     it("returns true for correct images", async () => {
-      expect(await MiniMagick.isValidImage(portrait)).toBe(true);
-      expect(await MiniMagick.isValidImage(copyToTempfile(portrait))).toBe(true);
+      expect(await MiniMagick.isValidImage(portrait)).toBeTruthy();
+      expect(await MiniMagick.isValidImage(copyToTempfile(portrait))).toBeTruthy();
     });
 
     it("returns false for invalid images", async () => {
-      expect(await MiniMagick.isValidImage(fixtureImage("invalid.jpg"))).toBe(false);
-      expect(await MiniMagick.isValidImage(copyToTempfile(fixtureImage("invalid.jpg")))).toBe(
-        false,
-      );
+      expect(await MiniMagick.isValidImage(fixtureImage("invalid.jpg"))).toBeFalsy();
+      expect(
+        await MiniMagick.isValidImage(copyToTempfile(fixtureImage("invalid.jpg"))),
+      ).toBeFalsy();
     });
   });
 
@@ -258,7 +260,7 @@ describe("ImageProcessing::MiniMagick", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
   });
 
@@ -296,7 +298,7 @@ describe("ImageProcessing::MiniMagick", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
   });
 
@@ -332,7 +334,7 @@ describe("ImageProcessing::MiniMagick", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
   });
 
@@ -410,7 +412,7 @@ describe("ImageProcessing::MiniMagick", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
   });
 
@@ -474,7 +476,7 @@ describe("ImageProcessing::MiniMagick", () => {
       expect(
         sharpened.size() > normal.size(),
         "Expected sharpened thumbnail to have bigger filesize than not sharpened thumbnail",
-      ).toBe(true);
+      ).toBeTruthy();
     });
   });
 
@@ -695,9 +697,8 @@ describe("ImageProcessing::MiniMagick", () => {
   describe("#limits", () => {
     it("adds resource limits", async () => {
       const pipeline = MiniMagick.limits({ width: 1 }).source(portrait);
-      const exception = await pipeline.call().catch((e: unknown) => e);
-      expect(exception).toBeInstanceOf(MiniMagickError);
-      expect((exception as Error).message).toContain("limit");
+      const exception = await assertRaises([MiniMagickError], {}, () => pipeline.call());
+      assertIncludes(exception.message, "limit");
     });
   });
 

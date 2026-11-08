@@ -95,7 +95,7 @@ describe("ImageProcessing::Pipeline", () => {
     await expect(pipeline.call(null, { destination: destinationPath })).rejects.toThrow(
       MiniMagickError,
     );
-    expect(await File.isExistAsync(destinationPath)).toBe(false);
+    expect(await File.isExistAsync(destinationPath)).toBeFalsy();
   });
 
   it("doesn't delete the destination file if it has already existed", async () => {
@@ -104,7 +104,7 @@ describe("ImageProcessing::Pipeline", () => {
     await expect(pipeline.call(null, { destination: destination.path() })).rejects.toThrow(
       MiniMagickError,
     );
-    expect(await File.isExistAsync(destination.path()!)).toBe(true);
+    expect(await File.isExistAsync(destination.path()!)).toBeTruthy();
   });
 
   it("doesn't fail when destination file hasn't been created", async () => {
@@ -258,7 +258,7 @@ describe("ImageProcessing::Pipeline", () => {
   it("returns a rewinded and refreshed tempfile in binary mode", async () => {
     const tempfile = await Vips.convert("png").call(portrait);
     expect(tempfile).toBeInstanceOf(Tempfile);
-    expect(tempfile.isBinmode()).toBe(true);
+    expect(tempfile.isBinmode()).toBeTruthy();
     expect(tempfile.pos).toEqual(0);
     expect(tempfile.read()).toEqual(IO.binread(tempfile.path()!));
   });
@@ -291,14 +291,14 @@ describe("ImageProcessing::Pipeline", () => {
 
   it("doesn't allow making system calls", async () => {
     Vips.source(portrait).apply({ system: "touch foo.txt" });
-    expect(await File.isExistAsync("foo.txt")).toBe(false);
+    expect(await File.isExistAsync("foo.txt")).toBeFalsy();
 
     await expect(Vips.source(portrait).spawn("touch foo.txt").call()).rejects.toThrow();
-    expect(await File.isExistAsync("foo.txt")).toBe(false);
+    expect(await File.isExistAsync("foo.txt")).toBeFalsy();
 
     await expect(MiniMagick.source(portrait).spawn("touch foo.txt").call()).rejects.toThrow(
       MiniMagickError,
     );
-    expect(await File.isExistAsync("foo.txt")).toBe(false);
+    expect(await File.isExistAsync("foo.txt")).toBeFalsy();
   });
 });
