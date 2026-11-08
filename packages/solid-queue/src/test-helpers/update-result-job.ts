@@ -1,5 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
+import { sleep } from "./processes-test-helper.js";
 import type { JobResult } from "./job-result.js";
 
 export class UpdateResultJob extends ApplicationJob {
@@ -13,7 +14,7 @@ export class UpdateResultJob extends ApplicationJob {
   ): Promise<void> {
     jobResult.status += `s${name}`;
 
-    if (pause != null) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
+    if (pause != null) await sleep(pause);
     if (exception != null) throw new exception();
 
     jobResult.status += `c${name}`;
