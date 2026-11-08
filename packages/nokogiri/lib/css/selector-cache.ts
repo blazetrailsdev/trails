@@ -1,3 +1,5 @@
+import { CSS } from "../namespaces.js";
+import { constSet } from "@blazetrails/ruby-compat";
 import type { XPathVisitor } from "./xpath-visitor.js";
 
 let cache = new Map<string, string[]>();
@@ -27,3 +29,5 @@ export const SelectorCache = {
     return JSON.stringify([selector, { ...config, namespaces }]);
   },
 };
+
+constSet(CSS, "SelectorCache", SelectorCache);

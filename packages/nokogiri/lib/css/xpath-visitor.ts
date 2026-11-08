@@ -1,5 +1,7 @@
+import { CSS } from "../namespaces.js";
 import {
   ArgumentError,
+  constSet,
   fixMod,
   rbFSend,
   rbInspect,
@@ -383,3 +385,5 @@ export class XPathVisitor {
     }
   }
 }
+
+constSet(CSS, "XPathVisitor", XPathVisitor);

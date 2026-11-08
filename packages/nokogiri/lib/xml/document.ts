@@ -1,9 +1,12 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
-import { include } from "@blazetrails/ruby-compat";
+import { constSet, include } from "@blazetrails/ruby-compat";
+
+import { XML } from "../namespaces.js";
 
 import type { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
 import { XmlNode } from "./node.js";
+import { ParseOptions } from "./parse-options.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
@@ -16,31 +19,51 @@ export class XmlDocument {
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
-  readonly errors: ReadonlyArray<SyntaxError>;
-  private _doc: LibXmlDocument | null;
-  private _root: XmlNode | null;
+  errors: SyntaxError[] = [];
+  private _doc: LibXmlDocument | null = null;
+  private _root: XmlNode | null = null;
 
-  private constructor(doc: LibXmlDocument | null, errors: SyntaxError[]) {
-    this._doc = doc;
-    this.errors = errors;
-    this._root = doc !== null ? new XmlNode(doc.root, this) : null;
+  static parse(
+    stringOrIo: string | Readable | null,
+    url: string | null = null,
+    encoding: string | null = null,
+    options: ParseOptions | number = ParseOptions.DEFAULT_XML,
+  ): XmlDocument {
+    if (typeof options === "number") options = new ParseOptions(options);
+
+    if (XmlDocument.isEmptyDoc(stringOrIo)) {
+      if (options.isStrict()) {
+        throw new SyntaxError("Empty document", 3);
+      } else {
+        return new XmlDocument();
+      }
+    }
+
+    return XmlDocument.readMemory(readSource(stringOrIo!), url, encoding, options.toI());
   }
 
-  /** @missingRailsArgs new — CONVERGEABLE nokogiri-parse-constructs-through-new */
-  static parse(data: string | Readable): XmlDocument {
-    const errors: SyntaxError[] = [];
+  /** @internal */
+  private static isEmptyDoc(stringOrIo: string | Readable | null): boolean {
+    return stringOrIo == null || stringOrIo === "";
+  }
+
+  static readMemory(
+    string: string,
+    _url: string | null,
+    _encoding: string | null,
+    _options: number,
+  ): XmlDocument {
+    const document = new XmlDocument();
     try {
-      const doc = LibXmlDocument.fromString(readSource(data));
-      return new XmlDocument(doc, errors);
+      document._doc = LibXmlDocument.fromString(string);
+      document._root = new XmlNode(document._doc.root, document);
     } catch (e) {
-      if (e instanceof XmlParseError) {
-        for (const detail of e.details) {
-          errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
-        }
-        return new XmlDocument(null, errors);
+      if (!(e instanceof XmlParseError)) throw e;
+      for (const detail of e.details) {
+        document.errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
       }
-      throw e;
     }
+    return document;
   }
 
   get document(): XmlDocument {
@@ -76,3 +99,4 @@ export class XmlDocument {
 }
 
 include(XmlDocument, Searchable);
+constSet(XML, "Document", XmlDocument);

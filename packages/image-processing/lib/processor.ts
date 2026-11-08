@@ -1,3 +1,4 @@
+import { ImageProcessing } from "./namespaces.js";
 import {
   isPlainHash,
   rbBlockGivenP,
@@ -114,3 +115,5 @@ export class Processor {
     return result != null && result !== false ? result : this._accumulator;
   }
 }
+
+ImageProcessing.Processor = Processor;

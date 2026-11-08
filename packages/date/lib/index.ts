@@ -19,3 +19,4 @@ export {
   tzdataOffsetInstant,
 } from "./tzdata-isdst.js";
 export { tzdataAbbreviation, tzdataAbbreviationChanges } from "./tzdata-abbreviations.js";
+import "./constants.generated.js";

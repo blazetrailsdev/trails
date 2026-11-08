@@ -1,6 +1,7 @@
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { HTML4, HTML5, type VendorMethods } from "./namespaces.js";
 
+/** @noRailsEquivalent CONVERGEABLE html-sanitizer-split-html4-html5-sanitizer-classes */
 export abstract class Sanitizer {
   declare private static _html5Support: boolean | undefined;
 

@@ -42,26 +42,8 @@ const GENERATED = "constants.generated.ts";
 /** The table for the classes in files outside the package entry's graph, which those files import. */
 const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 
-/**
- * The api-compare packages with no constant table: `activerecord-test-support`,
- * whose classes are not loaded from the package entry, and the gem ports scored
- * by `parity:api` before their top-level Ruby module (`Nokogiri`, `Racc`,
- * `Crass`, `Loofah`, `Rails::HTML`, `ImageProcessing`, `Date`, `TZInfo`) is
- * seated with `constSet`, which `constGet` needs to resolve any path under it.
- * Those eight leave this set with story
- * `gem-ports-seat-top-level-modules-for-class-paths`.
- */
-const SKIPPED = new Set([
-  "activerecord-test-support",
-  "crass",
-  "date",
-  "image-processing",
-  "loofah",
-  "nokogiri",
-  "racc",
-  "rails-html-sanitizer",
-  "tzinfo",
-]);
+/** The api-compare packages with no constant table: `activerecord-test-support`, whose classes are not loaded from the package entry. */
+const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {
@@ -346,9 +328,10 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsFile,
           tsByFileName,
         );
+        const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
         tsCls ??=
           kind === "classes"
-            ? tsByFileName.get(`${tsFile}::${fqn.split("::").at(-2)}${short}`)
+            ? [...tsByFileName].find(([k]) => k.toLowerCase() === prefixed)?.[1]
             : undefined;
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
@@ -386,13 +369,13 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     };
     for (const [key, candidate] of paired) {
       let entry = candidate;
+      const placed = place.at(entry.file, !fallbackModules.has(key));
+      if (placed === null) continue;
       if (ambiguous.has(key)) {
         const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
         if (seated === undefined) continue;
         entry = { ...entry, fqn: seated };
       }
-      const placed = place.at(entry.file, !fallbackModules.has(key));
-      if (placed === null) continue;
       const source = await read(entry.file);
       const reached = await tsPath(entry);
       if (reached !== null) {

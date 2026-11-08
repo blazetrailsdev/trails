@@ -19,7 +19,7 @@ import {
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export class InvalidTimezoneIdentifier extends Error {
@@ -734,3 +734,4 @@ export const TZInfo = {
   DataSources: { ConstantOffsetDataTimezoneInfo },
   Data: { name: "TZInfo::Data" },
 };
+constSet(TopLevel, "TZInfo", TZInfo);

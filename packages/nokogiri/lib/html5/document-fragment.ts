@@ -1,4 +1,4 @@
-import { parseFragment, type DefaultTreeAdapterMap } from "parse5";
+import { defaultTreeAdapter, parseFragment, type DefaultTreeAdapterMap } from "parse5";
 
 import { Document } from "./document.js";
 import { childNodes, type Node } from "./node.js";
@@ -7,21 +7,41 @@ import { NodeSet } from "../xml/node-set.js";
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
 export class DocumentFragment {
-  private constructor(
-    public document: Document,
-    /**
-     * @internal
-     * @noRailsEquivalent PERMANENT
-     */
-    readonly _node: Parse5Parent,
-  ) {}
+  errors: unknown[];
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  readonly _node: Parse5Parent;
 
-  /** @missingRailsArgs new — CONVERGEABLE nokogiri-parse-constructs-through-new */
-  static parse(tags: string): DocumentFragment {
+  constructor(
+    public document: Document,
+    input: string | null = null,
+    context: Node | string | null = null,
+    _options: Record<string, unknown> = {},
+  ) {
+    this.document = document;
+    this.errors = [];
+    this._node = defaultTreeAdapter.createDocumentFragment();
+    if (input == null) return;
+
+    this._node =
+      context !== null && typeof context !== "string" && context.isElement()
+        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
+        : parseFragment(input);
+  }
+
+  static parse(
+    input: string,
+    _encoding: string | null = null,
+    options: { context?: Node | string | null } = {},
+  ): DocumentFragment {
+    const { context = null, ...rest } = options;
+
     const document = new Document();
     document.encoding = "UTF-8";
 
-    return new DocumentFragment(document, parseFragment(tags));
+    return new DocumentFragment(document, input, context, rest);
   }
 
   get children(): Node[] {

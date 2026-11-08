@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { SaxDocument } from "../../lib/sax/document.js";
-import { SaxParser } from "../../lib/sax/parser.js";
+import { SaxDocument } from "../../../lib/xml/sax/document.js";
+import { SaxParser } from "../../../lib/xml/sax/parser.js";
 
 describe("Nokogiri::XML::SAX::Parser", () => {
   it("emits start and end document callbacks", () => {

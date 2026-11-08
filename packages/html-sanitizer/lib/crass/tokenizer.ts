@@ -1,5 +1,6 @@
-import { StringScanner } from "@blazetrails/ruby-compat";
 import { TokenType, tokenize, type CSSToken } from "@csstools/css-tokenizer";
+
+import { Scanner } from "./scanner.js";
 
 export interface Node {
   node: string;
@@ -47,7 +48,6 @@ const MATCH_TOKENS: Record<string, string> = {
 const RE_HEX = /[0-9A-Fa-f]{1,6}/;
 const RE_NON_PRINTABLE = /[\u0000-\u0008\u000b\u000e-\u001f\u007f]+/; // eslint-disable-line no-control-regex
 const RE_WHITESPACE = /[\n\t ]+/;
-const RE_CHAR = /[\s\S]/u;
 
 const RE_NAME = /[0-9A-Za-z_\u0080-\u{10ffff}-]+/u;
 const RE_NON_ASCII_START = /^[\u0080-\u{10ffff}]/u;
@@ -59,17 +59,16 @@ export class Tokenizer {
     return new Tokenizer(input, options).tokenize();
   }
 
-  private _input: string;
+  private s: Scanner;
   private _options: TokenizerOptions;
 
-  /** @missingRailsCall new — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner */
   constructor(input: string, options: TokenizerOptions = {}) {
-    this._input = this.preprocess(input);
+    this.s = new Scanner(this.preprocess(input));
     this._options = options;
   }
 
   tokenize(): Node[] {
-    const css = this._input;
+    const css = this.s.string;
     const tokens: Node[] = [];
     let lastEnd = -1;
     let offset = 0;
@@ -89,34 +88,32 @@ export class Tokenizer {
         if (token[0] === TokenType.EOF) break restart;
         if (token[0] === TokenType.Comment && !this._options.preserveComments) continue;
         const tokenStart = token[2] + start;
-        let created = this.createToken(token, charPos(tokenStart));
+        let created = this._convertToken(token, charPos(tokenStart));
         let end = token[3] + start + 1;
         const nonAscii = token[0] === TokenType.Delim && RE_NON_ASCII_START.test(token[1]);
         if (nonAscii) {
-          const s = new StringScanner(css.slice(tokenStart));
+          while (this.s.pos < created.pos) this.s.consume();
+          this.s.mark();
           let value = "";
-          while (!s.isEos()) {
-            const match = s.scan(RE_NAME);
+          while (!this.s.isEos()) {
+            const match = this.s.scan(RE_NAME);
             if (match !== null) {
               value += match;
               continue;
             }
 
-            const char = s.peek(1);
-
-            if (char === "\\" && s.peek(2)[1] !== "\n") {
-              s.scan(RE_CHAR);
-              value += this.consumeEscaped(s);
-            } else if (char === "*" && this._options.preserveHacks) {
-              s.scan(RE_CHAR);
-              value += s.scan(RE_CHAR) ?? "";
+            if (this.isValidEscape(this.s.peek(2))) {
+              this.s.consume();
+              value += this.consumeEscaped();
+            } else if (this.s.peek() === "*" && this._options.preserveHacks) {
+              this.s.consume();
+              value += this.s.consume();
             } else {
               break;
             }
           }
-          end = tokenStart + s.pos;
-          const raw = css.slice(tokenStart, end);
-          created = { node: "ident", pos: created.pos, raw, value };
+          created = this.createToken("ident", { value });
+          end = tokenStart + created.raw.length;
         }
         const adjacent = lastEnd === tokenStart;
         const merged: Node | null = adjacent
@@ -145,7 +142,8 @@ export class Tokenizer {
     return tokens;
   }
 
-  private createToken(token: CSSToken, pos: number): Node {
+  /** @noRailsEquivalent PERMANENT */
+  private _convertToken(token: CSSToken, pos: number): Node {
     const [type, raw] = token;
     const data = token[4] as Record<string, Node[string]> | undefined;
     const simple = SIMPLE_TOKENS[type];
@@ -169,12 +167,10 @@ export class Tokenizer {
       case TokenType.BadString:
         return { node: "bad_string", pos, raw, error: true, value: raw.slice(1) };
       case TokenType.BadURL:
-        return {
-          node: "bad_url",
-          pos,
-          raw,
-          ...this.consumeUrl(new StringScanner(raw.slice(raw.indexOf("(") + 1))),
-        };
+        while (this.s.pos < pos) this.s.consume();
+        this.s.mark();
+        this.s.scanUntil(/\(/);
+        return this.consumeUrl();
       case TokenType.UnicodeRange:
         return {
           node: "unicode_range",
@@ -237,35 +233,35 @@ export class Tokenizer {
     return null;
   }
 
-  /**
-   * @missingRailsArgs consume_escaped — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   * @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   */
-  private consumeBadUrl(s: StringScanner): string {
+  private consumeBadUrl(): string {
     let text = "";
 
-    while (!s.isEos()) {
-      const char = s.scan(RE_CHAR)!;
-
-      if (char === "\\" && s.peek(1) !== "\n" && !s.isEos()) {
-        text += this.consumeEscaped(s);
-      } else if (char === ")") {
-        break;
+    while (!this.s.isEos()) {
+      if (this.isValidEscape()) {
+        text += this.consumeEscaped();
+      } else if (this.isValidEscape(this.s.peek(2))) {
+        this.s.consume();
+        text += this.consumeEscaped();
       } else {
-        text += char;
+        const char = this.s.consume();
+
+        if (char === ")") {
+          break;
+        } else {
+          text += char;
+        }
       }
     }
 
     return text;
   }
 
-  /** @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner */
-  private consumeEscaped(s: StringScanner): string {
-    if (s.isEos()) return "\ufffd";
+  private consumeEscaped(): string {
+    if (this.s.isEos()) return "\ufffd";
 
-    const hexStr = s.scan(RE_HEX);
+    const hexStr = this.s.scan(RE_HEX);
     if (hexStr != null) {
-      if (RE_WHITESPACE.test(s.peek(1))) s.scan(RE_CHAR);
+      if (RE_WHITESPACE.test(this.s.peek())) this.s.consume();
 
       const codepoint = parseInt(hexStr, 16);
 
@@ -276,53 +272,61 @@ export class Tokenizer {
       }
     }
 
-    return s.scan(RE_CHAR)!;
+    return this.s.consume();
   }
 
-  /**
-   * @missingRailsCall create_token — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   * @missingRailsArgs consume_bad_url — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   * @missingRailsArgs consume_escaped — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   * @missingRailsArgs peek — CONVERGEABLE crass-tokenizer-reads-a-crass-scanner
-   */
-  private consumeUrl(s: StringScanner): { error?: true; value: string } {
+  private consumeUrl(): Node {
     let value = "";
 
-    s.scan(RE_WHITESPACE);
+    this.s.scan(RE_WHITESPACE);
 
-    while (!s.isEos()) {
-      const char = s.scan(RE_CHAR)!;
+    while (!this.s.isEos()) {
+      const char = this.s.consume();
 
       if (char === ")") {
         break;
       } else if (RE_WHITESPACE.test(char)) {
-        s.scan(RE_WHITESPACE);
+        this.s.scan(RE_WHITESPACE);
 
-        if (s.isEos() || s.peek(1) === ")") {
-          s.scan(RE_CHAR);
+        if (this.s.isEos() || this.s.peek() === ")") {
+          this.s.consume();
           break;
         } else {
-          return { value: value + this.consumeBadUrl(s) };
+          return this.createToken("bad_url", { value: value + this.consumeBadUrl() });
         }
       } else if (char === '"' || char === "'" || char === "(" || RE_NON_PRINTABLE.test(char)) {
-        return { error: true, value: value + this.consumeBadUrl(s) };
+        return this.createToken("bad_url", { error: true, value: value + this.consumeBadUrl() });
       } else if (char === "\\") {
-        if (s.peek(1) !== "\n" && !s.isEos()) {
-          value += this.consumeEscaped(s);
+        if (this.isValidEscape()) {
+          value += this.consumeEscaped();
         } else {
-          return { error: true, value: value + this.consumeBadUrl(s) };
+          return this.createToken("bad_url", { error: true, value: value + this.consumeBadUrl() });
         }
       } else {
         value += char;
       }
     }
 
-    return { value };
+    return this.createToken("url", { value });
+  }
+
+  private createToken(type: string, properties: Record<string, unknown> = {}): Node {
+    return {
+      node: type,
+      pos: this.s.marker,
+      raw: this.s.marked(),
+      ...properties,
+    };
   }
 
   private preprocess(input: string): string {
     return String(input)
       .replace(/\r\n|[\r\f]/g, "\n")
       .replaceAll("\0", "\ufffd");
+  }
+
+  private isValidEscape(text: string | null = null): boolean {
+    if (text === null) text = (this.s.current ?? "") + this.s.peek();
+    return text[0] === "\\" && text[1] !== "\n";
   }
 }
