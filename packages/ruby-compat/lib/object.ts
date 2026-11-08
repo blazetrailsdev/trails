@@ -2029,8 +2029,16 @@ function ivarField(obj: object, id: string): string {
     const field = ivarFields.get(o)?.get(id);
     if (field !== undefined) return field;
   }
-  return id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z])/g, (_, c: string) => c.toUpperCase());
+  let field = defaultIvarFields.get(id);
+  if (field === undefined) {
+    field = id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z])/g, (_, c: string) => c.toUpperCase());
+    defaultIvarFields.set(id, field);
+  }
+  return field;
 }
+
+const defaultIvarFields = new Map<string, string>();
+const validIvarNames = new Set<string>();
 
 function fieldIvar(obj: object, field: string): string {
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
@@ -2041,11 +2049,13 @@ function fieldIvar(obj: object, field: string): string {
 }
 
 function idForVar(obj: object, iv: string): string {
+  if (validIvarNames.has(iv)) return iv;
   if (!/^@[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_\u0080-\u{10FFFF}]*$/u.test(iv)) {
     throw new NameError(`\`${iv}' is not allowed as an instance variable name`, iv, {
       receiver: obj,
     });
   }
+  validIvarNames.add(iv);
   return iv;
 }
 

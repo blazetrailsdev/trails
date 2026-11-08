@@ -1164,6 +1164,16 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
       "`foo' is not allowed as an instance variable name",
     );
   });
+
+  it("validates and maps each name the same way on every read", () => {
+    const o = new Holder();
+    for (let i = 0; i < 2; i++) {
+      rbObjIvarSet(o, "@foo_bar", i);
+      expect(rbObjIvarGet(o, "@foo_bar")).toBe(i);
+      expect((o as unknown as { fooBar: number }).fooBar).toBe(i);
+      expect(() => rbObjIvarGet(o, "@1a")).toThrow(NameError);
+    }
+  });
 });
 
 describe("Class#superclass", () => {

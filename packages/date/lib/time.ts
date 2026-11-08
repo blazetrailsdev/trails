@@ -478,7 +478,7 @@ function rbStrftimeAlloc(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  timev: Rational,
+  timev: () => Rational,
   gmt: boolean,
 ): string | null {
   return rbStrftime(format, time, vtm, timev, gmt);
@@ -1650,7 +1650,7 @@ export class Time extends rbCTime {
           return self.zone;
         },
       },
-      this.toR(),
+      () => this.toR(),
       this.#tzmodeUtc,
     );
     if (str == null) throw new ArgumentError(`invalid format: ${format}`);
