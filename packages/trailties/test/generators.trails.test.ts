@@ -22,7 +22,7 @@ beforeAll(async () => {
 async function generatorDirectories(): Promise<string[]> {
   const fs = getFs();
   const path = getPath();
-  const root = decodeURIComponent(new URL("./generators/trails/", import.meta.url).pathname);
+  const root = decodeURIComponent(new URL("../lib/generators/trails/", import.meta.url).pathname);
   const out: string[] = [];
   const walk = async (dir: string, namespace: string[]): Promise<void> => {
     const entries = (await fs.readdir!(dir)).sort();

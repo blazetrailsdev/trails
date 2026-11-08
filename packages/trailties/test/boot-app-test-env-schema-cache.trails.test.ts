@@ -28,9 +28,7 @@ describe("a booted app in the test env", () => {
     const loadAllBang = vi.spyOn(SchemaReflection.prototype, "loadAllBang");
 
     await import("./fixtures/boot-app/config/application.js");
-    Trails.application!.config.setRoot(
-      new URL("./__fixtures__/boot-app", import.meta.url).pathname,
-    );
+    Trails.application!.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
 
     expect(loadAllBang).not.toHaveBeenCalled();

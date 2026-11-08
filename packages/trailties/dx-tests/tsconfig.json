@@ -4,7 +4,7 @@
     "composite": false,
     "noEmit": true,
     "paths": {
-      "@blazetrails/trailties/template-builder": ["../src/template-builder/index.ts"]
+      "@blazetrails/trailties/template-builder": ["../lib/template-builder/index.ts"]
     }
   },
   "include": ["."]

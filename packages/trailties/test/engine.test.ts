@@ -63,7 +63,7 @@ function installFs(dirs: Set<string>, files: Set<string>): void {
   fsAdapterConfig.adapter = "engine-test";
 }
 
-const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
+const fixtureRoot = new URL("./fixtures/initializer-engine", import.meta.url).pathname;
 
 const PREV = fsAdapterConfig.adapter;
 afterEach(() => {
@@ -331,7 +331,7 @@ describe("Engine", () => {
     class RoutingEngine extends Engine {}
     Engine.register(RoutingEngine, fixtureRoot);
     const engine = RoutingEngine.instance();
-    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    engine.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     const reloader = { paths: [] as string[], routeSets: [] as unknown[], externalRoutes: [] };
     const appRoutes = new RouteSet();
 
@@ -351,7 +351,7 @@ describe("Engine", () => {
     class ViewEngine extends Engine {}
     Engine.register(ViewEngine, fixtureRoot);
     const engine = ViewEngine.instance();
-    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    engine.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
 
@@ -373,7 +373,7 @@ describe("Engine", () => {
     class RenderEngine extends Engine {}
     Engine.register(RenderEngine, fixtureRoot);
     const engine = RenderEngine.instance();
-    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    engine.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
 
     class PostsController extends ActionController.Base {}
@@ -482,7 +482,7 @@ describe("Engine", () => {
       class WrappedSeedEngine extends Engine {}
       Engine.register(
         WrappedSeedEngine,
-        new URL("./__fixtures__/seed-engine", import.meta.url).pathname,
+        new URL("./fixtures/seed-engine", import.meta.url).pathname,
       );
       const engine = WrappedSeedEngine.instance();
       const wrapped: string[] = [];

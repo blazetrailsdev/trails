@@ -16,7 +16,7 @@ describe("a booted app's models are warm before user code runs", () => {
     const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}boot-app-`);
     const database = `${dir}/development.sqlite3`;
     await Base.establishConnection({ adapter: "sqlite3", database });
-    await rbFLoad(new URL("./__fixtures__/boot-app/db/schema.ts", import.meta.url).pathname);
+    await rbFLoad(new URL("./fixtures/boot-app/db/schema.ts", import.meta.url).pathname);
     await Base.removeConnection();
 
     savedEnv = env.TRAILS_ENV;
@@ -26,9 +26,7 @@ describe("a booted app's models are warm before user code runs", () => {
     _resetTrailsEnv();
 
     await import("./fixtures/boot-app/config/application.js");
-    Trails.application!.config.setRoot(
-      new URL("./__fixtures__/boot-app", import.meta.url).pathname,
-    );
+    Trails.application!.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
   }
 

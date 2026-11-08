@@ -6,7 +6,7 @@ import { Application } from "../lib/application.js";
 import { Trails } from "../lib/trails.js";
 
 describe("trails-tsc build views inside a booted app", () => {
-  const root = new URL("./__fixtures__/boot-app", import.meta.url).pathname;
+  const root = new URL("./fixtures/boot-app", import.meta.url).pathname;
   let outDir: string;
 
   beforeAll(async () => {

@@ -20,7 +20,7 @@ describe("zeitwerk:check", () => {
 
   async function check(): Promise<void> {
     await Rake.withApplication(async () => {
-      await rbFLoad(File.join(import.meta.dirname, "zeitwerk.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/zeitwerk.ts"));
       const task = Rake.application!.lookup("zeitwerk:check")!;
       task.clearPrerequisites();
       await task.invoke();

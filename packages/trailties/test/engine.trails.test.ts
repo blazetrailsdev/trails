@@ -8,7 +8,7 @@ describe("Engine#buildRequest", () => {
     class RequestEngine extends Engine {}
     Engine.register(
       RequestEngine,
-      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+      new URL("./fixtures/initializer-engine", import.meta.url).pathname,
     );
     const engine = RequestEngine.instance();
     engine.envConfig()["engine.flag"] = "on";
@@ -43,10 +43,7 @@ describe("Railtie class-level method_missing", () => {
         return "Blog::Engine";
       }
     }
-    Engine.register(
-      BlogEngine,
-      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
-    );
+    Engine.register(BlogEngine, new URL("./fixtures/initializer-engine", import.meta.url).pathname);
     const blog = BlogEngine as unknown as typeof BlogEngine & Pick<Engine, "routes">;
     expect(blog.routes()).toBe(BlogEngine.instance().routes());
     blog.routes().draw(function () {
@@ -69,7 +66,7 @@ describe("Engine.isolate_namespace", () => {
     class IsolatedEngine extends Engine {}
     Engine.register(
       IsolatedEngine,
-      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+      new URL("./fixtures/initializer-engine", import.meta.url).pathname,
     );
     const mod: Parameters<typeof Engine.isolateNamespace>[0] = { name: "Blog::Admin" };
     IsolatedEngine.isolateNamespace(mod);
@@ -87,13 +84,13 @@ describe("Engine.isolate_namespace", () => {
 
 describe("Engine.findRoot", () => {
   it("stops at a package root that has a package.json and no lib", () => {
-    const src = new URL("./", import.meta.url).pathname;
+    const src = new URL("../lib/", import.meta.url).pathname;
     expect(Engine.findRoot(src)).toBe(new URL("../", import.meta.url).pathname.replace(/\/$/, ""));
   });
 });
 
 describe("Engine#loadServer awaits server blocks", () => {
-  const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
+  const fixtureRoot = new URL("./fixtures/initializer-engine", import.meta.url).pathname;
 
   it("awaits each server block, in registration order, before it resolves", async () => {
     class AsyncServerEngine extends Engine {}

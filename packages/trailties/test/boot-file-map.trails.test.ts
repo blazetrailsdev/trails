@@ -5,9 +5,7 @@ const record = "(globalThis.__loaded ??= []).push(import.meta.url);\nexport {};\
 
 describe("trails build's boot file map", () => {
   it("boots .trails/entry.generated.js under plain node through the registered thunks", async () => {
-    const here = decodeURIComponent(
-      new URL("./__fixtures__/boot-file-map", import.meta.url).pathname,
-    );
+    const here = decodeURIComponent(new URL("./fixtures/boot-file-map", import.meta.url).pathname);
     const base = File.realpath(Dir.mktmpdir("build", here));
     const root = `${base}/app`;
     const engineRoot = `${base}/blog`;
@@ -32,7 +30,7 @@ Application.register(BootFileMap, import.meta.dirname);
         `${root}/config/environment.ts`,
         `import { Trails } from "@blazetrails/trailties";
 
-await import("../lib/application.ts");
+await import("./application.ts");
 
 await Trails.application.initializeBang();
 export default Trails.application;

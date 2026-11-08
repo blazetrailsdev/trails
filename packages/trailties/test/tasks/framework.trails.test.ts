@@ -24,7 +24,7 @@ describe("tasks/framework", () => {
     vi.stubEnv("LOCATION", "");
     await expect(
       Rake.withApplication(async (rake) => {
-        await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
+        await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/framework.ts"));
         const task = rake.lookup("app:template")!;
         task.clearPrerequisites();
         await task.invoke();
@@ -40,7 +40,7 @@ describe("tasks/framework", () => {
     File.write(tmpl, 'export default (g) => g.generate("helper", "Post", { inline: true });\n');
     vi.stubEnv("LOCATION", tmpl);
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/framework.ts"));
       const task = rake.lookup("app:template")!;
       task.clearPrerequisites();
       await task.invoke();
@@ -52,7 +52,7 @@ describe("tasks/framework", () => {
 
   it("copies the default templates", async () => {
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "framework.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/framework.ts"));
       await rake.lookup("app:templates:copy")!.invoke();
     });
     for (const name of ["controller/view.html.tse.tt", "mailer/layout.text.tse.tt"]) {

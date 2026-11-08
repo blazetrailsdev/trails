@@ -21,8 +21,8 @@ const makeRouteSet = (): Counted => {
   };
   return r;
 };
-const trails = new URL("../trails.js", import.meta.url).href;
-const engine = new URL("../engine.js", import.meta.url).href;
+const trails = new URL("../../lib/trails.js", import.meta.url).href;
+const engine = new URL("../../lib/engine.js", import.meta.url).href;
 const drawInto = (receiver: string, path: string): string =>
   `import { Trails } from "${trails}";\n` +
   `${receiver}.routes().draw(function () { this.get("${path}", { to: "posts#index" }); });\n`;

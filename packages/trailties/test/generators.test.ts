@@ -4,7 +4,7 @@ import * as nodePath from "node:path";
 import { Generators } from "../lib/generators.js";
 
 const GENERATORS_PATH = nodePath.join(
-  decodeURIComponent(new URL(".", import.meta.url).pathname),
+  decodeURIComponent(new URL("../lib/", import.meta.url).pathname),
   "generators",
 );
 

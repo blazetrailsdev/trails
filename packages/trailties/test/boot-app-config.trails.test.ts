@@ -23,7 +23,7 @@ describe("a generated app's config files configure the application", () => {
   it("applies config/environments/test.ts and config/initializers/filter-parameter-logging.ts", async () => {
     await import("./fixtures/boot-app/config/application.js");
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     expect(app.config.considerAllRequestsLocal).toBe(false);
     expect(app.config.filterParameters).toEqual([]);
 

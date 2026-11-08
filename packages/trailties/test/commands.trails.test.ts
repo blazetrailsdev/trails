@@ -15,7 +15,7 @@ vi.mock("../lib/command.js", () => ({ invoke: vi.fn() }));
 describe("trails/commands", () => {
   const load = (...argv: string[]) => {
     rbAryReplace(rbArgv(), argv);
-    return rbFLoad(File.join(import.meta.dirname, "commands.ts"));
+    return rbFLoad(File.join(import.meta.dirname, "../lib/commands.ts"));
   };
 
   beforeEach(() => {

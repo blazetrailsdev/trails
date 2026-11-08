@@ -13,7 +13,7 @@ describe("a generated app renders its own views", () => {
   it("renders a .tse template wrapped in the application layout", async () => {
     await import("./fixtures/boot-app/config/application.js");
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
     const order = app.initializers.tsort().map((i) => i.name);

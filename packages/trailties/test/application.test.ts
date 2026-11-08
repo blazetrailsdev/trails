@@ -410,7 +410,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     async () => {
       const { BootApp } = await import("./fixtures/boot-app/config/application.js");
       const app = Trails.application!;
-      app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+      app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
       await Trails.initialize();
 
@@ -441,7 +441,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.register(BootAppRoutes);
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
@@ -461,7 +461,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.register(BootAppHelpers);
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
@@ -479,7 +479,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.register(BootAppUrlHelpers);
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
@@ -501,7 +501,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.register(BootAppUrlFor);
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
@@ -525,7 +525,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     class BootAppDebug extends BootApp {}
     Application.register(BootAppDebug);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     app.config.considerAllRequestsLocal = true;
     await Trails.initialize();
 
@@ -538,7 +538,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     class BootAppRescues extends BootApp {}
     Application.register(BootAppRescues);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     app.config.considerAllRequestsLocal = true;
     const lines: string[] = [];
     vi.spyOn(app.config, "defaultLogFile").mockResolvedValue({
@@ -581,7 +581,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
     Application.register(BootAppHelpersAtBoot);
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
 
     const { ApplicationController } =

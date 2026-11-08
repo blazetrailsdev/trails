@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SRC = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
+const SRC = fileURLToPath(new URL("../../lib", import.meta.url));
 const EDGE = /(?:import|export)\b[^;]*?from\s*["'](\.[^"']+)["']|import\s*\(\s*["'](\.[^"']+)["']/g;
 const BARE =
   /(?:import|export)\b[^;]*?from\s*["']([^."'][^"']*)["']|import\s*\(\s*["']([^."'][^"']*)["']/g;

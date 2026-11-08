@@ -18,7 +18,7 @@ describe("Trails::Command::Actions", () => {
   });
 
   it("load_generators sets Generators.namespace to the engine's railtie namespace", async () => {
-    const root = new URL("../__fixtures__/initializer-engine", import.meta.url).pathname;
+    const root = new URL("../fixtures/initializer-engine", import.meta.url).pathname;
     const mod: Parameters<typeof Engine.isolateNamespace>[0] = { name: "ActionsBlog" };
     class ActionsBlogEngine extends Engine {}
     constSet(TopLevel, "ActionsBlog", mod);

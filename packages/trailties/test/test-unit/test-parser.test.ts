@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { TestParser } from "../../lib/test-unit/test-parser.js";
 
-const FILE = new URL("../__fixtures__/test-unit/test-parser-fixture.ts", import.meta.url).pathname;
+const FILE = new URL("../fixtures/test-unit/test-parser-fixture.ts", import.meta.url).pathname;
 
 describe("TestParserTest", () => {
   beforeAll(() => TestParser.requireParser());

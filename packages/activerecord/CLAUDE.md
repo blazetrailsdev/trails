@@ -778,7 +778,7 @@ As a consequence:
 
 - A Rails `klass.new(attributes, &block)` ports as
   `new klass(attributes, block)`, in source and in tests. Generated application
-  code says `new Post(params)` too (`trailties/src/generators/active-model.ts`).
+  code says `new Post(params)` too (`trailties/lib/generators/active-model.ts`).
 - `inheritance.rb`'s `new` has no member in `inheritance.ts`. Do not add one,
   and do not file a story to move the body out of the constructor.
 - `Persistence#becomes` (`persistence.rb:487-500`) is `klass.allocate` +

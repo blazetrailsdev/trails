@@ -369,15 +369,15 @@ const alias = {
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/lib/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/lib/index.ts"),
-  "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/src/all.ts"),
+  "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/lib/all.ts"),
   "@blazetrails/trailties/trailties/":
-    path.resolve(__dirname, "packages/trailties/src/trailties") + "/",
-  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
+    path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",
+  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/lib/engine.ts"),
   "@blazetrails/trailties/trailtie/configuration": path.resolve(
     __dirname,
-    "packages/trailties/src/trailtie/configuration.ts",
+    "packages/trailties/lib/trailtie/configuration.ts",
   ),
-  "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
+  "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/lib/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/lib") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/lib/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/lib/index.ts"),
@@ -493,7 +493,7 @@ const aliasEntries = [
   },
   {
     find: /^@blazetrails\/trailties$/,
-    replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+    replacement: path.resolve(__dirname, "packages/trailties/lib/index.ts"),
   },
   ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
 ];
@@ -504,11 +504,11 @@ const otherResolve = {
     // A generated app under tmp/ must share the suite's source Trails, not dist's.
     {
       find: /^@blazetrails\/trailties\/(trails|test-unit\/trailtie)$/,
-      replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",
+      replacement: path.resolve(__dirname, "packages/trailties/lib") + "/$1.ts",
     },
     {
       find: /^@blazetrails\/trailties$/,
-      replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+      replacement: path.resolve(__dirname, "packages/trailties/lib/index.ts"),
     },
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
@@ -718,14 +718,14 @@ export default defineConfig({
           name: "trailties",
           globals: true,
           include: [
-            "packages/trailties/src/**/*.test.ts",
+            "packages/trailties/test/**/*.test.ts",
             "packages/solid-cable/test/generators/**/*.test.ts",
             "packages/solid-queue/test/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
-            "./packages/trailties/src/test-helpers/build-templates.ts",
-            "./packages/trailties/src/test-helpers/isolation/global-setup.ts",
+            "./packages/trailties/test/support/build-templates.ts",
+            "./packages/trailties/test/support/isolation/global-setup.ts",
             "./packages/solid-cable/test/support/build-templates.ts",
             "./packages/solid-queue/test/support/build-templates.ts",
           ],

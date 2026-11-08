@@ -20,7 +20,7 @@ describe("tasks/statistics", () => {
     const warn = vi.spyOn(deprecator(), "warn").mockReturnValue(undefined);
 
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "statistics.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/statistics.ts"));
       await rake.lookup("stats")!.invoke();
     });
 

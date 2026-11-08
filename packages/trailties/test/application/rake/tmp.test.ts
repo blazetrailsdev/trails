@@ -4,7 +4,7 @@ import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
 
 async function tmpClear(): Promise<void> {
   await Rake.withApplication(async (rake) => {
-    await rbFLoad(File.join(import.meta.dirname, "../../tasks/tmp.ts"));
+    await rbFLoad(File.join(import.meta.dirname, "../../../lib/tasks/tmp.ts"));
     await rake.lookup("tmp:clear")!.invoke();
   });
 }

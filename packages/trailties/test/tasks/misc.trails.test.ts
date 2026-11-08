@@ -15,7 +15,7 @@ describe("tasks/misc", () => {
       return null;
     });
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "misc.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/misc.ts"));
       await rake.lookup(task)!.invoke(...args);
     });
     return out;

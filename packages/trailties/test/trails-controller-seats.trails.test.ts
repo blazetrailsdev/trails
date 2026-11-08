@@ -3,7 +3,7 @@ import { File, getFs } from "@blazetrails/ruby-compat";
 import { HealthController } from "../lib/health-controller.js";
 import { Trails } from "../lib/trails.js";
 
-const SRC = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const SRC = File.dirname(decodeURIComponent(new URL("../lib/x", import.meta.url).pathname));
 
 async function reachesTrails(entry: string): Promise<boolean> {
   const seen = new Set<string>();

@@ -5,7 +5,7 @@ import { APP_PATH, setAppPath, setEngineRoot } from "../../lib/app-path.js";
 vi.mock("../../lib/commands.js", () => ({}));
 
 describe("engine/commands", () => {
-  const load = () => rbFLoad(File.join(import.meta.dirname, "commands.ts"));
+  const load = () => rbFLoad(File.join(import.meta.dirname, "../../lib/engine/commands.ts"));
 
   afterEach(() => {
     setAppPath(undefined);

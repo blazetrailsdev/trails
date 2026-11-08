@@ -67,7 +67,7 @@ name becomes a file name or a locale key, and each site carries
   name used as a partial's name
 - `AbstractController::Translation#translate`'s lazy-lookup scope
   (`abstract-controller/translation.ts`)
-- `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
+- `RouteInfo#viewPath` (`trailties/lib/commands/unused-routes.ts`)
 - `ActionMailer::Base#collectResponsesFromTemplates`
   (`actionmailer/lib/base.ts`; `base.rb:991-1002`), which also dasherizes the
   default `mailer_name` directory, as `localPrefixes` does
@@ -79,7 +79,7 @@ namespaces kept: `Admin::StoryPagesController` renders from `admin/story-pages/`
 It carries `@inventedArm dasherize — PERMANENT`. `controller_path` itself stays
 underscored: it names the controller in routes and URL generation, where a
 hyphen is not legal. Three more sites follow that directory: the scaffold's view
-generator (`trailties/src/generators/tse/scaffold/scaffold-generator.ts`) writes
+generator (`trailties/lib/generators/tse/scaffold/scaffold-generator.ts`) writes
 to the dasherized `controllerFilePath()` while `controllerFilePath` and
 `controllerI18nScope` stay underscored; `partialPath`
 (`actionview/lib/renderer/abstract-renderer.ts`) dasherizes the directory part

@@ -39,7 +39,7 @@ describe("Trails::ApplicationController", () => {
   });
 
   it("prepends its templates directory as a path, and the build ships the application layout", async () => {
-    const templates = File.expandPath("templates", import.meta.dirname);
+    const templates = File.expandPath("../lib/templates", import.meta.dirname);
     expect([...ApplicationController.viewPaths()].map((p) => String(p))).toContain(templates);
     const dist = File.expandPath("../dist/templates", import.meta.dirname);
     const layout = new LookupContext([dist]).findTemplate(

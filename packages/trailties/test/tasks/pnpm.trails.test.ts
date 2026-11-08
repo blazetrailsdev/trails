@@ -17,7 +17,7 @@ describe("tasks/pnpm", () => {
 
   async function install(): Promise<void> {
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "pnpm.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/pnpm.ts"));
       await rake.lookup("pnpm:install")!.invoke();
     });
   }

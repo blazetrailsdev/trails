@@ -6,7 +6,7 @@ import { RoutesReloader, type RouteSetLike } from "../../lib/application/routes-
 import { Trails } from "../../lib/trails.js";
 
 type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void };
-const trails = new URL("../trails.js", import.meta.url).href;
+const trails = new URL("../../lib/trails.js", import.meta.url).href;
 const makeRouteSet = (): Counted => {
   const r: Counted = {
     disableClearAndFinalize: false,

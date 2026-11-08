@@ -77,7 +77,7 @@ async function reachableFrom(
 
 describe("production boot", () => {
   it("reaches neither playwright nor vite", async () => {
-    const trailties = getPath().join(packagesRoot, "trailties/src");
+    const trailties = getPath().join(packagesRoot, "trailties/lib");
     const { files, bare, chain } = await reachableFrom([
       getPath().join(trailties, "index.ts"),
       getPath().join(trailties, "all.ts"),

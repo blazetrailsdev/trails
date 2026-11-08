@@ -27,7 +27,7 @@ describe("LogTest", () => {
     File.write("log/dummy.log", "dummy");
 
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "../../tasks/log.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../../lib/tasks/log.ts"));
       await rake.lookup("log:clear")!.invoke();
     });
 

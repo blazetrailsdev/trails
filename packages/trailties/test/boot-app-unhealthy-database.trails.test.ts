@@ -31,9 +31,7 @@ describe("a booted app against an unhealthy database", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     await import("./fixtures/boot-app/config/application.js");
-    Trails.application!.config.setRoot(
-      new URL("./__fixtures__/boot-app", import.meta.url).pathname,
-    );
+    Trails.application!.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
 
     expect(warn).toHaveBeenCalledWith(

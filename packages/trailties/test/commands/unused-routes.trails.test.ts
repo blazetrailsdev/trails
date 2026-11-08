@@ -96,9 +96,7 @@ describe("UnusedRoutesCommand", () => {
     class PostsController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
-          new ActionView.FileSystemResolver(
-            new URL("./__fixtures__/views", import.meta.url).pathname,
-          ),
+          new ActionView.FileSystemResolver(new URL("../fixtures/views", import.meta.url).pathname),
         ]);
       }
     }
@@ -111,9 +109,7 @@ describe("UnusedRoutesCommand", () => {
     class PostsController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
-          new ActionView.FileSystemResolver(
-            new URL("./__fixtures__/views", import.meta.url).pathname,
-          ),
+          new ActionView.FileSystemResolver(new URL("../fixtures/views", import.meta.url).pathname),
         ]);
       }
     }
@@ -130,9 +126,7 @@ describe("UnusedRoutesCommand", () => {
     class StoryPagesController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
-          new ActionView.FileSystemResolver(
-            new URL("./__fixtures__/views", import.meta.url).pathname,
-          ),
+          new ActionView.FileSystemResolver(new URL("../fixtures/views", import.meta.url).pathname),
         ]);
       }
     }
@@ -167,7 +161,7 @@ describe("UnusedRoutesCommand", () => {
     const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}boot-app-`);
     const database = `${dir}/development.sqlite3`;
     await Base.establishConnection({ adapter: "sqlite3", database });
-    await rbFLoad(new URL("../__fixtures__/boot-app/db/schema.ts", import.meta.url).pathname);
+    await rbFLoad(new URL("../fixtures/boot-app/db/schema.ts", import.meta.url).pathname);
     await Base.removeConnection();
     const savedEnv = env.TRAILS_ENV;
     const savedUrl = env.DATABASE_URL;
@@ -184,9 +178,7 @@ describe("UnusedRoutesCommand", () => {
       Application.appClass = null;
     });
     await import("../fixtures/boot-app/config/application.js");
-    Trails.application!.config.setRoot(
-      new URL("../__fixtures__/boot-app", import.meta.url).pathname,
-    );
+    Trails.application!.config.setRoot(new URL("../fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
 
     const output = await capture(":stdout", () => invoke("routes", ["-u", "-c", "legacy"]));

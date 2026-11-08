@@ -28,7 +28,7 @@ DSL.namespace("db", () => DSL.task("migrate"));
 
   it("loads the dummy Rakefile under the app namespace", async () => {
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "engine.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/engine.ts"));
 
       expect(rake.lookup("app:db:migrate")).toBeTruthy();
       expect(rake.lookup("app:environment")).toBeTruthy();
@@ -42,7 +42,7 @@ DSL.namespace("db", () => DSL.task("migrate"));
 
   it("raises from update:bin until the updater has a generator", async () => {
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "engine.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/engine.ts"));
 
       await expect(rake.lookup("app:update:bin")!.invoke()).rejects.toThrow(
         "no generator factory installed",
@@ -53,7 +53,7 @@ DSL.namespace("db", () => DSL.task("migrate"));
   it("falls back to the working directory for ENGINE_ROOT", async () => {
     setEngineRoot(undefined);
     await Rake.withApplication(async () => {
-      await rbFLoad(File.join(import.meta.dirname, "engine.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/engine.ts"));
     });
     expect(ENGINE_ROOT).toBe(File.expandPath(Dir.pwd()));
   });

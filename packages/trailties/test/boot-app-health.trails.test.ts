@@ -18,9 +18,7 @@ async function requestUp(): Promise<[number, string]> {
 describe("a generated app routes /up to Trails::HealthController", () => {
   beforeAll(async () => {
     await import("./fixtures/boot-app/config/application.js");
-    Trails.application!.config.setRoot(
-      new URL("./__fixtures__/boot-app", import.meta.url).pathname,
-    );
+    Trails.application!.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
     await Trails.initialize();
   }, 15_000);
 

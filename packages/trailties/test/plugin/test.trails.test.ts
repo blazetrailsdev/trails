@@ -15,7 +15,7 @@ describe("plugin/test", () => {
     const parseOptions = vi.spyOn(Runner, "parseOptions").mockImplementation(() => {});
     const run = vi.spyOn(Runner, "run").mockResolvedValue();
 
-    await rbFLoad(File.join(import.meta.dirname, "test.ts"));
+    await rbFLoad(File.join(import.meta.dirname, "../../lib/plugin/test.ts"));
 
     expect(TestUnitReporter.executable).toBe("bin/test");
     expect(parseOptions).toHaveBeenCalledOnce();

@@ -22,7 +22,7 @@ describe("a generated app reloads its views in development", () => {
     });
     await import("./fixtures/boot-app/config/application.js");
     const app = Trails.application!;
-    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
     expect(app.config.isReloadingEnabled()).toBe(true);

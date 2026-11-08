@@ -1356,7 +1356,7 @@ describe("CI runs every tooling test suite", () => {
       expect(thorOnly.activerecord_affected).toBe("false");
 
       const withTrailties = await runGate(
-        "packages/thor/lib/actions.ts\npackages/trailties/src/generators/base.ts",
+        "packages/thor/lib/actions.ts\npackages/trailties/lib/generators/base.ts",
       );
       expect(withTrailties.thor_only).toBe("false");
       expect(withTrailties.trailties_affected).toBe("true");
@@ -1397,7 +1397,7 @@ describe("CI runs every tooling test suite", () => {
       expect(cableOnly.activerecord_affected).toBe("false");
       expect(cableOnly.actionpack_affected).toBe("false");
 
-      const withTrailties = await runGate(`${cable}\npackages/trailties/src/generators/base.ts`);
+      const withTrailties = await runGate(`${cable}\npackages/trailties/lib/generators/base.ts`);
       expect(withTrailties.actioncable_only).toBe("false");
       expect(withTrailties.trailties_affected).toBe("true");
 
@@ -1421,7 +1421,7 @@ describe("CI runs every tooling test suite", () => {
       for (const dep of ["i18n", "nokogiri", "rack-session", "rack-test", "html-sanitizer"]) {
         expect((await runGate(`packages/${dep}/src/index.ts`)).actioncable_affected).toBe("true");
       }
-      expect((await runGate("packages/trailties/src/index.ts")).actioncable_affected).toBe("false");
+      expect((await runGate("packages/trailties/lib/index.ts")).actioncable_affected).toBe("false");
       expect((await runGate(cable)).actionpack_affected).toBe("false");
     },
   );
@@ -1521,7 +1521,7 @@ describe("CI runs every tooling test suite", () => {
     async () => {
       const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
       expect((await runGate("packages/zeitwerk/lib/a.ts")).unit_packages).toBe("packages/zeitwerk");
-      expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
+      expect((await runGate("packages/trailties/lib/a.ts")).unit_packages).toBe("none");
       expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
       expect((await runGate("packages/activemodel/lib/a.ts")).unit_packages.split(" ")).toEqual(
         expect.arrayContaining(["packages/activemodel", "packages/arel", "packages/globalid"]),

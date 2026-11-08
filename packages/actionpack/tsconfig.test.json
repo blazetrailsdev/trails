@@ -4,8 +4,8 @@
     "outDir": "dist-test",
     "rootDir": ".",
     "paths": {
-      "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"],
-      "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
+      "@blazetrails/trailties/engine": ["../trailties/lib/engine.ts"],
+      "@blazetrails/trailties/trailtie": ["../trailties/lib/trailtie.ts"]
     }
   },
   "exclude": [],

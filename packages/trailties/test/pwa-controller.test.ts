@@ -31,8 +31,8 @@ describe("PWAController", () => {
 
 describe("skip_forgery_protection", () => {
   it.each([
-    ["./pwa-controller.js", "PwaController"],
-    ["./welcome-controller.js", "WelcomeController"],
+    ["../lib/pwa-controller.js", "PwaController"],
+    ["../lib/welcome-controller.js", "WelcomeController"],
   ])("%s calls skipForgeryProtection in its class body", async (file, name) => {
     vi.resetModules();
     const { ActionController } = await import("@blazetrails/actionpack");

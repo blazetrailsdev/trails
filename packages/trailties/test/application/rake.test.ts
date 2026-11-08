@@ -18,7 +18,7 @@ describe("RakeTest", () => {
 
   it("copy templates", async () => {
     await Rake.withApplication(async (rake) => {
-      await rbFLoad(File.join(import.meta.dirname, "../tasks/framework.ts"));
+      await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/framework.ts"));
       await rake.lookup("app:templates:copy")!.invoke();
     });
     expect(File.isExist(File.join(appPath, "lib", "templates", "tse", "controller"))).toBeTruthy();

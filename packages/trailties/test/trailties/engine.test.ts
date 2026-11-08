@@ -18,15 +18,12 @@ describe("EngineTest", () => {
   it("adds its fixtures path to fixture_paths", async () => {
     resetLoadHooks();
     class Bukkits extends Engine {}
-    Engine.register(
-      Bukkits,
-      new URL("../__fixtures__/initializer-engine", import.meta.url).pathname,
-    );
+    Engine.register(Bukkits, new URL("../fixtures/initializer-engine", import.meta.url).pathname);
     const engine = Bukkits.instance();
-    engine.config.setRoot(new URL("../__fixtures__/boot-app", import.meta.url).pathname);
+    engine.config.setRoot(new URL("../fixtures/boot-app", import.meta.url).pathname);
     const root = vi
       .spyOn(Trails, "root")
-      .mockReturnValue(new URL("../__fixtures__", import.meta.url).pathname);
+      .mockReturnValue(new URL("../fixtures", import.meta.url).pathname);
 
     await engine.initializers.find((i) => i.name === "add_fixture_paths")!.run();
 

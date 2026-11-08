@@ -130,7 +130,7 @@ describe("Engine#helpers", () => {
     const helpers = await app.helpers();
     expect(await app.helpers()).toBe(helpers);
     (app as unknown as { _helpers?: object })._helpers = undefined;
-    app.config.helpersPaths.push(`${import.meta.dirname}/__fixtures__/helpers`);
+    app.config.helpersPaths.push(`${import.meta.dirname}/fixtures/helpers`);
     constSet(TopLevel, "ShoutHelper", { shout: () => "HEY" });
     class Includer {}
     include(Includer, await app.helpers());

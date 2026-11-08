@@ -40,7 +40,7 @@ constSet(TopLevel, "BootAppIntegrationTest", BootAppIntegrationTest);
 type FixtureHost = { fixturePaths: string[]; fileFixturePath?: string; fixtures?: unknown };
 
 describe("test_help wires a booted app into the test case classes", () => {
-  const root = new URL("./__fixtures__/boot-app", import.meta.url).pathname;
+  const root = new URL("./fixtures/boot-app", import.meta.url).pathname;
   let previousEnv: string | undefined;
 
   beforeAll(async () => {
