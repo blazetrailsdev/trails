@@ -12,7 +12,6 @@ import { XML } from "../namespaces.js";
 
 import type { Node } from "../html5/node.js";
 import { NodeSet } from "./node-set.js";
-import { XmlDocument } from "./document.js";
 import * as Searchable from "./searchable.js";
 
 export interface AttrNode {
@@ -122,8 +121,8 @@ export class XmlNode {
     if (data instanceof NodeSet) {
       return data;
     } else if (typeof data === "string") {
-      return XmlDocument.parse(`<root>${data}</root>`).xpath("/root/node()");
-    } else if (!(data instanceof XmlDocument) && data instanceof XmlNode) {
+      return XML.Document.parse(`<root>${data}</root>`).xpath("/root/node()");
+    } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
       return data;
     }
 

@@ -20,6 +20,7 @@ export class XmlDocument {
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
   errors: SyntaxError[] = [];
+  encoding: string | null = null;
   private _doc: LibXmlDocument | null = null;
   private _root: XmlNode | null = null;
 
@@ -28,14 +29,23 @@ export class XmlDocument {
     url: string | null = null,
     encoding: string | null = null,
     options: ParseOptions | number = ParseOptions.DEFAULT_XML,
+    block?: (options: ParseOptions) => void,
   ): XmlDocument {
     if (typeof options === "number") options = new ParseOptions(options);
+    if (block !== undefined) block(options);
+
+    url ??=
+      stringOrIo !== null && typeof stringOrIo === "object" && "path" in stringOrIo
+        ? String(stringOrIo.path)
+        : null;
 
     if (XmlDocument.isEmptyDoc(stringOrIo)) {
       if (options.isStrict()) {
         throw new SyntaxError("Empty document");
       } else {
-        return new XmlDocument();
+        const doc = new XmlDocument();
+        if (encoding !== null) doc.encoding = encoding;
+        return doc;
       }
     }
 
