@@ -74,8 +74,29 @@ class Timestamp extends PGSimpleDecoder {
     let year = Number(m?.[1]);
 
     if (year > 0 && m) {
-      const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
       if (m[12]) year = -year + 1;
+      const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
+      const local = !m[8] && this.flags & TIMESTAMP_DB_LOCAL;
+      if (!local && year <= 275759) {
+        const ms = globalThis.Date.UTC(
+          year,
+          Number(m[2]) - 1,
+          Number(m[3]),
+          Number(m[4]),
+          Number(m[5]),
+          Number(m[6]),
+        );
+        if (year >= 100 && !Number.isNaN(ms)) {
+          let gmtOffset = 0;
+          if (m[8]) {
+            gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
+            if (m[8] === "-") gmtOffset = -gmtOffset;
+          }
+          const epochNs = BigInt(ms - gmtOffset * 1000) * 1_000_000n + nsec;
+          if (m[8]) return Time.timespecNew(epochNs, gmtOffset);
+          return Time.timespecNew(epochNs, this.flags & TIMESTAMP_APP_LOCAL ? "local" : "utc");
+        }
+      }
       const secValue = nsec
         ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
         : Number(m[6]);
