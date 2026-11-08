@@ -473,6 +473,9 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   onLoad("action_controller", (base: ActionControllerBaseLike) => {
     if (typeof base.prependViewPath === "function") base.prependViewPath(views);
   });
+  onLoad("action_mailer", (base: ActionControllerBaseLike) => {
+    base.prependViewPath!(views);
+  });
 });
 
 Engine.initializer("add_fixture_paths", async function (this: Engine) {
