@@ -8,7 +8,7 @@
       "@blazetrails/activerecord": ["../../activerecord/src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
-      "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
+      "@blazetrails/activesupport": ["../../activesupport/lib/index.ts"],
       "@blazetrails/i18n": ["../../i18n/src/index.ts"],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/lib/include.ts"],
       "@blazetrails/ruby-compat/method-missing-proxy": [
@@ -26,31 +26,31 @@
       "@blazetrails/date": ["../../date/lib/index.ts"],
       "@blazetrails/tzinfo": ["../../tzinfo/lib/index.ts"],
       "@blazetrails/activesupport/message-verifier": [
-        "../../activesupport/src/message-verifier.ts"
+        "../../activesupport/lib/message-verifier.ts"
       ],
       "@blazetrails/activesupport/core-ext/date/conversions": [
-        "../../activesupport/src/core-ext/date/conversions.ts"
+        "../../activesupport/lib/core-ext/date/conversions.ts"
       ],
       "@blazetrails/activesupport/core-ext/string/inflections": [
-        "../../activesupport/src/core-ext/string/inflections.ts"
+        "../../activesupport/lib/core-ext/string/inflections.ts"
       ],
       "@blazetrails/activesupport/core-ext/date-time/conversions": [
-        "../../activesupport/src/core-ext/date-time/conversions.ts"
+        "../../activesupport/lib/core-ext/date-time/conversions.ts"
       ],
       "@blazetrails/activesupport/core-ext/date/calculations": [
-        "../../activesupport/src/core-ext/date/calculations.ts"
+        "../../activesupport/lib/core-ext/date/calculations.ts"
       ],
       "@blazetrails/activesupport/core-ext/date-and-time/zones": [
-        "../../activesupport/src/core-ext/date-and-time/zones.ts"
+        "../../activesupport/lib/core-ext/date-and-time/zones.ts"
       ],
       "@blazetrails/activesupport/core-ext/hash/slice": [
-        "../../activesupport/src/core-ext/hash/slice.ts"
+        "../../activesupport/lib/core-ext/hash/slice.ts"
       ],
       "@blazetrails/activesupport/core-ext/string/inflections": [
-        "../../activesupport/src/core-ext/string/inflections.ts"
+        "../../activesupport/lib/core-ext/string/inflections.ts"
       ],
-      "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
-      "@blazetrails/activesupport/test-case": ["../../activesupport/src/test-case.ts"],
+      "@blazetrails/activesupport/gzip": ["../../activesupport/lib/gzip.ts"],
+      "@blazetrails/activesupport/test-case": ["../../activesupport/lib/test-case.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]
     }
   },

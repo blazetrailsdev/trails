@@ -42,7 +42,7 @@ where Rails returns a String, and an async `translate` makes it return a
   (`naming.ts:220`), which name a model and its attributes everywhere one is
   rendered.
 - `Inflector#ordinal` / `#ordinalize`
-  (`packages/activesupport/src/inflector.ts:256`, `:260`), `Array#to_sentence`
+  (`packages/activesupport/lib/inflector.ts:256`, `:260`), `Array#to_sentence`
   (`array-utils.ts:63`), `NumberConverter`'s `i18n_format_options` /
   `translate_number_value_with_default`
   (`number-helper/number-converter.ts:155`, `:177`) and
@@ -76,7 +76,7 @@ As a consequence:
   (`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:79-111`). Its `_fetch`
   (`:93-99`) reads a cache store inside the lookup, and every
   `ActiveSupport::Cache` store's `read` / `write` is async
-  (`packages/activesupport/src/cache/store.ts`). It is an opt-in mixin — an
+  (`packages/activesupport/lib/cache/store.ts`). It is an opt-in mixin — an
   application includes it into a backend and sets `cache_store` itself — so not
   porting it costs behaviour no default configuration has. Its
   `unported-files` row cites this section.
@@ -95,7 +95,7 @@ As a consequence:
   the `I18n.cache_store` accessor it is configured through (`cache.rb:44-74`,
   with no counterpart in `packages/i18n/src/i18n.ts`). Its
   `ActiveSupport::Cache.lookup_store(:memory_store)` call does resolve
-  (`packages/activesupport/src/cache.ts:16`), so the two i18n names are the
+  (`packages/activesupport/lib/cache.ts:16`), so the two i18n names are the
   whole blocker. The receipt carries the citation instead.
 - `Backend::KeyValue` is unaffected, because the gem already requires a
   synchronous store there: Ruby's store answers `[]`, `[]=` and `keys`

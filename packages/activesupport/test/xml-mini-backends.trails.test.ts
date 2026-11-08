@@ -4,8 +4,8 @@ import { castBackendNameToModule } from "../lib/xml-mini.js";
 
 describe("XmlMini backends", () => {
   // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
-  const ported = Object.keys(import.meta.glob("./xml-mini/*.ts") as Record<string, unknown>)
-    .map((path) => path.replace(/^\.\/xml-mini\//, "").replace(/\.ts$/, ""))
+  const ported = Object.keys(import.meta.glob("../lib/xml-mini/*.ts") as Record<string, unknown>)
+    .map((path) => path.replace(/^\.\.\/lib\/xml-mini\//, "").replace(/\.ts$/, ""))
     .filter((name) => !/\.test$|-engine$|-readable$/.test(name));
 
   it("resolves every ported backend file by name", async () => {

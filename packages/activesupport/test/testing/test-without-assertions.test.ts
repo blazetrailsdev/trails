@@ -8,7 +8,7 @@ class TestsWithoutAssertionsWarnTest extends TestCase {
 }
 iseqLocationSetup(
   TestsWithoutAssertionsWarnTest.prototype.test_without_assertions,
-  "packages/activesupport/src/testing/test_without_assertions_test.ts",
+  "packages/activesupport/test/testing/test_without_assertions_test.ts",
   9,
 );
 

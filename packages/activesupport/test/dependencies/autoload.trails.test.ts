@@ -7,7 +7,10 @@ import * as Autoload from "../../lib/dependencies/autoload.js";
 
 describe("ActiveSupport::Autoload registry", () => {
   it("has no runtime imports", async () => {
-    const source = await readFile(new URL("./autoload.ts", import.meta.url), "utf8");
+    const source = await readFile(
+      new URL("../../lib/dependencies/autoload.ts", import.meta.url),
+      "utf8",
+    );
     const api = new API();
     try {
       const { outputText } = api.transpileModule(source, {

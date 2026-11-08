@@ -152,7 +152,7 @@ describe("rails-error-parity unported allowlist", () => {
       },
     };
     // baz.ts "exists"; foo_bar.rb maps to foo-bar.ts (snake→kebab) and is absent.
-    const exists = async (rel) => rel === "packages/activesupport/src/baz.ts";
+    const exists = async (rel) => rel === "packages/activesupport/lib/baz.ts";
 
     const result = await findUnported(manifest, exists);
     expect(result).toEqual([

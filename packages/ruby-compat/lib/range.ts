@@ -1,7 +1,7 @@
 /**
  * Ruby's core `Range` class (`vendor/ruby/v3.3.11/range.c:31`), which Rails'
  * `core_ext/range/*` files reopen. Those Rails files are ported one-for-one
- * under `activesupport/src/core-ext/range/`, and reopen this class the way
+ * under `activesupport/lib/core-ext/range/`, and reopen this class the way
  * Ruby reopens `Range`.
  *
  * @boundary-file: ordering goes through `comparable.ts`'s `cmp`, which coerces

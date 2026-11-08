@@ -32,13 +32,13 @@ describe("UnexpectedErrorTest", () => {
     const raised = new Error("boom");
     raised.stack = [
       "Error: boom",
-      `    at doThing (${Dir.pwd()}/packages/activesupport/src/thing.ts:1:1)`,
+      `    at doThing (${Dir.pwd()}/packages/activesupport/lib/thing.ts:1:1)`,
       "    at runTest (/somewhere/node_modules/vitest/dist/runner.js:2:2)",
-      `    at afterFramework (${Dir.pwd()}/packages/activesupport/src/other.ts:3:3)`,
+      `    at afterFramework (${Dir.pwd()}/packages/activesupport/lib/other.ts:3:3)`,
     ].join("\n");
 
     expect(new UnexpectedError(raised).message).toBe(
-      "Error: boom\n    at doThing (packages/activesupport/src/thing.ts:1:1)",
+      "Error: boom\n    at doThing (packages/activesupport/lib/thing.ts:1:1)",
     );
   });
 
@@ -63,15 +63,15 @@ describe("UnexpectedErrorTest", () => {
     const raised = new Error("boom");
     raised.stack = [
       "Error: boom",
-      `    at doThing (${Dir.pwd()}/packages/activesupport/src/thing.ts:1:1)`,
-      `    at inThePlugin (${Dir.pwd()}/packages/activesupport/src/plugin.ts:2:2)`,
+      `    at doThing (${Dir.pwd()}/packages/activesupport/lib/thing.ts:1:1)`,
+      `    at inThePlugin (${Dir.pwd()}/packages/activesupport/lib/plugin.ts:2:2)`,
     ].join("\n");
 
     const original = Minitest.backtraceFilter;
     Minitest.backtraceFilter = new BacktraceFilter(/plugin\.ts/);
     try {
       expect(new UnexpectedError(raised).message).toBe(
-        "Error: boom\n    at doThing (packages/activesupport/src/thing.ts:1:1)",
+        "Error: boom\n    at doThing (packages/activesupport/lib/thing.ts:1:1)",
       );
     } finally {
       Minitest.backtraceFilter = original;

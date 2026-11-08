@@ -613,7 +613,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // Vendored as a read-anchor only. api-compare/test-compare derive their
         // package list from this file and key each package to a TS workspace
         // dir (`packages/<name>/src`); minitest has no such package — the port
-        // is a slice of `packages/activesupport/src/testing/assertions.ts` —
+        // is a slice of `packages/activesupport/lib/testing/assertions.ts` —
         // so enrolling it would compare against a directory that does not
         // exist. Whether the comparator can be taught to map a non-Rails gem
         // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on

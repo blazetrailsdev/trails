@@ -92,7 +92,7 @@ class UndeprecatedError extends StandardError {}
 constSet(Undeprecated, "Error", UndeprecatedError);
 
 class CallerLocationFixture implements CallerLocation {
-  path = "packages/activesupport/src/deprecation.test.ts";
+  path = "packages/activesupport/test/deprecation.test.ts";
   lineno: number;
   label: string;
 
