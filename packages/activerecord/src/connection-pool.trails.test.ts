@@ -316,7 +316,7 @@ it("withConnectionSync on a saturated pool borrows a busy connection instead of 
   const seen = pool.withConnectionSync((conn) => conn);
   expect(seen).toBe(held);
   expect(pool.stat().busy).toBe(1);
-  expect(pool.connectionLease().connection).toBeFalsy();
+  expect(pool.isActiveConnection()).toBeNull();
 });
 
 it("withConnectionSync raises when a borrowed connection's block goes async", async () => {
