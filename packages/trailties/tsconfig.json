@@ -32,6 +32,5 @@
     { "path": "../et-orbi" },
     { "path": "../mail" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers", "lib/**/__fixtures__"]
+  ]
 }

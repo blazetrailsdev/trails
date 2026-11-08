@@ -57,6 +57,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "activerecord-cli",
   "activestorage",
   "i18n",
+  "trailties",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

@@ -1155,7 +1155,7 @@ export default defineConfig(
   {
     files: [
       "packages/actionpack/{lib,test}/**/*.ts",
-      "packages/trailties/lib/**/*.ts",
+      "packages/trailties/{lib,test}/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
     ],
     rules: {

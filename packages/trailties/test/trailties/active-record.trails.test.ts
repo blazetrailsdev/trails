@@ -1,0 +1,349 @@
+import { describe, it, expect } from "vitest";
+import { getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
+import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { Trailtie } from "../../lib/trailties/active-record.js";
+import { Trailtie as ActionDispatchTrailtie } from "../../lib/trailties/action-dispatch.js";
+import {
+  Deprecators,
+  EncryptedConfiguration,
+  Logger,
+  NotificationEvent,
+  Notifications,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
+import {
+  ActionController,
+  Callbacks,
+  ExceptionWrapper,
+  MiddlewareStack,
+  Request,
+  Response,
+} from "@blazetrails/actionpack";
+import {
+  ActiveRecord,
+  Base,
+  LogSubscriber,
+  Migration,
+  RecordInvalid,
+  RecordNotFound,
+  RecordNotSaved,
+  RuntimeRegistry,
+  StaleObjectError,
+  disablePreparedStatements,
+  generateSecureTokenOn,
+  QueryLogs,
+  queryTransformers,
+  setDisablePreparedStatements,
+  setGenerateSecureTokenOn,
+  setQueryTransformers,
+  setVerboseQueryLogs,
+} from "@blazetrails/activerecord";
+import { Encryption } from "@blazetrails/activerecord/encryption";
+import { Configuration } from "../../lib/application/configuration.js";
+import { Configuration as TrailtieConfiguration } from "../../lib/trailtie/configuration.js";
+import { MiddlewareStackProxy } from "../../lib/configuration.js";
+import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
+import { Application } from "../../lib/application.js";
+import type { ActiveRecordConfig } from "../../lib/trailties/active-record.js";
+
+const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration> => {
+  const encrypted = new EncryptedConfiguration({
+    configPath: `${dir}/credentials.yml.enc`,
+    keyPath: `${dir}/master.key`,
+    envKey: "TRAILS_MASTER_KEY",
+    raiseIfMissingKey: false,
+  });
+  await encrypted.config();
+  return encrypted;
+};
+
+const blogApp = (): {
+  config: { filterParameters: Array<string | RegExp> };
+  deprecators: Deprecators;
+  credentials: typeof credentials;
+} => ({
+  deprecators: new Deprecators(),
+  config: { filterParameters: [] },
+  credentials,
+});
+
+describe("RailtieTest (trails-only)", () => {
+  useInMemoryDatabaseUrl();
+
+  it("runInitializers configures Encryption with the active_record_encryption credentials", async () => {
+    const primaryKey = Encryption.config.hasPrimaryKey();
+    const deterministicKey = Encryption.config.hasDeterministicKey();
+    const keyDerivationSalt = Encryption.config.hasKeyDerivationSalt();
+    try {
+      const fs = getFs();
+      const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${getPath().sep}config-`);
+      await fs.writeFile!(`${dir}/master.key`, EncryptedConfiguration.generateKey());
+      await (
+        await credentials(dir)
+      ).write(
+        "active_record_encryption:\n" +
+          "  primary_key: credentials-primary-key\n" +
+          "  deterministic_key: credentials-deterministic-key\n" +
+          "  key_derivation_salt: credentials-salt\n",
+      );
+      await runTrailtieInitializers(Trailtie, {
+        ...blogApp(),
+        credentials: () => credentials(dir),
+      });
+      runLoadHooks("active_record_encryption", Encryption);
+      expect(Encryption.config.primaryKey).toBe("credentials-primary-key");
+      expect(Encryption.config.deterministicKey).toBe("credentials-deterministic-key");
+      expect(Encryption.config.keyDerivationSalt).toBe("credentials-salt");
+    } finally {
+      Object.assign(Encryption.config, { primaryKey, deterministicKey, keyDerivationSalt });
+    }
+  });
+
+  it("runInitializers includes ControllerRuntime into ActionController::Base", async () => {
+    await runTrailtieInitializers(Trailtie, blogApp());
+    class LogRuntimeController extends ActionController.Base {}
+    runLoadHooks("action_controller", LogRuntimeController);
+
+    const events: Record<string, unknown>[] = [];
+    const subscriber = Notifications.subscribe(
+      "process_action.action_controller",
+      (event: { payload: Record<string, unknown> }) => {
+        events.push({ ...event.payload });
+      },
+    );
+
+    class WidgetsController extends LogRuntimeController {
+      static actions = ["index"];
+      index(): void {
+        RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 12.0);
+        RuntimeRegistry.setQueriesCount(RuntimeRegistry.queriesCount() + 1);
+        this.head(204);
+      }
+    }
+
+    try {
+      await new WidgetsController().dispatch(
+        "index",
+        new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/widgets", HTTP_HOST: "localhost" }),
+        new Response(),
+      );
+    } finally {
+      Notifications.unsubscribe(subscriber);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].db_runtime).toBe(12.0);
+    expect(events[0].queries_count).toBe(1);
+    expect(events[0].cached_queries_count).toBe(0);
+    expect(LogRuntimeController.logProcessAction(events[0])).toContain(
+      "ActiveRecord: 12.0ms (1 query, 0 cached)",
+    );
+  });
+
+  it("config.loadDefaults 7.1 makes generate_secure_token_on initialize on a booted app", async () => {
+    const saved = Trailtie.config.get("activeRecord");
+    try {
+      const config = new Configuration("/app");
+      config.set("activeRecord", { encryption: {} });
+      config.loadDefaults("7.1");
+
+      await runTrailtieInitializers(Trailtie, blogApp());
+
+      expect(generateSecureTokenOn()).toBe("initialize");
+    } finally {
+      Trailtie.config.set("activeRecord", saved);
+      setGenerateSecureTokenOn("create");
+    }
+  });
+
+  it("active_record.backtrace_cleaner points the verbose query log at the app frame", async () => {
+    const saved = Trailtie.config.get("activeRecord");
+    const savedCleaner = LogSubscriber.backtraceCleaner;
+    const savedLogger = Base.logger;
+    const debug: string[] = [];
+    const logger = new Logger(null);
+    logger.debug = (message?: string | (() => string)): boolean => {
+      debug.push(typeof message === "function" ? message() : (message ?? ""));
+      return true;
+    };
+    try {
+      Trailtie.config.set("activeRecord", { ...(saved as object), verboseQueryLogs: true });
+      class BlogApp extends Application {}
+      Application.register(BlogApp);
+      Trails.application!.config.setRoot("/srv/blog");
+      Base.logger = logger;
+
+      await runTrailtieInitializers(Trailtie, blogApp());
+
+      const event = new NotificationEvent("sql.active_record", null, null, "id", {
+        sql: "SELECT 1",
+      });
+      const postsIndex = new Function(
+        "subscriber",
+        "event",
+        "subscriber.sql(event);\n//# sourceURL=/srv/blog/app/models/post.js",
+      ) as (subscriber: LogSubscriber, event: NotificationEvent) => void;
+      postsIndex(new LogSubscriber(), event);
+
+      expect(LogSubscriber.backtraceCleaner).toBe(Trails.backtraceCleaner);
+      expect(debug[debug.length - 1]).toBe("  ↳ app/models/post.js:3:in 'eval'");
+    } finally {
+      Trailtie.config.set("activeRecord", saved);
+      Trails.application = null;
+      Application.appClass = null;
+      _resetTrailsEnv();
+      LogSubscriber.backtraceCleaner = savedCleaner;
+      Base.logger = savedLogger;
+      setVerboseQueryLogs(false);
+    }
+  });
+
+  it("pushes the ActiveRecord namespace onto config.eagerLoadNamespaces", () => {
+    expect(Trailtie.config.eagerLoadNamespaces).toContain(ActiveRecord);
+  });
+
+  describe("active_record.migration_error", () => {
+    const mergedStack = async (migrationError: ActiveRecordConfig["migrationError"]) => {
+      const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
+      const savedProxy = TrailtieConfiguration._appMiddleware;
+      TrailtieConfiguration._appMiddleware = new MiddlewareStackProxy();
+      try {
+        Trailtie.config.set("activeRecord", { ...saved, migrationError });
+        const fileWatcher = class {};
+        await runTrailtieInitializers(Trailtie, {
+          ...blogApp(),
+          config: { filterParameters: [], fileWatcher },
+        });
+        const stack = new MiddlewareStack();
+        stack.use(Callbacks as never);
+        Trailtie.config.appMiddleware().mergeInto(stack);
+        return { stack, fileWatcher };
+      } finally {
+        Trailtie.config.set("activeRecord", saved);
+        TrailtieConfiguration._appMiddleware = savedProxy;
+      }
+    };
+
+    it("inserts CheckPending after ActionDispatch::Callbacks when set to page_load", async () => {
+      const { stack, fileWatcher } = await mergedStack("page_load");
+
+      expect(stack.middlewares.map((m) => m.klass)).toEqual([Callbacks, Migration.CheckPending]);
+      expect(stack.middlewares[1].args).toEqual([{ fileWatcher }]);
+    });
+
+    it("does not insert CheckPending otherwise", async () => {
+      const { stack } = await mergedStack(false);
+
+      expect(stack.includes(Migration.CheckPending as never)).toBe(false);
+    });
+  });
+
+  describe("active_record.query_log_tags_config", () => {
+    const boot = async (cfg: Partial<ActiveRecordConfig>, loadDefaults?: string) => {
+      const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
+      const savedTransformers = queryTransformers();
+      const savedDisable = disablePreparedStatements();
+      const savedTags = QueryLogs.tags;
+      const savedFormatter = QueryLogs.tagsFormatter;
+      const savedTaggings = QueryLogs.taggings;
+      setQueryTransformers([]);
+      resetLoadHooks();
+      class BlogApplication {}
+      Trails.application = new BlogApplication() as never;
+      try {
+        Trailtie.config.set("activeRecord", { ...saved, ...cfg });
+        const config = new Configuration("/app");
+        if (loadDefaults) config.loadDefaults(loadDefaults);
+        const app = { deprecators: new Deprecators(), config, credentials };
+        await runTrailtieInitializers(Trailtie, app);
+        runLoadHooks("after_initialize", app);
+        return {
+          transformers: [...queryTransformers()],
+          disablePreparedStatements: disablePreparedStatements(),
+          tagsFormatter: QueryLogs.tagsFormatter,
+          application: QueryLogs.taggings.application,
+          taggingKeys: Object.keys(QueryLogs.taggings),
+        };
+      } finally {
+        Trails.application = null;
+        Trailtie.config.set("activeRecord", saved);
+        setQueryTransformers(savedTransformers);
+        setDisablePreparedStatements(savedDisable);
+        QueryLogs.tags = savedTags;
+        QueryLogs.tagsFormatter = savedFormatter as string;
+        QueryLogs.taggings = savedTaggings;
+        resetLoadHooks();
+      }
+    };
+
+    it("does not modify the query execution path by default", async () => {
+      const booted = await boot({});
+
+      expect(booted.transformers).not.toContain(QueryLogs);
+    });
+
+    it("appends QueryLogs to the query transformers and disables prepared statements when enabled", async () => {
+      const booted = await boot({ queryLogTagsEnabled: true });
+
+      expect(booted.transformers).toContain(QueryLogs);
+      expect(booted.disablePreparedStatements).toBe(true);
+      expect(booted.application).toBe("BlogApplication");
+      expect(booted.taggingKeys).toEqual([
+        "application",
+        "pid",
+        "socket",
+        "db_host",
+        "database",
+        "source_location",
+      ]);
+    });
+
+    it("config.loadDefaults 7.1 makes the tags formatter sqlcommenter on a booted app", async () => {
+      const booted = await boot({ queryLogTagsEnabled: true }, "7.1");
+
+      expect(booted.tagsFormatter).toBe("sqlcommenter");
+    });
+  });
+});
+
+describe("ActiveRecord::Railtie rescue_responses", () => {
+  it("merges ActiveRecord's rescue_responses into ExceptionWrapper through action_dispatch.configure", async () => {
+    expect(Trailtie.config.actionDispatch.rescueResponses).toMatchObject({
+      "ActiveRecord::RecordNotFound": ":not_found",
+      "ActiveRecord::StaleObjectError": ":conflict",
+      "ActiveRecord::RecordInvalid": ":unprocessable_entity",
+      "ActiveRecord::RecordNotSaved": ":unprocessable_entity",
+    });
+    expect(
+      [RecordNotFound, StaleObjectError, RecordInvalid, RecordNotSaved].map((klass) =>
+        rbObjClassname(Object.create(klass.prototype)),
+      ),
+    ).toEqual([
+      "ActiveRecord::RecordNotFound",
+      "ActiveRecord::StaleObjectError",
+      "ActiveRecord::RecordInvalid",
+      "ActiveRecord::RecordNotSaved",
+    ]);
+    await runTrailtieInitializers(ActionDispatchTrailtie, {
+      deprecators: new Deprecators(),
+      config: new Configuration("/app"),
+    });
+    expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
+    expect(new ExceptionWrapper(null, new RecordInvalid(null)).statusCode).toBe(422);
+    expect(new ExceptionWrapper(null, new StaleObjectError()).statusCode).toBe(409);
+    expect(new ExceptionWrapper(null, new RecordNotSaved("unsaved")).statusCode).toBe(422);
+  });
+});
+describe("ActiveRecord::ConnectionHandling::TRAILS_ENV", () => {
+  it("reads Trails.env before TRAILS_ENV, so a booted app resolves its own environment's config", () => {
+    const originalEnv = Trails.env;
+    Trails.env = "staging";
+    try {
+      expect(ActiveRecord.ConnectionHandling.DEFAULT_ENV()).toBe("staging");
+    } finally {
+      Trails.env = originalEnv;
+    }
+  });
+});
