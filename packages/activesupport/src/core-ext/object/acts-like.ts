@@ -14,7 +14,7 @@ export function actsLike(this: unknown, duck: string): boolean {
   }
 }
 
-/** @perf 640ns — PERMANENT */
+/** @perf 627ns — PERMANENT */
 const _tsNames = new Map<string, string>();
 
 function respondTo(this: unknown, rubyName: string): boolean {

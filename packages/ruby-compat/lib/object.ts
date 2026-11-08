@@ -2038,9 +2038,9 @@ function ivarField(obj: object, id: string): string {
   return field;
 }
 
-/** @perf 640ns — PERMANENT */
+/** @perf 633ns — PERMANENT */
 const _defaultIvarFields = new Map<string, string>();
-/** @perf 45ns — PERMANENT */
+/** @perf 44ns — PERMANENT */
 const _validIvarNames = new Set<string>();
 
 function fieldIvar(obj: object, field: string): string {
