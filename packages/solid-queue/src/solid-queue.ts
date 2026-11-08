@@ -17,6 +17,14 @@ export const SolidQueue = {
 
   DEFAULT_LOGGER: new Logger(STDOUT),
 
+  onStart(block: () => unknown): void {
+    SolidQueue.Supervisor!.onStart(block);
+  },
+
+  onStop(block: () => unknown): void {
+    SolidQueue.Supervisor!.onStop(block);
+  },
+
   onWorkerStart(block: () => unknown): void {
     SolidQueue.Worker!.onStart(block);
   },
@@ -83,7 +91,9 @@ export const SolidQueue = {
   onWorkerStop(block: () => unknown): void;
   Dispatcher?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
   Scheduler?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
-  Supervisor?: unknown;
+  Supervisor?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  onStart(block: () => unknown): void;
+  onStop(block: () => unknown): void;
   Process?: typeof import("./process.js").Process;
   onSchedulerStart(block: () => unknown): void;
   onSchedulerStop(block: () => unknown): void;
