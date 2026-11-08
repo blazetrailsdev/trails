@@ -1770,6 +1770,11 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "solid-queue": "packages/solid-queue/src/",
   "solid-cable": "packages/solid-cable/test/",
   erubi: "packages/tse-compiler/test/",
+  nokogiri: "packages/nokogiri/test/",
+  racc: "packages/nokogiri/test/racc/",
+  "rails-html-sanitizer": "packages/html-sanitizer/test/",
+  loofah: "packages/html-sanitizer/test/loofah/",
+  crass: "packages/html-sanitizer/test/crass/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
