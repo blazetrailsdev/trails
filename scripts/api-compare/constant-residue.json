@@ -1297,7 +1297,7 @@
     }
   },
   "trailties": {
-    "rows": 150,
+    "rows": 151,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1345,6 +1345,7 @@
       "commands/destroy.ts::DestroyCommand": "Trails::Command::DestroyCommand",
       "commands/dev.ts::DevCommand": "Trails::Command::DevCommand",
       "commands/encrypted.ts::EncryptedCommand": "Trails::Command::EncryptedCommand",
+      "commands/gem-help.ts::GemHelpCommand": "Trails::Command::GemHelpCommand",
       "commands/generate.ts::GenerateCommand": "Trails::Command::GenerateCommand",
       "commands/notes.ts::NotesCommand": "Trails::Command::NotesCommand",
       "commands/plugin.ts::PluginCommand": "Trails::Command::PluginCommand",
