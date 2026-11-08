@@ -54,7 +54,9 @@ export class JobGenerator extends NamedBase {
 
   /** @internal */
   private applicationJobFileName(): string {
-    return (this._applicationJobFileName ??= `app/jobs/application-job${this.ext()}`);
+    return (this._applicationJobFileName ??= this.isMountableEngine()
+      ? `app/jobs/${this.namespacedPath()}/application-job${this.ext()}`
+      : `app/jobs/application-job${this.ext()}`);
   }
 
   /** @internal */
