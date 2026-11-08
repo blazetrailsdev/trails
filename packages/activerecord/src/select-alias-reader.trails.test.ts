@@ -34,6 +34,30 @@ describe("select alias dynamic reader (trails)", () => {
     expect(record.bumped_id).not.toBeUndefined();
   });
 
+  it("records loaded with the same alias share one reader instead of a singleton each", async () => {
+    const [a, b] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    const [c] = await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    expect(Object.getPrototypeOf(a)).toBe(Object.getPrototypeOf(b));
+    expect(Object.getPrototypeOf(a)).toBe(Object.getPrototypeOf(c));
+    expect(Object.getPrototypeOf(Object.getPrototypeOf(a))).toBe(Comment.prototype);
+    expect(a).toBeInstanceOf(Comment);
+    expect(a.bumped_id).not.toEqual(b.bumped_id);
+  });
+
+  it("does not leak an alias reader onto records loaded without it", async () => {
+    await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    const [plain] = (await Comment.order("id")) as (Comment & { bumped_id: unknown })[];
+    const [other] = (await Comment.select("comments.*, (id + 2000) AS other_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown; other_id: unknown })[];
+    expect(Object.getPrototypeOf(plain)).toBe(Comment.prototype);
+    expect(plain.bumped_id).toBeUndefined();
+    expect(other.bumped_id).toBeUndefined();
+    expect(other.other_id).toEqual(other.readAttribute("other_id"));
+  });
+
   it("loads a record without materializing its attribute set", async () => {
     const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
     const attributes = (record as unknown as { _attributes: { _attributes: object } })._attributes;

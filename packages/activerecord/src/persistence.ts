@@ -632,6 +632,9 @@ export async function reload<T extends ReloadRecord>(
   this._associationCache = freshObject._associationCache;
   for (const association of this._associationCache.values()) association.owner = this;
   this._attributes = freshObject._attributes;
+  if (virtualAttributePrototypes.has(Object.getPrototypeOf(this))) {
+    Object.setPrototypeOf(this, this.constructor.prototype);
+  }
   if (Object.getPrototypeOf(this) !== this.constructor.prototype) {
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
   }
@@ -969,12 +972,55 @@ export function instantiateInstanceOf(
   const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
-  for (const name of names) {
-    if (!basicObjRespondTo(record, name)) {
-      (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-    }
-  }
+  const virtual = names.filter((name) => !basicObjRespondTo(record, name));
+  if (virtual.length > 0) Object.setPrototypeOf(record, virtualAttributePrototype(klass, virtual));
   return record.initWithAttributes(attributes, false, block);
+}
+
+const virtualAttributePrototypeCache = new WeakMap<object, Map<string, object>>();
+const virtualAttributePrototypes = new WeakSet<object>();
+
+/**
+ * @internal
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
+function virtualAttributePrototype(klass: typeof Base, names: string[]): object {
+  let byKey = virtualAttributePrototypeCache.get(klass);
+  if (!byKey) virtualAttributePrototypeCache.set(klass, (byKey = new Map()));
+  const key = names.join("\0");
+  let proto = byKey.get(key);
+  if (proto) return proto;
+  proto = Object.create(klass.prototype) as object;
+  for (const name of names) Object.defineProperties(proto, virtualAttributeMethods(klass, name));
+  byKey.set(key, proto);
+  virtualAttributePrototypes.add(proto);
+  return proto;
+}
+
+const virtualAttributeMethodCache = new WeakMap<object, Map<string, PropertyDescriptorMap>>();
+
+/**
+ * @internal
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
+function virtualAttributeMethods(klass: typeof Base, name: string): PropertyDescriptorMap {
+  let byName = virtualAttributeMethodCache.get(klass);
+  if (!byName) virtualAttributeMethodCache.set(klass, (byName = new Map()));
+  let descriptors = byName.get(name);
+  if (descriptors) return descriptors;
+
+  const template = klass.allocate();
+  (rbObjSingletonClass(template) as unknown as typeof Base).defineAttributeMethod(name);
+  descriptors = {};
+  for (let proto = Object.getPrototypeOf(template); proto && proto !== klass.prototype; ) {
+    for (const key of Reflect.ownKeys(proto)) {
+      if (typeof key !== "string" || key === "constructor" || key in descriptors) continue;
+      descriptors[key] = Object.getOwnPropertyDescriptor(proto, key)!;
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  byName.set(name, descriptors);
+  return descriptors;
 }
 
 /** @internal */
