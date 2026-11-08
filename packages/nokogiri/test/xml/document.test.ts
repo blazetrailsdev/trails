@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { XmlDocument } from "../../lib/xml/document.js";
+import { ParseOptions } from "../../lib/xml/parse-options.js";
 
 describe("Nokogiri::XML::Document", () => {
   let doc: XmlDocument | null = null;
@@ -124,5 +125,26 @@ describe("Nokogiri::XML::Searchable", () => {
     expect(doc.css("a").length).toBe(1);
     expect(doc.css("y|b").length).toBe(1);
     expect(doc.root.children[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+  });
+});
+
+describe("Nokogiri::XML::Document.parse (trails)", () => {
+  it("parse yields the options to the block", () => {
+    let yielded: ParseOptions | null = null;
+    const doc = XmlDocument.parse("<root/>", null, null, ParseOptions.DEFAULT_XML, (o) => {
+      yielded = o;
+    });
+    expect(yielded).toBeInstanceOf(ParseOptions);
+    doc.dispose();
+  });
+
+  it("parse sets encoding on an empty recovered document", () => {
+    expect(XmlDocument.parse("", null, "UTF-8").encoding).toBe("UTF-8");
+  });
+
+  it("parse reads an IO", () => {
+    const doc = XmlDocument.parse({ read: () => "<root/>" });
+    expect(doc.root.name).toBe("root");
+    doc.dispose();
   });
 });

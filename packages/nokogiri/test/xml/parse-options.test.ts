@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import { ParseOptions } from "../../lib/xml/parse-options.js";
-import { XmlDocument } from "../../lib/xml/document.js";
 
 type Dyn = Record<string, () => unknown>;
 
@@ -74,26 +73,5 @@ describe("Nokogiri::XML::TestParseOptions", () => {
     const options = new ParseOptions().recover().noent();
     const other = new ParseOptions().recover().noent();
     expect(options.equals(other)).toBe(true);
-  });
-});
-
-describe("Nokogiri::XML::Document.parse (trails)", () => {
-  it("parse yields the options to the block", () => {
-    let yielded: ParseOptions | null = null;
-    const doc = XmlDocument.parse("<root/>", null, null, ParseOptions.DEFAULT_XML, (o) => {
-      yielded = o;
-    });
-    expect(yielded).toBeInstanceOf(ParseOptions);
-    doc.dispose();
-  });
-
-  it("parse sets encoding on an empty recovered document", () => {
-    expect(XmlDocument.parse("", null, "UTF-8").encoding).toBe("UTF-8");
-  });
-
-  it("parse reads an IO", () => {
-    const doc = XmlDocument.parse({ read: () => "<root/>" });
-    expect(doc.root.name).toBe("root");
-    doc.dispose();
   });
 });
