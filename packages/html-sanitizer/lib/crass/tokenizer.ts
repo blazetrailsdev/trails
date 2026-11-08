@@ -514,7 +514,7 @@ export class Tokenizer {
 
   preprocess(input: string): string {
     return String(input)
-      .toWellFormed()
+      .replace(/\p{Cs}/gu, "\ufffd")
       .replace(/\r\n|[\r\f]/g, "\n")
       .replaceAll("\0", "\ufffd");
   }
