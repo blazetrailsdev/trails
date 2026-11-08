@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
+import { _virtualAttributePrototypeCache } from "./persistence.js";
 
 describe("select alias dynamic reader (trails)", () => {
   fixtures(["posts", "comments"]);
@@ -75,6 +76,22 @@ describe("select alias dynamic reader (trails)", () => {
     )) as (Comment & { bumped_id: unknown })[];
     expect(Object.getPrototypeOf(b) === Object.getPrototypeOf(a)).toBe(false);
     expect(b.bumped_id).toEqual(b.readAttribute("bumped_id"));
+  });
+
+  it("caches at most 64 alias sets and 64 alias readers per class", async () => {
+    Comment.undefineAttributeMethods();
+    for (let i = 0; i < 65; i++) {
+      const [record] = (await Comment.select(`comments.*, (id + ${i}) AS alias_${i}`).order(
+        "id",
+      )) as (Comment & Record<string, unknown>)[];
+      expect(record[`alias_${i}`]).toEqual(record.readAttribute(`alias_${i}`));
+    }
+    const cache = _virtualAttributePrototypeCache.get(Comment)!;
+    expect(cache.prototypes.size).toBe(64);
+    expect(cache.methods.size).toBe(64);
+    const [first] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
+    const [second] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
+    expect(Object.getPrototypeOf(first) === Object.getPrototypeOf(second)).toBe(false);
   });
 
   it("loads a record without materializing its attribute set", async () => {

@@ -981,8 +981,6 @@ export const _virtualAttributePrototypeCache = new WeakMap<
 >();
 /** @perf 90x — PERMANENT */
 const _virtualAttributePrototypes = new WeakSet<object>();
-/** @perf 90x — PERMANENT */
-const _VIRTUAL_ATTRIBUTE_PROTOTYPE_LIMIT = 64;
 
 /** @perf 90x — PERMANENT */
 function _virtualAttributePrototype(klass: typeof Base, names: string[]): object {
@@ -998,7 +996,7 @@ function _virtualAttributePrototype(klass: typeof Base, names: string[]): object
   for (const name of names) {
     Object.defineProperties(proto, _virtualAttributeMethods(klass, cache.methods, name));
   }
-  if (cache.prototypes.size < _VIRTUAL_ATTRIBUTE_PROTOTYPE_LIMIT) cache.prototypes.set(key, proto);
+  if (cache.prototypes.size < 64) cache.prototypes.set(key, proto);
   _virtualAttributePrototypes.add(proto);
   return proto;
 }
@@ -1022,7 +1020,7 @@ function _virtualAttributeMethods(
     }
     proto = Object.getPrototypeOf(proto);
   }
-  methods.set(name, descriptors);
+  if (methods.size < 64) methods.set(name, descriptors);
   return descriptors;
 }
 
