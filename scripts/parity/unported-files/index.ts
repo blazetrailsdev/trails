@@ -28,6 +28,7 @@ import { CRASS_UNPORTED_FILES } from "./crass.js";
 import { IMAGE_PROCESSING_UNPORTED_FILES } from "./image-processing.js";
 import { RACKUP_UNPORTED_FILES } from "./rackup.js";
 import { RAILS_DOM_TESTING_UNPORTED_FILES } from "./rails-dom-testing.js";
+import { SOLID_QUEUE_UNPORTED_FILES } from "./solid-queue.js";
 import { THOR_UNPORTED_FILES } from "./thor.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
@@ -57,6 +58,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...IMAGE_PROCESSING_UNPORTED_FILES,
   ...RACKUP_UNPORTED_FILES,
   ...RAILS_DOM_TESTING_UNPORTED_FILES,
+  ...SOLID_QUEUE_UNPORTED_FILES,
   ...THOR_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,

@@ -4,7 +4,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { isPresent, minutes } from "@blazetrails/activesupport";
+import { isPresent, minutes, pluck } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
@@ -13,7 +13,15 @@ import {
   getProcessAdapter,
 } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
-import { Job, Process, SolidQueueAdapter } from "./index.js";
+import {
+  ClaimedExecution,
+  FailedExecution,
+  Job,
+  Process,
+  ReadyExecution,
+  SolidQueueAdapter,
+} from "./index.js";
+import { StoreResultJob } from "./test-helpers/job-result.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
 import {
@@ -21,9 +29,26 @@ import {
   assertRegisteredProcesses,
   findProcessesRegisteredAs,
   runSupervisor,
+  sleep,
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
 } from "./test-helpers/processes-test-helper.js";
+
+const dummyRoot = `${import.meta.dirname}/test-helpers/dummy`;
+
+function configFilePath(name: string): string {
+  return `${dummyRoot}/config/${name}.yml`;
+}
+
+function captureStderr(): string[] {
+  const err: string[] = [];
+  vi.spyOn(getProcessAdapter().stderr, "write").mockImplementation((chunk) => {
+    err.push(String(chunk));
+    return true;
+  });
+  vi.spyOn(getProcessAdapter(), "setExitCode").mockImplementation(() => {});
+  return err;
+}
 
 async function assertRegisteredWorkers({
   supervisorPid = null,
@@ -104,6 +129,32 @@ describe("SupervisorTest", () => {
     await assertNoRegisteredProcesses();
   });
 
+  it("start with empty configuration", async () => {
+    const error = captureStderr();
+    const run = runSupervisor({ workers: [], dispatchers: [] });
+    await sleep(0.5);
+    await assertNoRegisteredProcesses();
+
+    await waitForProcessTerminationWithTimeout(run, { exitstatus: 1 });
+    expect(run.supervisor).toBeFalsy();
+    expect(error.join("")).toMatch(/No processes configured/);
+  });
+
+  it("start with invalid recurring tasks", async () => {
+    const error = captureStderr();
+    const run = runSupervisor({
+      recurringScheduleFile: configFilePath("recurring_with_invalid"),
+      skipRecurring: false,
+    });
+
+    await sleep(0.5);
+    await assertNoRegisteredProcesses();
+
+    await waitForProcessTerminationWithTimeout(run, { exitstatus: 1 });
+    expect(run.supervisor).toBeFalsy();
+    expect(error.join("")).toMatch(/Invalid recurring tasks/);
+  });
+
   it("create and delete pidfile", async () => {
     expect(await File.isExistAsync(pidfile)).toBeFalsy();
 
@@ -122,12 +173,7 @@ describe("SupervisorTest", () => {
   it("abort if there's already a pidfile for a supervisor", async () => {
     await FileUtils.mkdirPAsync(File.dirname(pidfile));
     await File.writeAsync(pidfile, RubyProcess.pid.toString());
-    const err: string[] = [];
-    vi.spyOn(getProcessAdapter().stderr, "write").mockImplementation((chunk) => {
-      err.push(String(chunk));
-      return true;
-    });
-    vi.spyOn(getProcessAdapter(), "setExitCode").mockImplementation(() => {});
+    const err = captureStderr();
 
     const run = runSupervisor();
     await waitForRegisteredProcesses(4);
@@ -151,6 +197,36 @@ describe("SupervisorTest", () => {
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toBe(pid);
 
     await run.terminate();
+  });
+
+  it("fail orphaned executions", async () => {
+    for (let i = 0; i < 3; i++) {
+      await (
+        StoreResultJob.set({ queue: "new_queue" }) as unknown as typeof StoreResultJob
+      ).performLater(i);
+    }
+    const process = await Process.register({ kind: "Worker", pid: 42, name: "worker-123" });
+
+    await ReadyExecution.claim("*", 5, process.id);
+
+    expect(await ClaimedExecution.count()).toBe(3);
+    expect(await ReadyExecution.count()).toBe(0);
+
+    expect([...new Set(pluck(await ClaimedExecution.last(3), "process_id"))]).toEqual([process.id]);
+
+    await process.delete();
+
+    const run = runSupervisor({
+      workers: [{ queues: "background", pollingInterval: 10, processes: 2 }],
+    });
+    const pid = RubyProcess.pid;
+    await waitForRegisteredProcesses(3);
+    await assertRegisteredSupervisor(pid);
+
+    await run.terminate();
+
+    expect(await ClaimedExecution.count()).toBe(0);
+    expect(await FailedExecution.count()).toBe(3);
   });
 
   it("prune processes with expired heartbeats", async () => {

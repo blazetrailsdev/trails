@@ -1,5 +1,5 @@
 import { Concern, extend, isPresent } from "@blazetrails/activesupport";
-import type { Base } from "@blazetrails/activerecord";
+import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Job } from "../job.js";
@@ -31,6 +31,7 @@ export class ClassMethods {
 
 export class Schedulable {
   static readonly [classModule] = true;
+  declare static scheduled: () => Relation<Job>;
   declare static ClassMethods: typeof ClassMethods;
   declare scheduled_at: Time | null;
   declare id: number;

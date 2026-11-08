@@ -10,3 +10,12 @@ export class Callbacks {
     (base as typeof ActiveModelCallbacks).defineModelCallbacks("boot", "shutdown");
   }
 }
+
+export declare class ClassMethods {
+  beforeBoot: (...args: unknown[]) => void;
+  aroundBoot: (...args: unknown[]) => void;
+  afterBoot: (...args: unknown[]) => void;
+  beforeShutdown: (...args: unknown[]) => void;
+  aroundShutdown: (...args: unknown[]) => void;
+  afterShutdown: (...args: unknown[]) => void;
+}

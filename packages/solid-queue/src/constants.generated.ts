@@ -60,7 +60,6 @@ defineConstants([
   [() => m0.AppExecutor, "SolidQueue::AppExecutor"],
   [() => m1.BlockedExecution, "SolidQueue::BlockedExecution"],
   [() => m2.ClaimedExecution, "SolidQueue::ClaimedExecution"],
-  [() => m2.Result, "SolidQueue::ClaimedExecution::Result"],
   [() => m3.Configuration, "SolidQueue::Configuration"],
   [() => m4.Dispatcher, "SolidQueue::Dispatcher"],
   [() => m5.ConcurrencyMaintenance, "SolidQueue::Dispatcher::ConcurrencyMaintenance"],

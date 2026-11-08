@@ -26,7 +26,7 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
     },
     async terminate(signal: "TERM" | "QUIT" = "TERM") {
       const supervisor = supervisors[0];
-      if (supervisor.isStopped()) return await running;
+      if (supervisor === undefined || supervisor.isStopped()) return await running;
       (supervisor as unknown as { signalQueue(): string[] }).signalQueue().push(signal);
       await (supervisor as unknown as { interrupt(): Promise<void> }).interrupt();
       await running;

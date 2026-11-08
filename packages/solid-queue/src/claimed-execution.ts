@@ -1,21 +1,19 @@
 import { type Base, type Relation } from "@blazetrails/activerecord";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { constSet, rbFArray } from "@blazetrails/ruby-compat";
+import { Struct, constSet, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution, UndiscardableError } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
 
-export class Result {
-  constructor(
-    public success: boolean,
-    public error: Error | null,
-  ) {}
-
-  isSuccess(): boolean {
-    return this.success;
-  }
-}
-
 export class ClaimedExecution extends Execution {
+  static Result = class Result extends Struct.new("success", "error") {
+    declare success: boolean;
+    declare error: Error | null;
+
+    isSuccess(): boolean {
+      return this.success;
+    }
+  };
+
   declare static orphaned: () => Relation<ClaimedExecution>;
   declare process_id: unknown;
   declare process: Promise<Base | null>;
@@ -125,14 +123,14 @@ export class ClaimedExecution extends Execution {
   }
 
   /** @internal */
-  private async execute(): Promise<Result> {
+  private async execute(): Promise<InstanceType<typeof ClaimedExecution.Result>> {
     try {
       await ActiveJobBase.execute(
         (await this.job).arguments as unknown as Parameters<typeof ActiveJobBase.execute>[0],
       );
-      return new Result(true, null);
+      return new ClaimedExecution.Result(true, null);
     } catch (e) {
-      return new Result(false, e as Error);
+      return new ClaimedExecution.Result(false, e as Error);
     }
   }
 

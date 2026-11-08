@@ -12,28 +12,26 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
-import { File, Pathname, RuntimeError, env, rbInspect } from "@blazetrails/ruby-compat";
+import { File, Pathname, RuntimeError, Struct, env, rbInspect } from "@blazetrails/ruby-compat";
 import { RecurringTask } from "./recurring-task.js";
 import { Record } from "./record.js";
 
 type Options = { [key: string]: unknown };
 
-class Process {
-  constructor(
-    public kind: string,
-    public attributes: Options,
-  ) {}
-
-  instantiate(): object {
-    const klass = safeConstantize(`SolidQueue::${titleize(this.kind)}`) as new (
-      attributes: Options,
-    ) => object;
-    return new klass(this.attributes);
-  }
-}
+type Process = InstanceType<typeof Configuration.Process>;
 
 export class Configuration extends Model {
-  static Process = Process;
+  static Process = class Process extends Struct.new("kind", "attributes") {
+    declare kind: string;
+    declare attributes: Options;
+
+    instantiate(): object {
+      const klass = safeConstantize(`SolidQueue::${titleize(this.kind)}`) as new (
+        attributes: Options,
+      ) => object;
+      return new klass(this.attributes);
+    }
+  };
 
   static {
     this.validate(":ensureConfiguredProcesses");
@@ -175,7 +173,11 @@ export class Configuration extends Model {
       ) as number;
       return Array.from(
         { length: processes },
-        () => new Process("worker", reverseMerge(workerOptions, Configuration.WORKER_DEFAULTS)),
+        () =>
+          new Configuration.Process(
+            "worker",
+            reverseMerge(workerOptions, Configuration.WORKER_DEFAULTS),
+          ),
       );
     });
   }
@@ -184,7 +186,7 @@ export class Configuration extends Model {
   private async dispatchers(): Promise<Process[]> {
     return (await this.dispatchersOptions()).map(
       (dispatcherOptions) =>
-        new Process(
+        new Configuration.Process(
           "dispatcher",
           reverseMerge(dispatcherOptions, Configuration.DISPATCHER_DEFAULTS),
         ),
@@ -194,7 +196,9 @@ export class Configuration extends Model {
   /** @internal */
   private async schedulers(): Promise<Process[]> {
     if (!this.isSkipRecurringTasks() && (await this.recurringTasks()).length > 0) {
-      return [new Process("scheduler", { recurringTasks: await this.recurringTasks() })];
+      return [
+        new Configuration.Process("scheduler", { recurringTasks: await this.recurringTasks() }),
+      ];
     } else {
       return [];
     }

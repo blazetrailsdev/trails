@@ -1025,9 +1025,10 @@ export function extractFromProgram(
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
           if (!decl.initializer) continue;
-          const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
-          const methods = ts.isObjectLiteralExpression(decl.initializer)
-            ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
+          const literal = unwrapAssertions(decl.initializer);
+          const objectLiteral = ts.isObjectLiteralExpression(literal);
+          const methods = ts.isObjectLiteralExpression(literal)
+            ? harvestObjectLiteralMethods(literal, checker, relPath)
             : isDefineModuleCall(unwrapAssertions(decl.initializer))
               ? (unwrapAssertions(decl.initializer) as ts.CallExpression).arguments
                   .map(unwrapAssertions)
@@ -3654,6 +3655,22 @@ function attrMacro(name: string): { reader: boolean; writer: boolean } | undefin
 }
 
 /**
+ * ruby-compat's `rb_mod_attr_reader` / `rb_mod_attr_writer` ports
+ * (`vendor/ruby/v3.3.11/object.c`), called as `rbModAttrReader(klass, "x")` — Ruby's
+ * `attr_reader :x`, typically inside an `included do` hook.
+ */
+function rbModAttrMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "rbModAttrReader":
+      return { reader: true, writer: false };
+    case "rbModAttrWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
+/**
  * The `.call` receivers of `attr_internal_*` (`core_ext/module/attr_internal.rb:5-23`),
  * which define instance methods only: `attrInternal.call(m, "x")` is `x` and `x=`
  * on `m`, the `moduleEval` carrier of the module it is called inside.
@@ -3686,6 +3703,8 @@ function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
 
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   if (isConfigAccessorCallee(expr)) return true;
+  if (ts.isIdentifier(expr) && rbModAttrMacro(importedName(expr, expr.getSourceFile())))
+    return true;
   return (
     ts.isPropertyAccessExpression(expr) &&
     ts.isIdentifier(expr.expression) &&
@@ -3702,6 +3721,25 @@ function readClassAttributeCall(
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
   if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
+  if (ts.isIdentifier(node.expression)) {
+    const attr = rbModAttrMacro(importedName(node.expression, sourceFile))!;
+    const names = node.arguments
+      .slice(1)
+      .filter(ts.isStringLiteralLike)
+      .map((arg) => arg.text);
+    if (names.length === 0 || names.length !== node.arguments.length - 1) return null;
+    const enclosing = enclosingEntity(node);
+    return {
+      ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      names,
+      reader: false,
+      writer: false,
+      instanceReader: attr.reader,
+      instanceWriter: attr.writer,
+      instancePredicate: false,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    };
+  }
   const callee = node.expression as ts.PropertyAccessExpression;
   if (
     callee.name.text === "call" &&
