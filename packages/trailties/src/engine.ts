@@ -14,6 +14,7 @@ import {
   getFs,
   getPath,
   rbFLoad,
+  rbFRequireFile,
   rbObjRespondTo,
   rbProcCall,
   block,
@@ -316,12 +317,11 @@ export class Engine extends Trailtie {
   }
 
   async loadConfigInitializer(initializer: string): Promise<void> {
-    const { pathToFileURL } = getPath();
     await Notifications.instrument(
       "load_config_initializer.railties",
       { initializer },
       async () => {
-        await import(pathToFileURL!(initializer).href);
+        await rbFLoad(initializer);
       },
     );
   }
@@ -329,9 +329,8 @@ export class Engine extends Trailtie {
   async loadSeed(): Promise<void> {
     const seedFile = ((await this.paths().get("db/seeds.ts")?.existent()) ?? [])[0];
     if (seedFile !== undefined) {
-      const { pathToFileURL } = getPath();
       await this.runCallbacks("load_seed", async () => {
-        await import(pathToFileURL!(seedFile).href);
+        await rbFLoad(seedFile);
       });
     }
   }
@@ -418,9 +417,8 @@ Engine.initializer(
   "load_environment_config",
   { before: "load_environment_hook", group: "all" },
   async function (this: Engine) {
-    const { pathToFileURL } = getPath();
     for (const environment of (await this.paths().get("config/environments")?.existent()) ?? []) {
-      await import(pathToFileURL!(environment).href);
+      await rbFRequireFile(environment);
     }
   },
 );
