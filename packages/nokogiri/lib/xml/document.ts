@@ -24,6 +24,7 @@ export class XmlDocument {
   private _doc: LibXmlDocument | null = null;
   private _root: XmlNode | null = null;
 
+  /** @missingRailsCall expand_path — CONVERGEABLE nokogiri-xml-document-parse-pathname-arm */
   static parse(
     stringOrIo: string | Readable | null,
     url: string | null = null,
@@ -63,11 +64,14 @@ export class XmlDocument {
   private static isEmptyDoc(stringOrIo: string | Readable | null): boolean {
     return (
       stringOrIo == null ||
-      stringOrIo === "" ||
+      (typeof stringOrIo === "string"
+        ? stringOrIo === ""
+        : stringOrIo.isEmpty !== undefined && stringOrIo.isEmpty()) ||
       (typeof stringOrIo === "object" && stringOrIo.isEof !== undefined && stringOrIo.isEof())
     );
   }
 
+  /** @missingRailsCall xmlReadIO — CONVERGEABLE nokogiri-libxml2-wasm-xinclude-flags-and-read-io */
   static readIo(
     io: Readable,
     url: string | null,
@@ -107,9 +111,17 @@ export class XmlDocument {
     this.processXincludes(options.toI());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs xmlXIncludeProcessTreeFlags — CONVERGEABLE nokogiri-libxml2-wasm-xinclude-flags-and-read-io
+   */
   private processXincludes(_options: number): void {
-    this._doc?.processXInclude();
+    try {
+      this._doc?.processXInclude();
+    } catch (e) {
+      if (!(e instanceof XmlParseError)) throw e;
+      throw new SyntaxError(e.message);
+    }
   }
 
   get document(): XmlDocument {

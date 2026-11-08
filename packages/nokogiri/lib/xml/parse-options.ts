@@ -37,10 +37,10 @@ type ParseOptionsGenerated = {
   [K in ParseOptionsFlag as `is${Capitalize<K>}`]: () => boolean;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- types the methods the class_eval loop below defines
 export interface ParseOptions extends ParseOptionsGenerated {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- merges with the generated-method interface above
 export class ParseOptions {
   static readonly STRICT = 0;
   static readonly RECOVER = 1 << 0;
@@ -106,31 +106,24 @@ export class ParseOptions {
 
   inspect(): string {
     const options: string[] = [];
-    for (const k of constants) {
-      const name = k.toLowerCase();
-      if ((this as unknown as Record<string, () => boolean>)[predicateName(name)]()) {
-        options.push(name);
+    for (const k of Object.keys(ParseOptions).filter((k) => /^[A-Z]/.test(k))) {
+      const name = k.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+      if (
+        (this as unknown as Record<string, () => boolean>)[
+          `is${name[0].toUpperCase()}${name.slice(1)}`
+        ]()
+      ) {
+        options.push(k.toLowerCase());
       }
     }
     return rbObjInspect(this).replace(/>$/, " " + options.join(", ") + ">");
   }
 }
 
-const constants = Object.keys(ParseOptions).filter((k) => /^[A-Z]/.test(k));
-
-function camelize(name: string): string {
-  return name.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
-}
-
-function predicateName(name: string): string {
-  const camel = camelize(name);
-  return `is${camel[0].toUpperCase()}${camel.slice(1)}`;
-}
-
-for (const constant of constants) {
+for (const constant of Object.keys(ParseOptions).filter((k) => /^[A-Z]/.test(k))) {
   if (constant === "STRICT") continue;
   const value = (ParseOptions as unknown as Record<string, number>)[constant];
-  const name = camelize(constant.toLowerCase());
+  const name = constant.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
   Object.defineProperties(ParseOptions.prototype, {
     [name]: {
       value: function (this: ParseOptions) {
@@ -148,7 +141,7 @@ for (const constant of constants) {
       writable: true,
       configurable: true,
     },
-    [predicateName(constant.toLowerCase())]: {
+    [`is${name[0].toUpperCase()}${name.slice(1)}`]: {
       value: function (this: ParseOptions) {
         return (this.options & value) === value;
       },

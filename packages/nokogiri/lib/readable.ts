@@ -1,5 +1,6 @@
 export interface Readable {
   read(): string | null;
+  isEmpty?(): boolean;
   isEof?(): boolean;
 }
 

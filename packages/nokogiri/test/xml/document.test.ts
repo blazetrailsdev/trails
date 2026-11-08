@@ -147,4 +147,23 @@ describe("Nokogiri::XML::Document.parse (trails)", () => {
     expect(doc.root.name).toBe("root");
     doc.dispose();
   });
+
+  it("parse processes xincludes when the xinclude option is set", () => {
+    const xml =
+      '<r xmlns:xi="http://www.w3.org/2001/XInclude"><a xml:id="x">t</a><xi:include xpointer="x"/></r>';
+    const doc = XmlDocument.parse(
+      xml,
+      null,
+      null,
+      ParseOptions.DEFAULT_XML | ParseOptions.XINCLUDE,
+    );
+    expect(doc.css("a").size).toBe(2);
+    doc.dispose();
+  });
+
+  it("parse treats an IO at eof as an empty document", () => {
+    const doc = XmlDocument.parse({ read: () => "<root/>", isEof: () => true }, null, "UTF-8");
+    expect(doc.encoding).toBe("UTF-8");
+    expect(() => doc.root).toThrow();
+  });
 });

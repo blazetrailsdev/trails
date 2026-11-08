@@ -4,10 +4,6 @@ import { ParseOptions } from "../../lib/xml/parse-options.js";
 
 type Dyn = Record<string, () => unknown>;
 
-function camelize(name: string): string {
-  return name.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
-}
-
 describe("Nokogiri::XML::TestParseOptions", () => {
   it("new", () => {
     const options = new ParseOptions();
@@ -21,7 +17,7 @@ describe("Nokogiri::XML::TestParseOptions", () => {
 
   for (const constant of Object.keys(ParseOptions).filter((k) => /^[A-Z]/.test(k))) {
     if (constant === "STRICT") continue;
-    const name = camelize(constant);
+    const name = constant.toLowerCase().replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
     const predicate = `is${name[0].toUpperCase()}${name.slice(1)}`;
     it(`predicate ${constant.toLowerCase()}`, () => {
       const options = new ParseOptions(
