@@ -13,7 +13,11 @@ interface BootLoader {
 }
 
 interface BootPaths {
-  get(path: string): { toAry(): string[] } | undefined;
+  get(
+    path: string,
+  ):
+    | { toAry(): string[]; extensions(): string[] | undefined; existent(): Promise<string[]> }
+    | undefined;
 }
 
 interface BootEngine {
@@ -93,7 +97,6 @@ const BOOT_PATHS = [
   "config/environments",
   "config/initializers",
   "db/seeds.ts",
-  "app/helpers",
 ];
 
 async function writeBoot(
@@ -109,13 +112,18 @@ async function writeBoot(
   for (const engine of engines) {
     const engineRoot = engine.config.root ?? root;
     for (const key of BOOT_PATHS) {
-      for (const raw of engine.paths!().get(key)?.toAry() ?? []) {
-        const full = File.expandPath(raw, engineRoot);
-        if (await File.isDirectoryAsync(full)) {
-          const found = await Dir.globAsync("**/*.{ts,js}", 0, { base: full });
-          for (const file of found.sort()) files.add(File.join(full, file));
-        } else if (await File.isExistAsync(full)) {
-          files.add(full);
+      const node = engine.paths!().get(key);
+      if (node === undefined) continue;
+      if (key !== "config/environments") {
+        for (const file of await node.existent()) files.add(file);
+        continue;
+      }
+      const glob = `*.{${(node.extensions() ?? ["ts", "js"]).join(",")}}`;
+      for (const raw of node.toAry()) {
+        const dir = File.expandPath(raw, engineRoot);
+        if (!(await File.isDirectoryAsync(dir))) continue;
+        for (const file of (await Dir.globAsync(glob, 0, { base: dir })).sort()) {
+          files.add(File.join(dir, file));
         }
       }
     }

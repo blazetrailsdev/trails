@@ -232,17 +232,35 @@ describe("buildAutoload", () => {
       File.write("config/initializers/deep/inflections.ts", "export {};\n");
       File.write("db/seeds.ts", "export {};\n");
       const root = Dir.pwd();
-      const table: Record<string, string[]> = {
-        "config/routes.ts": ["config/routes.ts"],
-        "config/routes": ["config/routes"],
-        "config/environments": ["config/environments"],
-        "config/initializers": ["config/initializers"],
-        "db/seeds.ts": ["db/seeds.ts"],
-        "app/helpers": ["app/helpers"],
+      const globs: Record<string, string> = {
+        "config/routes": "**/*.{ts,js}",
+        "config/environments": "test.{ts,js}",
+        "config/initializers": "**/*.{ts,js}",
       };
-      const paths = () => ({ get: (key: string) => ({ toAry: () => table[key] ?? [] }) });
+      const paths = (engineRoot: string) => () => ({
+        get: (key: string) => ({
+          toAry: () => [key],
+          extensions: () => globs[key]?.match(/\{(\S+)\}/)?.[1].split(","),
+          existent: async () => {
+            const full = File.expandPath(key, engineRoot);
+            if (globs[key] === undefined) return File.isExist(full) ? [full] : [];
+            if (!File.isDirectory(full)) return [];
+            const found = await Dir.globAsync(globs[key], 0, { base: full });
+            return found.sort().map((file) => File.join(full, file));
+          },
+        }),
+      });
+      const engineRoot = File.expandPath("vendor/blog");
+      FileUtils.mkdirP(`${engineRoot}/config/initializers`);
+      File.write(`${engineRoot}/config/routes.ts`, "export {};\n");
+      File.write(`${engineRoot}/config/initializers/blog.ts`, "export {};\n");
       seats.Trails = {
-        application: { config: { root }, paths, initializers: { tsort: () => [] } },
+        application: {
+          config: { root },
+          paths: paths(root),
+          railties: () => [{ config: { root: engineRoot }, paths: paths(engineRoot) }, {}],
+          initializers: { tsort: () => [] },
+        },
       };
 
       await buildAutoload();
@@ -255,6 +273,8 @@ describe("buildAutoload", () => {
         "config/environments/test.ts",
         "config/initializers/deep/inflections.ts",
         "db/seeds.ts",
+        "vendor/blog/config/routes.ts",
+        "vendor/blog/config/initializers/blog.ts",
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
