@@ -16,7 +16,7 @@ const __dirname_ = join(new URL(".", import.meta.url).pathname);
 const VERSION = "2.8.1";
 const ROOT = join(__dirname_, "..", "..");
 const SRC = join(ROOT, "vendor", "mail", VERSION, "lib", "mail", "parsers");
-const OUT = join(ROOT, "packages", "mail", "src", "parsers");
+const OUT = join(ROOT, "packages", "mail", "lib", "parsers");
 
 const camel = (s: string): string =>
   s.replace(/(?<=[a-z0-9])_([a-z0-9])/g, (_, c) => c.toUpperCase());
