@@ -19,7 +19,6 @@ export function step<T>(
 /** @internal */
 function ensureIterationAllowed<T>(this: Range<T>): void {
   if (this.first() instanceof TimeWithZone) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new TypeError("can't iterate from ActiveSupport::TimeWithZone");
   }
 }
