@@ -8,9 +8,14 @@
   },
   "include": ["lib"],
   "references": [
-    { "path": "../activesupport" },
-    { "path": "../activemodel" },
-    { "path": "../ruby-compat" }
-  ],
-  "exclude": ["lib/**/*.test.ts"]
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../activemodel"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }

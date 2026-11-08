@@ -8,10 +8,17 @@
   },
   "include": ["lib"],
   "references": [
-    { "path": "../ruby-compat" },
-    { "path": "../did-you-mean" },
-    { "path": "../activesupport" },
-    { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../did-you-mean"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
 }

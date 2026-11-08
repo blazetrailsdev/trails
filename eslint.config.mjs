@@ -144,7 +144,7 @@ export default defineConfig(
       "vendor/**",
       "**/dist/**",
       "**/*.tt.js",
-      "packages/thor/lib/test-helpers/fixtures/doc/*.rb.js",
+      "packages/thor/test/fixtures/doc/*.rb.js",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
@@ -355,7 +355,7 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
@@ -385,7 +385,7 @@ export default defineConfig(
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/website/src/**/*.ts",
     ],
     ignores: [
@@ -447,12 +447,12 @@ export default defineConfig(
       "packages/activejob/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/globalid/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -469,10 +469,10 @@ export default defineConfig(
   {
     files: [
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/activemodel/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
-      "packages/globalid/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -533,12 +533,12 @@ export default defineConfig(
       "packages/actionview/lib/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/activejob/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/date/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
-      "packages/globalid/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/msgpack/lib/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
@@ -659,7 +659,7 @@ export default defineConfig(
             "packages/arel/src/**/*.test.ts",
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
-            "packages/globalid/lib/**/*.test.ts",
+            "packages/globalid/test/**/*.test.ts",
             "packages/i18n/src/**/*.test.ts",
           ],
           rules: {
@@ -847,14 +847,14 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/thor/lib/**/*.ts"],
+    files: ["packages/thor/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/thor-import-boundary": "error",
     },
   },
 
   {
-    files: ["packages/thor/lib/**/*.ts"],
+    files: ["packages/thor/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": "error",
     },
@@ -991,7 +991,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/src/**/*.ts",
-      "packages/globalid/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
@@ -1156,7 +1156,7 @@ export default defineConfig(
     files: [
       "packages/actionpack/{lib,test}/**/*.ts",
       "packages/trailties/src/**/*.ts",
-      "packages/thor/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
