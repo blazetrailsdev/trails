@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 import { Dir, env, File, FileUtils, registerCompiledFiles, setEnv } from "@blazetrails/ruby-compat";
+import { Application } from "./application.js";
 import { Engine } from "./engine.js";
+import { Trails } from "./trails.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 
 const loads: string[] = [];
@@ -73,5 +75,20 @@ describe("boot sites load through a registered compiled file", () => {
       .run();
 
     expect(loads).toEqual(["config/environments/test.ts"]);
+  });
+
+  it("Application#requireEnvironmentBang requires config/environment.ts through the thunk", async () => {
+    tmp = Dir.mktmpdir("compiled_application_environment");
+    compiled(tmp, ["config/environment.ts"]);
+    File.write(`${tmp}/config.ts`, "");
+    class CompiledEnvironmentApp extends Application {}
+    Application.register(CompiledEnvironmentApp, tmp);
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+
+    await CompiledEnvironmentApp.instance().requireEnvironmentBang();
+
+    expect(loads).toEqual(["config/environment.ts"]);
   });
 });
