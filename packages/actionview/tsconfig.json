@@ -6,21 +6,31 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "exclude": [
-    "lib/**/*.test.ts",
-    "lib/test-helpers",
-    "lib/test",
-    "lib/test-case.ts",
-    "lib/constants.excluded.generated.ts"
-  ],
+  "exclude": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
   "references": [
-    { "path": "../builder" },
-    { "path": "../ruby-compat" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../did-you-mean" },
-    { "path": "../tse-compiler" },
-    { "path": "../html-sanitizer" },
-    { "path": "../nokogiri" }
+    {
+      "path": "../builder"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../did-you-mean"
+    },
+    {
+      "path": "../tse-compiler"
+    },
+    {
+      "path": "../html-sanitizer"
+    },
+    {
+      "path": "../nokogiri"
+    }
   ]
 }

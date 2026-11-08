@@ -10,26 +10,59 @@
       "@blazetrails/trails-tsc": ["../trails-tsc/lib/index.ts"],
       "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"],
       "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
-    }
+    },
+    "rootDir": "."
   },
   "exclude": [],
-  "include": ["lib/**/*.test.ts", "lib/test-helpers/**/*", "lib/test/**/*"],
+  "include": ["test"],
   "references": [
-    { "path": "./tsconfig.json" },
-    { "path": "../builder" },
-    { "path": "../ruby-compat" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../did-you-mean" },
-    { "path": "../tse-compiler" },
-    { "path": "../html-sanitizer" },
-    { "path": "../nokogiri" },
-    { "path": "./tsconfig.test-case.json" },
-    { "path": "../actionpack" },
-    { "path": "../activemodel" },
-    { "path": "../activerecord" },
-    { "path": "../rack" },
-    { "path": "../trails-tsc" },
-    { "path": "../trailties" }
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../builder"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../did-you-mean"
+    },
+    {
+      "path": "../tse-compiler"
+    },
+    {
+      "path": "../html-sanitizer"
+    },
+    {
+      "path": "../nokogiri"
+    },
+    {
+      "path": "./tsconfig.test-case.json"
+    },
+    {
+      "path": "../actionpack"
+    },
+    {
+      "path": "../activemodel"
+    },
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../rack"
+    },
+    {
+      "path": "../trails-tsc"
+    },
+    {
+      "path": "../trailties"
+    }
   ]
 }

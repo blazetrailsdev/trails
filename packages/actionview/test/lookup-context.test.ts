@@ -1,0 +1,229 @@
+import { beforeEach, describe, it, expect } from "vitest";
+import { DetailsKey, LookupContext } from "../lib/lookup-context.js";
+import type { RenderableTemplate, RenderOptions } from "../lib/renderer/abstract-renderer.js";
+import { MissingTemplate } from "../lib/template/error.js";
+import { Resolver } from "../lib/template/resolver.js";
+import { FixtureResolver } from "../lib/testing/resolvers.js";
+import { Template } from "../lib/template.js";
+import { TemplatePath } from "../lib/template-path.js";
+import { TSE } from "../lib/template/handlers/tse.js";
+
+async function render(ctx: LookupContext, options: RenderOptions) {
+  const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
+  return String(await view.viewRenderer.render(view, options));
+}
+
+describe("MissingTemplate#corrections", () => {
+  const paths = (candidates: string[]) => [new PathsOnlyResolver(candidates)];
+
+  it("returns close template path matches ranked by Jaro distance", () => {
+    const err = new MissingTemplate(
+      paths(["posts/index", "posts/show", "posts/new", "comments/index"]),
+      "indx",
+      ["posts"],
+      false,
+      {},
+    );
+    expect(err.corrections[0]).toBe("posts/index");
+  });
+
+  it("returns [] when no candidate paths are provided", () => {
+    const err = new MissingTemplate([], "index", ["posts"], false, {});
+    expect(err.corrections).toEqual([]);
+  });
+
+  it("filters partials when the missing path is a partial", () => {
+    const err = new MissingTemplate(
+      paths(["posts/_form", "posts/_header", "posts/index"]),
+      "frm",
+      ["posts"],
+      true,
+      {},
+    );
+    const corrections = err.corrections;
+    expect(corrections).not.toContain("posts/index");
+    expect(corrections[0]).toBe("posts/form");
+  });
+
+  it("filters non-partials when the missing path is not a partial", () => {
+    const err = new MissingTemplate(
+      paths(["posts/_form", "posts/index", "posts/show"]),
+      "indx",
+      ["posts"],
+      false,
+      {},
+    );
+    const corrections = err.corrections;
+    expect(corrections).not.toContain("posts/form");
+    expect(corrections).not.toContain("posts/_form");
+  });
+
+  it("returns at most 6 suggestions", () => {
+    const candidates = Array.from({ length: 20 }, (_, i) => `posts/action${i}`);
+    const err = new MissingTemplate(paths(candidates), "actio0", ["posts"], false, {});
+    expect(err.corrections.length).toBeLessThanOrEqual(6);
+  });
+
+  it("strips leading underscore from root-level partial suggestions", () => {
+    const err = new MissingTemplate(paths(["_form", "_header"]), "frm", [""], true, {});
+    expect(err.corrections[0]).toBe("/form");
+  });
+});
+
+class PathsOnlyResolver extends Resolver {
+  constructor(private readonly paths: readonly string[]) {
+    super();
+  }
+
+  protected override _findAll(): Template[] {
+    return [];
+  }
+
+  override allTemplatePaths(): readonly TemplatePath[] {
+    return this.paths.map((path) => TemplatePath.parse(path));
+  }
+}
+
+describe("LookupContext allCandidatePaths wiring", () => {
+  it("passes resolver allTemplatePaths into MissingTemplate when render throws", async () => {
+    const resolver = new PathsOnlyResolver(["posts/index", "posts/show", "posts/indx"]);
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([resolver]);
+
+    let caught: MissingTemplate | undefined;
+    try {
+      await render(ctx, { template: "indx", prefixes: ["posts"] });
+    } catch (e) {
+      if (e instanceof MissingTemplate) caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(MissingTemplate);
+    expect(Array.from(caught!.paths)).toContain(resolver);
+    expect(caught!.corrections).toEqual([]);
+  });
+
+  it("passes resolver allTemplatePaths into MissingTemplate when renderPartial throws", async () => {
+    const resolver = new PathsOnlyResolver(["posts/_form", "posts/_header"]);
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([resolver]);
+
+    let caught: MissingTemplate | undefined;
+    try {
+      await render(ctx, { partial: "posts/frm" });
+    } catch (e) {
+      if (e instanceof MissingTemplate) caught = e;
+    }
+
+    expect(caught).toBeInstanceOf(MissingTemplate);
+    expect(Array.from(caught!.paths)).toContain(resolver);
+    expect(caught!.corrections).toContain("posts/form");
+  });
+});
+
+describe("Base#render (trails)", () => {
+  function contextWith(templates: Record<string, string>): LookupContext {
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
+    const ctx = new LookupContext(null, {}, ["posts"]);
+    ctx.appendViewPaths([resolver]);
+    return ctx;
+  }
+
+  async function renderPartial(ctx: LookupContext, partial: string, locals = {}): Promise<string> {
+    return String(await new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
+  }
+
+  beforeEach(() => {
+    Template.registerTemplateHandler("tse", new TSE());
+  });
+
+  it("restores the parent's virtual path after a nested partial returns", async () => {
+    const ctx = contextWith({
+      "posts/_post":
+        '<%= render({ partial: "shared/spacer" }) %>|<%= render({ partial: "byline" }) %>',
+      "shared/_spacer": "spacer",
+      "posts/_byline": "byline",
+    });
+    expect(await renderPartial(ctx, "post")).toBe("spacer|byline");
+  });
+
+  it("renders a partial by bare name against the given prefix", async () => {
+    const ctx = contextWith({ "posts/_form": "<%= title %>" });
+    expect(await renderPartial(ctx, "form", { title: "New" })).toBe("New");
+  });
+
+  it("takes the prefix from a qualified name", async () => {
+    const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
+    expect(await renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
+  });
+
+  it("resolves a partial nested inside a partial", async () => {
+    const ctx = contextWith({
+      "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
+      "posts/_byline": "by <%= name %>",
+    });
+    expect(await renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
+  });
+
+  it("raises MissingTemplate when the partial does not resolve", async () => {
+    const ctx = contextWith({ "posts/_form": "" });
+    await expect(renderPartial(ctx, "frm")).rejects.toThrow(MissingTemplate);
+  });
+
+  it("is reachable from a template rendered through renderTemplate", async () => {
+    const ctx = contextWith({ "posts/_form": "form!" });
+    const out = await render(ctx, {
+      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new TSE(), {
+        locals: [],
+        virtualPath: "posts/index",
+        format: ":html",
+      }) as unknown as RenderableTemplate,
+    });
+    expect(out).toBe("form!");
+  });
+});
+
+describe("LookupContext#render with a layout", () => {
+  function contextWith(templates: Record<string, string>): LookupContext {
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([resolver]);
+    return ctx;
+  }
+
+  beforeEach(() => {
+    Template.registerTemplateHandler("tse", new TSE());
+  });
+
+  it("renders the content template inside the layout", async () => {
+    const ctx = contextWith({
+      "posts/index": "<p>body</p>",
+      "layouts/application": "<main><%= yield %></main>",
+    });
+    const options = { template: "index", prefixes: ["posts"], layout: "layouts/application" };
+    expect(await render(ctx, options)).toBe("<main><p>body</p></main>");
+  });
+
+  it("finds a template through an inherited prefix", async () => {
+    const ctx = contextWith({ "application/show": "<p>inherited</p>" });
+    expect(
+      await render(ctx, { template: "show", prefixes: ["posts", "application"], layout: false }),
+    ).toBe("<p>inherited</p>");
+  });
+
+  it("carries a named contentFor section from the content template to the layout", async () => {
+    const ctx = contextWith({
+      "posts/index": '<% contentFor("title", () => { %>Home<% }) %><p>body</p>',
+      "layouts/application": '<title><%= _layoutFor("title") %></title><%= yield %>',
+    });
+    const options = { template: "index", prefixes: ["posts"], layout: "layouts/application" };
+    expect(await render(ctx, options)).toBe("<title>Home</title><p>body</p>");
+  });
+});

@@ -1,0 +1,174 @@
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { I18n } from "@blazetrails/activesupport";
+import { PathRegistry } from "../lib/path-registry.js";
+import { FixtureResolver } from "../lib/testing/resolvers.js";
+import { Template } from "../lib/template.js";
+import {
+  ClassMethods,
+  _prefixes,
+  appendViewPath,
+  detailsForLookup,
+  formats,
+  isAnyTemplates,
+  locale,
+  lookupContext,
+  setFormats,
+  setLocale,
+  templateExists,
+  type ViewPaths,
+  type ViewPathsClass,
+} from "../lib/view-paths.js";
+
+class BaseController implements ViewPaths {
+  declare readonly ["constructor"]: ViewPathsClass;
+
+  static abstract = true;
+  static isAbstract(): boolean {
+    return this.abstract;
+  }
+  static controllerPath(): string {
+    return "base";
+  }
+
+  static _prefixes = ClassMethods._prefixes;
+  static localPrefixes = ClassMethods.localPrefixes;
+  static viewPaths = ClassMethods.viewPaths;
+
+  _prefixes = _prefixes;
+  lookupContext = lookupContext;
+  detailsForLookup = detailsForLookup;
+  formats = formats;
+  setFormats = setFormats;
+  locale = locale;
+  setLocale = setLocale;
+  templateExists = templateExists;
+  appendViewPath = appendViewPath;
+  isAnyTemplates = isAnyTemplates;
+}
+
+class PostsController extends BaseController {
+  static abstract = false;
+  static controllerPath(): string {
+    return "posts";
+  }
+}
+
+class DraftsController extends PostsController {
+  static controllerPath(): string {
+    return "drafts";
+  }
+}
+
+afterEach(() => {
+  PathRegistry.reset();
+});
+
+describe("ViewPaths::ClassMethods", () => {
+  test("_prefixes stops at the first abstract ancestor", () => {
+    expect(DraftsController._prefixes()).toEqual(["drafts", "posts"]);
+  });
+
+  test("the default prefix is the controller path in kebab-case, namespaces kept", () => {
+    class StoryPagesController extends PostsController {
+      static controllerPath(): string {
+        return "admin/story_pages";
+      }
+    }
+    expect(StoryPagesController.localPrefixes()).toEqual(["admin/story-pages"]);
+    expect(StoryPagesController.controllerPath()).toBe("admin/story_pages");
+  });
+
+  test("overriding localPrefixes adds its prefix ahead of the ancestors'", () => {
+    class OverridingLocalPrefixes extends PostsController {
+      static controllerPath(): string {
+        return "overriding_local_prefixes";
+      }
+      static localPrefixes(): string[] {
+        return [...super.localPrefixes(), "testing/me3"];
+      }
+    }
+    expect(OverridingLocalPrefixes._prefixes()).toEqual([
+      "overriding-local-prefixes",
+      "testing/me3",
+      "posts",
+    ]);
+    expect(new OverridingLocalPrefixes()._prefixes()).toEqual(OverridingLocalPrefixes._prefixes());
+  });
+
+  test("an overridden localPrefixes is inherited", () => {
+    class OverridingLocalPrefixes extends PostsController {
+      static controllerPath(): string {
+        return "overriding_local_prefixes";
+      }
+      static localPrefixes(): string[] {
+        return [this.controllerPath().replace(/_/g, "-")];
+      }
+    }
+    class Inheriting extends OverridingLocalPrefixes {
+      static controllerPath(): string {
+        return "inheriting_one";
+      }
+    }
+    expect(Inheriting._prefixes()).toEqual([
+      "inheriting-one",
+      "overriding-local-prefixes",
+      "posts",
+    ]);
+  });
+});
+
+describe("ViewPaths", () => {
+  let enforceAvailableLocales: boolean;
+  beforeEach(() => {
+    enforceAvailableLocales = I18n.enforceAvailableLocales();
+    I18n.setEnforceAvailableLocales(false);
+  });
+  afterEach(() => {
+    I18n.setLocale("en");
+    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+  });
+
+  test("lookup_context is built from the class's view paths, details and prefixes", () => {
+    PostsController.viewPaths([]);
+    const controller = new PostsController();
+
+    expect(controller.lookupContext().prefixes).toEqual(["posts"]);
+    expect(controller.detailsForLookup()).toEqual({});
+    expect(controller.lookupContext()).toBe(controller.lookupContext());
+  });
+
+  test("formats and locale delegate to the lookup context", () => {
+    PostsController.viewPaths([]);
+    const controller = new PostsController();
+
+    controller.setFormats([":json"]);
+    expect(controller.formats()).toEqual([":json"]);
+    expect(controller.lookupContext().formats).toEqual([":json"]);
+
+    controller.setLocale("de");
+    expect(controller.locale()).toBe(":de");
+    expect(controller.lookupContext().locale).toBe(":de");
+  });
+
+  test("template_exists? and any_templates? delegate to the lookup context", () => {
+    PostsController.viewPaths([]);
+    const controller = new PostsController();
+
+    expect(controller.templateExists("index", ["posts"])).toBe(false);
+    expect(controller.isAnyTemplates("index", ["posts"])).toBe(false);
+  });
+
+  test("an appended resolver is searched by template_exists?", () => {
+    Template.registerTemplateHandler("tse", {
+      call: () => 'return "";',
+    });
+    const resolver = new FixtureResolver({ "posts/index.html.tse": "hello" });
+    PostsController.viewPaths([]);
+    const controller = new PostsController();
+
+    controller.appendViewPath(resolver);
+
+    expect(controller.templateExists("index", ["posts"])).toBe(true);
+    expect(controller.templateExists("missing", ["posts"])).toBe(false);
+  });
+});
