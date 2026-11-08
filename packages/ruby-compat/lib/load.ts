@@ -6,6 +6,27 @@ import { constSet } from "./include.js";
 import { TopLevel } from "./object.js";
 
 let loads = 0;
+const compiledFiles = new Map<string, () => Promise<unknown>>();
+const loadedFiles = new Set<string>();
+
+/**
+ * Registers the modules a compiled build bundled for files it cannot reach
+ * through `import(url)`, in place of the read `load_iseq_eval`
+ * (`vendor/ruby/v3.3.11/load.c:744`) makes: each key is resolved against `root`, and the first
+ * {@link rbFLoad} of that path imports through its thunk (RFC 0224; CLAUDE.md
+ * § "Constant lookup is an import or a registry"). Registration lasts for the
+ * process, as `$LOADED_FEATURES` does; nothing unregisters a file.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function registerCompiledFiles(
+  root: string,
+  files: Record<string, () => Promise<unknown>>,
+): void {
+  for (const [rel, load] of Object.entries(files)) {
+    compiledFiles.set(File.expandPath(rel, root), load);
+  }
+}
 
 /**
  * `rb_f_load` (`vendor/ruby/v3.3.11/load.c:903`), `Kernel#load`: evaluates
@@ -18,11 +39,19 @@ let loads = 0;
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFLoad(fname: string): Promise<true> {
-  const { pathToFileURL } = getPath();
-  if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
-  const path = pathToFileURL(fname);
-  path.search = `?${(loads += 1)}`;
-  const exports = (await import(path.href)) as Record<string, unknown>;
+  const full = File.expandPath(fname);
+  const compiled = loadedFiles.has(full) ? undefined : compiledFiles.get(full);
+  let exports: Record<string, unknown>;
+  if (compiled !== undefined) {
+    exports = (await compiled()) as Record<string, unknown>;
+  } else {
+    const { pathToFileURL } = getPath();
+    if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
+    const path = pathToFileURL(fname);
+    path.search = `?${(loads += 1)}`;
+    exports = (await import(path.href)) as Record<string, unknown>;
+  }
+  loadedFiles.add(full);
   for (const [id, val] of Object.entries(exports)) {
     if (/^[\p{Lu}\p{Lt}]/u.test(id)) constSet(TopLevel, id, val);
   }
@@ -50,7 +79,7 @@ export async function rbFRequireFile(feature: string): Promise<boolean> {
       feature.endsWith(".js") || feature.endsWith(".ts") ? feature : `${feature}.js`,
       path,
     );
-    if (!(await File.isExistAsync(full))) continue;
+    if (!compiledFiles.has(full) && !(await File.isExistAsync(full))) continue;
     if (LOADED_FEATURES.includes(full)) return false;
     await rbFLoad(full);
     LOADED_FEATURES.push(full);
