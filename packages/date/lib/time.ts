@@ -1633,6 +1633,7 @@ export class Time extends rbCTime {
     }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
+    let timev: Rational | undefined;
     const str = rbStrftimeAlloc(
       format,
       this,
@@ -1650,7 +1651,7 @@ export class Time extends rbCTime {
           return self.zone;
         },
       },
-      () => this.toR(),
+      () => (timev ??= this.toR()),
       this.#tzmodeUtc,
     );
     if (str == null) throw new ArgumentError(`invalid format: ${format}`);

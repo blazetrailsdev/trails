@@ -2032,6 +2032,7 @@ function ivarField(obj: object, id: string): string {
   let field = _defaultIvarFields.get(id);
   if (field === undefined) {
     field = id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z])/g, (_, c: string) => c.toUpperCase());
+    if (_defaultIvarFields.size >= 1024) _defaultIvarFields.clear();
     _defaultIvarFields.set(id, field);
   }
   return field;
@@ -2057,6 +2058,7 @@ function idForVar(obj: object, iv: string): string {
       receiver: obj,
     });
   }
+  if (_validIvarNames.size >= 1024) _validIvarNames.clear();
   _validIvarNames.add(iv);
   return iv;
 }
