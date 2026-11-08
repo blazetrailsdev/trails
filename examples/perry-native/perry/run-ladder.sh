@@ -23,6 +23,11 @@ TIMEOUT="${TIMEOUT:-600}"
 mkdir -p "$OUT"
 : > "$OUT/ladder.log"
 
+# Rungs 07 and 08 import `.trails/entry.generated.js`, whose boot file map
+# names every path-loaded application file statically (FINDINGS wall 30), so
+# the entry has to be written before perry compiles them.
+pnpm run trails build >> "$OUT/ladder.log" 2>&1 || { echo "trails build failed; see $OUT/ladder.log" >&2; exit 1; }
+
 # Run Perry inside a transient scope so MemoryMax applies to the whole process
 # tree; without systemd, fall back to uncapped and say so.
 # `timeout` goes INSIDE the scope: it is a real binary systemd-run can exec,

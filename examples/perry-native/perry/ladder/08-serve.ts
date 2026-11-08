@@ -27,7 +27,7 @@
 //
 // Run it with `TRAILS_ENV=production` to take that branch. The environment has
 // to come from the process, not from an assignment in this file: the
-// `config/environment.js` import is hoisted and boots the application before
+// `.trails/entry.generated.js` import is hoisted and boots the application before
 // any statement here could set it.
 import { Handler } from "@blazetrails/rackup";
 import { Trails } from "@blazetrails/trailties";
