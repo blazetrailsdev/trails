@@ -33,13 +33,12 @@ export const HTML5 = {} as {
   SafeListSanitizer: typeof SafeListSanitizer;
 };
 
-export const Trails = (TopLevel.Trails ??= { name: "Trails" } as NonNullable<
+const Trails = (TopLevel.Trails ??= { name: "Trails" } as NonNullable<
   typeof TopLevel.Trails
 >) as NonNullable<typeof TopLevel.Trails> & {
   HTML: typeof HTML;
   HTML4: typeof HTML4;
   HTML5: typeof HTML5;
-  Html: typeof HTML;
 };
 
 Trails.HTML = HTML;
