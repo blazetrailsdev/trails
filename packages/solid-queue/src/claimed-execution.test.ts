@@ -57,10 +57,10 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
   });
 
   async function prepareAndClaimJob(
-    activeJob: { jobId: string },
+    activeJob: unknown,
     { process: claimingProcess = process }: { process?: Process } = {},
   ): Promise<ClaimedExecution> {
-    const job = (await Job.findBy({ active_job_id: activeJob.jobId })) as Job;
+    const job = (await Job.findBy({ active_job_id: (activeJob as ApplicationJob).jobId })) as Job;
 
     await job.prepareForExecution();
     await assertDifference(
