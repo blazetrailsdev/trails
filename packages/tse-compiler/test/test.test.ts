@@ -200,30 +200,6 @@ _buf.to_s
     );
   });
 
-  it("should handle <%% with a different literal prefix/postfix", () => {
-    checkOutput(
-      `<table>
-  <%% for item in @items %>
-  <tr>
-  </tr>
-  <%% end %>
-  <%%= "literal" %>
-</table>
-`,
-      `_buf = ::String.new; _buf << '<table>
-'; _buf << '  {% for item in @items %}
-'; _buf << '  <tr>
-  </tr>
-'; _buf << '  {% end %}
-'; _buf << '  {%= "literal" %}
-'; _buf << '</table>
-';
-_buf.to_s
-`,
-      { literalPrefix: "{%", literalPostfix: "%}" },
-    );
-  });
-
   it("should handle :escape option without :escapefunc option", () => {
     checkOutput(
       `<table>

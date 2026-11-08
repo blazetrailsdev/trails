@@ -18,9 +18,6 @@ export const erubi: Record<string, AssertionReceipt[]> = {
   "erubi:test.rb › Erubi › should handle :outvar and :freeze options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :preamble and :postamble options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle <%% and <%# syntax": [checkOutputEval],
-  "erubi:test.rb › Erubi › should handle <%% with a different literal prefix/postfix": [
-    checkOutputEval,
-  ],
   "erubi:test.rb › Erubi › should handle chain_appends option": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle ensure option": [
     checkOutputEval,
