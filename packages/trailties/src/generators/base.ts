@@ -17,6 +17,7 @@ import {
   hashDelete,
   constGet,
   constDefined,
+  rbModName,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -213,9 +214,10 @@ export abstract class Base extends (Group as unknown as (abstract new (
   static override sourcePaths(): string[] {
     if (!Object.hasOwn(this, "_sourcePaths")) {
       const sourcePaths: string[] = (this._sourcePaths = []);
-      if (this.name && !this.name.endsWith("Base")) {
+      const name = rbModName(this);
+      if (name && !name.endsWith("Base")) {
         for (const path of Generators.templatesPath()) {
-          if (this.name.includes("::")) {
+          if (name.includes("::")) {
             sourcePaths.push(File.join(path, this.baseName()!, this.generatorName()!));
           } else {
             sourcePaths.push(File.join(path, this.generatorName()!));
@@ -385,7 +387,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static baseName(): string | undefined {
-    const segments = this.name.split("::");
+    const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const base = segments[0];
     return base != null ? _underscore(base) : undefined;
@@ -393,7 +395,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static generatorName(): string | undefined {
-    const segments = this.name.split("::");
+    const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const generator = segments.at(-1);
     return generator != null ? _underscore(generator.replace(/Generator$/, "")) : undefined;
