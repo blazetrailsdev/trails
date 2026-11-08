@@ -229,6 +229,7 @@ describe("buildAutoload", () => {
       File.write("config/routes/admin.ts", "export {};\n");
       File.write("config/environments/test.ts", "export {};\n");
       File.write("config/environments/production.ts", "export {};\n");
+      File.write("config/environments/production.d.ts", "export {};\n");
       File.write("config/initializers/deep/inflections.ts", "export {};\n");
       File.write("db/seeds.ts", "export {};\n");
       const root = Dir.pwd();
@@ -278,6 +279,7 @@ describe("buildAutoload", () => {
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
+      expect(boot).not.toContain("production.d.ts");
       expect(File.read(".trails/autoload/install.generated.js")).toContain(
         'import "../boot.generated.js";',
       );

@@ -123,7 +123,8 @@ async function writeBoot(
         const dir = File.expandPath(raw, engineRoot);
         if (!(await File.isDirectoryAsync(dir))) continue;
         for (const file of (await Dir.globAsync(glob, 0, { base: dir })).sort()) {
-          files.add(File.join(dir, file));
+          if (!File.basename(file, File.extname(file)).includes("."))
+            files.add(File.join(dir, file));
         }
       }
     }
