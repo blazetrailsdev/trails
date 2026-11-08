@@ -1,9 +1,8 @@
 import { Deprecation, camelize } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
 import { HTML } from "./html4.js";
 import { Trails } from "./namespaces.js";
 
-constSet(Trails, "Html", HTML);
+Trails.Html = HTML;
 
 export const ActionView = {
   Helpers: {

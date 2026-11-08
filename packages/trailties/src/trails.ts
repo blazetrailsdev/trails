@@ -194,9 +194,10 @@ extend(Trails, Autoload);
 const reopened = TopLevel.Trails;
 constSet(TopLevel, "Trails", Trails);
 if (reopened !== undefined) {
-  for (const [id, value] of Object.entries(reopened)) {
-    if (!(id in Trails)) constSet(Trails, id, value);
-  }
+  Object.assign(
+    Trails,
+    Object.fromEntries(Object.entries(reopened).filter(([id]) => !(id in Trails))),
+  );
 }
 
 Trails.HealthController = HealthController;

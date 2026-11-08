@@ -1,4 +1,4 @@
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat";
 import type { FullSanitizer } from "./full-sanitizer.js";
 import type { LinkSanitizer } from "./link-sanitizer.js";
 import type { SafeListSanitizer } from "./safe-list-sanitizer.js";
@@ -35,8 +35,13 @@ export const HTML5 = {} as {
 
 export const Trails = (TopLevel.Trails ??= { name: "Trails" } as NonNullable<
   typeof TopLevel.Trails
->);
+>) as NonNullable<typeof TopLevel.Trails> & {
+  HTML: typeof HTML;
+  HTML4: typeof HTML4;
+  HTML5: typeof HTML5;
+  Html: typeof HTML;
+};
 
-constSet(Trails, "HTML", HTML);
-constSet(Trails, "HTML4", HTML4);
-constSet(Trails, "HTML5", HTML5);
+Trails.HTML = HTML;
+Trails.HTML4 = HTML4;
+Trails.HTML5 = HTML5;
