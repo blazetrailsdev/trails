@@ -2,6 +2,7 @@ import { STDIN } from "./io.js";
 import { format } from "./kernel-format.js";
 import { TopLevel } from "./object.js";
 import { env, exit } from "./process-adapter.js";
+import { extend } from "./include.js";
 import { StandardError } from "./standard-error.js";
 import { LoadError } from "./load-error.js";
 
@@ -89,8 +90,26 @@ export const HelperMethod = {
   /** @noRailsEquivalent PERMANENT */
   register(name: string, helperClass: HelperClass): void {
     HelperMethod.helperMethods[name] = helperClass;
+
+    HelpersContainer.installHelperMethods();
   },
 };
+
+/**
+ * `IRB::HelpersContainer` (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:178-188`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const HelpersContainer: Record<string, unknown> & { installHelperMethods(): void } =
+  Object.defineProperty({} as Record<string, unknown>, "installHelperMethods", {
+    value(): void {
+      for (const [name, helperMethodClass] of Object.entries(HelperMethod.helperMethods)) {
+        if (Object.hasOwn(HelpersContainer, name)) continue;
+        HelpersContainer[name] = (...args: unknown[]) =>
+          helperMethodClass.instance().execute(...args);
+      }
+    },
+  }) as Record<string, unknown> & { installHelperMethods(): void };
 
 /**
  * `IRB::Irb` (`vendor/ruby/v3.3.11/lib/irb.rb:920`), over the REPL adapter.
@@ -151,30 +170,18 @@ export class Irb {
   }
 
   /**
-   * `IRB::WorkSpace#load_helper_methods_to_main` and `HelpersContainer`
-   * (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:113-117`, `:178-188`), with
-   * the main binding's constant lookup through `TopLevel`.
+   * `IRB::WorkSpace#load_helper_methods_to_main`
+   * (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:113-117`). Main is the REPL
+   * context. Its singleton class's prototype is followed by `TopLevel`, so a
+   * name main and `HelpersContainer` lack resolves as a constant of `Object`
+   * does at `TOPLEVEL_BINDING`.
    *
    * @noRailsEquivalent PERMANENT
    */
   loadHelperMethodsToMain(server: ReplServerLike): void {
     const main = server.context;
-    const top = TopLevel as Record<string, unknown>;
-    Object.setPrototypeOf(
-      main,
-      new Proxy(Object.getPrototypeOf(main) as object, {
-        get: (target, key, receiver) =>
-          typeof key === "string" && Object.hasOwn(top, key)
-            ? top[key]
-            : Reflect.get(target, key, receiver),
-        has: (target, key) =>
-          (typeof key === "string" && Object.hasOwn(top, key)) || Reflect.has(target, key),
-      }),
-    );
-    for (const [name, helperMethodClass] of Object.entries(HelperMethod.helperMethods)) {
-      if (Object.hasOwn(main, name)) continue;
-      main[name] = (...args: unknown[]) => helperMethodClass.instance().execute(...args);
-    }
+    extend(main, HelpersContainer);
+    Object.setPrototypeOf(Object.getPrototypeOf(main), TopLevel);
   }
 
   /**
@@ -213,6 +220,7 @@ export class Irb {
  */
 export const IRB = {
   conf: {} as Record<string, unknown>,
+  INITIALIZED: false,
   Irb,
   HelperMethod,
   UndefinedPromptMode,
@@ -231,17 +239,46 @@ export const IRB = {
     if (conf.PROMPT[conf.PROMPT_MODE] == null) {
       throw new UndefinedPromptMode(conf.PROMPT_MODE);
     }
+    IRB.INITIALIZED = true;
   },
 
   /**
    * `IRB.init_config` (`vendor/ruby/v3.3.11/lib/irb/init.rb:64-189`).
+   * `VERSION`, `AP_NAME`, `IRB_LIB_PATH`, `MEASURE_PROC`, `LC_MESSAGES` and
+   * `COMMAND_ALIASES` name irb's own files and commands, which the REPL
+   * adapter has none of.
    *
    * @noRailsEquivalent PERMANENT
    */
   initConfig(_apPath: string | null): void {
     const conf = IRB.conf;
     conf.IRB_NAME = "irb";
-    conf.USE_AUTOCOMPLETE = (env.IRB_USE_AUTOCOMPLETE ?? "true") !== "false";
+
+    conf.RC = true;
+    conf.LOAD_MODULES = [];
+    conf.IRB_RC = null;
+
+    const nc = env.NO_COLOR;
+    conf.USE_COLORIZE = nc == null || nc === "";
+    conf.USE_AUTOCOMPLETE =
+      (Object.hasOwn(env, "IRB_USE_AUTOCOMPLETE") ? env.IRB_USE_AUTOCOMPLETE : "true") !== "false";
+    conf.COMPLETOR = Object.hasOwn(env, "IRB_COMPLETOR") ? env.IRB_COMPLETOR : "regexp";
+    conf.INSPECT_MODE = true;
+    conf.USE_TRACER = false;
+    conf.USE_LOADER = false;
+    conf.IGNORE_SIGINT = true;
+    conf.IGNORE_EOF = false;
+    conf.USE_PAGER = true;
+    conf.EXTRA_DOC_DIRS = [];
+    conf.ECHO = null;
+    conf.ECHO_ON_ASSIGNMENT = null;
+    conf.VERBOSE = null;
+
+    conf.EVAL_HISTORY = null;
+    conf.SAVE_HISTORY = 1000;
+
+    conf.BACK_TRACE_LIMIT = 16;
+
     conf.PROMPT = {
       NULL: { PROMPT_I: null, PROMPT_S: null, PROMPT_C: null, RETURN: "%s\n" },
       DEFAULT: {
@@ -267,6 +304,14 @@ export const IRB = {
       XMP: { PROMPT_I: null, PROMPT_S: null, PROMPT_C: null, RETURN: "    ==>%s\n" },
     };
     conf.PROMPT_MODE = STDIN.isTty() ? "DEFAULT" : "NULL";
+    conf.AUTO_INDENT = true;
+
+    conf.CONTEXT_MODE = 4;
+    conf.SINGLE_IRB = false;
+
+    conf.MEASURE = false;
+    conf.MEASURE_CALLBACKS = [];
+
     conf.AT_EXIT = [];
   },
 };
