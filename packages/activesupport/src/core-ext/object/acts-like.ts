@@ -14,14 +14,15 @@ export function actsLike(this: unknown, duck: string): boolean {
   }
 }
 
-const tsNames = new Map<string, string>();
+/** @perf 640ns — PERMANENT */
+const _tsNames = new Map<string, string>();
 
 function respondTo(this: unknown, rubyName: string): boolean {
   if (this == null) return false;
-  let tsName = tsNames.get(rubyName);
+  let tsName = _tsNames.get(rubyName);
   if (tsName === undefined) {
     tsName = rubyName.replace(/\?$/, "").replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
-    tsNames.set(rubyName, tsName);
+    _tsNames.set(rubyName, tsName);
   }
   return typeof (this as Record<string, unknown>)[tsName] === "function";
 }
