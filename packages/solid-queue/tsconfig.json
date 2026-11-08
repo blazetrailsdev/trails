@@ -3,9 +3,9 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../activejob" },
     { "path": "../activemodel" },
@@ -19,5 +19,5 @@
     { "path": "../thor" },
     { "path": "../trailties" }
   ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  "exclude": ["lib/**/*.test.ts", "lib/test-helpers"]
 }

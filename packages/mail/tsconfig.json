@@ -3,9 +3,9 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../activesupport" },
     { "path": "../date" },
@@ -14,5 +14,5 @@
     { "path": "../ruby-compat" },
     { "path": "../vitest-matchers" }
   ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/fixtures"]
+  "exclude": ["lib/**/*.test.ts", "lib/test-helpers", "lib/fixtures"]
 }
