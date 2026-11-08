@@ -51,7 +51,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
         if (!("Foo" in TopLevel)) throw new Error("Expected Foo to be defined");
 `);
 
-    await import(`${await t.appPath()}/config/environment.ts`);
+    await expect(import(`${await t.appPath()}/config/environment.ts`)).resolves.toBeDefined();
 
     expect(LOAD_PATH).toContain(`${await t.appPath()}/lib`);
   });
@@ -79,7 +79,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
       `
         import { include } from "@blazetrails/ruby-compat";
         export class Zoo {
-          static { include(this, (Zoo as any).ReptileHouse); }
+          static { include(this, (Zoo as unknown as { ReptileHouse: object }).ReptileHouse); }
         }
 `,
     );
