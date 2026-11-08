@@ -51,7 +51,7 @@ const kebab = (rubyPath) => rubyPath.replaceAll("_", "-");
 
 /**
  * Whether `filename` is the file that mirrors the cited `.rb`:
- * `activemodel/lib/active_model/api.rb` is `packages/activemodel/src/api.ts`,
+ * `activemodel/lib/active_model/api.rb` is `packages/activemodel/lib/api.ts`,
  * the gem's own namespace directory dropped, and
  * `actionpack/lib/action_controller/metal.rb` keeps a directory that is not
  * the gem's name as `packages/actionpack/lib/action-controller/metal.ts`.

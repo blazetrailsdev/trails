@@ -3395,7 +3395,7 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * The members of the class a mixin factory returns —
  * `export function Fallbacks(Superclass) { abstract class Fallbacks extends
  * Superclass { ... } return Fallbacks; }`
- * (packages/i18n/src/backend/fallbacks.ts, the port of Ruby's
+ * (packages/i18n/lib/backend/fallbacks.ts, the port of Ruby's
  * `include I18n::Backend::Fallbacks`).
  *
  * The class is a local declaration inside the function body, so the top-level

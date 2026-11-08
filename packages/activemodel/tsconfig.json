@@ -3,13 +3,18 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
-    { "path": "../activesupport" },
-    { "path": "../bcrypt" },
-    { "path": "../ruby-compat" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/**/*.bench.ts", "src/test-helpers"]
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../bcrypt"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }

@@ -14,7 +14,7 @@
     "packages/activesupport/lib/xml-mini.ts -> packages/activesupport/lib/xml-mini/rexml.ts [XmlMini_REXML]",
     "packages/et-orbi/lib/et-orbi.ts -> packages/et-orbi/lib/info.ts [_makeInfo, platformInfo, renderNozoneTime]",
     "packages/et-orbi/lib/et-orbi.ts -> packages/et-orbi/lib/make.ts [isChronicEnabled, make, makeTime, now, parse, setChronicEnabled]",
-    "packages/i18n/src/backend/simple.ts -> packages/i18n/src/backend/base.ts [Base]",
+    "packages/i18n/lib/backend/simple.ts -> packages/i18n/lib/backend/base.ts [Base]",
     "packages/nokogiri/lib/html5/document.ts -> packages/nokogiri/lib/xml/searchable.ts [Searchable]",
     "packages/nokogiri/lib/html5/node.ts -> packages/nokogiri/lib/xml/searchable.ts [Searchable]",
     "packages/nokogiri/lib/xml/node-set.ts -> packages/nokogiri/lib/xml/searchable.ts [Searchable]",

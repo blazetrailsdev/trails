@@ -33,7 +33,7 @@ const PACKAGE_DIRS: Record<string, string> = {
   date: "packages/date/test",
   "did-you-mean": "packages/did-you-mean/test",
   globalid: "packages/globalid/test",
-  i18n: "packages/i18n/src",
+  i18n: "packages/i18n/test",
 };
 
 const IN = path.join(ROOT, "scripts/test-compare/output/rails-tests.json");

@@ -1,0 +1,110 @@
+import * as TestCase from "./support/test-case.js";
+import { Thread } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
+import { MissingTranslationData } from "../lib/exceptions.js";
+import {
+  config,
+  locale,
+  newDoubleNestedCache,
+  normalizeKeys,
+  translateBang,
+  withLocale,
+} from "../lib/i18n.js";
+import { Simple } from "../lib/backend/simple.js";
+
+describe("I18n.translateBang", () => {
+  beforeEach(async () => {
+    config().backend = new Simple();
+    config().enforceAvailableLocales = false;
+  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
+
+  it("raises MissingTranslationData for a bogus key", () => {
+    expect(() => translateBang("bogus")).toThrow(MissingTranslationData);
+  });
+});
+
+describe("I18n.withLocale", () => {
+  beforeEach(async () => {
+    config().enforceAvailableLocales = false;
+  });
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
+
+  it("gives each Thread its own locale while concurrent blocks await", async () => {
+    const read = (tmpLocale: string) =>
+      new Thread(() =>
+        withLocale(tmpLocale, async () => {
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          return locale();
+        }),
+      );
+    const de = read("de");
+    const fr = read("fr");
+    expect([await de.value(), await fr.value()]).toEqual(["de", "fr"]);
+    expect(locale()).toBe("en");
+  });
+
+  it("keeps the locale set across an await and restores it when the block settles", async () => {
+    const promise = withLocale("de", async () => {
+      await Promise.resolve();
+      return locale();
+    });
+    expect(locale()).toBe("de");
+    expect(await promise).toBe("de");
+    expect(locale()).toBe("en");
+  });
+
+  it("restores the locale when an async block rejects", async () => {
+    const promise = withLocale("de", async () => {
+      await Promise.resolve();
+      throw new Error("boom");
+    });
+    await expect(promise).rejects.toThrow("boom");
+    expect(locale()).toBe("en");
+  });
+});
+
+describe("I18n.newDoubleNestedCache", () => {
+  it("returns an empty map whose values are maps", () => {
+    const cache = newDoubleNestedCache();
+    expect(cache.size).toBe(0);
+    cache.set(".", new Map([["foo", ["foo"]]]));
+    expect(cache.get(".")?.get("foo")).toEqual(["foo"]);
+  });
+});
+
+describe("I18n.normalizeKeys memoization", () => {
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
+
+  it("does not let a caller mutating its result corrupt the cached segments", () => {
+    normalizeKeys(null, "foo.bar", null).push("baz");
+    expect(normalizeKeys(null, "foo.bar", null)).toEqual(["foo", "bar"]);
+  });
+
+  it("keys the cache by separator", () => {
+    expect(normalizeKeys(null, "foo.bar", null, ".")).toEqual(["foo", "bar"]);
+    expect(normalizeKeys(null, "foo.bar", null, "|")).toEqual(["foo.bar"]);
+  });
+
+  it("falls back to the default separator when passed false", () => {
+    expect(normalizeKeys(null, "foo.bar", null, false)).toEqual(["foo", "bar"]);
+  });
+});
+
+describe("I18n.normalizeKeys on a Symbol key", () => {
+  beforeEach(TestCase.setup);
+  afterEach(TestCase.teardown);
+
+  it("drops the leading colon of a Symbol key, scope and locale", () => {
+    expect(normalizeKeys(null, ":errors.format", null)).toEqual(["errors", "format"]);
+    expect(normalizeKeys(null, "format", ":errors")).toEqual(["errors", "format"]);
+    expect(normalizeKeys(":en" as never, "format", null)).toEqual(["en", "format"]);
+  });
+
+  it("drops the leading colon of each Symbol in an Array key", () => {
+    expect(normalizeKeys(null, [":errors", "format"], null)).toEqual(["errors", "format"]);
+  });
+});

@@ -1,0 +1,81 @@
+import { describe, it, expect } from "vitest";
+import * as Types from "../../lib/index.js";
+import { BinaryData } from "../../lib/index.js";
+import { rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+
+describe("BinaryTypeTrails", () => {
+  it("serialize returns null for nil rather than wrapping it", () => {
+    const type = new Types.BinaryType();
+    expect(type.serialize(null)).toBe(null);
+    expect(type.serialize(undefined)).toBe(null);
+  });
+
+  it("serialize wraps bytes without copying or decoding them", () => {
+    const type = new Types.BinaryType();
+    const bytes = new Uint8Array([0x80, 0xde, 0xad]);
+    const result = type.serialize(bytes);
+    expect(result).toBeInstanceOf(BinaryData);
+    expect(result!.toString()).toEqual(bytes);
+  });
+
+  it("Data#initialize takes another Data's bytes without decoding them", () => {
+    const bytes = new Uint8Array([0x80, 0x81]);
+    expect(new BinaryData(new BinaryData(bytes)).toString()).toBe(bytes);
+    expect(new BinaryData("ƒée").toString()).toEqual(new TextEncoder().encode("ƒée"));
+    expect(new BinaryData(1).toString()).toEqual(new Uint8Array([0x31]));
+  });
+
+  it("Data answers to_str, so a String compares with it and inspect does not coerce it", () => {
+    const data = new BinaryData("hello");
+    expect(data.toStr()).toBe(data.toString());
+    expect(rbEqual("hello", data)).toBe(true);
+    expect(rbEqual("hellO", data)).toBe(false);
+    expect(rbInspect(new BinaryData(new Uint8Array([0x80])))).toMatch(/^#<.*@value=/);
+  });
+
+  it("Data#equals compares a non-ASCII String as Ruby does a UTF-8 one with a binary one", () => {
+    expect(new BinaryData("ƒée").equals("ƒée")).toBe(false);
+  });
+
+  it("Data#equals compares bytes, not the decoded string", () => {
+    const a = new BinaryData(new Uint8Array([0x80, 0x81]));
+    const b = new BinaryData(new Uint8Array([0x82, 0x83]));
+    expect(a.equals(b)).toBe(false);
+    expect(a.equals(new BinaryData(new Uint8Array([0x80, 0x81])))).toBe(true);
+  });
+
+  it("Data#equals accepts the byte sources that stand in for a Ruby String", () => {
+    const data = new BinaryData("hello");
+    expect(data.equals("hello")).toBe(true);
+    expect(data.equals(new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]))).toBe(true);
+    expect(data.equals("hell")).toBe(false);
+    expect(data.equals("hellO")).toBe(false);
+  });
+
+  it("Data#equals is false for values Ruby would fall through to identity on", () => {
+    const data = new BinaryData("1");
+    expect(data.equals(1)).toBe(false);
+    expect(data.equals(null)).toBe(false);
+    expect(data.equals(undefined)).toBe(false);
+    expect(data.equals(data)).toBe(true);
+  });
+});
+
+describe("BinaryType dirty tracking against Ruby value equality", () => {
+  it("reports a byte-equal reassignment as unchanged", () => {
+    const type = new Types.BinaryType();
+    expect(type.isChanged(new Uint8Array([0x80, 0xde]), new Uint8Array([0x80, 0xde]), null)).toBe(
+      false,
+    );
+    expect(type.isChanged(new Uint8Array([0x80, 0xde]), new Uint8Array([0x80, 0x01]), null)).toBe(
+      true,
+    );
+  });
+
+  it("isChangedInPlace deserializes the raw value and compares it by value", () => {
+    const type = new Types.BinaryType();
+    const raw = new Uint8Array([0x80, 0xde]);
+    expect(type.isChangedInPlace(raw, new Uint8Array([0x80, 0xde]))).toBe(false);
+    expect(type.isChangedInPlace(raw, new Uint8Array([0x80, 0xde, 0x7a]))).toBe(true);
+  });
+});

@@ -25,7 +25,7 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 const PKG_DIRS: Record<string, string> = {
   arel: "packages/arel/src/",
-  activemodel: "packages/activemodel/src/",
+  activemodel: "packages/activemodel/test/",
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/src/",

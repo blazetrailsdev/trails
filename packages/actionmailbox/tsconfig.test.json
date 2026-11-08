@@ -2,9 +2,22 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "declarationDir": "dist-test/types"
+    "declarationDir": "dist-test/types",
+    "paths": {
+      "@blazetrails/activestorage/test-helpers/*": ["../activestorage/test/support/*.ts"]
+    }
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts"],
-  "references": [{ "path": "./tsconfig.json" }, { "path": "../activerecord/tsconfig.test.json" }]
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../activerecord/tsconfig.test.json"
+    },
+    {
+      "path": "../activestorage/tsconfig.test.json"
+    }
+  ]
 }

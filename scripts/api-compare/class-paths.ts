@@ -518,11 +518,24 @@ export const CORE_CLASSES: readonly [string, string | null, string, string][] = 
   ["ZeroDivisionError", "rational.ts", "ZeroDivisionError", "numeric.c:6154"],
 ];
 
-/** Reds a `CORE_CLASSES` row whose MRI site does not name its class. */
+/**
+ * MRI core classes another package ports, credited as `CORE_CLASSES` credits
+ * ruby-compat's: each row is `[package dir, key, MRI site]`, the key the
+ * walk's `file::tsName`.
+ */
+export const PACKAGE_CORE_CLASSES: readonly [string, string, string][] = [
+  ["date", "time.ts::Time", "time.c:5832"],
+];
+
+/** Reds a `CORE_CLASSES` or `PACKAGE_CORE_CLASSES` row whose MRI site does not name its class. */
 async function checkCoreSites(): Promise<string[]> {
   const ruby = path.join(ROOT_DIR, "vendor/ruby/v3.3.11");
   const bad: string[] = [];
-  for (const [fqn, , , site] of CORE_CLASSES) {
+  const rows = [
+    ...CORE_CLASSES.map(([fqn, , , site]) => [fqn, site]),
+    ...PACKAGE_CORE_CLASSES.map(([, key, site]) => [key.split("::").at(-1)!, site]),
+  ];
+  for (const [fqn, site] of rows) {
     const [file, line] = site.split(":");
     const source = await fs.readFile(path.join(ruby, file), "utf8").catch(() => null);
     if (source === null) {
@@ -703,6 +716,7 @@ export async function unreceiptedExclusions(
     if (before.has(key)) continue;
     const [file, tsName] = splitKey(key);
     if (topLevel.has(key)) continue;
+    if (PACKAGE_CORE_CLASSES.some(([d, k]) => d === dir && k === key)) continue;
     if (ambiguousUnseated.has(`${dir}/${key}`)) {
       console.warn(`${dir}: ${key} pairs with several Ruby classes and none is seated`);
       continue;

@@ -22,7 +22,7 @@ const FIXTURE = {
     // `attribute` folds out of the file-wide union: private on the instance
     // half (activemodel/lib/active_model/attributes.rb:161), public on
     // `Attributes::ClassMethods` (attributes.rb:59).
-    "packages/activemodel/src/attributes.ts": [],
+    "packages/activemodel/lib/attributes.ts": [],
     // `loadRecords` folds out of both file-wide unions: private on the nested
     // `LoaderRecords` (activerecord/lib/active_record/associations/preloader/
     // association.rb:91), public on `Association` (:197).
@@ -37,10 +37,10 @@ const FIXTURE = {
       "LoaderRecords",
       "Preloader",
     ],
-    "packages/activemodel/src/attributes.ts": ["ActiveModel", "Attributes", "ClassMethods"],
+    "packages/activemodel/lib/attributes.ts": ["ActiveModel", "Attributes", "ClassMethods"],
   },
   instanceFiles: {
-    "packages/activemodel/src/attributes.ts": ["attribute"],
+    "packages/activemodel/lib/attributes.ts": ["attribute"],
     "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   entityInstanceFiles: {
@@ -53,7 +53,7 @@ setManifestForTests(FIXTURE);
 const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const lockFile = path.join(REPO_ROOT, "packages/rack/src/lock.ts");
-const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
+const attributesFile = path.join(REPO_ROOT, "packages/activemodel/lib/attributes.ts");
 const preloaderAssociationFile = path.join(
   REPO_ROOT,
   "packages/activerecord/src/associations/preloader/association.ts",

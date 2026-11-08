@@ -503,7 +503,6 @@ export function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   return abbr == null ? "" : String(abbr);
 }
 
-/** @noRailsEquivalent CONVERGEABLE class-paths-credits-core-time-in-date */
 export class Time extends rbCTime {
   #vtmMemo: Vtm | null;
   /** @internal */

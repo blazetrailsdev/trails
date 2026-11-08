@@ -6,10 +6,10 @@
     "paths": {
       "@blazetrails/activerecord/fixtures.js": ["../../activerecord/src/fixtures.ts"],
       "@blazetrails/activerecord": ["../../activerecord/src/index.ts"],
-      "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
+      "@blazetrails/activemodel": ["../../activemodel/lib/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/lib/index.ts"],
-      "@blazetrails/i18n": ["../../i18n/src/index.ts"],
+      "@blazetrails/i18n": ["../../i18n/lib/index.ts"],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/lib/include.ts"],
       "@blazetrails/ruby-compat/method-missing-proxy": [
         "../../ruby-compat/lib/method-missing-proxy.ts"
