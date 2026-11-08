@@ -18,7 +18,8 @@ import {
   Worker,
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
-import { ExpectedTestError, RaisingJob } from "./test-helpers/raising-job.js";
+import { RaisingJob } from "./test-helpers/raising-job.js";
+import { ExpectedTestError } from "./test-helpers/expected-test-error.js";
 import { ErrorBuffer } from "./test-helpers/error-buffer.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";

@@ -17,8 +17,10 @@ import {
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
-import { ExpectedTestError, RaisingJob } from "./test-helpers/raising-job.js";
+import { RaisingJob } from "./test-helpers/raising-job.js";
+import { ExpectedTestError } from "./test-helpers/expected-test-error.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
+import { silentOnThreadErrorFor } from "./test-helpers/jobs-test-helper.js";
 
 class InfiniteRecursionJob extends ApplicationJob {
   static {
@@ -42,15 +44,6 @@ class InfiniteRecursionJob extends ApplicationJob {
   }
 }
 constSet(TopLevel, "InfiniteRecursionJob", InfiniteRecursionJob);
-
-function silentOnThreadErrorFor(
-  exceptions: (abstract new (...args: never[]) => Error)[],
-  onThreadError: typeof SolidQueue.onThreadError,
-): typeof SolidQueue.onThreadError {
-  return (exception) => {
-    if (!exceptions.some((klass) => exception instanceof klass)) onThreadError?.(exception);
-  };
-}
 
 describe("SolidQueue::FailedExecutionTest", () => {
   let worker: Worker;
