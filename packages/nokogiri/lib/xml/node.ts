@@ -116,12 +116,16 @@ export class XmlNode {
     }));
   }
 
+  fragment(tags: string): XmlNode {
+    return new XML.DocumentFragment(this.document as never, tags, this);
+  }
+
   /** @internal */
   protected coerce(data: unknown): XmlNode | NodeSet {
     if (data instanceof NodeSet) {
       return data;
     } else if (typeof data === "string") {
-      return XML.Document.parse(`<root>${data}</root>`).xpath("/root/node()");
+      return new NodeSet(this.document, this.fragment(data).children as unknown as Node[]);
     } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
       return data;
     }
@@ -132,13 +136,13 @@ export class XmlNode {
   }
 
   /** @internal */
-  private addChildNode(node: XmlNode): void {
+  protected addChildNode(node: XmlNode): void {
     xmlUnlinkNode(node.pointerId);
     xmlAddChild(this.pointerId, node.pointerId);
   }
 
   /** @internal */
-  private addChildNodeAndReparentAttrs(node: XmlNode): void {
+  protected addChildNodeAndReparentAttrs(node: XmlNode): void {
     this.addChildNode(node);
     if (!(node._node instanceof LibXmlElement)) return;
     for (const attrNode of node._node.attrs.filter((a) => a.name.includes(":"))) {
