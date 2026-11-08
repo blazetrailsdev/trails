@@ -1,3 +1,4 @@
+import "../../../constants.test-unit-model-model-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { Base } from "../../test-unit.js";

@@ -1,3 +1,4 @@
+import "../../../../../constants.trails-db-system-change-change-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`change_generator.rb:12`); the class/interface merge is how the mixin surfaces on the type side. */
 import { any } from "@blazetrails/activesupport";
 import {

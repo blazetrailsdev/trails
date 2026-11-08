@@ -1,3 +1,4 @@
+import "../../constants.testing-behavior.generated.js";
 import {
   Dir,
   File,

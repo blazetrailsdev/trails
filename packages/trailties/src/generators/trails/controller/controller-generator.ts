@@ -1,3 +1,4 @@
+import "../../../constants.trails-controller-controller-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";

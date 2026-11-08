@@ -91,7 +91,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   actionmailer: ["test-case.ts", "test-helper.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
-  trailties: ["commands/", "command.ts"],
+  trailties: ["commands/", "command.ts", "generators/"],
 };
 
 /**
@@ -152,12 +152,14 @@ async function tsconfigExcludes(dir: string): Promise<string[]> {
 /**
  * trails spells a renamed token its own way in a constant too: `Handlers::ERB`
  * is `Handlers::TSE`, and a `TS_CLASS_RENAMES` segment is renamed as
- * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`.
+ * `parity:api` matches it, so `Rails::Railtie` is `Rails::Trailtie`. The
+ * `Erb` namespace is the TSE brand, so `Erb::Generators` is `TSE::Generators`.
  */
 function renameTokens(fqn: string): string {
   let out = fqn
     .split("::")
     .map((seg) => (BRAND_RENAMES.includes(seg) ? TS_CLASS_RENAMES[seg] : seg))
+    .map((seg) => (seg === "Erb" ? TOKEN_RENAMES.ERB : seg))
     .join("::");
   for (const [tok, to] of Object.entries(TOKEN_RENAMES)) {
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);

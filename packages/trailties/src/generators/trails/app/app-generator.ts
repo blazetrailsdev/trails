@@ -1,3 +1,4 @@
+import "../../../constants.trails-app-app-generator.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
 import {
   File,

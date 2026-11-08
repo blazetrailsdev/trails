@@ -1,3 +1,4 @@
+import "../../../constants.trails-application-record-application-record-generator.generated.js";
 import { Base } from "../../base.js";
 
 type DescHost = { desc(description?: string | null): Promise<string | null> };

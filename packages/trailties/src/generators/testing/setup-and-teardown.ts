@@ -1,3 +1,4 @@
+import "../../constants.testing-setup-and-teardown.generated.js";
 import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { ensureCurrentPath, isDestinationRootIsSet } from "./behavior.js";
 

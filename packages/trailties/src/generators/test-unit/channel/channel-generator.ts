@@ -1,3 +1,4 @@
+import "../../../constants.test-unit-channel-channel-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";
@@ -11,7 +12,6 @@ export class ChannelGenerator extends Base {
     this.methodAdded("createTestFiles");
   }
 
-  /** @missingRailsArgs template — PERMANENT */
   async createTestFiles(): Promise<void> {
     await this.template(
       "channel_test.ts",

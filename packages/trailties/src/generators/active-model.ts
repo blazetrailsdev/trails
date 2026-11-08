@@ -1,3 +1,4 @@
+import "../constants.active-model.generated.js";
 export class ActiveModel {
   readonly name: string;
   constructor(name: string) {

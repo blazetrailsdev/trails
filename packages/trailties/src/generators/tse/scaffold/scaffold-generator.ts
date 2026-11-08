@@ -1,3 +1,4 @@
+import "../../../constants.tse-scaffold-scaffold-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`erb/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
 import {
   dasherize,

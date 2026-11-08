@@ -1,3 +1,4 @@
+import "../constants.database.generated.js";
 export const DATABASES = ["mysql", "postgresql", "sqlite3", "mariadb-mysql"] as const;
 export type DatabaseName = (typeof DATABASES)[number];
 

@@ -1,3 +1,4 @@
+import "../../../constants.trails-generator-generator-generator.generated.js";
 import type { GeneratorOptions } from "../../base.js";
 import { File } from "@blazetrails/ruby-compat";
 import { NamedBase } from "../../named-base.js";
