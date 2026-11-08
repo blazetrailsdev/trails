@@ -73,6 +73,11 @@ export interface PackageEntry {
    * flips it on alongside its api-compare wiring.
    */
   compareTests?: boolean;
+  /**
+   * Why `compareTests` is false, naming the story that enrolls it. Required
+   * whenever it is, the way `apiExcludedReason` is for `compareApi`.
+   */
+  testsExcludedReason?: string;
 }
 
 export interface UpstreamSource {
@@ -492,6 +497,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libEntryFile: "lib/image_processing.rb",
         testPath: "test",
         compareTests: false,
+        testsExcludedReason: "enrolled by image-processing-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -617,6 +623,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         apiExcludedReason:
           "no packages/minitest exists; the port is a slice of activesupport's testing/assertions.ts.",
         compareTests: false,
+        testsExcludedReason:
+          "no packages/minitest exists; mapping it is map-vendored-minitest-and-drop-norailsequivalent.",
       },
     ],
   },
@@ -634,6 +642,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/rails/dom/testing",
         libEntryFile: "lib/rails/dom/testing.rb",
         compareTests: false,
+        testsExcludedReason: "enrolled by rails-dom-testing-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -651,6 +660,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "nokogiri",
         libPath: "lib/nokogiri",
         compareTests: false,
+        testsExcludedReason: "enrolled by nokogiri-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -669,6 +679,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "racc",
         libPath: "lib/racc",
         compareTests: false,
+        testsExcludedReason: "enrolled by racc-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -685,6 +696,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/rails/html",
         portedBy: "html-sanitizer",
         compareTests: false,
+        testsExcludedReason: "enrolled by html-sanitizer-gems-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -700,6 +712,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "loofah",
         libPath: "lib/loofah",
         compareTests: false,
+        testsExcludedReason: "enrolled by html-sanitizer-gems-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -715,6 +728,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "crass",
         libPath: "lib/crass",
         compareTests: false,
+        testsExcludedReason: "enrolled by html-sanitizer-gems-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -836,6 +850,25 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "erubi",
+    origin: {
+      type: "git",
+      url: "https://github.com/jeremyevans/erubi.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:201; actionview's ERB handler
+      // subclasses ::Erubi::Engine (action_view/template/handlers/erb/erubi.rb).
+      ref: "1.13.1",
+    },
+    packages: [
+      {
+        name: "erubi",
+        libPath: "lib/erubi",
+        libEntryFile: "lib/erubi.rb",
+        testPath: "test",
+        portedBy: "tse-compiler",
+      },
+    ],
+  },
+  {
     name: "solid_cache",
     origin: {
       type: "git",
@@ -850,6 +883,8 @@ export const SOURCES: readonly UpstreamSource[] = [
         compareApi: false,
         apiExcludedReason: "no packages/solid-cache exists yet.",
         compareTests: false,
+        testsExcludedReason:
+          "no packages/solid-cache exists yet; enrolled by solid-cache-package-skeleton.",
       },
     ],
   },
@@ -866,6 +901,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         libPath: "lib/tzinfo",
         libEntryFile: "lib/tzinfo.rb",
         compareTests: false,
+        testsExcludedReason: "enrolled by tzinfo-tests-enroll-in-parity-test.",
       },
     ],
   },
@@ -1063,6 +1099,11 @@ export function validateSources(sources: readonly UpstreamSource[]): void {
       if (pkg.compareApi === false && !pkg.apiExcludedReason) {
         throw new Error(
           `vendor/sources.ts: package "${pkg.name}" sets compareApi: false without an apiExcludedReason`,
+        );
+      }
+      if (pkg.compareTests === false && !pkg.testsExcludedReason) {
+        throw new Error(
+          `vendor/sources.ts: package "${pkg.name}" sets compareTests: false without a testsExcludedReason`,
         );
       }
     }

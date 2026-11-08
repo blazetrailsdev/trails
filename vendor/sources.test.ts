@@ -218,6 +218,7 @@ describe("vendor/sources.ts", () => {
       "zeitwerk",
       "rails-dom-testing",
       "i18n",
+      "erubi",
       "tzinfo",
       "solid-queue",
       "solid-cable",
@@ -406,6 +407,7 @@ describe("vendor/sources.ts", () => {
         "crass",
         "date",
         "did-you-mean",
+        "erubi",
         "et-orbi",
         "fugit",
         "globalid",
@@ -476,6 +478,7 @@ describe("vendor/sources.ts", () => {
         "chronic",
         "date",
         "did-you-mean",
+        "erubi",
         "et-orbi",
         "fugit",
         "globalid",
@@ -501,6 +504,7 @@ describe("vendor/sources.ts", () => {
       ].sort(),
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
+    expect(m["erubi"].endsWith("vendor/erubi/1.13.1/test")).toBe(true);
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.2.8/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);
@@ -516,5 +520,16 @@ describe("vendor/sources.ts", () => {
       },
     ];
     expect(() => validateSources(bad)).toThrow(/missing libPath/);
+  });
+
+  it("validateSources rejects compareTests: false without a testsExcludedReason", () => {
+    const bad: UpstreamSource[] = [
+      {
+        name: "x",
+        origin: { type: "git", url: "u", ref: "r" },
+        packages: [{ name: "p", libPath: "lib", compareTests: false }],
+      },
+    ];
+    expect(() => validateSources(bad)).toThrow(/compareTests: false without a testsExcludedReason/);
   });
 });

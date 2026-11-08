@@ -2878,6 +2878,8 @@ def run
                  Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
+    # erubi keeps its whole suite in one `test/test.rb`.
+    test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
     test_files.uniq!
 
     select_package_test_files!(pkg_name, pkg_dir, test_files)

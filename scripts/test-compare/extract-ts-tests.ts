@@ -65,7 +65,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "solid-queue",
     "solid-cable",
   ];
-  const packageAliases: Record<string, string> = {};
+  const packageAliases: Record<string, string> = { erubi: "tse-compiler" };
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
@@ -95,7 +95,7 @@ function getPackageTestFiles(): Record<string, string[]> {
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
 
-  // Aliased packages (trailties → cli)
+  // Aliased packages (erubi → tse-compiler)
   for (const [alias, dir] of Object.entries(packageAliases)) {
     const files = globInTestRoots(dir, "**/*.test.ts").sort();
     result[alias] = files;

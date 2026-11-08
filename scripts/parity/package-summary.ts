@@ -345,14 +345,23 @@ export function compareKeysOf(dir: string): string[] {
   return keys.length > 0 ? keys : [dir];
 }
 
-function withExclusion(description: string | null, excluded: string | null): string | null {
+function withExclusion(
+  description: string | null,
+  excluded: string | null,
+  gate = "parity:api",
+): string | null {
   if (excluded === null) return description;
-  return `${description ?? ""}${description ? " " : ""}(Not in parity:api: ${excluded})`;
+  return `${description ?? ""}${description ? " " : ""}(Not in ${gate}: ${excluded})`;
 }
 
 /** Why api-compare skips `dir`'s own entry, if it does. */
 export function apiExcludedReasonOf(dir: string): string | null {
   return entriesOf(dir).find((e) => e.p.compareApi === false)?.p.apiExcludedReason ?? null;
+}
+
+/** Why test-compare skips `dir`'s own entry, if it does. */
+export function testsExcludedReasonOf(dir: string): string | null {
+  return entriesOf(dir).find((e) => e.p.compareTests === false)?.p.testsExcludedReason ?? null;
 }
 
 interface ApiComparison {
@@ -514,7 +523,11 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
       name,
       railsCounterpart: railsCounterpartOf(name),
       compareKeys: compareKeysOf(name),
-      description: withExclusion(pkgJson.description ?? null, apiExcludedReasonOf(name)),
+      description: withExclusion(
+        withExclusion(pkgJson.description ?? null, apiExcludedReasonOf(name)),
+        testsExcludedReasonOf(name),
+        "parity:test",
+      ),
       claudeMd,
       tags,
       marks: {

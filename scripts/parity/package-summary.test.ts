@@ -7,6 +7,7 @@ import { TS_ONLY_PACKAGES } from "../api-compare/config.js";
 import {
   ROOT_DIR,
   apiExcludedReasonOf,
+  testsExcludedReasonOf,
   compareKeysOf,
   githubAnchor,
   main,
@@ -241,7 +242,7 @@ describe("package-summary", () => {
   it("appends why parity:api skips a package to its description", async () => {
     const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
     expect(cache.railsCounterpart).toBe("solid_cache");
-    expect(cache.description).toBe(
+    expect(cache.description).toContain(
       `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")})`,
     );
     expect(apiExcludedReasonOf("solid-cache")).toContain("no packages/solid-cache");
@@ -249,17 +250,25 @@ describe("package-summary", () => {
     expect(apiExcludedReasonOf("activerecord")).toBeNull();
   });
 
+  it("appends why parity:test skips a package to its description", async () => {
+    const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
+    expect(cache.description).toBe(
+      `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")}) (Not in parity:test: ${testsExcludedReasonOf("solid-cache")})`,
+    );
+    expect(testsExcludedReasonOf("solid-cache")).toContain("solid-cache-package-skeleton");
+    expect(testsExcludedReasonOf("activerecord")).toBeNull();
+  });
+
+  it("pairs tse-compiler with erubi", () => {
+    expect(railsCounterpartOf("tse-compiler")).toBe("erubi");
+    expect(compareKeysOf("tse-compiler")).toEqual(["erubi"]);
+  });
+
   it("names a counterpart for every package but the trails-only ones", async () => {
     const dirs = (await fs.readdir(path.join(ROOT_DIR, "packages"), { withFileTypes: true }))
       .filter((d) => d.isDirectory())
       .map((d) => d.name);
-    const tooling = [
-      "activerecord-cli",
-      "trails-tsc",
-      "tse-compiler",
-      "vitest-matchers",
-      "website",
-    ];
+    const tooling = ["activerecord-cli", "trails-tsc", "vitest-matchers", "website"];
     expect(
       dirs.filter((dir) => railsCounterpartOf(dir) === null).sort(),
       "a new package that ports no gem belongs in `tooling` here; a gem port needs a vendor/sources.ts entry",

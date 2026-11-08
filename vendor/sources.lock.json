@@ -24,6 +24,10 @@
       "ref": "v1.6.3",
       "sha": "f7703add765054b6e63ef581818a0c307fdd4abf"
     },
+    "erubi": {
+      "ref": "1.13.1",
+      "sha": "f1a0fb5bfb2a2604c0cf850d3c960bfc458421b6"
+    },
     "et-orbi": {
       "ref": "v1.2.11",
       "sha": "037e2074b009186d2da43e0e948069d874abe10c"
