@@ -37,7 +37,7 @@ import { Trails } from "@blazetrails/trailties";
 // statically here keeps this rung on the direct path with 0 dynamic edges, as
 // the note above describes, instead of leaving `Handler.Node` undefined.
 import "@blazetrails/rackup/dist/handler/node.js";
-import "../../config/environment.js";
+import "../../.trails/entry.generated.js";
 
 const app = Trails.application!;
 const port = 3178;
