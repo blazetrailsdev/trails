@@ -94,8 +94,7 @@ class Timestamp extends PGSimpleDecoder {
           }
           const epochNs = BigInt(ms - gmtOffset * 1000) * 1_000_000n + nsec;
           if (m[8]) return Time.timespecNew(epochNs, gmtOffset);
-          const res = Time.timespecNew(epochNs, "utc");
-          return this.flags & TIMESTAMP_APP_LOCAL ? res.getlocal() : res;
+          return Time.timespecNew(epochNs, this.flags & TIMESTAMP_APP_LOCAL ? "local" : "utc");
         }
       }
       const secValue = nsec
