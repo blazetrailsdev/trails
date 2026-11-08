@@ -114,6 +114,7 @@ export class Irb {
 
   /**
    * `IRB::Irb#run` (`vendor/ruby/v3.3.11/lib/irb.rb:998-1035`).
+   * History and the `SIGINT` trap are the REPL adapter's own.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -218,6 +219,8 @@ export const IRB = {
 
   /**
    * `IRB.setup` (`vendor/ruby/v3.3.11/lib/irb/init.rb:50-61`).
+   * `init_error`, `parse_opts`, `run_config` and `load_modules` are not
+   * ported: the REPL adapter reads no `.irbrc`, argv or locale.
    *
    * @noRailsEquivalent PERMANENT
    */
