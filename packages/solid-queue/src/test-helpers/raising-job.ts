@@ -7,11 +7,17 @@ class DefaultError extends StandardError {}
 class DiscardableError extends StandardError {}
 
 export class RaisingJob extends ApplicationJob {
-  static DefaultError = DefaultError;
-  static DiscardableError = DiscardableError;
+  declare static DefaultError: typeof DefaultError;
+  declare static DiscardableError: typeof DiscardableError;
 
   static {
+    constSet(this, "DefaultError", DefaultError);
+    constSet(this, "DiscardableError", DiscardableError);
+
     this.queueAs("background");
+
+    this.retryOn(DefaultError, { attempts: 3, wait: seconds(0.1) });
+    this.discardOn(DiscardableError);
   }
 
   perform(raising: unknown, identifier: string, failCount = 1): void {
@@ -29,8 +35,3 @@ export class RaisingJob extends ApplicationJob {
   }
 }
 constSet(TopLevel, "RaisingJob", RaisingJob);
-constSet(RaisingJob, "DefaultError", DefaultError);
-constSet(RaisingJob, "DiscardableError", DiscardableError);
-
-RaisingJob.retryOn(DefaultError, { attempts: 3, wait: seconds(0.1) });
-RaisingJob.discardOn(DiscardableError);
