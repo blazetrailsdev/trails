@@ -168,10 +168,10 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.get("/trails/mailers");
     t.assertSelect("title", { text: "Action Mailer Previews" });
     t.assertSelect("h1", { text: "Action Mailer Previews" });
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
     );
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
     );
   });
@@ -184,7 +184,7 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
     await t.get("/trails/mailers/notifier");
 
-    expect(t.lastResponse().isOk).toBe(true);
+    expect(t.lastResponse().isOk).toBeTruthy();
     t.assertSelect("title", { text: "Action Mailer Previews for notifier" });
     t.assertSelect("h1", { text: "Action Mailer Previews for notifier" });
     t.assertSelect("p", { text: "You have not defined any actions for NotifierPreview." });
@@ -212,7 +212,7 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
     await t.get("/trails/mailers/notifier");
 
-    expect(t.lastResponse().isOk).toBe(true);
+    expect(t.lastResponse().isOk).toBeTruthy();
     t.assertSelect("title", { text: "Action Mailer Previews for notifier" });
     t.assertSelect("h1", { text: "Action Mailer Previews for notifier" });
     t.assertSelect("ul li a[href=?]", "/trails/mailers/notifier/foo");
@@ -221,10 +221,8 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
   it("mailer preview not found", async () => {
     await t.app("development");
     await t.get("/trails/mailers/notifier");
-    expect(t.lastResponse().isNotFound).toBe(true);
-    expect(String(h(t.lastResponse().body))).toContain(
-      "Mailer preview &#39;notifier&#39; not found",
-    );
+    expect(t.lastResponse().isNotFound).toBeTruthy();
+    expect(String(h(t.lastResponse().body))).toMatch("Mailer preview &#39;notifier&#39; not found");
   });
 
   it("mailer preview email not found", async () => {
@@ -240,14 +238,14 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/bar");
-    expect(t.lastResponse().isNotFound).toBe(true);
-    expect(String(h(t.lastResponse().body))).toContain(
+    expect(t.lastResponse().isNotFound).toBeTruthy();
+    expect(String(h(t.lastResponse().body))).toMatch(
       "Email &#39;bar&#39; not found in NotifierPreview",
     );
 
     await t.get("/trails/mailers/download/notifier/bar");
-    expect(t.lastResponse().isNotFound).toBe(true);
-    expect(String(h(t.lastResponse().body))).toContain(
+    expect(t.lastResponse().isNotFound).toBeTruthy();
+    expect(String(h(t.lastResponse().body))).toMatch(
       "Email &#39;bar&#39; not found in NotifierPreview",
     );
   });
@@ -263,10 +261,10 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/foo");
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       "You are trying to preview an email that does not have any content.",
     );
-    expect(t.lastResponse().body).toContain("notifier#foo");
+    expect(t.lastResponse().body).toMatch("notifier#foo");
   });
 
   it("mailer preview email part not found", async () => {
@@ -282,8 +280,8 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/foo?part=text%2Fhtml");
-    expect(t.lastResponse().isNotFound).toBe(true);
-    expect(String(h(t.lastResponse().body))).toContain(
+    expect(t.lastResponse().isNotFound).toBeTruthy();
+    expect(String(h(t.lastResponse().body))).toMatch(
       "Email part &#39;text/html&#39; not found in NotifierPreview#foo",
     );
   });
@@ -315,17 +313,17 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
 
     await t.get("/trails/mailers/notifier/foo");
     expect(t.lastResponse().status).toBe(200);
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<dd id="from">Ruby on Rails &lt;core@rubyonrails.org&gt;</dd>',
     );
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<dd id="to">Andrew White &lt;andyw@pixeltrix.co.uk&gt;</dd>',
     );
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<dd id="cc">David Heinemeier Hansson &lt;david@heinemeierhansson.com&gt;</dd>',
     );
-    expect(t.lastResponse().body).not.toContain('<dd id="smtp_from">');
-    expect(t.lastResponse().body).not.toContain('<dd id="smtp_to">');
+    expect(t.lastResponse().body).not.toMatch('<dd id="smtp_from">');
+    expect(t.lastResponse().body).not.toMatch('<dd id="smtp_to">');
 
     await t.get("/trails/mailers/download/notifier/foo");
     const email = Mail.readFromString(t.lastResponse().body);
@@ -364,12 +362,10 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
 
     await t.get("/trails/mailers/notifier/foo");
     expect(t.lastResponse().status).toBe(200);
-    expect(t.lastResponse().body).toContain('<dd id="from">from@example.com</dd>');
-    expect(t.lastResponse().body).toContain('<dd id="smtp_from">smtp-from@example.com</dd>');
-    expect(t.lastResponse().body).toContain('<dd id="to">to@example.com</dd>');
-    expect(t.lastResponse().body).toContain(
-      '<dd id="smtp_to">to@example.com, bcc@example.com</dd>',
-    );
+    expect(t.lastResponse().body).toMatch('<dd id="from">from@example.com</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="smtp_from">smtp-from@example.com</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="to">to@example.com</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="smtp_to">to@example.com, bcc@example.com</dd>');
   });
 
   it("part menu selects correct option", async () => {
@@ -388,13 +384,13 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
 
     await t.get("/trails/mailers/notifier/foo.html");
     expect(t.lastResponse().status).toBe(200);
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<option selected value="part=text%2Fhtml">View as HTML email</option>',
     );
 
     await t.get("/trails/mailers/notifier/foo.txt");
     expect(t.lastResponse().status).toBe(200);
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<option selected value="part=text%2Fplain">View as plain-text email</option>',
     );
   });
@@ -412,10 +408,10 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers", {}, { SCRIPT_NAME: "/my_app" });
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<h3><a href="/my_app/trails/mailers/notifier">Notifier</a></h3>',
     );
-    expect(t.lastResponse().body).toContain(
+    expect(t.lastResponse().body).toMatch(
       '<li><a href="/my_app/trails/mailers/notifier/foo">foo</a></li>',
     );
   });
@@ -454,7 +450,7 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/foo");
-    expect(t.lastResponse().body).toContain("<title>Mailer Preview for notifier#foo</title>");
+    expect(t.lastResponse().body).toMatch("<title>Mailer Preview for notifier#foo</title>");
   });
 
   it("mailer preview sender tags", async () => {
@@ -479,9 +475,9 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/foo");
-    expect(t.lastResponse().body).toContain('<dd id="to">to@example.org</dd>');
-    expect(t.lastResponse().body).toContain('<dd id="cc">cc@example.com</dd>');
-    expect(t.lastResponse().body).toContain('<dd id="bcc">bcc@example.com</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="to">to@example.org</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="cc">cc@example.com</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="bcc">bcc@example.com</dd>');
   });
 
   it("mailer preview date tag renders date from message header", async () => {
@@ -510,7 +506,7 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await t.app("development");
 
     await t.get("/trails/mailers/notifier/foo");
-    expect(t.lastResponse().body).toContain('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
   });
 
   it("mailer preview date tag falls back to current time when date header is not present", async () => {
@@ -528,6 +524,6 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     await travelTo(Time.utc(2023, 10, 20, 10, 20, 30), {}, async () => {
       await t.get("/trails/mailers/notifier/foo");
     });
-    expect(t.lastResponse().body).toContain('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
+    expect(t.lastResponse().body).toMatch('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
   });
 });
