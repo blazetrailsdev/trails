@@ -142,7 +142,7 @@ export class Tokenizer {
     return tokens;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE crass-tokenizer-ports-consume */
   private _convertToken(token: CSSToken, pos: number): Node {
     const [type, raw] = token;
     const data = token[4] as Record<string, Node[string]> | undefined;
@@ -192,7 +192,7 @@ export class Tokenizer {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE crass-tokenizer-ports-consume */
   private mergeTokens(first: Node, second: Node, afterName: boolean): Node | null {
     const raw = first.raw + second.raw;
     const name = second.node === "ident" || (afterName && second.node === "function");

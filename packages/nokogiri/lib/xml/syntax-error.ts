@@ -5,7 +5,7 @@ export class SyntaxError extends Error {
   readonly line?: number;
   readonly column?: number;
 
-  constructor(message: string, level: number, line?: number, column?: number) {
+  constructor(message: string, level = 0, line?: number, column?: number) {
     super(message);
     this.name = "Nokogiri::XML::SyntaxError";
     this.level = level;

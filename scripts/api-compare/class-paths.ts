@@ -313,9 +313,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const ambiguous = new Map<string, string[]>();
     for (const kind of ["classes", "modules"] as const) {
       const tsByFileName = new Map<string, ClassInfo>();
+      const tsByLowerFileName = new Map<string, ClassInfo>();
       const tsKinds = kind === "modules" ? (["modules", "classes"] as const) : ([kind] as const);
       for (const cls of tsKinds.flatMap((k) => Object.values(tsPkg[k] ?? {}))) {
         if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
+        if (cls.file) tsByLowerFileName.set(`${cls.file}::${cls.name}`.toLowerCase(), cls);
       }
       for (const [fqn, info] of Object.entries(rubyPkg[kind] ?? {})) {
         if (!info.file || isRubyOnlyClass(fqn) || isSourceUnported(info.file, pkg)) continue;
@@ -329,10 +331,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           tsByFileName,
         );
         const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
-        tsCls ??=
-          kind === "classes"
-            ? [...tsByFileName].find(([k]) => k.toLowerCase() === prefixed)?.[1]
-            : undefined;
+        tsCls ??= kind === "classes" ? tsByLowerFileName.get(prefixed) : undefined;
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;

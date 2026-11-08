@@ -49,4 +49,19 @@ describe("Crass::Tokenizer", () => {
       { node: "ident", pos: 0, raw: "\u00d7\\61*x", value: "\u00d7ax" },
     ]);
   });
+
+  it("keeps its scanner in step past a bad url and a non-ASCII ident with an escape", () => {
+    expect(Tokenizer.tokenize("url(a b\\)c) x")).toEqual([
+      { node: "bad_url", pos: 0, raw: "url(a b\\)c)", value: "ab)c" },
+      { node: "whitespace", pos: 11, raw: " " },
+      { node: "ident", pos: 12, raw: "x", value: "x" },
+    ]);
+    expect(Tokenizer.tokenize('a:url(a"b) é\\41 c')).toEqual([
+      { node: "ident", pos: 0, raw: "a", value: "a" },
+      { node: "colon", pos: 1, raw: ":" },
+      { node: "bad_url", pos: 2, raw: 'url(a"b)', error: true, value: "ab" },
+      { node: "whitespace", pos: 10, raw: " " },
+      { node: "ident", pos: 11, raw: "é\\41 c", value: "éAc" },
+    ]);
+  });
 });

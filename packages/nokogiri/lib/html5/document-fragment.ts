@@ -1,7 +1,7 @@
-import { defaultTreeAdapter, parseFragment, type DefaultTreeAdapterMap } from "parse5";
+import { defaultTreeAdapter, html, parseFragment, type DefaultTreeAdapterMap } from "parse5";
 
 import { Document } from "./document.js";
-import { childNodes, type Node } from "./node.js";
+import { childNodes, Node } from "./node.js";
 import { NodeSet } from "../xml/node-set.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
@@ -20,13 +20,15 @@ export class DocumentFragment {
     context: Node | string | null = null,
     _options: Record<string, unknown> = {},
   ) {
-    this.document = document;
     this.errors = [];
     this._node = defaultTreeAdapter.createDocumentFragment();
     if (input == null) return;
 
+    if (typeof context === "string") {
+      context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
+    }
     this._node =
-      context !== null && typeof context !== "string" && context.isElement()
+      context !== null && context.isElement()
         ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
         : parseFragment(input);
   }

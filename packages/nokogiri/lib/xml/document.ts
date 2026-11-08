@@ -33,7 +33,7 @@ export class XmlDocument {
 
     if (XmlDocument.isEmptyDoc(stringOrIo)) {
       if (options.isStrict()) {
-        throw new SyntaxError("Empty document", 3);
+        throw new SyntaxError("Empty document");
       } else {
         return new XmlDocument();
       }
@@ -51,7 +51,7 @@ export class XmlDocument {
     string: string,
     _url: string | null,
     _encoding: string | null,
-    _options: number,
+    options: number,
   ): XmlDocument {
     const document = new XmlDocument();
     try {
@@ -62,6 +62,7 @@ export class XmlDocument {
       for (const detail of e.details) {
         document.errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
       }
+      if (new ParseOptions(options).isStrict()) throw document.errors[0];
     }
     return document;
   }

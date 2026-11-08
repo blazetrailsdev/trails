@@ -10,6 +10,7 @@ import { ArgumentError, include, constSet, rbObjClassname } from "@blazetrails/r
 
 import { XML } from "../namespaces.js";
 
+import type { Node } from "../html5/node.js";
 import { NodeSet } from "./node-set.js";
 import { XmlDocument } from "./document.js";
 import * as Searchable from "./searchable.js";
@@ -91,7 +92,7 @@ export class XmlNode {
 
   set children(nodeOrTags: XmlNode | NodeSet | string) {
     const coerced = this.coerce(nodeOrTags);
-    for (const child of this.children) child.unlink();
+    new NodeSet(this.document, this.children as unknown as Node[]).unlink();
     if (coerced instanceof NodeSet) {
       coerced.each((n) => this.addChildNodeAndReparentAttrs(n as unknown as XmlNode));
     } else {
@@ -122,7 +123,7 @@ export class XmlNode {
       return data;
     } else if (typeof data === "string") {
       return XmlDocument.parse(`<root>${data}</root>`).xpath("/root/node()");
-    } else if (data instanceof XmlNode) {
+    } else if (!(data instanceof XmlDocument) && data instanceof XmlNode) {
       return data;
     }
 
