@@ -71,10 +71,6 @@ function assertEvent(
   if (!rbEqual(attributes, sliced)) expect(sliced).toEqual(attributes);
 }
 
-async function lastJobs(n: number) {
-  return (await Job.order({ id: "desc" }).limit(n).toArray()).reverse();
-}
-
 describe("InstrumentationTest", () => {
   let originalOnThreadError: typeof SolidQueue.onThreadError;
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
@@ -132,7 +128,7 @@ describe("InstrumentationTest", () => {
   it("claiming jobs emits claim events", async () => {
     for (let i = 0; i < 3; i++) await StoreResultJob.performLater(42);
     let process: Process | null = null;
-    const jobs = await lastJobs(3);
+    const jobs = await Job.last(3);
 
     const events = await subscribed("claim.solid_queue", async () => {
       const worker = new Worker();
@@ -301,7 +297,7 @@ describe("InstrumentationTest", () => {
     });
 
     for (let i = 0; i < 3; i++) await StoreResultJob.set({ queue: "new_queue" }).performLater(i);
-    const jobs = await lastJobs(3);
+    const jobs = await Job.last(3);
 
     await ReadyExecution.claim("*", 5, process.id);
 
@@ -359,7 +355,7 @@ describe("InstrumentationTest", () => {
     for (let i = 0; i < 3; i++) await RaisingJob.performLater(ExpectedTestError, "A");
     await AddToBufferJob.performLater("A");
 
-    const jobs = Job.where({ id: (await lastJobs(4)).map((job) => job.id) });
+    const jobs = Job.where({ id: (await Job.last(4)).map((job) => job.id) });
 
     const worker = new Worker();
     await worker.start();
@@ -426,9 +422,7 @@ describe("InstrumentationTest", () => {
     travelTo(days(3).fromNow() as Time);
     await Semaphore.expired().deleteAll();
 
-    const blockedExecutions = (
-      await BlockedExecution.order({ id: "desc" }).limit(2).toArray()
-    ).reverse();
+    const blockedExecutions = await BlockedExecution.last(2);
     const blockedJobs = await Promise.all(blockedExecutions.map(async (e) => await e.job));
     const concurrencyKey = blockedJobs[0].concurrency_key;
 
