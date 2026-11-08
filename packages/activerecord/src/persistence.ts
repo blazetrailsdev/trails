@@ -974,33 +974,42 @@ export function instantiateInstanceOf(
   return record.initWithAttributes(attributes, false, block);
 }
 
-/** @perf 1.8x — PERMANENT */
-const _virtualAttributePrototypeCache = new WeakMap<object, Map<string, object>>();
-/** @perf 1.8x — PERMANENT */
+/** @perf 90x — PERMANENT */
+export const _virtualAttributePrototypeCache = new WeakMap<
+  object,
+  { prototypes: Map<string, object>; methods: Map<string, PropertyDescriptorMap> }
+>();
+/** @perf 90x — PERMANENT */
 const _virtualAttributePrototypes = new WeakSet<object>();
+/** @perf 90x — PERMANENT */
+const _VIRTUAL_ATTRIBUTE_PROTOTYPE_LIMIT = 64;
 
-/** @perf 1.8x — PERMANENT */
+/** @perf 90x — PERMANENT */
 function _virtualAttributePrototype(klass: typeof Base, names: string[]): object {
-  let byKey = _virtualAttributePrototypeCache.get(klass);
-  if (!byKey) _virtualAttributePrototypeCache.set(klass, (byKey = new Map()));
+  let cache = _virtualAttributePrototypeCache.get(klass);
+  if (!cache) {
+    cache = { prototypes: new Map(), methods: new Map() };
+    _virtualAttributePrototypeCache.set(klass, cache);
+  }
   const key = names.join("\0");
-  let proto = byKey.get(key);
+  let proto = cache.prototypes.get(key);
   if (proto) return proto;
   proto = Object.create(klass.prototype) as object;
-  for (const name of names) Object.defineProperties(proto, _virtualAttributeMethods(klass, name));
-  byKey.set(key, proto);
+  for (const name of names) {
+    Object.defineProperties(proto, _virtualAttributeMethods(klass, cache.methods, name));
+  }
+  if (cache.prototypes.size < _VIRTUAL_ATTRIBUTE_PROTOTYPE_LIMIT) cache.prototypes.set(key, proto);
   _virtualAttributePrototypes.add(proto);
   return proto;
 }
 
-/** @perf 1.8x — PERMANENT */
-const _virtualAttributeMethodCache = new WeakMap<object, Map<string, PropertyDescriptorMap>>();
-
-/** @perf 1.8x — PERMANENT */
-function _virtualAttributeMethods(klass: typeof Base, name: string): PropertyDescriptorMap {
-  let byName = _virtualAttributeMethodCache.get(klass);
-  if (!byName) _virtualAttributeMethodCache.set(klass, (byName = new Map()));
-  let descriptors = byName.get(name);
+/** @perf 90x — PERMANENT */
+function _virtualAttributeMethods(
+  klass: typeof Base,
+  methods: Map<string, PropertyDescriptorMap>,
+  name: string,
+): PropertyDescriptorMap {
+  let descriptors = methods.get(name);
   if (descriptors) return descriptors;
 
   const template = klass.allocate();
@@ -1013,7 +1022,7 @@ function _virtualAttributeMethods(klass: typeof Base, name: string): PropertyDes
     }
     proto = Object.getPrototypeOf(proto);
   }
-  byName.set(name, descriptors);
+  methods.set(name, descriptors);
   return descriptors;
 }
 

@@ -58,6 +58,25 @@ describe("select alias dynamic reader (trails)", () => {
     expect(other.other_id).toEqual(other.readAttribute("other_id"));
   });
 
+  it("a clone of a record carrying the shared alias reader keeps it", async () => {
+    const [record] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    const copy = record.clone() as Comment & { bumped_id: unknown };
+    expect(copy.bumped_id).toEqual(record.bumped_id);
+    expect(copy).toBeInstanceOf(Comment);
+  });
+
+  it("rebuilds the shared alias reader after the class undefines its attribute methods", async () => {
+    const [a] = await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    Comment.undefineAttributeMethods();
+    const [b] = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order(
+      "id",
+    )) as (Comment & { bumped_id: unknown })[];
+    expect(Object.getPrototypeOf(b) === Object.getPrototypeOf(a)).toBe(false);
+    expect(b.bumped_id).toEqual(b.readAttribute("bumped_id"));
+  });
+
   it("loads a record without materializing its attribute set", async () => {
     const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
     const attributes = (record as unknown as { _attributes: { _attributes: object } })._attributes;
