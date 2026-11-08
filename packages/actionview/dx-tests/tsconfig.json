@@ -7,7 +7,7 @@
       "@blazetrails/actionview": ["../lib/index.ts"],
       "@blazetrails/rack-session": ["../../rack-session/lib/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/lib/index.ts"],
-      "@blazetrails/i18n": ["../../i18n/src/index.ts"],
+      "@blazetrails/i18n": ["../../i18n/lib/index.ts"],
       "@blazetrails/activesupport/digest": ["../../activesupport/lib/digest.ts"],
       "@blazetrails/activesupport/cache": ["../../activesupport/lib/cache.ts"],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/lib/include.ts"],

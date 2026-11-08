@@ -1,0 +1,224 @@
+import * as TestCase from "../support/test-case.js";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
+import { Chain } from "../../lib/backend/chain.js";
+import { KeyValue, type Store } from "../../lib/backend/key-value.js";
+import { Simple } from "../../lib/backend/simple.js";
+import { config, t } from "../../lib/i18n.js";
+import { deepSymbolizeKeys, type TranslationData } from "../../lib/utils.js";
+
+describe("I18nBackendChainTest", () => {
+  let first: Simple;
+  let second: Simple;
+  let chain: Chain;
+
+  function backend(translations: Record<string, unknown>): Simple {
+    const backend = new Simple();
+    for (const [locale, data] of Object.entries(translations)) {
+      backend.storeTranslations(locale, data as TranslationData);
+    }
+    return backend;
+  }
+
+  function send(
+    target: Simple | Chain,
+    name: "translations" | "initTranslations",
+  ): TranslationData {
+    return (target as unknown as Record<typeof name, () => TranslationData>)[name]();
+  }
+
+  beforeEach(async () => {
+    await TestCase.setup();
+    config().enforceAvailableLocales = false;
+    first = backend({
+      en: {
+        foo: "Foo",
+        formats: {
+          short: "short",
+          subformats: { short: "short" },
+        },
+        plural_1: { one: "%{count}" },
+        dates: { a: "A" },
+        fallback_bar: null,
+      },
+    });
+    second = backend({
+      en: {
+        bar: "Bar",
+        formats: {
+          long: "long",
+          subformats: { long: "long" },
+        },
+        plural_2: { one: "one" },
+        dates: { a: "B", b: "B" },
+        fallback_bar: "Bar",
+      },
+    });
+    chain = new Chain(first, second);
+    config().backend = chain;
+  });
+  afterEach(TestCase.teardown);
+
+  it("looks up translations from the first chained backend", () => {
+    expect((send(first, "translations").get(":en") as TranslationData).get(":foo")).toBe("Foo");
+    expect(t("foo")).toBe("Foo");
+  });
+
+  it("looks up translations from the second chained backend", () => {
+    expect((send(second, "translations").get(":en") as TranslationData).get(":bar")).toBe("Bar");
+    expect(t("bar")).toBe("Bar");
+  });
+
+  it("defaults only apply to lookups on the last backend in the chain", () => {
+    expect(t("foo", { default: "Bah" })).toBe("Foo");
+    expect(t("bar", { default: "Bah" })).toBe("Bar");
+    expect(t("bah", { default: "Bah" })).toBe("Bah");
+  });
+
+  it("default", () => {
+    expect(t(null, { default: "Fuh" })).toBe("Fuh");
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }), count: 0 })).toBe("Zero");
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }) })).toEqual(
+      deepSymbolizeKeys({ zero: "Zero" }),
+    );
+    expect(t(null, { default: ":foo" })).toBe("Foo");
+  });
+
+  it("default is returned if translation is missing", () => {
+    expect(t("i18n.transliterate.rule", { locale: "en", default: {} })).toEqual({});
+  });
+
+  it("namespace lookup collects results from all backends and merges deep hashes", () => {
+    expect(t("formats")).toEqual(
+      deepSymbolizeKeys({
+        long: "long",
+        subformats: { long: "long", short: "short" },
+        short: "short",
+      }),
+    );
+  });
+
+  it("namespace lookup collects results from all backends and lets leftmost backend take priority", () => {
+    expect(t("dates")).toEqual(deepSymbolizeKeys({ a: "A", b: "B" }));
+  });
+
+  it("namespace lookup with only the first backend returning a result", () => {
+    expect(t("plural_1")).toEqual(deepSymbolizeKeys({ one: "%{count}" }));
+  });
+
+  it("pluralization still works", () => {
+    expect(t("plural_1", { count: 1 })).toBe("1");
+    expect(t("plural_2", { count: 1 })).toBe("one");
+  });
+
+  it("bulk lookup collects results from all backends", () => {
+    expect(t(["foo", "bar"])).toEqual(["Foo", "Bar"]);
+    expect(t(["foo", "bar", "bah"], { default: "Bah" })).toEqual(["Foo", "Bar", "Bah"]);
+    expect(t(["formats", "plural_2", "bah"], { default: "Bah" })).toEqual([
+      deepSymbolizeKeys({
+        long: "long",
+        subformats: { long: "long", short: "short" },
+        short: "short",
+      }),
+      deepSymbolizeKeys({ one: "one" }),
+      "Bah",
+    ]);
+  });
+
+  it("store_translations options are not dropped while transferring to backend", () => {
+    const storeTranslations = vi.spyOn(first, "storeTranslations");
+    config().backend.storeTranslations("foo", { bar: ":baz" }, { option: "persists" });
+    expect(storeTranslations).toHaveBeenCalledWith("foo", { bar: ":baz" }, { option: "persists" });
+  });
+
+  it("store should call initialize on all backends and return true if all initialized", () => {
+    send(first, "initTranslations");
+    send(second, "initTranslations");
+    expect((config().backend as Chain).initialized()).toBeTruthy();
+  });
+
+  it("store should call initialize on all backends and return false if one not initialized", async () => {
+    await first.reloadBang();
+    send(second, "initTranslations");
+    expect(!(config().backend as Chain).initialized()).toBeTruthy();
+  });
+
+  it("should reload all backends", async () => {
+    send(first, "initTranslations");
+    send(second, "initTranslations");
+    await config().backend.reloadBang();
+    expect(!first.initialized()).toBeTruthy();
+    expect(!second.initialized()).toBeTruthy();
+  });
+
+  it("should eager load all backends", async () => {
+    await config().backend.eagerLoadBang();
+    expect(first.initialized()).toBeTruthy();
+    expect(second.initialized()).toBeTruthy();
+  });
+
+  it("falls back to other backends for nil values", () => {
+    expect(
+      (send(first, "translations").get(":en") as TranslationData).get(":fallback_bar"),
+    ).toBeNull();
+    expect((send(second, "translations").get(":en") as TranslationData).get(":fallback_bar")).toBe(
+      "Bar",
+    );
+    expect(t("fallback_bar")).toBe("Bar");
+  });
+
+  it("should be able to get all translations of all backends merged together", () => {
+    const expected = {
+      en: {
+        foo: "Foo",
+        bar: "Bar",
+        formats: {
+          short: "short",
+          long: "long",
+          subformats: { short: "short", long: "long" },
+        },
+        plural_1: { one: "%{count}" },
+        plural_2: { one: "one" },
+        dates: { a: "A", b: "B" },
+        fallback_bar: "Bar",
+      },
+    };
+    expect(send(chain, "translations")).toEqual(deepSymbolizeKeys(expected));
+  });
+});
+
+describe("I18nBackendChainWithKeyValueTest", () => {
+  beforeEach(async () => {
+    await TestCase.setup();
+    config().enforceAvailableLocales = false;
+  });
+  afterEach(TestCase.teardown);
+
+  function setupBackend(subtrees = true): void {
+    const first = new KeyValue(new Map<string, string>() as Store, subtrees);
+    first.storeTranslations("en", { plural_1: { one: "%{count}" } });
+
+    const second = new Simple();
+    second.storeTranslations("en", { plural_2: { one: "one" } });
+    config().backend = new Chain(first, second);
+  }
+
+  it("subtrees enabled: looks up pluralization translations from the first chained backend", () => {
+    setupBackend();
+    expect(t("plural_1", { count: 1 })).toBe("1");
+  });
+
+  it("subtrees disabled: looks up pluralization translations from the first chained backend", () => {
+    setupBackend(false);
+    expect(t("plural_1", { count: 1 })).toBe("1");
+  });
+
+  it("subtrees enabled: looks up translations from the second chained backend", () => {
+    setupBackend();
+    expect(t("plural_2", { count: 1 })).toBe("one");
+  });
+
+  it("subtrees disabled: looks up translations from the second chained backend", () => {
+    setupBackend(false);
+    expect(t("plural_2", { count: 1 })).toBe("one");
+  });
+});

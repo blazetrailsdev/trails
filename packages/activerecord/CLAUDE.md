@@ -330,7 +330,7 @@ constructor cannot await.
 
 A writer that must await, such as `has_one_attached`'s `setAvatar`
 (`activestorage/lib/active_storage/attached/model.rb:118-125`), takes the same
-shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps the
+shape. `awaitingAssignment` (`activemodel/lib/attribute-assignment.ts`) wraps the
 build in each create path, and the constructor's `assignAttributes` hands it
 the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
 nothing is parked on the record. `new` and `build` still raise.

@@ -4,7 +4,7 @@
     "outDir": "dist-test",
     "paths": {
       "@blazetrails/actionpack": ["../actionpack/lib/index.ts"],
-      "@blazetrails/activemodel": ["../activemodel/src/index.ts"],
+      "@blazetrails/activemodel": ["../activemodel/lib/index.ts"],
       "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
       "@blazetrails/rack": ["../rack/src/index.ts"],
       "@blazetrails/trails-tsc": ["../trails-tsc/lib/index.ts"],

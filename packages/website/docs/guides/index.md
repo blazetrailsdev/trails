@@ -164,7 +164,7 @@ The record is passed in explicitly (Ruby callbacks get it via `self`).
 `around` callbacks receive a `proceed` thunk to invoke the inner chain,
 rather than a block with Ruby's `yield`. Returning `false` from a
 `before` callback halts the chain, matching Rails. See
-`packages/activemodel/src/callbacks.ts`.
+`packages/activemodel/lib/callbacks.ts`.
 
 ### Browser support via adapters {#adapters}
 

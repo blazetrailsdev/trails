@@ -48,8 +48,8 @@ const GATE_INPUTS: Record<string, string[]> = {
     "vendor/sources.lock.json",
     "scripts/api-compare/config.ts",
     "scripts/db-init/mysql/01-rails-user.sql",
-    "packages/activerecord-cli/src/__e2e__/mysql-happy-path.test.ts",
-    "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+    "packages/activerecord-cli/test/__e2e__/mysql-happy-path.test.ts",
+    "packages/activerecord-cli/test/__e2e__/postgres-happy-path.test.ts",
   ],
 };
 
@@ -189,7 +189,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  did-you-mean (per packages/activerecord/package.json).
  *  activerecord-cli consumes @blazetrails/trails-tsc at runtime via its
  *  tsc-wrapper CLI + type-virtualization modules (see
- *  packages/activerecord-cli/src/), so trails-tsc changes can fail the
+ *  packages/activerecord-cli/lib/), so trails-tsc changes can fail the
  *  suites the AR jobs run — include it in the gate.
  *  activerecord-cli E2E suites run in the three AR DB jobs (its tests
  *  exercise the CLI against real DBs), so cli source changes must also
@@ -948,7 +948,7 @@ describe("CI runs every tooling test suite", () => {
 
     const runs = [
       "packages/activerecord/src/relation.ts",
-      "packages/activemodel/src/validations.ts",
+      "packages/activemodel/lib/validations.ts",
       "packages/website/docs/guides/active-record-basics.md",
       "scripts/guides-typecheck/check.ts",
     ];
@@ -993,7 +993,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord/src/connection-adapters/sql-classification.ts",
         "packages/arel/src/visitors/postgresql.ts",
         "packages/arel/src/visitors/mysql.ts",
-        "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+        "packages/activerecord-cli/test/__e2e__/postgres-happy-path.test.ts",
       ];
       const skips = [
         "packages/activerecord/src/relation.ts",
@@ -1023,10 +1023,10 @@ describe("CI runs every tooling test suite", () => {
     const runGate = await gateRunner(yml);
 
     const paths = [
-      "packages/i18n/src/config.ts",
-      "packages/i18n/src/exceptions.ts",
-      "packages/i18n/src/i18n.ts",
-      "packages/i18n/src/interpolate/ruby.ts",
+      "packages/i18n/lib/config.ts",
+      "packages/i18n/lib/exceptions.ts",
+      "packages/i18n/lib/i18n.ts",
+      "packages/i18n/lib/interpolate/ruby.ts",
     ];
     const dependentGates = [
       "actionview_affected",
@@ -1052,7 +1052,7 @@ describe("CI runs every tooling test suite", () => {
     expect(fired.every((f) => f.sqlite_only === "true")).toBe(true);
     const dependentRegexes = ["AV_PKGS_RE", "TRAILTIES_PKGS_RE", "RACK_PKGS_RE"];
     expect(
-      dependentRegexes.filter((name) => gateRegex(yml, name).test("packages/i18n/src/config.ts")),
+      dependentRegexes.filter((name) => gateRegex(yml, name).test("packages/i18n/lib/config.ts")),
     ).toEqual([]);
 
     // Anchor probe: every path above starts at position 0, so none of them can
@@ -1476,7 +1476,7 @@ describe("CI runs every tooling test suite", () => {
     { timeout: 60_000 },
     async () => {
       const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-      const storage = await runGate("packages/activestorage/src/blob.ts");
+      const storage = await runGate("packages/activestorage/lib/blob.ts");
       expect(storage.activerecord_affected).toBe("true");
       expect(storage.ar_scope).toBe("packages/activestorage");
       expect(storage.sqlite_only).toBe("false");
@@ -1487,11 +1487,11 @@ describe("CI runs every tooling test suite", () => {
         (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
       ).toBe("");
       expect(
-        (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/src/b.ts"))
+        (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/lib/b.ts"))
           .sqlite_only,
       ).toBe("false");
       expect(
-        (await runGate("packages/activestorage/src/blob.ts\nscripts/api-compare/config.ts"))
+        (await runGate("packages/activestorage/lib/blob.ts\nscripts/api-compare/config.ts"))
           .ar_scope,
       ).toBe("packages/activestorage");
     },
@@ -1523,7 +1523,7 @@ describe("CI runs every tooling test suite", () => {
       expect((await runGate("packages/zeitwerk/src/a.ts")).unit_packages).toBe("packages/zeitwerk");
       expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
       expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
-      expect((await runGate("packages/activemodel/src/a.ts")).unit_packages.split(" ")).toEqual(
+      expect((await runGate("packages/activemodel/lib/a.ts")).unit_packages.split(" ")).toEqual(
         expect.arrayContaining(["packages/activemodel", "packages/arel", "packages/globalid"]),
       );
       expect((await runGate("scripts/start-worktree.sh")).unit_packages).toBe("");

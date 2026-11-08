@@ -44,6 +44,10 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "chronic",
   "actionview",
   "activejob",
+  "activemodel",
+  "activerecord-cli",
+  "activestorage",
+  "i18n",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

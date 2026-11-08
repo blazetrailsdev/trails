@@ -159,7 +159,7 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
-      "packages/activestorage/src/test-helpers/fixtures/files/**",
+      "packages/activestorage/test/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
@@ -170,7 +170,7 @@ export default defineConfig(
       // parser's project service cannot resolve them when linted by path.
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
-      "packages/activerecord-cli/src/type-virtualization/fixtures/**",
+      "packages/activerecord-cli/test/type-virtualization/fixtures/**",
       // `strip-asany`'s input sample is a file full of `as any` by
       // construction — linting it would be linting the codemod's test data.
       "scripts/__fixtures__/**",
@@ -179,7 +179,7 @@ export default defineConfig(
       // part hand-edited, and its whole job is to stay shaped like the Ruby it
       // mirrors. Linting the TS half would pull it away from its twin.
       "scripts/parity/pipeline/fixtures/**",
-      "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
+      "packages/activerecord-cli/test/fixtures/**",
     ],
   },
   eslint.configs.recommended,
@@ -239,7 +239,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -261,7 +261,7 @@ export default defineConfig(
       "packages/ruby-compat/lib/zlib-adapter.ts",
       "packages/activesupport/lib/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
-      "packages/activerecord-cli/src/tsc-wrapper/**",
+      "packages/activerecord-cli/lib/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
       "packages/activerecord/src/sqlite/expo-sqlite.ts",
       "packages/activerecord/src/encryption/config.ts",
@@ -360,7 +360,7 @@ export default defineConfig(
       "packages/actionview/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
       "packages/rack/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
@@ -378,7 +378,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -440,7 +440,7 @@ export default defineConfig(
     files: [
       "packages/arel/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
@@ -448,7 +448,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/trailties/src/**/*.ts",
@@ -470,10 +470,10 @@ export default defineConfig(
     files: [
       "packages/trailties/src/**/*.ts",
       "packages/thor/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
@@ -506,7 +506,7 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -539,7 +539,7 @@ export default defineConfig(
       "packages/date/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/msgpack/lib/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
       "packages/rack-test/lib/**/*.ts",
@@ -574,7 +574,7 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -597,7 +597,7 @@ export default defineConfig(
     files: [
       "packages/arel/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
@@ -626,7 +626,7 @@ export default defineConfig(
         {
           files: [
             "packages/arel/src/**/*.ts",
-            "packages/activemodel/src/**/*.ts",
+            "packages/activemodel/lib/**/*.ts",
             "packages/actioncable/lib/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
@@ -660,7 +660,7 @@ export default defineConfig(
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
-            "packages/i18n/src/**/*.test.ts",
+            "packages/i18n/test/**/*.test.ts",
           ],
           rules: {
             "blazetrails/rails-test-name-parity": "error",
@@ -677,7 +677,7 @@ export default defineConfig(
       "packages/activerecord/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/arel/src/**/*.ts",
     ],
@@ -917,7 +917,7 @@ export default defineConfig(
   {
     files: [
       "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
     ],
@@ -940,13 +940,13 @@ export default defineConfig(
 
   // ── activemodel ──
   {
-    files: ["packages/activemodel/src/**/*.ts"],
+    files: ["packages/activemodel/{lib,test}/**/*.ts"],
     rules: {
       "unused-imports/no-unused-vars": "off",
     },
   },
   {
-    files: ["packages/activemodel/src/**/*.test.ts"],
+    files: ["packages/activemodel/test/**/*.test.ts"],
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
@@ -992,7 +992,7 @@ export default defineConfig(
     files: [
       "packages/arel/src/**/*.ts",
       "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
     ],
@@ -1216,7 +1216,7 @@ export default defineConfig(
   //    `record.save()` whose result nobody awaits.
   {
     files: [
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "scripts/**/*.ts",
     ],

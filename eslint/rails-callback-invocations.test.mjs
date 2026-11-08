@@ -34,7 +34,7 @@ process.on("exit", () => {
 const { default: rule } = await import("./rails-callback-invocations.mjs");
 
 const srcFile = path.join(REPO_ROOT, "packages/activerecord/src/persistence.ts");
-const outOfScopeFile = path.join(REPO_ROOT, "packages/activemodel/src/callbacks.ts");
+const outOfScopeFile = path.join(REPO_ROOT, "packages/activemodel/lib/callbacks.ts");
 
 const tester = new RuleTester({
   languageOptions: {

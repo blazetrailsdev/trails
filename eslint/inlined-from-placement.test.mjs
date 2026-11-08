@@ -44,7 +44,7 @@ tester.run("inlined-from-placement", rule, {
       code: onConstructor(
         "ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482",
       ),
-      filename: "/repo/packages/activemodel/src/core.ts",
+      filename: "/repo/packages/activemodel/lib/core.ts",
     },
     {
       code: onConstructor(
@@ -131,7 +131,7 @@ tester.run("inlined-from-placement", rule, {
     },
     {
       code: onConstructor(API),
-      filename: "/repo/packages/activemodel/src/api.ts",
+      filename: "/repo/packages/activemodel/lib/api.ts",
       errors: [{ messageId: "redundant" }],
     },
     {
