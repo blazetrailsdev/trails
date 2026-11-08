@@ -478,7 +478,7 @@ function rbStrftimeAlloc(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  timev: Rational,
+  timev: () => Rational,
   gmt: boolean,
 ): string | null {
   return rbStrftime(format, time, vtm, timev, gmt);
@@ -1636,7 +1636,11 @@ export class Time extends rbCTime {
     ).toDatetime();
   }
 
-  /** `time_strftime` (`vendor/ruby/v3.3.11/time.c:5234-5264`). */
+  /**
+   * `time_strftime` (`vendor/ruby/v3.3.11/time.c:5234-5264`).
+   *
+   * @perf 1000ns — PERMANENT
+   */
   strftime(format: string): string {
     if (format.length === 0) {
       rbWarning("strftime called with empty format string");
@@ -1644,6 +1648,7 @@ export class Time extends rbCTime {
     }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
+    let timev: Rational | undefined;
     const str = rbStrftimeAlloc(
       format,
       this,
@@ -1661,7 +1666,7 @@ export class Time extends rbCTime {
           return self.zone;
         },
       },
-      this.toR(),
+      () => (timev ??= this.toR()),
       this.#tzmodeUtc,
     );
     if (str == null) throw new ArgumentError(`invalid format: ${format}`);

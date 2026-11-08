@@ -53,6 +53,11 @@ describe("Time", () => {
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 +0000 UTC");
   });
 
+  it("reads seconds and subseconds together in one strftime format", () => {
+    const time = Time.at(1000000000, 123456789, "nsec", { in: "UTC" });
+    expect(time.strftime("%s %L %N")).toBe("1000000000 123 123456789");
+  });
+
   it("Time.at builds a local time from the seconds since the Epoch", () => {
     vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
     resetLocalTimeZoneId();

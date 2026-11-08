@@ -95,7 +95,7 @@ function rbStrftimeWithTimespec(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  timev: Rational,
+  timev: () => Rational,
   gmt: boolean,
   maxsize: number,
 ): boolean {
@@ -267,7 +267,7 @@ function rbStrftimeWithTimespec(
           i = 2;
           break again;
         case "s": {
-          const sec = timev.div(1);
+          const sec = timev().div(1);
           FMTV("0", 1, Number.isSafeInteger(sec) ? sec : BigInt(sec));
           break again;
         }
@@ -443,7 +443,7 @@ function rbStrftimeWithTimespec(
           const w = format[f] === "L" ? 3 : 9;
           if (precision <= 0) precision = w;
           NEEDS(precision);
-          const subsec = timev.mod(1);
+          const subsec = timev().mod(1);
           let ww = precision;
           let n = subsec.numerator;
           while (9 <= ww) {
@@ -566,7 +566,7 @@ export function rbStrftime(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  timev: Rational,
+  timev: () => Rational,
   gmt: boolean,
 ): string | null {
   const result = { s: "", capacity: 0 };
