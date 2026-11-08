@@ -18,7 +18,7 @@
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { LIB_TEST_PACKAGES } from "../scripts/layout/package-roots.ts";
+import { libRoot } from "../scripts/layout/package-roots.ts";
 import { describe, it, expect } from "vitest";
 // Reuse the rule's own namespace map + path mapping so this file-independent
 // check can never drift from the file-driven rule it backstops.
@@ -56,7 +56,7 @@ async function findUnported(manifest, exists) {
     if (!ns) continue;
     for (const e of classes) {
       if (!e.rubyFile.startsWith(ns)) continue;
-      const rel = `packages/${pkg}/${LIB_TEST_PACKAGES.has(pkg) ? "lib" : "src"}/${rubyToSrcRel(e.rubyFile)}`;
+      const rel = `packages/${pkg}/${libRoot(pkg)}/${rubyToSrcRel(e.rubyFile)}`;
       if (await exists(rel)) continue;
       out.push({ package: pkg, name: e.name, rubyFile: e.rubyFile });
     }
@@ -97,7 +97,7 @@ describe("rails-error-parity unported allowlist", () => {
       // whose rubyFile doesn't live under its package namespace is treated as
       // malformed (caught below) rather than silently path-mapped.
       const inNs = ns && e.rubyFile.startsWith(ns);
-      const rel = `packages/${e.package}/${LIB_TEST_PACKAGES.has(e.package) ? "lib" : "src"}/${rubyToSrcRel(e.rubyFile)}`;
+      const rel = `packages/${e.package}/${libRoot(e.package)}/${rubyToSrcRel(e.rubyFile)}`;
       const ported = inNs && (await fileExists(path.join(ROOT, rel)));
       if (ported) stale.push(entryKey(e));
     }
