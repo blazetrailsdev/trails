@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, onTestFinished } from "vitest";
 import { Dir, env, File, FileUtils, registerCompiledFiles, setEnv } from "@blazetrails/ruby-compat";
 import { Engine } from "./engine.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
-import { Trailtie as ActionControllerTrailtie } from "./trailties/action-controller.js";
 
 const loads: string[] = [];
 let tmp: string;
@@ -74,17 +73,5 @@ describe("boot sites load through a registered compiled file", () => {
       .run();
 
     expect(loads).toEqual(["config/environments/test.ts"]);
-  });
-
-  it("action_controller.set_helpers_path requires app/helpers through the thunk", async () => {
-    tmp = Dir.mktmpdir("compiled_helpers");
-    compiled(tmp, ["app/helpers/compiled-probe-helper.ts"]);
-    const app = { config: { helpersPaths: [`${tmp}/app/helpers`] } };
-
-    await ActionControllerTrailtie.instance()
-      .initializers.find((i) => i.name === "action_controller.set_helpers_path")!
-      .run(app);
-
-    expect(loads).toEqual(["app/helpers/compiled-probe-helper.ts"]);
   });
 });

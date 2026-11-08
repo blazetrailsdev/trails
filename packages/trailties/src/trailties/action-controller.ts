@@ -16,7 +16,6 @@ import {
   File,
   getPath,
   Module,
-  rbFRequireFile,
   rbFSend,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -159,6 +158,7 @@ async function helperConstants(
 ): Promise<Map<string, AbstractController.HelperMethodsModule>> {
   const path = getPath();
   const constants = new Map<string, AbstractController.HelperMethodsModule>();
+  if (!path.pathToFileURL) return constants;
 
   const walk = async (dir: string, namespace: readonly string[]): Promise<void> => {
     for (const entry of Dir.children(dir).slice().sort()) {
@@ -174,9 +174,9 @@ async function helperConstants(
         .replace(/[-_]helper$/, "")
         .replaceAll("-", "_");
       const name = `${camelize([...namespace, stem].join("/"))}Helper`;
-      await rbFRequireFile(full);
+      const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
 
-      const exported = (TopLevel as Record<string, unknown>)[demodulize(name)];
+      const exported = mod[demodulize(name)];
       if (rbObjIsKindOf(exported, Module)) {
         constants.set(name, exported as AbstractController.HelperMethodsModule);
       } else if (exported && typeof exported === "object") {
