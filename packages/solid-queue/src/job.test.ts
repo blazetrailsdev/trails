@@ -15,14 +15,22 @@ import { performAllLater } from "@blazetrails/activejob";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
+  ClaimedExecution,
   EnqueueError,
   Job,
+  Process,
   ReadyExecution,
   ScheduledExecution,
   Semaphore,
   SolidQueue,
   SolidQueueAdapter,
+  UndiscardableError,
+  Worker,
 } from "./index.js";
+import {
+  permanentConnectionCheckout,
+  setPermanentConnectionCheckout,
+} from "@blazetrails/activerecord/active-record";
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
@@ -268,6 +276,27 @@ describe("SolidQueue::JobTest", () => {
       {},
       () => assertJobCounts({ blocked: -1 }, () => blockedJob.discard()),
     );
+  });
+
+  it("try to discard claimed job", async () => {
+    const oldPermanentConnectionCheckout = permanentConnectionCheckout();
+    setPermanentConnectionCheckout(true);
+    await StoreResultJob.performLater(42, { pause: 2 });
+    const job = (await Job.last()) as Job;
+
+    const worker = new Worker({ queues: "background" });
+    await worker.start();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    try {
+      await assertNoDifference([() => Job.count(), () => ClaimedExecution.count()], null, () =>
+        expect(job.discard()).rejects.toThrow(UndiscardableError),
+      );
+    } finally {
+      await worker.stop();
+      await Process.destroyAll();
+      setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
+    }
   });
 
   it("discard scheduled job", async () => {

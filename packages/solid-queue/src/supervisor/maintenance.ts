@@ -4,6 +4,7 @@ import { ClaimedExecution } from "../claimed-execution.js";
 import { Process } from "../process.js";
 import { ProcessMissingError } from "../processes/process-missing-error.js";
 import { SolidQueue } from "../solid-queue.js";
+import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
 interface MaintenanceHost {
   _maintenanceTask?: TimerTask;
@@ -52,7 +53,7 @@ export class Maintenance {
 extend(Maintenance, Concern);
 (
   Maintenance as unknown as {
-    included(base: null, block: (this: { afterBoot(name: string): void }) => void): void;
+    included(base: null, block: (this: CallbacksClassMethods) => void): void;
   }
 ).included(null, function () {
   this.afterBoot(":failOrphanedExecutions");

@@ -6,7 +6,7 @@ export { Execution, UndiscardableError } from "./execution.js";
 export { ReadyExecution } from "./ready-execution.js";
 export { ScheduledExecution } from "./scheduled-execution.js";
 export { BlockedExecution } from "./blocked-execution.js";
-export { ClaimedExecution, Result } from "./claimed-execution.js";
+export { ClaimedExecution } from "./claimed-execution.js";
 export { FailedExecution } from "./failed-execution.js";
 export { RecurringExecution, AlreadyRecorded } from "./recurring-execution.js";
 export { RecurringJob } from "./recurring-job.js";

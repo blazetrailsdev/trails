@@ -1,11 +1,12 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import type { Base } from "@blazetrails/activerecord";
+import type { Base, Relation } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Job } from "../job.js";
 import { FailedExecution } from "../failed-execution.js";
 
 export class Retryable {
   static readonly [classModule] = true;
+  declare static failed: () => Relation<Job>;
   declare id: number;
   declare arguments: { [key: string]: unknown };
   declare failedExecution: Promise<FailedExecution | null>;

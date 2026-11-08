@@ -14,7 +14,7 @@ import {
   travelTo,
 } from "@blazetrails/activesupport";
 import type { Time } from "@blazetrails/date";
-import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Dispatcher,
   FailedExecution,
@@ -28,14 +28,12 @@ import {
 import { ApplicationJob } from "../test-helpers/application-job.js";
 import { AddToBufferJob, JobBuffer } from "../test-helpers/add-to-buffer-job.js";
 import { RaisingJob } from "../test-helpers/raising-job.js";
+import { ExpectedTestError } from "../test-helpers/expected-test-error.js";
 import { loadAppSchema } from "../test-helpers/queue-schema.js";
 import {
   silentOnThreadErrorFor,
   waitForJobsToFinishFor,
 } from "../test-helpers/jobs-test-helper.js";
-
-class ExpectedTestError extends RuntimeError {}
-constSet(TopLevel, "ExpectedTestError", ExpectedTestError);
 
 async function deletingFinishedJobs(block: () => Promise<void>) {
   const previous = SolidQueue.preserveFinishedJobs;

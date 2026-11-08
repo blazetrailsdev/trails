@@ -6,8 +6,9 @@ import {
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
-import { RuntimeError, StringIO, rbModName, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat";
 import {
+  ClaimedExecution,
   Job,
   Process,
   ReadyExecution,
@@ -17,6 +18,9 @@ import {
   Worker,
 } from "./index.js";
 import { ApplicationJob } from "./test-helpers/application-job.js";
+import { RaisingJob } from "./test-helpers/raising-job.js";
+import { ExpectedTestError } from "./test-helpers/expected-test-error.js";
+import { ErrorBuffer } from "./test-helpers/error-buffer.js";
 import { AddToBufferJob, JobBuffer } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
 import { loadAppSchema } from "./test-helpers/queue-schema.js";
@@ -27,33 +31,6 @@ import {
   waitForRegisteredProcesses,
   assertNoRegisteredProcesses,
 } from "./test-helpers/processes-test-helper.js";
-
-class ExpectedTestError extends RuntimeError {}
-constSet(TopLevel, "ExpectedTestError", ExpectedTestError);
-
-class RaisingJob extends ApplicationJob {
-  static {
-    this.queueAs("background");
-  }
-
-  perform(raising: new (message: string) => Error, _identifier: string): void {
-    throw new raising(`This is a ${rbModName(raising)} exception`);
-  }
-}
-
-constSet(TopLevel, "RaisingJob", RaisingJob);
-
-class ErrorBuffer {
-  errors: [Error, unknown][] = [];
-
-  report(error: Error, options: unknown): void {
-    this.errors.push([error, options]);
-  }
-
-  get messages(): string[] {
-    return this.errors.map((error) => error[0].message);
-  }
-}
 
 async function waitForJobsToFinishFor(timeout = 1) {
   await waitWhileWithTimeout(timeout, () => Job.where({ finished_at: null }).isAny());
@@ -126,6 +103,34 @@ describe("WorkerTest", () => {
     expect(claim).toHaveBeenCalled();
   });
 
+  it("errors on claimed executions are reported via Rails error subscriber regardless of on_thread_error setting", async () => {
+    const originalOnThreadError = SolidQueue.onThreadError;
+    SolidQueue.onThreadError = null;
+
+    const subscriber = new ErrorBuffer();
+    ActiveSupport.errorReporter.subscribe(subscriber);
+
+    try {
+      const result = vi.spyOn(ClaimedExecution, "Result").mockImplementation(() => {
+        throw new ExpectedTestError("everything is broken");
+      });
+
+      await AddToBufferJob.performLater("hey!");
+
+      await worker.start();
+
+      await waitForJobsToFinishFor(1);
+      await worker.wakeUp();
+
+      expect(result).toHaveBeenCalled();
+      expect(subscriber.errors.length).toBe(1);
+      expect(subscriber.messages()[0]).toBe("everything is broken");
+    } finally {
+      ActiveSupport.errorReporter.unsubscribe(subscriber);
+      SolidQueue.onThreadError = originalOnThreadError;
+    }
+  });
+
   it("errors on claimed executions are reported via Rails error subscriber", async () => {
     SolidQueue.appExecutor = Executor;
     const subscriber = new ErrorBuffer();
@@ -140,7 +145,7 @@ describe("WorkerTest", () => {
       await worker.wakeUp();
 
       expect(subscriber.errors.length).toBe(1);
-      expect(subscriber.messages[0]).toBe("This is a ExpectedTestError exception");
+      expect(subscriber.messages()[0]).toBe("This is a ExpectedTestError exception");
     } finally {
       ActiveSupport.errorReporter.unsubscribe(subscriber);
       SolidQueue.appExecutor = null;

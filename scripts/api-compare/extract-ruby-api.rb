@@ -2110,11 +2110,21 @@ class ApiExtractor
     target[:classMethods] << {
       name: names[0],
       visibility: "public",
-      params: [],
+      params: scope_lambda_params(args),
       file: @current_file,
       line: @current_line,
       notes: "scope",
     }
+  end
+
+  def scope_lambda_params(args)
+    list = positional_arg_list(args)
+    return [] unless list.is_a?(Array)
+    body = list.find { |el| el.is_a?(Array) && el[0] == :lambda }
+    return [] unless body
+    params = body[1]
+    params = params[1] if params.is_a?(Array) && params[0] == :paren
+    extract_params(params)
   end
 
   def process_scope_from_arg_paren(args)
@@ -2128,7 +2138,7 @@ class ApiExtractor
     target[:classMethods] << {
       name: names[0],
       visibility: "public",
-      params: [],
+      params: scope_lambda_params(args),
       file: @current_file,
       line: @current_line,
       notes: "scope",
