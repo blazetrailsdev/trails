@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { PGTextDecoder, PGTypeMapByOid } from "./pg-text-decoder.js";
@@ -194,7 +194,12 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
     "275760-01-01 00:00:00",
   ];
 
+  class TimestampUtcToLocal extends PGTextDecoder.TimestampUtc {
+    protected override flags = 0x2;
+  }
+
   const coders = [
+    [new TimestampUtcToLocal({ oid: OID_TIMESTAMP, name: "timestamp" }), false, true],
     [new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" }), false, false],
     [
       new PGTextDecoder.TimestampWithTimeZone({ oid: OID_TIMESTAMPTZ, name: "timestamptz" }),
@@ -218,4 +223,18 @@ describe("PGTextDecoder — timestamps match Time.new", () => {
       }
     });
   }
+
+  it("takes the timespec path only where Date.UTC agrees with Time.new", () => {
+    const spy = vi.spyOn(RubyTime, "timespecNew");
+    const coder = new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" });
+    try {
+      coder.decode("2026-11-06 19:33:14.918");
+      expect(spy).toHaveBeenCalledTimes(1);
+      coder.decode("0099-01-01 00:00:00");
+      coder.decode("275760-01-01 00:00:00");
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
