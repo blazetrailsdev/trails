@@ -100,6 +100,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "crass",
   "date",
   "did-you-mean",
+  "erubi",
   "et-orbi",
   "raabro",
   "zeitwerk",
