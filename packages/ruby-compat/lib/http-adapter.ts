@@ -69,6 +69,7 @@ export interface HttpClientConnection {
   ): Promise<HttpClientResponse>;
   close(): void;
   isClosed(): boolean;
+  isEof(): boolean;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -126,6 +127,7 @@ type NodeSocket = {
   removeListener(event: string, listener: (error?: Error) => void): unknown;
   destroy(): unknown;
   readonly destroyed: boolean;
+  readonly readableEnded: boolean;
 };
 
 type NodeIncoming = {
@@ -196,6 +198,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
           }),
         close: () => socket.destroy(),
         isClosed: () => socket.destroyed,
+        isEof: () => socket.readableEnded,
       });
     });
   });

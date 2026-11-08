@@ -280,6 +280,9 @@ export class HTTP {
       if (this._lastCommunicated + this._keepAliveTimeout < performance.now() / 1000) {
         this._socket!.close();
         await this.connect();
+      } else if (this._socket!.isEof()) {
+        this._socket!.close();
+        await this.connect();
       }
     }
 
