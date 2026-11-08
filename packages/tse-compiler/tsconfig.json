@@ -5,5 +5,10 @@
     "outDir": "dist",
     "rootDir": "lib"
   },
-  "include": ["lib"]
+  "include": ["lib"],
+  "references": [
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }

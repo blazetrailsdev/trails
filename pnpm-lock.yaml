@@ -1163,7 +1163,11 @@ importers:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
 
-  packages/tse-compiler: {}
+  packages/tse-compiler:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/tzinfo:
     dependencies:
