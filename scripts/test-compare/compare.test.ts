@@ -740,3 +740,12 @@ describe("patternMatchOrder", () => {
     expect(patternMatchOrder(testCases)).toEqual([2, 0, 1]);
   });
 });
+
+describe("erubi wiring", () => {
+  it("reads erubi's TS tests from tse-compiler", async () => {
+    const { getPackageTestFiles } = await import("./extract-ts-tests.js");
+    const files = getPackageTestFiles()["erubi"];
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.every((f) => f.startsWith(PKG_SRC_DIRS.erubi))).toBe(true);
+  });
+});

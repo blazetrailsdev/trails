@@ -2844,6 +2844,8 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
     controller_dir = File.join(pkg_dir, "controller")
     test_files.select! { |f| f.start_with?(controller_dir) }
   end
+
+  test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
   test_files
 end
 

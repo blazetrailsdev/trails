@@ -1769,6 +1769,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   mail: "packages/mail/src/",
   "solid-queue": "packages/solid-queue/src/",
   "solid-cable": "packages/solid-cable/test/",
+  erubi: "packages/tse-compiler/test/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
