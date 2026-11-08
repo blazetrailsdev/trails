@@ -20,7 +20,7 @@ describe("PartialRenderingQueryTest", () => {
       this.view = Base.withEmptyTemplateCache().withViewPaths(
         [
           new FileSystemResolver(
-            File.expandPath("../test/fixtures", new URL(".", import.meta.url).pathname),
+            File.expandPath("../fixtures", new URL(".", import.meta.url).pathname),
           ),
         ],
         {},

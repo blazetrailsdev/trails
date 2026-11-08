@@ -20,7 +20,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
-const FIXTURE_LOAD_PATH = File.expandPath("../test/fixtures", __dir__);
+const FIXTURE_LOAD_PATH = File.expandPath("../fixtures", __dir__);
 
 export class ActiveRecordTestConnector {
   declare static ableToConnect: boolean;
@@ -72,7 +72,7 @@ export class ActiveRecordTestConnector {
 
   private static async loadSchema(): Promise<void> {
     const source = await getFs().readFile(
-      File.expandPath("../test/fixtures/db_definitions/sqlite.sql", __dir__),
+      File.expandPath("../fixtures/db_definitions/sqlite.sql", __dir__),
       "utf-8",
     );
     for (const sql of source.split(";")) {
@@ -81,7 +81,7 @@ export class ActiveRecordTestConnector {
   }
 
   private static async requireFixtureModels(): Promise<void> {
-    for (const f of Dir.glob(File.expandPath("../test/fixtures/*.ts", __dir__))) await import(f);
+    for (const f of Dir.glob(File.expandPath("../fixtures/*.ts", __dir__))) await import(f);
   }
 }
 

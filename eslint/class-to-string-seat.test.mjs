@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import rule from "./class-to-string-seat.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const FILE = "packages/activejob/src/base.ts";
+const FILE = "packages/activejob/lib/base.ts";
 const manifest = {
   files: {
     [FILE]: { classPaths: { Base: "ActiveJob::Base", Inner: "ActiveJob::Base::Inner" } },
@@ -31,7 +31,7 @@ tester.run("class-to-string-seat", rule, {
   valid: [
     at(`export class Base {\n  ${seat("ActiveJob::Base")}\n}`),
     at("export class Unmatched {}"),
-    at("export class Base {}", { filename: path.join(ROOT, "packages/activejob/src/other.ts") }),
+    at("export class Base {}", { filename: path.join(ROOT, "packages/activejob/lib/other.ts") }),
     at(`/**\n * @noRailsEquivalent PERMANENT\n */\n\nexport class Base {}`),
   ],
   invalid: [

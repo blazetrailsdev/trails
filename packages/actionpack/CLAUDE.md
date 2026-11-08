@@ -63,7 +63,7 @@ name becomes a file name or a locale key, and each site carries
 - `EtagWithTemplateDigest#pickTemplateForEtag`
   (`action-controller/metal/etag-with-template-digest.ts`)
 - `ActionView::Rendering#_processRenderTemplateOptions`
-  (`actionview/src/rendering.ts`), which covers `render action:` and the action
+  (`actionview/lib/rendering.ts`), which covers `render action:` and the action
   name used as a partial's name
 - `AbstractController::Translation#translate`'s lazy-lookup scope
   (`abstract-controller/translation.ts`)
@@ -73,7 +73,7 @@ name becomes a file name or a locale key, and each site carries
   default `mailer_name` directory, as `localPrefixes` does
 
 The DIRECTORY a controller's templates are looked up in is kebab-case too.
-`ViewPaths::ClassMethods#localPrefixes` (`actionview/src/view-paths.ts`; Rails'
+`ViewPaths::ClassMethods#localPrefixes` (`actionview/lib/view-paths.ts`; Rails'
 `local_prefixes`, `view_paths.rb:75-77`) returns the controller path dasherized,
 namespaces kept: `Admin::StoryPagesController` renders from `admin/story-pages/`.
 It carries `@inventedArm dasherize — PERMANENT`. `controller_path` itself stays
@@ -82,11 +82,11 @@ hyphen is not legal. Three more sites follow that directory: the scaffold's view
 generator (`trailties/src/generators/tse/scaffold/scaffold-generator.ts`) writes
 to the dasherized `controllerFilePath()` while `controllerFilePath` and
 `controllerI18nScope` stay underscored; `partialPath`
-(`actionview/src/renderer/abstract-renderer.ts`) dasherizes the directory part
+(`actionview/lib/renderer/abstract-renderer.ts`) dasherizes the directory part
 of a record's `to_partial_path` and leaves the partial's own name alone
 (`line_items/line_item` is found at `line-items/_line_item`), carrying
 `@inventedArm dasherize — PERMANENT`; and `_impliedLayoutName`
-(`actionview/src/layouts.ts`; `layouts.rb:345-347`) returns the controller path
+(`actionview/lib/layouts.ts`; `layouts.rb:345-347`) returns the controller path
 dasherized, so the implied layout is `layouts/admin/story-pages`. That last one
 carries no `@inventedArm` receipt and must not be given one: the arm-throw gate
 does not compare that declaration and fails a tag on it as stale. This paragraph
@@ -197,7 +197,7 @@ Rails loads a session lazily: `Request::Session#load_for_read!` calls
 cache client is. Making the session accessors async as well was rejected:
 `form_authenticity_token` and `request.flash` read the session from inside a
 template, and a non-streaming template compiles to a synchronous function
-(`actionview/src/template.ts`).
+(`actionview/lib/template.ts`).
 
 **The store hooks are async and the accessors stay synchronous and lazy.**
 `writeSession`, `deleteSession` and `commitSession` are async, and

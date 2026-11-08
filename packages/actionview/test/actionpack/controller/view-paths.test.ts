@@ -10,7 +10,7 @@ import { Template } from "../../../lib/template.js";
 import { Resolver } from "../../../lib/template/resolver.js";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
-const FIXTURE_LOAD_PATH = File.expandPath("../../test/fixtures", __dir__);
+const FIXTURE_LOAD_PATH = File.expandPath("../../fixtures", __dir__);
 
 let expand: (array: string[]) => string[];
 

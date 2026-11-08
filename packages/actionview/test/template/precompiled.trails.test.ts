@@ -66,7 +66,7 @@ describe("Templates are precompiled", () => {
   it("leaves no eval, new Function or vm call in shipped actionview or tse-compiler source", async () => {
     // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
     const globbed: Record<string, string> = import.meta.glob(
-      ["../**/*.ts", "../../../tse-compiler/lib/**/*.ts"],
+      ["../../lib/**/*.ts", "../../../tse-compiler/lib/**/*.ts"],
       { query: "?raw", import: "default", eager: true },
     );
     const files = Object.entries(globbed).filter(

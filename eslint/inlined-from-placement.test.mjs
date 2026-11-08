@@ -16,7 +16,7 @@ const BASE = "/repo/packages/activerecord/src/base.ts";
 
 const CONTENT_TAG =
   "ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:20-22";
-const TAGS_BASE = "/repo/packages/actionview/src/helpers/tags/base.ts";
+const TAGS_BASE = "/repo/packages/actionview/lib/helpers/tags/base.ts";
 const onMethod = (name, ...tags) =>
   `class Base {\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  ${name}() {}\n}\n`;
 

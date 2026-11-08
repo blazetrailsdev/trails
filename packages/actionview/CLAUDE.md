@@ -95,8 +95,8 @@ cache (a development reload) compiles it again. A file-backed template with no e
 raises `LoadError` ("cannot load such file -- <path>"), and a string-source
 template (`Template::Inline`, `render inline:`, a `Template` built from a
 string) raises `NotImplementedError` from the same loader in
-`packages/actionview/src/template.ts`. Test code compiles from source instead:
-`packages/actionview/src/test-helpers/compile-template.ts` builds the same
+`packages/actionview/lib/template.ts`. Test code compiles from source instead:
+`packages/actionview/test/support/compile-template.ts` builds the same
 stand-in, runs `transpileModule` and evaluates it, and the `other` vitest
 project's setup installs it through `setTemplateCompiler`.
 
