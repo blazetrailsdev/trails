@@ -19,6 +19,7 @@ import {
   rbFLoad,
   getFs,
   getPath,
+  rbFRequireFile,
   LOAD_PATH,
   Pathname,
   constGet,
@@ -378,7 +379,7 @@ export class Application extends Engine {
 
   async requireEnvironmentBang(): Promise<void> {
     const environment = (await (await this.paths()).get("config/environment")!.existent())[0];
-    if (environment) await import(getPath().pathToFileURL!(environment).href);
+    if (environment) await rbFRequireFile(environment);
   }
 
   routesReloader(): RoutesReloader {
