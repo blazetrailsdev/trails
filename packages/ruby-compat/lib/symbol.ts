@@ -16,9 +16,9 @@
  * (`vendor/ruby/v3.3.11/symbol.c:954` `rb_sym2str` is what answers for one), spelled
  * against the colon convention above.
  *
- * Call sites: `i18n/src/backend/base.ts`, `backend/fallbacks.ts`,
+ * Call sites: `i18n/lib/backend/base.ts`, `backend/fallbacks.ts`,
  * `backend/simple.ts`, `backend/key-value.ts`,
- * `activemodel/src/validations/numericality.ts`.
+ * `activemodel/lib/validations/numericality.ts`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Symbol`, which Rails inherits
  * rather than defines.
@@ -31,7 +31,7 @@ export function isSymbol(value: unknown): value is string {
  * Ruby `Symbol#to_s` / `Symbol#name` — `vendor/ruby/v3.3.11/symbol.c:954` `rb_sym2str`,
  * the frozen string representation NOT including the leading colon.
  *
- * Call sites: `i18n/src/backend/base.ts`'s `toS` and its `t()` key
+ * Call sites: `i18n/lib/backend/base.ts`'s `toS` and its `t()` key
  * interpolation.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Symbol#to_s`, which Rails inherits

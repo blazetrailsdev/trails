@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "../../../..");
-const AR_BIN_TS = resolve(SCRIPT_DIR, "../bin.ts");
+const AR_BIN_TS = resolve(SCRIPT_DIR, "../../lib/bin.ts");
 const TSX_BIN = resolve(
   REPO_ROOT,
   "node_modules/.bin",

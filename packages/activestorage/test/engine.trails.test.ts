@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
-import { RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
+import { File, RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "../lib/engine.js";
 import { Model } from "../lib/attached/model.js";
@@ -23,7 +23,7 @@ describe("ActiveStorage::Engine", () => {
 
   it("finds its routes file through the config/routes.ts path", async () => {
     const routes = await Engine.config.paths().get("config/routes.ts")!.existent();
-    expect(routes).toEqual([`${import.meta.dirname}/config/routes.ts`]);
+    expect(routes).toEqual([File.expandPath("../lib/config/routes.ts", import.meta.dirname)]);
   });
 
   it("hands its routes file to the application's routes reloader", async () => {
@@ -31,7 +31,7 @@ describe("ActiveStorage::Engine", () => {
     await initializer.bind(Engine.instance()).run(app);
     expect(
       (app as unknown as { routesReloader(): { paths: string[] } }).routesReloader().paths,
-    ).toContain(`${import.meta.dirname}/config/routes.ts`);
+    ).toContain(File.expandPath("../lib/config/routes.ts", import.meta.dirname));
   });
 
   it("draws nothing when draw_routes is false", async () => {

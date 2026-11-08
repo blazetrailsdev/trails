@@ -8,7 +8,7 @@ import {
 } from "../../lib/transformers/image-processing-transformer.js";
 import { Transformer } from "../../lib/transformers/transformer.js";
 
-const FIXTURE = new URL("../test-helpers/fixtures/files/racecar.jpg", import.meta.url).pathname;
+const FIXTURE = new URL("../fixtures/files/racecar.jpg", import.meta.url).pathname;
 
 describe("ActiveStorage::Transformers::ImageProcessingTransformer", () => {
   const unsupported = ActiveStorage.unsupportedImageProcessingArguments;

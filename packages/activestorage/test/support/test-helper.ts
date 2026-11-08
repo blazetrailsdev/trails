@@ -148,7 +148,7 @@ export class Group extends Base {
 }
 constSet(TopLevel, "Group", Group);
 
-FixtureSet.fileFixturePath = File.expandPath("fixtures/files", import.meta.dirname);
+FixtureSet.fileFixturePath = File.expandPath("../fixtures/files", import.meta.dirname);
 
 export const SERVICE_CONFIGURATIONS = {
   local: { service: "Disk", root: File.join(import.meta.dirname, "../../tmp/storage") },

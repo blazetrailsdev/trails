@@ -152,7 +152,7 @@ export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile:
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
- * segment is dropped so both sides land on `packages/i18n/src/<x>`.
+ * segment is dropped so both sides land on `packages/i18n/lib/<x>`.
  *
  * A shared test-behavior mixin (a `_behavior.rb` file under a `behaviors`
  * directory) is not a test file on either side — ours is a plain module the
@@ -1731,7 +1731,7 @@ function formatGate(g?: TestGate): string {
 /** Each compare package's TS source root, repo-relative with a trailing slash. */
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/src/",
-  activemodel: "packages/activemodel/src/",
+  activemodel: "packages/activemodel/test/",
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/src/",
@@ -1760,11 +1760,11 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activejob: "packages/activejob/test/",
   actionmailer: "packages/actionmailer/test/",
   actionmailbox: "packages/actionmailbox/src/",
-  activestorage: "packages/activestorage/src/",
+  activestorage: "packages/activestorage/test/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",
   "did-you-mean": "packages/did-you-mean/test/",
-  i18n: "packages/i18n/src/",
+  i18n: "packages/i18n/test/",
   date: "packages/date/test/",
   "ruby-compat": "packages/ruby-compat/test/",
   thor: "packages/thor/src/",

@@ -19,7 +19,7 @@ function databaseName(): string {
 const primary = {
   ...arunit.configurationHash,
   database: databaseName(),
-  migrationsPaths: `${import.meta.dirname}/../../db/migrate`,
+  migrationsPaths: `${import.meta.dirname}/../../../lib/db/migrate`,
 };
 
 export default {

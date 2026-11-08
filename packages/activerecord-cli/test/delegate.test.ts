@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { run } from "../lib/cli.js";
 
-vi.mock("./delegate.js", () => ({
+vi.mock("../lib/delegate.js", () => ({
   delegateBin: vi.fn((_pkg: string, _bin: string, _args: string[]) => 0),
 }));
 
-vi.mock("./bin/trails-models-dump.js", () => ({
+vi.mock("../lib/bin/trails-models-dump.js", () => ({
   run: vi.fn((_argv: string[]) => Promise.resolve(0)),
 }));
 

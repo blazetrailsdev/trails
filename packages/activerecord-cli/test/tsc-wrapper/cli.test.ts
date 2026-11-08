@@ -19,7 +19,7 @@ const createProgramWithArPlugin = createArTrailsProgram;
 const createBuilderWithArPlugin = createArSolutionBuilder;
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
+const FIXTURES_DIR = path.resolve(CURRENT_DIR, "../fixtures");
 const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../bin/trails-tsc.js");
 const CLI_DIST_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
 const itIfCliBin = fs.existsSync(CLI_DIST_PATH) ? it : it.skip;

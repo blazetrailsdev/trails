@@ -19,8 +19,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const GRANT_FILE = "scripts/db-init/mysql/01-rails-user.sql";
 const CI_WORKFLOW = ".github/workflows/ci.yml";
 const E2E_FILES = [
-  "packages/activerecord-cli/src/__e2e__/mysql-happy-path.test.ts",
-  "packages/activerecord-cli/src/__e2e__/postgres-happy-path.test.ts",
+  "packages/activerecord-cli/test/__e2e__/mysql-happy-path.test.ts",
+  "packages/activerecord-cli/test/__e2e__/postgres-happy-path.test.ts",
 ];
 
 /**

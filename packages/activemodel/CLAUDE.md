@@ -17,7 +17,7 @@ is async, so an `include:`-bearing `serializable_hash` cannot be fully
 synchronous.
 
 **The settled answer is the dual-shape return** — `thenableHash` in
-`activemodel/src/serialization.ts` builds a Proxy that is both a plain hash and
+`activemodel/lib/serialization.ts` builds a Proxy that is both a plain hash and
 a `PromiseLike`. Read a key off it and you get the synchronous hash, where an
 unloaded `include:` fails loud rather than silently serializing nothing;
 `await` it and the includes are lazily loaded first, which is where Ruby's

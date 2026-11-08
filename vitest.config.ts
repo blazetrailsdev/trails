@@ -112,7 +112,7 @@ const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 const alias = {
   "@blazetrails/activemodel/locale/en": path.resolve(
     __dirname,
-    "packages/activemodel/src/locale/en.ts",
+    "packages/activemodel/lib/locale/en.ts",
   ),
   "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
     __dirname,
@@ -235,7 +235,7 @@ const alias = {
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/lib/index.ts"),
   "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
-  "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
+  "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/lib/index.ts"),
   "@blazetrails/activerecord/destroy-association-async-job": path.resolve(
     __dirname,
     "packages/activerecord/src/destroy-association-async-job.ts",
@@ -326,7 +326,7 @@ const alias = {
   ),
   "@blazetrails/activerecord-cli": path.resolve(
     __dirname,
-    "packages/activerecord-cli/src/index.ts",
+    "packages/activerecord-cli/lib/index.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/lib") + "/",
@@ -360,8 +360,10 @@ const alias = {
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
   "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
-  "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/src") + "/",
-  "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/src/index.ts"),
+  "@blazetrails/activestorage/test-helpers/":
+    path.resolve(__dirname, "packages/activestorage/test/support") + "/",
+  "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/lib") + "/",
+  "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/lib/index.ts"),
   "@blazetrails/actionmailbox/": path.resolve(__dirname, "packages/actionmailbox/src") + "/",
   "@blazetrails/actionmailbox": path.resolve(__dirname, "packages/actionmailbox/src/index.ts"),
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
@@ -390,7 +392,7 @@ const alias = {
   "@blazetrails/mail": path.resolve(__dirname, "packages/mail/src/index.ts"),
   "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/lib/index.ts"),
-  "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
+  "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/lib/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/lib/builder.ts"),
   "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/lib/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/lib/marcel.ts"),
@@ -443,7 +445,7 @@ const TRAILS_TSC_COVERAGE = process.env.TRAILS_TSC_COVERAGE === "1";
 const COVERAGE_INCLUDE = AR_COVERAGE
   ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
   : AR_CLI_COVERAGE
-    ? ["packages/activerecord-cli/src/**/*.ts", "packages/activerecord-cli/src/**/*.mts"]
+    ? ["packages/activerecord-cli/lib/**/*.ts", "packages/activerecord-cli/lib/**/*.mts"]
     : TRAILS_TSC_COVERAGE
       ? ["packages/trails-tsc/lib/**/*.ts", "packages/trails-tsc/lib/**/*.mts"]
       : ["packages/*/{src,lib}/**/*.ts", "packages/*/{src,lib}/**/*.mts"];
@@ -580,7 +582,7 @@ export default defineConfig({
             "packages/activerecord/scripts/**/*.test.ts",
             "packages/solid-queue/src/**/*.test.ts",
             "packages/solid-cable/test/**/*.test.ts",
-            "packages/activestorage/src/**/*.test.ts",
+            "packages/activestorage/test/**/*.test.ts",
             "packages/actionmailbox/src/**/*.test.ts",
           ],
           exclude: [

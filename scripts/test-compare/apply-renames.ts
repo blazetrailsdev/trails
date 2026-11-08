@@ -225,517 +225,517 @@ const RENAMES: [string, string, string][] = [
   // ==========================================================================
   // Validations - length
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "rejects too short",
     "validates length of using minimum",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "rejects too long",
     "validates length of using maximum",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "accepts within range",
     "validates length of using within",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates exact length with is",
     "validates length of using is",
   ],
 
   // Validations - numericality
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "accepts numbers",
     "default validates numericality of",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates onlyInteger",
     "validates numericality of with integer only",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates greaterThan",
     "validates numericality with greater than",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates lessThan",
     "validates numericality with less than",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates odd",
     "validates numericality with odd",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates even",
     "validates numericality with even",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "skips null",
     "validates numericality of with nil allowed",
   ],
 
   // Validations - inclusion/exclusion/format
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "accepts included values",
     "validates inclusion of",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "rejects excluded values",
     "validates exclusion of",
   ],
-  ["packages/activemodel/src/activemodel.test.ts", "accepts matching format", "validate format"],
+  ["packages/activemodel/test/activemodel.test.ts", "accepts matching format", "validate format"],
 
   // Validations - acceptance
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "accepts '1' and true",
     "terms of service agreement",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "rejects '0' and false",
     "terms of service agreement no acceptance",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "custom accept values",
     "terms of service agreement with accept value",
   ],
 
   // Validations - confirmation
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "passes when confirmation matches",
     "title confirmation",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "fails when confirmation doesn't match",
     "no title confirmation",
   ],
 
   // Validations - conditional
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "if: skips when condition is false",
     "if validation using block false",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "unless: skips when condition is true",
     "unless validation using block true",
   ],
 
   // Validations - general
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "isInvalid is the inverse of isValid",
     "invalid should be the opposite of valid",
   ],
 
   // Errors
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "add and get",
     "add creates an error object and returns it",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "count and size",
     "size calculates the number of error messages",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "empty and any",
     "detecting whether there are errors with empty?, blank?, include?",
   ],
-  ["packages/activemodel/src/activemodel.test.ts", "clear removes all errors", "clear errors"],
+  ["packages/activemodel/test/activemodel.test.ts", "clear removes all errors", "clear errors"],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "attributeNames returns unique names",
     "attribute_names returns the error attributes",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "fullMessages for base has no prefix",
     "full_message returns the given message when attribute is :base",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "fullMessages for attribute has prefix",
     "full_message returns the given message with the attribute name included",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "details returns error detail objects",
     "details returns added error detail",
   ],
 
   // Dirty tracking
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "tracks changes after writeAttribute",
     "setting attribute will result in change",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "attributeChange returns [old, new]",
     "changes to attribute values",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "changes returns all changes",
     "list of changed attribute keys",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "setting same value does not register change",
     "setting color to same value should not result in change being recorded",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "setting back to original clears the change",
     "resetting attribute",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "multiple changes retain first original value",
     "changing the same attribute multiple times retains the correct original value",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "restoreAttributes reverts all changes",
     "restore_attributes should restore all previous data",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "changesApplied commits changes and records previousChanges",
     "saving should preserve previous changes",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "clears both current and previous changes",
     "clear_changes_information should reset all changes",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "new changes after changesApplied don't affect previousChanges",
     "setting new attributes should not affect previous changes",
   ],
 
   // Callbacks
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "full callback chain: before → around → action → around → after",
     "complete callback chain",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "before callback returning false halts the chain",
     "further callbacks should not be called if before validation throws abort",
   ],
 
   // Serialization
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "serializableHash returns all attributes",
     "method serializable hash should work",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "only filters attributes",
     "method serializable hash should work with only option",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "except excludes attributes",
     "method serializable hash should work with except option",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "methods includes method results",
     "method serializable hash should work with methods option",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "only + methods combined",
     "method serializable hash should work with only and methods",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "include option serializes nested associations",
     "include option with singular association",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "include with options filters nested attributes",
     "include with options",
   ],
 
   // fromJson
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "sets attributes from a JSON string",
     "from_json should work without a root (class attribute)",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "supports includeRoot option",
     "from_json should work with a root (method parameter)",
   ],
 
   // Naming
-  ["packages/activemodel/src/activemodel.test.ts", "singular is underscored", "singular"],
-  ["packages/activemodel/src/activemodel.test.ts", "plural adds s", "plural"],
-  ["packages/activemodel/src/activemodel.test.ts", "element is underscored", "element"],
-  ["packages/activemodel/src/activemodel.test.ts", "collection matches plural", "collection"],
-  ["packages/activemodel/src/activemodel.test.ts", "paramKey is underscored", "param key"],
-  ["packages/activemodel/src/activemodel.test.ts", "routeKey is plural", "route key"],
-  ["packages/activemodel/src/activemodel.test.ts", "i18nKey is underscored", "i18n key"],
+  ["packages/activemodel/test/activemodel.test.ts", "singular is underscored", "singular"],
+  ["packages/activemodel/test/activemodel.test.ts", "plural adds s", "plural"],
+  ["packages/activemodel/test/activemodel.test.ts", "element is underscored", "element"],
+  ["packages/activemodel/test/activemodel.test.ts", "collection matches plural", "collection"],
+  ["packages/activemodel/test/activemodel.test.ts", "paramKey is underscored", "param key"],
+  ["packages/activemodel/test/activemodel.test.ts", "routeKey is plural", "route key"],
+  ["packages/activemodel/test/activemodel.test.ts", "i18nKey is underscored", "i18n key"],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "toPartialPath returns conventional path",
     "to_partial_path default implementation returns a string giving a relative path",
   ],
 
   // Conversion
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "returns self",
     "to_model default implementation returns self",
   ],
 
   // Types
-  ["packages/activemodel/src/activemodel.test.ts", "casts string to Date", "type cast date"],
+  ["packages/activemodel/test/activemodel.test.ts", "casts string to Date", "type cast date"],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "casts ISO string to Date",
     "type cast datetime and timestamp",
   ],
-  ["packages/activemodel/src/activemodel.test.ts", "casts number to string", "type cast decimal"],
+  ["packages/activemodel/test/activemodel.test.ts", "casts number to string", "type cast decimal"],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "casts NaN string to null",
     "type cast decimal from invalid string",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "registers custom type",
     "a class can be registered for a symbol",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "throws on unknown type",
     "a reasonable error is given when no type is found",
   ],
 
   // ComparisonValidator
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates equalTo",
     "validates comparison with equal to using numeric",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates otherThan",
     "validates comparison with other than using numeric",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "supports function comparands (like Rails procs)",
     "validates comparison with proc",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "works with dates",
     "validates comparison with greater than using date",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "works with strings",
     "validates comparison with greater than using string",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "skips nil values",
     "validates comparison with nil allowed",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "supports multiple constraints",
     "validates comparison of multiple values",
   ],
 
   // Numericality comparison operators
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "greaterThanOrEqualTo",
     "validates numericality with greater than or equal",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "lessThanOrEqualTo",
     "validates numericality with less than or equal to",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "equalTo",
     "validates numericality with equal to",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "otherThan",
     "validates numericality with other than",
   ],
 
   // Inclusion/exclusion allowNil
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "skips nil by default",
     "validates inclusion of with allow nil",
   ],
 
   // validates_*_of shorthand
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validatesPresenceOf validates presence",
     "validate presences",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validatesAbsenceOf validates absence",
     "validates absence of",
   ],
 
   // Errors enhancements
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "added? checks if a specific error was already added",
     "added? defaults message to :invalid",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "delete removes errors for an attribute",
     "delete removes details on given attribute",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "copy/merge copies errors from another instance",
     "merge errors",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "toHash groups messages by attribute",
     "to_hash returns the error messages hash",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "include checks if attribute has errors",
     "include?",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "fullMessage generates a complete message",
     "full_messages creates a list of error messages with the attribute name included",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "returns full messages for a specific attribute",
     "full_messages_for contains all the error messages for the given attribute indifferent",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "checks if error of specific kind exists",
     "of_kind? defaults message to :invalid",
   ],
 
   // Errors#generateMessage
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "generates a message for a type",
     "generate_message works without i18n_scope",
   ],
 
   // typeForAttribute
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "returns the type for a registered attribute",
     ".type_for_attribute returns the registered attribute type",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "returns null for unknown attributes",
     ".type_for_attribute returns the default type when an unregistered attribute is specified",
   ],
 
   // isPersisted
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "returns false for ActiveModel instances",
     "persisted is always false",
   ],
 
   // ConfirmationValidator caseSensitive
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "is case-sensitive by default",
     "title confirmation with case sensitive option true",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "supports caseSensitive: false",
     "title confirmation with case sensitive option false",
   ],
 
   // validatesWith
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates using a custom validator class",
     "validation with class that adds errors",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "passes extra options to the validator constructor",
     "passes all configuration options to the validator class",
   ],
 
   // validatesEach
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates each attribute with a block function",
     "validates each",
   ],
 
   // strict validations
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "raises an exception instead of adding to errors",
     "strict validation in validates",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "does not throw when validation passes",
     "strict validation not fails",
   ],
 
   // custom validation contexts
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "validates with custom context",
     "with a class that adds errors on create and validating a new model",
   ],
   [
-    "packages/activemodel/src/activemodel.test.ts",
+    "packages/activemodel/test/activemodel.test.ts",
     "standard create/update contexts still work",
     "with a class that adds errors on update and validating a new model",
   ],
