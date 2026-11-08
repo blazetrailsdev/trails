@@ -723,6 +723,7 @@ export class ConnectionPool implements ReapablePool {
         const conns = this._connections;
         const borrowed =
           !pinned &&
+          !this.isDiscarded() &&
           conns &&
           !this._available?.any &&
           conns.length + this._nowConnecting >= this.size

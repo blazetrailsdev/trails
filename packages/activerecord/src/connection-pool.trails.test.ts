@@ -345,6 +345,19 @@ it("withConnectionSync does not borrow a connection with an open transaction", a
   expect(() => pool.withConnectionSync((conn) => conn)).toThrow(ConnectionTimeoutError);
 });
 
+it("withConnectionSync leaves a borrowed connection checked out when its block throws", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  expect(() =>
+    pool.withConnectionSync(() => {
+      throw new RuntimeError("boom");
+    }),
+  ).toThrow("boom");
+  expect(pool.stat().busy).toBe(1);
+  expect(held.isInUse()).not.toBeNull();
+});
+
 it("withConnectionSync checks out an idle connection rather than borrowing", async () => {
   const pool = makePool(2);
   const held = await pool.checkout();
