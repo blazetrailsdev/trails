@@ -4,6 +4,6 @@
     "outDir": "dist-test"
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*"],
+  "include": ["lib/**/*.test.ts", "lib/test-helpers/**/*"],
   "references": [{ "path": "./tsconfig.json" }]
 }

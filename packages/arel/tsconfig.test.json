@@ -5,10 +5,10 @@
   },
   "exclude": [],
   "include": [
-    "src/**/*.test.ts",
-    "src/test-setup-*.ts",
-    "src/**/*.bench.ts",
-    "src/test-helpers/**/*"
+    "lib/**/*.test.ts",
+    "lib/test-setup-*.ts",
+    "lib/**/*.bench.ts",
+    "lib/test-helpers/**/*"
   ],
   "references": [{ "path": "./tsconfig.json" }]
 }

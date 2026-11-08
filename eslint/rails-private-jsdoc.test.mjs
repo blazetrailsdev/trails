@@ -18,7 +18,7 @@ const FIXTURE = {
     // Rails' `Rack::Lock` declares a private `unlock` (rack/lib/rack/lock.rb);
     // lock.ts also hosts a local `Mutex` protocol whose `unlock` mirrors the
     // PUBLIC stdlib `Mutex#unlock`.
-    "packages/rack/src/lock.ts": ["unlock"],
+    "packages/rack/lib/lock.ts": ["unlock"],
     // `attribute` folds out of the file-wide union: private on the instance
     // half (activemodel/lib/active_model/attributes.rb:161), public on
     // `Attributes::ClassMethods` (attributes.rb:59).
@@ -29,7 +29,7 @@ const FIXTURE = {
     "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   entities: {
-    "packages/rack/src/lock.ts": ["Lock", "Rack"],
+    "packages/rack/lib/lock.ts": ["Lock", "Rack"],
     "packages/activerecord/src/associations/preloader/association.ts": [
       "ActiveRecord",
       "Associations",
@@ -52,7 +52,7 @@ const FIXTURE = {
 setManifestForTests(FIXTURE);
 const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
-const lockFile = path.join(REPO_ROOT, "packages/rack/src/lock.ts");
+const lockFile = path.join(REPO_ROOT, "packages/rack/lib/lock.ts");
 const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
 const preloaderAssociationFile = path.join(
   REPO_ROOT,
