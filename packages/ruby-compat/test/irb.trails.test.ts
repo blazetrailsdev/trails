@@ -102,6 +102,12 @@ describe("IRB", () => {
     const { prompt, server } = started[0];
     expect(prompt).toBe("irb(main):001> ");
     expect((server.context.greet as () => string)()).toBe("hello");
+    const singleton = Object.getPrototypeOf(server.context) as object;
+    expect(singleton).not.toBe(Object.prototype);
+    expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+    expect(Object.getPrototypeOf(Object.prototype)).toBeNull();
+    expect(String(server.context)).toBe("[object Object]");
+    expect(typeof (server.context as object).hasOwnProperty).toBe("function");
     (TopLevel as Record<string, unknown>).IrbSeatedLater = 42;
     try {
       expect(server.context.IrbSeatedLater).toBe(42);

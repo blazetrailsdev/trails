@@ -172,16 +172,29 @@ export class Irb {
   /**
    * `IRB::WorkSpace#load_helper_methods_to_main`
    * (`vendor/ruby/v3.3.11/lib/irb/workspace.rb:113-117`). Main is the REPL
-   * context. Its singleton class's prototype is followed by `TopLevel`, so a
-   * name main and `HelpersContainer` lack resolves as a constant of `Object`
-   * does at `TOPLEVEL_BINDING`.
+   * context. Above its singleton class sits `Object`: `Object.prototype`
+   * with `TopLevel`'s constants read first, so a name main and
+   * `HelpersContainer` lack resolves as a constant of `Object` does at
+   * `TOPLEVEL_BINDING`. `TopLevel` has no prototype and a JS object has
+   * one, so the two are joined by a Proxy over `Object.prototype`.
    *
    * @noRailsEquivalent PERMANENT
    */
   loadHelperMethodsToMain(server: ReplServerLike): void {
     const main = server.context;
     extend(main, HelpersContainer);
-    Object.setPrototypeOf(Object.getPrototypeOf(main), TopLevel);
+    const top = TopLevel as Record<string, unknown>;
+    Object.setPrototypeOf(
+      Object.getPrototypeOf(main),
+      new Proxy(Object.prototype, {
+        get: (target, key, receiver) =>
+          typeof key === "string" && Object.hasOwn(top, key)
+            ? top[key]
+            : Reflect.get(target, key, receiver),
+        has: (target, key) =>
+          (typeof key === "string" && Object.hasOwn(top, key)) || Reflect.has(target, key),
+      }),
+    );
   }
 
   /**

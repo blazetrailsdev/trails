@@ -12,7 +12,7 @@ describe("IRBConsole#start", () => {
     ran = null;
     prevEnv = String(Trails.env);
     vi.spyOn(IRB.Irb.prototype, "run").mockImplementation(async (conf) => {
-      ran = conf;
+      ran = conf ?? null;
     });
   });
 
