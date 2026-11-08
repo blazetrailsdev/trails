@@ -5,7 +5,7 @@
 
 import type { UnportedFile } from "./types.js";
 
-const NOT_YET_PORTED = "No TS test file ports this Ruby test file yet.";
+const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
 
 export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/css/test_css.rb", package: "nokogiri", reason: NOT_YET_PORTED },

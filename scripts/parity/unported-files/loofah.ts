@@ -5,7 +5,7 @@
 
 import type { UnportedFile } from "./types.js";
 
-const NOT_YET_PORTED = "No TS test file ports this Ruby test file yet.";
+const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
 
 export const LOOFAH_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/html5/test_sanitizer.rb", package: "loofah", reason: NOT_YET_PORTED },

@@ -5,7 +5,7 @@
 
 import type { UnportedFile } from "./types.js";
 
-const NOT_YET_PORTED = "No TS test file ports this Ruby test file yet.";
+const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
 
 export const CRASS_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/test_crass.rb", package: "crass", reason: NOT_YET_PORTED },
