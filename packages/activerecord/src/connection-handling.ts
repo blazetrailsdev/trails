@@ -369,7 +369,9 @@ export function appendToConnectedToStack(entry: {
 }
 
 export const TRAILS_ENV = (): string | null | undefined =>
-  TopLevel.Trails?.env.toString() ?? presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
+  TopLevel.Trails?.env?.toString() ??
+  presence(getEnv("TRAILS_ENV")) ??
+  presence(getEnv("NODE_ENV"));
 
 export const DEFAULT_ENV = (): string => TRAILS_ENV() || "default_env";
 

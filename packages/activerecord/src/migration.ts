@@ -194,7 +194,7 @@ export class PendingMigrationError extends MigrationError {
   detailedMigrationMessage(pendingMigrations: Array<{ filename?: string }>): string {
     let message =
       "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db:migrate";
-    if (TopLevel.Trails !== undefined && !TopLevel.Trails.env["local?"]()) {
+    if (TopLevel.Trails?.env !== undefined && !TopLevel.Trails.env["local?"]()) {
       message += ` TRAILS_ENV=${TopLevel.Trails.env}`;
     }
     message += "\n\n";
@@ -219,7 +219,7 @@ export class NoEnvironmentInSchemaError extends MigrationError {
   constructor() {
     const msg =
       "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/trails db:environment:set";
-    if (TopLevel.Trails !== undefined) {
+    if (TopLevel.Trails?.env !== undefined) {
       super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}`);
     } else {
       super(msg);
@@ -245,7 +245,7 @@ export class EnvironmentMismatchError extends ActiveRecordError {
     msg += `You are running in \`${current ?? ""}\` environment. `;
     msg += `If you are sure you want to continue, first set the environment using:\n\n`;
     msg += `        bin/trails db:environment:set`;
-    if (TopLevel.Trails !== undefined) {
+    if (TopLevel.Trails?.env !== undefined) {
       super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}\n\n`);
     } else {
       super(`${msg}\n\n`);

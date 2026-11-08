@@ -58,7 +58,8 @@ export class LogSubscriber extends BaseLogSubscriber {
       let message =
         `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${Math.round(event.duration)}ms` +
         ` (${additions.join(" | ")})`;
-      if (TopLevel.Trails !== undefined && TopLevel.Trails.env["development?"]()) message += "\n\n";
+      if (TopLevel.Trails?.env !== undefined && TopLevel.Trails.env["development?"]())
+        message += "\n\n";
 
       return message;
     });

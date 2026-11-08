@@ -1021,15 +1021,14 @@
     }
   },
   "html-sanitizer": {
-    "rows": 4,
+    "rows": 5,
     "excluded": [
       "full-sanitizer.ts::FullSanitizer",
       "link-sanitizer.ts::LinkSanitizer",
-      "safe-list-sanitizer.ts::SafeListSanitizer",
-      "sanitizer.ts::Sanitizer"
+      "safe-list-sanitizer.ts::SafeListSanitizer"
     ],
     "unwalked": [],
-    "residue": {}
+    "residue": { "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer" }
   },
   "i18n": {
     "rows": 27,
