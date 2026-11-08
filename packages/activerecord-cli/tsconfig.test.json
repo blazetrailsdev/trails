@@ -1,9 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "outDir": "dist-test"
+    "outDir": "dist-test",
+    "rootDir": "."
   },
-  "exclude": ["lib/tsc-wrapper/__fixtures__", "lib/type-virtualization/fixtures"],
-  "include": ["lib/**/*.test.ts", "lib/**/__fixtures__"],
-  "references": [{ "path": "./tsconfig.json" }]
+  "exclude": ["test/fixtures", "test/type-virtualization/fixtures"],
+  "include": ["test"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    }
+  ]
 }

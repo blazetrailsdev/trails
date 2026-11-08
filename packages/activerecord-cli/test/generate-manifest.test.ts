@@ -1,0 +1,219 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { mkdtemp, readFile, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join, relative, isAbsolute } from "path";
+import { scanModels, buildManifest, generateManifest } from "../lib/generate-manifest.js";
+
+async function writeModel(dir: string, file: string, body: string): Promise<void> {
+  await writeFile(join(dir, file), body, "utf8");
+}
+
+async function seedModels(dir: string): Promise<void> {
+  const imp = `import { Base } from "@blazetrails/activerecord";\n`;
+  await writeModel(dir, "user.ts", `${imp}export class User extends Base {}\n`);
+  await writeModel(dir, "tweet.ts", `${imp}export class Tweet extends Base {}\n`);
+  await writeModel(
+    dir,
+    "follow.ts",
+    `${imp}export abstract class ApplicationRecord extends Base {}\nexport class Follow extends ApplicationRecord {}\n`,
+  );
+  await writeModel(dir, "helper.ts", `export class Helper {}\n`);
+  await writeModel(dir, "user.test.ts", `export class Nope extends Base {}\n`);
+  await writeModel(dir, "index.ts", `// stale manifest\n`);
+}
+
+describe("ArGenerateManifestTest", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "ar-manifest-"));
+  });
+
+  it("scans only exported classes that transitively extend Base", async () => {
+    await seedModels(dir);
+    const entries = await scanModels(dir);
+    const names = entries.map((e) => e.className);
+    expect(names).toEqual(["Follow", "Tweet", "User"]);
+    expect(entries.find((e) => e.className === "Follow")?.importPath).toBe("./follow.js");
+  });
+
+  it("excludes abstract bases (abstract keyword, static field, static block; abstractClass and _abstractClass)", async () => {
+    await writeModel(
+      dir,
+      "field.ts",
+      `import { Base } from "@blazetrails/activerecord";\n` +
+        `export class FieldBase extends Base {\n  static abstractClass = true;\n}\n` +
+        `export class Widget extends FieldBase {}\n`,
+    );
+    await writeModel(
+      dir,
+      "backing.ts",
+      `import { Base } from "@blazetrails/activerecord";\n` +
+        `export class BackingBase extends Base {\n  static override _abstractClass = true;\n}\n` +
+        `export class Gizmo extends BackingBase {}\n`,
+    );
+    await writeModel(
+      dir,
+      "block.ts",
+      `import { Base } from "@blazetrails/activerecord";\n` +
+        `export class BlockBase extends Base {\n  static {\n    this._abstractClass = true;\n  }\n}\n` +
+        `export class Gadget extends BlockBase {}\n`,
+    );
+    const names = (await scanModels(dir)).map((e) => e.className);
+    expect(names).toEqual(["Gadget", "Gizmo", "Widget"]);
+  });
+
+  it("ignores a class extending a `Base` imported from another package", async () => {
+    await writeModel(
+      dir,
+      "helper.ts",
+      `import { Base } from "some-ui-lib";\nexport class Helper extends Base {}\n`,
+    );
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class User extends Base {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["User"]);
+  });
+
+  it("recognizes Base under an import alias", async () => {
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { Base as AR } from "@blazetrails/activerecord";\nexport class User extends AR {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["User"]);
+  });
+
+  it("discovers a model whose superclass is a private (non-exported) same-file base", async () => {
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { Base } from "@blazetrails/activerecord";\n` +
+        `class ApplicationRecord extends Base {}\n` +
+        `export class User extends ApplicationRecord {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["User"]);
+  });
+
+  it("resolves a relative import alias to the target class", async () => {
+    await writeModel(
+      dir,
+      "application_record.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
+    );
+    await writeModel(
+      dir,
+      "user.ts",
+      `import { ApplicationRecord as ARBase } from "./application_record.js";\n` +
+        `export class User extends ARBase {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["ApplicationRecord", "User"]);
+  });
+
+  it("does not follow an external parent that shares a name with a local base", async () => {
+    await writeModel(
+      dir,
+      "application_record.ts",
+      `import { Base } from "@blazetrails/activerecord";\n` +
+        `export class ApplicationRecord extends Base {\n  static abstractClass = true;\n}\n`,
+    );
+    await writeModel(
+      dir,
+      "widget.ts",
+      `import { ApplicationRecord } from "some-engine";\nexport class Widget extends ApplicationRecord {}\n`,
+    );
+    await writeModel(
+      dir,
+      "gadget.ts",
+      `import { ApplicationRecord } from "./application_record.js";\nexport class Gadget extends ApplicationRecord {}\n`,
+    );
+    expect((await scanModels(dir)).map((e) => e.className)).toEqual(["Gadget"]);
+  });
+
+  it("handles an empty models dir without dangling re-exports", async () => {
+    const manifest = await buildManifest(dir);
+    expect(manifest).toContain(`export const models: ReadonlyArray<typeof Base> = [];`);
+    expect(manifest).not.toContain("export {");
+  });
+
+  it("emits import + register + re-export lines in alphabetical order", async () => {
+    await seedModels(dir);
+    const manifest = await buildManifest(dir);
+    expect(manifest).toContain(`// AUTO-GENERATED by @blazetrails/activerecord-cli.`);
+    expect(manifest).not.toContain(`models/index.ts —`);
+    expect(manifest).toContain(`import { TopLevel } from "@blazetrails/activesupport";`);
+    expect(manifest).toContain(`import { User } from "./user.js";`);
+    expect(manifest).toContain(`export const models = [Follow, Tweet, User] as const;`);
+    expect(manifest).toContain(`Object.assign(TopLevel, { Follow, Tweet, User });`);
+    expect(manifest).toContain(`export { Follow, Tweet, User };`);
+  });
+
+  it("imports a default-exported model by its default binding, not a named one", async () => {
+    await writeModel(
+      dir,
+      "account.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport default class Account extends Base {}\n`,
+    );
+    const manifest = await buildManifest(dir);
+    expect(manifest).toContain(`import Account from "./account.js";`);
+    expect(manifest).not.toContain(`import { Account }`);
+    expect(manifest).toContain(`export { Account };`);
+  });
+
+  it("rejects two model classes that share a name (would not compile)", async () => {
+    await writeModel(
+      dir,
+      "a.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class Dup extends Base {}\n`,
+    );
+    await writeModel(
+      dir,
+      "b.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class Dup extends Base {}\n`,
+    );
+    await expect(scanModels(dir)).rejects.toThrow(
+      /duplicate exported class "Dup" in a\.ts and b\.ts/,
+    );
+  });
+
+  it("rejects a non-model duplicate rather than letting it shadow a real model", async () => {
+    await writeModel(
+      dir,
+      "a.ts",
+      `import { Base } from "@blazetrails/activerecord";\nexport class User extends Base {}\n`,
+    );
+    await writeModel(dir, "z.ts", `export class User {}\n`);
+    await expect(scanModels(dir)).rejects.toThrow(
+      /duplicate exported class "User" in a\.ts and z\.ts/,
+    );
+  });
+
+  it("reports a friendly error when the models dir is missing", async () => {
+    await expect(scanModels(join(dir, "nope"))).rejects.toThrow(/models directory not found/);
+  });
+
+  it("writes the manifest under .trails/, then is a byte-identical no-op on rerun", async () => {
+    await seedModels(dir);
+    const root = await mkdtemp(join(tmpdir(), "ar-manifest-root-"));
+    const first = await generateManifest(dir, root);
+    expect(first.changed).toBe(true);
+    expect(first.path).toBe(join(root, ".trails", "models", "index.ts"));
+    const onDisk = await readFile(first.path, "utf8");
+    expect(onDisk).toBe(first.content);
+    expect(onDisk).toContain(`from "${relative(join(root, ".trails", "models"), dir)}/user.js"`);
+    expect(await readFile(join(dir, "index.ts"), "utf8")).toBe(`// stale manifest\n`);
+
+    const second = await generateManifest(dir, root);
+    expect(second.changed).toBe(false);
+    expect(await readFile(second.path, "utf8")).toBe(onDisk);
+  });
+
+  it("returns an absolute path even when the app root is relative", async () => {
+    await seedModels(dir);
+    const result = await generateManifest(dir, relative(process.cwd(), dir));
+    expect(isAbsolute(result.path)).toBe(true);
+    expect(result.path).toBe(join(dir, ".trails", "models", "index.ts"));
+  });
+});

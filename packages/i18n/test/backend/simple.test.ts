@@ -1,0 +1,298 @@
+import * as TestCase from "../support/test-case.js";
+import { Hash, kernelCatch } from "@blazetrails/ruby-compat";
+import { readFile } from "node:fs/promises";
+import { beforeEach, describe, expect, it, afterEach } from "vitest";
+import { Simple } from "../../lib/backend/simple.js";
+import { config, type TranslationKey } from "../../lib/i18n.js";
+import { UnknownFileType } from "../../lib/exceptions.js";
+import {
+  preloadTranslationFiles,
+  registerFileReader,
+  registerLocaleModule,
+  type TranslateOptions,
+} from "../../lib/backend/base.js";
+import { en } from "../test-data/locales/en.js";
+import type { TranslationData } from "../../lib/utils.js";
+
+function localesDir(): string {
+  return new URL("../test-data/locales", import.meta.url).pathname;
+}
+
+describe("I18nBackendSimpleTest", () => {
+  let backend: Simple;
+
+  beforeEach(async () => {
+    await TestCase.setup();
+    registerFileReader((filename) => readFile(filename, "utf8"));
+    await preloadTranslationFiles(
+      ["en.yml", "en.yaml", "en.json", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
+        (name) => `${localesDir()}/${name}`,
+      ),
+    );
+    registerLocaleModule(`${localesDir()}/en.js`, { en });
+    backend = new Simple();
+    config().backend = backend;
+    config().enforceAvailableLocales = false;
+  });
+  afterEach(TestCase.teardown);
+
+  function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
+    expect(predicate(actual)).toBe(true);
+  }
+
+  function send(
+    target: Simple,
+    name: "loadJs" | "loadYml" | "loadJson",
+    filename: string,
+  ): [unknown, boolean] {
+    return (target as unknown as Record<typeof name, (f: string) => [unknown, boolean]>)[name](
+      filename,
+    );
+  }
+
+  function h(...pairs: [unknown, unknown][]): Hash<unknown, unknown> {
+    const hash = new Hash<unknown, unknown>();
+    for (const [k, v] of pairs) hash.set(k, v);
+    return hash;
+  }
+
+  function storeTranslations(locale: string, data: object): unknown {
+    return backend.storeTranslations(locale, data as TranslationData);
+  }
+
+  function translations(): TranslationData {
+    return (backend as unknown as { translationsStore: TranslationData }).translationsStore;
+  }
+
+  function t(key: TranslationKey | null, options: TranslateOptions = {}): unknown {
+    return kernelCatch(":exception", () => backend.translate("en", key, options));
+  }
+
+  it("simple backend translate: given nil as a key it still interpolations the default value", () => {
+    expect(t(null, { default: "Hi %{name}", name: "David" })).toBe("Hi David");
+  });
+
+  it("simple backend translate: given true as a key", () => {
+    storeTranslations("en", h([":available", h([true, "Yes"], [false, "No"])]));
+    expect((t("available") as TranslationData).get(true)).toBe("Yes");
+    expect((t("available") as TranslationData).get(false)).toBe("No");
+  });
+
+  it("simple backend translate: given integer as a key", () => {
+    storeTranslations(
+      "en",
+      h([":available", h([-1, "Possibly"], [0, "Maybe"], [1, "Yes"], [2, "No"], [3, "Never"])]),
+    );
+    expect((t("available") as TranslationData).get(-1)).toBe("Possibly");
+    expect(t("available.-1")).toBe("Possibly");
+    expect((t("available") as TranslationData).get(0)).toBe("Maybe");
+    expect(t("available.0")).toBe("Maybe");
+    expect((t("available") as TranslationData).get(1)).toBe("Yes");
+    expect(t("available.1")).toBe("Yes");
+    expect((t("available") as TranslationData).get(2)).toBe("No");
+    expect(t("available.2")).toBe("No");
+    expect((t("available") as TranslationData).get(3)).toBe("Never");
+    expect(t("available.+3")).toBe("Never");
+  });
+
+  it("simple backend translate: given integer with a leading positive/negative sign", () => {
+    storeTranslations("en", h([":available", h([-1, "No"], [0, "Maybe"], [1, "Yes"])]));
+    expect((t("available") as TranslationData).get(-1)).toBe("No");
+    expect(t("available.-1")).toBe("No");
+    expect((t("available") as TranslationData).get(+0)).toBe("Maybe");
+    expect((t("available") as TranslationData).get(-0)).toBe("Maybe");
+    expect(t("available.-0")).toBe("Maybe");
+    expect(t("available.+0")).toBe("Maybe");
+    expect((t("available") as TranslationData).get(+1)).toBe("Yes");
+    expect(t("available.+1")).toBe("Yes");
+  });
+
+  it("simple backend translate: given integer with a lead zero as a key", () => {
+    storeTranslations("en", h([":available", h(["01", "foo"])]));
+    expect((t("available") as TranslationData).get(":01")).toBe("foo");
+    expect(t("available.01")).toBe("foo");
+  });
+
+  it("simple backend translate: symbolize keys in hash", () => {
+    storeTranslations("en", { nested_hashes_in_array: { hello: "world" } });
+    expect(t("nested_hashes_in_array.hello")).toBe("world");
+    expect((t("nested_hashes_in_array") as TranslationData).get(":hello")).toBe("world");
+  });
+
+  it("simple backend translate: symbolize keys in array", () => {
+    storeTranslations("en", { nested_hashes_in_array: [{ hello: "world" }] });
+    for (const val of t("nested_hashes_in_array") as TranslationData[]) {
+      expect(val.get(":hello")).toBe("world");
+    }
+  });
+
+  it("simple load_translations: given an unknown file type it raises I18n::UnknownFileType", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.xml`)).toThrow(UnknownFileType);
+  });
+
+  it("simple load_translations: given a YAML file name with yaml extension does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.yaml`)).not.toThrow();
+  });
+
+  it("simple load_translations: given a JSON file name with yaml extension does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.json`)).not.toThrow();
+  });
+
+  it("simple load_translations: given a Ruby file name it does not raise anything", () => {
+    expect(() => backend.loadTranslations(`${localesDir()}/en.js`)).not.toThrow();
+  });
+
+  it("simple load_translations: given no argument, it uses I18n.load_path", async () => {
+    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    backend.loadTranslations();
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+  });
+
+  it("simple load_rb: loads data from a Ruby file", () => {
+    const [data] = send(backend, "loadJs", `${localesDir()}/en.js`);
+    expect(data).toEqual({ en: { fuh: { bah: "bas" } } });
+  });
+
+  it("simple load_yml: loads data from a YAML file", () => {
+    const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
+    const expected = new Hash<unknown, unknown>().set(
+      ":en",
+      new Hash<unknown, unknown>().set(":foo", new Hash<unknown, unknown>().set(":bar", "baz")),
+    );
+    expect(data).toEqual(expected);
+    expect(data).toEqual(expected);
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
+    );
+  });
+
+  it("simple load_json: loads data from a JSON file", () => {
+    const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
+    );
+  });
+
+  it("simple load_translations: loads data from known file formats", () => {
+    backend = new Simple();
+    config().backend = backend;
+    backend.loadTranslations(`${localesDir()}/en.js`, `${localesDir()}/en.yml`);
+    const expected = h([":en", h([":fuh", h([":bah", "bas"])], [":foo", h([":bar", "baz"])])]);
+    expect(translations()).toEqual(expected);
+  });
+
+  it("simple load_translations: given file names as array it does not raise anything", () => {
+    expect(() =>
+      backend.loadTranslations([`${localesDir()}/en.js`, `${localesDir()}/en.yml`]),
+    ).not.toThrow();
+  });
+
+  it("simple store_translations: stores translations, ... no, really :-)", () => {
+    storeTranslations("en", { foo: "bar" });
+    expect(translations()).toEqual(h([":en", h([":foo", "bar"])]));
+  });
+
+  it("simple store_translations: deep_merges with existing translations", () => {
+    storeTranslations("en", { foo: { bar: "bar" } });
+    storeTranslations("en", { foo: { baz: "baz" } });
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "bar"], [":baz", "baz"])])]));
+  });
+
+  it("simple store_translations: converts the given locale to a Symbol", () => {
+    storeTranslations("en", { foo: "bar" });
+    expect(translations()).toEqual(h([":en", h([":foo", "bar"])]));
+  });
+
+  it("simple store_translations: converts keys to Symbols", () => {
+    storeTranslations("en", h(["foo", h(["bar", "bar"], ["baz", "baz"])]));
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "bar"], [":baz", "baz"])])]));
+  });
+
+  it("simple store_translations: do not store translations unavailable locales if enforce_available_locales is true", () => {
+    try {
+      config().enforceAvailableLocales = true;
+      config().availableLocales = ["en", "es"];
+      storeTranslations("fr", { foo: { bar: "barfr", baz: "bazfr" } });
+      storeTranslations("es", { foo: { bar: "bares", baz: "bazes" } });
+      expect(translations().get(":fr")).toEqual(h());
+      expect(translations().get(":es")).toEqual(
+        h([":foo", h([":bar", "bares"], [":baz", "bazes"])]),
+      );
+    } finally {
+      config().enforceAvailableLocales = false;
+    }
+  });
+
+  it("simple store_translations: store translations for unavailable locales if enforce_available_locales is false", () => {
+    config().availableLocales = ["en", "es"];
+    storeTranslations("fr", { foo: { bar: "barfr", baz: "bazfr" } });
+    expect(translations().get(":fr")).toEqual(h([":foo", h([":bar", "barfr"], [":baz", "bazfr"])]));
+  });
+
+  it("simple store_translations: supports numeric keys", () => {
+    storeTranslations("en", h([1, "foo"]));
+    expect(t("1")).toBe("foo");
+    expect(t(1)).toBe("foo");
+    expect(t("1")).toBe("foo");
+  });
+
+  it("simple store_translations: store translations doesn't deep symbolize keys if skip_symbolize_keys is true", async () => {
+    const data = h([":foo", h(["bar", "barfr"], ["baz", "bazfr"])]);
+
+    storeTranslations("fr", data);
+    expect(translations().get(":fr")).toEqual(h([":foo", h([":bar", "barfr"], [":baz", "bazfr"])]));
+
+    await backend.reloadBang();
+
+    backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
+    expect(translations().get(":fr")).toEqual(h([":foo", h(["bar", "barfr"], ["baz", "bazfr"])]));
+  });
+
+  it("simple reload_translations: unloads translations", async () => {
+    storeTranslations("en", { foo: "bar" });
+    await backend.reloadBang();
+    expect(translations()).toBeUndefined();
+  });
+
+  it("simple reload_translations: uninitializes the backend", async () => {
+    await backend.reloadBang();
+    expect(backend.initialized()).toBe(false);
+  });
+
+  it("simple eager_load!: loads the translations", async () => {
+    expect(backend.initialized()).toBe(false);
+    await backend.eagerLoadBang();
+    expect(backend.initialized()).toBe(true);
+  });
+
+  it("simple reload!: reinitialize the backend if it was previously eager loaded", async () => {
+    await backend.eagerLoadBang();
+    await backend.reloadBang();
+    expect(backend.initialized()).toBe(true);
+  });
+
+  it("Nested keys within pluralization context", () => {
+    storeTranslations("en", {
+      stars: {
+        one: "%{count} star",
+        other: "%{count} stars",
+        special: {
+          one: "%{count} special star",
+          other: "%{count} special stars",
+        },
+      },
+    });
+    expect(t("stars", { count: 1 })).toBe("1 star");
+    expect(t("stars", { count: 20 })).toBe("20 stars");
+    expect(t("stars.special", { count: 1 })).toBe("1 special star");
+    expect(t("stars.special", { count: 20 })).toBe("20 special stars");
+  });
+
+  it("returns localized string given missing pluralization data", async () => {
+    await config().setLoadPath([`${localesDir()}/en.yml`]);
+    backend.loadTranslations();
+    expect(t("foo.bar", { count: 1 })).toBe("baz");
+  });
+});

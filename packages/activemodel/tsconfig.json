@@ -7,9 +7,14 @@
   },
   "include": ["lib"],
   "references": [
-    { "path": "../activesupport" },
-    { "path": "../bcrypt" },
-    { "path": "../ruby-compat" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/**/*.bench.ts", "lib/test-helpers"]
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../bcrypt"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }

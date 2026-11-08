@@ -22,7 +22,7 @@ export default [
     ignores: [
       "packages/marcel/test/fixtures/**",
       "packages/mini-magick/test/fixtures/**",
-      "packages/activestorage/lib/test-helpers/fixtures/files/**",
+      "packages/activestorage/test/fixtures/files/**",
       "packages/rack/test/cgi/assets/**",
     ],
   },

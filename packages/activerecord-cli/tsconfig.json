@@ -6,17 +6,21 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "exclude": [
-    "lib/**/*.test.ts",
-    "lib/**/__fixtures__",
-    "lib/tsc-wrapper/__fixtures__",
-    "lib/type-virtualization/fixtures"
-  ],
   "references": [
-    { "path": "../activerecord" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../ruby-compat" },
-    { "path": "../trails-tsc" }
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trails-tsc"
+    }
   ]
 }

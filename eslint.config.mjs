@@ -159,7 +159,7 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
-      "packages/activestorage/lib/test-helpers/fixtures/files/**",
+      "packages/activestorage/test/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
@@ -170,7 +170,7 @@ export default defineConfig(
       // parser's project service cannot resolve them when linted by path.
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
-      "packages/activerecord-cli/lib/type-virtualization/fixtures/**",
+      "packages/activerecord-cli/test/type-virtualization/fixtures/**",
       // `strip-asany`'s input sample is a file full of `as any` by
       // construction — linting it would be linting the codemod's test data.
       "scripts/__fixtures__/**",
@@ -179,7 +179,7 @@ export default defineConfig(
       // part hand-edited, and its whole job is to stay shaped like the Ruby it
       // mirrors. Linting the TS half would pull it away from its twin.
       "scripts/parity/pipeline/fixtures/**",
-      "packages/activerecord-cli/lib/tsc-wrapper/__fixtures__/**",
+      "packages/activerecord-cli/test/fixtures/**",
     ],
   },
   eslint.configs.recommended,
@@ -660,7 +660,7 @@ export default defineConfig(
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
             "packages/globalid/src/**/*.test.ts",
-            "packages/i18n/lib/**/*.test.ts",
+            "packages/i18n/test/**/*.test.ts",
           ],
           rules: {
             "blazetrails/rails-test-name-parity": "error",
@@ -940,13 +940,13 @@ export default defineConfig(
 
   // ── activemodel ──
   {
-    files: ["packages/activemodel/lib/**/*.ts"],
+    files: ["packages/activemodel/{lib,test}/**/*.ts"],
     rules: {
       "unused-imports/no-unused-vars": "off",
     },
   },
   {
-    files: ["packages/activemodel/lib/**/*.test.ts"],
+    files: ["packages/activemodel/test/**/*.test.ts"],
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
