@@ -91,7 +91,7 @@ export class XmlNode {
     return result;
   }
 
-  set children(nodeOrTags: XmlNode | NodeSet | string) {
+  set children(nodeOrTags: XmlNode | NodeSet | DocumentFragment | string) {
     const coerced = this.coerce(nodeOrTags);
     new NodeSet(this.document, this.children as unknown as Node[]).unlink();
     if (coerced instanceof NodeSet) {
@@ -126,6 +126,8 @@ export class XmlNode {
   protected coerce(data: unknown): XmlNode | NodeSet {
     if (data instanceof NodeSet) {
       return data;
+    } else if (data instanceof XML.DocumentFragment) {
+      return new NodeSet(this.document, data.children as unknown as Node[]);
     } else if (typeof data === "string") {
       return new NodeSet(this.document, this.fragment(data).children as unknown as Node[]);
     } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
@@ -138,7 +140,7 @@ export class XmlNode {
   }
 
   /** @internal */
-  protected addChildNode(node: XmlNode): void {
+  private addChildNode(node: XmlNode): void {
     xmlUnlinkNode(node.pointerId);
     xmlAddChild(this.pointerId, node.pointerId);
   }

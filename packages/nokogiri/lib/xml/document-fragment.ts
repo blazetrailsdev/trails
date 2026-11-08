@@ -5,6 +5,7 @@ import { XML } from "../namespaces.js";
 
 import { XmlDocument } from "./document.js";
 import { XmlNode } from "./node.js";
+import { NodeSet } from "./node-set.js";
 import { ParseOptions } from "./parse-options.js";
 import type { SyntaxError } from "./syntax-error.js";
 
@@ -38,15 +39,13 @@ export class DocumentFragment extends XmlNode {
     let children;
     if (context !== null) {
       /** @missingRailsCall parse — CONVERGEABLE nokogiri-xml-node-parse-in-context */
-      const wrapperDoc = XmlDocument.parse(`<root>${tags}</root>`, null, null, options);
-      this.errors = wrapperDoc.errors;
-      children = wrapperDoc.xpath("/root/node()");
+      children = new NodeSet(document, XML.DocumentFragment.parse(tags, options).children as never);
     } else {
       const wrapperDoc = XmlDocument.parse(`<root>${tags}</root>`, null, null, options);
       this.errors = wrapperDoc.errors;
       children = wrapperDoc.xpath("/root/node()");
     }
-    children.each((child) => this.addChildNode(child as unknown as XmlNode));
+    children.each((child) => this.addChildNodeAndReparentAttrs(child as unknown as XmlNode));
   }
 
   get name(): string {
