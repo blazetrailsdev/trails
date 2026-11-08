@@ -11,6 +11,8 @@ import { ArgumentError, include, constSet, rbObjClassname } from "@blazetrails/r
 import { XML } from "../namespaces.js";
 
 import type { Node } from "../html5/node.js";
+import type { XmlDocument } from "./document.js";
+import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
 
@@ -116,8 +118,8 @@ export class XmlNode {
     }));
   }
 
-  fragment(tags: string): XmlNode {
-    return new XML.DocumentFragment(this.document as never, tags, this);
+  fragment(tags: string): DocumentFragment {
+    return new XML.DocumentFragment(this.document as XmlDocument, tags, this);
   }
 
   /** @internal */
