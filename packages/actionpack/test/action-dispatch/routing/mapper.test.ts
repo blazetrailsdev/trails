@@ -136,7 +136,10 @@ describe("Mapper public DSL additions", () => {
 
   it("draws a sub-routes file through its registered compiled thunk", async () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-draw-compiled-"));
-    await writeFile(join(dir, "compiled.ts"), "export function drawRoutes() {}\n");
+    await writeFile(
+      join(dir, "compiled.ts"),
+      'export function drawRoutes() { this.get("/disk", { to: "disk#index" }); }\n',
+    );
     registerCompiledFiles(dir, {
       "compiled.ts": async () => ({
         drawRoutes(this: Mapper) {
@@ -150,7 +153,12 @@ describe("Mapper public DSL additions", () => {
 
     await m.draw("compiled");
 
-    expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/compiled(.:format)");
+    const specs = () => set.routes().routes.map((r) => r.path.spec.toString());
+    expect(specs()).toContain("/compiled(.:format)");
+    expect(specs()).not.toContain("/disk(.:format)");
+
+    await m.draw("compiled");
+    expect(specs()).toContain("/disk(.:format)");
   });
 
   it("root routes through match_root_route and keeps the bare slash", () => {
