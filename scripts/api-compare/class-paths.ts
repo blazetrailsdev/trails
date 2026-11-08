@@ -42,8 +42,13 @@ const GENERATED = "constants.generated.ts";
 /** The table for the classes in files outside the package entry's graph, which those files import. */
 const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 
-/** The api-compare packages with no constant table: `activerecord-test-support`, whose classes are not loaded from the package entry. */
-const SKIPPED = new Set(["activerecord-test-support"]);
+/**
+ * The api-compare packages with no constant table: `activerecord-test-support`,
+ * whose classes are not loaded from the package entry, and html-sanitizer's
+ * gems, whose `Sanitizer` pairs with both `Rails::HTML::Sanitizer` and
+ * `Rails::HTML5::Sanitizer` (story `html-sanitizer-seats-rails-html-for-class-paths`).
+ */
+const SKIPPED = new Set(["activerecord-test-support", "crass", "loofah", "rails-html-sanitizer"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
 const SUBPATH_ENTRIES: Record<string, string> = {
@@ -206,8 +211,6 @@ function isSelfNamespace(source: string, file: string, tsName: string): boolean 
 
 /** Paired classes a table cannot import, which `--check` reports. */
 const unexported: string[] = [];
-/** Walked exports paired with several Ruby classes, none seated; reported, not gated. */
-const ambiguousUnseated = new Set<string>();
 /** Paired Ruby modules with no exported binding; reported, not gated. */
 const unexportedModules: string[] = [];
 
@@ -374,10 +377,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (placed === null) continue;
       if (ambiguous.has(key)) {
         const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
-        if (seated === undefined) {
-          ambiguousUnseated.add(`${dir}/${entry.file}::${entry.tsName}`);
-          continue;
-        }
+        if (seated === undefined) continue;
         entry = { ...entry, fqn: seated };
       }
       const source = await read(entry.file);
@@ -703,10 +703,6 @@ export async function unreceiptedExclusions(
     if (before.has(key)) continue;
     const [file, tsName] = splitKey(key);
     if (topLevel.has(key)) continue;
-    if (ambiguousUnseated.has(`${dir}/${key}`)) {
-      console.warn(`${dir}: ${key} pairs with several Ruby classes and none is seated`);
-      continue;
-    }
     const source = await fs.readFile(
       path.join(ROOT_DIR, "packages", dir, libRoot(dir), file),
       "utf8",

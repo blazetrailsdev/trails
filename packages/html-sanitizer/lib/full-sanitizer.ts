@@ -1,7 +1,6 @@
 import { Sanitizer, isTrivialInput } from "./sanitizer.js";
 import { stripAllTags } from "./engine.js";
 
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-split-html4-html5-sanitizer-classes */
 export class FullSanitizer extends Sanitizer {
   sanitize(html: string | null | undefined): string | null | undefined {
     if (isTrivialInput(html)) return html;

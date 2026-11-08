@@ -2,7 +2,6 @@ import { Sanitizer, type SanitizeOptions, isTrivialInput } from "./sanitizer.js"
 import { safeListSanitize } from "./engine.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "./config.js";
 
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-split-html4-html5-sanitizer-classes */
 export class SafeListSanitizer extends Sanitizer {
   static allowedTags: Set<string> = new Set(DEFAULT_ALLOWED_TAGS);
 

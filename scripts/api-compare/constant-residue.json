@@ -1020,17 +1020,6 @@
       "uri/gid.ts::MissingModelIdError": "URI::GID::MissingModelIdError"
     }
   },
-  "html-sanitizer": {
-    "rows": 4,
-    "excluded": [
-      "full-sanitizer.ts::FullSanitizer",
-      "link-sanitizer.ts::LinkSanitizer",
-      "safe-list-sanitizer.ts::SafeListSanitizer",
-      "sanitizer.ts::Sanitizer"
-    ],
-    "unwalked": [],
-    "residue": {}
-  },
   "i18n": {
     "rows": 27,
     "excluded": [],
