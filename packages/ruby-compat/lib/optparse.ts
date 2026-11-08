@@ -1,4 +1,5 @@
-import { argv as ARGV, env } from "./process-adapter.js";
+import { File } from "./file.js";
+import { argv as ARGV, env, rbProgname } from "./process-adapter.js";
 import { RuntimeError } from "./runtime-error.js";
 import { Shellwords } from "./shellwords.js";
 
@@ -120,8 +121,8 @@ export class OptionParser {
   /** @noRailsEquivalent PERMANENT */
   static InvalidOption = InvalidOption;
 
-  /** @noRailsEquivalent PERMANENT */
-  banner: string;
+  private _banner: string | null;
+  private _programName: string | null = null;
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1147 */
   summaryWidth: number;
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1148 */
@@ -131,9 +132,30 @@ export class OptionParser {
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1143 */
   constructor(banner: string | null = null, width = 32, indent = " ".repeat(4)) {
-    this.banner = banner ?? "";
+    this._banner = banner;
     this.summaryWidth = width;
     this.summaryIndent = indent;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1235-1241 */
+  get banner(): string {
+    if (this._banner == null) {
+      this._banner = `Usage: ${this.programName} [options]`;
+    }
+    return this._banner;
+  }
+
+  set banner(banner: string) {
+    this._banner = banner;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1247-1249 */
+  get programName(): string {
+    return this._programName ?? File.basename(rbProgname(), ".*");
+  }
+
+  set programName(programName: string) {
+    this._programName = programName;
   }
 
   /** @noRailsEquivalent PERMANENT */
