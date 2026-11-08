@@ -21,7 +21,7 @@ export class CipherError extends StandardError {}
  *
  * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616
  */
-export class SSLError extends StandardError {
+class SSLError extends StandardError {
   static [Symbol.hasInstance](error: unknown): boolean {
     const code = (error as { code?: unknown } | null | undefined)?.code;
     return (
