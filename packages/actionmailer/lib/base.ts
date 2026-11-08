@@ -28,6 +28,7 @@ import {
   type TestMailer,
 } from "@blazetrails/mail";
 import {
+  Hash,
   NoMethodError,
   PROTOCOL_PROBES,
   RuntimeError,
@@ -574,8 +575,8 @@ export class NullMail {
     return "";
   }
 
-  header(): Record<string, unknown> {
-    return {};
+  header(): Hash<string, unknown> {
+    return new Hash();
   }
 
   isRespondTo(_string: string, _includeAll = false): boolean {

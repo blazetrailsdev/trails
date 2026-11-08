@@ -24,6 +24,7 @@ import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
 import { ArgumentError } from "./argument-error.js";
 import { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
+import type { rbFRequireFile } from "./load.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { constGet } from "./variable.js";
@@ -2180,6 +2181,7 @@ export interface KernelModule {
   freeze(this: object): object;
   abort: typeof abort;
   rand: typeof kernelRand;
+  require: typeof rbFRequireFile;
 }
 
 /**
@@ -2193,8 +2195,10 @@ export interface KernelModule {
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
  * `abort` is the module function `Kernel.abort` (`rb_f_abort`,
  * vendor/ruby/v3.3.11/process.c:4536), and `rand` the module function `Kernel.rand`
- * (`rb_f_rand`, vendor/ruby/v3.3.11/random.c:1684, defined at :1840), both seated by
- * `index.ts`, which loads every module involved.
+ * (`rb_f_rand`, vendor/ruby/v3.3.11/random.c:1684, defined at :1840), and `require`
+ * `Kernel#require` (`rb_f_require`, vendor/ruby/v3.3.11/load.c:1022), each seated by
+ * `index.ts`, which loads every module involved. A gem that decorates `require`
+ * (Zeitwerk's `core_ext/kernel.rb`) reassigns that seat.
  *
  * @noRailsEquivalent PERMANENT
  */

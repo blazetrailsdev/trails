@@ -2,6 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { Hash, dup, update } from "./hash.js";
 import { rbDefineAllocFunc, rbObjDup, constSet } from "./include.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { rbEqual } from "./rb-equal.js";
 
 import { rbDeclareIvar, rbModName, rbObjClass, rbObjRespondTo, TopLevel } from "./object.js";
 
@@ -136,6 +137,24 @@ export class Set<T> extends JsSet<T> {
    */
   override has(o: T): boolean {
     return this._hash.has(o);
+  }
+
+  /**
+   * `Set#==` (`vendor/ruby/v3.3.11/lib/set.rb:674`), the `equals` that
+   * `rbEqual` dispatches to.
+   * @noRailsEquivalent PERMANENT
+   */
+  equals(other: unknown): boolean {
+    if (this === other) {
+      return true;
+    } else if (rbObjClass(other) === rbObjClass(this)) {
+      return rbEqual(this._hash, (other as Set<unknown>)._hash);
+    } else if (other instanceof Set && this.size === other.size) {
+      for (const o of other) if (!this._hash.isInclude(o as T)) return false;
+      return true;
+    } else {
+      return false;
+    }
   }
 
   /**

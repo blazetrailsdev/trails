@@ -66,7 +66,7 @@
       <dd id="smtp_from"><%= this.email.smtpEnvelopeFrom() %></dd>
     <% } %>
 
-    <% if (!RubyCompat.rbEqual(new Set([...RubyCompat.rbFArray(this.email.to()), ...RubyCompat.rbFArray(this.email.cc()), ...RubyCompat.rbFArray(this.email.bcc())]), new Set(RubyCompat.rbFArray(this.email.smtpEnvelopeTo())))) { %>
+    <% if (!RubyCompat.rbEqual(new RubyCompat.Set([...RubyCompat.rbFArray(this.email.to()), ...RubyCompat.rbFArray(this.email.cc()), ...RubyCompat.rbFArray(this.email.bcc())]), new RubyCompat.Set(RubyCompat.rbFArray(this.email.smtpEnvelopeTo())))) { %>
       <dt>SMTP-To:</dt>
       <dd id="smtp_to"><%= this.email.smtpEnvelopeTo().join(", ") %></dd>
     <% } %>

@@ -32,7 +32,7 @@ export class MailersController extends ApplicationController {
     this.emailAction = File.basename(this.params.get("path") as string);
     if (this._preview.isEmailExists(this.emailAction)) {
       this.email = await this._preview.call(this.emailAction, this.params);
-      this.sendData(this.email.toString(), { filename: `${this.emailAction}.eml` });
+      await this.sendData(this.email.toString(), { filename: `${this.emailAction}.eml` });
     } else {
       throw new AbstractController.ActionNotFound(
         `Email '${this.emailAction}' not found in ${rbModName(this._preview)}`,
@@ -81,7 +81,7 @@ export class MailersController extends ApplicationController {
             Mime.get("html")!,
             Mime.get("text")!,
           );
-          await this.render({ action: "email", layout: false, formats: ["html"] });
+          await this.render({ action: "email", layout: false, formats: [":html"] });
         }
       } else {
         throw new AbstractController.ActionNotFound(
@@ -150,7 +150,7 @@ export class MailersController extends ApplicationController {
   /** @internal */
   private attachmentsFor(email: Message): Record<string, Part> {
     return indexBy(
-      email.allParts().filter((part) => part.isAttachment()),
+      (email.allParts() ?? []).filter((part) => part.isAttachment()),
       (attachment) =>
         String(
           rbObjRespondTo(attachment, "originalFilename")

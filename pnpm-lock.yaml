@@ -1153,6 +1153,9 @@ importers:
       '@blazetrails/et-orbi':
         specifier: workspace:*
         version: link:../et-orbi
+      '@blazetrails/mail':
+        specifier: workspace:*
+        version: link:../mail
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test

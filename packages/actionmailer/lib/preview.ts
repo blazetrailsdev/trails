@@ -13,7 +13,7 @@ import type { Message } from "@blazetrails/mail";
 import {
   Dir,
   aryDelete,
-  rbFRequireFile,
+  Kernel,
   rbModName,
   rbFSend,
   publicInstanceMethods,
@@ -128,8 +128,8 @@ export class Preview {
   /** @internal */
   private static async loadPreviews(): Promise<void> {
     for (const previewPath of this.previewPaths()) {
-      for (const file of (await Dir.globAsync(`${previewPath}/**/*{-,_}preview.js`)).sort()) {
-        await rbFRequireFile(file.slice(0, -".js".length));
+      for (const file of (await Dir.globAsync(`${previewPath}/**/*{-,_}preview.{ts,js}`)).sort()) {
+        await Kernel.require(file);
       }
     }
   }
