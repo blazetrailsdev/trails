@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { OptionParser } from "../lib/optparse.js";
 
-describe("OptionParser", () => {
-  it("banner defaults to Usage: program_name [options]", () => {
-    const opts = new OptionParser();
-    opts.programName = "rackup";
-    expect(opts.banner).toBe("Usage: rackup [options]");
-    expect(opts.toString().split("\n")[0]).toBe("Usage: rackup [options]");
+describe("TestOptionParserSummaryTest", () => {
+  it("banner", () => {
+    const o = new OptionParser("foo bar");
+    expect(o.banner).toBe("foo bar");
   });
 
-  it("banner keeps an explicit value", () => {
-    const opts = new OptionParser("custom");
-    expect(opts.banner).toBe("custom");
-    opts.banner = "other";
-    expect(opts.banner).toBe("other");
+  it("banner from progname", () => {
+    const o = new OptionParser();
+    o.programName = "foobar";
+    expect(o.toString()).toBe("Usage: foobar [options]\n");
   });
 });
