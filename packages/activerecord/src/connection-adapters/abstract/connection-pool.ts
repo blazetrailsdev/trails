@@ -720,6 +720,25 @@ export class ConnectionPool implements ReapablePool {
         if (pinned && this._connections && !this._connections.includes(pinned)) {
           this._connections.push(pinned);
         }
+        const conns = this._connections;
+        const borrowed =
+          !pinned &&
+          !this.isDiscarded() &&
+          conns &&
+          !this._available?.any &&
+          conns.length + this._nowConnecting >= this.size
+            ? conns.find((c) => c.isInUse() && !c.isTransactionOpen())
+            : undefined;
+        if (borrowed) {
+          const value = fn(borrowed);
+          if (value instanceof Promise) {
+            value.catch(() => {});
+            throw new RuntimeError(
+              "withConnectionSync borrowed a busy connection; its block must not go async",
+            );
+          }
+          return ensure(false, value);
+        }
         result = fn(
           (lease.connection = pinned ?? this.acquireConnectionSync(this.checkoutTimeout)),
         );

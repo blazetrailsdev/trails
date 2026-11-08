@@ -8,7 +8,7 @@ import { Result } from "./result.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import { ConnectionNotEstablished } from "./errors.js";
+import { ConnectionNotEstablished, ConnectionTimeoutError } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
@@ -307,6 +307,65 @@ it("withConnection waits using pool default timeout without explicit checkoutTim
   await waiter;
   expect(connSeen).toBe(held);
   expect(pool.stat().busy).toBe(0);
+});
+
+it("withConnectionSync on a saturated pool borrows a busy connection instead of timing out", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).toBe(held);
+  expect(pool.stat().busy).toBe(1);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
+it("withConnectionSync raises when a borrowed connection's block goes async", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+
+  expect(() => pool.withConnectionSync(async () => 1)).toThrow(RuntimeError);
+  expect(pool.stat().busy).toBe(1);
+});
+
+it("withConnectionSync restores a non-sticky lease after borrowing with preventPermanentCheckout", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+  const lease = pool["connectionLease"]();
+  lease.sticky = null;
+
+  pool.withConnectionSync((conn) => conn, { preventPermanentCheckout: true });
+  expect(lease.sticky).toBeNull();
+});
+
+it("withConnectionSync does not borrow a connection with an open transaction", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+  held.isTransactionOpen = () => true;
+
+  expect(() => pool.withConnectionSync((conn) => conn)).toThrow(ConnectionTimeoutError);
+});
+
+it("withConnectionSync leaves a borrowed connection checked out when its block throws", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  expect(() =>
+    pool.withConnectionSync(() => {
+      throw new RuntimeError("boom");
+    }),
+  ).toThrow("boom");
+  expect(pool.stat().busy).toBe(1);
+  expect(held.isInUse()).not.toBeNull();
+});
+
+it("withConnectionSync checks out an idle connection rather than borrowing", async () => {
+  const pool = makePool(2);
+  const held = await pool.checkout();
+  pool.checkin(held);
+  const other = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).not.toBe(other);
 });
 
 it("full pool async checkout timeout", async () => {
