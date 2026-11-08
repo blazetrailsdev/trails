@@ -49,12 +49,32 @@ export class XmlDocument {
       }
     }
 
-    return XmlDocument.readMemory(readSource(stringOrIo!), url, encoding, options.toI());
+    const doc =
+      typeof stringOrIo === "object" && stringOrIo !== null && "read" in stringOrIo
+        ? XmlDocument.readIo(stringOrIo, url, encoding, options.toI())
+        : XmlDocument.readMemory(stringOrIo as string, url, encoding, options.toI());
+
+    if (options.isXinclude()) doc.doXinclude(options);
+
+    return doc;
   }
 
   /** @internal */
   private static isEmptyDoc(stringOrIo: string | Readable | null): boolean {
-    return stringOrIo == null || stringOrIo === "";
+    return (
+      stringOrIo == null ||
+      stringOrIo === "" ||
+      (typeof stringOrIo === "object" && stringOrIo.isEof !== undefined && stringOrIo.isEof())
+    );
+  }
+
+  static readIo(
+    io: Readable,
+    url: string | null,
+    encoding: string | null,
+    options: number,
+  ): XmlDocument {
+    return XmlDocument.readMemory(readSource(io), url, encoding, options);
   }
 
   static readMemory(
@@ -75,6 +95,21 @@ export class XmlDocument {
       if (new ParseOptions(options).isStrict()) throw document.errors[0];
     }
     return document;
+  }
+
+  doXinclude(
+    options: ParseOptions | number = ParseOptions.DEFAULT_XML,
+    block?: (options: ParseOptions) => void,
+  ): void {
+    if (typeof options === "number") options = new ParseOptions(options);
+    if (block !== undefined) block(options);
+
+    this.processXincludes(options.toI());
+  }
+
+  /** @internal */
+  private processXincludes(_options: number): void {
+    this._doc?.processXInclude();
   }
 
   get document(): XmlDocument {
