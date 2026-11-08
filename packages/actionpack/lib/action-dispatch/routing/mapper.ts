@@ -30,6 +30,7 @@ import {
   Enumerable,
   extend,
   getFs,
+  isCompiledFile,
   loadIseqEval,
   hashAref,
   hashAset,
@@ -1395,7 +1396,8 @@ export class Mapper {
     const fs = getFs();
     let path: string | undefined;
     for (const _path of this._drawPaths) {
-      if (await fs.exists(`${_path}/${name}.ts`)) {
+      const file = `${_path}/${name}.ts`;
+      if (isCompiledFile(file) || (await fs.exists(file))) {
         path = _path;
         break;
       }
