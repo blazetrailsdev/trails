@@ -14,6 +14,5 @@
     { "path": "../msgpack" },
     { "path": "../nokogiri" },
     { "path": "../tse-compiler" }
-  ],
-  "exclude": ["lib/**/*.test.ts", "lib/test-setup-*.ts", "lib/fixtures"]
+  ]
 }

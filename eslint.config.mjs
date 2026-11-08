@@ -1121,7 +1121,7 @@ export default defineConfig(
 
   // ── activesupport ──
   {
-    files: ["packages/activesupport/lib/**/*.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-this-alias": "off",
@@ -1131,7 +1131,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/activesupport/lib/**/*.test.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-unused-expressions": "off",
     },

@@ -1,0 +1,199 @@
+import { describe, expect, it } from "vitest";
+
+import { TimeZone } from "../lib/values/time-zone.js";
+import { AmbiguousTime, PeriodNotFound } from "@blazetrails/tzinfo";
+import { ArgumentError } from "../lib/hash-utils.js";
+import { Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
+
+describe("TimeZoneTest", () => {
+  it("clear resets the memos", () => {
+    const before = TimeZone.all();
+    const usBefore = TimeZone.usZones();
+    const moscowBefore = TimeZone.find("Moscow");
+
+    TimeZone.clear();
+
+    const after = TimeZone.all();
+    expect(after).not.toBe(before);
+    expect(after.map((zone) => zone.name)).toEqual(before.map((zone) => zone.name));
+    expect(TimeZone.usZones()).not.toBe(usBefore);
+    expect(TimeZone.find("Moscow")).not.toBe(moscowBefore);
+    expect(TimeZone.find("Moscow")!.name).toBe("Moscow");
+  });
+
+  it("country zones for a link-backed country answer the canonical zone's Rails name", () => {
+    expect(TimeZone.countryZones("va")).toEqual([TimeZone.find("Rome")]);
+  });
+
+  it("country zones for a link-backed country whose canonical zone has no mapping answer the canonical name", () => {
+    expect(TimeZone.countryZones("ua").map((z) => z.name)).toContain("Europe/Kyiv");
+    expect(TimeZone.countryZones("ua").map((z) => z.name)).not.toContain("Europe/Kiev");
+  });
+});
+
+describe("TimeZone country zone membership", () => {
+  it("country zones agree with TZInfo zone_identifiers for au", () => {
+    expect(TimeZone.countryZones("au").map((z) => z.name)).toEqual([
+      "Perth",
+      "Australia/Eucla",
+      "Osaka",
+      "Sapporo",
+      "Tokyo",
+      "Adelaide",
+      "Australia/Broken_Hill",
+      "Darwin",
+      "Antarctica/Macquarie",
+      "Australia/Lindeman",
+      "Brisbane",
+      "Hobart",
+      "Melbourne",
+      "Sydney",
+      "Australia/Lord_Howe",
+    ]);
+  });
+
+  it("country zones agree with TZInfo zone_identifiers for ru", () => {
+    expect(TimeZone.countryZones("ru").map((z) => z.name)).toEqual([
+      "Kaliningrad",
+      "Europe/Kirov",
+      "Europe/Simferopol",
+      "Moscow",
+      "St. Petersburg",
+      "Volgograd",
+      "Europe/Astrakhan",
+      "Europe/Saratov",
+      "Europe/Ulyanovsk",
+      "Samara",
+      "Ekaterinburg",
+      "Asia/Omsk",
+      "Asia/Barnaul",
+      "Asia/Novokuznetsk",
+      "Asia/Tomsk",
+      "Krasnoyarsk",
+      "Novosibirsk",
+      "Irkutsk",
+      "Asia/Chita",
+      "Asia/Khandyga",
+      "Yakutsk",
+      "Asia/Ust-Nera",
+      "Vladivostok",
+      "Asia/Sakhalin",
+      "Magadan",
+      "Srednekolymsk",
+      "Asia/Anadyr",
+      "Kamchatka",
+    ]);
+  });
+
+  it("country zones for a known zoneless country answer an empty list", () => {
+    expect(TimeZone.countryZones("bv")).toEqual([]);
+    expect(TimeZone.countryZones("hm")).toEqual([]);
+  });
+
+  it("country zones for an unknown country code raise", () => {
+    expect(() => TimeZone.countryZones("zz")).toThrow(/Invalid country code/);
+  });
+});
+
+describe("TimeZoneLocalPeriodsTest", () => {
+  const zone = () => TimeZone.find("Eastern Time (US & Canada)")!;
+
+  it("periods_for_local returns one period for an unambiguous local time", () => {
+    const periods = zone().periodsForLocal(Time.utc(2024, 1, 15, 12));
+    expect(periods.length).toBe(1);
+    expect(periods[0].observedUtcOffset).toBe(-5 * 3600);
+    expect(periods[0].isDst()).toBe(false);
+  });
+
+  it("periods_for_local returns both periods for an ambiguous local time", () => {
+    const periods = zone().periodsForLocal(Time.utc(2006, 10, 29, 1, 30));
+    expect(periods.length).toBe(2);
+    expect(periods.map((period) => period.observedUtcOffset)).toEqual([-4 * 3600, -5 * 3600]);
+  });
+
+  it("period_for_local resolves an ambiguous local time with the dst argument", () => {
+    const ambiguous = Time.utc(2006, 10, 29, 1, 30);
+    expect(zone().periodForLocal(ambiguous).isDst()).toBe(true);
+    expect(zone().periodForLocal(ambiguous, false).isDst()).toBe(false);
+  });
+
+  it("periods_for_local returns a period for a BCE local time", () => {
+    const periods = zone().periodsForLocal(Time.utc(-8001, 12, 31, 19));
+    expect(periods.map((period) => period.observedUtcOffset)).toEqual([-17762]);
+  });
+
+  it("periods_for_local returns no periods for a nonexistent local time", () => {
+    expect(zone().periodsForLocal(Time.utc(2024, 3, 10, 2, 30))).toEqual([]);
+  });
+
+  it("period_for_local raises for a nonexistent local time", () => {
+    expect(() => zone().periodForLocal(Time.utc(2024, 3, 10, 2, 30))).toThrow(PeriodNotFound);
+  });
+
+  it("periods_for_local ignores the offset a Time carries", () => {
+    const withOffset = Time.new(2024, 11, 3, 5, 30, 0, "+04:00");
+    expect(zone().periodsForLocal(withOffset).length).toBe(1);
+    expect(zone().periodsForLocal(Time.utc(2024, 11, 3, 1, 30)).length).toBe(2);
+  });
+
+  it("period_for_local ignores the offset a Time carries", () => {
+    expect(() => zone().periodForLocal(Time.new(2024, 3, 10, 2, 30, 0, "-05:00"))).toThrow(
+      PeriodNotFound,
+    );
+    expect(() => zone().periodForLocal(Time.new(2024, 3, 10, 2, 30, 0, "-05:00"))).toThrow(
+      /2024-03-10T02:30:00 is not valid for/,
+    );
+  });
+
+  it("local_to_utc raises for an ambiguity dst does not resolve", () => {
+    expect(() => zone().localToUtc(Time.utc(2006, 10, 29, 1, 30), null)).toThrow(AmbiguousTime);
+    expect(
+      zone()
+        .localToUtc(Time.utc(2006, 10, 29, 1, 30))
+        .toS(),
+    ).toBe(Time.utc(2006, 10, 29, 5, 30).toS());
+  });
+
+  it("iso8601 and rfc3339 keep sub-millisecond digits", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(eastern.iso8601("1999-12-31T19:00:00.123456789").nsec).toBe(123456789);
+    expect(eastern.rfc3339("1999-12-31T19:00:00.123456789-05:00").nsec).toBe(123456789);
+  });
+
+  it("iso8601 and rfc3339 raise ArgumentError on an invalid date", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(() => eastern.iso8601(null)).toThrow(ArgumentError);
+    expect(() => eastern.iso8601("foobar")).toThrow(ArgumentError);
+    expect(() => eastern.rfc3339("1999-12-31")).toThrow(ArgumentError);
+  });
+
+  it("strptime %Q keeps digits below the millisecond", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const twz = eastern.strptime("946684800123456", "%Q")!;
+    expect(twz.toI()).toBe(946684800123);
+    expect(twz.nsec).toBe(456000000);
+  });
+
+  it("utc_to_local keeps digits below the microsecond on the legacy arm", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const utc = Time.utc(2000, 1, 1, 0, 0, 0, 123456.789);
+    expect(utc.nsec).toBe(123456789);
+    expect(eastern.utcToLocal(utc).nsec).toBe(123456789);
+  });
+
+  it("at keeps digits below the millisecond", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    expect(eastern.at(946684800, 123456.789).nsec).toBe(123456789);
+    expect(eastern.at(new Rational(946684800123456789n, 1_000_000_000n)).nsec).toBe(123456789);
+  });
+
+  it("tzinfo local_to_utc raises AmbiguousTime by default while TimeZone#local_to_utc picks DST", () => {
+    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
+    const ambiguous = Time.utc(2018, 11, 4, 1, 30, 0);
+
+    expect(() => zone.tzinfo.localToUtc(ambiguous)).toThrow(AmbiguousTime);
+    expect(zone.tzinfo.localToUtc(ambiguous, true).toI()).toBe(1541309400);
+    expect(zone.localToUtc(ambiguous).toI()).toBe(1541309400);
+  });
+});
