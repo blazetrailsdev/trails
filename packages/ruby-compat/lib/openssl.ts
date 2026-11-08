@@ -14,6 +14,21 @@ const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
  */
 export class CipherError extends StandardError {}
 
+const SSL_VERIFY_CODES = [
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "CERT_REVOKED",
+  "CERT_UNTRUSTED",
+  "CERT_REJECTED",
+  "CERT_SIGNATURE_FAILURE",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "HOSTNAME_MISMATCH",
+];
+
 /**
  * `OpenSSL::SSL::SSLError` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616`). A
  * TLS failure reaches JS as the host's own error with an `ERR_SSL_` or
@@ -21,15 +36,15 @@ export class CipherError extends StandardError {}
  *
  * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2616
  */
-const SSL_ERROR_CODE =
-  /^(?:ERR_SSL_|ERR_TLS_|CERT_|UNABLE_TO_|DEPTH_ZERO_SELF_SIGNED_CERT$|SELF_SIGNED_CERT_IN_CHAIN$|HOSTNAME_MISMATCH$)/;
-
 class SSLError extends StandardError {
   static [Symbol.hasInstance](error: unknown): boolean {
     const code = (error as { code?: unknown } | null | undefined)?.code;
     return (
       Function.prototype[Symbol.hasInstance].call(this, error) ||
-      (typeof code === "string" && SSL_ERROR_CODE.test(code))
+      (typeof code === "string" &&
+        (code.startsWith("ERR_SSL_") ||
+          code.startsWith("ERR_TLS_") ||
+          SSL_VERIFY_CODES.includes(code)))
     );
   }
 }

@@ -232,13 +232,12 @@ export class HTTP {
       for (;;) {
         try {
           await this.beginTransport(req);
-          let sock;
+          const sock = await Timeout.timeout(this._readTimeout, null, null, () =>
+            this._socket!.request(req.method, req.path, req.toHash(), req.body),
+          ).catch((e: unknown) => {
+            throw e instanceof Timeout.Error ? new ReadTimeout() : e;
+          });
           do {
-            sock = await Timeout.timeout(this._readTimeout, null, null, () =>
-              this._socket!.request(req.method, req.path, req.toHash(), req.body),
-            ).catch((e: unknown) => {
-              throw e instanceof Timeout.Error ? new ReadTimeout() : e;
-            });
             res = HTTPResponse.readNew(sock);
             res.decodeContent = req.decodeContent;
             res.bodyEncoding = this.responseBodyEncoding;

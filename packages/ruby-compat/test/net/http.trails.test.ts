@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { createServer as createNetServer, type Socket as NetSocket } from "node:net";
 import { gzipSync } from "node:zlib";
 import { afterEach, describe, expect, it } from "vitest";
-import { SystemCallError } from "../../lib/errno.js";
+import { Errno, SystemCallError } from "../../lib/errno.js";
 import { OpenSSL } from "../../lib/openssl.js";
 import { SocketError } from "../../lib/socket.js";
 import { HTTPS, URI } from "../../lib/uri.js";
@@ -109,6 +109,31 @@ describe("Net::HTTP", () => {
     expect(response.isConnectionClose()).toBe(true);
     expect(http.isKeepAlive(new Net.HTTP.Post("/"), response)).toBe(false);
     http.doFinish();
+  });
+
+  it("reconnects when the server closed an idle keep-alive connection", async () => {
+    const server = createServer((_req, res) => res.end("ok"));
+    server.keepAliveTimeout = 20;
+    const port = await listen(server);
+    const http = new Net.HTTP("127.0.0.1", port);
+    await http.start();
+    expect((await http.post("/", "")).code).toBe("200");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect((await http.post("/", "")).code).toBe("200");
+    http.doFinish();
+  });
+
+  it("connection_close? reads the request's connection header", () => {
+    expect(new Net.HTTP.Post("/", { Connection: "keep-alive, close" }).isConnectionClose()).toBe(
+      true,
+    );
+    expect(new Net.HTTP.Post("/").isConnectionClose()).toBe(false);
+  });
+
+  it("raises Errno::ETIMEDOUT and Errno::ECONNABORTED with their strerror", () => {
+    expect(new Errno.ETIMEDOUT("x").message).toBe("Connection timed out - x");
+    expect(new Errno.ECONNABORTED().message).toBe("Software caused connection abort");
+    expect(Object.assign(new Error(), { code: "ETIMEDOUT" })).toBeInstanceOf(Errno.ETIMEDOUT);
   });
 
   it("sends accept-encoding and decodes only when the caller set neither it nor range", () => {
