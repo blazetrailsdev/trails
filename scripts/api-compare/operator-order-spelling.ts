@@ -85,6 +85,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // action_controller/metal/strong_parameters.rb:797 `def [](key)` →
   // metal/strong-parameters.ts `Parameters#get`, and :803 `def []=(key, value)` → `set`.
   "ActionController::Parameters": { "[]": ["get"], "[]=": ["set"] },
+  "Nokogiri::XML::Node": { "[]": ["get"], "[]=": ["set"], "==": ["equals"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts

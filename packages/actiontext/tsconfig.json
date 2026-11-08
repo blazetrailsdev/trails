@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "rootDir": "lib"
+  },
+  "include": ["lib"],
+  "references": [
+    { "path": "../actionpack" },
+    { "path": "../actionview" },
+    { "path": "../activerecord" },
+    { "path": "../activestorage" },
+    { "path": "../activesupport" },
+    { "path": "../globalid" },
+    { "path": "../html-sanitizer" },
+    { "path": "../nokogiri" },
+    { "path": "../ruby-compat" }
+  ]
+}

@@ -9,6 +9,7 @@
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/actionmailer": "workspace:*",
     "@blazetrails/actionmailbox": "workspace:*",
+    "@blazetrails/actiontext": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",

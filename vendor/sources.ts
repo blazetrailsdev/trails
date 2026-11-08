@@ -214,6 +214,15 @@ export const SOURCES: readonly UpstreamSource[] = [
         compareTests: true,
       },
       {
+        name: "actiontext",
+        libPath: "actiontext/lib/action_text",
+        libEntryFile: "actiontext/lib/action_text.rb",
+        extraLibPaths: ["actiontext/app/models/action_text", "actiontext/app/helpers/action_text"],
+        testPath: "actiontext/test",
+        compareApi: true,
+        compareTests: true,
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
         extraLibPaths: [

@@ -23,6 +23,7 @@ import { Parser as CssParser } from "./css/parser.js";
 import { SelectorCache } from "./css/selector-cache.js";
 import { Tokenizer as CssTokenizer } from "./css/tokenizer.js";
 import { XPathVisitor } from "./css/xpath-visitor.js";
+export { SaveOptions } from "./xml/node/save-options.js";
 export { usesLibxml } from "./version/info.js";
 import { xpathFor } from "./css.js";
 import "./constants.generated.js";

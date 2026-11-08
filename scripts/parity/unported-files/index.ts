@@ -14,6 +14,7 @@ import { ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES } from "./activerecord-test-su
 import { ACTIONVIEW_UNPORTED_FILES } from "./actionview.js";
 import { ACTIVEJOB_UNPORTED_FILES } from "./activejob.js";
 import { ACTIONMAILBOX_UNPORTED_FILES } from "./actionmailbox.js";
+import { ACTIONTEXT_UNPORTED_FILES } from "./actiontext.js";
 import { ACTIVESTORAGE_UNPORTED_FILES } from "./activestorage.js";
 import { ACTIVESUPPORT_UNPORTED_FILES } from "./activesupport.js";
 import { DATE_UNPORTED_FILES } from "./date.js";
@@ -43,6 +44,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...ACTIONVIEW_UNPORTED_FILES,
   ...ACTIVEJOB_UNPORTED_FILES,
   ...ACTIONMAILBOX_UNPORTED_FILES,
+  ...ACTIONTEXT_UNPORTED_FILES,
   ...ACTIVESTORAGE_UNPORTED_FILES,
   ...ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES,
   ...ACTIVESUPPORT_UNPORTED_FILES,

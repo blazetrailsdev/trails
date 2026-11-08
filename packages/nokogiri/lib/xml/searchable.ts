@@ -26,6 +26,22 @@ export interface SearchableHost {
   xpathImpl: typeof xpathImpl;
 }
 
+export const LOOKS_LIKE_XPATH = /^(\.\/|\/|\.\.|\.$)/;
+
+export function search(this: SearchableHost, ...args: unknown[]): NodeSet {
+  const [paths, handler, ns, binds] = this.extractParams(args);
+
+  const xpaths = [
+    ...new Set(
+      paths
+        .map((path) => String(path))
+        .map((path) => (LOOKS_LIKE_XPATH.test(path) ? path : this.xpathQueryFromCssRule(path, ns))),
+    ),
+  ];
+
+  return this.xpath(...[...xpaths, ns, handler, binds].filter((x) => x != null));
+}
+
 export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
   const [rules, handler, ns] = this.extractParams(args);
 

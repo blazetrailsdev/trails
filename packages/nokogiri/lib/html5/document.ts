@@ -1,8 +1,9 @@
-import { defaultTreeAdapter, parse, type DefaultTreeAdapterMap } from "parse5";
+import { defaultTreeAdapter, html, parse, type DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, Node } from "./node.js";
+import { DocumentFragment } from "./document-fragment.js";
 import type { NodeSet } from "../xml/node-set.js";
 import * as Searchable from "../xml/searchable.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
@@ -16,6 +17,7 @@ export class Document {
   declare atXpath: (...args: unknown[]) => Node | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+  static readonly NCNAME_RE = /^xmlns(?::([A-Za-z_][A-Za-z_\-.0-9]*))?$/;
 
   url: string | null = null;
   encoding: string | null = null;
@@ -80,6 +82,36 @@ export class Document {
   get root(): Node | null {
     const root = childNodes(this._node, this).find((node) => node.isElement());
     return root ?? null;
+  }
+
+  dup(level = 1): Document {
+    const copy = new Document(new Node(this._node as never).dup(level)._node as never);
+    copy.url = this.url;
+    copy.encoding = this.encoding;
+    return copy;
+  }
+
+  createElement(name: string, ...contentsOrAttrs: unknown[]): Node {
+    const elm = new Node(defaultTreeAdapter.createElement(name, html.NS.HTML, []), this);
+    for (const arg of contentsOrAttrs) {
+      if (arg !== null && typeof arg === "object") {
+        for (const [k, v] of Object.entries(arg)) {
+          const key = String(k);
+          if (Document.NCNAME_RE.test(key)) {
+            elm.set(key, v);
+          } else {
+            elm.set(String(k), String(v));
+          }
+        }
+      } else {
+        elm.content = arg;
+      }
+    }
+    return elm;
+  }
+
+  fragment(markup: string | null = null): DocumentFragment {
+    return new DocumentFragment(this, markup);
   }
 
   createCdata(string: string): Node {

@@ -43,6 +43,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/solid-queue", "../solid-queue/lib/index.ts"],
   ["@blazetrails/solid-cable", "../solid-cable/lib/index.ts"],
   ["@blazetrails/actionmailbox", "../actionmailbox/src/index.ts"],
+  ["@blazetrails/actiontext", "../actiontext/lib/index.ts"],
   ["@blazetrails/activestorage", "../activestorage/lib/index.ts"],
   ["@blazetrails/bcrypt", "../bcrypt/lib/index.ts"],
   ["@blazetrails/date", "../date/lib/index.ts"],

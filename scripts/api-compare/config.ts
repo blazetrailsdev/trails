@@ -206,6 +206,7 @@ export const MANIFEST_PACKAGES = [
   "activejob",
   "actionmailer",
   "actionmailbox",
+  "actiontext",
   "activestorage",
   "trailties",
   "rack",
