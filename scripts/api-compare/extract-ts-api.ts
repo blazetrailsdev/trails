@@ -1025,7 +1025,15 @@ export function extractFromProgram(
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
           if (!decl.initializer) continue;
-          const literal = unwrapAssertions(decl.initializer);
+          // `{ … } as T` is a module only where the file already seats module
+          // attributes on it (`mattrAccessor.call(X, …)`); elsewhere an asserted
+          // literal is a namespace or constant table.
+          const declName = decl.name.text;
+          const literal = collectClassAttributeCalls(sourceFile).some(
+            (call) => call.receiver === declName,
+          )
+            ? unwrapAssertions(decl.initializer)
+            : decl.initializer;
           const objectLiteral = ts.isObjectLiteralExpression(literal);
           const methods = ts.isObjectLiteralExpression(literal)
             ? harvestObjectLiteralMethods(literal, checker, relPath)
