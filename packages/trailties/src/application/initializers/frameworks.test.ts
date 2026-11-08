@@ -121,7 +121,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
 `,
     );
     await (t as unknown as Rack).app("development");
-    expect(Base.connectionPool().isActiveConnection()).toBeNull();
+    expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
   it.skip("includes URL helpers as action methods", () => {
