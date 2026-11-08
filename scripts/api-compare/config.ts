@@ -157,7 +157,7 @@ export interface PackageRoots {
  *
  * Derived from `TS_EXTRACT_PACKAGES` rather than a `packages/` listing so the
  * freshness guards see the same tree the extractor does: workspaces that are not
- * api-compared (`activerecord-cli`, `trails-tsc`, `tse-compiler`, `website`, …)
+ * api-compared (`activerecord-cli`, `trails-tsc`, `website`, …)
  * cannot affect the TS manifest and so must not be able to block a run.
  */
 export function apiComparePackageRoots(): PackageRoots[] {

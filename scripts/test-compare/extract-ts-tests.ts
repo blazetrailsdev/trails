@@ -25,7 +25,7 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-function getPackageTestFiles(): Record<string, string[]> {
+export function getPackageTestFiles(): Record<string, string[]> {
   const packages = [
     "arel",
     "activemodel",
