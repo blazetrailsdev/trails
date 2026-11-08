@@ -15,7 +15,6 @@
  * Mapping mirrors the rule's `PKG_NS` + `rubyToSrcRel` (snake_case→kebab-case)
  * exactly. No node:* imports; async fs only.
  */
-import { libRoot } from "../scripts/layout/package-roots.ts";
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
