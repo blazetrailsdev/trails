@@ -3,7 +3,6 @@ import { getEnv } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, HashConfig } from "@blazetrails/activerecord";
 import { Engine } from "../engine.js";
 import { loadQueueSchema, loadShardSchemas } from "./queue-schema.js";
-import "./dummy/config/initializers/solid-queue-record.js";
 
 const configurations = Base.configurations();
 const primary = configurations.configsFor({ envName: "arunit", name: "primary" })!;
