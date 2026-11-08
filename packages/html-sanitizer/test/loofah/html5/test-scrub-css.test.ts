@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
 
 import { Scrub } from "../../../lib/loofah/html5/scrub.js";

@@ -25,7 +25,8 @@
     "sanitize-html": "^2.13.0"
   },
   "devDependencies": {
-    "@types/sanitize-html": "^2.13.0"
+    "@types/sanitize-html": "^2.13.0",
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {
     "node": ">=26"

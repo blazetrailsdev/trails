@@ -56,6 +56,42 @@ _buf.to_s
     );
   });
 
+  it("should escape all backslashes and apostrophes in text", () => {
+    checkOutput(
+      `<table>
+ <tbody>' ' \\ \\
+  <% i = 0
+     list.each_with_index do |item, i| %>
+  <tr>
+   <td><%= i+1 -%>
+</td>
+   <td><%== item %></td>
+  </tr>
+ <% end %>
+ </tbody>
+</table>
+<%== i+1 %>
+<%
+%>`,
+      `_buf = ::String.new; _buf << '<table>
+ <tbody>\\' \\' \\\\ \\\\
+';   i = 0
+     list.each_with_index do |item, i| 
+ _buf << '  <tr>
+   <td>'; _buf << ( i+1 ).to_s; _buf << '</td>
+   <td>'; _buf << ::Erubi.h(( item )); _buf << '</td>
+  </tr>
+';  end 
+ _buf << ' </tbody>
+</table>
+'; _buf << ::Erubi.h(( i+1 )); _buf << '
+';
+_buf.to_s
+`,
+      {},
+    );
+  });
+
   it("should strip only whitespace for <%, <%- and <%# tags", () => {
     checkOutput(
       `  <% a = 1 %>  
@@ -174,6 +210,41 @@ end
     );
   });
 
+  it("should handle :freeze_template_literals => true option", () => {
+    checkOutput(
+      `<table>
+ <tbody>
+  <% i = 0
+     list.each_with_index do |item, i| %>
+  <tr>
+   <td><%= i+1 %></td>
+   <td><%== item %></td>
+  </tr>
+ <% end %>
+ </tbody>
+</table>
+<%== i+1 %>
+`,
+      `_buf = ::String.new; _buf << '<table>
+ <tbody>
+'.freeze;   i = 0
+     list.each_with_index do |item, i| 
+ _buf << '  <tr>
+   <td>'.freeze; _buf << ( i+1 ).to_s; _buf << '</td>
+   <td>'.freeze; _buf << ::Erubi.h(( item )); _buf << '</td>
+  </tr>
+'.freeze;  end 
+ _buf << ' </tbody>
+</table>
+'.freeze; _buf << ::Erubi.h(( i+1 )); _buf << '
+'.freeze;
+_buf.to_s
+`,
+      { freezeTemplateLiterals: true },
+      false,
+    );
+  });
+
   it("should handle <%% and <%# syntax", () => {
     checkOutput(
       `<table>
@@ -197,6 +268,65 @@ end
 _buf.to_s
 `,
       {},
+    );
+  });
+
+  it("should handle <%% with a different literal prefix/postfix", () => {
+    checkOutput(
+      `<table>
+  <%% for item in @items %>
+  <tr>
+  </tr>
+  <%% end %>
+  <%%= "literal" %>
+</table>
+`,
+      `_buf = ::String.new; _buf << '<table>
+'; _buf << '  {% for item in @items %}
+'; _buf << '  <tr>
+  </tr>
+'; _buf << '  {% end %}
+'; _buf << '  {%= "literal" %}
+'; _buf << '</table>
+';
+_buf.to_s
+`,
+      { literalPrefix: "{%", literalPostfix: "%}" },
+    );
+  });
+
+  it("should handle :trim => false option", () => {
+    checkOutput(
+      `<table>
+  <% for item in @items %>
+  <tr>
+    <td><%# 
+    i+1
+    %></td>
+    <td><%== item %></td>
+  </tr>
+  <% end %><%#%>
+  <% i = 1 %>a
+  <% i = 1 %>
+</table>
+`,
+      `_buf = ::String.new; _buf << '<table>
+'; _buf << '  '; for item in @items ; _buf << '
+'; _buf << '  <tr>
+    <td>';
+
+ _buf << '</td>
+    <td>'; _buf << ::Erubi.h(( item )); _buf << '</td>
+  </tr>
+'; _buf << '  '; end ;
+ _buf << '
+'; _buf << '  '; i = 1 ; _buf << 'a
+'; _buf << '  '; i = 1 ; _buf << '
+'; _buf << '</table>
+';
+_buf.to_s
+`,
+      { trim: false },
     );
   });
 

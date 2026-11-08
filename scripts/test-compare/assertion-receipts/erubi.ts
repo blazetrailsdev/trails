@@ -9,15 +9,25 @@ const checkOutputEval: AssertionReceipt = {
 };
 
 export const erubi: Record<string, AssertionReceipt[]> = {
+  "erubi:test.rb › Erubi › should escape all backslashes and apostrophes in text": [
+    checkOutputEval,
+  ],
   "erubi:test.rb › Erubi › should handle :bufvar and :freeze options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :escape and :escapefunc options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :escape option without :escapefunc option": [
     checkOutputEval,
   ],
   "erubi:test.rb › Erubi › should handle :escape_html and :escapefunc options": [checkOutputEval],
+  "erubi:test.rb › Erubi › should handle :freeze_template_literals => true option": [
+    checkOutputEval,
+  ],
   "erubi:test.rb › Erubi › should handle :outvar and :freeze options": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle :preamble and :postamble options": [checkOutputEval],
+  "erubi:test.rb › Erubi › should handle :trim => false option": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle <%% and <%# syntax": [checkOutputEval],
+  "erubi:test.rb › Erubi › should handle <%% with a different literal prefix/postfix": [
+    checkOutputEval,
+  ],
   "erubi:test.rb › Erubi › should handle chain_appends option": [checkOutputEval],
   "erubi:test.rb › Erubi › should handle ensure option": [
     checkOutputEval,

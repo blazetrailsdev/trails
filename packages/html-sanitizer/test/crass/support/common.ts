@@ -16,7 +16,7 @@ export function assertTokens(
 
 export function repositionTokens(tokens: Node[], offset: number): Node[] {
   tokens.forEach((token) => {
-    (token as { pos: number }).pos += offset;
+    token.pos += offset;
   });
   return tokens;
 }
