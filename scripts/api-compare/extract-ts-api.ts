@@ -372,7 +372,7 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   // `dist/*.d.ts` a cross-package import actually resolves through) lives.
   const packagesDir = path.posix.dirname(path.posix.dirname(srcDir.replace(/\\/g, "/")));
   const rel = path.posix.relative(packagesDir, abs);
-  const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
+  const m = /^([^./][^/]*)\/(?:src|lib|dist)\/(.+)$/.exec(rel);
   if (!m) return EXTERNAL_DECL_FILE;
   return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
 }
