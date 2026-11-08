@@ -37,7 +37,7 @@ listed here and does not need a namespace — see root CLAUDE.md
 body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
 
-- `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
+- `activesupport/src/namespaces.ts`, `actionview/lib/namespaces.ts`,
   `actionpack/lib/namespaces.ts` hold the `ActiveSupport`, `ActionView` and
   `ActionDispatch` namespace objects. Autoloaded and seated there:
   `ActionView.Base` (`action_view.rb:37`; read by `handlers/erb.rb:86`,

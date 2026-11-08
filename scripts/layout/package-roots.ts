@@ -41,6 +41,8 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "html-sanitizer",
   "msgpack",
   "chronic",
+  "actionview",
+  "activejob",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

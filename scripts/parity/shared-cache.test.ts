@@ -247,12 +247,12 @@ describe("resolved read-set", () => {
           root,
           "packages/actionview/node_modules/@blazetrails/activesupport/dist/index.d.ts",
         ),
-        path.join(root, "packages/actionview/src/own.ts"),
+        path.join(root, "packages/actionview/lib/own.ts"),
         path.join(root, "node_modules/typescript/lib.d.ts"),
         outside,
       ],
       root,
-      new Set(["packages/actionview/src/own.ts"]),
+      new Set(["packages/actionview/lib/own.ts"]),
     );
     expect(readSet).toEqual(["packages/activesupport/dist/index.d.ts"]);
   });

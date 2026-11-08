@@ -1,0 +1,14 @@
+import { rbObjAsString, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { Base } from "../../../lib/base.js";
+import { JobBuffer } from "../job-buffer.js";
+
+export class HelloJob extends Base {
+  static toString(): string {
+    return "HelloJob";
+  }
+
+  perform(greeter: unknown = "David"): void {
+    JobBuffer.add(`${rbObjAsString(greeter)} says hello`);
+  }
+}
+constSet(TopLevel, "HelloJob", HelloJob);

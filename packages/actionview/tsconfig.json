@@ -3,24 +3,34 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/test-helpers",
-    "src/test",
-    "src/test-case.ts",
-    "src/constants.excluded.generated.ts"
-  ],
+  "include": ["lib"],
+  "exclude": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
   "references": [
-    { "path": "../builder" },
-    { "path": "../ruby-compat" },
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../did-you-mean" },
-    { "path": "../tse-compiler" },
-    { "path": "../html-sanitizer" },
-    { "path": "../nokogiri" }
+    {
+      "path": "../builder"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../did-you-mean"
+    },
+    {
+      "path": "../tse-compiler"
+    },
+    {
+      "path": "../html-sanitizer"
+    },
+    {
+      "path": "../nokogiri"
+    }
   ]
 }

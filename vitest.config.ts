@@ -336,8 +336,8 @@ const alias = {
   "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/lib") + "/",
   "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/lib/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
-  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
-  "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
+  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/lib") + "/",
+  "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/lib/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/lib/index.ts"),
   "@blazetrails/actionpack/system-testing": path.resolve(
     __dirname,
@@ -350,8 +350,8 @@ const alias = {
     "packages/globalid/src/signed-global-id.ts",
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
-  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
-  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
+  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/lib") + "/",
+  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/lib/index.ts"),
   "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/lib") + "/",
   "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/lib/index.ts"),
   "@blazetrails/actioncable/test-helpers/":
@@ -519,7 +519,7 @@ const otherSetupFiles = [
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
-  "./packages/actionview/src/test-helpers/setup-compile-template.ts",
+  "./packages/actionview/test/support/setup-compile-template.ts",
   "./packages/ruby-compat/test-setup/class-paths.ts",
 ];
 
@@ -602,7 +602,7 @@ export default defineConfig({
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
-            "./packages/actionview/src/test-helpers/setup-compile-template.ts",
+            "./packages/actionview/test/support/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
@@ -690,7 +690,7 @@ export default defineConfig({
               : ["packages/actioncable/test/subscription-adapter/redis.test.ts"]),
             ...SHARED_EXCLUDE,
           ],
-          globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
+          globalSetup: ["./packages/actionview/test/support/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
         },
       },

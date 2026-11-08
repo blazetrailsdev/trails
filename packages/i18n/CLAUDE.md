@@ -49,7 +49,7 @@ where Rails returns a String, and an async `translate` makes it return a
   `HtmlSafeTranslation.translate` (`html-safe-translation.ts:11`).
 - Every helper that renders a translated string:
   `ActionView::Helpers::TranslationHelper#translate` / `#localize`
-  (`packages/actionview/src/helpers/translation-helper.ts:40`, `:101`),
+  (`packages/actionview/lib/helpers/translation-helper.ts:40`, `:101`),
   `#time_tag` (`date-helper.ts:223`), `DateTimeSelector`'s private
   `translated_month_names` / `translated_date_order` (`:510`, `:566`),
   `weekday_options_for_select` (`form-options-helper.ts:271`), and
@@ -89,7 +89,7 @@ As a consequence:
   `it.skip` under a `PERMANENT-SKIP:` line citing this section. The one
   instance is `translate caching backend`
   (`vendor/rails/v8.0.2/actionview/test/template/translation_helper_test.rb:390-410`),
-  at `packages/actionview/src/template/translation-helper.test.ts`. Its body is
+  at `packages/actionview/test/template/translation-helper.test.ts`. Its body is
   empty rather than Rails', because that body names two things the port does
   not define: `I18n::Backend::Cache`, which this section leaves unported, and
   the `I18n.cache_store` accessor it is configured through (`cache.rb:44-74`,

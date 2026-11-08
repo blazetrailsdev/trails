@@ -1,0 +1,115 @@
+import { afterEach, describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+
+import { isModuleIncluded } from "@blazetrails/ruby-compat";
+
+import { Base } from "../lib/base.js";
+import { Context } from "../lib/context.js";
+import { Helpers } from "../lib/helpers.js";
+import { CaptureHelper } from "../lib/helpers/capture-helper.js";
+import { ContentExfiltrationPreventionHelper } from "../lib/helpers/content-exfiltration-prevention-helper.js";
+import { OutputSafetyHelper } from "../lib/helpers/output-safety-helper.js";
+import { SanitizeHelper } from "../lib/helpers/sanitize-helper.js";
+import { TagHelper } from "../lib/helpers/tag-helper.js";
+import { TextHelper } from "../lib/helpers/text-helper.js";
+import { UrlHelper } from "../lib/helpers/url-helper.js";
+import { LookupContext } from "../lib/lookup-context.js";
+import { Template } from "../lib/template.js";
+import { TSE } from "../lib/template/handlers/tse.js";
+import { FixtureResolver } from "../lib/testing/resolvers.js";
+
+describe("ActionView::Base include Helpers, Context (base.rb:158)", () => {
+  it("includes the helper modules as live modules, with their own includes", () => {
+    for (const mod of [Helpers, Context, UrlHelper, TextHelper, TagHelper, SanitizeHelper]) {
+      expect(isModuleIncluded(Base, mod)).toBe(true);
+    }
+    expect(isModuleIncluded(Base, CaptureHelper)).toBe(true);
+    expect(isModuleIncluded(Base, OutputSafetyHelper)).toBe(true);
+    expect(isModuleIncluded(Base, ContentExfiltrationPreventionHelper)).toBe(true);
+  });
+
+  it("gives url_helper.rb:26-27 and text_helper.rb:39-41 their includes", () => {
+    const Url = class {};
+    include(Url, UrlHelper);
+    expect(isModuleIncluded(Url, TagHelper)).toBe(true);
+    expect(isModuleIncluded(Url, ContentExfiltrationPreventionHelper)).toBe(true);
+    expect(isModuleIncluded(Url, CaptureHelper)).toBe(true);
+
+    const Text = class {};
+    include(Text, TextHelper);
+    expect(isModuleIncluded(Text, SanitizeHelper)).toBe(true);
+    expect(isModuleIncluded(Text, TagHelper)).toBe(true);
+    expect(isModuleIncluded(Text, OutputSafetyHelper)).toBe(true);
+    expect(isModuleIncluded(Text, UrlHelper)).toBe(false);
+  });
+
+  it("resolves _layout_for through RenderingHelper, whose super reaches Context", () => {
+    const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+    view.viewFlow.set("layout", "body");
+    expect(String(view._layoutFor())).toBe("body");
+    const layoutFor = view._layoutFor as (...args: unknown[]) => unknown;
+    expect(String(layoutFor.call(view, "x", () => "captured"))).toBe("captured");
+  });
+});
+
+describe("ActionView::Base#in_rendering_context", () => {
+  it("swaps view_renderer with lookup_context and restores both (base.rb:290-309)", () => {
+    const lookupContext = new LookupContext([]);
+    const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
+    const oldViewRenderer = view.viewRenderer;
+
+    view.inRenderingContext({ formats: [":json"] }, (renderer) => {
+      expect(view.viewRenderer).toBe(renderer);
+      expect(view.lookupContext).not.toBe(lookupContext);
+      expect(view.viewRenderer).not.toBe(oldViewRenderer);
+      expect(view.viewRenderer.lookupContext).toBe(view.lookupContext);
+    });
+
+    expect(view.lookupContext).toBe(lookupContext);
+    expect(view.viewRenderer).toBe(oldViewRenderer);
+  });
+});
+
+describe("ActionView::Base#render returns the renderer body unwrapped", () => {
+  const renderTse = async (source: string): Promise<string> => {
+    Template.registerTemplateHandler("tse", new TSE());
+    const lookupContext = new LookupContext(null, {}, []);
+    lookupContext.appendViewPaths([new FixtureResolver({ "test/_bold.html.tse": "<b>bold</b>" })]);
+    const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
+    return String(
+      await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(view, {}),
+    );
+  };
+
+  it("escapes a render plain: body appended by <%= %> (template/text.rb:23-25)", async () => {
+    expect(await renderTse('<%= render({ plain: "<b>" }) %>')).toBe("&lt;b&gt;");
+  });
+
+  it("does not escape a render partial: body, an OutputBuffer#to_s (template.rb:272)", async () => {
+    expect(await renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
+  });
+});
+
+describe("ActionView::Base class-hosted accessors", () => {
+  afterEach(() => {
+    TSE.tseTrimMode = "-";
+  });
+
+  it("stores the field_error_proc default as the proc itself", () => {
+    const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+    expect(typeof Base.fieldErrorProc).toBe("function");
+    expect(String(Base.fieldErrorProc.call(view, "<input>", null))).toContain("field_with_errors");
+    expect(view.fieldErrorProc).toBe(Base.fieldErrorProc);
+  });
+
+  it("delegates erb_trim_mode= to the handler", () => {
+    Base.tseTrimMode = ">";
+    expect(TSE.tseTrimMode).toBe(">");
+  });
+});
+
+describe("ActionView::Base#initialize Routing::UrlFor segment", () => {
+  it("a bare view sets no own _routes", () => {
+    expect(Object.hasOwn(Base.empty(), "_routes")).toBe(false);
+  });
+});

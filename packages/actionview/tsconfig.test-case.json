@@ -3,12 +3,12 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "lib",
     "paths": {
       "@blazetrails/actionpack": ["../actionpack/lib/index.ts"]
     }
   },
-  "include": ["src/test-case.ts", "src/constants.excluded.generated.ts"],
+  "include": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
   "references": [
     {
       "path": "./tsconfig.json"

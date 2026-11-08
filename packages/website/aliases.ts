@@ -25,13 +25,13 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/rack", "../rack/src/index.ts"],
   [
     "@blazetrails/actionview/rails-dom-testing/assertions",
-    "../actionview/src/rails-dom-testing/assertions.ts",
+    "../actionview/lib/rails-dom-testing/assertions.ts",
   ],
   [
     "@blazetrails/actionview/rails-dom-testing/testing",
-    "../actionview/src/rails-dom-testing/testing.ts",
+    "../actionview/lib/rails-dom-testing/testing.ts",
   ],
-  ["@blazetrails/actionview", "../actionview/src/index.ts"],
+  ["@blazetrails/actionview", "../actionview/lib/index.ts"],
   ["@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"],
   ["@blazetrails/actionpack", "../actionpack/lib/index.ts"],
   ["@blazetrails/trailties/all", "../trailties/src/all.ts"],

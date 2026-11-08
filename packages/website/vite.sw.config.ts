@@ -46,7 +46,7 @@ export default defineConfig({
       },
       pkgAlias("@blazetrails/activerecord", "../activerecord/src/index.ts"),
       pkgAlias("@blazetrails/rack", "../rack/src/index.ts"),
-      pkgAlias("@blazetrails/actionview", "../actionview/src/index.ts"),
+      pkgAlias("@blazetrails/actionview", "../actionview/lib/index.ts"),
       pkgAlias("@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"),
       pkgAlias("@blazetrails/actionpack", "../actionpack/lib/index.ts"),
       pkgAlias("@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"),

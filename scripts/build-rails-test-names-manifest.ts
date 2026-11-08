@@ -28,7 +28,7 @@ const ROOT = path.resolve(__dirname, "..");
 // Packages whose Rails test names are published to the rule. Grows with the
 // rule's enrollment globs in eslint.config.mjs.
 const PACKAGE_DIRS: Record<string, string> = {
-  actionview: "packages/actionview/src",
+  actionview: "packages/actionview/test",
   arel: "packages/arel/src",
   date: "packages/date/test",
   "did-you-mean": "packages/did-you-mean/test",
