@@ -374,7 +374,7 @@ export class Tokenizer {
     const type = number[2];
 
     if (type === "integer") {
-      value = Math.trunc(value) + 0;
+      value = Math.trunc(value);
     }
 
     if (this.isStartIdentifier(this.s.peek(3))) {
@@ -485,12 +485,14 @@ export class Tokenizer {
   convertStringToNumber(str: string): number {
     const matches = RE_NUMBER_STR.exec(str)!.groups!;
 
-    const s = matches.sign === "-" ? -1 : 1;
+    const s = matches.sign === "-" ? -1n : 1n;
+    const i = BigInt(matches.integer || "0");
+    const f = BigInt(matches.fractional || "0");
     const d = matches.fractional !== undefined ? matches.fractional.length : 0;
     const t = matches.exponentSign === "-" ? -1 : 1;
     const e = parseInt(matches.exponent || "0", 10);
 
-    let value = s * Number(`${matches.integer}${matches.fractional ?? ""}e${t * e - d}`);
+    let value = Number(`${s * (i * 10n ** BigInt(d) + f)}e${t * e - d}`);
 
     if (value > Number.MAX_VALUE) {
       value = Number.MAX_VALUE;
@@ -512,6 +514,7 @@ export class Tokenizer {
 
   preprocess(input: string): string {
     return String(input)
+      .toWellFormed()
       .replace(/\r\n|[\r\f]/g, "\n")
       .replaceAll("\0", "\ufffd");
   }
