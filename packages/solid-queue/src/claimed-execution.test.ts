@@ -7,7 +7,7 @@ import {
 import { Callbacks } from "@blazetrails/activejob/callbacks";
 import {
   ActiveSupport,
-  Executor,
+  Reloader,
   assertDifference,
   type ClassMethods as CallbacksClassMethods,
 } from "@blazetrails/activesupport";
@@ -130,7 +130,8 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
   it("job failures are reported via Rails error subscriber", async () => {
     const subscriber = new ErrorBuffer();
     const executeCallbacks = rbObjSingletonClass(Callbacks) as unknown as CallbacksClassMethods;
-    const reloaderHook = block((_: unknown, inner: () => unknown) => Executor.wrap(() => inner()));
+    const reloader = class extends Reloader {};
+    const reloaderHook = block((_: unknown, inner: () => unknown) => reloader.wrap(() => inner()));
     executeCallbacks.setCallback("execute", "around", { prepend: true }, reloaderHook);
 
     try {
