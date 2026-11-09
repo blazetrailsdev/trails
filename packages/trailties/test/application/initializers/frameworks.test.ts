@@ -10,11 +10,13 @@ import {
   File,
   FileUtils,
   env as ENV,
+  extend,
   include,
   rbObjRespondTo,
   setEnv,
   TopLevel,
 } from "@blazetrails/ruby-compat";
+import { Methods } from "@blazetrails/rack-test";
 import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";
 import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
@@ -165,8 +167,48 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
-  it.skip("action_controller api executes using all the middleware stack", () => {
-    // BLOCKED: isolation-build-app-production-secret-key-base
+  it("action_controller api executes using all the middleware stack", async () => {
+    await t.addToConfig("this.config.apiOnly = true;");
+
+    await t.appFile(
+      "app/controllers/application-controller.ts",
+      `
+        import { ActionController } from "@blazetrails/actionpack";
+        export class ApplicationController extends ActionController.API {}
+`,
+    );
+
+    await t.appFile(
+      "app/controllers/omg-controller.ts",
+      `
+        import { ApplicationController } from "./application-controller.ts";
+        export class OmgController extends ApplicationController {
+          show() {
+            this.render({ json: { omg: "omg" } });
+          }
+        }
+`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.routes().draw(function () {
+          this.get("/:controller(/:action)");
+        });
+`,
+    );
+
+    extend(t, Methods);
+    await (t as unknown as Rack).app();
+
+    const rt = t as unknown as {
+      get(path: string): Promise<unknown>;
+      lastResponse(): { body: string };
+    };
+    await rt.get("omg/show");
+    expect(rt.lastResponse().body).toBe('{"omg":"omg"}');
   });
 
   it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {
