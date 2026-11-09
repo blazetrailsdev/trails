@@ -23,6 +23,7 @@ export interface ActionsHost {
   injectIntoFile(destination: string, ...args: unknown[]): unknown;
   gsubFile: OmitThisParameter<typeof gsubFile>;
   findInSourcePaths(file: string): Promise<string>;
+  _indentation: number;
 }
 
 export interface EnvironmentOptions {
@@ -307,6 +308,22 @@ export function optimizeIndentation(value: unknown, amount: number = 0): string 
 }
 
 export const rebaseIndentation = optimizeIndentation;
+
+export function indentation(this: Pick<ActionsHost, "_indentation">): string {
+  return "  ".repeat(this._indentation);
+}
+
+export async function withIndentation<H extends Pick<ActionsHost, "_indentation">>(
+  this: H,
+  block: (this: H, host: H) => unknown,
+): Promise<void> {
+  this._indentation += 1;
+  try {
+    await block.call(this, this);
+  } finally {
+    this._indentation -= 1;
+  }
+}
 
 /** @internal */
 async function matchFile(path: string, pattern: RegExp): Promise<RegExpMatchArray | null> {
