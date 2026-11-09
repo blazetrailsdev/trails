@@ -176,6 +176,16 @@ export class OptionParser {
     this._banner = banner;
   }
 
+  /** @noRailsEquivalent PERMANENT — `OptionParser#top`, `vendor/ruby/v3.3.11/lib/optparse.rb:1297-1299`. */
+  get top(): List {
+    return this._stack.at(-1)!;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `OptionParser#base`, `vendor/ruby/v3.3.11/lib/optparse.rb:1304-1306`. */
+  get base(): List {
+    return this._stack[1];
+  }
+
   /** @noRailsEquivalent PERMANENT */
   get programName(): string {
     return this._programName ?? File.basename(rbProgname(), ".*");
@@ -187,17 +197,17 @@ export class OptionParser {
 
   /** @noRailsEquivalent PERMANENT */
   separator(string: string): void {
-    this._stack.at(-1)!.list.push(string);
+    this.top.list.push(string);
   }
 
   /** @noRailsEquivalent PERMANENT */
   on(...opts: (string | SwitchBlock)[]): void {
-    this._stack.at(-1)!.list.push(this._makeSwitch(opts));
+    this.top.list.push(this._makeSwitch(opts));
   }
 
   /** @noRailsEquivalent PERMANENT — `on_tail`, `vendor/ruby/v3.3.11/lib/optparse.rb:1597`. */
   onTail(...opts: (string | SwitchBlock)[]): void {
-    this._stack[1].list.push(this._makeSwitch(opts));
+    this.base.list.push(this._makeSwitch(opts));
   }
 
   private _makeSwitch(opts: (string | SwitchBlock)[]): Switch {
@@ -229,7 +239,10 @@ export class OptionParser {
   }
 
   private get _switches(): Switch[] {
-    return [...this._stack].reverse().flatMap((el) => el.list).filter((l): l is Switch => l instanceof Switch);
+    return [...this._stack]
+      .reverse()
+      .flatMap((el) => el.list)
+      .filter((l): l is Switch => l instanceof Switch);
   }
 
   private _complete(opt: string): Switch {
@@ -335,9 +348,9 @@ export class OptionParser {
    * call and returned where Ruby mutates its argument and returns `nil`.
    *
    * @inventedArm return — PERMANENT
-   * @internal
+   * @noRailsEquivalent PERMANENT
    */
-  private visit(id: "addBanner", to: string): string {
+  visit(id: "addBanner", to: string): string {
     for (const el of [...this._stack].reverse()) {
       to = el[id](to);
     }
