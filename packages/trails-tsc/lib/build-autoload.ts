@@ -97,7 +97,21 @@ const BOOT_PATHS = [
   "config/environments",
   "config/initializers",
   "db/seeds.ts",
+  "app/helpers",
 ];
+
+const HELPER_FILE = /[-_]helper\.[cm]?[tj]s$/;
+
+async function helperFiles(dir: string, out: Set<string>): Promise<void> {
+  for (const entry of Dir.children(dir).slice().sort()) {
+    const full = File.join(dir, entry);
+    if (await File.isDirectoryAsync(full)) {
+      await helperFiles(full, out);
+    } else if (HELPER_FILE.test(entry) && !/\.(test|d)\./.test(entry)) {
+      out.add(full);
+    }
+  }
+}
 
 async function writeBoot(
   trailsDir: string,
@@ -114,6 +128,12 @@ async function writeBoot(
     for (const key of BOOT_PATHS) {
       const node = engine.paths!().get(key);
       if (node === undefined) continue;
+      if (key === "app/helpers") {
+        for (const dir of await node.existent()) {
+          if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
+        }
+        continue;
+      }
       if (key !== "config/environments") {
         for (const file of await node.existent()) files.add(file);
         continue;
