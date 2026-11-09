@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { xpathFor } from "../../lib/css.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+import { libxml2Patches } from "../../lib/version/info.js";
 import { BuiltinsConfig, DoctypeConfig, XPathVisitor } from "../../lib/css/xpath-visitor.js";
 
 describe("Nokogiri::CSS::XPathVisitor", () => {
@@ -19,14 +21,25 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
 
   describe(".new", () => {
     it("accepts some config parameters", () => {
-      for (const builtins of BuiltinsConfig.VALUES) {
-        expect(new XPathVisitor({ builtins }).builtins).toEqual(builtins);
-      }
-      expect(() => new XPathVisitor({ builtins: "not_valid" as never })).toThrow("Invalid values");
-      for (const doctype of DoctypeConfig.VALUES) {
-        expect(new XPathVisitor({ doctype }).doctype).toEqual(doctype);
-      }
-      expect(() => new XPathVisitor({ doctype: "not_valid" as never })).toThrow("Invalid values");
+      expect(new XPathVisitor({ builtins: BuiltinsConfig.NEVER }).builtins).toEqual(
+        BuiltinsConfig.NEVER,
+      );
+      expect(new XPathVisitor({ builtins: BuiltinsConfig.ALWAYS }).builtins).toEqual(
+        BuiltinsConfig.ALWAYS,
+      );
+      expect(new XPathVisitor({ builtins: BuiltinsConfig.OPTIMAL }).builtins).toEqual(
+        BuiltinsConfig.OPTIMAL,
+      );
+      expect(() => new XPathVisitor({ builtins: "not_valid" as never })).toThrow(ArgumentError);
+
+      expect(new XPathVisitor({ doctype: DoctypeConfig.XML }).doctype).toEqual(DoctypeConfig.XML);
+      expect(new XPathVisitor({ doctype: DoctypeConfig.HTML4 }).doctype).toEqual(
+        DoctypeConfig.HTML4,
+      );
+      expect(new XPathVisitor({ doctype: DoctypeConfig.HTML5 }).doctype).toEqual(
+        DoctypeConfig.HTML5,
+      );
+      expect(() => new XPathVisitor({ doctype: "not_valid" as never })).toThrow(ArgumentError);
 
       expect(new XPathVisitor({ namespaces: { foo: "bar" } }).namespaces).toEqual({ foo: "bar" });
 
@@ -57,7 +70,7 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       })();
 
       expect(xpathFor("a:aaron()", { visitor, cache: false })).toEqual(["//a[aaron() = 1]"]);
-      expect(visitor.called).toBe(true);
+      expect(visitor.called).toBeTruthy();
     });
 
     it("pseudo-classes selectors", () => {
@@ -71,7 +84,7 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       })();
 
       expect(xpathFor("a:aaron", { visitor, cache: false })).toEqual(["//a[aaron() = 1]"]);
-      expect(visitor.called).toBe(true);
+      expect(visitor.called).toBeTruthy();
     });
   });
 
@@ -97,15 +110,27 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
     });
   });
 
-  describe("doctype:html5 builtins:always without the wildcard-namespaces patch", () => {
-    const config = { doctype: "html5", builtins: "always" } as const;
+  describe("doctype:html5", () => {
+    describe("builtins:always", () => {
+      const config = { doctype: "html5", builtins: "always" } as const;
 
-    it("matches on the element's local-name, ignoring namespaces", () => {
-      assertXpath("//*[nokogiri-builtin:local-name-is('foo')]", "foo", config);
-    });
+      it("matches on the element's local-name, ignoring namespaces", () => {
+        // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_xpath_visitor.rb:822
+        if (libxml2Patches().includes("0009-allow-wildcard-namespaces.patch")) {
+          assertXpath("//*:foo", "foo", config);
+        } else {
+          assertXpath("//*[nokogiri-builtin:local-name-is('foo')]", "foo", config);
+        }
+      });
 
-    it("avoids the wildcard when using attribute selectors (extended-syntax)", () => {
-      assertXpath("//*[nokogiri-builtin:local-name-is('a')]/@href", "a/@href", config);
+      it("avoids the wildcard when using attribute selectors (extended-syntax)", () => {
+        // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_xpath_visitor.rb:834
+        if (libxml2Patches().includes("0009-allow-wildcard-namespaces.patch")) {
+          assertXpath("//*:a/@href", "a/@href", config);
+        } else {
+          assertXpath("//*[nokogiri-builtin:local-name-is('a')]/@href", "a/@href", config);
+        }
+      });
     });
   });
 

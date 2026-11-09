@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { Parser as CP } from "../../lib/crass/parser.js";
-import { Tokenizer as CT, type TokenizerOptions } from "../../lib/crass/tokenizer.js";
+import { assertTokens } from "./support/common.js";
+import { type TokenizerOptions } from "../../lib/crass/tokenizer.js";
 
 describe("Crass::Parser", () => {
   describe("#parse_properties", () => {
@@ -12,12 +13,12 @@ describe("Crass::Parser", () => {
     });
 
     it("should include semicolon and whitespace tokens", () => {
-      expect(parse(";; /**/ ; ;")).toEqual(CT.tokenize(";; /**/ ; ;"));
+      assertTokens(";; /**/ ; ;", parse(";; /**/ ; ;"));
     });
 
     it("should include semicolon, whitespace, and comment tokens when :preserve_comments == true", () => {
       const tree = parse(";; /**/ ; ;", { preserveComments: true });
-      expect(tree).toEqual(CT.tokenize(";; /**/ ; ;", { preserveComments: true }));
+      assertTokens(";; /**/ ; ;", tree, 0, { preserveComments: true });
     });
 
     it("should parse at-rules even though they may be invalid in the given context", () => {

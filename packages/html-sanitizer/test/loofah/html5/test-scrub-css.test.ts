@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
 
 import { Scrub } from "../../../lib/loofah/html5/scrub.js";
@@ -54,14 +55,14 @@ describe("UnitHTML5Scrub", () => {
     });
 
     it("does not allow values with embedded or irregular quotes", () => {
-      expect(Scrub.scrubCss(`font-family:'AvenirNext"-Regular';`)).toBe("");
-      expect(Scrub.scrubCss(`font-family:"AvenirNext'-Regular";`)).toBe("");
+      expect(Scrub.scrubCss(`font-family:'AvenirNext"-Regular';`)).toBeEmpty();
+      expect(Scrub.scrubCss(`font-family:"AvenirNext'-Regular";`)).toBeEmpty();
 
-      expect(Scrub.scrubCss("font-family:'AvenirNext-Regular;")).toBe("");
-      expect(Scrub.scrubCss(`font-family:'AvenirNext-Regular";`)).toBe("");
+      expect(Scrub.scrubCss("font-family:'AvenirNext-Regular;")).toBeEmpty();
+      expect(Scrub.scrubCss(`font-family:'AvenirNext-Regular";`)).toBeEmpty();
 
-      expect(Scrub.scrubCss('font-family:"AvenirNext-Regular;')).toBe("");
-      expect(Scrub.scrubCss(`font-family:"AvenirNext-Regular';`)).toBe("");
+      expect(Scrub.scrubCss('font-family:"AvenirNext-Regular;')).toBeEmpty();
+      expect(Scrub.scrubCss(`font-family:"AvenirNext-Regular';`)).toBeEmpty();
     });
 
     it("keeps whitespace around delimiters if it's already there", () => {
@@ -101,7 +102,7 @@ describe("UnitHTML5Scrub", () => {
     it("does not allow non-colors", () => {
       const text = "background-color:blurple;";
 
-      expect(Scrub.scrubCss(text)).toBe("");
+      expect(Scrub.scrubCss(text)).toBeEmpty();
     });
   });
 });
