@@ -94,18 +94,18 @@ describe("ScheduledTask", () => {
     expect(reasons[1]).toBeInstanceOf(CancelledOperationError);
   });
 
-  it("does not run before the wall clock reaches its deadline", async () => {
-    const start = Date.now();
+  it("does not run before the monotonic clock reaches its deadline", async () => {
+    const start = performance.now();
     let ranAt: number | null = null;
     ScheduledTask.execute(0.1, { executor: new ImmediateExecutor() }, () => {
-      ranAt = Date.now();
+      ranAt = performance.now();
     });
     const realNow = Date.now.bind(Date);
-    const lag = vi.spyOn(Date, "now").mockImplementation(() => realNow() - 60);
+    const ahead = vi.spyOn(Date, "now").mockImplementation(() => realNow() + 60);
     try {
       await sleep(250);
     } finally {
-      lag.mockRestore();
+      ahead.mockRestore();
     }
     expect(ranAt).not.toBeNull();
     expect(ranAt! - start).toBeGreaterThanOrEqual(100);
