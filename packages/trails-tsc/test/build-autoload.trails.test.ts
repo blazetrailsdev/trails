@@ -240,6 +240,7 @@ describe("buildAutoload", () => {
       File.write("config/storage.ts", "export default {};\n");
       File.write("config/storage/production.ts", "export default {};\n");
       File.write("config/types.d.ts", "export {};\n");
+      File.write("config/my.settings.ts", "export default {};\n");
       File.write("app/helpers/admin/users_helper.ts", "export {};\n");
       File.write("app/helpers/format.ts", "export {};\n");
       File.write("app/helpers/posts-helper.test.ts", "export {};\n");
@@ -291,6 +292,7 @@ describe("buildAutoload", () => {
         "config/cable.ts",
         "config/storage.ts",
         "config/storage/production.ts",
+        "config/my.settings.ts",
         "vendor/blog/config/routes.ts",
         "vendor/blog/config/initializers/blog.ts",
       ]) {
