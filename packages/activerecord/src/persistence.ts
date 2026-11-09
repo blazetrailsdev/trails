@@ -957,7 +957,6 @@ export function _raiseRecordNotTouchedError(): never {
  * @internal
  * @inventedArm if — PERMANENT
  * @inventedArm keys — PERMANENT
- * @inventedArm basicObjRespondTo — PERMANENT
  */
 export function instantiateInstanceOf(
   this: PersistenceHost,
@@ -981,10 +980,7 @@ const _virtualAttributeNamesCache = new WeakMap<
   Map<string, { serial: number; virtual: string[] }>
 >();
 
-/**
- * @perf 10x — PERMANENT
- * @inventedArm basicObjRespondTo — PERMANENT
- */
+/** @perf 10x — PERMANENT */
 function _virtualAttributeNames(record: object, names: string[]): string[] {
   const proto = Object.getPrototypeOf(record) as object;
   let byKey = _virtualAttributeNamesCache.get(proto);
@@ -994,7 +990,7 @@ function _virtualAttributeNames(record: object, names: string[]): string[] {
   if (hit && hit.serial === methodCacheSerial) return hit.virtual;
   const serial = methodCacheSerial;
   const virtual = names.filter((name) => !basicObjRespondTo(record, name));
-  if (byKey.size < 64) byKey.set(key, { serial, virtual });
+  if (hit || byKey.size < 64) byKey.set(key, { serial, virtual });
   return virtual;
 }
 
