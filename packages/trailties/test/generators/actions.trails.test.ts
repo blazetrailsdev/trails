@@ -25,4 +25,13 @@ describe("Actions indentation", () => {
     ).rejects.toThrow("boom");
     expect(host._indentation).toBe(0);
   });
+
+  it("withIndentation yields the receiver to the block", async () => {
+    const host = { _indentation: 0 };
+    let yielded: unknown;
+    await withIndentation.call(host, (g) => {
+      yielded = g;
+    });
+    expect(yielded).toBe(host);
+  });
 });

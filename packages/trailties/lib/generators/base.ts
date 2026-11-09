@@ -113,7 +113,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
   /** @internal */
-  private _indentation?: number;
+  _indentation: number;
 
   /**
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
