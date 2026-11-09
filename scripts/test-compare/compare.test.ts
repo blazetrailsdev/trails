@@ -207,6 +207,13 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
   });
 
+  it("strips tzinfo's tc_ prefix and kebabs its subdirectory", () => {
+    expect(rubyToConventionTs("tc_timezone_proxy.rb", "tzinfo")).toBe("timezone-proxy.test.ts");
+    expect(rubyToConventionTs("data_sources/tc_zoneinfo_reader.rb", "tzinfo")).toBe(
+      "data-sources/zoneinfo-reader.test.ts",
+    );
+  });
+
   it("strips fugit's _spec suffix", () => {
     expect(rubyToConventionTs("cron_spec.rb", "fugit")).toBe("cron.test.ts");
   });

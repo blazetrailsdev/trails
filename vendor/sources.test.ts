@@ -511,6 +511,7 @@ describe("vendor/sources.ts", () => {
         "solid-queue",
         "thor",
         "trailties",
+        "tzinfo",
         "zeitwerk",
       ].sort(),
     );
