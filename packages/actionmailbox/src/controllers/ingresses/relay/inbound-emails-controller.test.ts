@@ -45,6 +45,9 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     await inboundEmail.rawEmail.load();
+    await (
+      await inboundEmail.rawEmail.attachment
+    )?.blob;
     expect(await inboundEmail.rawEmail.download()).toEqual(
       await File.binreadAsync(String(t.fileFixture("../files/welcome.eml"))),
     );
@@ -68,6 +71,9 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     await inboundEmail.rawEmail.load();
+    await (
+      await inboundEmail.rawEmail.attachment
+    )?.blob;
     expect(await inboundEmail.rawEmail.download()).toEqual(
       await File.binreadAsync(String(t.fileFixture("../files/invalid_utf.eml"))),
     );

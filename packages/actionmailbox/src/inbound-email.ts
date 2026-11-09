@@ -52,6 +52,9 @@ export class InboundEmail extends Record {
   async source(): Promise<Uint8Array> {
     if (this._source == null) {
       await this.rawEmail.load();
+      await (
+        await this.rawEmail.attachment
+      )?.blob;
       this._source = await this.rawEmail.download();
     }
     return this._source;
