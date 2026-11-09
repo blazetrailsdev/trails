@@ -3,7 +3,6 @@
   "server-path-activemodel-lint": ["packages/activesupport/dist/testing/assertions.js"],
   "server-path-activesupport-test-case-and-behaviors": [
     "packages/activesupport/dist/executor/test-helper.js",
-    "packages/activesupport/dist/test-case.js",
     "packages/activesupport/dist/testing/file-fixtures.js"
   ],
   "server-path-mail-test-mailer": ["packages/mail/dist/network/delivery-methods/test-mailer.js"],
