@@ -1,6 +1,28 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark":
+    [
+      {
+        kind: "assert_equal",
+        value:
+          's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("before") { }\n  x.report("after") { }\n\n  x.compare!\nend\n',
+        as: "assert_equal",
+        reason:
+          "benchmark_generator_test.rb asserts the generated script as Ruby source; the port generates the same script as TypeScript",
+      },
+    ],
+  "trailties:generators/benchmark_generator_test.rb › BenchmarkGeneratorTest › generate benchmark with reports":
+    [
+      {
+        kind: "assert_equal",
+        value:
+          's:# frozen_string_literal: true\n\nrequire_relative "../../config/environment"\n\n# Any benchmarking setup goes here...\n\n\n\nBenchmark.ips do |x|\n  x.report("with_patch") { }\n  x.report("without_patch") { }\n\n  x.compare!\nend\n',
+        as: "assert_equal",
+        reason:
+          "benchmark_generator_test.rb asserts the generated script as Ruby source; the port generates the same script as TypeScript",
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",

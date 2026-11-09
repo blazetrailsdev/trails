@@ -1,13 +1,14 @@
+import "../../config/environment.js";
+import { Benchmark } from "benchmark-ips";
+
 // Any benchmarking setup goes here...
 
-const reports: Record<string, () => void> = {
-<% for (const report of this.reports) { -%>
-  <%= report %>: () => {},
-<% } -%>
-};
 
-for (const [name, fn] of Object.entries(reports)) {
-  const start = performance.now();
-  fn();
-  console.log(`${name}: ${(performance.now() - start).toFixed(3)}ms`);
-}
+
+Benchmark.ips((x) => {
+<% for (const report of this.reports) { -%>
+  x.report("<%= report %>", () => {});
+<% } -%>
+
+  x.compare();
+});
