@@ -184,7 +184,7 @@ ModelGenerator.classOption("database", {
   desc: "The database for your model's migration. By default, the current environment's primary database is used.",
 });
 
-const baseName = (ModelGenerator as unknown as { baseName(): string }).baseName();
+const baseName = ModelGenerator["baseName"]()!;
 for (const path of Generators.templatesPath()) {
   ModelGenerator.sourcePaths().push(File.join(path, baseName, "migration"));
 }

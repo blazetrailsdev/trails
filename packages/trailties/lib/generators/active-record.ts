@@ -1,19 +1,13 @@
 import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import { NamedBase } from "./named-base.js";
-import { ClassMethods, Migration } from "./migration.js";
+import * as Generators from "./migration.js";
 import type { GeneratedAttribute } from "./generated-attribute.js";
-import {
-  configuredMigratePath,
-  dbMigratePath,
-  defaultMigratePath,
-  foreignKeyType,
-  nextMigrationNumber,
-  primaryKeyType,
-} from "./active-record/migration.js";
+import { ClassMethods, Migration } from "./active-record/migration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
+/** @noRailsEquivalent CONVERGEABLE create-table-migration-template-inlines-its-body */
 export function indexNameLiteral(attribute: GeneratedAttribute): string {
   const indexName = attribute.indexName();
   return Array.isArray(indexName)
@@ -21,45 +15,37 @@ export function indexNameLiteral(attribute: GeneratedAttribute): string {
     : `"${indexName}"`;
 }
 
+/** @noRailsEquivalent CONVERGEABLE create-table-migration-template-inlines-its-body */
 export function kwargs(...options: Array<string | undefined>): string {
   const pairs = options.join("");
   return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof Migration> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base extends Included<typeof Generators.Migration>, Included<typeof Migration> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class Base extends NamedBase {
+export class Base extends NamedBase {
   declare options: NamedBase["options"] & { primaryKeyType?: string; timestamps?: boolean };
   migrationNumber = "";
   migrationFileName = "";
   migrationClassName = "";
 
-  declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
-  declare static migrationExists: Extended<typeof ClassMethods>["migrationExists"];
-  declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
-  static nextMigrationNumber = nextMigrationNumber;
-
-  /** @internal */
-  primaryKeyType = primaryKeyType;
-  /** @internal */
-  foreignKeyType = foreignKeyType;
-  /** @internal */
-  dbMigratePath = dbMigratePath;
-  /** @internal */
-  defaultMigratePath = defaultMigratePath;
-  /** @internal */
-  configuredMigratePath = configuredMigratePath;
+  declare static migrationLookupAt: Extended<typeof Generators.ClassMethods>["migrationLookupAt"];
+  declare static migrationExists: Extended<typeof Generators.ClassMethods>["migrationExists"];
+  declare static currentMigrationNumber: Extended<
+    typeof Generators.ClassMethods
+  >["currentMigrationNumber"];
+  declare static nextMigrationNumber: Extended<typeof ClassMethods>["nextMigrationNumber"];
 
   static override baseRoot(): string {
     return __dir__;
   }
 
-  /** @internal */
-  protected abstract attributesWithIndex(): GeneratedAttribute[];
-
-  protected createTableMigration(): string {
+  /** @noRailsEquivalent CONVERGEABLE create-table-migration-template-inlines-its-body */
+  protected createTableMigration(
+    this: Base & { attributesWithIndex(): GeneratedAttribute[] },
+  ): string {
     const table = this.tableName();
     const colLines: string[] = [];
     for (const attribute of this.attributes) {
@@ -95,7 +81,9 @@ export abstract class Base extends NamedBase {
   }
 }
 
+include(Base, Generators.Migration);
 include(Base, Migration);
+extend(Base, Generators.ClassMethods);
 extend(Base, ClassMethods);
 
 Object.defineProperty(Base, "name", { value: "ActiveRecord::Generators::Base" });

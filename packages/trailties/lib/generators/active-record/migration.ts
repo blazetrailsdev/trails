@@ -1,4 +1,4 @@
-import { Base, Migration } from "@blazetrails/activerecord";
+import { Base, Migration as ActiveRecordMigration } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 interface MigrationHost {
@@ -12,7 +12,7 @@ export function nextMigrationNumber(
   dirname: string,
 ): string {
   const nextMigrationNumber = this.currentMigrationNumber(dirname) + 1;
-  return Migration.nextMigrationNumber(nextMigrationNumber);
+  return ActiveRecordMigration.nextMigrationNumber(nextMigrationNumber);
 }
 
 /** @internal */
@@ -53,3 +53,13 @@ export function foreignKeyType(this: { options: { primaryKeyType?: string } }): 
   const keyType = this.options.primaryKeyType;
   if (keyType) return `, type: "${keyType}"`;
 }
+
+export const ClassMethods = { nextMigrationNumber };
+
+export const Migration = {
+  primaryKeyType,
+  foreignKeyType,
+  dbMigratePath,
+  defaultMigratePath,
+  configuredMigratePath,
+};
