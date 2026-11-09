@@ -14,6 +14,7 @@ export class DocumentFragment {
    */
   readonly _node: Parse5Parent;
 
+  /** @missingRailsCall fragment — CONVERGEABLE nokogiri-html5-document-fragment-gumbo-fragment */
   constructor(
     public document: Document,
     input: string | null = null,

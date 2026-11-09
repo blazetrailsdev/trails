@@ -1,5 +1,6 @@
 import { XmlDocument } from "./xml/document.js";
 import { XmlNode } from "./xml/node.js";
+import "./xml/document-fragment.js";
 import { parseXml } from "./xml/parse.js";
 import { SyntaxError } from "./xml/syntax-error.js";
 import { SaxDocument } from "./xml/sax/document.js";

@@ -6,6 +6,7 @@ import type { Attr } from "./xml/attr.js";
 import type { Namespace } from "./xml/namespace.js";
 import type { XmlNode } from "./xml/node.js";
 import type { XmlDocument } from "./xml/document.js";
+import type { DocumentFragment } from "./xml/document-fragment.js";
 import type { ParseOptions } from "./xml/parse-options.js";
 import type { XPathContext } from "./xml/xpath-context.js";
 
@@ -18,6 +19,7 @@ export const XML = { name: "Nokogiri::XML" } as {
   Namespace: typeof Namespace;
   ParseOptions: typeof ParseOptions;
   Document: typeof XmlDocument;
+  DocumentFragment: typeof DocumentFragment;
 };
 
 export const HTML5 = { name: "Nokogiri::HTML5" } as { name: string; Node: typeof Node };

@@ -11,6 +11,8 @@ import { ArgumentError, include, constSet, rbObjClassname } from "@blazetrails/r
 import { XML } from "../namespaces.js";
 
 import type { Node } from "../html5/node.js";
+import type { XmlDocument } from "./document.js";
+import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
 
@@ -89,7 +91,7 @@ export class XmlNode {
     return result;
   }
 
-  set children(nodeOrTags: XmlNode | NodeSet | string) {
+  set children(nodeOrTags: XmlNode | NodeSet | DocumentFragment | string) {
     const coerced = this.coerce(nodeOrTags);
     new NodeSet(this.document, this.children as unknown as Node[]).unlink();
     if (coerced instanceof NodeSet) {
@@ -116,12 +118,18 @@ export class XmlNode {
     }));
   }
 
+  fragment(tags: string): DocumentFragment {
+    return new XML.DocumentFragment(this.document as XmlDocument, tags, this);
+  }
+
   /** @internal */
   protected coerce(data: unknown): XmlNode | NodeSet {
     if (data instanceof NodeSet) {
       return data;
+    } else if (data instanceof XML.DocumentFragment) {
+      return new NodeSet(this.document, data.children as unknown as Node[]);
     } else if (typeof data === "string") {
-      return XML.Document.parse(`<root>${data}</root>`).xpath("/root/node()");
+      return new NodeSet(this.document, this.fragment(data).children as unknown as Node[]);
     } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
       return data;
     }
@@ -138,7 +146,7 @@ export class XmlNode {
   }
 
   /** @internal */
-  private addChildNodeAndReparentAttrs(node: XmlNode): void {
+  protected addChildNodeAndReparentAttrs(node: XmlNode): void {
     this.addChildNode(node);
     if (!(node._node instanceof LibXmlElement)) return;
     for (const attrNode of node._node.attrs.filter((a) => a.name.includes(":"))) {
