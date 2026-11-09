@@ -242,6 +242,10 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+    devDependencies:
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
 
   packages/actionmailer:
     dependencies:

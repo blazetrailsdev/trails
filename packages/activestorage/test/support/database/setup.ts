@@ -49,6 +49,7 @@ TopLevel.Trails = {
   application: {
     routes: () => app.routes(),
     envConfig: () => ({}),
+    credentials: () => app.credentials(),
     get executor() {
       return app.executor;
     },
