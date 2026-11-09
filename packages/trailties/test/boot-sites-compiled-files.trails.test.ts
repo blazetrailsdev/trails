@@ -98,7 +98,8 @@ describe("boot sites load through a registered compiled file", () => {
     File.write(`${tmp}/config/database.ts`, 'throw new Error("read from disk");\n');
     registerCompiledFiles(tmp, {
       "config/database.ts": async () => (
-        loads.push("config/database.ts"), { default: { test: { adapter: "sqlite3" } } }
+        loads.push("config/database.ts"),
+        { default: { test: { adapter: "sqlite3" } } }
       ),
     });
 
@@ -118,7 +119,8 @@ describe("boot sites load through a registered compiled file", () => {
     File.write(`${tmp}/config.ts`, "");
     registerCompiledFiles(tmp, {
       "config/compiled-cable.ts": async () => (
-        loads.push("config/compiled-cable.ts"), { default: { test: { adapter: "async" } } }
+        loads.push("config/compiled-cable.ts"),
+        { default: { test: { adapter: "async" } } }
       ),
     });
     class CompiledConfigApp extends Application {}
