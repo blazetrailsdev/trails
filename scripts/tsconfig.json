@@ -28,7 +28,7 @@
       "path": "../packages/trails-tsc"
     },
     {
-      "path": "../packages/activerecord"
+      "path": "../packages/activerecord/tsconfig.test.json"
     },
     {
       "path": "../packages/rack"

@@ -77,4 +77,29 @@ describe("planTestMoves", () => {
     );
     expect(plan.collisions).toEqual(["test/support/a.ts"]);
   });
+
+  it("places a test under a lib test-helpers dir by rule 3, not as support", () => {
+    const plan = planTestMoves(
+      fixture({
+        pkg: "actionpack",
+        libDir: "lib",
+        files: [
+          "action-dispatch/testing/test-helpers/page-dump-helper.ts",
+          "action-dispatch/testing/test-helpers/page-dump-helper.trails.test.ts",
+        ],
+        libImported: new Set(),
+        comparison: [],
+      }),
+    );
+    expect(plan.moves).toEqual([
+      [
+        "lib/action-dispatch/testing/test-helpers/page-dump-helper.trails.test.ts",
+        "test/action-dispatch/testing/test-helpers/page-dump-helper.trails.test.ts",
+      ],
+      [
+        "lib/action-dispatch/testing/test-helpers/page-dump-helper.ts",
+        "test/support/page-dump-helper.ts",
+      ],
+    ]);
+  });
 });

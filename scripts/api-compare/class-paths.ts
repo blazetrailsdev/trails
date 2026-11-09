@@ -69,6 +69,12 @@ const LAZY_DIRS: Record<string, string[]> = {
     "test-databases.ts",
     "testing/query-assertions.ts",
   ],
+  actioncable: [
+    "channel/test-case.ts",
+    "connection/test-case.ts",
+    "subscription-adapter/test.ts",
+    "test-helper.ts",
+  ],
   actionmailbox: ["inbound-email.ts", "inbound-email/"],
   actionmailer: ["test-case.ts", "test-helper.ts"],
   actionview: ["testing/resolvers.ts"],
@@ -137,6 +143,16 @@ async function readJson<T>(name: string): Promise<T> {
 async function tsconfigExcludes(dir: string): Promise<string[]> {
   const raw = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "tsconfig.json"), "utf8");
   return (JSON.parse(raw) as { exclude?: string[] }).exclude ?? [];
+}
+
+/** Files and directories the package's test project lists by name: test-only, so in no table. */
+async function testProjectFiles(dir: string): Promise<string[]> {
+  const raw = await fs
+    .readFile(path.join(ROOT_DIR, "packages", dir, "tsconfig.test.json"), "utf8")
+    .catch(() => "{}");
+  return ((JSON.parse(raw) as { include?: string[] }).include ?? []).filter(
+    (f) => !f.includes("*"),
+  );
 }
 
 /**
@@ -227,6 +243,7 @@ const unexportedModules: string[] = [];
 async function placement(dir: string) {
   const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
   const excluded = await tsconfigExcludes(dir);
+  const testOnly = await testProjectFiles(dir);
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
   const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
@@ -238,6 +255,7 @@ async function placement(dir: string) {
     sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
     const rel = path.join(libRoot(dir), file);
+    if (testOnly.some((f) => rel === f || rel.startsWith(`${f}/`))) return null;
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&

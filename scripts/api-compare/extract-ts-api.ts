@@ -1247,6 +1247,37 @@ export function extractFromProgram(
       mod.instanceMethods.push({ ...aliased, name: alias.text, aliasOf: original.text });
     }
 
+    // `ClassMethods.tasks = ClassMethods.commands;` — Ruby's
+    // `alias_method :tasks, :commands` on a plain-object module whose literal
+    // types the alias with a placeholder slot.
+    for (const statement of sourceFile.statements) {
+      const expr = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!expr || !ts.isBinaryExpression(expr)) continue;
+      if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
+      const { left, right } = expr;
+      if (!ts.isPropertyAccessExpression(left) || !ts.isPropertyAccessExpression(right)) continue;
+      if (!ts.isIdentifier(left.expression) || !ts.isIdentifier(right.expression)) continue;
+      if (left.expression.text !== right.expression.text) continue;
+      const mod = info.modules[`${relPath}:${left.expression.text}`];
+      if (!mod) continue;
+      for (const list of [mod.instanceMethods, mod.classMethods]) {
+        const original = list.find((m) => m.name === right.name.text && !m.bodyless);
+        const at = list.findIndex((m) => m.name === left.name.text);
+        if (!original) continue;
+        const { internal: _internal, inventedArms: _inventedArms, ...body } = original;
+        const own = at >= 0 ? list[at].internal : undefined;
+        const aliased = {
+          ...body,
+          name: left.name.text,
+          aliasOf: right.name.text,
+          line: sourceFile.getLineAndCharacterOfPosition(statement.getStart()).line + 1,
+          ...(own !== undefined ? { internal: own } : {}),
+        };
+        if (at >= 0) list[at] = aliased;
+        else list.push(aliased);
+      }
+    }
+
     for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
       const entity = info.classes[`${relPath}:${generated.receiver}`];
       if (entity === undefined) continue;
@@ -3735,8 +3766,10 @@ function readClassAttributeCall(
       .map((arg) => arg.text);
     if (names.length === 0 || names.length !== node.arguments.length - 1) return null;
     const enclosing = enclosingEntity(node);
+    const receiver = rbModAttrReceiver(node.arguments[0], sourceFile);
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      ...(enclosing === undefined && receiver !== undefined ? { receiver } : {}),
       names,
       reader: false,
       writer: false,
@@ -3812,6 +3845,31 @@ function readClassAttributeCall(
 }
 
 /** `Klass.prototype`, a top-level macro's receiver for a class module's instance side. */
+/**
+ * The module a top-level `rbModAttrReader(X, …)` installs on: `X`, or `X` for
+ * the `{ prototype: X }` shape a plain-object module passes, whose own members
+ * are its instance methods.
+ */
+function rbModAttrReceiver(
+  expr: ts.Expression | undefined,
+  sourceFile: ts.SourceFile,
+): string | undefined {
+  if (expr === undefined) return undefined;
+  if (ts.isIdentifier(expr)) return importedName(expr, sourceFile);
+  if (!ts.isObjectLiteralExpression(expr)) return undefined;
+  for (const prop of expr.properties) {
+    if (
+      ts.isPropertyAssignment(prop) &&
+      ts.isIdentifier(prop.name) &&
+      prop.name.text === "prototype" &&
+      ts.isIdentifier(prop.initializer)
+    ) {
+      return importedName(prop.initializer, sourceFile);
+    }
+  }
+  return undefined;
+}
+
 function prototypeReceiver(expr: ts.Expression): string | undefined {
   return ts.isPropertyAccessExpression(expr) &&
     expr.name.text === "prototype" &&

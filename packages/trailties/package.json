@@ -108,7 +108,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('lib/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'gem-help', 'runner', 'test']) require('fs').cpSync('lib/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('lib/templates', 'dist/templates', { recursive: true })\" && trails-tsc-views build --views dist/templates --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/gem-help/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
+    "build:templates": "node -e \"require('fs').cpSync('lib/generators', 'dist/generators', { recursive: true, filter: (source) => !/\\.(ts|snap)$/.test(source) }); for (const name of ['credentials', 'encrypted', 'gem-help', 'help', 'runner', 'test']) require('fs').cpSync('lib/commands/' + name + '/USAGE', 'dist/commands/' + name + '/USAGE'); require('fs').cpSync('lib/templates', 'dist/templates', { recursive: true })\" && trails-tsc-views build --views dist/templates --in-place && trails-tsc-views build-templates dist/generators dist/commands/credentials/USAGE dist/commands/encrypted/USAGE dist/commands/gem-help/USAGE dist/commands/help/USAGE dist/commands/runner/USAGE dist/commands/test/USAGE"
   },
   "files": [
     "dist",

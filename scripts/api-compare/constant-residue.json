@@ -1308,7 +1308,7 @@
     }
   },
   "trailties": {
-    "rows": 154,
+    "rows": 156,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1358,6 +1358,7 @@
       "commands/encrypted.ts::EncryptedCommand": "Trails::Command::EncryptedCommand",
       "commands/gem-help.ts::GemHelpCommand": "Trails::Command::GemHelpCommand",
       "commands/generate.ts::GenerateCommand": "Trails::Command::GenerateCommand",
+      "commands/help.ts::HelpCommand": "Trails::Command::HelpCommand",
       "commands/notes.ts::NotesCommand": "Trails::Command::NotesCommand",
       "commands/plugin.ts::PluginCommand": "Trails::Command::PluginCommand",
       "commands/rake.ts::RakeCommand": "Trails::Command::RakeCommand",
@@ -1370,6 +1371,7 @@
       "commands/test.ts::TestCommand": "Trails::Command::TestCommand",
       "commands/unused-routes.ts::RouteInfo": "Trails::Command::UnusedRoutesCommand::RouteInfo",
       "commands/unused-routes.ts::UnusedRoutesCommand": "Trails::Command::UnusedRoutesCommand",
+      "commands/version.ts::VersionCommand": "Trails::Command::VersionCommand",
       "configuration.ts::Generators": "Trails::Configuration::Generators",
       "configuration.ts::MiddlewareStackProxy": "Trails::Configuration::MiddlewareStackProxy",
       "engine.ts::Engine": "Trails::Engine",

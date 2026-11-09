@@ -1,10 +1,4 @@
 {
-  "server-path-actioncable-testing": [
-    "packages/actioncable/dist/channel/test-case.js",
-    "packages/actioncable/dist/connection/test-case.js",
-    "packages/actioncable/dist/subscription-adapter/test.js",
-    "packages/actioncable/dist/test-helper.js"
-  ],
   "server-path-actionmailer-testing": [
     "packages/actionmailer/dist/test-case.js",
     "packages/actionmailer/dist/test-helper.js"
@@ -31,19 +25,8 @@
     "packages/activejob/dist/test-helper.js"
   ],
   "server-path-activerecord-testing": [
-    "packages/activerecord/dist/cases/helper.js",
-    "packages/activerecord/dist/encryption/test-helpers.js",
     "packages/activerecord/dist/support/async-helper.js",
-    "packages/activerecord/dist/support/describe-if-mysql-adapter.js",
-    "packages/activerecord/dist/support/describe-if-pg.js",
-    "packages/activerecord/dist/support/describe-if-postgresql-adapter.js",
-    "packages/activerecord/dist/support/describe-if-sqlite.js",
-    "packages/activerecord/dist/support/setup-second-pool.js",
-    "packages/activerecord/dist/support/supports.js",
-    "packages/activerecord/dist/test-adapter.js",
-    "packages/activerecord/dist/test-helpers/models/arunit2-model.js",
-    "packages/activerecord/dist/test-helpers/models/index.js",
-    "packages/activerecord/dist/test-helpers/test-schema.js"
+    "packages/activerecord/dist/support/describe-if-pg.js"
   ],
   "server-path-activesupport-index-testing": [
     "packages/activesupport/dist/testing/assertions.js",

@@ -38,7 +38,7 @@ describe("Trails::Command.find_by_namespace", () => {
   it("hides unused_routes from the program, as printing_commands subtracts hidden_commands", async () => {
     await lookupBang();
     const hidden = hiddenCommands().map((klass) => klass.commandName());
-    expect(hidden).toEqual(["unused-routes", "application", "plugin", "gem-help"]);
+    expect(hidden).toEqual(["unused-routes", "application", "plugin", "help", "gem-help"]);
   }, 30_000);
 
   it("finds a command ported onto Base by its namespace", async () => {

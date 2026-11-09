@@ -6,7 +6,6 @@ export { RemoteConnections } from "./remote-connections.js";
 export { ActionCableHelper } from "./helpers/action-cable-helper.js";
 export { Inline } from "./subscription-adapter/inline.js";
 export { Async } from "./subscription-adapter/async.js";
-export { Test } from "./subscription-adapter/test.js";
 import "./action-cable.js";
 export { ENGINE_CALLED_FROM } from "./action-cable.js";
 import "./channel/naming.js";
@@ -30,7 +29,5 @@ import "./server/connections.js";
 import "./server/base.js";
 import "./channel/broadcasting.js";
 import "./channel/streams.js";
-import "./channel/test-case.js";
-import "./connection/test-case.js";
 
 import "./constants.generated.js";

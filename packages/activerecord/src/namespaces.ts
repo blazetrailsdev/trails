@@ -23,7 +23,6 @@ import type { Serialization } from "./attribute-methods/serialization.js";
 import type { TimeZoneConversion } from "./attribute-methods/time-zone-conversion.js";
 import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
-import type { TestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -303,7 +302,6 @@ export const ActiveRecord = {
   Tasks: typeof Tasks;
   Type: typeof TypeModule;
   Point: new (x: number, y: number) => { x: number; y: number };
-  TestCase: typeof TestCase;
   Railties: typeof Railties;
   InverseOfAssociationRecursiveError: typeof InverseOfAssociationRecursiveError;
   HasManyThroughAssociationNotFoundError: typeof HasManyThroughAssociationNotFoundError;

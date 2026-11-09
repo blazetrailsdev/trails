@@ -98,7 +98,9 @@ let currentTestCase: TestCase | null = null;
 /** @internal */
 export function rootTestCase(): TestCaseClass {
   if (rootTestCaseClass === undefined) {
-    const { TestCase } = ActiveRecord;
+    const { TestCase } = ActiveRecord as typeof ActiveRecord & {
+      TestCase: typeof ActiveRecordTestCase;
+    };
     rootTestCaseClass = class extends TestCase {
       override async beforeSetup(): Promise<void> {
         const testKlass = this.constructor as TestCaseClass;

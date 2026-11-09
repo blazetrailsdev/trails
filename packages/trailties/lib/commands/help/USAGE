@@ -1,0 +1,17 @@
+Usage:
+  bin/trails COMMAND [options]
+
+You must specify a command. The most common commands are:
+
+  generate     Generate new code (short-cut alias: "g")
+  console      Start the Trails console (short-cut alias: "c")
+  server       Start the Trails server (short-cut alias: "s")
+  test         Run tests except system tests (short-cut alias: "t")
+  test:system  Run system tests
+  dbconsole    Start a console for the database specified in config/database.yml
+               (short-cut alias: "db")
+<% if (!isEngine()) { -%>
+  plugin new   Create a new Trails railtie or engine
+<% } -%>
+
+All commands can be run with -h (or --help) for more information.

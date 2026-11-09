@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "../../lib/index.js";
+import "../../lib/test-case.js";
 import {
   commonSubscriptionAdapterTest,
   type CommonSubscriptionAdapterTestHost,

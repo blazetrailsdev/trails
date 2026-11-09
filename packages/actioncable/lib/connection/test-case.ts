@@ -1,3 +1,4 @@
+import "../constants.test-case.generated.js";
 import { Headers, TestRequest as ActionDispatchTestRequest } from "@blazetrails/actionpack";
 import {
   assertRaises,
