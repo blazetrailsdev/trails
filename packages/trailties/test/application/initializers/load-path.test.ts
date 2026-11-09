@@ -72,14 +72,14 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
     expect(constants.Foo).toBeTruthy();
   });
 
-  // BLOCKED: zeitwerk-namespace-body-autoloads-own-children
-  it.skip("eager loading loads parent classes before children", async () => {
+  it("eager loading loads parent classes before children", async () => {
     await t.appFile(
       "lib/zoo.ts",
       `
         import { include } from "@blazetrails/ruby-compat";
+        import { ReptileHouse } from "./zoo/reptile-house.js";
         export class Zoo {
-          static { include(this, (Zoo as unknown as { ReptileHouse: object }).ReptileHouse); }
+          static { include(this, ReptileHouse); }
         }
 `,
     );
