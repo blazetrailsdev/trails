@@ -1478,6 +1478,22 @@
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
     }
   },
+  "tzinfo": {
+    "rows": 9,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
+      "data-sources/constant-offset-data-timezone-info.ts::ConstantOffsetDataTimezoneInfo": "TZInfo::DataSources::ConstantOffsetDataTimezoneInfo",
+      "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
+      "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
+      "timezone-transition.ts::TimezoneTransition": "TZInfo::TimezoneTransition",
+      "timezone.ts::AmbiguousTime": "TZInfo::AmbiguousTime",
+      "timezone.ts::InvalidTimezoneIdentifier": "TZInfo::InvalidTimezoneIdentifier",
+      "timezone.ts::PeriodNotFound": "TZInfo::PeriodNotFound",
+      "timezone.ts::Timezone": "TZInfo::Timezone"
+    }
+  },
   "zeitwerk": {
     "rows": 16,
     "excluded": [],

@@ -1,3 +1,4 @@
+import "./constants.generated.js";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { InvalidCountryCode } from "./country.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
@@ -23,9 +24,11 @@ export const TZInfo = {
   DataTimezone: Timezone,
   TimezonePeriod,
   TimezoneOffset,
+  TimezoneTransition,
   AmbiguousTime,
   PeriodNotFound,
   InvalidTimezoneIdentifier,
+  InvalidCountryCode,
   DataSources: { ConstantOffsetDataTimezoneInfo },
   Data: { name: "TZInfo::Data" },
 };
