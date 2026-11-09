@@ -1,3 +1,4 @@
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
 import { TestMailer, type Message } from "@blazetrails/mail";
@@ -10,7 +11,7 @@ class LayoutMailer extends Base {
     this.setMailerName("layout_mailer");
     (this as unknown as { layout(name: string): void }).layout("layout-mailer");
     this.prependViewPath(
-      new ActionView.FixtureResolver({
+      new FixtureResolver({
         "layout-mailer/plain.text.tse": "Body",
         "layouts/layout-mailer.text.tse": "[<%= yield %>]",
       }),
@@ -26,7 +27,7 @@ class ImpliedLayoutMailer extends Base {
   static {
     this.setMailerName("implied_layout_mailer");
     this.prependViewPath(
-      new ActionView.FixtureResolver({
+      new FixtureResolver({
         "implied-layout-mailer/plain.text.tse": "Body",
         "layouts/implied-layout-mailer.text.tse": "<%= yield %> (implied)",
       }),
@@ -43,7 +44,7 @@ class TextMailer extends Base {
     this.setMailerName("text_mailer");
     this.default({ to: "system@test.lindsaar.net", from: "jose@test.plataformatec.com" });
     this.prependViewPath(
-      new ActionView.FixtureResolver({
+      new FixtureResolver({
         "text-mailer/plain.text.html": "Welcome",
         "text-mailer/multi.text.html": "Text",
         "text-mailer/multi.html.html": "<b>Html</b>",

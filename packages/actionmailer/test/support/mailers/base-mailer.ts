@@ -1,4 +1,4 @@
-import { ActionView } from "@blazetrails/actionpack";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Base64 } from "@blazetrails/ruby-compat";
 import { dasherize } from "@blazetrails/activesupport";
 import type { Message } from "@blazetrails/mail";
@@ -47,11 +47,11 @@ const FIXTURES: Record<string, string> = {
   "layouts/different-layout.text.tse": "PLAIN -- <%= yield %>",
 };
 
-export const ANOTHER_PATH_RESOLVER = new ActionView.FixtureResolver({
+export const ANOTHER_PATH_RESOLVER = new FixtureResolver({
   "base-mailer/welcome.tse": "Welcome from another path",
 });
 
-export const UNKNOWN_RESOLVER = new ActionView.FixtureResolver({});
+export const UNKNOWN_RESOLVER = new FixtureResolver({});
 
 export class BaseMailer extends Base {
   static {
@@ -63,7 +63,7 @@ export class BaseMailer extends Base {
       replyTo: this.emailAddressWithName("mikel@test.lindsaar.net", "Mikel"),
     });
 
-    this.prependViewPath(new ActionView.FixtureResolver(FIXTURES));
+    this.prependViewPath(new FixtureResolver(FIXTURES));
   }
 
   welcome(hash: Hash = {}) {

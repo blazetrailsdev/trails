@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  Base,
-  FixtureResolver,
-  LookupContext,
-  Template,
-  TseHandler,
-} from "@blazetrails/actionview";
+import { Base, LookupContext, Template, TseHandler } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import "../../../lib/namespaces.js";
 import {
   EXTENSION_LOOKUP,

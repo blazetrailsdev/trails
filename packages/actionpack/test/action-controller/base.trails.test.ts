@@ -1,11 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import {
-  Base as ViewBase,
-  FixtureResolver,
-  MissingTemplate,
-  Template,
-} from "@blazetrails/actionview";
+import { Base as ViewBase, MissingTemplate, Template } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Model } from "@blazetrails/activemodel";
 import {
   extend,

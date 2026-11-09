@@ -1,5 +1,6 @@
 import { beforeAll, describe, it, expect } from "vitest";
-import { FixtureResolver, LookupContext, Template } from "@blazetrails/actionview";
+import { LookupContext, Template } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import {
   determineTemplateEtag,
   lookupAndDigestTemplate,

@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FixtureResolver, Rendering as ActionViewRendering } from "@blazetrails/actionview";
+import { Rendering as ActionViewRendering } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 
 import { Base } from "../../lib/action-controller/base.js";
 import {

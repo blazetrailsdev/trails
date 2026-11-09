@@ -71,6 +71,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   ],
   actionmailbox: ["inbound-email.ts", "inbound-email/"],
   actionmailer: ["test-case.ts", "test-helper.ts"],
+  actionview: ["testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts", "generators/"],
@@ -87,10 +88,17 @@ function seatedFqn(source: string, tsName: string, fqns: string[]): string | und
   return hits.length === 1 ? hits[0] : undefined;
 }
 
-/** A lazy file's table, named from its path under the prefix so same-named files do not collide. */
+/**
+ * A lazy file's table, named from its path under the prefix so same-named files do not collide.
+ * A file under `testing/` keeps that segment, so its table is a testing export (RFC 0223).
+ */
 function lazyTable(dir: string, file: string): string {
   const prefix = (LAZY_DIRS[dir] ?? []).find((p) => p.endsWith("/") && file.startsWith(p));
-  const rel = prefix ? file.slice(prefix.length) : path.basename(file);
+  const rel = prefix
+    ? file.slice(prefix.length)
+    : file.startsWith("testing/")
+      ? file
+      : path.basename(file);
   return `constants.${rel.replace(/\.ts$/, "").replaceAll("/", "-")}.generated.ts`;
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
-import { FixtureResolver } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Base, DoubleRenderError } from "../../lib/action-controller/base.js";
 import { API } from "../../lib/action-controller/api.js";
 import { Metal } from "../../lib/action-controller/metal.js";
