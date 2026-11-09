@@ -267,8 +267,31 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(ScopeRegistry.currentScope(Post)).toBeNull();
   });
 
-  it.skip("filters for Active Record encrypted attributes are added to config.filter_parameters only once", () => {
-    // BLOCKED: reload-autoloads-constant-on-first-reference
+  it("filters for Active Record encrypted attributes are added to config.filter_parameters only once", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate");
+
+    await t.appFile(
+      "app/models/post.ts",
+      `
+        import { Base } from "@blazetrails/activerecord";
+        export class Post extends Base {
+          static {
+            this.encrypts("title");
+          }
+        }
+`,
+    );
+
+    await (t as unknown as Rack).app("development");
+
+    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    const filterParameters = [...Trails.application!.config.filterParameters];
+
+    await Dependencies.clear();
+
+    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
   it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", () => {

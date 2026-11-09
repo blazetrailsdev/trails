@@ -12,7 +12,7 @@ export const Dependencies = {
 
   _autoloadedTrackedClasses: new Set<AnyClass>(),
 
-  autoloader: null as { reload(): Promise<void> } | null,
+  autoloader: null as { reload(): Promise<void>; eagerLoad(): Promise<void> } | null,
 
   runInterlock<T>(block: () => T | Promise<T>): Promise<T> {
     return this.interlock.running(block);
@@ -26,10 +26,12 @@ export const Dependencies = {
     return this.interlock.unloading(block);
   },
 
+  /** @inventedArm eagerLoad — PERMANENT */
   async clear(): Promise<void> {
     await this.unloadInterlock(async () => {
       this._autoloadedTrackedClasses.clear();
       await this.autoloader!.reload();
+      await this.autoloader!.eagerLoad();
     });
   },
 
