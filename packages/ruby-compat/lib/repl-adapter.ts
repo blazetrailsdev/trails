@@ -326,9 +326,16 @@ export const TSREPL = {
     TSREPL.INITIALIZED = true;
   },
 
-  /** `IRB::VERSION` (`vendor/ruby/v3.3.11/lib/irb/version.rb:8-10`). */
+  /**
+   * `IRB::VERSION`, `@RELEASE_VERSION` and `@LAST_UPDATE_DATE`
+   * (`vendor/ruby/v3.3.11/lib/irb/version.rb:8-10`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   VERSION: "1.13.1",
+  /** @noRailsEquivalent PERMANENT */
   RELEASE_VERSION: "1.13.1",
+  /** @noRailsEquivalent PERMANENT */
   LAST_UPDATE_DATE: "2024-05-05",
 
   /**
