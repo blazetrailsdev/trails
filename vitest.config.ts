@@ -354,7 +354,7 @@ const alias = {
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/lib/index.ts"),
   "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/lib") + "/",
   "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/lib/index.ts"),
-  "@blazetrails/actioncable/test-helpers/":
+  "@blazetrails/actioncable/test/support/":
     path.resolve(__dirname, "packages/actioncable/test/support") + "/",
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/lib") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
