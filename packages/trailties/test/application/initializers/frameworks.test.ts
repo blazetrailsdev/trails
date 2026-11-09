@@ -17,11 +17,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";
-import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
+import type { Generation, Rack, Reload } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface FrameworksTest extends Generation {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface FrameworksTest extends Generation, Reload {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class FrameworksTest extends TestCase {}
 include(FrameworksTest, Isolation);
@@ -285,12 +285,14 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
 
     await (t as unknown as Rack).app("development");
 
-    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    const post = (TopLevel as unknown as Record<string, unknown>).Post;
+    expect(post).toBeTruthy();
     const filterParameters = [...Trails.application!.config.filterParameters];
 
-    await Dependencies.clear();
+    await t.reload();
 
     expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    expect((TopLevel as unknown as Record<string, unknown>).Post).not.toBe(post);
     expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
