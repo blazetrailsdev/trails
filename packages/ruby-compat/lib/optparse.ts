@@ -233,7 +233,7 @@ export class OptionParser {
       } else if ((m = o.match(/^-(.)(.+)?/))) {
         short.push(m[1]);
         guess(m[2]);
-      } else desc.push(o);
+      } else if (o !== "") desc.push(o);
     }
     return Object.assign(new klass(), { short, long, desc, block, arg });
   }
