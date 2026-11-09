@@ -1,6 +1,8 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import type { FullSanitizer } from "./full-sanitizer.js";
 import type { LinkSanitizer } from "./link-sanitizer.js";
 import type { SafeListSanitizer } from "./safe-list-sanitizer.js";
+import type { Sanitizer } from "./sanitizer.js";
 
 export interface VendorMethods {
   readonly fullSanitizer: typeof FullSanitizer;
@@ -8,6 +10,14 @@ export interface VendorMethods {
   readonly safeListSanitizer: typeof SafeListSanitizer;
   readonly whiteListSanitizer: typeof SafeListSanitizer;
 }
+
+export const HTML = {} as {
+  Sanitizer: typeof Sanitizer;
+  FullSanitizer: typeof FullSanitizer;
+  LinkSanitizer: typeof LinkSanitizer;
+  SafeListSanitizer: typeof SafeListSanitizer;
+  WhiteListSanitizer: typeof SafeListSanitizer;
+};
 
 export const HTML4 = {} as {
   Sanitizer: VendorMethods & { VendorMethods: VendorMethods };
@@ -22,3 +32,15 @@ export const HTML5 = {} as {
   LinkSanitizer: typeof LinkSanitizer;
   SafeListSanitizer: typeof SafeListSanitizer;
 };
+
+const Trails = (TopLevel.Trails ??= { name: "Trails" } as NonNullable<
+  typeof TopLevel.Trails
+>) as NonNullable<typeof TopLevel.Trails> & {
+  HTML: typeof HTML;
+  HTML4: typeof HTML4;
+  HTML5: typeof HTML5;
+};
+
+Trails.HTML = HTML;
+Trails.HTML4 = HTML4;
+Trails.HTML5 = HTML5;

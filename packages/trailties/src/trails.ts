@@ -191,7 +191,14 @@ export function _resetTrailsEnv(): void {
 }
 
 extend(Trails, Autoload);
+const reopened = TopLevel.Trails;
 constSet(TopLevel, "Trails", Trails);
+if (reopened !== undefined) {
+  Object.assign(
+    Trails,
+    Object.fromEntries(Object.entries(reopened).filter(([id]) => !(id in Trails))),
+  );
+}
 
 Trails.HealthController = HealthController;
 Trails.InfoController = InfoController;

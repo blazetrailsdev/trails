@@ -4,7 +4,7 @@ import { FullSanitizer } from "./full-sanitizer.js";
 import { LinkSanitizer } from "./link-sanitizer.js";
 import { SafeListSanitizer } from "./safe-list-sanitizer.js";
 import { Sanitizer } from "./sanitizer.js";
-import { HTML4, type VendorMethods } from "./namespaces.js";
+import { HTML, HTML4, type VendorMethods } from "./namespaces.js";
 
 const VendorMethods: VendorMethods = {
   get fullSanitizer() {
@@ -32,12 +32,9 @@ HTML4.SafeListSanitizer = SafeListSanitizer;
 
 extend(Sanitizer, VendorMethods);
 
-export const HTML = {
-  Sanitizer: Sanitizer as typeof Sanitizer & VendorMethods,
-  FullSanitizer: HTML4.FullSanitizer,
-  LinkSanitizer: HTML4.LinkSanitizer,
-  SafeListSanitizer: HTML4.SafeListSanitizer,
-  WhiteListSanitizer: HTML4.SafeListSanitizer,
-};
+HTML.FullSanitizer = HTML4.FullSanitizer;
+HTML.LinkSanitizer = HTML4.LinkSanitizer;
+HTML.SafeListSanitizer = HTML4.SafeListSanitizer;
+HTML.WhiteListSanitizer = HTML.SafeListSanitizer;
 
-export { HTML4 };
+export { HTML, HTML4 };

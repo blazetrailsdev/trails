@@ -1,7 +1,11 @@
 import * as Nokogiri from "@blazetrails/nokogiri";
-import { HTML4, HTML5, type VendorMethods } from "./namespaces.js";
+import { HTML, HTML4, HTML5, type VendorMethods } from "./namespaces.js";
 
 export abstract class Sanitizer {
+  declare static readonly fullSanitizer: VendorMethods["fullSanitizer"];
+  declare static readonly linkSanitizer: VendorMethods["linkSanitizer"];
+  declare static readonly safeListSanitizer: VendorMethods["safeListSanitizer"];
+  declare static readonly whiteListSanitizer: VendorMethods["whiteListSanitizer"];
   declare private static _html5Support: boolean | undefined;
 
   static isHtml5Support(): boolean {
@@ -29,3 +33,5 @@ export interface SanitizeOptions {
 export function isTrivialInput(html: string | null | undefined): boolean {
   return html == null || html.length === 0;
 }
+
+HTML.Sanitizer = Sanitizer;
