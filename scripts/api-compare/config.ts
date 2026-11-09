@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { apiComparePackages } from "../../vendor/sources.js";
-import { libRoot } from "../layout/package-roots.js";
+import { libRoot } from "../layout/package-roots.mjs";
 
 export const SCRIPT_DIR = __dirname;
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");

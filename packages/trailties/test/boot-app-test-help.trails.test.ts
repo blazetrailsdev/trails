@@ -5,7 +5,7 @@ import { ActionCable } from "@blazetrails/actioncable";
 import { Base as Connection } from "@blazetrails/actioncable/connection/base";
 import { Subscriptions } from "@blazetrails/actioncable/connection/subscriptions";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
-import { TestServer } from "@blazetrails/actioncable/test-helpers/stubs/test-server";
+import { TestServer } from "@blazetrails/actioncable/test/support/stubs/test-server";
 import { ActiveSupportJSON, constantize, safeConstantize } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { TestCase } from "@blazetrails/activesupport/test-case";

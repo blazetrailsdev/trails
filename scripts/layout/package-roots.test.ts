@@ -1,8 +1,10 @@
+import { execFile } from "node:child_process";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
-import { LIB_TEST_PACKAGES, libRoot, sourceRoots, testRoots } from "./package-roots.js";
+import { LIB_TEST_PACKAGES, libRoot, sourceRoots, testRoots } from "./package-roots.mjs";
 import { srcReferencePattern } from "./src-references.js";
 
 const PACKAGES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../packages");
@@ -15,6 +17,20 @@ describe("package-roots", () => {
       if (entries.includes("lib") && !entries.includes("src")) moved.push(pkg);
     }
     expect(moved.sort()).toEqual([...LIB_TEST_PACKAGES].sort());
+  });
+
+  it("loads with named exports under tsx -e", async () => {
+    const { stdout } = await promisify(execFile)(
+      "pnpm",
+      [
+        "exec",
+        "tsx",
+        "-e",
+        "import('./scripts/layout/package-roots.mts').then((m) => console.log(m.libRoot('ruby-compat')))",
+      ],
+      { cwd: path.resolve(PACKAGES, "..") },
+    );
+    expect(stdout.trim()).toBe("lib");
   });
 
   it("answers src for an unmoved package", () => {

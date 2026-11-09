@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { planTestMoves, type PlanInput } from "./plan-test-moves.js";
+import {
+  planTestMoves,
+  registerLibTestPackage,
+  rewriteSpecifiers,
+  type PlanInput,
+} from "./plan-test-moves.js";
 
 const fixture = (overrides: Partial<PlanInput> = {}): PlanInput => ({
   pkg: "activerecord",
@@ -101,5 +106,72 @@ describe("planTestMoves", () => {
         "test/support/page-dump-helper.ts",
       ],
     ]);
+  });
+});
+
+describe("planTestMoves assets", () => {
+  it("moves a non-.ts file beside its one referencing test, and flags a shared or library one", () => {
+    const plan = planTestMoves(
+      fixture({
+        pkg: "ruby-compat",
+        libDir: "lib",
+        files: ["marshal.ts", "marshal.trails.test.ts", "a/x.test.ts", "b/y.test.ts"],
+        libImported: new Set(),
+        comparison: [],
+        assetRefs: new Map([
+          ["marshal.fixtures.json", ["marshal.trails.test.ts"]],
+          ["shared.json", ["a/x.test.ts", "b/y.test.ts"]],
+          ["data.json", ["marshal.ts"]],
+          ["unused.txt", []],
+        ]),
+      }),
+    );
+    expect(plan.moves).toContainEqual(["lib/marshal.fixtures.json", "test/marshal.fixtures.json"]);
+    expect(plan.flagged).toEqual(["lib/data.json", "lib/shared.json"]);
+    expect(plan.moves.map(([from]) => from)).not.toContain("lib/unused.txt");
+  });
+});
+
+describe("registerLibTestPackage", () => {
+  it("adds the package to LIB_TEST_PACKAGES, sorted", () => {
+    const source =
+      'export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([\n  "zeitwerk",\n  "arel",\n]);\n';
+    expect(registerLibTestPackage(source, "mail")).toBe(
+      'export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([\n  "arel",\n  "mail",\n  "zeitwerk",\n]);\n',
+    );
+  });
+});
+
+describe("rewriteSpecifiers", () => {
+  it("re-points a moved test's library, helper, side-effect and declare module specifiers", () => {
+    const moved = new Map([
+      ["src/relation/where.test.ts", "test/cases/relation/where.test.ts"],
+      ["src/test-helpers/models/topic.ts", "test/models/topic.ts"],
+    ]);
+    const source = [
+      'import { Relation } from "../relation.js";',
+      'import { Topic } from "../test-helpers/models/topic.js";',
+      'import "../test-setup.js";',
+      'declare module "../relation.js" {}',
+      'vi.mock("../relation.js");',
+      'const m = await import("./sibling.js");',
+    ].join("\n");
+    expect(
+      rewriteSpecifiers(
+        source,
+        "src/relation/where.test.ts",
+        "test/cases/relation/where.test.ts",
+        moved,
+      ),
+    ).toBe(
+      [
+        'import { Relation } from "../../../src/relation.js";',
+        'import { Topic } from "../../models/topic.js";',
+        'import "../../../src/test-setup.js";',
+        'declare module "../../../src/relation.js" {}',
+        'vi.mock("../../../src/relation.js");',
+        'const m = await import("../../../src/relation/sibling.js");',
+      ].join("\n"),
+    );
   });
 });

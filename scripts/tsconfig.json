@@ -7,7 +7,7 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["**/*.ts", "../vendor/*.ts"],
+  "include": ["**/*.ts", "**/*.mts", "../vendor/*.ts"],
   "references": [
     {
       "path": "../packages/activesupport"

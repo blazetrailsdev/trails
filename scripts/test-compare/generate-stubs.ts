@@ -23,32 +23,6 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-const PKG_DIRS: Record<string, string> = {
-  arel: "packages/arel/test/",
-  activemodel: "packages/activemodel/test/",
-  activerecord: "packages/activerecord/src/",
-  activesupport: "packages/activesupport/test/",
-  rack: "packages/rack/test/",
-  "rack-session": "packages/rack-session/test/",
-  "rack-test": "packages/rack-test/test/",
-  bcrypt: "packages/bcrypt/test/",
-  msgpack: "packages/msgpack/test/",
-  marcel: "packages/marcel/test/",
-  chronic: "packages/chronic/test/",
-  builder: "packages/builder/test/",
-  "et-orbi": "packages/et-orbi/test/",
-  raabro: "packages/raabro/test/",
-  zeitwerk: "packages/zeitwerk/test/",
-  fugit: "packages/fugit/test/",
-  actiondispatch: "packages/actionpack/test/action-dispatch/",
-  actioncontroller: "packages/actionpack/test/action-controller/",
-  abstractcontroller: "packages/actionpack/test/abstract-controller/",
-  actionview: "packages/actionview/test/",
-  actioncable: "packages/actioncable/test/",
-  activejob: "packages/activejob/test/",
-  thor: "packages/thor/test/",
-};
-
 interface ConventionFile {
   rubyFile: string;
   conventionTsFile: string;
@@ -190,7 +164,7 @@ function main() {
   for (const [pkg, pkgInfo] of Object.entries(rails.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
 
-    const pkgDir = PKG_DIRS[pkg];
+    const pkgDir = PKG_SRC_DIRS[pkg];
     if (!pkgDir) continue;
 
     const pkgMissing = missingByFile.get(pkg);
