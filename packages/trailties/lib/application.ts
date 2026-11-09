@@ -19,6 +19,7 @@ import {
   rbFLoad,
   getFs,
   getPath,
+  loadIseqEval,
   rbFRequireFile,
   LOAD_PATH,
   Pathname,
@@ -512,9 +513,7 @@ export class Application extends Engine {
       ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;
     }
     if (ext !== undefined) {
-      const mod: { default?: unknown } = await import(
-        getPath().pathToFileURL!(`${yaml}${ext}`).href
-      );
+      const mod: { default?: unknown } = await loadIseqEval(`${yaml}${ext}`);
       const allConfigs = mod.default ?? {};
       let config = (allConfigs as Record<string, unknown>)[env] ?? null;
       const shared = (allConfigs as Record<string, unknown>).shared;

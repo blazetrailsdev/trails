@@ -208,7 +208,7 @@ describe("buildAutoload", () => {
     }
   });
 
-  it("writes a boot file that registers the routes, environments, initializers and seeds", async () => {
+  it("writes a boot file that registers the routes, environments, initializers, seeds, helpers and config reads", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
     try {
@@ -218,6 +218,7 @@ describe("buildAutoload", () => {
         "config/routes",
         "db",
         "app/helpers/admin",
+        "config/storage",
       ]) {
         FileUtils.mkdirP(dir);
       }
@@ -234,6 +235,11 @@ describe("buildAutoload", () => {
       File.write("config/initializers/deep/inflections.ts", "export {};\n");
       File.write("db/seeds.ts", "export {};\n");
       File.write("app/helpers/application-helper.ts", "export {};\n");
+      File.write("config/database.ts", "export default {};\n");
+      File.write("config/cable.ts", "export default {};\n");
+      File.write("config/storage.ts", "export default {};\n");
+      File.write("config/storage/production.ts", "export default {};\n");
+      File.write("config/types.d.ts", "export {};\n");
       File.write("app/helpers/admin/users_helper.ts", "export {};\n");
       File.write("app/helpers/format.ts", "export {};\n");
       File.write("app/helpers/posts-helper.test.ts", "export {};\n");
@@ -281,6 +287,10 @@ describe("buildAutoload", () => {
         "db/seeds.ts",
         "app/helpers/application-helper.ts",
         "app/helpers/admin/users_helper.ts",
+        "config/database.ts",
+        "config/cable.ts",
+        "config/storage.ts",
+        "config/storage/production.ts",
         "vendor/blog/config/routes.ts",
         "vendor/blog/config/initializers/blog.ts",
       ]) {
@@ -289,6 +299,8 @@ describe("buildAutoload", () => {
       expect(boot).not.toContain("production.d.ts");
       expect(boot).not.toContain("app/helpers/format.ts");
       expect(boot).not.toContain("posts-helper.test.ts");
+      expect(boot).not.toContain("config/types.d.ts");
+      expect(boot).not.toContain('"config/initializers":');
       expect(File.read(".trails/autoload/install.generated.js")).toContain(
         'import "../boot.generated.js";',
       );

@@ -98,7 +98,23 @@ const BOOT_PATHS = [
   "config/initializers",
   "db/seeds.ts",
   "app/helpers",
+  "config",
 ];
+
+/** @noRailsEquivalent PERMANENT */
+const CONFIG_FILE = /^[^.]+\.[cm]?[tj]s$/;
+
+/** @noRailsEquivalent PERMANENT */
+async function configFiles(dir: string, out: Set<string>): Promise<void> {
+  for (const entry of Dir.children(dir).slice().sort()) {
+    const full = File.join(dir, entry);
+    if (entry === "storage" && (await File.isDirectoryAsync(full))) {
+      await configFiles(full, out);
+    } else if (CONFIG_FILE.test(entry) && !(await File.isDirectoryAsync(full))) {
+      out.add(full);
+    }
+  }
+}
 
 /** @noRailsEquivalent PERMANENT */
 const HELPER_FILE = /[-_]helper\.[cm]?[tj]s$/;
@@ -130,6 +146,12 @@ async function writeBoot(
     for (const key of BOOT_PATHS) {
       const node = engine.paths!().get(key);
       if (node === undefined) continue;
+      if (key === "config") {
+        for (const dir of await node.existent()) {
+          if (await File.isDirectoryAsync(dir)) await configFiles(dir, files);
+        }
+        continue;
+      }
       if (key === "app/helpers") {
         for (const dir of await node.existent()) {
           if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
