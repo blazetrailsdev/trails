@@ -6,7 +6,15 @@ import { Dependencies } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { File, FileUtils, env as ENV, include, setEnv, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  env as ENV,
+  include,
+  rbObjRespondTo,
+  setEnv,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";
 import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
@@ -126,8 +134,31 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
-  it.skip("includes URL helpers as action methods", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("includes URL helpers as action methods", async () => {
+    await t.appFile(
+      "config/routes.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.routes().draw(function () {
+          this.get("/foo", { to: (env) => [200, {}, []], as: "foo" });
+        });
+`,
+    );
+
+    await t.appFile(
+      "app/mailers/foo.ts",
+      `
+        import { Base } from "@blazetrails/actionmailer";
+        export class Foo extends Base {
+          notify() {}
+        }
+`,
+    );
+
+    await (t as unknown as Rack).app("development");
+    const Foo = (TopLevel as unknown as Record<string, unknown>).Foo as new () => object;
+    expect(rbObjRespondTo(new Foo(), "fooUrl")).toBe(true);
+    expect(rbObjRespondTo(new Foo(), "mainApp")).toBe(true);
   });
 
   it.skip("allows to not load all helpers for controllers", () => {
