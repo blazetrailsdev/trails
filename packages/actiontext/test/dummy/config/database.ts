@@ -20,6 +20,7 @@ const primary = {
   ...arunit.configurationHash,
   database: databaseName(),
   migrationsPaths: `${import.meta.dirname}/../db/migrate`,
+  ...(arunit.adapter === "sqlite3" ? {} : { schemaDump: false }),
 };
 
 export default {

@@ -39,6 +39,7 @@ await DatabaseTasks.purge(
 
 Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirname)];
 await Base.establishConnection();
+await Base.connectionPool().migrationContext.migrate();
 await Migration.maintainTestSchemaBang();
 
 I18n.config().enforceAvailableLocales = false;
