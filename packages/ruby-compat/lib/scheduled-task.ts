@@ -24,7 +24,13 @@ export class CancelledOperationError extends StandardError {}
  * `TimerSet#ns_post_task` / `#process_tasks`
  * (`concurrent/executor/timer_set.rb:95-107,146-180`), whose timer thread waits
  * through `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`). The wait
- * here is an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling.
+ * here is an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling. The
+ * deadline is read from `Date.now()` where concurrent-ruby reads
+ * `Concurrent.monotonic_time`: callers compute the delay from `Time.current`,
+ * which JS truncates to the millisecond, so a monotonic deadline can wake before
+ * that clock reaches it (a recurring task then re-enqueues the same second).
+ * The cost is that a wall-clock step moves a pending deadline with it: a step
+ * back delays the task by the step, a step forward runs it early.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -103,7 +109,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
 
   private nsSchedule(delay: number): void {
     this.delay = delay;
-    this.time = performance.now() / 1000 + this.delay;
+    this.time = Date.now() / 1000 + this.delay;
     if (this.delay <= 0.01) {
       this.state = "processing";
       this.executor.post(() => this.processTask());
@@ -113,7 +119,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   }
 
   private processTasks(): void {
-    const diff = this.time! - performance.now() / 1000;
+    const diff = this.time! - Date.now() / 1000;
     if (diff <= 0) {
       this.state = "processing";
       this.executor.post(() => this.processTask());
