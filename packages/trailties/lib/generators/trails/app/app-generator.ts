@@ -589,6 +589,10 @@ export class AppGenerator extends AppBase {
     return generator;
   }
 
+  async runAfterBundleCallbacks(): Promise<void> {
+    for (const callback of this.afterBundleCallbacks) await callback();
+  }
+
   static banner(): string {
     return `trails new ${(this as unknown as ThorClass)
       .arguments()
@@ -601,8 +605,6 @@ export class AppGenerator extends AppBase {
     if (this.options.database)
       this.options.database = DB_ALIAS[this.options.database] ?? this.options.database;
     this.implyOptions(AppGenerator.OPTION_IMPLICATIONS, { metaOptions: META_OPTIONS });
-
-    this.afterBundleCallbacks = [];
     const options: AppBaseOptions = { ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...this.options };
     const skipDependents = options.skipActiveStorage ? true : undefined;
     this.options = Object.freeze({
@@ -622,6 +624,8 @@ export class AppGenerator extends AppBase {
         `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
       );
     }
+
+    this.afterBundleCallbacks = [];
   }
 
   async createRootFiles(): Promise<void> {
@@ -806,10 +810,6 @@ export class AppGenerator extends AppBase {
         `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
       );
     }
-  }
-
-  async runAfterBundleCallbacks(): Promise<void> {
-    for (const callback of this.afterBundleCallbacks) await callback();
   }
 
   /** @internal */

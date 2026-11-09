@@ -678,7 +678,7 @@ ${requireStatements.join("\n")}`;
     } catch (e) {
       if (e instanceof ThorError || e instanceof LoadError || e instanceof Errno.ENOENT) {
         throw new Error(
-          `The template [${this.trailsTemplate}] could not be loaded. Error: ${(e as Error).message}`,
+          `The template [${this.trailsTemplate}] could not be loaded. Error: ${e.message}`,
         );
       }
       throw e;
