@@ -1367,3 +1367,35 @@ describe("Hash.new", () => {
     expect(() => new Hash("1", () => "2")).toThrow(ArgumentError);
   });
 });
+
+describe("Hash#fetch dispatch", () => {
+  it("sends a receiver's own fetch exactly the arguments it was given", () => {
+    const seen: number[] = [];
+    const row = new (class {
+      fetch(...args: unknown[]): unknown {
+        seen.push(args.length);
+        return args[1] ?? "own";
+      }
+    })();
+    expect(fetch(row, "a")).toBe("own");
+    expect(fetch(row, "a", undefined)).toBe("own");
+    expect(fetch(row, "a", 7)).toBe(7);
+    expect(seen).toEqual([1, 2, 2]);
+  });
+
+  it("does not read Object.prototype as a stored __proto__ key", () => {
+    expect(fetch({}, "__proto__", 0)).toBe(0);
+    expect(() => fetch({}, "__proto__")).toThrow(KeyError);
+  });
+
+  it("lets a block supersede a default, as rb_hash_fetch_m does", () => {
+    expect(
+      fetch(
+        {},
+        "a",
+        0,
+        block(() => 1),
+      ),
+    ).toBe(1);
+  });
+});
