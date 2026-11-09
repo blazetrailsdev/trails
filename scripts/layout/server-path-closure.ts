@@ -13,6 +13,11 @@
  * - or one that imports `vitest` or `@blazetrails/vitest-matchers` (a package
  *   that is test-only as a whole, so its own exports are not entries).
  *
+ * A package's dynamic `import()` of its own testing export by its bare
+ * specifier is a load by name, as Rails' `require` of a feature path
+ * (`pubsub_adapter`'s `require path_to_adapter`): the server path reaches it
+ * only when configuration names it, so it is not followed.
+ *
  * Today's violations are `server-path-closure-exclude.json`, only-shrink: a new
  * violation reds, and so does a listed one that no longer occurs.
  *
@@ -167,7 +172,8 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
         const rel = path.relative(root, file);
         const source = await fs.readFile(file, "utf-8").catch(() => null);
         if (source === null) continue;
-        const specifiers = moduleSpecifiers(source).map((s) => s.specifier);
+        const imports = moduleSpecifiers(source);
+        const specifiers = imports.map((s) => s.specifier);
         const testing =
           testingEntries.has(file) ||
           isTestingPath(path.relative(path.join(file.split("/dist/")[0], "dist"), file)) ||
@@ -176,11 +182,19 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
           if (!found.has(rel)) found.set(rel, { module: rel, chain: [...chain, rel] });
           continue;
         }
-        for (const specifier of specifiers) {
+        for (const { specifier, kind } of imports) {
           const next = specifier.startsWith(".")
             ? path.resolve(path.dirname(file), specifier)
             : resolveBare(specifier, packages);
-          if (next !== null) queue.push([next, [...chain, rel]]);
+          if (next === null) continue;
+          if (
+            kind === "dynamic" &&
+            file.startsWith(`${packages.get(specifier.split("/").slice(0, 2).join("/"))?.dir}/`) &&
+            testingEntries.has(next)
+          ) {
+            continue;
+          }
+          queue.push([next, [...chain, rel]]);
         }
       }
     }

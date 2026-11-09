@@ -74,6 +74,28 @@ describe("server-path-closure", () => {
     ]);
   });
 
+  it("does not follow a dynamic import of a testing export by bare specifier", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "server-path-closure-"));
+    await write(
+      root,
+      "packages/a/package.json",
+      JSON.stringify({
+        name: "@blazetrails/a",
+        exports: { ".": "./dist/index.js", "./adapter/test": "./dist/adapter/test.js" },
+      }),
+    );
+    await write(
+      root,
+      "packages/a/dist/index.js",
+      'const load = () => import("@blazetrails/a/adapter/test");\nimport("./adapter/test.js");\n',
+    );
+    await write(root, "packages/a/dist/adapter/test.js", 'import "vitest";\n');
+    const violations = await findViolations(root);
+    expect(violations.map((v) => v.chain)).toEqual([
+      ["@blazetrails/a", "packages/a/dist/index.js", "packages/a/dist/adapter/test.js"],
+    ]);
+  });
+
   it("expands a single-star export pattern", () => {
     expect(wildcardMatch("./dist/*.js", "dist/a/b.js")).toBe("a/b");
     expect(wildcardMatch("./hidden/*", "./hidden/h")).toBe("h");
