@@ -103,7 +103,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
 
   private nsSchedule(delay: number): void {
     this.delay = delay;
-    this.time = performance.now() / 1000 + this.delay;
+    this.time = Date.now() / 1000 + this.delay;
     if (this.delay <= 0.01) {
       this.state = "processing";
       this.executor.post(() => this.processTask());
@@ -113,7 +113,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   }
 
   private processTasks(): void {
-    const diff = this.time! - performance.now() / 1000;
+    const diff = this.time! - Date.now() / 1000;
     if (diff <= 0) {
       this.state = "processing";
       this.executor.post(() => this.processTask());
