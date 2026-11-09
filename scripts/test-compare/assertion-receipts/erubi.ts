@@ -44,4 +44,31 @@ export const erubi: Record<string, AssertionReceipt[]> = {
   "erubi:test.rb › Erubi › should strip only whitespace for <%, <%- and <%# tags": [
     checkOutputEval,
   ],
+  "erubi:test.rb › Erubi › should handle :freeze_template_literals => false option": [
+    checkOutputEval,
+  ],
+  "erubi:test.rb › Erubi › should handle ensure option with no bufvar": [checkOutputEval],
+  "erubi:test.rb › Erubi › Erubi::CaptureBlockEngine › should handle empty tags by concatening empty string":
+    [checkOutputEval],
+  "erubi:test.rb › Erubi › Erubi::CaptureBlockEngine › should work as specified in documentation": [
+    checkOutputEval,
+  ],
+  "erubi:test.rb › Erubi › Erubi::CaptureBlockEngine › should allow <%= and <% for unescaped capturing when with :escape => ":
+    [checkOutputEval],
+  "erubi:test.rb › Erubi › Erubi::CaptureBlockEngine › should allow <%= and <% for escaped capturing with :escape => ":
+    [checkOutputEval],
+  "erubi:test.rb › Erubi › should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer":
+    [checkOutputEval, checkOutputEval],
+  "erubi:test.rb › Erubi › should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer as the result of the block":
+    [checkOutputEval, checkOutputEval],
+  "erubi:test.rb › Erubi › should allow <%|= and <%| for capturing with :escape_capture =>  and :escape => ":
+    [checkOutputEval],
+  "erubi:test.rb › Erubi › should handle loops in <%|= and <%| for capturing when with :escape => ":
+    [checkOutputEval],
+  "erubi:test.rb › Erubi › should allow <%|= and <%| for nested capturing when with :escape => ": [
+    checkOutputEval,
+  ],
+  "erubi:test.rb › Erubi › should allow <%|= and <%| for capturing when with :escape => ": [
+    checkOutputEval,
+  ],
 };

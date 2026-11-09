@@ -564,131 +564,129 @@ _buf.to_s
     ).toThrow(ArgumentError);
   });
 
-  describe("CaptureEndEngine", () => {
-    const engine = CaptureEndEngine;
-    it("should handle trailing rspace with - modifier in <%|= and <%|", () => {
-      checkOutput(
-        `<%|= '&' -%>
+  it("should handle trailing rspace with - modifier in <%|= and <%|", () => {
+    checkOutput(
+      `<%|= '&' -%>
 <%| -%>
 `,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( '&'  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( '&'  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        {},
-        true,
-        engine,
-      );
-    });
-    it("should handle lspace in <%|=", () => {
-      checkOutput(
-        `<%|= %><%| %><%|= %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ((  )).to_s; ensure; _buf = __erubi_stack.pop; end;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ((  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      {},
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should handle lspace in <%|=", () => {
+    checkOutput(
+      `<%|= %><%| %><%|= %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ((  )).to_s; ensure; _buf = __erubi_stack.pop; end;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ((  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        {},
-        true,
-        engine,
-      );
-    });
-    it("should have <%|= not escape by default", () => {
-      checkOutput(
-        `<%|= "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      {},
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should have <%|= not escape by default", () => {
+    checkOutput(
+      `<%|= "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        {},
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|= "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      {},
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|= "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escape: false },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|= "&" %><%| %>`,
-        `__erubi = ::Erubi; _buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << __erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escape: false },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|= "&" %><%| %>`,
+      `__erubi = ::Erubi; _buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << __erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escape: true },
-        true,
-        engine,
-      );
-    });
-    it("should have <%|== escape by default", () => {
-      checkOutput(
-        `<%|== "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escape: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should have <%|== escape by default", () => {
+    checkOutput(
+      `<%|== "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        {},
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|== "&" %><%| %>`,
-        `__erubi = ::Erubi; _buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      {},
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|== "&" %><%| %>`,
+      `__erubi = ::Erubi; _buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escape: true },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|== "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escape: true },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|== "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escape: false },
-        true,
-        engine,
-      );
-    });
-    it("should have <%|= and <%|== respect :escape_capture option", () => {
-      checkOutput(
-        `<%|= "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escape: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should have <%|= and <%|== respect :escape_capture option", () => {
+    checkOutput(
+      `<%|= "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escapeCapture: false },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|= "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escapeCapture: false },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|= "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escapeCapture: true },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|== "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escapeCapture: true },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|== "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escapeCapture: true },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|== "&" %><%| %>`,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
+      { escapeCapture: true },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|== "&" %><%| %>`,
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << ::Erubi.h(( "&"  )).to_s; ensure; _buf = __erubi_stack.pop; end;
 _buf.to_s
 `,
-        { escapeCapture: false },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|= and <%| for capturing with :escape_capture => false and :escape => true", () => {
-      checkOutput(
-        `<table>
+      { escapeCapture: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|= and <%| for capturing with :escape_capture => false and :escape => true", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|= bar do %>
    <b><%= '&' %></b>
@@ -696,7 +694,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
+      `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do  @a << '
 '; @a << '   <b>'; @a << __erubi.h(( '&' )); @a << '</b>
@@ -706,14 +704,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escapeCapture: false, escape: true },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|== and <%| for capturing with :escape_capture => true and :escape => false", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escapeCapture: false, escape: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|== and <%| for capturing with :escape_capture => true and :escape => false", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|== bar do %>
    <b><%== '&' %></b>
@@ -721,7 +719,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `@a = ::String.new; @a << '<table>
+      `@a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do  @a << '
 '; @a << '   <b>'; @a << ::Erubi.h(( '&' )); @a << '</b>
@@ -731,14 +729,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escapeCapture: true, escape: false },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|= and <%| for capturing when with :escape => true", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escapeCapture: true, escape: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|= and <%| for capturing when with :escape => true", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|= bar do %>
    <b><%= '&' %></b>
@@ -746,7 +744,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
+      `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << __erubi.h(( bar do  @a << '
 '; @a << '   <b>'; @a << __erubi.h(( '&' )); @a << '</b>
@@ -756,14 +754,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: true },
-        true,
-        engine,
-      );
-    });
-    it("should handle loops in <%|= and <%| for capturing when with :escape => true", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escape: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should handle loops in <%|= and <%| for capturing when with :escape => true", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|= quux do |i| %>
    <b><%= "\\#{i}&" %></b>
@@ -771,7 +769,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
+      `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << __erubi.h(( quux do |i|  @a << '
 '; @a << '   <b>'; @a << __erubi.h(( "\\#{i}&" )); @a << '</b>
@@ -781,14 +779,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: true },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|= and <%| for nested capturing when with :escape => true", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escape: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|= and <%| for nested capturing when with :escape => true", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|= bar do %>
    <b><%= '&' %></b>
@@ -797,7 +795,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
+      `__erubi = ::Erubi; @a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << __erubi.h(( bar do  @a << '
 '; @a << '   <b>'; @a << __erubi.h(( '&' )); @a << '</b>
@@ -808,14 +806,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: true },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|== and <%| for capturing when with :escape => false", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escape: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|== and <%| for capturing when with :escape => false", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|== bar do %>
    <b><%== '&' %></b>
@@ -823,7 +821,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `@a = ::String.new; @a << '<table>
+      `@a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << ::Erubi.h(( bar do  @a << '
 '; @a << '   <b>'; @a << ::Erubi.h(( '&' )); @a << '</b>
@@ -833,14 +831,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: false },
-        true,
-        engine,
-      );
-    });
-    it("should handle loops in <%|== and <%| for capturing when with :escape => false", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escape: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should handle loops in <%|== and <%| for capturing when with :escape => false", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|== quux do |i| %>
    <b><%== "\\#{i}&" %></b>
@@ -848,7 +846,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `@a = ::String.new; @a << '<table>
+      `@a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << ::Erubi.h(( quux do |i|  @a << '
 '; @a << '   <b>'; @a << ::Erubi.h(( "\\#{i}&" )); @a << '</b>
@@ -858,14 +856,14 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: false },
-        true,
-        engine,
-      );
-    });
-    it("should allow <%|== and <%| for nested capturing when with :escape => false", () => {
-      checkOutput(
-        `<table>
+      { bufvar: "@a", escape: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should allow <%|== and <%| for nested capturing when with :escape => false", () => {
+    checkOutput(
+      `<table>
  <tbody>
   <%|== bar do %>
    <b><%== '&' %></b>
@@ -874,7 +872,7 @@ _buf.to_s
  </tbody>
 </table>
 `,
-        `@a = ::String.new; @a << '<table>
+      `@a = ::String.new; @a << '<table>
  <tbody>
 '; @a << '  ';begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << ::Erubi.h(( bar do  @a << '
 '; @a << '   <b>'; @a << ::Erubi.h(( '&' )); @a << '</b>
@@ -885,52 +883,52 @@ _buf.to_s
 ';
 @a.to_s
 `,
-        { bufvar: "@a", escape: false },
-        true,
-        engine,
-      );
-    });
-    it("should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer", () => {
-      checkOutput(
-        `<%|= bar do |item| %>
+      { bufvar: "@a", escape: false },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer", () => {
+    checkOutput(
+      `<%|= bar do |item| %>
 Let's eat <%= item %>!
 <% nil %><%| end %>
 `,
-        `@a = ::String.new;begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do |item|  @a << '
+      `@a = ::String.new;begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do |item|  @a << '
 '; @a << 'Let\\'s eat '; @a << ( item ).to_s; @a << '!
 '; nil ; end )).to_s; ensure; @a = __erubi_stack.pop; end; @a << '
 ';
 @a.to_s
 `,
-        { bufvar: "@a" },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|= bar do |item| %>
+      { bufvar: "@a" },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|= bar do |item| %>
 Let's eat <%= item %>!
 <% i = i = nil %><%| end %>
 `,
-        `@a = ::String.new;begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do |item|  @a << '
+      `@a = ::String.new;begin; (__erubi_stack ||= []) << @a; @a = ::String.new; __erubi_stack.last << (( bar do |item|  @a << '
 '; @a << 'Let\\'s eat '; @a << ( item ).to_s; @a << '!
 '; i = i = nil ; @a;  end )).to_s; ensure; @a = __erubi_stack.pop; end; @a << '
 ';
 @a.to_s
 `,
-        { bufvar: "@a", yieldReturnsBuffer: true },
-        true,
-        engine,
-      );
-    });
-    it("should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer as the result of the block", () => {
-      checkOutput(
-        `<%|= bar do %>
+      { bufvar: "@a", yieldReturnsBuffer: true },
+      true,
+      CaptureEndEngine,
+    );
+  });
+  it("should respect the :yield_returns_buffer option for making templates return the (potentially modified) buffer as the result of the block", () => {
+    checkOutput(
+      `<%|= bar do %>
 Let's eat the tacos!
 <%| end %>
 
 Delicious!
 `,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( bar do  _buf << '
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( bar do  _buf << '
 '; _buf << 'Let\\'s eat the tacos!
 '; _buf;  end )).to_s; ensure; _buf = __erubi_stack.pop; end; _buf << '
 '; _buf << '
@@ -938,18 +936,18 @@ Delicious!
 ';
 _buf.to_s
 `,
-        { yieldReturnsBuffer: true },
-        true,
-        engine,
-      );
-      checkOutput(
-        `<%|= bar("Don't eat the burgers!") do %>
+      { yieldReturnsBuffer: true },
+      true,
+      CaptureEndEngine,
+    );
+    checkOutput(
+      `<%|= bar("Don't eat the burgers!") do %>
 Let's eat burgers!
 <%| end %>
 
 Delicious!
 `,
-        `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( bar("Don't eat the burgers!") do  _buf << '
+      `_buf = ::String.new;begin; (__erubi_stack ||= []) << _buf; _buf = ::String.new; __erubi_stack.last << (( bar("Don't eat the burgers!") do  _buf << '
 '; _buf << 'Let\\'s eat burgers!
 '; _buf;  end )).to_s; ensure; _buf = __erubi_stack.pop; end; _buf << '
 '; _buf << '
@@ -957,12 +955,12 @@ Delicious!
 ';
 _buf.to_s
 `,
-        { yieldReturnsBuffer: true },
-        true,
-        engine,
-      );
-    });
+      { yieldReturnsBuffer: true },
+      true,
+      CaptureEndEngine,
+    );
   });
+
   describe("Erubi::CaptureBlockEngine", () => {
     const engine = CaptureBlockEngine;
     it("should handle empty tags by concatening empty string", () => {
