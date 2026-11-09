@@ -126,7 +126,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     await t.appFile(
       "config/initializers/active-record.ts",
       `
-        import { Base, ScopeRegistry } from "@blazetrails/activerecord";
+        import { Base } from "@blazetrails/activerecord";
         await Base.leaseConnection();
 `,
     );
@@ -228,7 +228,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     } finally {
       await Base.removeConnection();
       if (origDatabaseUrl != null) setEnv("DATABASE_URL", origDatabaseUrl);
-      Trails.env = origTrailsEnv;
+      if (origTrailsEnv != null) Trails.env = origTrailsEnv;
     }
   });
 
@@ -245,7 +245,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     await t.appFile(
       "app/models/post.ts",
       `
-        import { Base, ScopeRegistry } from "@blazetrails/activerecord";
+        import { Base } from "@blazetrails/activerecord";
         export class Post extends Base {
           static [Symbol.hasInstance](_) {
             return false;
