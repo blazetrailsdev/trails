@@ -115,11 +115,14 @@ class PlacedArgument extends Switch {
   }
 }
 
-/** `OptionParser::Completion.regexp`, `vendor/ruby/v3.3.11/lib/optparse.rb:441-443`. */
-function completionRegexp(key: string, icase: boolean): RegExp {
-  const quoted = key.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
-  return new RegExp("^" + quoted.replace(/\w+\b/g, "$&\\w*"), icase ? "i" : "");
-}
+/** `OptionParser::Completion`, `vendor/ruby/v3.3.11/lib/optparse.rb:440`. */
+const Completion = {
+  /** `Completion.regexp`, `vendor/ruby/v3.3.11/lib/optparse.rb:441-443`. */
+  regexp(key: string, icase: boolean): RegExp {
+    const quoted = key.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+    return new RegExp("^" + quoted.replace(/\w+\b/g, "$&\\w*"), icase ? "i" : "");
+  },
+};
 
 /**
  * `OptionParser::OptionMap` (`vendor/ruby/v3.3.11/lib/optparse.rb:503`), a Hash
@@ -128,7 +131,7 @@ function completionRegexp(key: string, icase: boolean): RegExp {
  */
 class OptionMap extends Map<string, Switch> {
   complete(key: string, icase = false): [string, Switch] | undefined {
-    const pat = completionRegexp(key, icase);
+    const pat = Completion.regexp(key, icase);
     const candidates = [...this]
       .filter(([k]) => pat.test(k))
       .sort((a, b) => a[0].length - b[0].length);
