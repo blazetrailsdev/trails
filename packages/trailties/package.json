@@ -137,7 +137,6 @@
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/tzinfo": "workspace:*",
     "@blazetrails/zeitwerk": "workspace:*",
-    "commander": "^14.0.0",
     "vite": "^7.0.0"
   },
   "devDependencies": {

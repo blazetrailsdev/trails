@@ -1,36 +1,68 @@
-import { beforeAll, describe, it, expect } from "vitest";
-import { createProgram } from "../lib/cli.js";
-import { VERSION } from "../lib/gem-version.js";
-import { Generators } from "../lib/generators.js";
-import { lookupBang } from "../lib/command/behavior.js";
+import { afterAll, beforeAll, describe, it, expect, onTestFinished, vi } from "vitest";
+import { Dir, File, SystemExit, getFs, stdout } from "@blazetrails/ruby-compat";
+import { buildTemplates } from "@blazetrails/trails-tsc";
+import { GemHelpCommand } from "../lib/commands/gem-help.js";
+import { HELP_MAPPINGS, invoke } from "../lib/command.js";
 
-await lookupBang();
-
-beforeAll(async () => {
-  await Generators.lookupBang();
-});
+async function trails(...argv: string[]): Promise<string> {
+  let output = "";
+  const write = vi.spyOn(stdout, "write").mockImplementation((s: unknown) => {
+    output += String(s);
+    return true;
+  });
+  onTestFinished(() => write.mockRestore());
+  try {
+    const first = argv[0];
+    if (first == null || first === "help" || HELP_MAPPINGS.has(first)) {
+      await invoke("gem_help", argv.slice(1));
+    } else if (first === "plugin") {
+      await invoke("plugin", argv.slice(1));
+    } else {
+      await invoke("application", argv);
+    }
+  } catch (e) {
+    if (!(e instanceof SystemExit)) throw e;
+  }
+  return output;
+}
 
 describe("CLI", () => {
-  it("prints version with --version flag", () => {
-    const program = createProgram();
-    program.exitOverride();
-    let output = "";
-    program.configureOutput({
-      writeOut: (str) => {
-        output = str;
-      },
-    });
-    try {
-      program.parse(["node", "trails", "--version"]);
-    } catch (e: any) {
-      /** @empty */
-    }
-    expect(output.trim()).toBe(VERSION.STRING);
+  const dir = Dir.mktmpdir();
+
+  beforeAll(async () => {
+    const usage = File.join(dir, "USAGE");
+    const source = await GemHelpCommand.usagePath();
+    await getFs().writeFile!(usage, await getFs().readFile(source!, "utf8"));
+    await buildTemplates([usage]);
+    vi.spyOn(GemHelpCommand, "usagePath").mockResolvedValue(usage);
+  }, 60_000);
+
+  afterAll(async () => {
+    vi.restoreAllMocks();
+    await getFs().rm!(dir, { recursive: true, force: true });
   });
 
-  it("has all expected commands registered", () => {
-    const program = createProgram();
-    const names = program.commands.map((c) => c.name());
-    expect(names).toContain("new");
-  });
+  it("prints the gem help with no command", async () => {
+    const output = await trails();
+    expect(output).toMatch(/^Usage:\n {2}trails COMMAND \[options\]\n/);
+    expect(output).toContain("You must specify a command:");
+  }, 60_000);
+
+  it("prints the gem help for --help", async () => {
+    expect(await trails("--help")).toBe(await trails());
+  }, 60_000);
+
+  it("prints the app generator help for a command's --help outside an app", async () => {
+    expect(await trails("server", "--help")).toMatch(
+      /^Usage:\n {2}trails new APPPATH \[options\]\n/,
+    );
+  }, 60_000);
+
+  it("prints the app generator help for new with no path", async () => {
+    expect(await trails("new")).toMatch(/^Usage:\n {2}trails new APPPATH \[options\]\n/);
+  }, 60_000);
+
+  it("prints the app generator help for an unknown command", async () => {
+    expect(await trails("nope")).toBe(await trails("new"));
+  }, 60_000);
 });

@@ -18,7 +18,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
-import { Command } from "commander";
 import { environment } from "../command.js";
 import { APP_PATH } from "../app-path.js";
 import { Base } from "../command/base.js";
@@ -185,16 +184,4 @@ export class DbconsoleCommand extends Base {
     await this.bootApplicationBang();
     await DBConsole.start(this.options);
   }
-}
-
-export function dbconsoleCommand(): Command {
-  const klass = DbconsoleCommand;
-  const cmd = new Command(klass.commandName());
-  cmd.description("Start a console for the database specified in config/database.yml");
-  cmd.argument("[args...]").allowUnknownOption().helpOption(false);
-  cmd.action(async (_args: string[], _options: object, command: Command) => {
-    await klass.perform(klass.commandName(), command.args, {});
-  });
-
-  return cmd;
 }

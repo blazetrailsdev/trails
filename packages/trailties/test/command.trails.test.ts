@@ -2,10 +2,8 @@ import { afterEach } from "vitest";
 import { setAppPath, setEngineRoot } from "../lib/app-path.js";
 import { root } from "../lib/command.js";
 import type { Base } from "../lib/command/base.js";
-import { Command as Program } from "commander";
 import { Rake } from "@blazetrails/rake";
 import { describe, it, expect, onTestFinished, vi } from "vitest";
-import { createProgram } from "../lib/cli.js";
 import { findByNamespace, hiddenCommands, invoke } from "../lib/command.js";
 import { lookupBang, subclasses } from "../lib/command/behavior.js";
 
@@ -14,10 +12,6 @@ vi.mock(
   "../lib/commands/generate.js",
   async (importOriginal) => (loaded.push("generate"), importOriginal()),
 );
-
-function programName(command: Awaited<ReturnType<typeof findByNamespace>>): unknown {
-  return (command as Program | undefined)?.name();
-}
 
 describe("Trails::Command.find_by_namespace", () => {
   it("loads only the candidate command, as lookup requires only its file", async () => {
@@ -50,17 +44,14 @@ describe("Trails::Command.find_by_namespace", () => {
   it("performs a Base command only for a name in all_commands", async () => {
     const { UnusedRoutesCommand } = await import("../lib/commands/unused-routes.js");
     const perform = vi.spyOn(UnusedRoutesCommand, "perform").mockResolvedValue();
-    const rake = vi.spyOn(Program.prototype, "parseAsync").mockResolvedValue(createProgram());
-    onTestFinished(() => (perform.mockRestore(), rake.mockRestore()));
+    onTestFinished(() => perform.mockRestore());
 
     await invoke("unused_routes", ["-g", "x"]);
     expect(perform).toHaveBeenCalledWith("unused-routes", ["-g", "x"], {});
-    expect(rake).not.toHaveBeenCalled();
 
     perform.mockClear();
     await expect(invoke("unused_routes:constructor")).rejects.toThrow('called with "1"');
     expect(perform).not.toHaveBeenCalled();
-    expect(rake).not.toHaveBeenCalled();
   }, 30_000);
 
   it("hands an unknown name to the rake command, with --describe for help", async () => {
