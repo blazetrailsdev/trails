@@ -58,6 +58,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "activestorage",
   "i18n",
   "trailties",
+  "actiontext",
 ]);
 
 /** `packages/<pkg>/<libRoot>` holds the library sources. */

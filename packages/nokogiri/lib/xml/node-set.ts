@@ -108,6 +108,7 @@ export class NodeSet implements Iterable<Node> {
     return this.map((node) => node.text).join("");
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   toHtml(options: { saveWith?: number } = {}): string {
     return this.map((node) => node.toHtml(options)).join("");
   }

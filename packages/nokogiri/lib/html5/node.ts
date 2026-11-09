@@ -189,6 +189,7 @@ export class Node {
     return this.ancestors().last()!.search(selector).isInclude(this);
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   innerHtml(options: { preserveNewline?: boolean; saveWith?: number } = {}): string {
     let result = options.preserveNewline && this.isPrependNewline() ? "\n" : "";
     result += this.children.map((child) => child.toHtml(options)).join("");
