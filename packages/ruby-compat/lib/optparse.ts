@@ -136,13 +136,18 @@ class OptionMap extends Map<string, Switch> {
       .filter(([k]) => pat.test(k))
       .sort((a, b) => a[0].length - b[0].length);
     if (candidates.length === 0) return undefined;
-    const [canon, sw] = candidates.shift()!;
-    for (const [k, v] of candidates) {
+    let [cn, sw] = candidates.shift()!;
+    for (const [kn, v] of candidates) {
       if (sw === v) continue;
-      if (k.startsWith(canon)) continue;
+      if (cn.startsWith(kn)) {
+        [sw, cn] = [v, kn];
+        continue;
+      } else if (kn.startsWith(cn)) {
+        continue;
+      }
       throw new AmbiguousOption(key);
     }
-    return [canon, sw];
+    return [key, sw];
   }
 }
 
@@ -359,29 +364,41 @@ export class OptionParser {
           throw e;
         }
       } else if ((m = arg.match(/^-(.)((=).*|.+)?/s))) {
-        const eq = m[3];
+        let eq: unknown = m[3];
         const rest = m[2] ?? null;
         const opt = m[1];
-        let sw = this._search("short", opt);
+        let hasArg: unknown = eq;
+        let val: unknown = rest;
+        let sw: Switch | undefined;
         try {
-          sw ??= this._complete("long", opt);
+          sw = this._search("short", opt);
+          if (!sw) {
+            try {
+              sw = this._complete("short", opt);
+              val = arg.replace(/^-/, "");
+              hasArg = true;
+            } catch (e) {
+              if (!(e instanceof InvalidOption)) throw e;
+              sw = this._complete("long", opt);
+              eq ||= rest == null;
+            }
+          }
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, true);
           throw e;
         }
         let next: string | null;
-        let val: unknown;
         try {
-          [next, val] = sw.parse(rest, argv, (a) => {
+          [next, val] = sw.parse(val as string | null, argv, (a) => {
             if (eq) throw new NeedlessArgument(a);
           });
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, arg.length > 2);
           throw e;
         }
-        if (next != null) {
-          const short = next.replace(/^-*/, "-");
-          if (short !== "-") argv.unshift(short);
+        if (hasArg && !eq && arg === `-${next}`) throw new InvalidOption(arg);
+        if (next != null && (rest == null || (next = next.replace(/^-*/, "-")) !== "-")) {
+          argv.unshift(next);
         }
         await sw.block?.(val);
       } else nonopt(arg);

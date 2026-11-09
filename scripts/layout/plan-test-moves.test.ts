@@ -158,7 +158,7 @@ describe("planTestMoves", () => {
         ],
         libImported: new Set(),
         comparison: [],
-        railsTestDirs: new Set(["jobs", "adapters", "cases"]),
+        railsTestDirs: new Set(["jobs", "adapters", "cases", "helper.rb"]),
       }),
     );
     expect(plan.moves).toEqual([
@@ -167,6 +167,18 @@ describe("planTestMoves", () => {
       ["src/test-helpers/jobs/hello-job.ts", "test/jobs/hello-job.ts"],
       ["src/test-helpers/other.ts", "test/support/other.ts"],
     ]);
+  });
+
+  it("keeps helper.ts under test/support/ when the gem has no test/helper.rb", () => {
+    const plan = planTestMoves(
+      fixture({
+        pkg: "x",
+        files: ["test-helpers/helper.ts"],
+        libImported: new Set(),
+        comparison: [],
+      }),
+    );
+    expect(plan.moves).toEqual([["src/test-helpers/helper.ts", "test/support/helper.ts"]]);
   });
 });
 

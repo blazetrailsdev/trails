@@ -50,4 +50,12 @@ describe("OptionParser DefaultList", () => {
     const o = new OptionParser();
     expect(await o.parse(["-"])).toEqual(["-"]);
   });
+
+  it("completes a short switch against the long options when no short one matches", async () => {
+    const o = new OptionParser();
+    const got: unknown[] = [];
+    o.on("--quiet", (v) => got.push(v));
+    await o.parse(["-q"]);
+    expect(got).toEqual([true]);
+  });
 });

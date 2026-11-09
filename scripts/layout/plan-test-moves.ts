@@ -27,6 +27,7 @@ import { promisify } from "util";
 import { PKG_SRC_DIRS } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
 import { LIB_TEST_PACKAGES } from "./package-roots.mjs";
+import { resolveSourcePath } from "../../vendor/sources.js";
 import { COMMITTED_TS_FILES, walkTsFiles } from "../api-compare/ts-file-walk.js";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -75,7 +76,7 @@ export interface PlanInput {
   comparison: readonly ComparedPackage[];
   /** Each non-`.ts` file under `libDir` to the files there naming it by a relative path. */
   assetRefs?: ReadonlyMap<string, readonly string[]>;
-  /** The directories directly under the gem's own `test/` (`jobs`, `adapters`). */
+  /** The entries directly under the gem's own `test/` (`jobs`, `adapters`, `helper.rb`). */
   railsTestDirs?: ReadonlySet<string>;
 }
 
@@ -96,7 +97,9 @@ function supportHome(file: string, railsTestDirs: ReadonlySet<string> = new Set(
   if (rest.length > 1 && (RAILS_SUPPORT_DIRS.has(rest[0]) || railsTestDirs.has(rest[0]))) {
     return `test/${rest.join("/")}`;
   }
-  if (rest.length === 1 && rest[0] === "helper.ts") return "test/helper.ts";
+  if (rest.length === 1 && rest[0] === "helper.ts" && railsTestDirs.has("helper.rb")) {
+    return "test/helper.ts";
+  }
   if (parts[at] === "__fixtures__") return `test/fixtures/${rest.join("/")}`;
   return `test/support/${rest.join("/")}`;
 }
@@ -243,12 +246,10 @@ async function libImportedFiles(libPath: string, files: readonly string[]): Prom
   return imported;
 }
 
-/** The directories under `vendor/rails/v8.0.2/<gem>/test/`, empty for a non-Rails gem. */
-async function railsTestDirs(pkg: string, cwd: string): Promise<Set<string>> {
-  const entries = await fs
-    .readdir(path.join(cwd, "vendor/rails/v8.0.2", pkg, "test"), { withFileTypes: true })
-    .catch(() => []);
-  return new Set(entries.filter((e) => e.isDirectory()).map((e) => e.name));
+/** The entries under the vendored Rails gem's `test/`, empty for a non-Rails gem. */
+async function railsTestDirs(pkg: string): Promise<Set<string>> {
+  const entries = await fs.readdir(resolveSourcePath("rails", `${pkg}/test`)).catch(() => []);
+  return new Set(entries);
 }
 
 export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<string> {
@@ -278,7 +279,7 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     libImported: await libImportedFiles(libPath, files),
     comparison: comparison.results,
     assetRefs: await assetReferences(libPath, files),
-    railsTestDirs: await railsTestDirs(pkg, cwd),
+    railsTestDirs: await railsTestDirs(pkg),
   });
   if (plan.collisions.length > 0) {
     throw new Error(`plan-test-moves: two files land on:\n  ${plan.collisions.join("\n  ")}`);

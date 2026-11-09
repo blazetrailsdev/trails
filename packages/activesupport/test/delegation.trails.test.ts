@@ -279,3 +279,16 @@ describe("delegate_missing_to and then", () => {
     expect(await holder).toBe(holder);
   });
 });
+
+describe("Delegation.generate to a constant name", () => {
+  it("reads a capitalised to: as a constant on the owner, not a method", () => {
+    class Target {
+      static greet(): string {
+        return "hi";
+      }
+    }
+    const owner = { Target } as { Target: typeof Target; greet?: () => string };
+    delegate.call(owner, "greet", { to: "Target" });
+    expect(owner.greet!()).toBe("hi");
+  });
+});
