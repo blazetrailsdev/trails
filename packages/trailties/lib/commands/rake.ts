@@ -3,7 +3,7 @@ import { Rake, TaskManager, type Application as RakeApplication } from "@blazetr
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
-import { UnrecognizedCommandError, root } from "../command.js";
+import { UnrecognizedCommandError, printingCommands, root } from "../command.js";
 
 export class RakeCommand extends Base {
   static {
@@ -38,7 +38,7 @@ export class RakeCommand extends Base {
         this._rakeTasks = rake.tasks;
         throw new UnrecognizedCommandError(
           unrecognizedTask,
-          this._rakeTasks.map((t) => t.name),
+          (await printingCommands()).map(([name]) => name),
         );
       }
 
