@@ -21,7 +21,6 @@ export class CaptureBlockEngine extends Engine {
   }
 
   /** @internal */
-  /** @internal */
   protected addExpressionOp(op: string, code: string): void {
     const check = /^[ \t\r\n\f\v]*$/.test(code) ? "''" : "";
     this.withBuffer(() => {
