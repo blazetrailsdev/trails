@@ -15,7 +15,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";
 import type { GeneratorConfig } from "../../base.js";
 import { Trails } from "../../../trails.js";
-import { Error as GeneratorError } from "../../base.js";
+import { Error } from "../../base.js";
 import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 import { VERSION } from "../../../gem-version.js";
@@ -451,6 +451,8 @@ export class AppBuilder extends ActionMethods {
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
+  /** @internal */
+  private afterBundleCallbacks: Array<() => unknown>;
   readonly sqliteDriver: SqliteDriver;
 
   static override OPTION_IMPLICATIONS: Record<string, readonly string[]> = {
@@ -569,6 +571,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
     this.publicCommand("generateBundlerBinstub");
+    this.methodAdded("runAfterBundleCallbacks");
   }
 
   declare options: AppGeneratorOptions & AppBaseOptions;
@@ -581,7 +584,13 @@ export class AppGenerator extends AppBase {
     );
     generator.setDefaultAccessorsBang();
     await generator.applyTrailsTemplate();
+    await generator.runInstall();
+    await generator.runAfterBundleCallbacks();
     return generator;
+  }
+
+  async runAfterBundleCallbacks(): Promise<void> {
+    for (const callback of this.afterBundleCallbacks) await callback();
   }
 
   static banner(): string {
@@ -606,15 +615,17 @@ export class AppGenerator extends AppBase {
     this.packageManager = this.options.packageManager ?? "pnpm";
     this.sqliteDriver = this.options.sqliteDriver ?? "better-sqlite3";
     if (!VALID_PACKAGE_MANAGERS.includes(this.packageManager)) {
-      throw new GeneratorError(
+      throw new Error(
         `Unknown package manager '${this.packageManager}'. Valid options: ${VALID_PACKAGE_MANAGERS.join(", ")}`,
       );
     }
     if (!VALID_SQLITE_DRIVERS.includes(this.sqliteDriver)) {
-      throw new GeneratorError(
+      throw new Error(
         `Unknown SQLite driver '${this.sqliteDriver}'. Valid options: ${VALID_SQLITE_DRIVERS.join(", ")}`,
       );
     }
+
+    this.afterBundleCallbacks = [];
   }
 
   async createRootFiles(): Promise<void> {
@@ -799,6 +810,11 @@ export class AppGenerator extends AppBase {
         `config/initializers/new-framework-defaults-${VERSION.MAJOR}-${VERSION.MINOR}.ts`,
       );
     }
+  }
+
+  /** @internal */
+  protected afterBundle(block: () => unknown): void {
+    this.afterBundleCallbacks.push(block);
   }
 
   /** @internal */

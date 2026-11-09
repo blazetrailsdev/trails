@@ -8,7 +8,7 @@ import {
   singularize,
   underscore,
 } from "@blazetrails/activesupport";
-import { Error as GeneratorError } from "../../base.js";
+import { Error } from "../../base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
 import { format, File } from "@blazetrails/ruby-compat";
@@ -60,7 +60,7 @@ export class ScaffoldGenerator extends Base {
     if (this.isInflectionImpossible(this.name)) {
       const option1 = underscore(singularize(this.name));
       const option2 = singularize(underscore(pluralize(this.name)));
-      throw new GeneratorError(
+      throw new Error(
         format(ModelHelpers.INFLECTION_IMPOSSIBLE_ERROR_MESSAGE, this.name, option1, option2),
       );
     }

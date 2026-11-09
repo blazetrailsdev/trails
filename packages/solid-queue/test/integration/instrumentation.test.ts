@@ -356,7 +356,7 @@ describe("InstrumentationTest", () => {
     for (let i = 0; i < 3; i++) await RaisingJob.performLater(ExpectedTestError, "A");
     await AddToBufferJob.performLater("A");
 
-    const jobs = Job.where({ id: (await Job.last(4)).map((job) => job.id) });
+    const jobs = await Job.last(4);
 
     const worker = new Worker();
     await worker.start();

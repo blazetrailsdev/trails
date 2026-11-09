@@ -1,7 +1,7 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "../../lib/generators/model-helpers.js";
-import { Error as GeneratorError } from "../../lib/generators/base.js";
+import { Error } from "../../lib/generators/base.js";
 import {
   ModelGenerator,
   type ModelGeneratorOptions,
@@ -30,6 +30,6 @@ describe("normalizeModelName", () => {
   });
 
   it("raises GeneratorError on inflection-impossible names", () => {
-    expect(() => build("WIFI")).toThrow(GeneratorError);
+    expect(() => build("WIFI")).toThrow(Error);
   });
 });
