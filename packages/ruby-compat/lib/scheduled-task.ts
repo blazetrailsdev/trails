@@ -29,6 +29,8 @@ export class CancelledOperationError extends StandardError {}
  * `Concurrent.monotonic_time`: callers compute the delay from `Time.current`,
  * which JS truncates to the millisecond, so a monotonic deadline can wake before
  * that clock reaches it (a recurring task then re-enqueues the same second).
+ * The cost is that a wall-clock step moves a pending deadline with it: a step
+ * back delays the task by the step, a step forward runs it early.
  *
  * @noRailsEquivalent PERMANENT
  */
