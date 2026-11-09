@@ -18,6 +18,30 @@ describe("HTML5 node mutation", () => {
     expect(node.toHtml()).toBe('<div class="blue"></div>');
   });
 
+  it("yields before applying attributes", () => {
+    const node = new Document().createElement(
+      "div",
+      { class: "attr" },
+      (n: { set(k: string, v: string): void }) => n.set("class", "block"),
+    );
+    expect(node.get("class")).toBe("attr");
+  });
+
+  it("round-trips a pre's leading newline through to_html", () => {
+    const pre = DocumentFragment.parse("<pre>\n\nx</pre>").atCss("pre")!;
+    expect(pre.serialize({ preserveNewline: true, saveWith: SaveOptions.AS_HTML })).toBe(
+      "<pre>\n\nx</pre>",
+    );
+  });
+
+  it("chains save options and answers their predicates", () => {
+    const config = new SaveOptions().format().asHtml();
+    expect(config.toI()).toBe(SaveOptions.FORMAT | SaveOptions.AS_HTML);
+    expect(config.isAsHtml()).toBe(true);
+    expect(config.isAsXml()).toBe(false);
+    expect(new SaveOptions().noEmptyTags().isNoEmptyTags()).toBe(true);
+  });
+
   it("sets and checks attributes", () => {
     const node = new Document().createElement("figure");
     expect(node.isKey("data-x")).toBe(false);

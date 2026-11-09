@@ -1,4 +1,5 @@
 import { Gem } from "@blazetrails/ruby-compat";
+import { ActionText } from "./action-text.js";
 
 export function gemVersion(): InstanceType<typeof Gem.Version> {
   return new Gem.Version(VERSION.STRING);
@@ -16,3 +17,5 @@ export const VERSION = {
   PRE,
   STRING: [MAJOR, MINOR, TINY, PRE].filter((p) => p != null).join("."),
 };
+
+ActionText.gemVersion = gemVersion;

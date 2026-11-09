@@ -17,7 +17,6 @@ export class Document {
   declare atXpath: (...args: unknown[]) => Node | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
-  static readonly NCNAME_RE = /^xmlns(?::([A-Za-z_][A-Za-z_\-.0-9]*))?$/;
 
   url: string | null = null;
   encoding: string | null = null;
@@ -91,6 +90,10 @@ export class Document {
     return copy;
   }
 
+  /**
+   * @missingRailsCall add_namespace_definition — PERMANENT
+   * @missingRailsCall namespace_definitions — PERMANENT
+   */
   createElement(name: string, ...contentsOrAttrs: unknown[]): Node {
     const block =
       typeof contentsOrAttrs.at(-1) === "function"
@@ -101,12 +104,7 @@ export class Document {
     for (const arg of contentsOrAttrs) {
       if (arg !== null && typeof arg === "object") {
         for (const [k, v] of Object.entries(arg)) {
-          const key = String(k);
-          if (Document.NCNAME_RE.test(key)) {
-            elm.set(key, v);
-          } else {
-            elm.set(String(k), String(v));
-          }
+          elm.set(String(k), String(v));
         }
       } else {
         elm.content = arg;

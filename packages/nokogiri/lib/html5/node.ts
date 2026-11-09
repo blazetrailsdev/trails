@@ -48,6 +48,7 @@ export class Node {
   static readonly TEXT_NODE = 3;
   static readonly CDATA_SECTION_NODE = 4;
   static readonly COMMENT_NODE = 8;
+  static readonly SaveOptions = SaveOptions;
 
   constructor(
     /**
@@ -227,12 +228,20 @@ export class Node {
     return this.pointerId === (other as Node).pointerId;
   }
 
-  serialize(options: { encoding?: string | null; saveWith?: number } = {}): string {
+  serialize(...args: unknown[]): string {
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (config: SaveOptions) => void) : undefined;
+    const options = (
+      args[0] !== null && typeof args[0] === "object"
+        ? args.shift()
+        : { encoding: args[0], saveWith: args[1] }
+    ) as { encoding?: string | null; saveWith?: number };
+
     options.encoding ||= (this.document as { encoding?: string | null } | null)?.encoding;
 
     const io = new StringIO();
 
-    this.writeTo(io, options);
+    this.writeTo(io, options, block);
     return io.string();
   }
 
@@ -240,20 +249,37 @@ export class Node {
     return this.toFormat(SaveOptions.DEFAULT_HTML, options);
   }
 
-  writeTo(
-    io: StringIO,
-    options: { encoding?: string | null; saveWith?: number; preserveNewline?: boolean } = {},
-  ): void {
-    const saveOptions = options.saveWith || SaveOptions.FORMAT;
+  writeTo(io: StringIO, ...options: unknown[]): void {
+    const block =
+      typeof options.at(-1) === "function"
+        ? (options.pop() as (config: SaveOptions) => void)
+        : undefined;
+    const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
+      saveWith?: number;
+      indent?: number;
+      indentText?: string;
+      preserveNewline?: boolean;
+    };
+    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
 
-    const config = new SaveOptions(saveOptions);
+    const config = new SaveOptions(Number(saveOptions));
+    if (block) block(config);
 
     const configOptions = config.options;
     if ((configOptions & (SaveOptions.AS_XML | SaveOptions.AS_XHTML)) !== 0) {
       io.write(this.toString());
     } else {
-      io.write(serializeOuter(this._node));
+      const html = this.htmlStandardSerialize(opts.preserveNewline || false);
+      io.write(html);
     }
+  }
+
+  /** @internal */
+  private htmlStandardSerialize(preserveNewline: boolean): string {
+    const html = serializeOuter(this._node);
+    if (!preserveNewline || !this.isPrependNewline()) return html;
+    const start = html.indexOf(">") + 1;
+    return `${html.slice(0, start)}\n${html.slice(start)}`;
   }
 
   get attributes(): Record<string, Attr> {
@@ -406,7 +432,8 @@ function _cloneNode<T extends object>(node: T, level: number): T {
           })
         : [];
   }
-  if ("content" in node && node.content) copy.content = _cloneNode(node.content as object, level);
+  if ("content" in node && node.content && level > 0)
+    copy.content = _cloneNode(node.content as object, level);
   return copy as T;
 }
 
