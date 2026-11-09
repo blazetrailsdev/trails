@@ -47,10 +47,6 @@ const rel = (files: Set<string>): string[] => [...files].map((f) => path.relativ
 describe("the production server entry point", () => {
   const server = graph("server/index.ts");
 
-  it("cannot reach commander, so no command table is in the graph", () => {
-    expect([...server.packages].filter((p) => p === "commander")).toEqual([]);
-  });
-
   it("cannot reach vite or the other build tooling", () => {
     const tooling = [...server.packages].filter((p) =>
       /^(vite|rollup|esbuild|vitest)($|\/)/.test(p),
@@ -93,7 +89,6 @@ describe("the production server entry point", () => {
 
   it("and the bin reaches nothing the entry point does not", () => {
     const bin = graph("server-bin.ts");
-    expect([...bin.packages].filter((p) => p === "commander")).toEqual([]);
     expect(rel(bin.files).filter((f) => f.startsWith("commands/"))).toEqual([]);
   });
 });

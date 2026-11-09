@@ -1,39 +1,33 @@
 import { LoadError, regexpEscape } from "@blazetrails/ruby-compat";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
-import type { Command as Program } from "commander";
 import type { Base } from "./base.js";
 
-type CommandFactory = () => Program;
-
-const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory | null>>> = {
-  new: async () => (await import("../commands/new.js")).newCommand,
-  generate: async () => (await import("../commands/generate.js"), null),
-  server: async () => (await import("../commands/server.js"), null),
-  routes: async () => (await import("../commands/routes.js"), null),
-  "unused-routes": async () => (await import("../commands/unused-routes.js"), null),
-  console: async () => (await import("../commands/console.js"), null),
-  dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
-  destroy: async () => (await import("../commands/destroy.js"), null),
-  runner: async () => (await import("../commands/runner.js"), null),
-  notes: async () => (await import("../commands/notes.js"), null),
-  stats: async () => (await import("../commands/stats.js"), null),
-  credentials: async () => (await import("../commands/credentials.js"), null),
-  encrypted: async () => (await import("../commands/encrypted.js"), null),
-  dev: async () => (await import("../commands/dev.js"), null),
-  test: async () => (await import("../commands/test.js"), null),
-  build: async () => (await import("../commands/build.js"), null),
-  rake: async () => (await import("../commands/rake.js"), null),
-  application: async () => (await import("../commands/application.js"), null),
-  plugin: async () => (await import("../commands/plugin.js"), null),
-  help: async () => (await import("../commands/help.js"), null),
-  version: async () => (await import("../commands/version.js"), null),
-  "gem-help": async () => (await import("../commands/gem-help.js"), null),
-  "app/update": async () => (await import("../commands/app/update-command.js"), null),
-  "db/system/change/change": async () => (
+const LOAD_PATH: Readonly<Record<string, () => Promise<unknown>>> = {
+  generate: async () => await import("../commands/generate.js"),
+  server: async () => await import("../commands/server.js"),
+  routes: async () => await import("../commands/routes.js"),
+  "unused-routes": async () => await import("../commands/unused-routes.js"),
+  console: async () => await import("../commands/console.js"),
+  dbconsole: async () => await import("../commands/dbconsole.js"),
+  destroy: async () => await import("../commands/destroy.js"),
+  runner: async () => await import("../commands/runner.js"),
+  notes: async () => await import("../commands/notes.js"),
+  stats: async () => await import("../commands/stats.js"),
+  credentials: async () => await import("../commands/credentials.js"),
+  encrypted: async () => await import("../commands/encrypted.js"),
+  dev: async () => await import("../commands/dev.js"),
+  test: async () => await import("../commands/test.js"),
+  build: async () => await import("../commands/build.js"),
+  rake: async () => await import("../commands/rake.js"),
+  application: async () => await import("../commands/application.js"),
+  plugin: async () => await import("../commands/plugin.js"),
+  help: async () => await import("../commands/help.js"),
+  version: async () => await import("../commands/version.js"),
+  "gem-help": async () => await import("../commands/gem-help.js"),
+  "app/update": async () => await import("../commands/app/update-command.js"),
+  "db/system/change/change": async () =>
     await import("../commands/db/system/change/change-command.js"),
-    null
-  ),
 };
 
 export function noColorBang(): void {
@@ -44,13 +38,6 @@ let _subclasses: (typeof Base)[] | undefined;
 
 export function subclasses(): (typeof Base)[] {
   return (_subclasses ??= []);
-}
-
-const _commanderFactories: CommandFactory[] = [];
-
-/** @noRailsEquivalent CONVERGEABLE retire-commander-cli-onto-rails-command-invoke */
-export function commanderFactories(): CommandFactory[] {
-  return _commanderFactories;
 }
 
 /**
@@ -65,8 +52,7 @@ export async function lookup(namespaces: string[]): Promise<void> {
 
     try {
       if (!Object.hasOwn(LOAD_PATH, path)) throw new LoadError(`cannot load such file -- ${path}`);
-      const factory = await LOAD_PATH[path]();
-      if (factory && !commanderFactories().includes(factory)) commanderFactories().push(factory);
+      await LOAD_PATH[path]();
       return;
     } catch (e) {
       if (e instanceof LoadError) {
@@ -81,15 +67,11 @@ export async function lookup(namespaces: string[]): Promise<void> {
   }
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
     try {
-      const factory = await load();
-      if (factory && !commanderFactories().includes(factory)) commanderFactories().push(factory);
+      await load();
     } catch {
       continue;
     }

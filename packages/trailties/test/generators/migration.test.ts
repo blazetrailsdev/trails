@@ -28,10 +28,10 @@ describe("migration", () => {
       `${d}/20260103000000_other.ts`,
     ]);
     expect(ClassMethods.migrationLookupAt(nodePath.join(tmpDir, "missing"))).toEqual([]);
-    expect(ClassMethods.migrationExists(d, "create_posts")).toBe(
+    expect(ClassMethods.isMigrationExists(d, "create_posts")).toBe(
       `${d}/20260101000000_create_posts.ts`,
     );
-    expect(ClassMethods.migrationExists(d, "missing")).toBeUndefined();
+    expect(ClassMethods.isMigrationExists(d, "missing")).toBeUndefined();
     expect(ClassMethods.currentMigrationNumber(d)).toBe(20260103000000);
   });
 

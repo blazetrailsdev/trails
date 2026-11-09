@@ -28,7 +28,7 @@ export class Base extends NamedBase {
   migrationClassName = "";
 
   declare static migrationLookupAt: Extended<typeof Generators.ClassMethods>["migrationLookupAt"];
-  declare static migrationExists: Extended<typeof Generators.ClassMethods>["migrationExists"];
+  declare static isMigrationExists: Extended<typeof Generators.ClassMethods>["isMigrationExists"];
   declare static currentMigrationNumber: Extended<
     typeof Generators.ClassMethods
   >["currentMigrationNumber"];
