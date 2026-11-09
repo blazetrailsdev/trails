@@ -1,22 +1,30 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, FileUtils, stdout } from "@blazetrails/ruby-compat";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { include, stdout } from "@blazetrails/ruby-compat";
 import { CodeStatistics, DIRECTORIES, TEST_TYPES } from "../../lib/code-statistics.js";
 import { invoke } from "../../lib/command.js";
+import { setAppPath } from "../../lib/app-path.js";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 
-let appPath: string;
-let originalCwd: string;
+class StatsTest extends TestCase {}
+include(StatsTest, Isolation);
 
-beforeEach(() => {
-  appPath = Dir.mktmpdir("trails-stats-");
-  originalCwd = Dir.pwd();
-  Dir.chdir(appPath);
-  CodeStatistics.directories = [...DIRECTORIES];
-  CodeStatistics.testTypes = [...TEST_TYPES];
+let t: Generation;
+
+beforeAll(async () => {
+  t = new StatsTest("test") as unknown as Generation;
+  await t.buildApp();
+  setAppPath(await t.appPath("config", "application.ts"));
+});
+
+afterAll(async () => {
+  setAppPath(undefined);
+  await t.teardownApp();
 });
 
 afterEach(() => {
-  Dir.chdir(originalCwd);
-  FileUtils.rmRf(appPath);
   CodeStatistics.directories = [...DIRECTORIES];
   CodeStatistics.testTypes = [...TEST_TYPES];
 });
@@ -29,9 +37,9 @@ async function trails(): Promise<string> {
   return output;
 }
 
-describe("Trails::Command::StatsTest", { timeout: 30_000 }, () => {
+describe("Trails::Command::StatsTest", { timeout: 60_000 }, () => {
   it("`bin/trails stats` handles directories added by third parties", async () => {
-    FileUtils.mkdirP("custom/dir");
+    await t.appDir("custom/dir");
     CodeStatistics.registerDirectory("Custom dir", "custom/dir");
 
     expect(await trails()).toMatch("Custom dir");
