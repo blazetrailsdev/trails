@@ -2847,8 +2847,6 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
 
   test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
 
-  # tzinfo names its cases `tc_<subject>.rb` (vendor/tzinfo/v2.0.6/test/ts_all.rb:8 globs
-  # `tc_*.rb`); `test_utils.rb` is its shared helper, not a case file.
   if pkg_name == "tzinfo"
     test_files.reject! { |f| File.basename(f) == "test_utils.rb" }
     test_files.concat(Dir.glob(File.join(pkg_dir, "**", "tc_*.rb")))
