@@ -65,7 +65,7 @@ describe("server boot options (trails)", () => {
       expect(serverHost({ environment: "test" })).toBe("0.0.0.0");
     });
 
-    it("takes commander's string option default and the same 3000", () => {
+    it("takes a string port option and the same 3000 default", () => {
       expect(serverPort({ port: "3000" })).toBe(3000);
       expect(serverPort()).toBe(3000);
     });

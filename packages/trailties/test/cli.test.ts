@@ -1,40 +1,40 @@
 import { afterAll, beforeAll, describe, it, expect, onTestFinished, vi } from "vitest";
-import { Dir, File, SystemExit, getFs, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, getFs } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { GemHelpCommand } from "../lib/commands/gem-help.js";
-import { HELP_MAPPINGS, invoke } from "../lib/command.js";
+
+vi.mock("@blazetrails/activesupport/node", () => ({}));
+
+const dir = Dir.mktmpdir();
 
 async function trails(...argv: string[]): Promise<string> {
+  vi.resetModules();
+  const rb = await import("@blazetrails/ruby-compat");
+  const { GemHelpCommand } = await import("../lib/commands/gem-help.js");
+  vi.spyOn(GemHelpCommand, "usagePath").mockResolvedValue(File.join(dir, "USAGE"));
   let output = "";
-  const write = vi.spyOn(stdout, "write").mockImplementation((s: unknown) => {
+  vi.spyOn(rb.stdout, "write").mockImplementation((s: unknown) => {
     output += String(s);
     return true;
   });
-  onTestFinished(() => write.mockRestore());
-  try {
-    const first = argv[0];
-    if (first == null || first === "help" || HELP_MAPPINGS.has(first)) {
-      await invoke("gem_help", argv.slice(1));
-    } else if (first === "plugin") {
-      await invoke("plugin", argv.slice(1));
-    } else {
-      await invoke("application", argv);
-    }
-  } catch (e) {
-    if (!(e instanceof SystemExit)) throw e;
-  }
+  const cwd = Dir.pwd();
+  onTestFinished(() => {
+    Dir.chdir(cwd);
+    rb.rbAryReplace(rb.rbArgv(), []);
+    rb.setExitCode(0);
+  });
+  Dir.chdir(dir);
+  rb.rbAryReplace(rb.rbArgv(), argv);
+  await import("../lib/bin.js");
   return output;
 }
 
 describe("CLI", () => {
-  const dir = Dir.mktmpdir();
-
   beforeAll(async () => {
     const usage = File.join(dir, "USAGE");
     const source = await GemHelpCommand.usagePath();
     await getFs().writeFile!(usage, await getFs().readFile(source!, "utf8"));
     await buildTemplates([usage]);
-    vi.spyOn(GemHelpCommand, "usagePath").mockResolvedValue(usage);
   }, 60_000);
 
   afterAll(async () => {
