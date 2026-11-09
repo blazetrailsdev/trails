@@ -51,6 +51,7 @@
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/lib/gzip.ts"],
       "@blazetrails/activesupport/test-case": ["../../activesupport/lib/test-case.ts"],
+      "@blazetrails/activesupport/testing/*": ["../../activesupport/lib/testing/*.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/lib/signed-global-id.ts"],
       "@blazetrails/activejob": ["../../activejob/lib/index.ts"],
       "@blazetrails/actioncable": ["../../actioncable/lib/index.ts"],
