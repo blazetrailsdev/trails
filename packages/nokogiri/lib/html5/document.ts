@@ -91,8 +91,8 @@ export class Document {
   }
 
   /**
-   * @missingRailsCall add_namespace_definition — PERMANENT
-   * @missingRailsCall namespace_definitions — PERMANENT
+   * @missingRailsCall add_namespace_definition — CONVERGEABLE nokogiri-html5-create-element-namespace-definitions
+   * @missingRailsCall namespace_definitions — CONVERGEABLE nokogiri-html5-create-element-namespace-definitions
    */
   createElement(name: string, ...contentsOrAttrs: unknown[]): Node {
     const block =

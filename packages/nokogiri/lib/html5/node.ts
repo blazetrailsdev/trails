@@ -256,8 +256,6 @@ export class Node {
         : undefined;
     const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
       saveWith?: number;
-      indent?: number;
-      indentText?: string;
       preserveNewline?: boolean;
     };
     const saveOptions = opts.saveWith || SaveOptions.FORMAT;
