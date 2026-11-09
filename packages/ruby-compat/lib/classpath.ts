@@ -28,10 +28,7 @@ const tableClasses = new Map<string, () => unknown>();
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
  * or by a lookup of a class bearing the entry's last path segment, or of a
- * plain-object module, which bears no name. Inside a class body, where its
- * export is still in TDZ, the one row bearing its name whose thunk is in TDZ
- * answers, as Ruby has named a class by the time `class A::B` runs its body
- * (`vm_declare_class`, `vendor/ruby/v3.3.11/vm_insnhelper.c:5381`).
+ * plain-object module, which bears no name.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -52,6 +49,11 @@ export function defineConstants(entries: readonly [() => unknown, string][]): vo
  * constants under a namespace when the namespace is named. One whose owner
  * never resolves keeps a temporary path, as `rb_const_set` gives a constant
  * under an unnamed owner (`vendor/ruby/v3.3.11/variable.c:3648-3654`).
+ *
+ * Inside a class body, where its
+ * export is still in TDZ, the one row bearing its name whose thunk is in TDZ
+ * answers, as Ruby has named a class by the time `class A::B` runs its body
+ * (`vm_declare_class`, `vendor/ruby/v3.3.11/vm_insnhelper.c:5381`).
  *
  * @noRailsEquivalent PERMANENT
  */
