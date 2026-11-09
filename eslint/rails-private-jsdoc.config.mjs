@@ -41,7 +41,7 @@ export default [
   },
   {
     files: [
-      "packages/arel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
@@ -49,7 +49,7 @@ export default [
       "packages/actioncable/lib/**/*.ts",
       "packages/activejob/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
@@ -82,10 +82,10 @@ export default [
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
-      "packages/arel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).

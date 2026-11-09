@@ -94,7 +94,7 @@ export const TEST_SUPPORT_PACKAGES = new Set(["activerecord-test-support"]);
  * whether that name is a ported method taking arguments anywhere in the package
  * (compare.ts#resolvePortedWithArgsSigs), so a helper standing in for a Ruby
  * core method puts its name into that population and makes UNRELATED source
- * files flag. Observed in PR #7015: adding `arel/src/test-helpers/uniq.ts` — the
+ * files flag. Observed in PR #7015: adding `arel/test/support/uniq.ts` — the
  * sibling of `must-be-like.ts` — surfaced a new `uniq` row on
  * `nodes/bound-sql-literal.ts`, a file nothing had changed, whose port spells
  * `bound_sql_literal.rb:20-21`'s dedupe as `[...new Set(...)]`.

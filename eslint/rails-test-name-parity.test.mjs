@@ -19,12 +19,12 @@ process.env.RAILS_TEST_NAME_PARITY_MARK_PATH = TMP_MARK;
 fs.writeFileSync(
   TMP_NAMES,
   JSON.stringify({
-    "packages/arel/src/table.test.ts": ["should return an attribute", "should create a join"],
-    "packages/arel/src/marked.test.ts": ["should return an attribute"],
-    "packages/arel/src/table.trails.test.ts": ["should return an attribute"],
+    "packages/arel/lib/table.test.ts": ["should return an attribute", "should create a join"],
+    "packages/arel/lib/marked.test.ts": ["should return an attribute"],
+    "packages/arel/lib/table.trails.test.ts": ["should return an attribute"],
   }),
 );
-fs.writeFileSync(TMP_MARK, JSON.stringify({ "packages/arel/src/marked.test.ts": 1 }));
+fs.writeFileSync(TMP_MARK, JSON.stringify({ "packages/arel/lib/marked.test.ts": 1 }));
 
 const { default: rule, isManifestAvailable } = await import("./rails-test-name-parity.mjs");
 
@@ -36,7 +36,7 @@ afterAll(() => {
   else process.env.RAILS_TEST_NAME_PARITY_MARK_PATH = _prevMark;
 });
 
-const AREL = (rel) => path.join(ROOT, "packages/arel/src", rel);
+const AREL = (rel) => path.join(ROOT, "packages/arel/lib", rel);
 
 describe("rails-test-name-parity rule", () => {
   it("runs RuleTester cases", () => {

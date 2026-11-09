@@ -24,11 +24,11 @@ const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 const PKG_DIRS: Record<string, string> = {
-  arel: "packages/arel/src/",
+  arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/test/",
-  rack: "packages/rack/src/",
+  rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",
   bcrypt: "packages/bcrypt/test/",
@@ -37,7 +37,7 @@ const PKG_DIRS: Record<string, string> = {
   chronic: "packages/chronic/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
-  raabro: "packages/raabro/src/",
+  raabro: "packages/raabro/test/",
   zeitwerk: "packages/zeitwerk/test/",
   fugit: "packages/fugit/test/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",

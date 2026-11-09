@@ -36,7 +36,7 @@ describe("no-raw-sql scope", () => {
   it("anchors repoRel to the same root, absolute paths included", () => {
     expect(repoRel(`/home/dev/trails/${SRC}/relation.ts`)).toBe(`${SRC}/relation.ts`);
     expect(repoRel(`${SRC}/relation.ts`)).toBe(`${SRC}/relation.ts`);
-    expect(repoRel("packages/arel/src/nodes.ts")).toBe(null);
+    expect(repoRel("packages/arel/lib/nodes.ts")).toBe(null);
     expect(repoRel(`${SRC}/relation.js`)).toBe(null);
   });
 

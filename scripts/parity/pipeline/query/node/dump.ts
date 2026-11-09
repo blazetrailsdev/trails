@@ -168,8 +168,8 @@ async function main(): Promise<void> {
     }
 
     // 5. Extract SQL. Arel node/manager both expose .toSql():
-    //    Node#toSql()         packages/arel/src/nodes/node.ts
-    //    TreeManager#toSql()  packages/arel/src/tree-manager.ts
+    //    Node#toSql()         packages/arel/lib/nodes/node.ts
+    //    TreeManager#toSql()  packages/arel/lib/tree-manager.ts
     //    Arel inlines bind values into the SQL string — no separate bind array.
     const sqlStr = (result as { toSql(): string }).toSql().trim();
     // Arel arel-* fixtures have no bind params — paramSql equals sql.

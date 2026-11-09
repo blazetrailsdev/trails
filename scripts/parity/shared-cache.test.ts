@@ -448,7 +448,7 @@ describe("foreignAbsolutePath", () => {
   });
 
   it("accepts an absolute path inside the invoking worktree", () => {
-    const body = JSON.stringify({ note: `${root}/packages/arel/src/crud.ts` });
+    const body = JSON.stringify({ note: `${root}/packages/arel/lib/crud.ts` });
     expect(foreignAbsolutePath(body, root)).toBeNull();
   });
 

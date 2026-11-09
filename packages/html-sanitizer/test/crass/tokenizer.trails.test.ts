@@ -64,4 +64,20 @@ describe("Crass::Tokenizer", () => {
       { node: "ident", pos: 11, raw: "é\\41 c", value: "éAc" },
     ]);
   });
+
+  it("reads a negative zero as 0, as convert_string_to_number's Rationals do", () => {
+    const values = Tokenizer.tokenize("-0.0 -0e5 -.0 -0").map((token) => token.value);
+    expect(
+      values.filter((value) => value !== undefined).map((value) => Object.is(value, -0)),
+    ).toEqual([false, false, false, false]);
+  });
+
+  it("replaces a lone surrogate with U+FFFD, as preprocess's encode does", () => {
+    expect(Tokenizer.tokenize("a\ud800b")[0]).toEqual({
+      node: "ident",
+      pos: 0,
+      raw: "a\ufffdb",
+      value: "a\ufffdb",
+    });
+  });
 });

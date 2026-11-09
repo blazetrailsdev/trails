@@ -164,11 +164,11 @@ git fetch origin main
 scripts/start-worktree.sh rack-<slot>
 cd ~/github/blazetrailsdev/worktrees/rack-<slot>
 less vendor/rack/v3.2.8/lib/rack/<file>.rb
-$EDITOR packages/rack/src/<file>.ts
-$EDITOR packages/rack/src/<file>.test.ts
-pnpm vitest run packages/rack/src/<file>.test.ts
+$EDITOR packages/rack/lib/<file>.ts
+$EDITOR packages/rack/test/<file>.test.ts
+pnpm vitest run packages/rack/test/<file>.test.ts
 pnpm tsx scripts/api-compare/compare.ts --package rack --privates | grep <file>
-pnpm build && pnpm exec prettier --write packages/rack/src/<file>.{ts,test.ts}
+pnpm build && pnpm exec prettier --write packages/rack/lib/<file>.ts packages/rack/test/<file>.test.ts
 git add -A && git commit -m "feat(rack): <subject>" && git push -u origin <branch>
 gh pr create --draft --title "..." --body "..."
 ```

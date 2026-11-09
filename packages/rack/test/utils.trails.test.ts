@@ -1,0 +1,128 @@
+import { describe, it, expect, vi } from "vitest";
+import { ArgumentError, stderr } from "@blazetrails/ruby-compat";
+import * as Utils from "../lib/utils.js";
+
+describe("Utils.statusCode", () => {
+  it("takes the Symbol arm for a ':name' Symbol value", () => {
+    expect(Utils.statusCode(":ok")).toBe(200);
+    const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
+    try {
+      expect(Utils.statusCode(":not_extended")).toBe(510);
+      expect(warn.mock.lastCall![0]).toContain(
+        "warning: Status code :not_extended is deprecated and will be removed in a future version of Rack.\n",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+    expect(() => Utils.statusCode(":foobar")).toThrow("Unrecognized status code :foobar");
+  });
+
+  it("converts a numeric String with to_i", () => {
+    expect(Utils.statusCode("200abc")).toBe(200);
+    expect(Utils.statusCode(" 42")).toBe(42);
+    expect(Utils.statusCode("")).toBe(0);
+    expect(Utils.statusCode("  ")).toBe(0);
+  });
+
+  it("converts a non-numeric String with to_i", () => {
+    expect(Utils.statusCode("abc")).toBe(0);
+  });
+});
+
+describe("Utils.setCookieHeader", () => {
+  it("rejects a lowercase String same_site, which only the Symbol spelling matches", () => {
+    for (const val of ["none", "lax", "strict"]) {
+      expect(() => Utils.setCookieHeader("foo", { value: "bar", sameSite: val })).toThrow(
+        `Invalid :same_site value: "${val}"`,
+      );
+    }
+    expect(Utils.setCookieHeader("foo", { value: "bar", sameSite: ":Lax" })).toBe(
+      "foo=bar; samesite=lax",
+    );
+  });
+
+  it("guards each attribute with Ruby truthiness", () => {
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: null })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", maxAge: false })).toBe("foo=bar");
+    expect(Utils.setCookieHeader("foo", { value: "bar", domain: "", path: "" })).toBe(
+      "foo=bar; domain=; path=",
+    );
+  });
+});
+
+describe("Utils.unescape", () => {
+  it("decodes a non-UTF-8 percent-escape without raising", () => {
+    expect(() => Utils.unescape("%E2")).not.toThrow();
+    expect(Utils.unescape("a+b%20c")).toBe("a b c");
+  });
+
+  it("raises ArgumentError for a malformed percent-escape", () => {
+    expect(() => Utils.unescape("%zz")).toThrow(ArgumentError);
+    expect(() => Utils.unescape("%zz")).toThrow("invalid %-encoding (%zz)");
+  });
+});
+
+describe("Utils.unescapePath", () => {
+  it("decodes every %XX escape and leaves a malformed one as is", () => {
+    expect(Utils.unescapePath("/foo%24bar%2Bbaz%3A")).toBe("/foo$bar+baz:");
+    expect(Utils.unescapePath("/%zz")).toBe("/%zz");
+    expect(Utils.unescapePath("/100%")).toBe("/100%");
+  });
+});
+
+describe("Utils.multipartPartLimit", () => {
+  it("is the same accessor as multipartFileLimit", () => {
+    const old = Utils.multipartFileLimit();
+    try {
+      Utils.setMultipartPartLimit(7);
+      expect(Utils.multipartFileLimit()).toBe(7);
+      Utils.setMultipartFileLimit(9);
+      expect(Utils.multipartPartLimit()).toBe(9);
+    } finally {
+      Utils.setMultipartFileLimit(old);
+    }
+  });
+});
+
+describe("Rack::Utils.parse_cookies_header", () => {
+  it("reads a key-only cookie as nil", () => {
+    expect(Utils.parseCookiesHeader("foo; bar=baz")).toEqual({ foo: null, bar: "baz" });
+  });
+});
+
+it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQueryParser", () => {
+  const original = Utils.paramDepthLimit();
+  try {
+    Utils.setParamDepthLimit(2);
+    expect(Utils.paramDepthLimit()).toBe(2);
+    expect(() => Utils.parseNestedQuery("a[b][c]=1")).toThrow(Utils.ParamsTooDeepError);
+    expect(Utils.parseNestedQuery("a[b]=1")).toEqual({ a: { b: "1" } });
+  } finally {
+    Utils.setParamDepthLimit(original);
+  }
+});
+
+it("setDefaultQueryParser replaces the active parser", () => {
+  const original = Utils.defaultQueryParser();
+  try {
+    const tight = Utils.QueryParser.makeDefault(2, { paramsLimit: 1 });
+    Utils.setDefaultQueryParser(tight);
+    expect(() => Utils.parseQuery("a=1&b=2")).toThrow(Utils.QueryLimitError);
+  } finally {
+    Utils.setDefaultQueryParser(original);
+  }
+});
+
+it("multipart limit accessors round-trip", () => {
+  const origFile = Utils.multipartFileLimit();
+  const origTotal = Utils.multipartTotalPartLimit();
+  try {
+    Utils.setMultipartFileLimit(64);
+    Utils.setMultipartTotalPartLimit(512);
+    expect(Utils.multipartFileLimit()).toBe(64);
+    expect(Utils.multipartTotalPartLimit()).toBe(512);
+  } finally {
+    Utils.setMultipartFileLimit(origFile);
+    Utils.setMultipartTotalPartLimit(origTotal);
+  }
+});

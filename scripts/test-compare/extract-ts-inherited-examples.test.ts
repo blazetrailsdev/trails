@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { extractTestsFromSource } from "./extract-ts-core.js";
 
 function paths(source: string): string[] {
-  const info = extractTestsFromSource(source, "packages/rack/src/x.test.ts");
+  const info = extractTestsFromSource(source, "packages/rack/test/x.test.ts");
   return info.testCases.map((tc) => tc.path);
 }
 

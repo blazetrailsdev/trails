@@ -71,7 +71,7 @@ const { default: rule } = await import("./rails-error-parity.mjs");
 const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
-const rackFile = path.join(REPO_ROOT, "packages/rack/src/response.ts");
+const rackFile = path.join(REPO_ROOT, "packages/rack/lib/response.ts");
 const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/lib/errors.ts");
 const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/lib/duration.ts");
 // Scattered (non-errors.ts) file: DelegationError maps here via delegation.rb.

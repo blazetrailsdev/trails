@@ -107,7 +107,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "arel",
         libPath: "activerecord/lib/arel",
         // `Arel.sql`, `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute`
-        // are defined here and ported in `packages/arel/src/arel.ts`.
+        // are defined here and ported in `packages/arel/lib/arel.ts`.
         libEntryFile: "activerecord/lib/arel.rb",
         testPath: "activerecord/test/cases/arel",
       },

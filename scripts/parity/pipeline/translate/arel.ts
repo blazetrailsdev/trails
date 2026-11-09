@@ -128,7 +128,7 @@ function translateQuery(
     };
   }
 
-  // Apply single-expression translations (all rules verified against packages/arel/src/).
+  // Apply single-expression translations (all rules verified against packages/arel/lib/).
   // IMPORTANT: %w[...] rewrite must run before not_in_any wrapping so the wrapping
   // rule sees the expanded array literal, not the %w form.
   const tsExpr = query

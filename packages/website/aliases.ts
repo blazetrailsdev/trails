@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activesupport", "../activesupport/lib/index.ts"],
   ["@blazetrails/ruby-compat", "../ruby-compat/lib/index.ts"],
-  ["@blazetrails/arel", "../arel/src/index.ts"],
+  ["@blazetrails/arel", "../arel/lib/index.ts"],
   ["@blazetrails/activemodel", "../activemodel/lib/index.ts"],
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],
   ["@blazetrails/activerecord/base", "../activerecord/src/base.ts"],
@@ -22,7 +22,7 @@ export const packageEntries: Array<[string, string]> = [
   ],
   ["@blazetrails/activerecord/connection-adapters", "../activerecord/src/connection-adapters.ts"],
   ["@blazetrails/activerecord", "../activerecord/src/index.ts"],
-  ["@blazetrails/rack", "../rack/src/index.ts"],
+  ["@blazetrails/rack", "../rack/lib/index.ts"],
   [
     "@blazetrails/actionview/rails-dom-testing/assertions",
     "../actionview/lib/rails-dom-testing/assertions.ts",
@@ -53,7 +53,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/chronic", "../chronic/lib/chronic.ts"],
   ["@blazetrails/tzinfo", "../tzinfo/lib/index.ts"],
   ["@blazetrails/et-orbi", "../et-orbi/lib/et-orbi.ts"],
-  ["@blazetrails/raabro", "../raabro/src/raabro.ts"],
+  ["@blazetrails/raabro", "../raabro/lib/raabro.ts"],
   ["@blazetrails/msgpack", "../msgpack/lib/index.ts"],
   ["@blazetrails/nokogiri", "../nokogiri/lib/index.ts"],
 ];
@@ -67,7 +67,7 @@ export const packageEntries: Array<[string, string]> = [
 export const subpathPrefixes: Array<[string, string]> = [
   ["@blazetrails/activesupport/", "../activesupport/lib/"],
   ["@blazetrails/ruby-compat/", "../ruby-compat/lib/"],
-  ["@blazetrails/arel/src", "../arel/src"],
+  ["@blazetrails/arel/test", "../arel/test"],
 ];
 
 export function resolveEntries(entries: Array<[string, string]>): Array<[string, string]> {

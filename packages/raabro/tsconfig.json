@@ -3,9 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "references": [{ "path": "../ruby-compat" }, { "path": "../vitest-matchers" }],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  "include": ["lib"],
+  "references": [{ "path": "../ruby-compat" }, { "path": "../vitest-matchers" }]
 }

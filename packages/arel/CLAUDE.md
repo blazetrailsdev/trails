@@ -6,7 +6,7 @@ Rules that bind only inside `packages/arel`. The repo-wide rules are in the root
 
 ## Call-time constant resolution (arel)
 
-`arel/src/namespaces.ts` holds the `Arel` / `Arel::Attributes` /
+`arel/lib/namespaces.ts` holds the `Arel` / `Arel::Attributes` /
 `Arel::Collectors` / `Arel::Nodes` / `Arel::Visitors` namespace objects. All but
 `Collectors` are extended with `ActiveSupport::Autoload` (RFC 0151): Rails
 `require`s the collectors (`arel.rb:19`, `collectors/sql_string.rb:3`) and

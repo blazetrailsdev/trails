@@ -21,7 +21,7 @@ const original = hadExisting ? fs.readFileSync(MANIFEST_PATH, "utf8") : null;
 const sharedClassOrder = ["first", "second", "third"];
 const fixture = {
   files: {
-    "packages/arel/src/fixture-class.ts": {
+    "packages/arel/lib/fixture-class.ts": {
       classes: {
         X: sharedClassOrder,
         A: sharedClassOrder,
@@ -30,53 +30,53 @@ const fixture = {
       },
       functions: [],
     },
-    "packages/arel/src/fixture-fns.ts": {
+    "packages/arel/lib/fixture-fns.ts": {
       classes: {},
       functions: ["alpha", "beta", "gamma"],
     },
     // A Ruby module ported as a mixin OBJECT literal (`export const Math =
-    // { … }`, packages/arel/src/math.ts). Standalone modules bucket into
+    // { … }`, packages/arel/lib/math.ts). Standalone modules bucket into
     // `functions`, so the object literal claims that bucket.
-    "packages/arel/src/fixture-mixin.ts": {
+    "packages/arel/lib/fixture-mixin.ts": {
       classes: {},
       functions: ["alpha", "beta", "gamma"],
     },
     // A mixin object whose name matches a CLASS bucket (the flattened
     // `Foo::ClassMethods` shape) resolves by exact name, like a class body.
-    "packages/arel/src/fixture-mixinclass.ts": {
+    "packages/arel/lib/fixture-mixinclass.ts": {
       classes: { M: sharedClassOrder },
       functions: [],
     },
     // Two unresolved object literals competing for one `functions` bucket →
     // ambiguous, so neither is ordered.
-    "packages/arel/src/fixture-mixin2.ts": {
+    "packages/arel/lib/fixture-mixin2.ts": {
       classes: {},
       functions: ["alpha", "beta", "gamma"],
     },
-    "packages/arel/src/fixture-multi.ts": {
+    "packages/arel/lib/fixture-multi.ts": {
       classes: { Casted: ["before", "database"], Quoted: ["database", "before"] },
       functions: [],
     },
-    "packages/arel/src/fixture-nested.ts": {
+    "packages/arel/lib/fixture-nested.ts": {
       classes: { "A.Checker": ["before", "database"], "B.Checker": ["database", "before"] },
       functions: [],
     },
     // Bucket key `Integer` (the Rails constant) has no class named `Integer`;
     // the 1:1 rename fallback pairs it with the sole class body (`IntegerType`).
-    "packages/arel/src/fixture-rename.ts": {
+    "packages/arel/lib/fixture-rename.ts": {
       classes: { Integer: sharedClassOrder },
       functions: [],
     },
     // Two buckets, neither exact-matching a class name → ambiguous, so the
     // fallback must NOT pair; both classes stay unordered.
-    "packages/arel/src/fixture-ambiguous.ts": {
+    "packages/arel/lib/fixture-ambiguous.ts": {
       classes: { Foo: sharedClassOrder, Bar: sharedClassOrder },
       functions: [],
     },
     // Single 1/1 unmatched shape, but the bucket name is neither a substring of
     // the TS class name nor vice versa → no identity evidence, so the fallback
     // must NOT pair (guards a TS-only helper class from a never-ported bucket).
-    "packages/arel/src/fixture-noevidence.ts": {
+    "packages/arel/lib/fixture-noevidence.ts": {
       classes: { Zzz: sharedClassOrder },
       functions: [],
     },
@@ -84,13 +84,13 @@ const fixture = {
     // `initialize` AFTER other members (ActiveModel::Error's
     // `def self.full_message` at error.rb:15 vs `initialize` at :103). The
     // carve-out must NOT hoist it past `first`.
-    "packages/arel/src/fixture-ctor.ts": {
+    "packages/arel/lib/fixture-ctor.ts": {
       classes: { C: ["first", "constructor", "third"] },
       functions: [],
     },
     // A Rails CLASS method (`static first`) alongside a same-named instance
     // member that Rails does not define — the Arel::Table `engine` shape.
-    "packages/arel/src/fixture-static.ts": {
+    "packages/arel/lib/fixture-static.ts": {
       classes: { S: ["static first", "second"] },
       functions: [],
     },
@@ -98,14 +98,14 @@ const fixture = {
     // it as an INSTANCE method (a legitimate instance↔static flip). With no
     // `static first` declared, the slot falls back to the instance member so
     // the file still orders — the common port, not an invention.
-    "packages/arel/src/fixture-flip.ts": {
+    "packages/arel/lib/fixture-flip.ts": {
       classes: { F: ["static first", "second"] },
       functions: [],
     },
     // Both a static and an instance member of the same name, each with its own
     // Rails definition (`static kind` at validator.rb:103, `kind` at :116).
     // Two distinct slots; each is filled by the matching-staticness member.
-    "packages/arel/src/fixture-both.ts": {
+    "packages/arel/lib/fixture-both.ts": {
       classes: { B2: ["static first", "constructor", "first"] },
       functions: [],
     },
@@ -113,7 +113,7 @@ const fixture = {
     // TS file must declare them in that order (`nodes/window.rb` declares
     // Rows/Range/CurrentRow/Preceding/Following where window.ts had
     // Preceding/Following/CurrentRow/Rows/Range).
-    "packages/arel/src/fixture-decls.ts": {
+    "packages/arel/lib/fixture-decls.ts": {
       classes: { Gamma: sharedClassOrder },
       functions: [],
       declarations: ["Alpha", "Beta", "Gamma"],
@@ -131,22 +131,22 @@ fs.writeFileSync(MANIFEST_PATH, JSON.stringify(fixture, null, 2));
 // across files.
 process.on("exit", restoreManifest);
 
-const classFile = path.join(REPO_ROOT, "packages/arel/src/fixture-class.ts");
-const fnFile = path.join(REPO_ROOT, "packages/arel/src/fixture-fns.ts");
-const unlistedFile = path.join(REPO_ROOT, "packages/arel/src/fixture-unlisted.ts");
-const mixinFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin.ts");
-const mixinClassFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixinclass.ts");
-const mixin2File = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin2.ts");
-const multiFile = path.join(REPO_ROOT, "packages/arel/src/fixture-multi.ts");
-const nestedFile = path.join(REPO_ROOT, "packages/arel/src/fixture-nested.ts");
-const renameFile = path.join(REPO_ROOT, "packages/arel/src/fixture-rename.ts");
-const ambiguousFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ambiguous.ts");
-const noEvidenceFile = path.join(REPO_ROOT, "packages/arel/src/fixture-noevidence.ts");
-const ctorFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ctor.ts");
-const staticFile = path.join(REPO_ROOT, "packages/arel/src/fixture-static.ts");
-const flipFile = path.join(REPO_ROOT, "packages/arel/src/fixture-flip.ts");
-const bothFile = path.join(REPO_ROOT, "packages/arel/src/fixture-both.ts");
-const declsFile = path.join(REPO_ROOT, "packages/arel/src/fixture-decls.ts");
+const classFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-class.ts");
+const fnFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-fns.ts");
+const unlistedFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-unlisted.ts");
+const mixinFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-mixin.ts");
+const mixinClassFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-mixinclass.ts");
+const mixin2File = path.join(REPO_ROOT, "packages/arel/lib/fixture-mixin2.ts");
+const multiFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-multi.ts");
+const nestedFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-nested.ts");
+const renameFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-rename.ts");
+const ambiguousFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-ambiguous.ts");
+const noEvidenceFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-noevidence.ts");
+const ctorFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-ctor.ts");
+const staticFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-static.ts");
+const flipFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-flip.ts");
+const bothFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-both.ts");
+const declsFile = path.join(REPO_ROOT, "packages/arel/lib/fixture-decls.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -364,7 +364,7 @@ try {
           `export function beta(x: any): any { return x; }\n` +
           `export function gamma(): void {}\n`,
       },
-      // Mixin object literal out of order (packages/arel/src/math.ts). Its
+      // Mixin object literal out of order (packages/arel/lib/math.ts). Its
       // members are properties, not FunctionDeclarations, so before this the
       // whole `functions` bucket was dropped and no order was enforced.
       {
