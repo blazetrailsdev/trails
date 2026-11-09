@@ -3,6 +3,7 @@ import {
   Notifications,
   runLoadHooks,
   days,
+  delegate,
   mattrAccessor,
   minutes,
   seconds,
@@ -16,14 +17,6 @@ export const SolidQueue = {
   Processes: { name: "SolidQueue::Processes" },
 
   DEFAULT_LOGGER: new Logger(STDOUT),
-
-  onStart(block: () => unknown): void {
-    SolidQueue.Supervisor!.onStart(block);
-  },
-
-  onStop(block: () => unknown): void {
-    SolidQueue.Supervisor!.onStop(block);
-  },
 
   onWorkerStart(block: () => unknown): void {
     SolidQueue.Worker!.onStart(block);
@@ -123,6 +116,8 @@ mattrAccessor.call(SolidQueue, "supervisor", { default: false });
 mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
+
+delegate.call(SolidQueue, "onStart", "onStop", { to: "Supervisor" });
 
 constSet(TopLevel, "SolidQueue", SolidQueue);
 

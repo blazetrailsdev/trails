@@ -1,6 +1,6 @@
 import { Logger, TaggedLogging } from "@blazetrails/activesupport";
 import { rbObjAsString, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 
 export class OverriddenLoggingJob extends Base {
   static toString(): string {

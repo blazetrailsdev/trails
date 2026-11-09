@@ -9,7 +9,7 @@ import { ArgumentError, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-
 import { ActiveJob } from "../lib/namespaces.js";
 import { ObjectSerializer } from "../lib/serializers/object-serializer.js";
 import type { SerializerLike } from "../lib/namespaces.js";
-import "./support/helper.js";
+import "./helper.js";
 
 class SerializersTest {
   static toString(): string {

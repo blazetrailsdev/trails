@@ -11,8 +11,8 @@ import "../lib/queue-adapters/async-adapter.js";
 import "../lib/queue-adapters/inline-adapter.js";
 import "../lib/queue-adapters/test-adapter.js";
 import { TestCase } from "../lib/test-case.js";
-import "./support/helper.js";
-import "./support/jobs/hello-job.js";
+import "./helper.js";
+import "./jobs/hello-job.js";
 
 class ActiveJobTestCaseTest extends TestCase {
   static override toString(): string {

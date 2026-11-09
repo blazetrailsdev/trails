@@ -1,5 +1,5 @@
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 import { LoggingJob } from "./logging-job.js";
 
 export class NestedJob extends Base {

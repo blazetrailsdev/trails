@@ -106,6 +106,7 @@ import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-
 import {
   COPY_HOOKS,
   OPERATORS,
+  TOKEN_RENAMES,
   TS_CLASS_RENAMES,
   applyTokenRenames,
   isArityOverridden,
@@ -3253,6 +3254,7 @@ export const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
 export function nameMatches(rubyName: string, tsName: string): boolean {
   if (rubyName === tsName) return true;
   if (RUBY_ERROR_BUILTINS.has(rubyName) && tsName === "Error") return true;
+  if (Object.hasOwn(TOKEN_RENAMES, rubyName) && tsName === TOKEN_RENAMES[rubyName]) return true;
   for (const { transform } of TS_PARENT_ALIASES) {
     if (tsName === transform(rubyName)) return true;
   }

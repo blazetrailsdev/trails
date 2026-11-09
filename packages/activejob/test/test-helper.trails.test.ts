@@ -4,8 +4,8 @@ import type { TestAdapter } from "../lib/queue-adapters/test-adapter.js";
 import { ArgumentError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { TestCase } from "../lib/test-case.js";
 import type { TestHelper } from "../lib/test-helper.js";
-import { isAdapterIs } from "./support/helper.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
+import { isAdapterIs } from "./helper.js";
+import { HelloJob } from "./jobs/hello-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 class TestHelperPerformedJobsTest extends TestCase {

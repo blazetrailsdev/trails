@@ -1,5 +1,5 @@
 import { block, kernelThrow, StandardError, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 
 class MyError extends StandardError {}
 

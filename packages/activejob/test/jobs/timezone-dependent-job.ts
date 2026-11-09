@@ -1,8 +1,8 @@
 import { inTimeZone, TimeWithZone, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { cmp, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
-import { JobBuffer } from "../job-buffer.js";
+import { Base } from "../../lib/base.js";
+import { JobBuffer } from "../support/job-buffer.js";
 
 export class TimezoneDependentJob extends Base {
   static toString(): string {

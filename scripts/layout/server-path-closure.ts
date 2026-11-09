@@ -41,8 +41,19 @@ export interface PackageExports {
   exports: Record<string, string>;
 }
 
+/**
+ * Export keys whose `test` token names production code the gem loads at boot,
+ * not a testing entry: `Mail::TestMailer` is a delivery method autoloaded by
+ * `mail/network.rb` (vendor/mail/2.8.1/lib/mail/network.rb:11) and named by
+ * `Configuration#lookup_delivery_method` (mail/configuration.rb:44), and
+ * `Rails::TestUnitRailtie` is required by `rails/all.rb`
+ * (vendor/rails/v8.0.2/railties/lib/rails/all.rb), loading no test framework.
+ */
+const SERVER_EXPORTS = new Set(["./network/delivery-methods/test-mailer", "./test-unit/trailtie"]);
+
 /** True for an export key naming a testing entry. */
 export function isTestingExport(key: string): boolean {
+  if (SERVER_EXPORTS.has(key)) return false;
   return key.split(/[/.*-]/).some((token) => ["test", "testing", "tests"].includes(token));
 }
 

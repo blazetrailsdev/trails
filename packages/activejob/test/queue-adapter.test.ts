@@ -5,7 +5,7 @@ import { QueueAdapters } from "../lib/namespaces.js";
 import { AsyncAdapter } from "../lib/queue-adapters/async-adapter.js";
 import { TestCase } from "../lib/test-case.js";
 import type { TestQueueAdapterClass } from "../lib/test-helper.js";
-import "./support/helper.js";
+import "./helper.js";
 
 class StubOneAdapter {
   enqueue(..._args: unknown[]): void {}

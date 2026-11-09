@@ -1,8 +1,8 @@
 import { Logger, TaggedLogging } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
-import "./support/helper.js";
+import "./helper.js";
 import { Base } from "../lib/base.js";
-import { NestedJob } from "./support/jobs/nested-job.js";
+import { NestedJob } from "./jobs/nested-job.js";
 
 describe("Logging", () => {
   it("tags nested jobs with ActiveJob once", async () => {

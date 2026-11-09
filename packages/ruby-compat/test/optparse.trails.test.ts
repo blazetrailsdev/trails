@@ -20,3 +20,42 @@ describe("TestOptionParserSummaryTest", () => {
     expect(o.banner).toBe("Usage: foobar [options] [FILE]...");
   });
 });
+
+describe("OptionParser DefaultList", () => {
+  it("terminates option parsing at --", async () => {
+    const o = new OptionParser();
+    let seen = false;
+    o.on("-v", "--verbose", () => {
+      seen = true;
+    });
+    expect(await o.parse(["a", "--", "-v", "b"])).toEqual(["a", "-v", "b"]);
+    expect(seen).toBe(false);
+  });
+
+  it("completes an abbreviated long option and raises on an ambiguous one", async () => {
+    const o = new OptionParser();
+    const got: unknown[] = [];
+    o.on("--verbose", (v) => got.push(["verbose", v]));
+    o.on("--version", (v) => got.push(["version", v]));
+    o.on("--quiet", (v) => got.push(["quiet", v]));
+    await o.parse(["--qu", "--verb"]);
+    expect(got).toEqual([
+      ["quiet", true],
+      ["verbose", true],
+    ]);
+    await expect(o.parse(["--ver"])).rejects.toBeInstanceOf(OptionParser.AmbiguousOption);
+  });
+
+  it("passes a bare - through as a non-option", async () => {
+    const o = new OptionParser();
+    expect(await o.parse(["-"])).toEqual(["-"]);
+  });
+
+  it("completes a short switch against the long options when no short one matches", async () => {
+    const o = new OptionParser();
+    const got: unknown[] = [];
+    o.on("--quiet", (v) => got.push(v));
+    await o.parse(["-q"]);
+    expect(got).toEqual([true]);
+  });
+});

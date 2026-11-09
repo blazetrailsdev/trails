@@ -3,9 +3,9 @@ import { Notifications } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { TestHelper } from "../lib/test-helper.js";
-import { isAdapterIs } from "./support/helper.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
-import { RetryJob } from "./support/jobs/retry-job.js";
+import { isAdapterIs } from "./helper.js";
+import { HelloJob } from "./jobs/hello-job.js";
+import { RetryJob } from "./jobs/retry-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 class InstrumentationTest extends TestCase {

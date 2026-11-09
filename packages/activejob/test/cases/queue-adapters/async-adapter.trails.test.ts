@@ -6,7 +6,7 @@ import {
   constDefined,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
-import "../../support/helper.js";
+import "../../helper.js";
 import { Base } from "../../../lib/base.js";
 import { AsyncAdapter } from "../../../lib/queue-adapters/async-adapter.js";
 

@@ -1,5 +1,5 @@
 import { block, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 
 export class CallbackJob extends Base {
   static toString(): string {

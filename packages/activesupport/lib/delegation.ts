@@ -10,6 +10,7 @@ import {
   rbFSend,
   rbObjRespondTo,
   nameErrMesgReceiver,
+  constGet,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
@@ -53,11 +54,12 @@ function sendOrRead(value: unknown, name: string, args: unknown[]): unknown {
     : member;
 }
 
-function receiverValue(self: Record<string, unknown>, receiver: string): unknown {
+function receiverValue(owner: object, self: Record<string, unknown>, receiver: string): unknown {
   let value: unknown = self;
-  for (const segment of receiver.split(".")) {
+  for (const [i, segment] of receiver.split(".").entries()) {
     if (value == null) return value;
-    value = sendOrRead(value, segment, []);
+    value =
+      i === 0 && /^[A-Z]/.test(segment) ? constGet(owner, segment) : sendOrRead(value, segment, []);
   }
   return value;
 }
@@ -148,7 +150,7 @@ export namespace Delegation {
           ? constantize(receiver)
           : receiver === "self.class"
             ? rbObjClass(self)
-            : receiverValue(self, receiverName);
+            : receiverValue(owner, self, receiverName);
         if (nilable === false) return _;
         if (_ == null && !Object.hasOwn(NilClass, method)) {
           if (allowNil) return undefined;
