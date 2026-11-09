@@ -29,7 +29,7 @@ describe("PACKAGE_DIRS", () => {
     ["abstractcontroller", "packages/actionpack/lib/abstract-controller"],
     ["actionpackversion", "packages/actionpack/lib/action-pack"],
     ["arel", "packages/arel/lib"],
-    ["trailties", "packages/trailties/src"],
+    ["trailties", "packages/trailties/lib"],
   ])("spells %s's src dir the way the repo does", (pkg, dir) => {
     expect(PACKAGE_DIRS[pkg]).toBe(dir);
   });

@@ -2,12 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
+    "rootDir": ".",
     "paths": {
       "@blazetrails/actioncable/test-helpers/*": ["../actioncable/test/support/*.ts"]
     }
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*", "src/**/__fixtures__"],
+  "include": ["test"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../actionmailbox" },

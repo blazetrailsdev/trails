@@ -14,7 +14,7 @@
  *
  * Scope: this rule has no allow-list of files. Wire it up in
  * `eslint.config.mjs` only for the directories that should follow the
- * adapter contract (e.g. `packages/trailties/src/**`).
+ * adapter contract (e.g. `packages/trailties/lib/**`).
  */
 
 const SOURCE = "@blazetrails/ruby-compat";

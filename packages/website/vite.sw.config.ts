@@ -49,7 +49,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/actionview", "../actionview/lib/index.ts"),
       pkgAlias("@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"),
       pkgAlias("@blazetrails/actionpack", "../actionpack/lib/index.ts"),
-      pkgAlias("@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"),
+      pkgAlias("@blazetrails/trailties/generators", "../trailties/lib/generators/index.ts"),
       pkgAlias("@blazetrails/globalid/wire", "../globalid/lib/wire.ts"),
       pkgAlias("@blazetrails/globalid/signed-global-id", "../globalid/lib/signed-global-id.ts"),
       pkgAlias("@blazetrails/globalid", "../globalid/lib/index.ts"),

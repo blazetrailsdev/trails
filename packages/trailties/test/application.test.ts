@@ -1,0 +1,1009 @@
+import type { RackResponse } from "@blazetrails/rack";
+import {
+  publicInstanceMethods,
+  rbFSend,
+  constSet,
+  StringIO,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import {
+  BroadcastLogger,
+  Executor,
+  onLoad,
+  Reloader,
+  resetLoadHooks,
+  runLoadHooks,
+  setTrailsRoot,
+  trailsRoot,
+} from "@blazetrails/activesupport";
+import { FileStore } from "@blazetrails/activesupport/cache/file-store";
+import {
+  fsAdapterConfig,
+  registerFsAdapter,
+  type FsAdapter,
+  type PathAdapter,
+} from "@blazetrails/ruby-compat";
+import { Application } from "../lib/application.js";
+import { Configuration } from "../lib/application/configuration.js";
+import type { MiddlewareStack } from "@blazetrails/actionpack";
+import { DefaultMiddlewareStack } from "../lib/application/default-middleware-stack.js";
+import {
+  ActionableExceptions,
+  AssumeSSL,
+  Callbacks,
+  ContentSecurityPolicyMiddleware,
+  Cookies,
+  DebugExceptions,
+  Executor as ActionDispatchExecutor,
+  HostAuthorization,
+  Reloader as ActionDispatchReloader,
+  RequestId,
+  ServerTiming,
+  ShowExceptions,
+  SSL,
+  Static,
+  Session,
+  ActionDispatch,
+  ActionController,
+} from "@blazetrails/actionpack";
+import { Engine } from "../lib/engine.js";
+import { Collection } from "../lib/initializable.js";
+import { Root } from "../lib/paths.js";
+import { Trails } from "../lib/trails.js";
+import { HelloWorldApp, buildRoutes } from "./fixtures/hello-world/app.js";
+
+const posixPath: PathAdapter = {
+  join: (...p) => p.join("/").replace(/\/+/g, "/"),
+  dirname: (p) => p.replace(/\/[^/]*$/, "") || "/",
+  basename: (p) => p.split("/").pop() ?? "",
+  resolve: (...p) =>
+    p
+      .reduce((o, x) => (!x ? o : x.startsWith("/") ? x : o ? `${o}/${x}` : x), "")
+      .replace(/\/+/g, "/"),
+  extname: (p) => (p.lastIndexOf(".") > 0 ? p.slice(p.lastIndexOf(".")) : ""),
+  isAbsolute: (p) => p.startsWith("/"),
+  sep: "/",
+};
+
+const FIXED_MTIME = new Date(0);
+const stat = (d: boolean) => ({
+  isDirectory: () => d,
+  isFile: () => !d,
+  size: 0,
+  atime: FIXED_MTIME,
+  mtime: FIXED_MTIME,
+});
+
+function installFs(dirs: Set<string>, files: Set<string>, cwd = "/"): void {
+  const norm = (p: string) => p.replace(/\/+/g, "/");
+  registerFsAdapter(
+    "application-test",
+    {
+      cwd: () => cwd,
+      exists: async (p: string) => dirs.has(norm(p)) || files.has(norm(p)),
+      existsSync: (p: string) => dirs.has(norm(p)) || files.has(norm(p)),
+      readFile: async (p: string) => {
+        if (!files.has(p)) throw new Error("ENOENT");
+        return "";
+      },
+      mkdir: async (p: string) => void dirs.add(norm(p)),
+      writeFile: async (p: string) => void files.add(norm(p)),
+      stat: async (p: string) => {
+        if (dirs.has(norm(p))) return stat(true);
+        if (files.has(norm(p))) return stat(false);
+        throw new Error("ENOENT");
+      },
+      statSync: (p: string) => {
+        if (dirs.has(norm(p))) return stat(true);
+        if (files.has(norm(p))) return stat(false);
+        throw new Error("ENOENT");
+      },
+      realpath: async (p: string) => p,
+      openSync: () => 3,
+      writeSync: (_fd: number, b: Uint8Array) => b.length,
+    } as unknown as FsAdapter,
+    posixPath,
+  );
+  fsAdapterConfig.adapter = "application-test";
+}
+
+const PREV = fsAdapterConfig.adapter;
+beforeEach(() => resetLoadHooks());
+afterEach(() => {
+  fsAdapterConfig.adapter = PREV;
+  resetLoadHooks();
+  Application.appClass = null;
+});
+
+describe("Application", () => {
+  it("is a subclass of Engine", () => {
+    expect(Application.prototype).toBeInstanceOf(Engine);
+  });
+
+  it("Application is abstract and cannot be instantiated directly", () => {
+    expect(() => new Application()).toThrow(
+      "Trails::Application is abstract, you cannot instantiate it directly.",
+    );
+  });
+
+  describe("register", () => {
+    it("sets appClass to the registered subclass", () => {
+      class MyApp extends Application {}
+      Application.register(MyApp);
+      expect(Application.appClass).toBe(MyApp);
+    });
+
+    it("fires :before_configuration load hooks with the subclass", () => {
+      class MyApp2 extends Application {}
+      const seen: unknown[] = [];
+      onLoad("before_configuration", (base) => {
+        seen.push(base);
+      });
+      Application.register(MyApp2);
+      expect(seen).toEqual([MyApp2]);
+    });
+
+    it("registers the subclass in the Trailtie registry", () => {
+      class MyApp3 extends Application {}
+      Application.register(MyApp3);
+      expect(Application.subclasses()).toContain(MyApp3);
+    });
+
+    it("is idempotent — :before_configuration fires once per subclass", () => {
+      class MyApp4 extends Application {}
+      const seen: unknown[] = [];
+      onLoad("before_configuration", (base) => {
+        seen.push(base);
+      });
+      Application.register(MyApp4);
+      Application.register(MyApp4);
+      expect(seen).toEqual([MyApp4]);
+    });
+  });
+
+  describe("name", () => {
+    it("dasherizes the class name and strips a trailing /application", () => {
+      class MyBlogApplication extends Application {}
+      Application.register(MyBlogApplication);
+      expect(MyBlogApplication.instance().name()).toBe("my-blog");
+    });
+
+    it("dasherizes without the suffix when the class has no Application name", () => {
+      class WidgetShop extends Application {}
+      Application.register(WidgetShop);
+      expect(WidgetShop.instance().name()).toBe("widget-shop");
+    });
+  });
+
+  describe("find_root", () => {
+    it("walks parents looking for config.ts (trails' config.ru analog)", () => {
+      installFs(new Set(["/", "/app", "/app/src", "/app/src/inner"]), new Set(["/app/config.ts"]));
+      class RootApp extends Application {}
+      Application.register(RootApp);
+      expect(RootApp.findRoot("/app/src/inner")).toBe("/app");
+    });
+
+    it("falls back to fs.cwd() when no flag is found", () => {
+      installFs(new Set(["/", "/cwd", "/elsewhere"]), new Set(["/cwd/config.ts"]), "/cwd");
+      class CwdApp extends Application {}
+      Application.register(CwdApp);
+      expect(CwdApp.findRoot("/elsewhere")).toBe("/cwd");
+    });
+  });
+
+  describe("ensure_generator_templates_added", () => {
+    it("unshifts the existent lib/templates paths ahead of the configured ones", async () => {
+      installFs(new Set(["/", "/app", "/app/lib", "/app/lib/templates"]), new Set());
+      class TemplatesApp extends Application {}
+      Application.register(TemplatesApp);
+      const app = TemplatesApp.instance();
+      app.config.setRoot("/app");
+      const templates = app.config.generators().templates;
+      templates.push("/configured");
+
+      await app.ensureGeneratorTemplatesAdded();
+
+      expect(templates).toEqual(["/app/lib/templates", "/configured"]);
+    });
+
+    it("skips a lib/templates path that does not exist", async () => {
+      installFs(new Set(["/", "/app"]), new Set());
+      class NoTemplatesApp extends Application {}
+      Application.register(NoTemplatesApp);
+      const app = NoTemplatesApp.instance();
+      app.config.setRoot("/app");
+      const templates = app.config.generators().templates;
+
+      await app.ensureGeneratorTemplatesAdded();
+
+      expect(templates).toEqual([]);
+    });
+  });
+
+  describe("initialize!", () => {
+    afterEach(() => {
+      Trails.application = null;
+      Trails.logger = null;
+    });
+
+    it("returns false from initialized? before initialize() is called", () => {
+      class IApp extends Application {}
+      Application.register(IApp);
+      expect(IApp.instance().initialized()).toBe(false);
+    });
+
+    it("runs the Bootstrap initializer chain and flips initialized?", async () => {
+      class IApp2 extends Application {}
+      Application.register(IApp2);
+      const app = IApp2.instance();
+      await app.initializeBang();
+      expect(app.initialized()).toBe(true);
+      expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
+      expect(Trails.cache).toBeInstanceOf(FileStore);
+    });
+
+    it("fires :after_initialize load hooks once initialization completes", async () => {
+      class IApp3 extends Application {}
+      Application.register(IApp3);
+      const seen: unknown[] = [];
+      onLoad("after_initialize", (base) => {
+        seen.push(base);
+      });
+      const app = IApp3.instance();
+      await app.initializeBang();
+      expect(seen).toEqual([app]);
+    });
+
+    it("publishes the discovered root to the ActiveRecord seam (trailsRoot)", async () => {
+      installFs(new Set(["/", "/app", "/app/src"]), new Set(["/app/config.ts"]), "/cwd");
+      setTrailsRoot(null);
+      class RootPubApp extends Application {}
+      Application.register(RootPubApp, "/app/src");
+      try {
+        await RootPubApp.instance().initializeBang();
+        expect(trailsRoot()).toBe("/app");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
+    it("publishes config.root override (not the discovered root) to trailsRoot", async () => {
+      installFs(
+        new Set(["/", "/app", "/app/src", "/override"]),
+        new Set(["/app/config.ts"]),
+        "/cwd",
+      );
+      setTrailsRoot(null);
+      class RootOverrideApp extends Application {}
+      Application.register(RootOverrideApp, "/app/src");
+      const app = RootOverrideApp.instance();
+      app.config.setRoot("/override");
+      try {
+        await app.initializeBang();
+        expect(trailsRoot()).toBe("/override");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
+    it("expands a relative config.root override before publishing to trailsRoot", async () => {
+      installFs(new Set(["/", "/cwd", "/cwd/rel", "/app", "/app/src"]), new Set([]), "/cwd");
+      setTrailsRoot(null);
+      class RelRootApp extends Application {}
+      Application.register(RelRootApp, "/app/src");
+      const app = RelRootApp.instance();
+      app.config.setRoot("rel");
+      try {
+        await app.initializeBang();
+        expect(trailsRoot()).toBe("/cwd/rel");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
+    it("keeps trailsRoot in sync with a config.setRoot after boot (live read)", async () => {
+      installFs(new Set(["/", "/app", "/app/src", "/later"]), new Set(["/app/config.ts"]), "/cwd");
+      setTrailsRoot(null);
+      class LiveRootApp extends Application {}
+      Application.register(LiveRootApp, "/app/src");
+      const app = LiveRootApp.instance();
+      try {
+        await app.initializeBang();
+        expect(trailsRoot()).toBe("/app");
+        app.config.setRoot("/later");
+        expect(trailsRoot()).toBe("/later");
+      } finally {
+        setTrailsRoot(null);
+      }
+    });
+
+    it("raises when called twice", async () => {
+      class IApp4 extends Application {}
+      Application.register(IApp4);
+      const app = IApp4.instance();
+      await app.initializeBang();
+      await expect(app.initializeBang()).rejects.toThrow(/already initialized/);
+    });
+
+    it("splices Bootstrap initializers ahead of inherited Engine ones", () => {
+      class IApp5 extends Application {}
+      Application.register(IApp5);
+      const names = IApp5.instance().initializers.map((i) => i.name);
+      expect(names).toContain("load_environment_config");
+      expect(names).toContain("initialize_logger");
+      expect(names).toContain("initialize_cache");
+      expect(names).toContain("bootstrap_hook");
+    });
+
+    it("splices Finisher initializers after the inherited Engine ones", () => {
+      class IApp6 extends Application {}
+      Application.register(IApp6);
+      const names = IApp6.instance().initializers.map((i) => i.name);
+      expect(names.slice(-13)).toEqual([
+        "add_generator_templates",
+        "setup_main_autoloader",
+        "setup_default_session_store",
+        "build_middleware_stack",
+        "define_main_app_helper",
+        "add_to_prepare_blocks",
+        "run_prepare_callbacks",
+        "eager_load!",
+        "finisher_hook",
+        "configure_executor_for_concurrency",
+        "add_internal_routes",
+        "set_routes_reloader_hook",
+        "set_clear_dependencies_hook",
+      ]);
+    });
+
+    it("builds the middleware stack and draws routes when booted", async () => {
+      class IApp7 extends Application {}
+      Application.register(IApp7);
+      const app = IApp7.instance();
+      await app.initializeBang();
+      const middleware = app.config.middleware as MiddlewareStack;
+      expect(middleware.middlewares.length).toBeGreaterThan(0);
+      expect(middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
+      expect(app.routes().isEmpty()).toBe(true);
+      app.routes().draw(function () {
+        this.get("/hello", { to: "hello#index" });
+      });
+      expect(app.routes().isEmpty()).toBe(false);
+    });
+  });
+});
+
+describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
+  afterEach(() => {
+    Trails.application = null;
+  });
+
+  it("initializes a registered Application subclass and serves a route through actionpack", async () => {
+    Application.register(HelloWorldApp);
+    expect(Trails.application).toBeInstanceOf(HelloWorldApp);
+    await Trails.initialize();
+    expect(Trails.initialized()).toBe(true);
+    const [status, , body] = await buildRoutes().call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/hello",
+    });
+    expect(status).toBe(200);
+    expect([...(body as Iterable<string>)].join("")).toBe("hello world");
+  });
+});
+
+describe("Trails.application integration (boot-app fixture)", () => {
+  beforeEach(async () => {
+    const { Base } = await import("@blazetrails/activerecord");
+    runLoadHooks("active_record", Base);
+  });
+
+  afterEach(() => {
+    Trails.application = null;
+    Application.appClass = null;
+  });
+
+  it(
+    "boots the app through the initializer chain and serves a controller action",
+    { timeout: 30_000 },
+    async () => {
+      const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+      const app = Trails.application!;
+      app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+
+      await Trails.initialize();
+
+      expect(app).toBeInstanceOf(BootApp);
+      expect(app.routesReloader().loaded).toBe(false);
+      const [status, , body] = await (rbFSend(app.app(), "call", {
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/posts",
+      }) as Promise<RackResponse>);
+      expect(status).toBe(200);
+      expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
+      expect(app.routesReloader().loaded).toBe(true);
+
+      const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/admin/sessions",
+      }) as Promise<RackResponse>);
+      expect(nestedStatus).toBe(200);
+      expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
+        scope: "admin",
+      });
+    },
+  );
+
+  it("assigns the drawn route set to the controller's _routes", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppRoutes extends BootApp {}
+    Application.register(BootAppRoutes);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    expect(ActionController.Base._routes).toBe(app.routes());
+    const [status, , body] = await (rbFSend(app.app(), "call", {
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/show",
+      HTTP_ACCEPT: "*/*",
+    }) as Promise<RackResponse>);
+    expect(status).toBe(200);
+    expect([...(body as Iterable<string>)].join("")).toContain('<a href="/posts">All posts</a>');
+  });
+
+  it("calls a named route helper from a controller action with lazily drawn routes", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppHelpers extends BootApp {}
+    Application.register(BootAppHelpers);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await (rbFSend(app.app(), "call", {
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/link",
+    }) as Promise<RackResponse>);
+    expect(status).toBe(200);
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ href: "/posts" });
+  });
+
+  it("calls a named *_url helper from a controller action against the request host", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppUrlHelpers extends BootApp {}
+    Application.register(BootAppUrlHelpers);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await (rbFSend(app.app(), "call", {
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/url",
+      HTTP_HOST: "blog.example.com:8080",
+      "rack.url_scheme": "https",
+    }) as Promise<RackResponse>);
+    expect(status).toBe(200);
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
+      href: "https://blog.example.com:8080/posts",
+    });
+  });
+
+  it("resolves a controller's url_for through its own url_options, not the url_helpers singleton", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppUrlFor extends BootApp {}
+    Application.register(BootAppUrlFor);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await (rbFSend(app.app(), "call", {
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/canonical",
+      HTTP_HOST: "blog.example.com:8080",
+      "rack.url_scheme": "https",
+    }) as Promise<RackResponse>);
+    expect(status).toBe(200);
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
+      href: "https://blog.example.com:8080/posts",
+    });
+    expect(
+      app.routes().urlHelpers().urlFor({ controller: "posts", action: "index", onlyPath: true }),
+    ).toBe("/posts");
+  });
+
+  it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppDebug extends BootApp {}
+    Application.register(BootAppDebug);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+    app.config.considerAllRequestsLocal = true;
+    await Trails.initialize();
+
+    const [status] = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
+    expect(status).toBe(500);
+  });
+
+  it("answers rescue_responses statuses with the debug page and logs the exception", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppRescues extends BootApp {}
+    Application.register(BootAppRescues);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+    app.config.considerAllRequestsLocal = true;
+    const lines: string[] = [];
+    vi.spyOn(app.config, "defaultLogFile").mockResolvedValue({
+      write: (s: string) => void lines.push(s),
+    } as never);
+    Trails.logger = null;
+    await Trails.initialize();
+    const { PostsController } =
+      await import("./fixtures/boot-app/app/controllers/posts-controller.js");
+    PostsController.protectFromForgery({ with: "exception" });
+    ActionController.Base.allowForgeryProtection = true;
+
+    try {
+      const [notFound, , notFoundBody] = await app.call({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/nope",
+      });
+      expect(notFound).toBe(404);
+      expect([...(notFoundBody as Iterable<string>)].join("")).toContain("Routing Error");
+      expect(lines.join("")).toContain("ActionController::RoutingError");
+
+      const [unprocessable, , body] = await app.call({
+        REQUEST_METHOD: "POST",
+        PATH_INFO: "/posts",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        CONTENT_LENGTH: "22",
+        "rack.input": new StringIO("authenticity_token=bad"),
+      });
+      expect(unprocessable).toBe(422);
+      expect([...(body as Iterable<string>)].join("")).toContain("InvalidAuthenticityToken");
+      expect(lines.join("")).toContain("ActionController::InvalidAuthenticityToken");
+    } finally {
+      ActionController.Base.allowForgeryProtection = false;
+    }
+  }, 20_000);
+
+  it("includes every application helper into ApplicationController at boot, before any request", async () => {
+    const { BootApp } = await import("./fixtures/boot-app/config/application.js");
+    class BootAppHelpersAtBoot extends BootApp {}
+    Application.register(BootAppHelpersAtBoot);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./fixtures/boot-app", import.meta.url).pathname);
+    await Trails.initialize();
+
+    const { ApplicationController } =
+      await import("./fixtures/boot-app/app/controllers/application-controller.js");
+    const helpers = (ApplicationController as unknown as { _helpers: object })._helpers;
+    expect(publicInstanceMethods(helpers)).toContain("statusBadge");
+  });
+});
+
+describe("Application::Configuration", () => {
+  it("config.session_store writes the store and reads it back resolved", () => {
+    const c = new Configuration("/app");
+    expect(c.isSessionStore()).toBeNull();
+    expect(c.sessionStore()).toBeNull();
+
+    c.sessionStore(":cookie_store", { key: "_myapp_session" });
+    expect(c.isSessionStore()).toBe(":cookie_store");
+    expect(c.sessionStore()).toBe(Session.CookieStore);
+    expect(c.sessionOptions).toEqual({ key: "_myapp_session" });
+  });
+
+  it("config.session_store :disabled reads back as nil", () => {
+    const c = new Configuration("/app");
+    c.sessionStore(":disabled");
+    expect(c.isSessionStore()).toBe(":disabled");
+    expect(c.sessionStore()).toBeNull();
+  });
+
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
+    class MyCustomStore extends Session.CookieStore {}
+    constSet(ActionDispatch.Session, "MyCustomStore", MyCustomStore);
+    try {
+      const c = new Configuration("/app");
+      c.sessionStore(":my_custom_store");
+      expect(c.sessionStore()).toBe(MyCustomStore);
+    } finally {
+      rbModRemoveConst(ActionDispatch.Session, "MyCustomStore");
+    }
+  });
+
+  it("config.session_store with unknown store raises helpful error", () => {
+    const c = new Configuration("/app");
+    c.sessionStore(":nonexistent_store");
+    expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
+  });
+
+  it("config.debug_exception_response_format is :api by default if only_api is enabled", () => {
+    const c = new Configuration("/app");
+    expect(c.debugExceptionResponseFormat).toBe("default");
+    c.apiOnly = true;
+    expect(c.debugExceptionResponseFormat).toBe("api");
+  });
+
+  it("config.debug_exception_response_format can be overridden", () => {
+    const c = new Configuration("/app");
+    c.apiOnly = true;
+    c.debugExceptionResponseFormat = "default";
+    expect(c.debugExceptionResponseFormat).toBe("default");
+  });
+
+  it("defaults match Trails::Application::Configuration#initialize", () => {
+    const c = new Configuration("/app");
+    expect(c.considerAllRequestsLocal).toBe(false);
+    expect(c.apiOnly).toBe(false);
+    expect(c.timeZone).toBe("UTC");
+    expect(c.beginningOfWeek).toBe(":monday");
+    expect(c.logLevel).toBe("debug");
+    expect(c.publicFileServer).toEqual({ enabled: true, indexName: "index", headers: null });
+    expect(c.assumeSsl).toBe(false);
+    expect(c.forceSsl).toBe(false);
+    expect(c.hosts).toEqual([]);
+    expect(c.filterParameters).toEqual([]);
+    expect(c.helpersPaths).toEqual([]);
+    expect(c.reloadClassesOnlyOnChange).toBe(true);
+    expect(c.autoflushLog).toBe(true);
+    expect(c.railtiesOrder).toEqual([":all"]);
+    expect(c.rakeEagerLoad).toBe(false);
+    expect(c.serverTiming).toBe(false);
+    expect(c.yjit).toBe(false);
+    expect(c.disableSandbox).toBe(false);
+    expect(c.sandboxByDefault).toBe(false);
+    expect(c.addAutoloadPathsToLoadPath).toBe(true);
+    expect(c.encoding).toBe("utf-8");
+    expect(c.requireMasterKey).toBe(false);
+  });
+
+  it("config.load_defaults 5.0 assigns the 5.0 framework defaults", () => {
+    const c = new Configuration("/app");
+    c.set("activeRecord", {});
+    c.set("actionController", {});
+    c.set("activeSupport", {});
+
+    c.loadDefaults("5.0");
+
+    expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
+    expect(c.get("activeRecord")).toEqual({ belongsToRequiredByDefault: true });
+    expect(c.get("activeSupport")).toEqual({ toTimePreservesTimezone: ":offset" });
+    expect(c.get("actionController")).toEqual({
+      perFormCsrfTokens: true,
+      forgeryProtectionOriginCheck: true,
+    });
+    expect(c.loadedConfigVersion).toBe("5.0");
+  });
+
+  it("config.load_defaults includes defaults for versions prior to the target version", () => {
+    const c = new Configuration("/app");
+    c.set("activeRecord", { encryption: {} });
+
+    c.loadDefaults("7.2");
+
+    expect(c.yjit).toBe(true);
+    expect(c.addAutoloadPathsToLoadPath).toBe(false);
+    expect(c.precompileFilterParameters).toBe(true);
+    expect(c.domTestingDefaultHtmlVersion).toBe(":html5");
+    expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
+    expect((c.get("activeRecord") as Record<string, unknown>).belongsToRequiredByDefault).toBe(
+      true,
+    );
+    expect(c.loadedConfigVersion).toBe("7.2");
+  });
+
+  it("config.load_defaults skips a framework that has not registered its config", () => {
+    const c = new Configuration("/app");
+    expect(() => c.loadDefaults("8.0")).not.toThrow();
+    expect(c.isRespondTo("assets")).toBe(false);
+  });
+
+  it("config.load_defaults raises on an unknown version", () => {
+    const c = new Configuration("/app");
+    expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    await c.autoloadLib({ ignore: ["tasks", "generators"] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    await c.autoloadLib({ ignore: [] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", async () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    await c.autoloadLib({ ignore: "tasks" });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib_once adds lib to the once paths and ignores through the once loader", async () => {
+    class AutoloadLibOnceApp extends Application {}
+    const app = AutoloadLibOnceApp.instance();
+    Trails.application = app;
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+    const c = new Configuration("/app");
+    c.setRoot("/app");
+    await c.autoloadLibOnce({ ignore: "tasks" });
+
+    expect(c.autoloadOncePaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+    expect(app.autoloaders.once.ignoredGlobPatterns.has("/app/lib/tasks")).toBe(true);
+  });
+
+  it("setting priority for engines with config.railties_order", () => {
+    class BukkitsEngine extends Engine {}
+    class BlogEngine extends Engine {}
+    class OrderApp extends Application {}
+    const app = OrderApp.instance();
+    app.config.railtiesOrder = [BukkitsEngine, BlogEngine, ":all", ":main_app"];
+
+    expect(app.orderedRailties()).toEqual([
+      BukkitsEngine.instance(),
+      BlogEngine.instance(),
+      expect.any(Array),
+      app,
+    ]);
+  });
+
+  it("railties_order adds :all with lowest priority if not given", () => {
+    class Bukkits2Engine extends Engine {}
+    class OrderApp2 extends Application {}
+    const app = OrderApp2.instance();
+    app.config.railtiesOrder = [Bukkits2Engine];
+
+    const order = app.orderedRailties();
+    expect(order[0]).toBe(Bukkits2Engine.instance());
+    expect(order[order.length - 1]).toEqual(expect.any(Array));
+    expect(order.flat()).toContain(app);
+  });
+
+  it("railtiesInitializers walks ordered_railties in reverse", () => {
+    class RiApp extends Application {}
+    const app = RiApp.instance();
+    app.config.railtiesOrder = [":all", ":main_app"];
+
+    const current = new Collection();
+    expect(app.railtiesInitializers(current)).toEqual(expect.any(Collection));
+  });
+
+  it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
+    const c = new Configuration("/app");
+    expect(c.paths().get("public")).toBeDefined();
+  });
+
+  it("config.enable_reloading is !config.cache_classes", () => {
+    const c = new Configuration("/app");
+    c.cacheClasses = true;
+    expect(c.enableReloading).toBe(false);
+    c.enableReloading = true;
+    expect(c.cacheClasses).toBe(false);
+    expect(c.isReloadingEnabled()).toBe(true);
+  });
+});
+
+describe("Application::DefaultMiddlewareStack", () => {
+  const paths = (() => {
+    const root = new Root("/app");
+    root.add("public");
+    return root;
+  })();
+  const buildApp = () => ({
+    config: new Configuration("/app"),
+    executor: class extends Executor {},
+    reloader: class extends Reloader {},
+  });
+
+  const build = (mutate: (c: Configuration) => void = () => {}) => {
+    const app = buildApp();
+    mutate(app.config);
+    return new DefaultMiddlewareStack(app, app.config, paths)
+      .buildStack()
+      .middlewares.map((m) => m.klass);
+  };
+
+  it("passes DebugExceptions the configured response format", () => {
+    const app = buildApp();
+    app.config.apiOnly = true;
+    const mw = new DefaultMiddlewareStack(app, app.config, paths)
+      .buildStack()
+      .middlewares.find((m) => m.klass === DebugExceptions)!;
+    expect(mw.args).toEqual([app, "api"]);
+  });
+
+  it("default stack always includes RequestId, ShowExceptions, DebugExceptions, Callbacks, Static", () => {
+    const k = build();
+    expect(k).toEqual(
+      expect.arrayContaining([RequestId, ShowExceptions, DebugExceptions, Callbacks, Static]),
+    );
+  });
+
+  it("always includes ActionDispatch::Executor, wired to app.executor", () => {
+    const app = buildApp();
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    const entry = stack.middlewares.find((m) => m.klass === ActionDispatchExecutor);
+    expect(entry?.args[0]).toBe(app.executor);
+  });
+
+  it("includes ActionDispatch::Reloader, wired to app.reloader, only when reloading is enabled", () => {
+    const app = buildApp();
+    app.config.enableReloading = true;
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(stack.middlewares.find((m) => m.klass === ActionDispatchReloader)?.args[0]).toBe(
+      app.reloader,
+    );
+    expect(build((c) => (c.enableReloading = false))).not.toContain(ActionDispatchReloader);
+  });
+
+  it("includes HostAuthorization only when config.hosts is non-empty", () => {
+    expect(build()).not.toContain(HostAuthorization);
+    expect(build((c) => (c.hosts = ["example.com"]))).toContain(HostAuthorization);
+  });
+
+  it("includes AssumeSSL when config.assume_ssl is true", () => {
+    expect(build((c) => (c.assumeSsl = true))).toContain(AssumeSSL);
+  });
+
+  it("includes SSL middleware when config.force_ssl is true", () => {
+    expect(build((c) => (c.forceSsl = true))).toContain(SSL);
+  });
+
+  it("excludes Static when public_file_server.enabled is false", () => {
+    expect(build((c) => (c.publicFileServer.enabled = false))).not.toContain(Static);
+  });
+
+  it("includes ServerTiming only when config.server_timing is true", () => {
+    expect(build()).not.toContain(ServerTiming);
+    expect(build((c) => (c.serverTiming = true))).toContain(ServerTiming);
+  });
+
+  it("includes ActionableExceptions only when consider_all_requests_local is true", () => {
+    expect(build()).not.toContain(ActionableExceptions);
+    expect(build((c) => (c.considerAllRequestsLocal = true))).toContain(ActionableExceptions);
+  });
+
+  it("includes Cookies + ContentSecurityPolicyMiddleware unless api_only", () => {
+    expect(build()).toEqual(expect.arrayContaining([Cookies, ContentSecurityPolicyMiddleware]));
+    const apiOnly = build((c) => (c.apiOnly = true));
+    expect(apiOnly).not.toContain(Cookies);
+    expect(apiOnly).not.toContain(ContentSecurityPolicyMiddleware);
+  });
+
+  it("show_exceptions_app falls back to a PublicExceptions instance when exceptions_app is unset", () => {
+    const app = buildApp();
+    const stack = new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(stack.middlewares.find((m) => m.klass === ShowExceptions)?.args[0]).toBeTruthy();
+  });
+
+  it("forces session_options.secure when force_ssl + session_store and secure not explicit", () => {
+    const app = buildApp();
+    class FakeSessionStore {}
+    app.config.forceSsl = true;
+    app.config.sessionStore(FakeSessionStore);
+    new DefaultMiddlewareStack(app, app.config, paths).buildStack();
+    expect(app.config.sessionOptions.secure).toBe(true);
+  });
+});
+
+describe("Application key/message/credentials wiring", () => {
+  beforeEach(() => resetLoadHooks());
+  afterEach(() => {
+    fsAdapterConfig.adapter = PREV;
+    resetLoadHooks();
+    Application.appClass = null;
+  });
+
+  const setSecret = (app: Application, s: string) => {
+    app.config.secretKeyBase = s;
+  };
+
+  it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
+    expect(new Configuration("/app").credentials.toH()).toEqual({
+      contentPath: "/app/config/credentials.yml.enc",
+      keyPath: "/app/config/master.key",
+    });
+    class A extends Application {}
+    Application.register(A);
+    const app = A.instance();
+    expect(app.routesReloader()).toBe(app.routesReloader());
+    setSecret(app, "test-secret");
+    const gen = app.keyGenerator();
+    expect(gen.generateKey("salt", 16)).toBeInstanceOf(Buffer);
+    expect(app.keyGenerator()).toBe(gen);
+    const v = app.messageVerifier("cookies");
+    expect(v.verify(v.generate({ foo: 1 }))).toEqual({ foo: 1 });
+    await expect(app.configFor("exception_notification")).rejects.toThrow(
+      /Could not load configuration. No such file/,
+    );
+  });
+
+  it("credentials prefers env-specific config/credentials/{env}.yml.enc, else config/credentials.yml.enc", async () => {
+    const originalEnv = Trails.env;
+    Trails.env = "development";
+    onTestFinished(() => {
+      Trails.env = originalEnv;
+    });
+    const b = "/app/config/credentials";
+    installFs(
+      new Set(["/", "/app", "/app/config", b]),
+      new Set(["/app/config.ts", `${b}/development.yml.enc`, `${b}/development.key`]),
+    );
+    class A extends Application {}
+    Application.register(A, "/app");
+    let f = await A.instance().credentials();
+    expect([f.contentPath, f.keyPath]).toEqual([
+      `${b}/development.yml.enc`,
+      `${b}/development.key`,
+    ]);
+    installFs(new Set(["/", "/o", "/o/config"]), new Set(["/o/config.ts"]));
+    class B extends Application {}
+    Application.register(B, "/o");
+    f = await B.instance().credentials();
+    expect([f.contentPath, f.keyPath, f.envKey]).toEqual([
+      "/o/config/credentials.yml.enc",
+      "/o/config/master.key",
+      "TRAILS_MASTER_KEY",
+    ]);
+  });
+
+  it("credentials and the secret_key_base error read Trails.env, deciding content and key paths independently", async () => {
+    const originalEnv = Trails.env;
+    Trails.env = "staging";
+    onTestFinished(() => {
+      Trails.env = originalEnv;
+    });
+    const b = "/app/config/credentials";
+    installFs(
+      new Set(["/", "/app", "/app/config", b]),
+      new Set(["/app/config.ts", `${b}/staging.yml.enc`]),
+    );
+    class A extends Application {}
+    Application.register(A, "/app");
+    const f = await A.instance().credentials();
+    expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
+    expect(() => A.instance().secretKeyBase()).toThrow(
+      "Missing `secret_key_base` for 'staging' environment, set this string with `bin/trails credentials:edit`",
+    );
+  });
+});

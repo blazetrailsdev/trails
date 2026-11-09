@@ -98,7 +98,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
  *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
- *   maps to the `Trails` global in `packages/trailties/src/trails.ts`.
+ *   maps to the `Trails` global in `packages/trailties/lib/trails.ts`.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed

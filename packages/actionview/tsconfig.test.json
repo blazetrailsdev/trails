@@ -8,8 +8,8 @@
       "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
       "@blazetrails/rack": ["../rack/lib/index.ts"],
       "@blazetrails/trails-tsc": ["../trails-tsc/lib/index.ts"],
-      "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"],
-      "@blazetrails/trailties/trailtie": ["../trailties/src/trailtie.ts"]
+      "@blazetrails/trailties/engine": ["../trailties/lib/engine.ts"],
+      "@blazetrails/trailties/trailtie": ["../trailties/lib/trailtie.ts"]
     },
     "rootDir": "."
   },

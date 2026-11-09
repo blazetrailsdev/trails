@@ -53,7 +53,7 @@ codified hard rule.
 ## API surface
 
 ```ts
-// packages/trailties/src/template-builder/index.ts
+// packages/trailties/lib/template-builder/index.ts
 
 declare const refBrand: unique symbol;
 
@@ -211,8 +211,8 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Source:** new.
 
-- `packages/trailties/src/template-builder/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body}.ts`
-- `packages/trailties/src/template-builder/testing.ts` — exports `parseTs`, `assertNoRubySource`.
+- `packages/trailties/lib/template-builder/{index,types,refs,emit-module,emit-class,emit-interface,emit-import,emit-method,ts-body}.ts`
+- `packages/trailties/lib/template-builder/testing.ts` — exports `parseTs`, `assertNoRubySource`.
 - Unit tests:
   - Import dedup; default+named in same import; type-only.
   - Ref propagation through `type` and `tsBody`.
@@ -224,9 +224,9 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T1.
 
-- `packages/trailties/src/generators/trails/model/model-generator.ts`
-- `packages/trailties/src/generators/trails/migration/migration-generator.ts`
-- `packages/trailties/src/generators/trails/resource-route/resource-route-generator.ts`
+- `packages/trailties/lib/generators/trails/model/model-generator.ts`
+- `packages/trailties/lib/generators/trails/migration/migration-generator.ts`
+- `packages/trailties/lib/generators/trails/resource-route/resource-route-generator.ts`
 - Per-generator `__snapshots__/` covering the attribute-type matrix.
 - Per-generator test contract (snapshot + `parseTs` + `assertNoRubySource`).
 
@@ -234,9 +234,9 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T1.
 
-- `packages/trailties/src/generators/controller-generator.ts`
-- `packages/trailties/src/generators/scaffold-generator.ts`
-- Relocate both into `packages/trailties/src/generators/trails/` Rails layout
+- `packages/trailties/lib/generators/controller-generator.ts`
+- `packages/trailties/lib/generators/scaffold-generator.ts`
+- Relocate both into `packages/trailties/lib/generators/trails/` Rails layout
   in the same PR.
 - Factor out controller-template prose helpers used by T4 and PR 1.14b-cont.
 - Test contract as T2.
@@ -245,7 +245,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T3.
 
-- `packages/trailties/src/generators/trails/authentication/authentication-generator.ts`
+- `packages/trailties/lib/generators/trails/authentication/authentication-generator.ts`
 - Snapshots for all 7 emitted files (`app/models/{user,session,current}`,
   `app/controllers/{sessions,passwords,concerns/authentication}`,
   `app/mailers/passwords_mailer`).
@@ -260,7 +260,7 @@ PR T1 lands alone; T2–T5 parallelize off T1.
 
 **Blocked by:** PR T1 (builder).
 
-- `packages/trailties/src/generators/trails/devcontainer/devcontainer-generator.ts`
+- `packages/trailties/lib/generators/trails/devcontainer/devcontainer-generator.ts`
 - `update_devcontainer_db_host` / `update_devcontainer_db_feature` /
   `edit_compose_yaml` ports emit `devcontainer.json` AND `compose.yaml`
   via `JSON.stringify(..., null, 2)`. The `.yaml` extension stays
@@ -287,10 +287,10 @@ PR T1 lands alone; T2–T5 parallelize off T1.
    stops catching real regressions. None of these trip today; revisit
    the day one does.
 5. **No legacy generator templates to migrate.** The existing
-   `packages/trailties/src/templates/` tree holds actionview `.tse`
+   `packages/trailties/lib/templates/` tree holds actionview `.tse`
    view templates (e.g. `welcome/index.tse`) — out of scope here.
    The builder lives in a sibling subtree at
-   `packages/trailties/src/template-builder/`, exported as
+   `packages/trailties/lib/template-builder/`, exported as
    `@blazetrails/trailties/template-builder`.
 
 ## Plan-doc cross-references

@@ -21,7 +21,7 @@ tester.run("thor-import-boundary", rule, {
     { filename: TOP, code: 'import { getFs } from "@blazetrails/ruby-compat/fs-adapter";' },
     { filename: TOP, code: 'import { SpellChecker } from "@blazetrails/did-you-mean";' },
     {
-      filename: "packages/trailties/src/generators/base.ts",
+      filename: "packages/trailties/lib/generators/base.ts",
       code: 'import { camelize } from "@blazetrails/activesupport";',
     },
   ],

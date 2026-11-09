@@ -12,8 +12,8 @@ import {
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
-import migrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/migration.ts.tt?raw";
-import createTableMigrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/create_table_migration.ts.tt?raw";
+import migrationTemplate from "../../../../trailties/lib/generators/active-record/migration/templates/migration.ts.tt?raw";
+import createTableMigrationTemplate from "../../../../trailties/lib/generators/active-record/migration/templates/create_table_migration.ts.tt?raw";
 
 const MIGRATION_SOURCE_ROOT = "/.trails/templates/active-record/migration";
 const TEMPLATES: Record<string, string> = {
