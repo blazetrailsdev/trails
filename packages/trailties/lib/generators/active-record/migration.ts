@@ -1,3 +1,4 @@
+import "../../constants.active-record-migration.generated.js";
 import { Base, Migration as ActiveRecordMigration } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 

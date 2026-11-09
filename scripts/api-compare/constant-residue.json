@@ -1301,7 +1301,7 @@
     }
   },
   "trailties": {
-    "rows": 151,
+    "rows": 154,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1372,7 +1372,10 @@
       "gem-version.ts::VERSION": "Trails::VERSION",
       "generators/actions/create-migration.ts::CreateMigration": "Trails::Generators::Actions::CreateMigration",
       "generators/active-model.ts::ActiveModel": "Trails::Generators::ActiveModel",
+      "generators/active-record.ts::Base": "ActiveRecord::Generators::Base",
       "generators/active-record/application-record/application-record-generator.ts::ApplicationRecordGenerator": "ActiveRecord::Generators::ApplicationRecordGenerator",
+      "generators/active-record/migration.ts::ClassMethods": "ActiveRecord::Generators::Migration::ClassMethods",
+      "generators/active-record/migration.ts::Migration": "ActiveRecord::Generators::Migration",
       "generators/active-record/migration/migration-generator.ts::MigrationGenerator": "ActiveRecord::Generators::MigrationGenerator",
       "generators/active-record/model/model-generator.ts::ModelGenerator": "ActiveRecord::Generators::ModelGenerator",
       "generators/active-record/multi-db/multi-db-generator.ts::MultiDbGenerator": "ActiveRecord::Generators::MultiDbGenerator",

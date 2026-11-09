@@ -1,3 +1,4 @@
+import "../constants.active-record.generated.js";
 import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
 import { NamedBase } from "./named-base.js";
