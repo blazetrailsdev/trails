@@ -473,6 +473,7 @@ function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number 
  * The `struct vtm` `time_strftime` hands `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5234-5264`).
  *
  * @noRailsEquivalent PERMANENT
+ * @perf 1000ns — PERMANENT
  */
 class TimeVtm implements StrftimeVtm {
   readonly year: number;
@@ -512,14 +513,11 @@ function rbStrftimeAlloc(
   timew: { epochNs: bigint; subnano: Rational },
   gmt: boolean,
 ): string | null {
-  let timev: Rational | null = null;
   const ts = timew2timespecExact(timew);
-  if (!ts)
-    timev = new Rational(timew.epochNs, 1_000_000_000n).add(timew.subnano.quo(1_000_000_000));
-
-  if (timev == null) {
-    return rbStrftimeTimespec(format, time, vtm, ts!, gmt);
+  if (ts) {
+    return rbStrftimeTimespec(format, time, vtm, ts, gmt);
   } else {
+    const timev = new Rational(timew.epochNs, 1_000_000_000n).add(timew.subnano.quo(1_000_000_000));
     return rbStrftime(format, time, vtm, () => timev, gmt);
   }
 }
@@ -1847,15 +1845,8 @@ export class Time extends rbCTime {
   }
 
   /** `time_getgmtime` (`vendor/ruby/v3.3.11/time.c:4291`). */
-  /** `time_dup` (`vendor/ruby/v3.3.11/time.c:4058-4064`). */
-  #dup(): Time {
-    const dup = timeSAlloc(rbObjClass(this) as typeof Time);
-    Time.prototype.initializeCopy.call(dup, this);
-    return dup;
-  }
-
   getutc(): Time {
-    return this.#dup().utc();
+    return timeDup(this).utc();
   }
 
   getlocal(utcOffset: number | string | object | null = null): Time {
@@ -2126,6 +2117,13 @@ function timeSAlloc(klass: typeof Time): Time {
 }
 
 rbDefineAllocFunc(Time, timeSAlloc);
+
+/** `time_dup` (`vendor/ruby/v3.3.11/time.c:4058-4064`). */
+function timeDup(time: Time): Time {
+  const dup = timeSAlloc(rbObjClass(time) as typeof Time);
+  Time.prototype.initializeCopy.call(dup, time);
+  return dup;
+}
 
 for (const seat of ["Temporal.Instant", "Date"]) {
   Object.assign((TEMPORAL_METHOD_TABLE[seat] ??= {}), {

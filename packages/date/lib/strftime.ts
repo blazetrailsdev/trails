@@ -609,11 +609,7 @@ export function rbStrftime(
   return result.s;
 }
 
-/**
- * `rb_strftime_timespec` (`vendor/ruby/v3.3.11/strftime.c:938-946`).
- *
- * @noRailsEquivalent PERMANENT
- */
+/** `rb_strftime_timespec` (`vendor/ruby/v3.3.11/strftime.c:938-946`). */
 export function rbStrftimeTimespec(
   format: string,
   time: Time,
