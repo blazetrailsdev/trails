@@ -177,7 +177,6 @@ import {
   ClassMethods as AttributeMethodsClassMethods,
   isAttributeMethod as _isAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
-  isAttributeMethodsGenerated as _isAttributeMethodsGenerated,
   aliasAttribute as _aliasAttribute,
   undefineAttributeMethods as _undefineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
@@ -730,7 +729,6 @@ export class Base extends Model {
   /** @internal */
   declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   declare static defineAttributeMethods: typeof _defineAttributeMethods;
-  declare static isAttributeMethodsGenerated: typeof _isAttributeMethodsGenerated;
   declare static undefineAttributeMethods: typeof _undefineAttributeMethods;
   declare static aliasAttribute: typeof _aliasAttribute;
   declare static generateAliasAttributes: typeof _generateAliasAttributes;
@@ -2138,7 +2136,6 @@ include(Base, AMAttributeMethods.AttributeMethods);
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
-  isAttributeMethodsGenerated: _isAttributeMethodsGenerated,
   undefineAttributeMethods: _undefineAttributeMethods,
   aliasAttribute: _aliasAttribute,
   initializeGeneratedModules: _initializeGeneratedModules,

@@ -186,7 +186,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
           }
 
           async notIncludedHelper() {
-            await this.render({ inline: "<%= typeof this.fromBarHelper === 'function' -%>" });
+            await this.render({ inline: "<%= 'fromBarHelper' in this -%>" });
           }
         }
 `,
@@ -361,7 +361,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
           await (t as unknown as Rack).app("development");
 
           await expect(
-            (async () => (await Base.leaseConnection()).execute("SELECT 1"))(),
+            Base.leaseConnection().then((connection) => connection.execute("SELECT 1")),
           ).rejects.toThrow(ConnectionNotEstablished);
 
           await expect(Base.schemaCache().columns("posts")).rejects.toThrow(
@@ -412,7 +412,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
           await Base.connectionPool().schemaReflection.dataSources("__unused__" as never, "posts"),
         ).toBeTruthy();
         await expect(
-          (async () => (await Base.leaseConnection()).execute("SELECT 1"))(),
+          Base.leaseConnection().then((connection) => connection.execute("SELECT 1")),
         ).rejects.toThrow(ConnectionNotEstablished);
       }),
     );
@@ -505,7 +505,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
   });
 
   it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", async () => {
-    // BLOCKED: activerecord-port-message-pack-module
+    // BLOCKED: port-active-record-message-pack-initializer
     await t.trails("generate", "model", "post", "title:string");
     await t.trails("db:migrate");
 
