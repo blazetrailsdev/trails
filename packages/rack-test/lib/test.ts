@@ -47,7 +47,7 @@ export class Session {
   readonly defaultHost!: string;
 
   /** @internal */
-  private readonly app!: RackApp | RackMiddleware;
+  private readonly app!: RackApp | RackMiddleware | PromiseLike<RackApp | RackMiddleware>;
 
   /** @internal */
   private _env: RackEnv = {};
@@ -61,7 +61,10 @@ export class Session {
   /** @internal */
   private _lastResponse: MockResponse | null = null;
 
-  constructor(app: RackApp | RackMiddleware | Session, defaultHost: string = DEFAULT_HOST) {
+  constructor(
+    app: RackApp | RackMiddleware | PromiseLike<RackApp | RackMiddleware> | Session,
+    defaultHost: string = DEFAULT_HOST,
+  ) {
     if (app instanceof Session) {
       return app;
     }
@@ -364,7 +367,7 @@ export class Session {
   ): Promise<MockResponse> {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
-    const app = this.app;
+    const app = await this.app;
     const response = await (typeof app === "function" &&
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)

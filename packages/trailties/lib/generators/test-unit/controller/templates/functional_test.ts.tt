@@ -1,11 +1,28 @@
-import { describe, it, expect } from "vitest";
-import { <%= this.className().split("::").pop() %>Controller } from "<%= "../".repeat(this.classPathParts.length + 2) %>app/controllers/<%= [...this.classPathParts, this.fileName].map((part) => ActiveSupport.Inflector.dasherize(part)).join("/") %>-controller.js";
+import { describe, it } from "vitest";
+import { IntegrationTest } from "@blazetrails/actionpack";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper.js";
 
-describe("<%= this.className() %>Controller", () => {
+<% this.moduleNamespacing(() => { -%>
+export class <%= this.className().split("::").pop() %>ControllerTest extends IntegrationTest {
+  static {
+    constSet(TopLevel, "<%= this.className().split("::").pop() %>ControllerTest", this);
+  }
+}
+<% }) -%>
+
+describe("<%= this.className() %>ControllerTest", () => {
+<% if (this.actions.length === 0 || this.options.skipRoutes) { -%>
+  // it("the truth", () => {
+  //   expect(true).toBe(true);
+  // });
+<% } else { -%>
 <% for (const action of this.actions) { -%>
-  it("<%= action %>", () => {
-    // TODO: test <%= action %> action
+  it("should get <%= action %>", async ({ testCase: t }) => {
+    await t.get(t.<%= ActiveSupport.Inflector.camelize(`${this.urlHelperPrefix()}_${action}_url`, "lower") %>());
+    t.assertResponse("success");
   });
 <%= action === this.actions.at(-1) ? "" : "\n" -%>
+<% } -%>
 <% } -%>
 });

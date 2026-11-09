@@ -1,5 +1,4 @@
 import "../constants.notes.generated.js";
-import { stdout } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Base } from "../command/base.js";
@@ -25,20 +24,15 @@ export class NotesCommand extends Base {
     await this.displayAnnotations();
   }
 
-  /**
-   * @internal
-   * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
-   */
+  /** @internal */
   private async displayAnnotations(): Promise<void> {
     const annotations = this.options.annotations ?? Annotation.tags;
     const tag = annotations.length > 1;
 
-    stdout.write(
-      await SourceAnnotationExtractor.enumerate(annotations.join("|"), {
-        tag,
-        dirs: this.directories(),
-      }),
-    );
+    await SourceAnnotationExtractor.enumerate(annotations.join("|"), {
+      tag,
+      dirs: this.directories(),
+    });
   }
 
   /** @internal */

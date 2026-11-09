@@ -690,6 +690,34 @@ describe("AppGenerator", () => {
     });
   });
 
+  it("minimal trails app", () => {
+    const options = t.generator([t.destinationRoot], ["--minimal"]).options as Record<
+      string,
+      unknown
+    >;
+
+    expect(options.minimal).toBeTruthy();
+    expect(options.skipActionCable).toBeTruthy();
+    expect(options.skipActionMailbox).toBeTruthy();
+    expect(options.skipActionMailer).toBeTruthy();
+    expect(options.skipActionText).toBeTruthy();
+    expect(options.skipActiveJob).toBeTruthy();
+    expect(options.skipActiveStorage).toBeTruthy();
+    expect(options.skipBootsnap).toBeTruthy();
+    expect(options.skipBrakeman).toBeTruthy();
+    expect(options.skipCi).toBeTruthy();
+    expect(options.skipDevGems).toBeTruthy();
+    expect(options.skipDocker).toBeTruthy();
+    expect(options.skipHotwire).toBeTruthy();
+    expect(options.skipJavascript).toBeTruthy();
+    expect(options.skipJbuilder).toBeTruthy();
+    expect(options.skipKamal).toBeTruthy();
+    expect(options.skipEslint).toBeTruthy();
+    expect(options.skipSolid).toBeTruthy();
+    expect(options.skipSystemTest).toBeTruthy();
+    expect(options.skipThruster).toBeTruthy();
+  });
+
   it("rejects an unknown sqlite driver", () => {
     expect(() => t.generator([t.destinationRoot], { sqliteDriver: "bogus-driver" })).toThrow(
       /Unknown SQLite driver/,

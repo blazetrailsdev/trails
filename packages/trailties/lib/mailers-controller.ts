@@ -162,7 +162,7 @@ export class MailersController extends ApplicationController {
 
   /** @internal */
   private attachmentUrl(attachment: Part): string {
-    return `data:application/octet-stream;charset=utf-8;base64,${Base64.encode64(String(attachment.body()))}`;
+    return `data:application/octet-stream;charset=utf-8;base64,${Base64.encode64(attachment.body().decoded())}`;
   }
 
   /** @internal */

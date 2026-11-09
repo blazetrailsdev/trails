@@ -25,6 +25,7 @@ export class NamedBase extends GeneratorBase {
     this.noCommands(() => this.methodAdded("editHelper"));
     this.noCommands(() => this.methodAdded("newHelper"));
     this.noCommands(() => this.methodAdded("routeUrl"));
+    this.noCommands(() => this.methodAdded("urlHelperPrefix"));
     this.noCommands(() => this.methodAdded("redirectResourceName"));
     this.noCommands(() => this.methodAdded("modelResourceName"));
     this.noCommands(() => this.methodAdded("singularRouteName"));
@@ -163,6 +164,9 @@ export class NamedBase extends GeneratorBase {
       "/" +
       this.pluralFileName()
     );
+  }
+  urlHelperPrefix(): string {
+    return [...this.classPath(), this.fileName].join("_");
   }
 
   /** @missingRailsArgs model_resource_name — PERMANENT */

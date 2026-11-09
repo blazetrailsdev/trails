@@ -1,5 +1,5 @@
 import "../constants.stats.generated.js";
-import { File, stdout } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { CodeStatistics, type DirectoryPair } from "../code-statistics.js";
 import { Base } from "../command/base.js";
@@ -12,10 +12,7 @@ export class StatsCommand extends Base {
     klass.methodAdded("perform");
   }
 
-  /**
-   * @missingRailsCall new — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
-   * @inventedArm write — CONVERGEABLE notes-and-stats-output-is-printed-by-extractor-and-code-statistics
-   */
+  /** @missingRailsCall new — CONVERGEABLE code-statistics-create-stands-in-for-new */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
 
@@ -23,6 +20,6 @@ export class StatsCommand extends Base {
       .map(([name, dir]): DirectoryPair => [name, applicationRoot()!.join(dir).toString()])
       .filter(([, dir]) => File.isDirectory(dir));
 
-    stdout.write(`${(await CodeStatistics.create(...statDirectories)).toString()}\n`);
+    (await CodeStatistics.create(...statDirectories)).toString();
   }
 }

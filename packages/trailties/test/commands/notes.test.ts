@@ -149,8 +149,7 @@ describe("Trails::Command::NotesTest", { timeout: 30_000 }, () => {
     );
   });
 
-  it.skip("does not pick up notes inside string literals", async () => {
-    // BLOCKED: source-annotation-extractor-scans-comment-tokens-not-lines
+  it("does not pick up notes inside string literals", async () => {
     appFile("app/models/profile.ts", '"// TODO: do something"');
 
     expect(await runNotesCommand()).toBe("");

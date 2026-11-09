@@ -1,4 +1,11 @@
-import { Dir, File, LoadError, rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  LoadError,
+  STDOUT,
+  rbFRequire,
+  rbRequireLoaded,
+} from "@blazetrails/ruby-compat";
 import type * as Ast from "typescript/unstable/ast";
 import type { Node } from "typescript/unstable/ast";
 import type * as Scanner from "typescript/unstable/ast/scanner";
@@ -215,13 +222,13 @@ export class SourceAnnotationExtractor {
   static async enumerate(
     tag: string | null = null,
     options: AnnotationOptions & { dirs?: readonly string[] } = {},
-  ): Promise<string> {
+  ): Promise<void> {
     tokenizer ??= await requireTokenizer();
     tag ??= Annotation.tags.join("|");
     const extractor = new SourceAnnotationExtractor(tag);
     const dirs = options.dirs ?? Annotation.directories;
     delete options.dirs;
-    return extractor.display(extractor.find(dirs), options);
+    extractor.display(extractor.find(dirs), options);
   }
 
   constructor(public readonly tag: string) {}
@@ -255,18 +262,16 @@ export class SourceAnnotationExtractor {
     return results;
   }
 
-  display(results: Map<string, Annotation[]>, options: AnnotationOptions = {}): string {
+  display(results: Map<string, Annotation[]>, options: AnnotationOptions = {}): void {
     let maxLine = 0;
     for (const arr of results.values()) for (const a of arr) if (a.line > maxLine) maxLine = a.line;
-    const indent = String(maxLine).length;
-    const lines: string[] = [];
+    options.indent = String(maxLine).length;
     for (const file of [...results.keys()].sort()) {
-      lines.push(`${file}:`);
+      STDOUT.puts(`${file}:`);
       for (const note of results.get(file)!) {
-        lines.push(`  * ${note.toString({ ...options, indent })}`);
+        STDOUT.puts(`  * ${note.toString(options)}`);
       }
-      lines.push("");
+      STDOUT.puts();
     }
-    return lines.map((l) => `${l}\n`).join("");
   }
 }
