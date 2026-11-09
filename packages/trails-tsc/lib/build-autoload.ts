@@ -26,6 +26,7 @@ interface BootEngine {
 }
 
 interface BootApplication extends BootEngine {
+  config: BootEngine["config"] & { helpersPaths?: readonly string[] };
   railties?(): Iterable<object>;
   initializers: { tsort(): BootInitializer[] };
   autoloaders?: Partial<Record<"main" | "once", BootLoader>>;
@@ -172,6 +173,9 @@ async function writeBoot(
         }
       }
     }
+  }
+  for (const dir of application.config.helpersPaths ?? []) {
+    if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
   }
   const entries = [...files].map((file) => {
     const specifier = path.relative!(trailsDir, file);
