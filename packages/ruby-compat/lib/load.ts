@@ -96,7 +96,6 @@ export const LOAD_PATH: string[] = [];
 /** @noRailsEquivalent PERMANENT — `$"`, `vendor/ruby/v3.3.11/load.c:1606`. */
 export const LOADED_FEATURES: string[] = [];
 
-/** `loadable_ext` (`vendor/ruby/v3.3.11/load.c:43`): `.rb`, then the extension library suffix. */
 const loadableExt = [".js", ".ts"];
 
 /**
