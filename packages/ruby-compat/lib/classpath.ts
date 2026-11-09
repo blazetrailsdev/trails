@@ -28,7 +28,10 @@ const tableClasses = new Map<string, () => unknown>();
  * imported last by its package entry, after every module it names has been
  * evaluated, so a thunk still in TDZ then is retried on the next registration,
  * or by a lookup of a class bearing the entry's last path segment, or of a
- * plain-object module, which bears no name.
+ * plain-object module, which bears no name. Inside a class body, where its
+ * export is still in TDZ, the one row bearing its name whose thunk is in TDZ
+ * answers, as Ruby has named a class by the time `class A::B` runs its body
+ * (`vm_declare_class`, `vendor/ruby/v3.3.11/vm_insnhelper.c:5381`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -110,7 +113,18 @@ export function rbClassPath(klass: object): string | undefined {
       tableClassPaths.set(value, entry[1]);
     }
   }
-  return tableClassPaths.get(klass);
+  const resolved = tableClassPaths.get(klass);
+  if (resolved !== undefined || typeof name !== "string") return resolved;
+  const opening = pendingClassPaths.filter(([thunk, path]) => {
+    if (name !== path.slice(path.lastIndexOf(":") + 1)) return false;
+    try {
+      thunk();
+    } catch (error) {
+      return error instanceof ReferenceError;
+    }
+    return false;
+  });
+  return opening.length === 1 ? opening[0][1] : undefined;
 }
 
 /**

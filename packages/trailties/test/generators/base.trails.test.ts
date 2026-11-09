@@ -1,6 +1,13 @@
 import { capture } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
-import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  SecureRandom,
+  defineConstants,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { Base, type GeneratorConfig } from "../../lib/generators/base.js";
 import { Generators, type GeneratorClass } from "../../lib/generators.js";
 
@@ -597,5 +604,19 @@ describe("Base names read the Ruby class path (base.rb:334-347)", () => {
       klass.defaultForOption({ model: { x: 1 }, test_unit: { x: 2 }, trails: {} }, "x", {}, 0),
     ).toBe(1);
     expect(klass.defaultForOption({ test_unit: { x: 2 }, trails: {} }, "x", {}, 0)).toBe(2);
+  });
+});
+
+describe("Base class body reads its Ruby path", () => {
+  it("answers Trails::Generators::… from the generator's own static block", () => {
+    let seen: string | null = null;
+    defineConstants([[() => ProbeGenerator, "Trails::Generators::ProbeGenerator"]]);
+    class ProbeGenerator extends Base {
+      static {
+        seen = rbModName(this);
+      }
+    }
+    expect(seen).toBe("Trails::Generators::ProbeGenerator");
+    expect(ProbeGenerator.namespace()).toBe("trails:probe");
   });
 });
