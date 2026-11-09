@@ -14,6 +14,7 @@
       "types": "./dist/lint.d.ts",
       "default": "./dist/lint.js"
     },
+    "./testing/lint.js": null,
     "./lint": null,
     "./lint.js": null,
     "./*.js": {
