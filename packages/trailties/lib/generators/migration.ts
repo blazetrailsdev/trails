@@ -17,7 +17,7 @@ export const ClassMethods = {
     return Dir.glob(`${dirname}/[0-9]*_*.{ts,js,rb}`);
   },
 
-  migrationExists(
+  isMigrationExists(
     this: { migrationLookupAt(dirname: string): string[] },
     dirname: string,
     fileName: string,
@@ -46,7 +46,7 @@ export interface MigrationTemplateHost extends CreateMigrationHost {
   destinationRoot: string;
   constructor: {
     nextMigrationNumber(dirname: string): string;
-    migrationExists(dirname: string, fileName: string): string | undefined;
+    isMigrationExists(dirname: string, fileName: string): string | undefined;
   };
   migrationNumber: string;
   migrationClassName: string;

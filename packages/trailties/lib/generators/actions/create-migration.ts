@@ -7,7 +7,7 @@ import { Error as GeneratorError } from "../base.js";
 export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";
   migrationFileName: string;
-  constructor: { migrationExists(dirname: string, fileName: string): string | undefined };
+  constructor: { isMigrationExists(dirname: string, fileName: string): string | undefined };
 }
 
 export type CreateMigrationConfig = {
@@ -63,7 +63,7 @@ export class CreateMigration extends CreateFile {
 
   existingMigration(): string | false {
     return (this._existingMigration ||=
-      this.base.constructor.migrationExists(this.migrationDir, this.migrationFileName) ||
+      this.base.constructor.isMigrationExists(this.migrationDir, this.migrationFileName) ||
       (File.isExist(this.destination) && this.destination));
   }
 

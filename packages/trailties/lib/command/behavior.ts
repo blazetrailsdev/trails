@@ -67,10 +67,7 @@ export async function lookup(namespaces: string[]): Promise<void> {
   }
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
     try {
