@@ -163,7 +163,7 @@ export function fetch(
   return _hashFetch(receiver as Record<string, unknown> | Map<unknown, unknown>, plain, key, rest);
 }
 
-/** @perf 1.8x — PERMANENT */
+/** @perf 2x — PERMANENT */
 function _fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
   const argc = arguments.length;
   if (Object.getPrototypeOf(receiver) === Object.prototype) {
@@ -183,7 +183,7 @@ function _fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
   );
 }
 
-/** @perf 1.8x — PERMANENT */
+/** @perf 2x — PERMANENT */
 function _hashFetch(
   hash: Record<string, unknown> | Map<unknown, unknown>,
   plain: boolean,

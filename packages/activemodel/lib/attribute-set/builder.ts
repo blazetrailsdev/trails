@@ -39,11 +39,6 @@ export class Builder {
   }
 }
 
-/** @perf 1.8x — PERMANENT */
-const MISSING: unique symbol = Symbol("missing");
-/** @perf 1.8x — PERMANENT */
-const NO_VALUE = rbBlock((): typeof MISSING => MISSING);
-
 export class LazyAttributeSet extends AttributeSet {
   declare protected _attributes: RbHash<Attribute>;
   private values: RbHash<unknown>;
@@ -103,8 +98,14 @@ export class LazyAttributeSet extends AttributeSet {
       this.castedValues,
       name,
       rbBlock(() => {
-        const value = fetch<unknown>(this.values, name, NO_VALUE);
-        const valuePresent = value !== MISSING;
+        let valuePresent: boolean = true;
+        const value = fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => {
+            valuePresent = false;
+          }),
+        );
 
         if (valuePresent) {
           const type = fetch<ValueType>(
