@@ -19,11 +19,11 @@ import {
 import { Methods } from "@blazetrails/rack-test";
 import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";
-import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
+import type { Generation, Rack, Reload } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface FrameworksTest extends Generation {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface FrameworksTest extends Generation, Reload {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class FrameworksTest extends TestCase {}
 include(FrameworksTest, Isolation);
@@ -309,8 +309,31 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(ScopeRegistry.currentScope(Post)).toBeNull();
   });
 
-  it.skip("filters for Active Record encrypted attributes are added to config.filter_parameters only once", () => {
-    // BLOCKED: reload-autoloads-constant-on-first-reference
+  it("filters for Active Record encrypted attributes are added to config.filter_parameters only once", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate");
+
+    await t.appFile(
+      "app/models/post.ts",
+      `
+        import { Base } from "@blazetrails/activerecord";
+        export class Post extends Base {
+          static {
+            this.encrypts("title");
+          }
+        }
+`,
+    );
+
+    await (t as unknown as Rack).app("development");
+
+    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    const filterParameters = [...Trails.application!.config.filterParameters];
+
+    await t.reload();
+
+    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
+    expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
   it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", () => {

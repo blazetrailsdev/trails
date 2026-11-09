@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Identification } from "@blazetrails/globalid";
-import { File, RuntimeError, isModuleIncluded } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  RuntimeError,
+  isModuleIncluded,
+  registerCompiledFiles,
+} from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Engine } from "../lib/engine.js";
 import { Model } from "../lib/attached/model.js";
@@ -99,6 +106,38 @@ describe("ActiveStorage::Engine", () => {
     } finally {
       root.mockRestore();
       activeStorage.serviceConfigurations = configs;
+    }
+  });
+
+  it("active_storage.services reads config/storage.ts through the compiled-file map", async () => {
+    const trails = TopLevel.Trails!;
+    const activeStorage = (
+      trails.configuration as unknown as { activeStorage: { serviceConfigurations?: unknown } }
+    ).activeStorage;
+    const configs = activeStorage.serviceConfigurations;
+    const services = Blob.services;
+    const tmp = Dir.mktmpdir("compiled_storage");
+    FileUtils.mkdirP(`${tmp}/config`);
+    File.write(`${tmp}/config/storage.ts`, 'throw new Error("read from disk");\n');
+    const loads: string[] = [];
+    const compiled = { local: { service: "Disk", root: `${tmp}/storage` } };
+    registerCompiledFiles(tmp, {
+      "config/storage.ts": async () => (loads.push("config/storage.ts"), { default: compiled }),
+    });
+    const root = vi.spyOn(trails, "root").mockReturnValue(tmp);
+    activeStorage.serviceConfigurations = undefined;
+    try {
+      const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
+      await initializer.bind(Engine.instance()).run(app);
+      runLoadHooks("active_storage_blob", Blob);
+
+      expect(loads).toEqual(["config/storage.ts"]);
+      expect(activeStorage.serviceConfigurations).toBe(compiled);
+    } finally {
+      root.mockRestore();
+      activeStorage.serviceConfigurations = configs;
+      Blob.services = services;
+      FileUtils.rmRf(tmp);
     }
   });
 
