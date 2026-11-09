@@ -23,3 +23,6 @@ export function server(this: typeof ActionCable): unknown {
   return (this._server ??= new ActionCable.Server.Base());
 }
 ActionCable.server = server;
+
+/** @noRailsEquivalent PERMANENT */
+export const ENGINE_CALLED_FROM: string = import.meta.dirname;

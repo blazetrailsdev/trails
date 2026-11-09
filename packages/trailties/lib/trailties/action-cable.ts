@@ -1,6 +1,7 @@
 import {
   ActionCable,
   ActionCableHelper,
+  ENGINE_CALLED_FROM,
   deprecator as actionCableDeprecator,
 } from "@blazetrails/actioncable";
 import { Worker } from "@blazetrails/actioncable/server/worker";
@@ -23,7 +24,7 @@ type Options = OrderedOptions & Record<string, unknown>;
 
 export class Engine extends BaseEngine {
   static {
-    BaseEngine.register(this, import.meta.dirname);
+    BaseEngine.register(this, ENGINE_CALLED_FROM);
 
     this.config.set("actionCable", new OrderedOptions());
     (this.config.get("actionCable") as Options).mountPath = ActionCable.INTERNAL.defaultMountPath;
