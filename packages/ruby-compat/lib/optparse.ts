@@ -61,6 +61,15 @@ abstract class Switch {
   desc: string[] = [];
   block: SwitchBlock | null = null;
 
+  /** `Switch#add_banner`, `vendor/ruby/v3.3.11/lib/optparse.rb:640-646`. */
+  addBanner(to: string): string {
+    if (!(this.short.length > 0 || this.long.length > 0)) {
+      const s = this.desc.join("");
+      if (s !== "") to += " [" + s + "]...";
+    }
+    return to;
+  }
+
   abstract parse(
     arg: string | null,
     argv: string[],
@@ -106,6 +115,24 @@ class PlacedArgument extends Switch {
   }
 }
 
+/** `OptionParser::List`, `vendor/ruby/v3.3.11/lib/optparse.rb:800`. */
+class List {
+  list: (Switch | string)[] = [];
+
+  /** `List#add_banner`, `vendor/ruby/v3.3.11/lib/optparse.rb:961-967`. */
+  addBanner(to: string): string {
+    for (const opt of this.list) {
+      if (opt instanceof Switch) {
+        to = opt.addBanner(to);
+      }
+    }
+    return to;
+  }
+}
+
+/** `OptionParser::DefaultList`, `vendor/ruby/v3.3.11/lib/optparse.rb:1101`. */
+const DefaultList = new List();
+
 const stopOrder = Symbol("stopOrder");
 
 /** @noRailsEquivalent PERMANENT — `OptionParser`, `vendor/ruby/v3.3.11/lib/optparse.rb:427`. */
@@ -127,8 +154,7 @@ export class OptionParser {
   summaryWidth: number;
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1148 */
   summaryIndent: string;
-  private _lines: (Switch | string)[] = [];
-  private _tail: Switch[] = [];
+  private _stack: List[] = [DefaultList, new List(), new List()];
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1143 */
   constructor(banner: string | null = null, width = 32, indent = " ".repeat(4)) {
@@ -137,19 +163,27 @@ export class OptionParser {
     this.summaryIndent = indent;
   }
 
-  /**
-   * @missingRailsCall visit — CONVERGEABLE ruby-compat-optparse-visit-add-banner
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   get banner(): string {
     if (this._banner == null) {
       this._banner = `Usage: ${this.programName} [options]`;
+      this._banner = this.visit("addBanner", this._banner);
     }
     return this._banner;
   }
 
   set banner(banner: string) {
     this._banner = banner;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `OptionParser#top`, `vendor/ruby/v3.3.11/lib/optparse.rb:1297-1299`. */
+  get top(): List {
+    return this._stack.at(-1)!;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `OptionParser#base`, `vendor/ruby/v3.3.11/lib/optparse.rb:1304-1306`. */
+  get base(): List {
+    return this._stack[1];
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -163,17 +197,17 @@ export class OptionParser {
 
   /** @noRailsEquivalent PERMANENT */
   separator(string: string): void {
-    this._lines.push(string);
+    this.top.list.push(string);
   }
 
   /** @noRailsEquivalent PERMANENT */
   on(...opts: (string | SwitchBlock)[]): void {
-    this._lines.push(this._makeSwitch(opts));
+    this.top.list.push(this._makeSwitch(opts));
   }
 
   /** @noRailsEquivalent PERMANENT — `on_tail`, `vendor/ruby/v3.3.11/lib/optparse.rb:1597`. */
   onTail(...opts: (string | SwitchBlock)[]): void {
-    this._tail.push(this._makeSwitch(opts));
+    this.base.list.push(this._makeSwitch(opts));
   }
 
   private _makeSwitch(opts: (string | SwitchBlock)[]): Switch {
@@ -199,13 +233,16 @@ export class OptionParser {
       } else if ((m = o.match(/^-(.)(.+)?/))) {
         short.push(m[1]);
         guess(m[2]);
-      } else desc.push(o);
+      } else if (o !== "") desc.push(o);
     }
     return Object.assign(new klass(), { short, long, desc, block, arg });
   }
 
   private get _switches(): Switch[] {
-    return [...this._lines, ...this._tail].filter((l): l is Switch => l instanceof Switch);
+    return [...this._stack]
+      .reverse()
+      .flatMap((el) => el.list)
+      .filter((l): l is Switch => l instanceof Switch);
   }
 
   private _complete(opt: string): Switch {
@@ -304,10 +341,26 @@ export class OptionParser {
     await this.parse(Shellwords.shellwords(value));
   }
 
+  /**
+   * `OptionParser#visit`, `vendor/ruby/v3.3.11/lib/optparse.rb:1830-1835`. A JS
+   * string cannot be appended to in place (CLAUDE.md, "Ruby Strings are JS
+   * string primitives"), so each `add_banner` result is threaded into the next
+   * call and returned where Ruby mutates its argument and returns `nil`.
+   *
+   * @inventedArm return — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  visit(id: "addBanner", to: string): string {
+    for (const el of [...this._stack].reverse()) {
+      to = el[id](to);
+    }
+    return to;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   toString(): string {
     const out = [this.banner];
-    for (const line of [...this._lines, ...this._tail]) {
+    for (const line of [...this._stack].reverse().flatMap((el) => el.list)) {
       if (!(line instanceof Switch)) {
         out.push(line);
         continue;
