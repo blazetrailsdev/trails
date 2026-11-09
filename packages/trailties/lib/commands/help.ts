@@ -40,7 +40,20 @@ export class HelpCommand extends Base {
   }
 
   /** @internal */
+  private static readonly COMMANDS_IN_USAGE = [
+    "generate",
+    "console",
+    "server",
+    "test",
+    "test:system",
+    "dbconsole",
+    "new",
+  ];
+
+  /** @internal */
   private async printingCommandsNotInUsage(): Promise<[string, string | null][]> {
-    return (await printingCommands()).filter(([command]) => !COMMANDS_IN_USAGE.includes(command));
+    return (await printingCommands()).filter(
+      ([command]) => !HelpCommand.COMMANDS_IN_USAGE.includes(command),
+    );
   }
 }

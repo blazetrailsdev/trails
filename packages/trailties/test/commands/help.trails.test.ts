@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, SystemExit, getFs, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { capture } from "@blazetrails/activesupport";
 import { invoke } from "../../lib/command.js";
@@ -48,7 +48,23 @@ describe("Trails::Command::HelpCommand", () => {
 
 describe("Trails::Command::VersionCommand", () => {
   it("invoke -v prints the Trails version", async () => {
-    const output = await capture(":stdout", () => invoke("-v", []).catch(() => undefined));
-    expect(output).toContain(`Trails ${VERSION.STRING}`);
+    const exit = vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
+      throw new SystemExit(code ?? 0);
+    });
+    let status: number | null = null;
+    try {
+      const output = await capture(":stdout", async () => {
+        try {
+          await invoke("-v", []);
+        } catch (e) {
+          if (!(e instanceof SystemExit)) throw e;
+          status = e.status;
+        }
+      });
+      expect(output).toBe(`Trails ${VERSION.STRING}\n`);
+      expect(status).toBe(0);
+    } finally {
+      exit.mockRestore();
+    }
   }, 30_000);
 });
