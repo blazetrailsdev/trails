@@ -170,7 +170,10 @@ async function invokeRake(
 
 Trails.Command = { invoke };
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
 let _commandType: string | undefined;
