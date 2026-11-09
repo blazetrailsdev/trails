@@ -250,7 +250,9 @@ describe("RailtieTest (trails-only)", () => {
       const savedTaggings = QueryLogs.taggings;
       setQueryTransformers([]);
       resetLoadHooks();
-      class BlogApplication {}
+      class BlogApplication {
+        autoloaders = { main: { onUnload() {} } };
+      }
       Trails.application = new BlogApplication() as never;
       try {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });

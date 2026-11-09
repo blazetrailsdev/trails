@@ -157,8 +157,8 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
 
     await (t as unknown as Rack).app("development");
     const Foo = (TopLevel as unknown as Record<string, unknown>).Foo as new () => object;
-    expect(rbObjRespondTo(new Foo(), "fooUrl")).toBe(true);
-    expect(rbObjRespondTo(new Foo(), "mainApp")).toBe(true);
+    expect(rbObjRespondTo(new Foo(), "fooUrl")).toBeTruthy();
+    expect(rbObjRespondTo(new Foo(), "mainApp")).toBeTruthy();
   });
 
   it.skip("allows to not load all helpers for controllers", () => {
