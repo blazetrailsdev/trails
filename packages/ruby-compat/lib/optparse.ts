@@ -228,12 +228,8 @@ export class OptionParser {
     return Object.assign(new klass(), { short, long, desc, block, arg });
   }
 
-  private get _allLines(): (Switch | string)[] {
-    return [...this._stack].reverse().flatMap((el) => el.list);
-  }
-
   private get _switches(): Switch[] {
-    return this._allLines.filter((l): l is Switch => l instanceof Switch);
+    return [...this._stack].reverse().flatMap((el) => el.list).filter((l): l is Switch => l instanceof Switch);
   }
 
   private _complete(opt: string): Switch {
@@ -351,7 +347,7 @@ export class OptionParser {
   /** @noRailsEquivalent PERMANENT */
   toString(): string {
     const out = [this.banner];
-    for (const line of this._allLines) {
+    for (const line of [...this._stack].reverse().flatMap((el) => el.list)) {
       if (!(line instanceof Switch)) {
         out.push(line);
         continue;
