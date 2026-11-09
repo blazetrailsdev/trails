@@ -389,7 +389,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static baseName(): string | undefined {
-    if (Object.hasOwn(this, "_baseName") && this._baseName) return this._baseName;
+    if (Object.hasOwn(this, "_baseName") && this._baseName != null) return this._baseName;
     const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const base = segments[0];
@@ -398,7 +398,8 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static generatorName(): string | undefined {
-    if (Object.hasOwn(this, "_generatorName") && this._generatorName) return this._generatorName;
+    if (Object.hasOwn(this, "_generatorName") && this._generatorName != null)
+      return this._generatorName;
     const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const generator = segments.at(-1);
