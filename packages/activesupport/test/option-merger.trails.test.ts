@@ -24,4 +24,12 @@ describe("OptionMerger in the prototype chain", () => {
     expect(rbObjRespondTo(merger, "greet")).toBe(true);
     expect(rbObjRespondTo(merger, "missing")).toBe(false);
   });
+
+  it("forwards Object.prototype names to the context, as undef_method leaves them to method_missing", () => {
+    const context = { toString: (options: unknown) => `ctx ${JSON.stringify(options)}` };
+    const o = new OptionMerger(context, { a: 1 }) as unknown as { toString(): string };
+    expect(o.toString()).toBe('ctx {"a":1}');
+    expect(o instanceof OptionMerger).toBe(true);
+    expect(o.constructor).toBe(OptionMerger);
+  });
 });
